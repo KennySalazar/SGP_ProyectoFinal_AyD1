@@ -1,0 +1,85 @@
+<section class="dashboard-head">
+  <div>
+    <p class="page-kicker">CENTRO DE TRABAJO TECNICO</p>
+    <h1 class="page-title">Sistema de Gestion de Puentes</h1>
+    <p class="page-description">Base operativa para inventario, inspeccion tecnica, revision academica, mantenimiento y trabajo de campo sin conexion.</p>
+  </div>
+  <div class="head-status">
+    <span class="status-dot"></span>
+    <div><strong>Entorno disponible</strong><small>Servicios base operativos</small></div>
+  </div>
+</section>
+
+<section class="overview-grid" aria-label="Resumen de modulos">
+  <article class="metric-card">
+    <div class="metric-icon blue"><i class="pi pi-map"></i></div>
+    <div><span>Inventario</span><strong></strong><small>Puentes, ubicacion y mapa publico</small></div>
+  </article>
+  <article class="metric-card">
+    <div class="metric-icon cyan"><i class="pi pi-clipboard"></i></div>
+    <div><span>Inspecciones</span><strong></strong><small>Formulario dinamico y revision</small></div>
+  </article>
+  <article class="metric-card">
+    <div class="metric-icon amber"><i class="pi pi-wrench"></i></div>
+    <div><span>Mantenimiento</span><strong></strong><small>Ordenes y seguimiento tecnico</small></div>
+  </article>
+  <article class="metric-card">
+    <div class="metric-icon green"><i class="pi pi-cloud-download"></i></div>
+    <div><span>Modo offline</span><strong></strong><small>PWA, IndexedDB y persistencia local</small></div>
+  </article>
+</section>
+
+<section class="dashboard-layout">
+  <article class="workspace-card main-card">
+    <div class="card-head">
+      <div>
+        <p class="section-eyebrow">IMPLEMENTACION</p>
+        <h2>Modulos del proyecto</h2>
+      </div>
+      <span class="phase-badge">Base arquitectonica</span>
+    </div>
+
+    <div class="module-list">
+      <div class="module-row">
+        <span class="module-number">01</span>
+        <div class="module-copy"><strong>Inventario de puentes</strong><small>CRUD, georreferenciacion, duplicados por cercania y estado actual.</small></div>
+        <span class="module-state prepared"></span>
+      </div>
+      <div class="module-row">
+        <span class="module-number">02</span>
+        <div class="module-copy"><strong>Formulario e inspecciones</strong><small>JSON Schema, versionado, captura de danos y reporte fotografico.</small></div>
+        <span class="module-state pending"></span>
+      </div>
+      <div class="module-row">
+        <span class="module-number">03</span>
+        <div class="module-copy"><strong>Revision e indice de condicion</strong><small>Flujo academico, observaciones, maquina de estados y calculo IC.</small></div>
+        <span class="module-state pending"></span>
+      </div>
+      <div class="module-row">
+        <span class="module-number">04</span>
+        <div class="module-copy"><strong>Foro y mantenimiento</strong><small>Colaboracion tecnica, alertas y ordenes de intervencion.</small></div>
+        <span class="module-state pending"></span>
+      </div>
+    </div>
+  </article>
+
+  <aside class="side-stack">
+    <article class="workspace-card user-card">
+      <div class="user-top">
+        <div class="profile-mark">{{ auth.user()?.email?.charAt(0)?.toUpperCase() }}</div>
+        <div><span>Sesion actual</span><strong>{{ auth.user()?.email }}</strong></div>
+      </div>
+      <div class="user-detail"><span>Rol global</span><strong>{{ auth.user()?.role }}</strong></div>
+      <div class="user-detail"><span>Segundo factor</span><strong>{{ auth.user()?.twoFactorEnabled ? 'Activo' : 'Inactivo' }}</strong></div>
+    </article>
+
+    <article class="workspace-card legend-card">
+      <div class="card-head compact"><div><p class="section-eyebrow">REFERENCIA</p><h2>Condicion del puente</h2></div></div>
+      <p class="legend-note">Leyenda visual prevista para el indice de condicion. El estado siempre se acompanara de texto.</p>
+      <div class="condition-row"><span class="condition-dot good"></span><strong>Bueno</strong><small>IC ≥ 75</small></div>
+      <div class="condition-row"><span class="condition-dot regular"></span><strong>Regular</strong><small>50 ≤ IC &lt; 75</small></div>
+      <div class="condition-row"><span class="condition-dot bad"></span><strong>Malo</strong><small>IC &lt; 50</small></div>
+      <div class="condition-row"><span class="condition-dot none"></span><strong>Sin evaluar</strong><small>Sin inspeccion publicada</small></div>
+    </article>
+  </aside>
+</section>

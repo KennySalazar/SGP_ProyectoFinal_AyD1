@@ -1,0 +1,13 @@
+<app-auth-card title="Restablecer contrasena" subtitle="Usa el codigo OTP de recuperacion para establecer una nueva contrasena.">
+  @if(done()){
+    <p class="note success"><i class="pi pi-check-circle"></i> Contrasena restablecida correctamente.</p>
+    <div class="links"><a routerLink="/login">Iniciar sesion</a></div>
+  } @else {
+    <form [formGroup]="form" (ngSubmit)="submit()">
+      <label>Correo<input pInputText type="email" formControlName="email" autocomplete="email" /></label>
+      <label>Codigo OTP<input pInputText class="otp-input" inputmode="numeric" maxlength="6" formControlName="otp" placeholder="000000" /></label>
+      <label>Nueva contrasena<input pInputText type="password" formControlName="newPassword" autocomplete="new-password" placeholder="Minimo 10 caracteres" /></label>
+      <button pButton class="primary" type="submit" [disabled]="form.invalid"><i class="pi pi-key"></i><span>Restablecer contrasena</span></button>
+    </form>
+  }
+</app-auth-card>
