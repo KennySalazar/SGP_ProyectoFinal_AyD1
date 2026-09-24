@@ -1,0 +1,68 @@
+<div class="shell">
+  <main class="workspace">
+    <header class="workspace-bar">
+      <div>
+        <p class="workspace-kicker">Plataforma tecnica</p>
+        <strong>Sistema de Gestion de Puentes</strong>
+      </div>
+      <div class="workspace-meta">
+        <span class="environment">DESARROLLO</span>
+        <span class="connectivity" [class.offline]="!connectivity.online()">
+          <span class="dot"></span>
+          {{ connectivity.online() ? 'En linea' : 'Sin conexion' }}
+        </span>
+      </div>
+    </header>
+
+    <section class="route-content">
+      <router-outlet />
+    </section>
+  </main>
+
+  <aside class="sidebar" aria-label="Navegacion principal">
+    <a class="brand" routerLink="/" aria-label="Ir al inicio">
+      <span class="brand-mark">SGP</span>
+      <span class="brand-copy">
+        <strong>Gestion de Puentes</strong>
+        <small>Evaluacion tecnica</small>
+      </span>
+    </a>
+
+    <div class="sidebar-section">
+      <span class="section-label">OPERACION</span>
+      <nav>
+        <a routerLink="/" [routerLinkActiveOptions]="{exact:true}" routerLinkActive="active">
+          <i class="pi pi-home"></i><span>Inicio</span>
+        </a>
+        <a routerLink="/offline" routerLinkActive="active">
+          <i class="pi pi-cloud"></i><span>Offline</span>
+        </a>
+        <a routerLink="/seguridad" routerLinkActive="active">
+          <i class="pi pi-shield"></i><span>Seguridad</span>
+        </a>
+        @if(auth.user()?.role==='ADMINISTRADOR'){
+          <a routerLink="/admin" routerLinkActive="active">
+            <i class="pi pi-cog"></i><span>Administracion</span>
+          </a>
+        }
+      </nav>
+    </div>
+
+    <div class="sidebar-spacer"></div>
+
+    <div class="user-panel">
+      <div class="user-avatar">{{ auth.user()?.email?.charAt(0)?.toUpperCase() || 'U' }}</div>
+      <div class="user-data">
+        <strong>{{ auth.user()?.email }}</strong>
+        <span>{{ auth.user()?.role }}</span>
+      </div>
+    </div>
+
+    <button class="logout" type="button" (click)="logout()">
+      <i class="pi pi-sign-out"></i>
+      <span>Cerrar sesion</span>
+    </button>
+
+    <p class="sidebar-foot">CUNOC · AyD1 · 2026</p>
+  </aside>
+</div>

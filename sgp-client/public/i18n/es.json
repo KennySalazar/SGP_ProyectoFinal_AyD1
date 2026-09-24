@@ -1,0 +1,7 @@
+{
+  "app.title": "Sistema de Gestion de Puentes",
+  "auth.login": "Iniciar sesion",
+  "auth.register": "Crear cuenta",
+  "offline.online": "En linea",
+  "offline.offline": "Sin conexion"
+}
