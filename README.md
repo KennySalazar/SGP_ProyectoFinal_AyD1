@@ -1554,7 +1554,421 @@ develop
 
 ---
 
-# 23. Despliegue esperado
+# 23. Integracion Continua (CI) y estado de CD
+
+## 23.1 Que es CI
+
+CI significa:
+
+```text
+Continuous Integration
+Integracion Continua
+```
+
+El repositorio utiliza **GitHub Actions** para ejecutar verificaciones automaticas cuando se abre o actualiza un Pull Request.
+
+El objetivo es detectar errores antes de integrar codigo a una rama compartida.
+
+El flujo actual es:
+
+```text
+feature/*
+    |
+    | Pull Request
+    v
+develop
+    |
+    v
+GitHub Actions
+   /        \
+  v          v
+CI/backend  CI/frontend
+```
+
+En GitHub actualmente aparecen dos checks principales:
+
+```text
+CI / backend
+CI / frontend
+```
+
+Estos checks no significan que el sistema se este desplegando. Significan que GitHub esta validando automaticamente que el cambio pueda integrarse sin romper la base del proyecto.
+
+## 23.2 CI del backend
+
+El check:
+
+```text
+CI / backend
+```
+
+se encarga de validar el proyecto Spring Boot.
+
+Segun la configuracion del workflow, este tipo de check puede ejecutar tareas como:
+
+```text
+Maven
+compilacion
+pruebas automaticas
+mvn verify
+Spotless
+JaCoCo
+Testcontainers
+validacion de migraciones
+```
+
+El objetivo es detectar errores como:
+
+```text
+codigo Java que no compila
+tests que fallan
+errores de integracion
+problemas de persistencia
+problemas con PostgreSQL/PostGIS
+problemas con Flyway
+errores de formato cuando el workflow los valida
+```
+
+Las verificaciones exactas que se ejecutan estan definidas en:
+
+```text
+.github/workflows/
+```
+
+Los integrantes no deben modificar los workflows de CI sin coordinarlo con el equipo, porque un cambio en ellos afecta las verificaciones de todos los Pull Requests.
+
+## 23.3 CI del frontend
+
+El check:
+
+```text
+CI / frontend
+```
+
+valida el proyecto Angular.
+
+Puede ejecutar tareas como:
+
+```text
+instalacion de dependencias
+npm ci
+ESLint
+compilacion Angular
+npm run build
+pruebas frontend
+```
+
+Su objetivo es detectar problemas como:
+
+```text
+imports incorrectos
+errores TypeScript
+errores en templates
+dependencias faltantes
+errores de compilacion
+errores de lint
+```
+
+## 23.4 Que significan los estados de los checks
+
+Cuando GitHub muestra:
+
+```text
+CI / backend   OK
+CI / frontend  OK
+```
+
+y aparece:
+
+```text
+All checks have passed
+```
+
+significa que las verificaciones automaticas finalizaron correctamente.
+
+Esto no significa que el codigo sea perfecto ni reemplaza la revision humana, pero indica que paso las validaciones automatizadas configuradas.
+
+Cuando un check aparece en rojo:
+
+```text
+CI / backend   ERROR
+```
+
+o:
+
+```text
+CI / frontend  ERROR
+```
+
+el integrante debe abrir el detalle del check, revisar el log y corregir el problema antes de realizar el Merge.
+
+## 23.5 Regla para hacer Merge
+
+Un Pull Request no debe integrarse solamente porque GitHub indique que no existen conflictos.
+
+La regla del equipo debe ser:
+
+```text
+Sin conflictos
+      +
+CI backend correcto
+      +
+CI frontend correcto
+      +
+Revision del cambio
+      |
+      v
+    Merge
+```
+
+Antes de hacer Merge hacia `develop`, comprobar:
+
+```text
+[OK] No existen conflictos con la rama base
+[OK] CI / backend pasa
+[OK] CI / frontend pasa
+[OK] El cambio corresponde a la funcionalidad de la rama
+[OK] No se incluyeron secretos ni archivos .env
+[OK] El codigo fue revisado
+[OK] Las pruebas relevantes fueron ejecutadas
+```
+
+Si uno de los checks falla, primero debe corregirse el problema.
+
+## 23.6 Relacion entre CI y Testcontainers
+
+Testcontainers puede formar parte del CI del backend.
+
+El flujo esperado para pruebas de integracion es:
+
+```text
+Pull Request
+    |
+    v
+GitHub Actions
+    |
+    v
+CI / backend
+    |
+    v
+mvn verify
+    |
+    v
+Testcontainers
+    |
+    v
+PostgreSQL + PostGIS temporal
+    |
+    v
+Flyway
+    |
+    v
+Pruebas de integracion
+```
+
+De esta forma, el pipeline puede comprobar que las funcionalidades que dependen de PostgreSQL/PostGIS funcionen sobre una base real y reproducible.
+
+A medida que el proyecto incorpore nuevas pruebas con Testcontainers, estas deberan ejecutarse dentro del pipeline de CI correspondiente.
+
+## 23.7 Por que CI es importante para este equipo
+
+El proyecto sera desarrollado por varios integrantes.
+
+Sin CI podria ocurrir:
+
+```text
+Integrante A
+"En mi maquina funciona"
+
+Integrante B
+"En mi maquina no compila"
+```
+
+CI reduce ese problema porque todos los Pull Requests pasan por las mismas verificaciones automatizadas.
+
+Ejemplo:
+
+```text
+feature/inventario-puentes
+          |
+          v
+          PR
+          |
+          v
+CI backend + frontend
+          |
+         OK
+          |
+          v
+       develop
+```
+
+Mientras tanto otro integrante puede trabajar en:
+
+```text
+feature/inspecciones
+```
+
+sin depender de la configuracion local del primer integrante.
+
+## 23.8 CI no es lo mismo que CD
+
+Es importante diferenciar:
+
+```text
+CI = Continuous Integration
+```
+
+de:
+
+```text
+CD = Continuous Delivery / Continuous Deployment
+```
+
+### CI
+
+CI comprueba automaticamente que el codigo:
+
+```text
+compile
+pase pruebas
+cumpla validaciones
+pueda integrarse
+```
+
+### CD
+
+CD se encarga de preparar o realizar el despliegue de una version hacia un ambiente como:
+
+```text
+staging
+produccion
+servidor institucional
+infraestructura en la nube
+```
+
+Un flujo completo podria ser:
+
+```text
+feature/*
+    |
+    v
+Pull Request hacia develop
+    |
+    v
+CI
+    |
+    v
+develop
+    |
+    | cuando exista una version estable
+    v
+Pull Request hacia main
+    |
+    v
+CI
+    |
+    v
+CD
+    |
+    v
+Despliegue
+```
+
+## 23.9 Estado actual de CD
+
+**Actualmente este proyecto NO tiene CD automatico configurado.**
+
+Lo que existe actualmente es:
+
+```text
+[OK] CI para backend
+[OK] CI para frontend
+[PENDIENTE] CD / despliegue automatico
+```
+
+Por lo tanto, cuando GitHub muestra:
+
+```text
+CI / backend
+CI / frontend
+```
+
+no esta desplegando el sistema.
+
+Solamente esta verificando el codigo.
+
+El CD se configurara posteriormente, cuando el equipo defina:
+
+```text
+servidor o plataforma de despliegue
+dominio
+HTTPS / TLS
+certificados
+secrets de produccion
+PostgreSQL de produccion
+MinIO de produccion
+Nginx final
+estrategia de respaldos
+variables de entorno
+logs
+procedimiento de rollback
+```
+
+Hasta ese momento, `main` debe mantenerse como la rama estable y desplegable, pero el despliegue automatico queda pendiente.
+
+## 23.10 Flujo recomendado del proyecto
+
+Durante el desarrollo normal:
+
+```text
+feature/*
+    |
+    | Pull Request
+    v
+develop
+    |
+    v
+CI
+    |
+    v
+Integracion del equipo
+```
+
+Cuando exista una version estable:
+
+```text
+develop
+    |
+    | Pull Request
+    v
+main
+    |
+    v
+CI
+    |
+    v
+Version preparada para despliegue
+```
+
+En una fase posterior:
+
+```text
+main
+    |
+    v
+CI
+    |
+    v
+CD
+    |
+    v
+Produccion
+```
+
+---
+
+# 24. Despliegue esperado
 
 El despliegue final debe considerar:
 
@@ -1584,7 +1998,7 @@ Nginx actua como:
 
 ---
 
-# 24. Respaldos y operacion
+# 25. Respaldos y operacion
 
 La entrega final debe contemplar:
 
@@ -1603,7 +2017,7 @@ Estas tareas forman parte del despliegue y operacion final y todavia deben compl
 
 ---
 
-# 25. Estado actual de la base del proyecto
+# 26. Estado actual de la base del proyecto
 
 Actualmente esta preparado y probado:
 
@@ -1638,6 +2052,8 @@ Actualmente esta preparado y probado:
 [OK] Recuperacion de contrasena
 [OK] Roles base
 [OK] Estructura por dominios
+[OK] CI backend con GitHub Actions
+[OK] CI frontend con GitHub Actions
 ```
 
 Pendiente de implementar:
@@ -1658,11 +2074,12 @@ Pendiente de implementar:
 [PENDIENTE] Pruebas completas y cobertura requerida
 [PENDIENTE] Despliegue final
 [PENDIENTE] Respaldos/restauracion
+[PENDIENTE] CD / despliegue automatico
 ```
 
 ---
 
-# 26. Documentacion adicional
+# 27. Documentacion adicional
 
 Cada integrante debe leer:
 
