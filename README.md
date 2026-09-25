@@ -175,7 +175,7 @@ MapStruct 1.6.3
 Springdoc OpenAPI 2.6.0
 NetworkNT JSON Schema Validator 1.5.6
 ShedLock 6.3.0
-Testcontainers 1.20.4
+Testcontainers 1.21.4
 JaCoCo 0.8.12
 Spotless 2.44.5
 ```
@@ -1424,8 +1424,8 @@ Por esto Testcontainers es importante tanto para desarrollo local como para inte
 El backend ya incluye las dependencias necesarias:
 
 ```text
-org.testcontainers:junit-jupiter:1.20.4
-org.testcontainers:postgresql:1.20.4
+org.testcontainers:junit-jupiter:1.21.4
+org.testcontainers:postgresql:1.21.4
 ```
 
 La base incluye `DatabaseMigrationIntegrationTest`, que levanta `postgis/postgis:16-3.5`, ejecuta Flyway V1-V3 y comprueba extensiones/tablas iniciales.
