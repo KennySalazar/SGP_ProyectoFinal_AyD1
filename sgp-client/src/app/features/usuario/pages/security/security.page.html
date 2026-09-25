@@ -1,7 +1,7 @@
 <header class="page-heading">
-  <p class="page-kicker">CONTROL DE ACCESO</p>
-  <h1 class="page-title">Seguridad de la cuenta</h1>
-  <p class="page-description">Administra la autenticacion de dos factores asociada a tu cuenta y confirma cambios sensibles mediante un codigo temporal.</p>
+  <p class="page-kicker">{{ 'security.kicker' | transloco }}</p>
+  <h1 class="page-title">{{ 'security.title' | transloco }}</h1>
+  <p class="page-description">{{ 'security.description' | transloco }}</p>
 </header>
 
 <section class="security-layout">
@@ -9,36 +9,87 @@
     <div class="security-head">
       <div class="security-icon"><i class="pi pi-shield"></i></div>
       <div>
-        <span>Autenticacion de dos factores</span>
-        <h2>{{ auth.user()?.twoFactorEnabled ? 'Proteccion activa' : 'Proteccion inactiva' }}</h2>
+        <span>{{ 'security.twoFactor' | transloco }}</span>
+        <h2>
+          {{ (auth.user()?.twoFactorEnabled ? 'security.protectionActive' :
+          'security.protectionInactive') | transloco }}
+        </h2>
       </div>
-      <p-tag [value]="auth.user()?.twoFactorEnabled ? 'ACTIVA' : 'INACTIVA'" [severity]="auth.user()?.twoFactorEnabled ? 'success' : 'warn'" />
+      <p-tag
+        [value]="(auth.user()?.twoFactorEnabled ? 'security.active' : 'security.inactive') | transloco"
+        [severity]="auth.user()?.twoFactorEnabled ? 'success' : 'warn'"
+      />
     </div>
 
     @if(message()){
-      <div class="success-message" role="status"><i class="pi pi-check-circle"></i><span>{{ message() }}</span></div>
-    }
-
-    @if(!challengeId()){
-      <form [formGroup]="requestForm" (ngSubmit)="request()">
-        <label>Contrasena actual<input pInputText type="password" formControlName="currentPassword" autocomplete="current-password" placeholder="Confirma tu contrasena" /></label>
-        <button pButton class="primary-action" type="submit" [disabled]="requestForm.invalid">
-          <i class="pi" [class.pi-lock-open]="!auth.user()?.twoFactorEnabled" [class.pi-lock]="auth.user()?.twoFactorEnabled"></i>
-          <span>{{ auth.user()?.twoFactorEnabled ? 'Desactivar 2FA' : 'Activar 2FA' }}</span>
-        </button>
-      </form>
+    <div class="success-message" role="status">
+      <i class="pi pi-check-circle"></i><span>{{ message() }}</span>
+    </div>
+    } @if(!challengeId()){
+    <form [formGroup]="requestForm" (ngSubmit)="request()">
+      <label
+        >{{ 'common.currentPassword' | transloco }}<input
+          pInputText
+          type="password"
+          formControlName="currentPassword"
+          autocomplete="current-password"
+          [placeholder]="'common.confirmPasswordPlaceholder' | transloco"
+      /></label>
+      <button pButton class="primary-action" type="submit" [disabled]="requestForm.invalid">
+        <i
+          class="pi"
+          [class.pi-lock-open]="!auth.user()?.twoFactorEnabled"
+          [class.pi-lock]="auth.user()?.twoFactorEnabled"
+        ></i>
+        <span
+          >{{ (auth.user()?.twoFactorEnabled ? 'security.deactivate' : 'security.activate') |
+          transloco }}</span
+        >
+      </button>
+    </form>
     } @else {
-      <div class="challenge-note"><i class="pi pi-envelope"></i><span>Enviamos un codigo temporal a tu correo. Ingresalo para confirmar el cambio.</span></div>
-      <form [formGroup]="verifyForm" (ngSubmit)="confirm()">
-        <label>Codigo OTP<input pInputText class="otp-input" inputmode="numeric" maxlength="6" formControlName="code" autocomplete="one-time-code" placeholder="000000" /></label>
-        <button pButton class="primary-action" type="submit" [disabled]="verifyForm.invalid"><i class="pi pi-check"></i><span>Confirmar cambio</span></button>
-      </form>
+    <div class="challenge-note">
+      <i class="pi pi-envelope"></i><span>{{ 'security.sentCode' | transloco }}</span>
+    </div>
+    <form [formGroup]="verifyForm" (ngSubmit)="confirm()">
+      <label
+        >{{ 'common.otpCode' | transloco }}<input
+          pInputText
+          class="otp-input"
+          inputmode="numeric"
+          maxlength="6"
+          formControlName="code"
+          autocomplete="one-time-code"
+          placeholder="000000"
+      /></label>
+      <button pButton class="primary-action" type="submit" [disabled]="verifyForm.invalid">
+        <i class="pi pi-check"></i><span>{{ 'security.confirm' | transloco }}</span>
+      </button>
+    </form>
     }
   </article>
 
   <aside class="security-info">
-    <div class="info-block"><i class="pi pi-envelope"></i><div><strong>Codigo por correo</strong><span>El OTP se envia al correo verificado de la cuenta.</span></div></div>
-    <div class="info-block"><i class="pi pi-clock"></i><div><strong>Vigencia limitada</strong><span>Los codigos temporales vencen y tienen limite de intentos.</span></div></div>
-    <div class="info-block"><i class="pi pi-history"></i><div><strong>Trazabilidad</strong><span>Los cambios de seguridad forman parte del flujo auditado del sistema.</span></div></div>
+    <div class="info-block">
+      <i class="pi pi-envelope"></i>
+      <div>
+        <strong>{{ 'security.emailCode' | transloco }}</strong
+        ><span>{{ 'security.emailCodeNote' | transloco }}</span>
+      </div>
+    </div>
+    <div class="info-block">
+      <i class="pi pi-clock"></i>
+      <div>
+        <strong>{{ 'security.limitedValidity' | transloco }}</strong
+        ><span>{{ 'security.limitedValidityNote' | transloco }}</span>
+      </div>
+    </div>
+    <div class="info-block">
+      <i class="pi pi-history"></i>
+      <div>
+        <strong>{{ 'security.traceability' | transloco }}</strong
+        ><span>{{ 'security.traceabilityNote' | transloco }}</span>
+      </div>
+    </div>
   </aside>
 </section>

@@ -9,7 +9,7 @@
 | Stateless + JWT | Base preparada | Spring Security sin sesion; access token JWT. |
 | Java 21 + Spring Boot >= 3.3 + Maven | Base preparada | `pom.xml` usa Java 21, Spring Boot 3.3.13 y Maven. |
 | Dependencias tecnicas obligatorias | Base preparada | Web, JPA, Security, Validation, Actuator, Flyway, PostgreSQL, Spatial, Hypersistence, JJWT, MapStruct, Springdoc, JSON Schema Validator y ShedLock declaradas. |
-| MapStruct para entidad <-> DTO | Preparado, aun sin mapeos de dominio | Dependencia/procesador configurados. Los modulos nuevos deben crear `@Mapper`. |
+| MapStruct para entidad <-> DTO | Base preparada | `usuario/mapper/UserMapper` sirve como referencia; los modulos nuevos deben crear su propio `@Mapper`. |
 | RFC 7807 | Base preparada | `@RestControllerAdvice`, `ProblemDetail` y handlers de seguridad. |
 | Pageable max 100 | Pendiente de los endpoints de dominio | No hay colecciones de dominio aun. |
 | Evitar N+1 / LAZY | Base preparada como norma | Relaciones existentes son LAZY; repositorios usan `@EntityGraph` donde se necesita rol. |
@@ -23,7 +23,7 @@
 |---|---|---|
 | PostgreSQL 16+ | Base preparada | Compose usa PostGIS sobre PostgreSQL 16. |
 | `postgis`, `pg_trgm`, `uuid-ossp` | Base preparada | Flyway V1 habilita las tres extensiones. |
-| Flyway versionado | Base preparada | `db/migration/V1...` y `V2...`. |
+| Flyway versionado | Base preparada | `db/migration/V1...`, `V2...` y `V3...`; una prueba Testcontainers valida su aplicacion sobre PostgreSQL/PostGIS real. |
 | Usuario app sin DDL + usuario migrador | Base preparada | Variables separadas y script de inicializacion. |
 | UUID v7 | Base preparada | Generador UUID v7 para usuario, OTP y refresh token; debe reutilizarse en dominio. |
 | Snake case, singular, TIMESTAMPTZ/UTC | Base preparada | Convencion aplicada en migraciones iniciales y Hibernate UTC. |
@@ -69,7 +69,7 @@
 | Interceptor token/refresh/RFC7807 | Base preparada | Interceptores de auth y problem details. |
 | Encolar peticiones offline | Esqueleto, pendiente de dominio | Interceptor offline reservado; no se encolan escrituras genericas todavia para evitar semantica incorrecta. |
 | Guardias por rol | Base preparada | `authGuard` y `roleGuard`. |
-| Textos centralizados/i18n | Base preparada | Transloco y `public/i18n/es.json`; los textos iniciales visibles aun deben migrarse gradualmente al catalogo. |
+| Textos centralizados/i18n | Base preparada | Transloco 8.4.0, loader HTTP y `public/i18n/es.json`; las pantallas base consumen claves del catalogo. |
 | WCAG AA / controles tactiles | Base inicial | Controles de formulario >=44 px; auditoria WCAG completa queda para pantallas finales. |
 | MapLibre + OSM | Dependencia preparada | `maplibre-gl` declarado; pantalla de mapa pendiente. |
 | PWA + Angular service worker | Base preparada | Manifest, iconos, `ngsw-config.json` y service worker configurados. |
@@ -88,12 +88,12 @@
 | Nginx unico punto externo | Base preparada | Solo `nginx` publica puerto en el compose. |
 | `.env` fuera de Git + `.env.example` | Base preparada | `.gitignore` raiz y ejemplos incluidos. |
 | Contenedores con reinicio | Base preparada | `restart: unless-stopped`. |
-| Nginx gzip, cache, 25MB | Base preparada | Configuracion incluida. |
+| Nginx gzip, cache, 25MB | Base preparada | Configuracion incluida junto con CSP, `nosniff`, `DENY` y `Referrer-Policy`. |
 | Brotli | Pendiente en imagen de despliegue | Imagen local no carga modulo Brotli. |
 | Backups / restauracion | Pendiente de infraestructura final | Debe definirse con el servidor/proveedor elegido. |
-| 70% servicio + 100% IC/estados | Pendiente | Solo hay pruebas base; las metas aplican al dominio completo. |
-| Testcontainers PostgreSQL/PostGIS | Dependencias preparadas | Deben agregarse pruebas de integracion al desarrollar repositorios. |
-| Spotless / Prettier / ESLint | Base preparada | Configurados en ambos proyectos. |
+| 70% servicio + 100% IC/estados | Preparado para control final | JaCoCo genera reporte y el perfil `coverage-final` valida 70% de servicios. Las reglas de 100% se agregan cuando existan IC y maquinas de estado. |
+| Testcontainers PostgreSQL/PostGIS | Base preparada | `DatabaseMigrationIntegrationTest` levanta PostGIS real y valida V1-V3, extensiones y tablas. Cada modulo debe agregar sus propias pruebas. |
+| Spotless / Prettier / ESLint | Base preparada | CI ejecuta `spotless:check` en backend y `lint` + `format:check` + build en frontend. |
 | CI por PR | Base preparada | Workflow inicial en `.github/workflows/ci.yml`. |
 | ADR | Base preparada | `docs/adr/0001-base-arquitectonica.md`. |
 | Manuales y diccionario | Pendiente | Se completan al finalizar funcionalidad. |

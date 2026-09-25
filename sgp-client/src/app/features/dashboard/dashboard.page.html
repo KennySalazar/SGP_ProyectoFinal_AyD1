@@ -1,31 +1,50 @@
 <section class="dashboard-head">
   <div>
-    <p class="page-kicker">CENTRO DE TRABAJO TECNICO</p>
-    <h1 class="page-title">Sistema de Gestion de Puentes</h1>
-    <p class="page-description">Base operativa para inventario, inspeccion tecnica, revision academica, mantenimiento y trabajo de campo sin conexion.</p>
+    <p class="page-kicker">{{ 'dashboard.kicker' | transloco }}</p>
+    <h1 class="page-title">{{ 'app.title' | transloco }}</h1>
+    <p class="page-description">{{ 'dashboard.description' | transloco }}</p>
   </div>
   <div class="head-status">
     <span class="status-dot"></span>
-    <div><strong>Entorno disponible</strong><small>Servicios base operativos</small></div>
+    <div>
+      <strong>{{ 'dashboard.environmentAvailable' | transloco }}</strong
+      ><small>{{ 'dashboard.baseServices' | transloco }}</small>
+    </div>
   </div>
 </section>
 
-<section class="overview-grid" aria-label="Resumen de modulos">
+<section class="overview-grid" [attr.aria-label]="'dashboard.summaryAria' | transloco">
   <article class="metric-card">
     <div class="metric-icon blue"><i class="pi pi-map"></i></div>
-    <div><span>Inventario</span><strong></strong><small>Puentes, ubicacion y mapa publico</small></div>
+    <div>
+      <span>{{ 'dashboard.inventory' | transloco }}</span
+      ><strong>{{ 'dashboard.basePrepared' | transloco }}</strong
+      ><small>{{ 'dashboard.inventoryNote' | transloco }}</small>
+    </div>
   </article>
   <article class="metric-card">
     <div class="metric-icon cyan"><i class="pi pi-clipboard"></i></div>
-    <div><span>Inspecciones</span><strong></strong><small>Formulario dinamico y revision</small></div>
+    <div>
+      <span>{{ 'dashboard.inspections' | transloco }}</span
+      ><strong>{{ 'dashboard.toImplement' | transloco }}</strong
+      ><small>{{ 'dashboard.inspectionsNote' | transloco }}</small>
+    </div>
   </article>
   <article class="metric-card">
     <div class="metric-icon amber"><i class="pi pi-wrench"></i></div>
-    <div><span>Mantenimiento</span><strong></strong><small>Ordenes y seguimiento tecnico</small></div>
+    <div>
+      <span>{{ 'dashboard.maintenance' | transloco }}</span
+      ><strong>{{ 'dashboard.toImplement' | transloco }}</strong
+      ><small>{{ 'dashboard.maintenanceNote' | transloco }}</small>
+    </div>
   </article>
   <article class="metric-card">
     <div class="metric-icon green"><i class="pi pi-cloud-download"></i></div>
-    <div><span>Modo offline</span><strong></strong><small>PWA, IndexedDB y persistencia local</small></div>
+    <div>
+      <span>{{ 'dashboard.offlineMode' | transloco }}</span
+      ><strong>{{ 'dashboard.basePrepared' | transloco }}</strong
+      ><small>{{ 'dashboard.offlineNote' | transloco }}</small>
+    </div>
   </article>
 </section>
 
@@ -33,32 +52,44 @@
   <article class="workspace-card main-card">
     <div class="card-head">
       <div>
-        <p class="section-eyebrow">IMPLEMENTACION</p>
-        <h2>Modulos del proyecto</h2>
+        <p class="section-eyebrow">{{ 'dashboard.implementation' | transloco }}</p>
+        <h2>{{ 'dashboard.modules' | transloco }}</h2>
       </div>
-      <span class="phase-badge">Base arquitectonica</span>
+      <span class="phase-badge">{{ 'dashboard.architecturalBase' | transloco }}</span>
     </div>
 
     <div class="module-list">
       <div class="module-row">
         <span class="module-number">01</span>
-        <div class="module-copy"><strong>Inventario de puentes</strong><small>CRUD, georreferenciacion, duplicados por cercania y estado actual.</small></div>
-        <span class="module-state prepared"></span>
+        <div class="module-copy">
+          <strong>{{ 'dashboard.bridgeInventory' | transloco }}</strong
+          ><small>{{ 'dashboard.bridgeInventoryNote' | transloco }}</small>
+        </div>
+        <span class="module-state prepared">{{ 'common.prepared' | transloco }}</span>
       </div>
       <div class="module-row">
         <span class="module-number">02</span>
-        <div class="module-copy"><strong>Formulario e inspecciones</strong><small>JSON Schema, versionado, captura de danos y reporte fotografico.</small></div>
-        <span class="module-state pending"></span>
+        <div class="module-copy">
+          <strong>{{ 'dashboard.formsInspections' | transloco }}</strong
+          ><small>{{ 'dashboard.formsInspectionsNote' | transloco }}</small>
+        </div>
+        <span class="module-state pending">{{ 'common.pending' | transloco }}</span>
       </div>
       <div class="module-row">
         <span class="module-number">03</span>
-        <div class="module-copy"><strong>Revision e indice de condicion</strong><small>Flujo academico, observaciones, maquina de estados y calculo IC.</small></div>
-        <span class="module-state pending"></span>
+        <div class="module-copy">
+          <strong>{{ 'dashboard.reviewCondition' | transloco }}</strong
+          ><small>{{ 'dashboard.reviewConditionNote' | transloco }}</small>
+        </div>
+        <span class="module-state pending">{{ 'common.pending' | transloco }}</span>
       </div>
       <div class="module-row">
         <span class="module-number">04</span>
-        <div class="module-copy"><strong>Foro y mantenimiento</strong><small>Colaboracion tecnica, alertas y ordenes de intervencion.</small></div>
-        <span class="module-state pending"></span>
+        <div class="module-copy">
+          <strong>{{ 'dashboard.forumMaintenance' | transloco }}</strong
+          ><small>{{ 'dashboard.forumMaintenanceNote' | transloco }}</small>
+        </div>
+        <span class="module-state pending">{{ 'common.pending' | transloco }}</span>
       </div>
     </div>
   </article>
@@ -67,19 +98,49 @@
     <article class="workspace-card user-card">
       <div class="user-top">
         <div class="profile-mark">{{ auth.user()?.email?.charAt(0)?.toUpperCase() }}</div>
-        <div><span>Sesion actual</span><strong>{{ auth.user()?.email }}</strong></div>
+        <div>
+          <span>{{ 'dashboard.currentSession' | transloco }}</span
+          ><strong>{{ auth.user()?.email }}</strong>
+        </div>
       </div>
-      <div class="user-detail"><span>Rol global</span><strong>{{ auth.user()?.role }}</strong></div>
-      <div class="user-detail"><span>Segundo factor</span><strong>{{ auth.user()?.twoFactorEnabled ? 'Activo' : 'Inactivo' }}</strong></div>
+      <div class="user-detail">
+        <span>{{ 'dashboard.globalRole' | transloco }}</span
+        ><strong>{{ auth.user()?.role }}</strong>
+      </div>
+      <div class="user-detail">
+        <span>{{ 'dashboard.secondFactor' | transloco }}</span
+        ><strong
+          >{{ (auth.user()?.twoFactorEnabled ? 'dashboard.active' : 'dashboard.inactive') |
+          transloco }}</strong
+        >
+      </div>
     </article>
 
     <article class="workspace-card legend-card">
-      <div class="card-head compact"><div><p class="section-eyebrow">REFERENCIA</p><h2>Condicion del puente</h2></div></div>
-      <p class="legend-note">Leyenda visual prevista para el indice de condicion. El estado siempre se acompanara de texto.</p>
-      <div class="condition-row"><span class="condition-dot good"></span><strong>Bueno</strong><small>IC ≥ 75</small></div>
-      <div class="condition-row"><span class="condition-dot regular"></span><strong>Regular</strong><small>50 ≤ IC &lt; 75</small></div>
-      <div class="condition-row"><span class="condition-dot bad"></span><strong>Malo</strong><small>IC &lt; 50</small></div>
-      <div class="condition-row"><span class="condition-dot none"></span><strong>Sin evaluar</strong><small>Sin inspeccion publicada</small></div>
+      <div class="card-head compact">
+        <div>
+          <p class="section-eyebrow">{{ 'dashboard.reference' | transloco }}</p>
+          <h2>{{ 'dashboard.bridgeCondition' | transloco }}</h2>
+        </div>
+      </div>
+      <p class="legend-note">{{ 'dashboard.conditionNote' | transloco }}</p>
+      <div class="condition-row">
+        <span class="condition-dot good"></span><strong>{{ 'dashboard.good' | transloco }}</strong
+        ><small>IC ≥ 75</small>
+      </div>
+      <div class="condition-row">
+        <span class="condition-dot regular"></span
+        ><strong>{{ 'dashboard.regular' | transloco }}</strong><small>50 ≤ IC &lt; 75</small>
+      </div>
+      <div class="condition-row">
+        <span class="condition-dot bad"></span><strong>{{ 'dashboard.bad' | transloco }}</strong
+        ><small>IC &lt; 50</small>
+      </div>
+      <div class="condition-row">
+        <span class="condition-dot none"></span
+        ><strong>{{ 'dashboard.unevaluated' | transloco }}</strong
+        ><small>{{ 'dashboard.noPublishedInspection' | transloco }}</small>
+      </div>
     </article>
   </aside>
 </section>

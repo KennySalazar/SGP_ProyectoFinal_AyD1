@@ -6,14 +6,22 @@ import { ButtonModule } from 'primeng/button';
 import { InputTextModule } from 'primeng/inputtext';
 import { ChallengeResponse } from '../../../../core/models/auth.models';
 import { AuthCardComponent } from '../../../../shared/components/auth-card/auth-card.component';
+import { TranslocoPipe } from '@jsverse/transloco';
 
 @Component({
   selector: 'app-register-page',
   standalone: true,
-  imports: [ReactiveFormsModule, RouterLink, AuthCardComponent, ButtonModule, InputTextModule],
+  imports: [
+    ReactiveFormsModule,
+    RouterLink,
+    AuthCardComponent,
+    ButtonModule,
+    InputTextModule,
+    TranslocoPipe,
+  ],
   templateUrl: './register.page.html',
   styleUrl: './register.page.scss',
-  changeDetection: ChangeDetectionStrategy.OnPush
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class RegisterPage {
   private readonly fb = inject(FormBuilder);
@@ -22,14 +30,24 @@ export class RegisterPage {
 
   readonly form = this.fb.nonNullable.group({
     email: ['', [Validators.required, Validators.email]],
-    password: ['', [Validators.required, Validators.minLength(10), Validators.pattern(/^(?=.*[A-Za-z])(?=.*\d).+$/)]]
+    password: [
+      '',
+      [
+        Validators.required,
+        Validators.minLength(10),
+        Validators.pattern(/^(?=.*[A-Za-z])(?=.*\d).+$/),
+      ],
+    ],
   });
 
   submit(): void {
     if (this.form.invalid) return;
     const data = this.form.getRawValue();
-    this.http.post<ChallengeResponse>('/api/v1/auth/register', data).subscribe((response) =>
-      void this.router.navigate(['/registro/verificar'], { queryParams: { email: data.email, challengeId: response.challengeId } })
+    this.http.post<ChallengeResponse>('/api/v1/auth/register', data).subscribe(
+      (response) =>
+        void this.router.navigate(['/registro/verificar'], {
+          queryParams: { email: data.email, challengeId: response.challengeId },
+        }),
     );
   }
 }

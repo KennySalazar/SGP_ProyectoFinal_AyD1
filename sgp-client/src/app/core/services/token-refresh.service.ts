@@ -12,11 +12,15 @@ export class TokenRefreshService {
 
   refresh(): Observable<AccessTokenResponse> {
     if (this.inflight) return this.inflight;
-    this.inflight = this.rawHttp.post<AccessTokenResponse>('/api/v1/auth/refresh', {}, { withCredentials: true }).pipe(
-      tap((response) => this.auth.acceptToken(response)),
-      finalize(() => { this.inflight = null; }),
-      shareReplay({ bufferSize: 1, refCount: false })
-    );
+    this.inflight = this.rawHttp
+      .post<AccessTokenResponse>('/api/v1/auth/refresh', {}, { withCredentials: true })
+      .pipe(
+        tap((response) => this.auth.acceptToken(response)),
+        finalize(() => {
+          this.inflight = null;
+        }),
+        shareReplay({ bufferSize: 1, refCount: false }),
+      );
     return this.inflight;
   }
 }

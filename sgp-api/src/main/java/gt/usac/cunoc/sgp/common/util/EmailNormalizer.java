@@ -1,13 +1,12 @@
-
 package gt.usac.cunoc.sgp.common.util;
 
 import java.util.Locale;
 
 public final class EmailNormalizer {
 
-    private EmailNormalizer() {}
+  private EmailNormalizer() {}
 
-    public static String normalize(String email) {
-        return email == null ? null : email.trim().toLowerCase(Locale.ROOT);
-    }
+  public static String normalize(String email) {
+    return email == null ? null : email.trim().toLowerCase(Locale.ROOT);
+  }
 }

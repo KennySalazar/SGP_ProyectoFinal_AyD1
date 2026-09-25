@@ -1,4 +1,3 @@
-
 package gt.usac.cunoc.sgp.common.config;
 
 import io.swagger.v3.oas.models.Components;
@@ -11,10 +10,21 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 public class OpenApiConfiguration {
 
-    @Bean
-    OpenAPI sgpOpenApi() {
-        return new OpenAPI()
-            .info(new Info().title("SGP API").version("1.0.0").description("Sistema de Gestion de Puentes"))
-            .components(new Components().addSecuritySchemes("bearerAuth", new SecurityScheme().type(SecurityScheme.Type.HTTP).scheme("bearer").bearerFormat("JWT")));
-    }
+  @Bean
+  OpenAPI sgpOpenApi() {
+    return new OpenAPI()
+        .info(
+            new Info()
+                .title("SGP API")
+                .version("1.0.0")
+                .description("Sistema de Gestion de Puentes"))
+        .components(
+            new Components()
+                .addSecuritySchemes(
+                    "bearerAuth",
+                    new SecurityScheme()
+                        .type(SecurityScheme.Type.HTTP)
+                        .scheme("bearer")
+                        .bearerFormat("JWT")));
+  }
 }

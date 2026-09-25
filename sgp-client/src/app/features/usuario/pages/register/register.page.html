@@ -1,9 +1,28 @@
-<app-auth-card title="Crear cuenta" subtitle="El autorregistro crea una cuenta de Estudiante pendiente de activacion por un Catedratico.">
+<app-auth-card
+  [title]="'auth.register.title' | transloco"
+  [subtitle]="'auth.register.subtitle' | transloco"
+>
   <form [formGroup]="form" (ngSubmit)="submit()">
-    <label>Correo electronico<input pInputText type="email" formControlName="email" autocomplete="email" placeholder="nombre@correo.com" /></label>
-    <label>Contrasena<input pInputText type="password" formControlName="password" autocomplete="new-password" placeholder="Minimo 10 caracteres" /></label>
-    <p class="note"><i class="pi pi-info-circle"></i> Minimo 10 caracteres, con al menos una letra y un numero.</p>
-    <button pButton class="primary" type="submit" [disabled]="form.invalid"><i class="pi pi-user-plus"></i><span>Crear cuenta</span></button>
+    <label
+      >{{ 'common.email' | transloco }}<input
+        pInputText
+        type="email"
+        formControlName="email"
+        autocomplete="email"
+        [placeholder]="'common.emailPlaceholder' | transloco"
+    /></label>
+    <label
+      >{{ 'common.password' | transloco }}<input
+        pInputText
+        type="password"
+        formControlName="password"
+        autocomplete="new-password"
+        [placeholder]="'common.minPasswordPlaceholder' | transloco"
+    /></label>
+    <p class="note"><i class="pi pi-info-circle"></i> {{ 'auth.register.rule' | transloco }}</p>
+    <button pButton class="primary" type="submit" [disabled]="form.invalid">
+      <i class="pi pi-user-plus"></i><span>{{ 'auth.register.title' | transloco }}</span>
+    </button>
   </form>
-  <div class="links"><a routerLink="/login">Ya tengo cuenta</a></div>
+  <div class="links"><a routerLink="/login">{{ 'auth.register.haveAccount' | transloco }}</a></div>
 </app-auth-card>

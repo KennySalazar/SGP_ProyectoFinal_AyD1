@@ -1,4 +1,3 @@
-
 package gt.usac.cunoc.sgp.common.security;
 
 import gt.usac.cunoc.sgp.common.config.JwtProperties;
@@ -21,54 +20,64 @@ import org.springframework.stereotype.Service;
 @Service
 public class JwtService {
 
-    private final JwtProperties properties;
-    private final Clock clock;
-    private SecretKey signingKey;
+  private final JwtProperties properties;
+  private final Clock clock;
+  private SecretKey signingKey;
 
-    public JwtService(JwtProperties properties, Clock clock) {
-        this.properties = properties;
-        this.clock = clock;
+  public JwtService(JwtProperties properties, Clock clock) {
+    this.properties = properties;
+    this.clock = clock;
+  }
+
+  @PostConstruct
+  void validateConfiguration() {
+    if (properties.getSecretKey() == null
+        || properties.getSecretKey().getBytes(StandardCharsets.UTF_8).length < 32) {
+      throw new IllegalStateException("SECRET_KEY_JWT debe contener al menos 32 caracteres");
     }
-
-    @PostConstruct
-    void validateConfiguration() {
-        if (properties.getSecretKey() == null || properties.getSecretKey().getBytes(StandardCharsets.UTF_8).length < 32) {
-            throw new IllegalStateException("SECRET_KEY_JWT debe contener al menos 32 caracteres");
-        }
-        if (properties.getAccessExpirationMs() <= 0 || properties.getRefreshExpirationMs() <= 0) {
-            throw new IllegalStateException("La expiracion de los tokens debe ser positiva");
-        }
-        signingKey = Keys.hmacShaKeyFor(properties.getSecretKey().getBytes(StandardCharsets.UTF_8));
+    if (properties.getAccessExpirationMs() <= 0 || properties.getRefreshExpirationMs() <= 0) {
+      throw new IllegalStateException("La expiracion de los tokens debe ser positiva");
     }
+    signingKey = Keys.hmacShaKeyFor(properties.getSecretKey().getBytes(StandardCharsets.UTF_8));
+  }
 
-    public String issueAccessToken(UserAccount user) {
-        Instant now = clock.instant();
-        Instant expiration = now.plusMillis(properties.getAccessExpirationMs());
-        return Jwts.builder()
-            .subject(user.getEmail())
-            .claim("uid", user.getId().toString())
-            .claim("role", user.getRole().getName().name())
-            .claim("tv", user.getTokenVersion())
-            .issuedAt(Date.from(now))
-            .expiration(Date.from(expiration))
-            .signWith(signingKey)
-            .compact();
+  public String issueAccessToken(UserAccount user) {
+    Instant now = clock.instant();
+    Instant expiration = now.plusMillis(properties.getAccessExpirationMs());
+    return Jwts.builder()
+        .subject(user.getEmail())
+        .claim("uid", user.getId().toString())
+        .claim("role", user.getRole().getName().name())
+        .claim("tv", user.getTokenVersion())
+        .issuedAt(Date.from(now))
+        .expiration(Date.from(expiration))
+        .signWith(signingKey)
+        .compact();
+  }
+
+  public Optional<JwtData> parse(String token) {
+    try {
+      Claims claims =
+          Jwts.parser().verifyWith(signingKey).build().parseSignedClaims(token).getPayload();
+      String email = claims.getSubject();
+      String userId = claims.get("uid", String.class);
+      String role = claims.get("role", String.class);
+      Number tokenVersion = claims.get("tv", Number.class);
+      if (email == null || userId == null || role == null || tokenVersion == null)
+        return Optional.empty();
+      return Optional.of(
+          new JwtData(
+              email, UUID.fromString(userId), RoleName.valueOf(role), tokenVersion.intValue()));
+    } catch (JwtException | IllegalArgumentException exception) {
+      return Optional.empty();
     }
+  }
 
-    public Optional<JwtData> parse(String token) {
-        try {
-            Claims claims = Jwts.parser().verifyWith(signingKey).build().parseSignedClaims(token).getPayload();
-            String email = claims.getSubject();
-            String userId = claims.get("uid", String.class);
-            String role = claims.get("role", String.class);
-            Number tokenVersion = claims.get("tv", Number.class);
-            if (email == null || userId == null || role == null || tokenVersion == null) return Optional.empty();
-            return Optional.of(new JwtData(email, UUID.fromString(userId), RoleName.valueOf(role), tokenVersion.intValue()));
-        } catch (JwtException | IllegalArgumentException exception) {
-            return Optional.empty();
-        }
-    }
+  public long accessExpirationMs() {
+    return properties.getAccessExpirationMs();
+  }
 
-    public long accessExpirationMs() { return properties.getAccessExpirationMs(); }
-    public long refreshExpirationMs() { return properties.getRefreshExpirationMs(); }
+  public long refreshExpirationMs() {
+    return properties.getRefreshExpirationMs();
+  }
 }

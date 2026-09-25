@@ -1,4 +1,3 @@
-
 package gt.usac.cunoc.sgp.usuario.entity;
 
 import jakarta.persistence.Column;
@@ -13,19 +12,26 @@ import java.util.UUID;
 @Table(name = "rol")
 public class Role {
 
-    @Id
-    private UUID id;
+  @Id private UUID id;
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "nombre", nullable = false, unique = true, length = 40)
-    private RoleName name;
+  @Enumerated(EnumType.STRING)
+  @Column(name = "nombre", nullable = false, unique = true, length = 40)
+  private RoleName name;
 
-    @Column(name = "descripcion", nullable = false, length = 255)
-    private String description;
+  @Column(name = "descripcion", nullable = false, length = 255)
+  private String description;
 
-    protected Role() {}
+  protected Role() {}
 
-    public UUID getId() { return id; }
-    public RoleName getName() { return name; }
-    public String getDescription() { return description; }
+  public UUID getId() {
+    return id;
+  }
+
+  public RoleName getName() {
+    return name;
+  }
+
+  public String getDescription() {
+    return description;
+  }
 }

@@ -1,4 +1,3 @@
-
 package gt.usac.cunoc.sgp.common.config;
 
 import java.time.Clock;
@@ -9,16 +8,21 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 @Configuration
-@EnableConfigurationProperties({JwtProperties.class, OtpProperties.class, BootstrapProperties.class, RefreshCookieProperties.class})
+@EnableConfigurationProperties({
+  JwtProperties.class,
+  OtpProperties.class,
+  BootstrapProperties.class,
+  RefreshCookieProperties.class
+})
 public class CoreConfiguration {
 
-    @Bean
-    PasswordEncoder passwordEncoder() {
-        return new BCryptPasswordEncoder(12);
-    }
+  @Bean
+  PasswordEncoder passwordEncoder() {
+    return new BCryptPasswordEncoder(12);
+  }
 
-    @Bean
-    Clock clock() {
-        return Clock.systemUTC();
-    }
+  @Bean
+  Clock clock() {
+    return Clock.systemUTC();
+  }
 }

@@ -1,4 +1,3 @@
-
 package gt.usac.cunoc.sgp.usuario.dto;
 
 import java.util.UUID;
@@ -10,5 +9,4 @@ public record UserResponse(
     boolean verified,
     boolean activated,
     boolean active,
-    boolean twoFactorEnabled
-) {}
+    boolean twoFactorEnabled) {}

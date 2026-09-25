@@ -199,6 +199,7 @@ Node.js 24.19.0
 npm 11.17.0
 RxJS 7.8.2
 PrimeNG 21.x
+@jsverse/transloco 8.4.0
 PrimeIcons
 PrimeUIX Themes
 Standalone Components
@@ -1427,6 +1428,14 @@ org.testcontainers:junit-jupiter:1.20.4
 org.testcontainers:postgresql:1.20.4
 ```
 
+La base incluye `DatabaseMigrationIntegrationTest`, que levanta `postgis/postgis:16-3.5`, ejecuta Flyway V1-V3 y comprueba extensiones/tablas iniciales.
+
+Para validar la meta final de cobertura de servicios se dispone del perfil:
+
+```bash
+mvn -Pcoverage-final verify
+```
+
 Tener estas dependencias instaladas **no significa que las pruebas ya esten completas**.
 
 Significa que el proyecto ya tiene preparada la herramienta y que cada modulo debe agregar sus pruebas de integracion conforme se implemente.
@@ -1604,17 +1613,16 @@ CI / backend
 
 se encarga de validar el proyecto Spring Boot.
 
-Segun la configuracion del workflow, este tipo de check puede ejecutar tareas como:
+En la configuracion actual, el check ejecuta `mvn -B spotless:check verify`, por lo que valida:
 
 ```text
-Maven
-compilacion
+compilacion Maven
 pruebas automaticas
 mvn verify
 Spotless
 JaCoCo
 Testcontainers
-validacion de migraciones
+Flyway sobre PostgreSQL/PostGIS real
 ```
 
 El objetivo es detectar errores como:
@@ -1647,16 +1655,16 @@ CI / frontend
 
 valida el proyecto Angular.
 
-Puede ejecutar tareas como:
+En la configuracion actual ejecuta:
 
 ```text
-instalacion de dependencias
 npm ci
-ESLint
-compilacion Angular
+npm run lint
+npm run format:check
 npm run build
-pruebas frontend
 ```
+
+Con esto valida instalacion reproducible de dependencias, ESLint y compilacion Angular.
 
 Su objetivo es detectar problemas como:
 
@@ -2039,11 +2047,13 @@ Actualmente esta preparado y probado:
 [OK] Signals
 [OK] Reactive Forms
 [OK] PrimeNG
+[OK] Transloco / textos centralizados
 [OK] PWA
 [OK] Angular Service Worker
 [OK] Dexie
 [OK] IndexedDB
 [OK] MapLibre GL
+[OK] Nginx con headers de seguridad base
 [OK] Login
 [OK] JWT
 [OK] Refresh token
@@ -2052,6 +2062,8 @@ Actualmente esta preparado y probado:
 [OK] Recuperacion de contrasena
 [OK] Roles base
 [OK] Estructura por dominios
+[OK] Testcontainers smoke test PostgreSQL/PostGIS + Flyway
+[OK] MapStruct con UserMapper de referencia
 [OK] CI backend con GitHub Actions
 [OK] CI frontend con GitHub Actions
 ```

@@ -18,7 +18,7 @@ jobs:
           cache: maven
       - name: Backend tests
         working-directory: sgp-api
-        run: mvn -B verify
+        run: mvn -B spotless:check verify
 
   frontend:
     runs-on: ubuntu-latest
@@ -26,13 +26,16 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: '24'
       - name: Install
         working-directory: sgp-client
-        run: npm install --no-audit --no-fund
+        run: npm ci --no-audit --no-fund
       - name: Lint
         working-directory: sgp-client
         run: npm run lint
+      - name: Format check
+        working-directory: sgp-client
+        run: npm run format:check
       - name: Build
         working-directory: sgp-client
         run: npm run build
