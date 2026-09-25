@@ -1,2 +1,10 @@
 @use '../../../../shared/components/form-controls/form-controls.scss';
-.otp-input{text-align:center;font-size:1.25rem;font-weight:800;letter-spacing:.28em}.note i{margin-right:.35rem}
+.otp-input {
+  text-align: center;
+  font-size: 1.25rem;
+  font-weight: 800;
+  letter-spacing: 0.28em;
+}
+.note i {
+  margin-right: 0.35rem;
+}

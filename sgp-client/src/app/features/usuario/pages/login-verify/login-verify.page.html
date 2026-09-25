@@ -1,7 +1,21 @@
-<app-auth-card title="Verificacion en dos pasos" subtitle="Ingresa el codigo de 6 digitos enviado a tu correo.">
+<app-auth-card
+  [title]="'auth.verifyLogin.title' | transloco"
+  [subtitle]="'auth.verifyLogin.subtitle' | transloco"
+>
   <form [formGroup]="form" (ngSubmit)="submit()">
-    <label>Codigo OTP<input pInputText class="otp-input" inputmode="numeric" maxlength="6" formControlName="code" autocomplete="one-time-code" placeholder="000000" /></label>
-    <button pButton class="primary" type="submit" [disabled]="form.invalid"><i class="pi pi-verified"></i><span>Verificar codigo</span></button>
+    <label
+      >{{ 'common.otpCode' | transloco }}<input
+        pInputText
+        class="otp-input"
+        inputmode="numeric"
+        maxlength="6"
+        formControlName="code"
+        autocomplete="one-time-code"
+        placeholder="000000"
+    /></label>
+    <button pButton class="primary" type="submit" [disabled]="form.invalid">
+      <i class="pi pi-verified"></i><span>{{ 'auth.verifyLogin.action' | transloco }}</span>
+    </button>
   </form>
-  <p class="note"><i class="pi pi-clock"></i> Usa el codigo mas reciente recibido en tu correo.</p>
+  <p class="note"><i class="pi pi-clock"></i> {{ 'auth.verifyLogin.note' | transloco }}</p>
 </app-auth-card>

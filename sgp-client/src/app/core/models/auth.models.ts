@@ -30,4 +30,6 @@ export interface ChallengeResponse {
   message: string;
 }
 
-export interface MessageResponse { message: string; }
+export interface MessageResponse {
+  message: string;
+}

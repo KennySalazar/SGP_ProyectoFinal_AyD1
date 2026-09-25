@@ -1,4 +1,3 @@
-
 package gt.usac.cunoc.sgp.common.security;
 
 import gt.usac.cunoc.sgp.usuario.entity.RoleName;

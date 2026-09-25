@@ -1,4 +1,3 @@
-
 package gt.usac.cunoc.sgp.usuario.dto;
 
 import java.time.Instant;

@@ -1,4 +1,3 @@
-
 package gt.usac.cunoc.sgp.usuario.dto;
 
 import jakarta.validation.constraints.NotBlank;
@@ -8,5 +7,4 @@ import java.util.UUID;
 public record VerifyRegistrationRequest(
     @NotBlank(message = "El correo electronico es obligatorio") String email,
     @NotNull(message = "El identificador del desafio es obligatorio") UUID challengeId,
-    @NotBlank(message = "El codigo OTP es obligatorio") String otp
-) {}
+    @NotBlank(message = "El codigo OTP es obligatorio") String otp) {}

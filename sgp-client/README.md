@@ -6,22 +6,23 @@ La aplicacion esta pensada para trabajo tecnico de campo y escritorio, incluyend
 
 ## Stack verificado
 
-| Tecnologia | Version instalada / uso |
-|---|---|
-| Angular | **21.2.24** |
-| Angular CLI | **21.2.24** |
-| TypeScript | **5.9.3** |
-| Node.js | **24.19.0** |
-| npm | **11.17.0** |
-| RxJS | **7.8.2** |
-| Angular Service Worker | **21.2.24** |
-| PrimeNG | **21.1.10** |
-| PrimeUIX Themes | **3.x** |
-| PrimeIcons | **7.x** |
-| Dexie | **4.4.6** instalada |
-| MapLibre GL | **5.24.0** instalada |
-| ESLint | **9.39.5** instalado |
-| Prettier | **3.9.9** instalado |
+| Tecnologia             | Version instalada / uso |
+| ---------------------- | ----------------------- |
+| Angular                | **21.2.24**             |
+| Angular CLI            | **21.2.24**             |
+| TypeScript             | **5.9.3**               |
+| Node.js                | **24.19.0**             |
+| npm                    | **11.17.0**             |
+| RxJS                   | **7.8.2**               |
+| Angular Service Worker | **21.2.24**             |
+| PrimeNG                | **21.1.10**             |
+| Transloco              | **8.4.0**               |
+| PrimeUIX Themes        | **3.x**                 |
+| PrimeIcons             | **7.x**                 |
+| Dexie                  | **4.4.6** instalada     |
+| MapLibre GL            | **5.24.0** instalada    |
+| ESLint                 | **9.39.5** instalado    |
+| Prettier               | **3.9.9** instalado     |
 
 El proyecto utiliza:
 
@@ -37,6 +38,7 @@ El proyecto utiliza:
 - IndexedDB mediante Dexie.
 - MapLibre GL para mapas.
 - PrimeNG para componentes visuales y formularios.
+- Transloco para centralizar los textos de interfaz y permitir traduccion futura.
 
 ## Estructura
 
@@ -91,6 +93,9 @@ src/app/
 `theme/`
 : Configuracion visual de PrimeNG y del sistema.
 
+`core/i18n/`
+: Cargador y configuracion de internacionalizacion con Transloco.
+
 ## PrimeNG
 
 PrimeNG se utiliza como capa de componentes visuales, pero no reemplaza la arquitectura Angular.
@@ -120,6 +125,24 @@ estado       -> Tag
 ```
 
 No codificar las ocho secciones del formulario SIECA como plantillas fijas.
+
+## Textos e internacionalizacion con Transloco
+
+Los textos visibles de la interfaz deben centralizarse en:
+
+```text
+public/i18n/es.json
+```
+
+Los componentes utilizan claves mediante `TranslocoPipe`, por ejemplo:
+
+```html
+<span>{{ 'nav.home' | transloco }}</span>
+```
+
+No escribir nuevos textos repetidos directamente en las plantillas si corresponden a etiquetas, titulos, botones, mensajes base o navegacion. Agregar una clave al catalogo y reutilizarla.
+
+Actualmente el idioma base es espanol. La estructura permite agregar otros idiomas posteriormente sin reescribir los componentes.
 
 ## Diseno visual
 
@@ -271,7 +294,7 @@ Por esta razon se deben importar solo los componentes PrimeNG necesarios y mante
 - Mantener la funcionalidad dentro de su carpeta de dominio.
 - No colocar logica de negocio en componentes visuales.
 - No duplicar servicios que ya pertenecen a `core/`.
-- Mantener textos de interfaz preparados para centralizacion/traduccion.
+- Mantener los textos visibles centralizados con Transloco en `public/i18n/es.json`.
 
 ## Ejemplo de una nueva funcionalidad
 
@@ -291,13 +314,13 @@ La funcionalidad debe cargarse de forma diferida.
 
 ## Calidad
 
-Actualmente se encuentran configurados ESLint y Prettier.
+Actualmente se encuentran configurados ESLint y Prettier. El CI valida ambos antes de compilar el frontend.
 
 Antes de integrar cambios:
 
 ```bash
 npm run lint
-npm run format
+npm run format:check
 npm run build
 ```
 

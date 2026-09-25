@@ -2,14 +2,14 @@
   <main class="workspace">
     <header class="workspace-bar">
       <div>
-        <p class="workspace-kicker">Plataforma tecnica</p>
-        <strong>Sistema de Gestion de Puentes</strong>
+        <p class="workspace-kicker">{{ 'app.technicalPlatform' | transloco }}</p>
+        <strong>{{ 'app.title' | transloco }}</strong>
       </div>
       <div class="workspace-meta">
-        <span class="environment">DESARROLLO</span>
+        <span class="environment">{{ 'app.development' | transloco }}</span>
         <span class="connectivity" [class.offline]="!connectivity.online()">
           <span class="dot"></span>
-          {{ connectivity.online() ? 'En linea' : 'Sin conexion' }}
+          {{ (connectivity.online() ? 'connectivity.online' : 'connectivity.offline') | transloco }}
         </span>
       </div>
     </header>
@@ -19,30 +19,30 @@
     </section>
   </main>
 
-  <aside class="sidebar" aria-label="Navegacion principal">
-    <a class="brand" routerLink="/" aria-label="Ir al inicio">
+  <aside class="sidebar" [attr.aria-label]="'nav.main' | transloco">
+    <a class="brand" routerLink="/" [attr.aria-label]="'nav.goHome' | transloco">
       <span class="brand-mark">SGP</span>
       <span class="brand-copy">
-        <strong>Gestion de Puentes</strong>
-        <small>Evaluacion tecnica</small>
+        <strong>{{ 'app.shortTitle' | transloco }}</strong>
+        <small>{{ 'app.technicalEvaluation' | transloco }}</small>
       </span>
     </a>
 
     <div class="sidebar-section">
-      <span class="section-label">OPERACION</span>
+      <span class="section-label">{{ 'nav.operation' | transloco }}</span>
       <nav>
-        <a routerLink="/" [routerLinkActiveOptions]="{exact:true}" routerLinkActive="active">
-          <i class="pi pi-home"></i><span>Inicio</span>
+        <a routerLink="/" [routerLinkActiveOptions]="{ exact: true }" routerLinkActive="active">
+          <i class="pi pi-home"></i><span>{{ 'nav.home' | transloco }}</span>
         </a>
         <a routerLink="/offline" routerLinkActive="active">
-          <i class="pi pi-cloud"></i><span>Offline</span>
+          <i class="pi pi-cloud"></i><span>{{ 'nav.offline' | transloco }}</span>
         </a>
         <a routerLink="/seguridad" routerLinkActive="active">
-          <i class="pi pi-shield"></i><span>Seguridad</span>
+          <i class="pi pi-shield"></i><span>{{ 'nav.security' | transloco }}</span>
         </a>
-        @if(auth.user()?.role==='ADMINISTRADOR'){
+        @if (auth.user()?.role === 'ADMINISTRADOR') {
           <a routerLink="/admin" routerLinkActive="active">
-            <i class="pi pi-cog"></i><span>Administracion</span>
+            <i class="pi pi-cog"></i><span>{{ 'nav.administration' | transloco }}</span>
           </a>
         }
       </nav>
@@ -60,9 +60,9 @@
 
     <button class="logout" type="button" (click)="logout()">
       <i class="pi pi-sign-out"></i>
-      <span>Cerrar sesion</span>
+      <span>{{ 'nav.logout' | transloco }}</span>
     </button>
 
-    <p class="sidebar-foot">CUNOC · AyD1 · 2026</p>
+    <p class="sidebar-foot">{{ 'app.footer' | transloco }}</p>
   </aside>
 </div>

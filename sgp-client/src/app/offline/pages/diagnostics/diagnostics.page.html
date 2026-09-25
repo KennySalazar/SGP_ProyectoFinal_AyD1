@@ -1,15 +1,42 @@
 <header class="page-heading">
-  <p class="page-kicker">CAPACIDAD OFFLINE</p>
-  <h1 class="page-title">Diagnostico de almacenamiento</h1>
-  <p class="page-description">Estado local de la PWA, persistencia del navegador y elementos pendientes para la futura cola de sincronizacion.</p>
+  <p class="page-kicker">{{ 'offline.kicker' | transloco }}</p>
+  <h1 class="page-title">{{ 'offline.title' | transloco }}</h1>
+  <p class="page-description">{{ 'offline.description' | transloco }}</p>
 </header>
 
 <section class="metrics">
-  <article><div class="metric-icon"><i class="pi pi-inbox"></i></div><div><strong>{{ pending$ | async }}</strong><span>Elementos pendientes</span></div></article>
-  <article><div class="metric-icon"><i class="pi pi-database"></i></div><div><strong>{{ ((estimate().usage ?? 0) / 1048576) | number:'1.1-1' }} MB</strong><span>Espacio usado</span></div></article>
-  <article><div class="metric-icon"><i class="pi pi-save"></i></div><div><strong>{{ storage.persistent() === true ? 'Si' : storage.persistent() === false ? 'No' : 'Sin solicitar' }}</strong><span>Almacenamiento persistente</span></div></article>
+  <article>
+    <div class="metric-icon"><i class="pi pi-inbox"></i></div>
+    <div>
+      <strong>{{ pending$ | async }}</strong><span>{{ 'offline.pendingItems' | transloco }}</span>
+    </div>
+  </article>
+  <article>
+    <div class="metric-icon"><i class="pi pi-database"></i></div>
+    <div>
+      <strong>{{ ((estimate().usage ?? 0) / 1048576) | number:'1.1-1' }} MB</strong
+      ><span>{{ 'offline.usedSpace' | transloco }}</span>
+    </div>
+  </article>
+  <article>
+    <div class="metric-icon"><i class="pi pi-save"></i></div>
+    <div>
+      <strong
+        >{{ (storage.persistent() === true ? 'common.yes' : storage.persistent() === false ?
+        'common.no' : 'common.notRequested') | transloco }}</strong
+      ><span>{{ 'offline.persistentStorage' | transloco }}</span>
+    </div>
+  </article>
 </section>
 
 <section class="diagnostic-card">
-  <div class="card-head"><div><span>ALMACENAMIENTO LOCAL</span><h2>Controles de diagnostico</h2></div><div class="status-pill"><i class="pi pi-circle-fill"></i> Base preparada</div></div>
+  <div class="card-head">
+    <div>
+      <span>{{ 'offline.localStorage' | transloco }}</span>
+      <h2>{{ 'offline.controls' | transloco }}</h2>
+    </div>
+    <div class="status-pill">
+      <i class="pi pi-circle-fill"></i> {{ 'offline.basePrepared' | transloco }}
+    </div>
+  </div>
 </section>

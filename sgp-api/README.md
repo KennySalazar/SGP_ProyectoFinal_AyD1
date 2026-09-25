@@ -87,7 +87,7 @@ controller -> service -> repository -> entity
 - La logica de negocio vive en `service`.
 - Las entidades JPA no se exponen directamente en la API.
 - La API recibe y devuelve DTO.
-- El mapeo entidad <-> DTO debe realizarse con MapStruct cuando aplique.
+- El mapeo entidad <-> DTO debe realizarse con MapStruct cuando aplique. `usuario/mapper/UserMapper` es el ejemplo base para los nuevos modulos.
 - Las relaciones JPA son `LAZY` por defecto.
 - Las colecciones de API deben paginarse con `Pageable`.
 - La funcionalidad transversal que usan varios dominios se coloca en `common/`.
@@ -288,6 +288,8 @@ Ejecutar pruebas:
 mvn test
 ```
 
+La base incluye `DatabaseMigrationIntegrationTest`, que utiliza Testcontainers para levantar `postgis/postgis:16-3.5`, ejecutar Flyway sobre PostgreSQL/PostGIS real y validar extensiones y tablas iniciales. Docker debe estar disponible para ejecutar esta prueba.
+
 Verificacion completa:
 
 ```bash
@@ -306,6 +308,14 @@ Reporte JaCoCo:
 ```bash
 mvn clean verify
 ```
+
+Validacion de la meta final del 70% en paquetes de servicio:
+
+```bash
+mvn -Pcoverage-final verify
+```
+
+El perfil `coverage-final` se deja separado del CI base mientras los modulos funcionales aun estan en construccion. Cuando existan el Indice de Condicion y las maquinas de estado se deben agregar reglas especificas de cobertura del 100% para esos componentes.
 
 El reporte queda normalmente en:
 

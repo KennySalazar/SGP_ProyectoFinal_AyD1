@@ -13,13 +13,22 @@ export class AuthStore {
   readonly user = this.userState.asReadonly();
   readonly authenticated = computed(() => this.tokenState() !== null && this.userState() !== null);
 
-  setAccessToken(token: string | null): void { this.tokenState.set(token); }
-  setUser(user: UserSession | null): void { this.userState.set(user); }
-  clear(): void { this.tokenState.set(null); this.userState.set(null); }
+  setAccessToken(token: string | null): void {
+    this.tokenState.set(token);
+  }
+  setUser(user: UserSession | null): void {
+    this.userState.set(user);
+  }
+  clear(): void {
+    this.tokenState.set(null);
+    this.userState.set(null);
+  }
 
   loadMe(): Observable<UserSession> {
     return this.http.get<UserSession>('/api/v1/auth/me').pipe(tap((user) => this.setUser(user)));
   }
 
-  acceptToken(response: AccessTokenResponse): void { this.setAccessToken(response.accessToken); }
+  acceptToken(response: AccessTokenResponse): void {
+    this.setAccessToken(response.accessToken);
+  }
 }

@@ -12,7 +12,10 @@ export class SessionBootstrapService {
     return this.refresh.refresh().pipe(
       concatMap(() => this.auth.loadMe()),
       map(() => void 0),
-      catchError(() => { this.auth.clear(); return of(void 0); })
+      catchError(() => {
+        this.auth.clear();
+        return of(void 0);
+      }),
     );
   }
 }

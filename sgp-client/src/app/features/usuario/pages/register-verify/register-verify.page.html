@@ -1,11 +1,27 @@
-<app-auth-card title="Verificar correo" subtitle="Confirma tu direccion de correo con el codigo recibido.">
+<app-auth-card
+  [title]="'auth.verifyRegistration.title' | transloco"
+  [subtitle]="'auth.verifyRegistration.subtitle' | transloco"
+>
   @if(done()){
-    <p class="note success"><i class="pi pi-check-circle"></i> Correo verificado. Tu cuenta queda pendiente de activacion por un Catedratico.</p>
-    <div class="links"><a routerLink="/login">Volver al inicio de sesion</a></div>
+  <p class="note success">
+    <i class="pi pi-check-circle"></i> {{ 'auth.verifyRegistration.success' | transloco }}
+  </p>
+  <div class="links"><a routerLink="/login">{{ 'auth.recovery.back' | transloco }}</a></div>
   } @else {
-    <form [formGroup]="form" (ngSubmit)="submit()">
-      <label>Codigo OTP<input pInputText class="otp-input" inputmode="numeric" maxlength="6" formControlName="code" autocomplete="one-time-code" placeholder="000000" /></label>
-      <button pButton class="primary" type="submit" [disabled]="form.invalid"><i class="pi pi-check"></i><span>Verificar correo</span></button>
-    </form>
+  <form [formGroup]="form" (ngSubmit)="submit()">
+    <label
+      >{{ 'common.otpCode' | transloco }}<input
+        pInputText
+        class="otp-input"
+        inputmode="numeric"
+        maxlength="6"
+        formControlName="code"
+        autocomplete="one-time-code"
+        placeholder="000000"
+    /></label>
+    <button pButton class="primary" type="submit" [disabled]="form.invalid">
+      <i class="pi pi-check"></i><span>{{ 'auth.verifyRegistration.action' | transloco }}</span>
+    </button>
+  </form>
   }
 </app-auth-card>

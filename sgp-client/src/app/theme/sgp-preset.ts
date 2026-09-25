@@ -14,7 +14,7 @@ export const SgpPreset = definePreset(Aura, {
       700: '#1e40af',
       800: '#1e3a8a',
       900: '#172554',
-      950: '#0b1739'
-    }
-  }
+      950: '#0b1739',
+    },
+  },
 });
