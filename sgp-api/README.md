@@ -30,7 +30,7 @@ Este servicio implementa la API REST del sistema y concentra la logica de negoci
 | Springdoc OpenAPI | **2.6.0** |
 | NetworkNT JSON Schema Validator | **1.5.6** |
 | ShedLock | **6.3.0** |
-| Testcontainers | **1.20.4** |
+| Testcontainers | **1.21.4** |
 | Spotless | **2.44.5** |
 | JaCoCo | **0.8.12** |
 
