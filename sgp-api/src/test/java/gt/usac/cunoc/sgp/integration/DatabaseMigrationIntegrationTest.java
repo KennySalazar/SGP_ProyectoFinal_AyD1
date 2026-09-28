@@ -36,7 +36,7 @@ class DatabaseMigrationIntegrationTest {
             .load();
 
     var result = flyway.migrate();
-    assertTrue(result.migrationsExecuted >= 3);
+    assertEquals(11, result.migrationsExecuted);
     flyway.validate();
 
     try (Connection connection =
@@ -49,7 +49,22 @@ class DatabaseMigrationIntegrationTest {
       assertTrue(tableExists(statement, "usuario"));
       assertTrue(tableExists(statement, "rol"));
       assertTrue(tableExists(statement, "auditoria"));
+      assertTrue(tableExists(statement, "puente"));
+      assertTrue(tableExists(statement, "version_formulario"));
+      assertTrue(tableExists(statement, "inspeccion"));
+      assertTrue(tableExists(statement, "revision"));
+      assertTrue(tableExists(statement, "resultado_ic"));
+      assertTrue(tableExists(statement, "archivo"));
+      assertTrue(tableExists(statement, "orden_mantenimiento"));
+      assertTrue(tableExists(statement, "operacion_idempotente"));
       assertEquals("character varying", tokenHashType(statement));
+      assertTrue(indexExists(statement, "uq_version_formulario_activa"));
+      assertTrue(indexExists(statement, "uq_revision_abierta_por_inspeccion"));
+      assertTrue(indexExists(statement, "uq_resultado_ic_publicacion"));
+      assertTrue(indexExists(statement, "uq_inspeccion_sucesora_publicada"));
+      assertTrue(indexExists(statement, "uq_operacion_usuario_clave"));
+      assertTrue(constraintExists(statement, "archivo_foto_disponible_metadatos_completos"));
+      assertTrue(constraintExists(statement, "fk_orden_resultado_misma_inspeccion"));
     }
   }
 
@@ -79,6 +94,28 @@ class DatabaseMigrationIntegrationTest {
             "SELECT data_type FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'token_refresco' AND column_name = 'token_hash'")) {
       result.next();
       return result.getString(1);
+    }
+  }
+
+  private boolean indexExists(Statement statement, String index) throws Exception {
+    try (ResultSet result =
+        statement.executeQuery(
+            "SELECT EXISTS (SELECT 1 FROM pg_indexes WHERE schemaname = 'public' AND indexname = '"
+                + index
+                + "')")) {
+      result.next();
+      return result.getBoolean(1);
+    }
+  }
+
+  private boolean constraintExists(Statement statement, String constraint) throws Exception {
+    try (ResultSet result =
+        statement.executeQuery(
+            "SELECT EXISTS (SELECT 1 FROM information_schema.table_constraints WHERE table_schema = 'public' AND constraint_name = '"
+                + constraint
+                + "')")) {
+      result.next();
+      return result.getBoolean(1);
     }
   }
 }

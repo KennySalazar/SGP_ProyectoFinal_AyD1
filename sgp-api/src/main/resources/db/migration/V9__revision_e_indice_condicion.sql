@@ -84,4 +84,6 @@ CREATE TABLE resultado_ic (
     CONSTRAINT resultado_ic_ajuste_completo CHECK ((estado_confirmado = estado_calculado AND justificacion_ajuste IS NULL AND confirmado_por_id IS NULL AND confirmado_en IS NULL) OR (estado_confirmado <> estado_calculado AND justificacion_ajuste IS NOT NULL AND confirmado_por_id IS NOT NULL AND confirmado_en IS NOT NULL))
 );
 CREATE UNIQUE INDEX uq_resultado_ic_publicacion ON resultado_ic (inspeccion_id) WHERE tipo = 'PUBLICACION';
+ALTER TABLE resultado_ic
+    ADD CONSTRAINT uq_resultado_ic_id_inspeccion UNIQUE (id, inspeccion_id);
 CREATE INDEX idx_resultado_ic_inspeccion_fecha ON resultado_ic (inspeccion_id, calculado_en DESC);

@@ -40,7 +40,7 @@ CREATE TABLE orden_mantenimiento (
     puente_id UUID NOT NULL REFERENCES puente(id),
     inspeccion_origen_id UUID,
     regla_origen_id UUID REFERENCES regla_mantenimiento(id),
-    resultado_ic_origen_id UUID REFERENCES resultado_ic(id),
+    resultado_ic_origen_id UUID,
     plan_mantenimiento_rutinario_id UUID,
     ciclo_plan INTEGER,
     elemento_ref VARCHAR(300), instancia_elemento_id UUID, clave_generacion VARCHAR(200),
@@ -56,10 +56,12 @@ CREATE TABLE orden_mantenimiento (
     responsable_usuario_id UUID REFERENCES usuario(id), responsable_nombre VARCHAR(200), motivo_cierre_sin_ejecucion TEXT,
     creado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP, actualizado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP, version BIGINT NOT NULL DEFAULT 0,
     CONSTRAINT orden_plan_ciclo_coherente CHECK ((plan_mantenimiento_rutinario_id IS NULL AND ciclo_plan IS NULL) OR (plan_mantenimiento_rutinario_id IS NOT NULL AND ciclo_plan > 0 AND tipo = 'RUTINARIO')),
+    CONSTRAINT orden_resultado_origen_requiere_inspeccion CHECK (resultado_ic_origen_id IS NULL OR inspeccion_origen_id IS NOT NULL),
     CONSTRAINT orden_programada_completa CHECK (estado <> 'PROGRAMADA' OR (aceptado_por_id IS NOT NULL AND aceptado_en IS NOT NULL AND fecha_programada IS NOT NULL)),
     CONSTRAINT orden_ejecutada_completa CHECK (estado <> 'EJECUTADA' OR (fecha_ejecucion IS NOT NULL AND (responsable_usuario_id IS NOT NULL OR responsable_nombre IS NOT NULL))),
     CONSTRAINT orden_cierre_motivo CHECK (estado NOT IN ('DESCARTADA','CANCELADA') OR motivo_cierre_sin_ejecucion IS NOT NULL),
     CONSTRAINT fk_orden_inspeccion_puente FOREIGN KEY (inspeccion_origen_id, puente_id) REFERENCES inspeccion(id, puente_id),
+    CONSTRAINT fk_orden_resultado_misma_inspeccion FOREIGN KEY (resultado_ic_origen_id, inspeccion_origen_id) REFERENCES resultado_ic(id, inspeccion_id),
     CONSTRAINT fk_orden_plan_puente FOREIGN KEY (plan_mantenimiento_rutinario_id, puente_id) REFERENCES plan_mantenimiento_rutinario(id, puente_id)
 );
 CREATE INDEX idx_orden_puente_estado ON orden_mantenimiento (puente_id, estado);
@@ -83,7 +85,25 @@ CREATE TABLE archivo (
     estado VARCHAR(20) NOT NULL DEFAULT 'DISPONIBLE' CHECK (estado IN ('DISPONIBLE','RETIRADO','PURGADO')), retirado_en TIMESTAMPTZ, purgado_en TIMESTAMPTZ, motivo_retiro TEXT, creado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT archivo_contexto_unico CHECK (num_nonnulls(inspeccion_id, orden_mantenimiento_id, version_formulario_id) = 1),
     CONSTRAINT archivo_contexto_tipo CHECK ((tipo_uso IN ('FOTO_INSPECCION','DOCUMENTO_INSPECCION') AND inspeccion_id IS NOT NULL) OR (tipo_uso = 'EVIDENCIA_MANTENIMIENTO' AND orden_mantenimiento_id IS NOT NULL) OR (tipo_uso = 'ACTA_CALIBRACION' AND version_formulario_id IS NOT NULL)),
-    CONSTRAINT archivo_instancia_requiere_ref CHECK (instancia_elemento_id IS NULL OR elemento_ref IS NOT NULL)
+    CONSTRAINT archivo_instancia_requiere_ref CHECK (instancia_elemento_id IS NULL OR elemento_ref IS NOT NULL),
+    CONSTRAINT archivo_categoria_foto_valida CHECK (categoria_foto IS NULL OR categoria_foto IN ('ACCESO', 'SUPERESTRUCTURA', 'SUBESTRUCTURA', 'CAUCE', 'OTRA')),
+    CONSTRAINT archivo_foto_inspeccion_categoria_obligatoria CHECK (tipo_uso <> 'FOTO_INSPECCION' OR categoria_foto IS NOT NULL),
+    CONSTRAINT archivo_foto_disponible_metadatos_completos CHECK (
+        tipo_uso <> 'FOTO_INSPECCION' OR estado <> 'DISPONIBLE' OR (
+            ubicacion_captura IS NOT NULL AND capturado_en IS NOT NULL AND clave_objeto_miniatura IS NOT NULL
+            AND ancho_px IS NOT NULL AND ancho_px > 0 AND alto_px IS NOT NULL AND alto_px > 0
+            AND mime_real IN ('image/jpeg', 'image/webp')
+        )
+    ),
+    CONSTRAINT archivo_documento_inspeccion_formato_valido CHECK (
+        tipo_uso <> 'DOCUMENTO_INSPECCION' OR (mime_real = 'application/pdf' AND tamano_bytes <= 20971520)
+    ),
+    CONSTRAINT archivo_evidencia_mantenimiento_imagen_valida CHECK (
+        tipo_uso <> 'EVIDENCIA_MANTENIMIENTO' OR (
+            mime_real IN ('image/jpeg', 'image/webp') AND ancho_px IS NOT NULL AND ancho_px > 0
+            AND alto_px IS NOT NULL AND alto_px > 0
+        )
+    )
 );
 CREATE INDEX idx_archivo_inspeccion_tipo_estado ON archivo (inspeccion_id, tipo_uso, estado);
 CREATE INDEX idx_archivo_orden_estado ON archivo (orden_mantenimiento_id, estado);
