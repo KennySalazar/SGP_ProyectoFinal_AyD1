@@ -36,7 +36,7 @@ class DatabaseMigrationIntegrationTest {
             .load();
 
     var result = flyway.migrate();
-    assertEquals(11, result.migrationsExecuted);
+    assertEquals(12, result.migrationsExecuted);
     flyway.validate();
 
     try (Connection connection =
@@ -49,6 +49,8 @@ class DatabaseMigrationIntegrationTest {
       assertTrue(tableExists(statement, "usuario"));
       assertTrue(tableExists(statement, "rol"));
       assertTrue(tableExists(statement, "auditoria"));
+      assertTrue(tableExists(statement, "departamento"));
+      assertTrue(tableExists(statement, "municipio"));
       assertTrue(tableExists(statement, "puente"));
       assertTrue(tableExists(statement, "version_formulario"));
       assertTrue(tableExists(statement, "inspeccion"));
@@ -65,6 +67,9 @@ class DatabaseMigrationIntegrationTest {
       assertTrue(indexExists(statement, "uq_operacion_usuario_clave"));
       assertTrue(constraintExists(statement, "archivo_foto_disponible_metadatos_completos"));
       assertTrue(constraintExists(statement, "fk_orden_resultado_misma_inspeccion"));
+      assertEquals(22, rowCount(statement, "departamento"));
+      assertEquals(340, rowCount(statement, "municipio"));
+      assertTrue(municipiosCorrespondenADepartamento(statement));
     }
   }
 
@@ -114,6 +119,30 @@ class DatabaseMigrationIntegrationTest {
             "SELECT EXISTS (SELECT 1 FROM information_schema.table_constraints WHERE table_schema = 'public' AND constraint_name = '"
                 + constraint
                 + "')")) {
+      result.next();
+      return result.getBoolean(1);
+    }
+  }
+
+  private long rowCount(Statement statement, String table) throws Exception {
+    try (ResultSet result = statement.executeQuery("SELECT count(*) FROM " + table)) {
+      result.next();
+      return result.getLong(1);
+    }
+  }
+
+  private boolean municipiosCorrespondenADepartamento(Statement statement) throws Exception {
+    String query =
+        """
+        SELECT NOT EXISTS (
+            SELECT 1
+            FROM municipio AS municipio
+            JOIN departamento AS departamento ON departamento.id = municipio.departamento_id
+            WHERE left(municipio.codigo_ine, 2) <> departamento.codigo_ine
+        )
+        """;
+
+    try (ResultSet result = statement.executeQuery(query)) {
       result.next();
       return result.getBoolean(1);
     }

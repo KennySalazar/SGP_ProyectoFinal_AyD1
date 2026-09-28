@@ -1,3 +1,6 @@
+-- Revisión académica, historial de estados y resultados del índice de condición.
+
+-- Un ciclo por cada envío de una inspección.
 CREATE TABLE revision (
     id UUID PRIMARY KEY,
     inspeccion_id UUID NOT NULL REFERENCES inspeccion(id),
@@ -15,15 +18,27 @@ CREATE TABLE revision (
     hash_contenido VARCHAR(64) NOT NULL,
     creado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT revision_ciclo_positivo CHECK (numero_ciclo > 0),
-    CONSTRAINT revision_estado_valido CHECK (estado IN ('PENDIENTE','EN_CURSO','RESUELTA')),
-    CONSTRAINT revision_veredicto_valido CHECK (veredicto IS NULL OR veredicto IN ('APROBADA','CAMBIOS_SOLICITADOS','RECHAZADA')),
-    CONSTRAINT revision_resolucion_completa CHECK (estado <> 'RESUELTA' OR (veredicto IS NOT NULL AND resuelta_en IS NOT NULL)),
-    CONSTRAINT revision_motivo_veredicto CHECK (veredicto NOT IN ('CAMBIOS_SOLICITADOS','RECHAZADA') OR nullif(btrim(observacion_general), '') IS NOT NULL),
+    CONSTRAINT revision_estado_valido CHECK (
+        estado IN ('PENDIENTE', 'EN_CURSO', 'RESUELTA')
+    ),
+    CONSTRAINT revision_veredicto_valido CHECK (
+        veredicto IS NULL
+        OR veredicto IN ('APROBADA', 'CAMBIOS_SOLICITADOS', 'RECHAZADA')
+    ),
+    CONSTRAINT revision_resolucion_completa CHECK (
+        estado <> 'RESUELTA'
+        OR (veredicto IS NOT NULL AND resuelta_en IS NOT NULL)
+    ),
+    CONSTRAINT revision_motivo_veredicto CHECK (
+        veredicto NOT IN ('CAMBIOS_SOLICITADOS', 'RECHAZADA')
+        OR nullif(btrim(observacion_general), '') IS NOT NULL
+    ),
     CONSTRAINT uq_revision_inspeccion_ciclo UNIQUE (inspeccion_id, numero_ciclo)
 );
 CREATE UNIQUE INDEX uq_revision_abierta_por_inspeccion ON revision (inspeccion_id) WHERE estado IN ('PENDIENTE','EN_CURSO');
 CREATE INDEX idx_revision_revisor_estado_fecha ON revision (revisor_id, estado, enviada_en);
 
+-- Bitácora inmutable de transiciones de una inspección.
 CREATE TABLE historial_estado_inspeccion (
     id UUID PRIMARY KEY,
     inspeccion_id UUID NOT NULL REFERENCES inspeccion(id),
@@ -36,11 +51,17 @@ CREATE TABLE historial_estado_inspeccion (
     motivo TEXT,
     creado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT historial_estado_inspeccion_secuencia_positiva CHECK (secuencia > 0),
-    CONSTRAINT historial_estado_inspeccion_valido CHECK (estado_nuevo IN ('BORRADOR','ENVIADA','EN_REVISION','CAMBIOS_SOLICITADOS','PUBLICADA','RECHAZADA')),
+    CONSTRAINT historial_estado_inspeccion_valido CHECK (
+        estado_nuevo IN (
+            'BORRADOR', 'ENVIADA', 'EN_REVISION', 'CAMBIOS_SOLICITADOS',
+            'PUBLICADA', 'RECHAZADA'
+        )
+    ),
     CONSTRAINT uq_historial_estado_inspeccion_secuencia UNIQUE (inspeccion_id, secuencia)
 );
 CREATE INDEX idx_historial_estado_inspeccion_fecha ON historial_estado_inspeccion (inspeccion_id, creado_en);
 
+-- Observaciones puntuales dentro de un ciclo de revisión.
 CREATE TABLE observacion_revision (
     id UUID PRIMARY KEY,
     revision_id UUID NOT NULL REFERENCES revision(id),
@@ -55,10 +76,18 @@ CREATE TABLE observacion_revision (
     creado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT observacion_estado_valido CHECK (estado IN ('PENDIENTE','RESUELTA')),
     CONSTRAINT observacion_instancia_requiere_ref CHECK (instancia_elemento_id IS NULL OR elemento_ref IS NOT NULL),
-    CONSTRAINT observacion_resolucion_completa CHECK ((estado = 'PENDIENTE' AND resuelto_por_id IS NULL AND resuelto_en IS NULL) OR (estado = 'RESUELTA' AND resuelto_por_id IS NOT NULL AND resuelto_en IS NOT NULL))
+    CONSTRAINT observacion_resolucion_completa CHECK (
+        (estado = 'PENDIENTE' AND resuelto_por_id IS NULL AND resuelto_en IS NULL)
+        OR (
+            estado = 'RESUELTA'
+            AND resuelto_por_id IS NOT NULL
+            AND resuelto_en IS NOT NULL
+        )
+    )
 );
 CREATE INDEX idx_observacion_revision_estado ON observacion_revision (revision_id, estado);
 
+-- Resultados inmutables del índice de condición.
 CREATE TABLE resultado_ic (
     id UUID PRIMARY KEY,
     inspeccion_id UUID NOT NULL REFERENCES inspeccion(id),
@@ -78,10 +107,27 @@ CREATE TABLE resultado_ic (
     solicitado_por_id UUID REFERENCES usuario(id),
     calculado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     creado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT resultado_ic_tipo_valido CHECK (tipo IN ('PUBLICACION','RECALCULO')),
+    CONSTRAINT resultado_ic_tipo_valido CHECK (tipo IN ('PUBLICACION', 'RECALCULO')),
     CONSTRAINT resultado_ic_rango CHECK (indice_calculado BETWEEN 0 AND 100),
-    CONSTRAINT resultado_ic_estados_validos CHECK (estado_por_rango IN ('BUENO','REGULAR','MALO') AND estado_calculado IN ('BUENO','REGULAR','MALO') AND estado_confirmado IN ('BUENO','REGULAR','MALO')),
-    CONSTRAINT resultado_ic_ajuste_completo CHECK ((estado_confirmado = estado_calculado AND justificacion_ajuste IS NULL AND confirmado_por_id IS NULL AND confirmado_en IS NULL) OR (estado_confirmado <> estado_calculado AND justificacion_ajuste IS NOT NULL AND confirmado_por_id IS NOT NULL AND confirmado_en IS NOT NULL))
+    CONSTRAINT resultado_ic_estados_validos CHECK (
+        estado_por_rango IN ('BUENO', 'REGULAR', 'MALO')
+        AND estado_calculado IN ('BUENO', 'REGULAR', 'MALO')
+        AND estado_confirmado IN ('BUENO', 'REGULAR', 'MALO')
+    ),
+    CONSTRAINT resultado_ic_ajuste_completo CHECK (
+        (
+            estado_confirmado = estado_calculado
+            AND justificacion_ajuste IS NULL
+            AND confirmado_por_id IS NULL
+            AND confirmado_en IS NULL
+        )
+        OR (
+            estado_confirmado <> estado_calculado
+            AND justificacion_ajuste IS NOT NULL
+            AND confirmado_por_id IS NOT NULL
+            AND confirmado_en IS NOT NULL
+        )
+    )
 );
 CREATE UNIQUE INDEX uq_resultado_ic_publicacion ON resultado_ic (inspeccion_id) WHERE tipo = 'PUBLICACION';
 ALTER TABLE resultado_ic

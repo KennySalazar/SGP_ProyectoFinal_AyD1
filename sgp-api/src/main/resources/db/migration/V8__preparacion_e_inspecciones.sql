@@ -1,3 +1,6 @@
+-- Preparación offline, inspecciones y sus componentes repetibles.
+
+-- Contexto verificable descargado para captura offline.
 CREATE TABLE preparacion_salida (
     id UUID PRIMARY KEY,
     usuario_id UUID NOT NULL REFERENCES usuario(id),
@@ -9,6 +12,7 @@ CREATE TABLE preparacion_salida (
 );
 CREATE INDEX idx_preparacion_usuario_fecha ON preparacion_salida (usuario_id, preparado_en DESC);
 
+-- Agregado principal de una inspección de puente.
 CREATE TABLE inspeccion (
     id UUID PRIMARY KEY,
     puente_id UUID NOT NULL REFERENCES puente(id),
@@ -31,24 +35,58 @@ CREATE TABLE inspeccion (
     datos_permanentes_confirmados_en TIMESTAMPTZ,
     identificacion_capturada JSONB,
     datos JSONB NOT NULL DEFAULT '{}'::jsonb,
-    longitud_m NUMERIC(10,2), numero_tramos INTEGER,
-    ancho_rodadura_m NUMERIC(10,2), ancho_acera_derecha_m NUMERIC(10,2), ancho_acera_izquierda_m NUMERIC(10,2),
-    altura_libre_superior_m NUMERIC(10,2), altura_libre_sobre_cauce_m NUMERIC(10,2),
-    tipologia_puente VARCHAR(100), tipo_cruce VARCHAR(100), numero_vias_por_sentido INTEGER,
-    material_superestructura VARCHAR(100), material_subestructura VARCHAR(100), carga_diseno VARCHAR(100), anio_construccion SMALLINT,
-    trafico_vehiculos_dia INTEGER, porcentaje_camiones_buses NUMERIC(5,2),
-    ruta_pavimentada VARCHAR(10), alineamiento_horizontal VARCHAR(15), esviaje BOOLEAN,
-    poblacion_antes VARCHAR(200), poblacion_despues VARCHAR(200), tipo_cuerpo_agua VARCHAR(50), nombre_rio VARCHAR(200),
-    encauzamiento VARCHAR(20), antecedente_desbordamiento BOOLEAN, frecuencia_desbordamiento_anios NUMERIC(8,2), fecha_ultimo_desbordamiento DATE,
+    longitud_m NUMERIC(10, 2),
+    numero_tramos INTEGER,
+    ancho_rodadura_m NUMERIC(10, 2),
+    ancho_acera_derecha_m NUMERIC(10, 2),
+    ancho_acera_izquierda_m NUMERIC(10, 2),
+    altura_libre_superior_m NUMERIC(10, 2),
+    altura_libre_sobre_cauce_m NUMERIC(10, 2),
+    tipologia_puente VARCHAR(100),
+    tipo_cruce VARCHAR(100),
+    numero_vias_por_sentido INTEGER,
+    material_superestructura VARCHAR(100),
+    material_subestructura VARCHAR(100),
+    carga_diseno VARCHAR(100),
+    anio_construccion SMALLINT,
+    trafico_vehiculos_dia INTEGER,
+    porcentaje_camiones_buses NUMERIC(5, 2),
+    ruta_pavimentada VARCHAR(10),
+    alineamiento_horizontal VARCHAR(15),
+    esviaje BOOLEAN,
+    poblacion_antes VARCHAR(200),
+    poblacion_despues VARCHAR(200),
+    tipo_cuerpo_agua VARCHAR(50),
+    nombre_rio VARCHAR(200),
+    encauzamiento VARCHAR(20),
+    antecedente_desbordamiento BOOLEAN,
+    frecuencia_desbordamiento_anios NUMERIC(8, 2),
+    fecha_ultimo_desbordamiento DATE,
     alumbrado_existe BOOLEAN, drenajes_aledanos_existen BOOLEAN,
-    creado_dispositivo_en TIMESTAMPTZ, enviado_dispositivo_en TIMESTAMPTZ, sincronizado_en TIMESTAMPTZ,
-    publicado_en TIMESTAMPTZ, ultima_actividad_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    creado_dispositivo_en TIMESTAMPTZ,
+    enviado_dispositivo_en TIMESTAMPTZ,
+    sincronizado_en TIMESTAMPTZ,
+    publicado_en TIMESTAMPTZ,
+    ultima_actividad_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     eliminado_en TIMESTAMPTZ, eliminado_por_id UUID REFERENCES usuario(id),
-    creado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP, actualizado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    creado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    actualizado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     version BIGINT NOT NULL DEFAULT 0,
-    CONSTRAINT inspeccion_tipo_valido CHECK (tipo IN ('ORIGINAL','CORRECCION')),
-    CONSTRAINT inspeccion_estado_valido CHECK (estado IN ('BORRADOR','ENVIADA','EN_REVISION','CAMBIOS_SOLICITADOS','PUBLICADA','RECHAZADA')),
-    CONSTRAINT inspeccion_correccion_coherente CHECK ((tipo = 'ORIGINAL' AND supersede_a_id IS NULL AND motivo_correccion IS NULL) OR (tipo = 'CORRECCION' AND supersede_a_id IS NOT NULL AND motivo_correccion IS NOT NULL)),
+    CONSTRAINT inspeccion_tipo_valido CHECK (tipo IN ('ORIGINAL', 'CORRECCION')),
+    CONSTRAINT inspeccion_estado_valido CHECK (
+        estado IN (
+            'BORRADOR', 'ENVIADA', 'EN_REVISION', 'CAMBIOS_SOLICITADOS',
+            'PUBLICADA', 'RECHAZADA'
+        )
+    ),
+    CONSTRAINT inspeccion_correccion_coherente CHECK (
+        (tipo = 'ORIGINAL' AND supersede_a_id IS NULL AND motivo_correccion IS NULL)
+        OR (
+            tipo = 'CORRECCION'
+            AND supersede_a_id IS NOT NULL
+            AND motivo_correccion IS NOT NULL
+        )
+    ),
     CONSTRAINT inspeccion_publicacion_coherente CHECK (estado <> 'PUBLICADA' OR publicado_en IS NOT NULL),
     CONSTRAINT inspeccion_publicada_no_eliminada CHECK (estado <> 'PUBLICADA' OR eliminado_en IS NULL),
     CONSTRAINT inspeccion_base_distinta CHECK (inspeccion_base_id IS NULL OR inspeccion_base_id <> id),
@@ -60,8 +98,12 @@ CREATE TABLE inspeccion (
     CONSTRAINT inspeccion_alineamiento_valido CHECK (alineamiento_horizontal IS NULL OR alineamiento_horizontal IN ('TANGENTE','CURVA')),
     CONSTRAINT inspeccion_encauzamiento_valido CHECK (encauzamiento IS NULL OR encauzamiento IN ('RECTO','CURVA','INDEFINIDO')),
     CONSTRAINT uq_inspeccion_id_puente UNIQUE (id, puente_id),
-    CONSTRAINT fk_inspeccion_base_mismo_puente FOREIGN KEY (inspeccion_base_id, puente_id) REFERENCES inspeccion(id, puente_id),
-    CONSTRAINT fk_inspeccion_correccion_mismo_puente FOREIGN KEY (supersede_a_id, puente_id) REFERENCES inspeccion(id, puente_id)
+    CONSTRAINT fk_inspeccion_base_mismo_puente
+        FOREIGN KEY (inspeccion_base_id, puente_id)
+        REFERENCES inspeccion(id, puente_id),
+    CONSTRAINT fk_inspeccion_correccion_mismo_puente
+        FOREIGN KEY (supersede_a_id, puente_id)
+        REFERENCES inspeccion(id, puente_id)
 );
 CREATE INDEX idx_inspeccion_puente_fecha ON inspeccion (puente_id, fecha_inspeccion DESC);
 CREATE INDEX idx_inspeccion_autor_estado ON inspeccion (autor_id, estado);
@@ -71,12 +113,13 @@ CREATE INDEX idx_inspeccion_datos_gin ON inspeccion USING GIN (datos jsonb_path_
 CREATE INDEX idx_inspeccion_ubicacion_gist ON inspeccion USING GIST (ubicacion_inicio);
 CREATE UNIQUE INDEX uq_inspeccion_sucesora_publicada ON inspeccion (supersede_a_id) WHERE estado = 'PUBLICADA';
 
+-- Tramos repetibles consultables de una inspección.
 CREATE TABLE inspeccion_tramo (
     id UUID PRIMARY KEY,
     inspeccion_id UUID NOT NULL REFERENCES inspeccion(id),
     instancia_elemento_id UUID NOT NULL,
     orden INTEGER NOT NULL,
-    longitud_m NUMERIC(10,2),
+    longitud_m NUMERIC(10, 2),
     tipo_seccion VARCHAR(100),
     creado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT inspeccion_tramo_orden_positivo CHECK (orden > 0),
@@ -85,6 +128,7 @@ CREATE TABLE inspeccion_tramo (
     CONSTRAINT uq_inspeccion_tramo_orden UNIQUE (inspeccion_id, orden)
 );
 
+-- Acompañantes registrados en la visita de inspección.
 CREATE TABLE inspeccion_acompanante (
     id UUID PRIMARY KEY,
     inspeccion_id UUID NOT NULL REFERENCES inspeccion(id),

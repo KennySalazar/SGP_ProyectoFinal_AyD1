@@ -1,4 +1,4 @@
--- Catálogo territorial Guatemala.
+-- Catálogo territorial oficial de Guatemala: 22 departamentos y 340 municipios.
 
 INSERT INTO departamento (id, codigo_ine, nombre)
 VALUES
@@ -23,8 +23,7 @@ VALUES
   ('01a0e6d8-4f26-7013-b2f1-860a3bc36d2d', '19', 'Zacapa'),
   ('01a0e6d8-4f26-7014-8012-91f7ba72e555', '20', 'Chiquimula'),
   ('01a0e6d8-4f26-7015-8468-68c3a888ffe1', '21', 'Jalapa'),
-  ('01a0e6d8-4f26-7016-b0b2-6a32a57fcb23', '22', 'Jutiapa')
-;
+  ('01a0e6d8-4f26-7016-b0b2-6a32a57fcb23', '22', 'Jutiapa');
 
 DO $sgp$
 BEGIN
@@ -375,8 +374,8 @@ FROM (VALUES
   ('01a0e6d8-4f26-7169-9190-78c1d7edd8c8', '2216', 'San José Acatempa'),
   ('01a0e6d8-4f26-716a-8ab7-070521181a28', '2217', 'Quesada')
 ) AS v(id, codigo, nombre)
-JOIN departamento d ON d.codigo_ine = left(v.codigo, 2)
-;
+JOIN departamento d
+    ON d.codigo_ine = left(v.codigo, 2);
 
 DO $sgp$
 BEGIN

@@ -1,3 +1,6 @@
+-- Catálogos territoriales y estructura académica.
+
+-- Catálogos territoriales.
 CREATE TABLE departamento (
     id UUID PRIMARY KEY,
     codigo_ine VARCHAR(10) NOT NULL UNIQUE,
@@ -27,6 +30,7 @@ CREATE UNIQUE INDEX uq_municipio_departamento_nombre_lower
     ON municipio (departamento_id, lower(nombre));
 CREATE INDEX idx_municipio_departamento ON municipio (departamento_id);
 
+-- Oferta académica e inscripción de estudiantes.
 CREATE TABLE curso (
     id UUID PRIMARY KEY,
     codigo VARCHAR(50) NOT NULL,
@@ -59,7 +63,8 @@ CREATE TABLE curso_estudiante (
     version BIGINT NOT NULL DEFAULT 0,
     CONSTRAINT curso_estudiante_estado_valido CHECK (estado IN ('ACTIVO', 'RETIRADO')),
     CONSTRAINT curso_estudiante_retiro_coherente CHECK (
-        (estado = 'ACTIVO' AND retirado_en IS NULL) OR (estado = 'RETIRADO' AND retirado_en IS NOT NULL)
+        (estado = 'ACTIVO' AND retirado_en IS NULL)
+        OR (estado = 'RETIRADO' AND retirado_en IS NOT NULL)
     ),
     CONSTRAINT uq_curso_estudiante UNIQUE (curso_id, estudiante_id)
 );

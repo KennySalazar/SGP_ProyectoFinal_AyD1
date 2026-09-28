@@ -1,3 +1,6 @@
+-- Inventario oficial de puentes y asignaciones académicas.
+
+-- Activo físico de infraestructura.
 CREATE TABLE puente (
     id UUID PRIMARY KEY,
     codigo VARCHAR(40) NOT NULL UNIQUE,
@@ -19,7 +22,12 @@ CREATE TABLE puente (
     CONSTRAINT puente_kilometraje_no_negativo CHECK (kilometraje IS NULL OR kilometraje >= 0),
     CONSTRAINT puente_inactivacion_completa CHECK (
         (activo AND inactivado_en IS NULL AND inactivado_por_id IS NULL AND motivo_inactivacion IS NULL)
-        OR (NOT activo AND inactivado_en IS NOT NULL AND inactivado_por_id IS NOT NULL AND motivo_inactivacion IS NOT NULL)
+        OR (
+            NOT activo
+            AND inactivado_en IS NOT NULL
+            AND inactivado_por_id IS NOT NULL
+            AND motivo_inactivacion IS NOT NULL
+        )
     ),
     CONSTRAINT uq_puente_municipio_correlativo UNIQUE (municipio_id, correlativo_municipal),
     CONSTRAINT uq_puente_id_municipio UNIQUE (id, municipio_id)
@@ -30,6 +38,7 @@ CREATE INDEX idx_puente_nombre_trgm ON puente USING GIN (nombre gin_trgm_ops);
 CREATE INDEX idx_puente_municipio_activo ON puente (municipio_id, activo);
 CREATE INDEX idx_puente_ruta ON puente (ruta);
 
+-- Solicitudes que preceden al alta del inventario.
 CREATE TABLE solicitud_alta_puente (
     id UUID PRIMARY KEY,
     solicitado_por_id UUID NOT NULL REFERENCES usuario(id),
@@ -62,6 +71,7 @@ CREATE INDEX idx_solicitud_estado_creado ON solicitud_alta_puente (estado, cread
 CREATE INDEX idx_solicitud_solicitante ON solicitud_alta_puente (solicitado_por_id);
 CREATE INDEX idx_solicitud_ubicacion_gist ON solicitud_alta_puente USING GIST (ubicacion);
 
+-- Asignaciones históricas de puentes a estudiantes inscritos.
 CREATE TABLE asignacion_puente (
     id UUID PRIMARY KEY,
     curso_estudiante_id UUID NOT NULL REFERENCES curso_estudiante(id),

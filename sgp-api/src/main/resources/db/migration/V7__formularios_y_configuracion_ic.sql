@@ -1,3 +1,6 @@
+-- Versiones de formulario y configuración reproducible del índice de condición.
+
+-- Definición versionada del formulario de inspección.
 CREATE TABLE version_formulario (
     id UUID PRIMARY KEY,
     codigo VARCHAR(50) NOT NULL UNIQUE,
@@ -20,13 +23,20 @@ CREATE TABLE version_formulario (
     CONSTRAINT version_formulario_estado_valido CHECK (estado IN ('BORRADOR', 'PUBLICADA')),
     CONSTRAINT version_formulario_activa_publicada CHECK (NOT activa OR estado = 'PUBLICADA'),
     CONSTRAINT version_formulario_publicacion_completa CHECK (
-        estado <> 'PUBLICADA' OR (hash_contenido IS NOT NULL AND version_algoritmo_ic IS NOT NULL AND publicado_por_id IS NOT NULL AND publicado_en IS NOT NULL)
+        estado <> 'PUBLICADA'
+        OR (
+            hash_contenido IS NOT NULL
+            AND version_algoritmo_ic IS NOT NULL
+            AND publicado_por_id IS NOT NULL
+            AND publicado_en IS NOT NULL
+        )
     ),
     CONSTRAINT version_formulario_anterior_distinta CHECK (version_anterior_id IS NULL OR version_anterior_id <> id)
 );
 
 CREATE UNIQUE INDEX uq_version_formulario_activa ON version_formulario ((TRUE)) WHERE activa;
 
+-- Correspondencia declarada entre versiones de formulario.
 CREATE TABLE mapeo_campo_formulario (
     id UUID PRIMARY KEY,
     version_origen_id UUID NOT NULL REFERENCES version_formulario(id),
@@ -42,13 +52,18 @@ CREATE TABLE mapeo_campo_formulario (
     CONSTRAINT mapeo_referencias_coherentes CHECK (
         (tipo = 'NUEVO' AND elemento_ref_origen IS NULL AND elemento_ref_destino IS NOT NULL)
         OR (tipo = 'ELIMINADO' AND elemento_ref_origen IS NOT NULL AND elemento_ref_destino IS NULL)
-        OR (tipo IN ('EQUIVALENTE', 'RENOMBRADO') AND elemento_ref_origen IS NOT NULL AND elemento_ref_destino IS NOT NULL)
+        OR (
+            tipo IN ('EQUIVALENTE', 'RENOMBRADO')
+            AND elemento_ref_origen IS NOT NULL
+            AND elemento_ref_destino IS NOT NULL
+        )
     )
 );
 
 CREATE UNIQUE INDEX uq_mapeo_origen ON mapeo_campo_formulario (version_origen_id, version_destino_id, elemento_ref_origen) WHERE elemento_ref_origen IS NOT NULL;
 CREATE UNIQUE INDEX uq_mapeo_destino ON mapeo_campo_formulario (version_origen_id, version_destino_id, elemento_ref_destino) WHERE elemento_ref_destino IS NOT NULL;
 
+-- Pesos por elemento, congelados al publicar el formulario.
 CREATE TABLE configuracion_ic_elemento (
     id UUID PRIMARY KEY,
     version_formulario_id UUID NOT NULL REFERENCES version_formulario(id),
