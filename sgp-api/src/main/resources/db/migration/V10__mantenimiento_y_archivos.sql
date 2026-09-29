@@ -80,10 +80,6 @@ CREATE TABLE orden_mantenimiento (
     aceptado_por_id UUID REFERENCES usuario(id),
     aceptado_en TIMESTAMPTZ,
     fecha_programada DATE,
-    iniciado_en TIMESTAMPTZ,
-    fecha_ejecucion DATE,
-    responsable_usuario_id UUID REFERENCES usuario(id),
-    responsable_nombre VARCHAR(200),
     motivo_cierre_sin_ejecucion TEXT,
     creado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     actualizado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -105,13 +101,6 @@ CREATE TABLE orden_mantenimiento (
             aceptado_por_id IS NOT NULL
             AND aceptado_en IS NOT NULL
             AND fecha_programada IS NOT NULL
-        )
-    ),
-    CONSTRAINT orden_ejecutada_completa CHECK (
-        estado <> 'EJECUTADA'
-        OR (
-            fecha_ejecucion IS NOT NULL
-            AND (responsable_usuario_id IS NOT NULL OR responsable_nombre IS NOT NULL)
         )
     ),
     CONSTRAINT orden_cierre_motivo CHECK (
@@ -137,6 +126,25 @@ CREATE UNIQUE INDEX uq_orden_plan_ciclo_activo
     ON orden_mantenimiento (plan_mantenimiento_rutinario_id, ciclo_plan)
     WHERE estado IN ('PROPUESTA', 'PROGRAMADA', 'EN_EJECUCION', 'EJECUTADA');
 
+-- Información que existe únicamente cuando una orden entra en ejecución.
+-- El servicio valida atómicamente su presencia para los estados EN_EJECUCION y EJECUTADA.
+CREATE TABLE orden_mantenimiento_ejecucion (
+    orden_mantenimiento_id UUID PRIMARY KEY REFERENCES orden_mantenimiento(id),
+    iniciado_en TIMESTAMPTZ NOT NULL,
+    fecha_ejecucion DATE,
+    responsable_usuario_id UUID REFERENCES usuario(id),
+    responsable_nombre VARCHAR(200),
+    creado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    actualizado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    version BIGINT NOT NULL DEFAULT 0,
+    CONSTRAINT orden_ejecucion_responsable_requerido CHECK (
+        responsable_usuario_id IS NOT NULL OR responsable_nombre IS NOT NULL
+    ),
+    CONSTRAINT orden_ejecucion_fecha_coherente CHECK (
+        fecha_ejecucion IS NULL OR fecha_ejecucion >= iniciado_en::date
+    )
+);
+
 -- Bitácora inmutable de los cambios de estado de las órdenes.
 CREATE TABLE historial_estado_orden (
     id UUID PRIMARY KEY,
@@ -151,7 +159,8 @@ CREATE TABLE historial_estado_orden (
 );
 CREATE INDEX idx_historial_orden_fecha ON historial_estado_orden (orden_mantenimiento_id, creado_en);
 
--- Metadatos de objetos de MinIO; no almacena binarios en PostgreSQL.
+-- Metadatos físicos de un objeto en MinIO. El tipo discrimina el único vínculo
+-- de negocio permitido y evita las tres claves foráneas contextuales opcionales.
 CREATE TABLE archivo (
     id UUID PRIMARY KEY,
     tipo_uso VARCHAR(30) NOT NULL CHECK (
@@ -160,11 +169,6 @@ CREATE TABLE archivo (
             'EVIDENCIA_MANTENIMIENTO', 'ACTA_CALIBRACION'
         )
     ),
-    inspeccion_id UUID REFERENCES inspeccion(id),
-    orden_mantenimiento_id UUID REFERENCES orden_mantenimiento(id),
-    version_formulario_id UUID REFERENCES version_formulario(id),
-    elemento_ref VARCHAR(300),
-    instancia_elemento_id UUID,
     categoria_foto VARCHAR(30),
     nombre_original VARCHAR(255),
     nombre_almacenado VARCHAR(255) NOT NULL,
@@ -185,20 +189,13 @@ CREATE TABLE archivo (
     purgado_en TIMESTAMPTZ,
     motivo_retiro TEXT,
     creado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT archivo_contexto_unico CHECK (
-        num_nonnulls(inspeccion_id, orden_mantenimiento_id, version_formulario_id) = 1
-    ),
-    CONSTRAINT archivo_contexto_tipo CHECK (
-        (tipo_uso IN ('FOTO_INSPECCION', 'DOCUMENTO_INSPECCION') AND inspeccion_id IS NOT NULL)
-        OR (tipo_uso = 'EVIDENCIA_MANTENIMIENTO' AND orden_mantenimiento_id IS NOT NULL)
-        OR (tipo_uso = 'ACTA_CALIBRACION' AND version_formulario_id IS NOT NULL)
-    ),
-    CONSTRAINT archivo_instancia_requiere_ref CHECK (
-        instancia_elemento_id IS NULL OR elemento_ref IS NOT NULL
-    ),
+    CONSTRAINT uq_archivo_id_tipo_uso UNIQUE (id, tipo_uso),
     CONSTRAINT archivo_categoria_foto_valida CHECK (
         categoria_foto IS NULL
         OR categoria_foto IN ('ACCESO', 'SUPERESTRUCTURA', 'SUBESTRUCTURA', 'CAUCE', 'OTRA')
+    ),
+    CONSTRAINT archivo_categoria_solo_foto CHECK (
+        tipo_uso = 'FOTO_INSPECCION' OR categoria_foto IS NULL
     ),
     CONSTRAINT archivo_foto_inspeccion_categoria_obligatoria CHECK (
         tipo_uso <> 'FOTO_INSPECCION' OR categoria_foto IS NOT NULL
@@ -232,6 +229,61 @@ CREATE TABLE archivo (
         )
     )
 );
-CREATE INDEX idx_archivo_inspeccion_tipo_estado
-    ON archivo (inspeccion_id, tipo_uso, estado);
-CREATE INDEX idx_archivo_orden_estado ON archivo (orden_mantenimiento_id, estado);
+CREATE INDEX idx_archivo_tipo_estado ON archivo (tipo_uso, estado);
+CREATE INDEX idx_archivo_checksum_tamano ON archivo (checksum_sha256, tamano_bytes);
+
+-- Vínculo para fotos y documentos pertenecientes a una inspección.
+CREATE TABLE archivo_inspeccion (
+    archivo_id UUID PRIMARY KEY,
+    tipo_uso VARCHAR(30) NOT NULL,
+    inspeccion_id UUID NOT NULL REFERENCES inspeccion(id),
+    elemento_ref VARCHAR(300),
+    instancia_elemento_id UUID,
+    creado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT archivo_inspeccion_tipo_valido CHECK (
+        tipo_uso IN ('FOTO_INSPECCION', 'DOCUMENTO_INSPECCION')
+    ),
+    CONSTRAINT archivo_inspeccion_instancia_requiere_ref CHECK (
+        instancia_elemento_id IS NULL OR elemento_ref IS NOT NULL
+    ),
+    CONSTRAINT fk_archivo_inspeccion_tipo
+        FOREIGN KEY (archivo_id, tipo_uso)
+        REFERENCES archivo(id, tipo_uso)
+);
+CREATE INDEX idx_archivo_inspeccion_inspeccion_tipo
+    ON archivo_inspeccion (inspeccion_id, tipo_uso);
+
+-- Vínculo de evidencia fotográfica o documental con una orden de mantenimiento.
+CREATE TABLE archivo_evidencia_mantenimiento (
+    archivo_id UUID PRIMARY KEY,
+    tipo_uso VARCHAR(30) NOT NULL DEFAULT 'EVIDENCIA_MANTENIMIENTO',
+    orden_mantenimiento_id UUID NOT NULL REFERENCES orden_mantenimiento(id),
+    elemento_ref VARCHAR(300),
+    instancia_elemento_id UUID,
+    creado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT archivo_evidencia_tipo_valido CHECK (
+        tipo_uso = 'EVIDENCIA_MANTENIMIENTO'
+    ),
+    CONSTRAINT archivo_evidencia_instancia_requiere_ref CHECK (
+        instancia_elemento_id IS NULL OR elemento_ref IS NOT NULL
+    ),
+    CONSTRAINT fk_archivo_evidencia_tipo
+        FOREIGN KEY (archivo_id, tipo_uso)
+        REFERENCES archivo(id, tipo_uso)
+);
+CREATE INDEX idx_archivo_evidencia_orden
+    ON archivo_evidencia_mantenimiento (orden_mantenimiento_id);
+
+-- Acta de calibración que respalda una versión de formulario publicada.
+CREATE TABLE archivo_acta_calibracion (
+    archivo_id UUID PRIMARY KEY,
+    tipo_uso VARCHAR(30) NOT NULL DEFAULT 'ACTA_CALIBRACION',
+    version_formulario_id UUID NOT NULL REFERENCES version_formulario(id),
+    creado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT archivo_acta_tipo_valido CHECK (tipo_uso = 'ACTA_CALIBRACION'),
+    CONSTRAINT fk_archivo_acta_tipo
+        FOREIGN KEY (archivo_id, tipo_uso)
+        REFERENCES archivo(id, tipo_uso)
+);
+CREATE INDEX idx_archivo_acta_version
+    ON archivo_acta_calibracion (version_formulario_id);

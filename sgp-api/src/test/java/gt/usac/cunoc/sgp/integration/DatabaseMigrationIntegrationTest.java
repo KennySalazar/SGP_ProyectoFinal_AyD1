@@ -1,6 +1,7 @@
 package gt.usac.cunoc.sgp.integration;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.sql.Connection;
@@ -49,17 +50,35 @@ class DatabaseMigrationIntegrationTest {
       assertTrue(tableExists(statement, "usuario"));
       assertTrue(tableExists(statement, "rol"));
       assertTrue(tableExists(statement, "auditoria"));
+      assertTrue(tableExists(statement, "usuario_profesional"));
       assertTrue(tableExists(statement, "departamento"));
       assertTrue(tableExists(statement, "municipio"));
+      assertTrue(tableExists(statement, "asignatura"));
       assertTrue(tableExists(statement, "puente"));
       assertTrue(tableExists(statement, "version_formulario"));
       assertTrue(tableExists(statement, "inspeccion"));
+      assertTrue(tableExists(statement, "inspeccion_dato_tecnico"));
       assertTrue(tableExists(statement, "revision"));
       assertTrue(tableExists(statement, "resultado_ic"));
       assertTrue(tableExists(statement, "archivo"));
+      assertTrue(tableExists(statement, "archivo_inspeccion"));
+      assertTrue(tableExists(statement, "archivo_evidencia_mantenimiento"));
+      assertTrue(tableExists(statement, "archivo_acta_calibracion"));
       assertTrue(tableExists(statement, "orden_mantenimiento"));
+      assertTrue(tableExists(statement, "orden_mantenimiento_ejecucion"));
       assertTrue(tableExists(statement, "operacion_idempotente"));
       assertEquals("character varying", tokenHashType(statement));
+      assertTrue(columnExists(statement, "curso", "asignatura_id"));
+      assertFalse(columnExists(statement, "curso", "codigo"));
+      assertFalse(columnExists(statement, "curso", "nombre"));
+      assertTrue(columnExists(statement, "usuario_profesional", "numero_colegiado"));
+      assertFalse(columnExists(statement, "usuario", "numero_colegiado"));
+      assertTrue(columnExists(statement, "inspeccion_dato_tecnico", "longitud_m"));
+      assertFalse(columnExists(statement, "inspeccion", "longitud_m"));
+      assertTrue(columnExists(statement, "orden_mantenimiento_ejecucion", "fecha_ejecucion"));
+      assertFalse(columnExists(statement, "orden_mantenimiento", "fecha_ejecucion"));
+      assertTrue(columnExists(statement, "archivo_inspeccion", "inspeccion_id"));
+      assertFalse(columnExists(statement, "archivo", "inspeccion_id"));
       assertTrue(indexExists(statement, "uq_version_formulario_activa"));
       assertTrue(indexExists(statement, "uq_revision_abierta_por_inspeccion"));
       assertTrue(indexExists(statement, "uq_resultado_ic_publicacion"));
@@ -99,6 +118,22 @@ class DatabaseMigrationIntegrationTest {
             "SELECT data_type FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'token_refresco' AND column_name = 'token_hash'")) {
       result.next();
       return result.getString(1);
+    }
+  }
+
+  private boolean columnExists(Statement statement, String table, String column) throws Exception {
+    try (ResultSet result =
+        statement.executeQuery(
+            "SELECT EXISTS ("
+                + "SELECT 1 FROM information_schema.columns "
+                + "WHERE table_schema = 'public' "
+                + "AND table_name = '"
+                + table
+                + "' AND column_name = '"
+                + column
+                + "')")) {
+      result.next();
+      return result.getBoolean(1);
     }
   }
 

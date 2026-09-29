@@ -30,11 +30,22 @@ CREATE UNIQUE INDEX uq_municipio_departamento_nombre_lower
     ON municipio (departamento_id, lower(nombre));
 CREATE INDEX idx_municipio_departamento ON municipio (departamento_id);
 
+-- Definición estable de una asignatura. Su nombre depende de su código,
+-- no de cada período ni sección en que se imparte.
+CREATE TABLE asignatura (
+    id UUID PRIMARY KEY,
+    codigo VARCHAR(50) NOT NULL UNIQUE,
+    nombre VARCHAR(150) NOT NULL,
+    activo BOOLEAN NOT NULL DEFAULT TRUE,
+    creado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    actualizado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    version BIGINT NOT NULL DEFAULT 0
+);
+
 -- Oferta académica e inscripción de estudiantes.
 CREATE TABLE curso (
     id UUID PRIMARY KEY,
-    codigo VARCHAR(50) NOT NULL,
-    nombre VARCHAR(150) NOT NULL,
+    asignatura_id UUID NOT NULL REFERENCES asignatura(id),
     periodo VARCHAR(50) NOT NULL,
     seccion VARCHAR(30) NOT NULL,
     catedratico_id UUID NOT NULL REFERENCES usuario(id),
@@ -45,10 +56,11 @@ CREATE TABLE curso (
     actualizado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     version BIGINT NOT NULL DEFAULT 0,
     CONSTRAINT curso_fechas_validas CHECK (fecha_fin >= fecha_inicio),
-    CONSTRAINT uq_curso_oferta UNIQUE (codigo, periodo, seccion)
+    CONSTRAINT uq_curso_oferta UNIQUE (asignatura_id, periodo, seccion)
 );
 
 CREATE INDEX idx_curso_catedratico_activo ON curso (catedratico_id, activo);
+CREATE INDEX idx_curso_asignatura ON curso (asignatura_id);
 
 CREATE TABLE curso_estudiante (
     id UUID PRIMARY KEY,

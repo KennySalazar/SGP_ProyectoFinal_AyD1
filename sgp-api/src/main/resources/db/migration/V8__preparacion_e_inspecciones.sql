@@ -35,34 +35,6 @@ CREATE TABLE inspeccion (
     datos_permanentes_confirmados_en TIMESTAMPTZ,
     identificacion_capturada JSONB,
     datos JSONB NOT NULL DEFAULT '{}'::jsonb,
-    longitud_m NUMERIC(10, 2),
-    numero_tramos INTEGER,
-    ancho_rodadura_m NUMERIC(10, 2),
-    ancho_acera_derecha_m NUMERIC(10, 2),
-    ancho_acera_izquierda_m NUMERIC(10, 2),
-    altura_libre_superior_m NUMERIC(10, 2),
-    altura_libre_sobre_cauce_m NUMERIC(10, 2),
-    tipologia_puente VARCHAR(100),
-    tipo_cruce VARCHAR(100),
-    numero_vias_por_sentido INTEGER,
-    material_superestructura VARCHAR(100),
-    material_subestructura VARCHAR(100),
-    carga_diseno VARCHAR(100),
-    anio_construccion SMALLINT,
-    trafico_vehiculos_dia INTEGER,
-    porcentaje_camiones_buses NUMERIC(5, 2),
-    ruta_pavimentada VARCHAR(10),
-    alineamiento_horizontal VARCHAR(15),
-    esviaje BOOLEAN,
-    poblacion_antes VARCHAR(200),
-    poblacion_despues VARCHAR(200),
-    tipo_cuerpo_agua VARCHAR(50),
-    nombre_rio VARCHAR(200),
-    encauzamiento VARCHAR(20),
-    antecedente_desbordamiento BOOLEAN,
-    frecuencia_desbordamiento_anios NUMERIC(8, 2),
-    fecha_ultimo_desbordamiento DATE,
-    alumbrado_existe BOOLEAN, drenajes_aledanos_existen BOOLEAN,
     creado_dispositivo_en TIMESTAMPTZ,
     enviado_dispositivo_en TIMESTAMPTZ,
     sincronizado_en TIMESTAMPTZ,
@@ -90,13 +62,6 @@ CREATE TABLE inspeccion (
     CONSTRAINT inspeccion_publicacion_coherente CHECK (estado <> 'PUBLICADA' OR publicado_en IS NOT NULL),
     CONSTRAINT inspeccion_publicada_no_eliminada CHECK (estado <> 'PUBLICADA' OR eliminado_en IS NULL),
     CONSTRAINT inspeccion_base_distinta CHECK (inspeccion_base_id IS NULL OR inspeccion_base_id <> id),
-    CONSTRAINT inspeccion_medidas_validas CHECK (longitud_m IS NULL OR longitud_m >= 0),
-    CONSTRAINT inspeccion_porcentaje_valido CHECK (porcentaje_camiones_buses IS NULL OR porcentaje_camiones_buses BETWEEN 0 AND 100),
-    CONSTRAINT inspeccion_tramos_validos CHECK (numero_tramos IS NULL OR numero_tramos >= 0),
-    CONSTRAINT inspeccion_anio_valido CHECK (anio_construccion IS NULL OR anio_construccion BETWEEN 1 AND 9999),
-    CONSTRAINT inspeccion_ruta_pavimentada_valida CHECK (ruta_pavimentada IS NULL OR ruta_pavimentada IN ('SI','NO','PARCIAL')),
-    CONSTRAINT inspeccion_alineamiento_valido CHECK (alineamiento_horizontal IS NULL OR alineamiento_horizontal IN ('TANGENTE','CURVA')),
-    CONSTRAINT inspeccion_encauzamiento_valido CHECK (encauzamiento IS NULL OR encauzamiento IN ('RECTO','CURVA','INDEFINIDO')),
     CONSTRAINT uq_inspeccion_id_puente UNIQUE (id, puente_id),
     CONSTRAINT fk_inspeccion_base_mismo_puente
         FOREIGN KEY (inspeccion_base_id, puente_id)
@@ -112,6 +77,70 @@ CREATE INDEX idx_inspeccion_version_formulario ON inspeccion (version_formulario
 CREATE INDEX idx_inspeccion_datos_gin ON inspeccion USING GIN (datos jsonb_path_ops);
 CREATE INDEX idx_inspeccion_ubicacion_gist ON inspeccion USING GIST (ubicacion_inicio);
 CREATE UNIQUE INDEX uq_inspeccion_sucesora_publicada ON inspeccion (supersede_a_id) WHERE estado = 'PUBLICADA';
+
+-- Datos técnicos consultables del formulario. Es una extensión opcional 1:1:
+-- los borradores pueden no haber completado aún esta parte de la visita.
+CREATE TABLE inspeccion_dato_tecnico (
+    inspeccion_id UUID PRIMARY KEY REFERENCES inspeccion(id),
+    longitud_m NUMERIC(10, 2),
+    numero_tramos INTEGER,
+    ancho_rodadura_m NUMERIC(10, 2),
+    ancho_acera_derecha_m NUMERIC(10, 2),
+    ancho_acera_izquierda_m NUMERIC(10, 2),
+    altura_libre_superior_m NUMERIC(10, 2),
+    altura_libre_sobre_cauce_m NUMERIC(10, 2),
+    tipologia_puente VARCHAR(100),
+    tipo_cruce VARCHAR(100),
+    numero_vias_por_sentido INTEGER,
+    material_superestructura VARCHAR(100),
+    material_subestructura VARCHAR(100),
+    carga_diseno VARCHAR(100),
+    anio_construccion SMALLINT,
+    trafico_vehiculos_dia INTEGER,
+    porcentaje_camiones_buses NUMERIC(5, 2),
+    ruta_pavimentada VARCHAR(10),
+    alineamiento_horizontal VARCHAR(15),
+    esviaje BOOLEAN,
+    poblacion_antes VARCHAR(200),
+    poblacion_despues VARCHAR(200),
+    tipo_cuerpo_agua VARCHAR(50),
+    nombre_rio VARCHAR(200),
+    encauzamiento VARCHAR(20),
+    antecedente_desbordamiento BOOLEAN,
+    frecuencia_desbordamiento_anios NUMERIC(8, 2),
+    fecha_ultimo_desbordamiento DATE,
+    alumbrado_existe BOOLEAN,
+    drenajes_aledanos_existen BOOLEAN,
+    creado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    actualizado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    version BIGINT NOT NULL DEFAULT 0,
+    CONSTRAINT inspeccion_dato_tecnico_medidas_validas CHECK (
+        (longitud_m IS NULL OR longitud_m >= 0)
+        AND (ancho_rodadura_m IS NULL OR ancho_rodadura_m >= 0)
+        AND (ancho_acera_derecha_m IS NULL OR ancho_acera_derecha_m >= 0)
+        AND (ancho_acera_izquierda_m IS NULL OR ancho_acera_izquierda_m >= 0)
+        AND (altura_libre_superior_m IS NULL OR altura_libre_superior_m >= 0)
+        AND (altura_libre_sobre_cauce_m IS NULL OR altura_libre_sobre_cauce_m >= 0)
+    ),
+    CONSTRAINT inspeccion_dato_tecnico_porcentaje_valido CHECK (
+        porcentaje_camiones_buses IS NULL OR porcentaje_camiones_buses BETWEEN 0 AND 100
+    ),
+    CONSTRAINT inspeccion_dato_tecnico_tramos_validos CHECK (
+        numero_tramos IS NULL OR numero_tramos >= 0
+    ),
+    CONSTRAINT inspeccion_dato_tecnico_anio_valido CHECK (
+        anio_construccion IS NULL OR anio_construccion BETWEEN 1 AND 9999
+    ),
+    CONSTRAINT inspeccion_dato_tecnico_ruta_pavimentada_valida CHECK (
+        ruta_pavimentada IS NULL OR ruta_pavimentada IN ('SI', 'NO', 'PARCIAL')
+    ),
+    CONSTRAINT inspeccion_dato_tecnico_alineamiento_valido CHECK (
+        alineamiento_horizontal IS NULL OR alineamiento_horizontal IN ('TANGENTE', 'CURVA')
+    ),
+    CONSTRAINT inspeccion_dato_tecnico_encauzamiento_valido CHECK (
+        encauzamiento IS NULL OR encauzamiento IN ('RECTO', 'CURVA', 'INDEFINIDO')
+    )
+);
 
 -- Tramos repetibles consultables de una inspección.
 CREATE TABLE inspeccion_tramo (
