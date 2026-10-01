@@ -1,7 +1,6 @@
 package gt.usac.cunoc.sgp.usuario.service;
 
 import gt.usac.cunoc.sgp.common.exception.ApiException;
-import gt.usac.cunoc.sgp.common.exception.OtpRateLimitException;
 import gt.usac.cunoc.sgp.common.security.JwtService;
 import gt.usac.cunoc.sgp.common.util.EmailNormalizer;
 import gt.usac.cunoc.sgp.usuario.dto.AccessTokenResponse;
@@ -14,11 +13,12 @@ import gt.usac.cunoc.sgp.usuario.dto.PasswordChangeResponse;
 import gt.usac.cunoc.sgp.usuario.dto.RecoveryRequest;
 import gt.usac.cunoc.sgp.usuario.dto.RegisterRequest;
 import gt.usac.cunoc.sgp.usuario.dto.UserResponse;
-import gt.usac.cunoc.sgp.usuario.entity.OtpPurpose;
 import gt.usac.cunoc.sgp.usuario.entity.Role;
-import gt.usac.cunoc.sgp.usuario.entity.RoleName;
 import gt.usac.cunoc.sgp.usuario.entity.UserAccount;
+import gt.usac.cunoc.sgp.usuario.exception.OtpRateLimitException;
 import gt.usac.cunoc.sgp.usuario.mapper.UserMapper;
+import gt.usac.cunoc.sgp.usuario.model.OtpPurpose;
+import gt.usac.cunoc.sgp.usuario.model.RoleName;
 import gt.usac.cunoc.sgp.usuario.repository.RoleRepository;
 import gt.usac.cunoc.sgp.usuario.repository.UserAccountRepository;
 import java.time.Clock;

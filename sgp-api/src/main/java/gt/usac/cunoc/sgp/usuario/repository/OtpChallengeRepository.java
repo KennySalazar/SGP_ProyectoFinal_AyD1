@@ -1,8 +1,8 @@
 package gt.usac.cunoc.sgp.usuario.repository;
 
 import gt.usac.cunoc.sgp.usuario.entity.OtpChallenge;
-import gt.usac.cunoc.sgp.usuario.entity.OtpPurpose;
 import gt.usac.cunoc.sgp.usuario.entity.UserAccount;
+import gt.usac.cunoc.sgp.usuario.model.OtpPurpose;
 import jakarta.persistence.LockModeType;
 import java.time.Instant;
 import java.util.Optional;

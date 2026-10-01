@@ -1,8 +1,8 @@
 package gt.usac.cunoc.sgp.common.security;
 
 import gt.usac.cunoc.sgp.common.config.JwtProperties;
-import gt.usac.cunoc.sgp.usuario.entity.RoleName;
 import gt.usac.cunoc.sgp.usuario.entity.UserAccount;
+import gt.usac.cunoc.sgp.usuario.model.RoleName;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;

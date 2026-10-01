@@ -1,5 +1,6 @@
-package gt.usac.cunoc.sgp.common.exception;
+package gt.usac.cunoc.sgp.usuario.exception;
 
+import gt.usac.cunoc.sgp.common.exception.ApiException;
 import org.springframework.http.HttpStatus;
 
 public class OtpRateLimitException extends ApiException {

@@ -2,11 +2,10 @@ package gt.usac.cunoc.sgp.usuario.service;
 
 import gt.usac.cunoc.sgp.common.config.OtpProperties;
 import gt.usac.cunoc.sgp.common.exception.ApiException;
-import gt.usac.cunoc.sgp.common.exception.OtpRateLimitException;
-import gt.usac.cunoc.sgp.common.mail.EmailService;
 import gt.usac.cunoc.sgp.usuario.entity.OtpChallenge;
-import gt.usac.cunoc.sgp.usuario.entity.OtpPurpose;
 import gt.usac.cunoc.sgp.usuario.entity.UserAccount;
+import gt.usac.cunoc.sgp.usuario.exception.OtpRateLimitException;
+import gt.usac.cunoc.sgp.usuario.model.OtpPurpose;
 import gt.usac.cunoc.sgp.usuario.repository.OtpChallengeRepository;
 import java.security.SecureRandom;
 import java.time.Clock;
@@ -23,7 +22,7 @@ public class OtpService {
 
   private final OtpChallengeRepository challenges;
   private final PasswordEncoder passwordEncoder;
-  private final EmailService emailService;
+  private final OtpEmailService otpEmailService;
   private final OtpProperties properties;
   private final Clock clock;
   private final SecureRandom random = new SecureRandom();
@@ -31,12 +30,12 @@ public class OtpService {
   public OtpService(
       OtpChallengeRepository challenges,
       PasswordEncoder passwordEncoder,
-      EmailService emailService,
+      OtpEmailService otpEmailService,
       OtpProperties properties,
       Clock clock) {
     this.challenges = challenges;
     this.passwordEncoder = passwordEncoder;
-    this.emailService = emailService;
+    this.otpEmailService = otpEmailService;
     this.properties = properties;
     this.clock = clock;
   }
@@ -64,7 +63,7 @@ public class OtpService {
                 now.plusSeconds(properties.getExpirationMinutes() * 60L),
                 properties.getMaxAttempts(),
                 now));
-    emailService.sendOtp(user.getEmail(), purpose, code, challenge.getExpiresAt());
+    otpEmailService.sendOtp(user.getEmail(), purpose, code, challenge.getExpiresAt());
     return challenge;
   }
 

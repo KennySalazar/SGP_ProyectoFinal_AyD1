@@ -1,6 +1,7 @@
 package gt.usac.cunoc.sgp.usuario.entity;
 
 import gt.usac.cunoc.sgp.common.util.UuidV7Generator;
+import gt.usac.cunoc.sgp.usuario.model.OtpPurpose;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;

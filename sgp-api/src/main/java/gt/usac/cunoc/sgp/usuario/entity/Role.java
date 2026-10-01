@@ -1,5 +1,6 @@
 package gt.usac.cunoc.sgp.usuario.entity;
 
+import gt.usac.cunoc.sgp.usuario.model.RoleName;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;

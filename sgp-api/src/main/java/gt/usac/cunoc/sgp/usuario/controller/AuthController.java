@@ -17,7 +17,7 @@ import gt.usac.cunoc.sgp.usuario.dto.VerifyChallengeRequest;
 import gt.usac.cunoc.sgp.usuario.dto.VerifyLoginRequest;
 import gt.usac.cunoc.sgp.usuario.dto.VerifyRecoveryRequest;
 import gt.usac.cunoc.sgp.usuario.dto.VerifyRegistrationRequest;
-import gt.usac.cunoc.sgp.usuario.entity.OtpPurpose;
+import gt.usac.cunoc.sgp.usuario.model.OtpPurpose;
 import gt.usac.cunoc.sgp.usuario.service.AuthService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;

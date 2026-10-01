@@ -1,4 +1,4 @@
-package gt.usac.cunoc.sgp.usuario.entity;
+package gt.usac.cunoc.sgp.usuario.model;
 
 public enum RoleName {
   ADMINISTRADOR,
