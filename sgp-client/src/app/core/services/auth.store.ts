@@ -28,6 +28,10 @@ export class AuthStore {
     return this.http.get<UserSession>('/api/v1/auth/me').pipe(tap((user) => this.setUser(user)));
   }
 
+  logout(): Observable<void> {
+    return this.http.post<void>('/api/v1/auth/logout', {}, { withCredentials: true });
+  }
+
   acceptToken(response: AccessTokenResponse): void {
     this.setAccessToken(response.accessToken);
   }

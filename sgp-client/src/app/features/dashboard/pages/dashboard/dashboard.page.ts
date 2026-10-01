@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
-import { AuthStore } from '../../core/services/auth.store';
+import { AuthStore } from '../../../../core/services/auth.store';
 
 @Component({
   selector: 'app-dashboard-page',

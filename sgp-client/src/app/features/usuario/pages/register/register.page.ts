@@ -1,12 +1,11 @@
 import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
-import { HttpClient } from '@angular/common/http';
 import { Router, RouterLink } from '@angular/router';
 import { ButtonModule } from 'primeng/button';
 import { InputTextModule } from 'primeng/inputtext';
-import { ChallengeResponse } from '../../../../core/models/auth.models';
 import { AuthCardComponent } from '../../../../shared/components/auth-card/auth-card.component';
 import { TranslocoPipe } from '@jsverse/transloco';
+import { UsuarioApiService } from '../../services/usuario-api.service';
 
 @Component({
   selector: 'app-register-page',
@@ -25,7 +24,7 @@ import { TranslocoPipe } from '@jsverse/transloco';
 })
 export class RegisterPage {
   private readonly fb = inject(FormBuilder);
-  private readonly http = inject(HttpClient);
+  private readonly usuarioApi = inject(UsuarioApiService);
   private readonly router = inject(Router);
 
   readonly form = this.fb.nonNullable.group({
@@ -43,7 +42,7 @@ export class RegisterPage {
   submit(): void {
     if (this.form.invalid) return;
     const data = this.form.getRawValue();
-    this.http.post<ChallengeResponse>('/api/v1/auth/register', data).subscribe(
+    this.usuarioApi.register(data).subscribe(
       (response) =>
         void this.router.navigate(['/registro/verificar'], {
           queryParams: { email: data.email, challengeId: response.challengeId },

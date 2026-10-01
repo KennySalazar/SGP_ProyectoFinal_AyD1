@@ -1,12 +1,11 @@
 import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
-import { HttpClient } from '@angular/common/http';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { ButtonModule } from 'primeng/button';
 import { InputTextModule } from 'primeng/inputtext';
-import { MessageResponse } from '../../../../core/models/auth.models';
 import { AuthCardComponent } from '../../../../shared/components/auth-card/auth-card.component';
 import { TranslocoPipe } from '@jsverse/transloco';
+import { UsuarioApiService } from '../../services/usuario-api.service';
 
 @Component({
   selector: 'app-register-verify-page',
@@ -25,7 +24,7 @@ import { TranslocoPipe } from '@jsverse/transloco';
 })
 export class RegisterVerifyPage {
   private readonly fb = inject(FormBuilder);
-  private readonly http = inject(HttpClient);
+  private readonly usuarioApi = inject(UsuarioApiService);
   private readonly route = inject(ActivatedRoute);
   readonly done = signal(false);
   readonly form = this.fb.nonNullable.group({
@@ -36,12 +35,8 @@ export class RegisterVerifyPage {
     const email = this.route.snapshot.queryParamMap.get('email');
     const challengeId = this.route.snapshot.queryParamMap.get('challengeId');
     if (!email || !challengeId || this.form.invalid) return;
-    this.http
-      .post<MessageResponse>('/api/v1/auth/register/verify', {
-        email,
-        challengeId,
-        otp: this.form.controls.code.value,
-      })
+    this.usuarioApi
+      .verifyRegistration(email, challengeId, this.form.controls.code.value)
       .subscribe(() => this.done.set(true));
   }
 }

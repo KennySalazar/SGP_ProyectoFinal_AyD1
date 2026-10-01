@@ -1,13 +1,12 @@
 import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
-import { HttpClient } from '@angular/common/http';
 import { ActivatedRoute, Router } from '@angular/router';
 import { ButtonModule } from 'primeng/button';
 import { InputTextModule } from 'primeng/inputtext';
-import { LoginResponse } from '../../../../core/models/auth.models';
 import { AuthStore } from '../../../../core/services/auth.store';
 import { AuthCardComponent } from '../../../../shared/components/auth-card/auth-card.component';
 import { TranslocoPipe } from '@jsverse/transloco';
+import { UsuarioApiService } from '../../services/usuario-api.service';
 
 @Component({
   selector: 'app-login-verify-page',
@@ -19,7 +18,7 @@ import { TranslocoPipe } from '@jsverse/transloco';
 })
 export class LoginVerifyPage {
   private readonly fb = inject(FormBuilder);
-  private readonly http = inject(HttpClient);
+  private readonly usuarioApi = inject(UsuarioApiService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly auth = inject(AuthStore);
@@ -31,12 +30,8 @@ export class LoginVerifyPage {
   submit(): void {
     const challengeId = this.route.snapshot.queryParamMap.get('challengeId');
     if (!challengeId || this.form.invalid) return;
-    this.http
-      .post<LoginResponse>(
-        '/api/v1/auth/login/verify',
-        { challengeId, otp: this.form.controls.code.value },
-        { withCredentials: true },
-      )
+    this.usuarioApi
+      .verifyLogin(challengeId, this.form.controls.code.value)
       .subscribe((response) => {
         if (!response.accessToken) return;
         this.auth.setAccessToken(response.accessToken);

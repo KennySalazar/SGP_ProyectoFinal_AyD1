@@ -1,12 +1,11 @@
 import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
-import { HttpClient } from '@angular/common/http';
 import { ButtonModule } from 'primeng/button';
 import { InputTextModule } from 'primeng/inputtext';
 import { TagModule } from 'primeng/tag';
 import { AuthStore } from '../../../../core/services/auth.store';
-import { ChallengeResponse, MessageResponse } from '../../../../core/models/auth.models';
 import { TranslocoPipe } from '@jsverse/transloco';
+import { UsuarioApiService } from '../../services/usuario-api.service';
 
 @Component({
   selector: 'app-security-page',
@@ -18,7 +17,7 @@ import { TranslocoPipe } from '@jsverse/transloco';
 })
 export class SecurityPage {
   private readonly fb = inject(FormBuilder);
-  private readonly http = inject(HttpClient);
+  private readonly usuarioApi = inject(UsuarioApiService);
   readonly auth = inject(AuthStore);
   readonly challengeId = signal<string | null>(null);
   readonly message = signal<string | null>(null);
@@ -29,22 +28,23 @@ export class SecurityPage {
 
   request(): void {
     if (this.requestForm.invalid) return;
-    const endpoint = this.auth.user()?.twoFactorEnabled
-      ? '/api/v1/auth/2fa/disable'
-      : '/api/v1/auth/2fa/enable';
-    this.http
-      .post<ChallengeResponse>(endpoint, this.requestForm.getRawValue())
+    this.usuarioApi
+      .requestTwoFactorChange(
+        this.auth.user()?.twoFactorEnabled ?? false,
+        this.requestForm.controls.currentPassword.value,
+      )
       .subscribe((response) => this.challengeId.set(response.challengeId));
   }
 
   confirm(): void {
     const challengeId = this.challengeId();
     if (!challengeId || this.verifyForm.invalid) return;
-    const endpoint = this.auth.user()?.twoFactorEnabled
-      ? '/api/v1/auth/2fa/disable/verify'
-      : '/api/v1/auth/2fa/enable/verify';
-    this.http
-      .post<MessageResponse>(endpoint, { challengeId, otp: this.verifyForm.controls.code.value })
+    this.usuarioApi
+      .confirmTwoFactorChange(
+        this.auth.user()?.twoFactorEnabled ?? false,
+        challengeId,
+        this.verifyForm.controls.code.value,
+      )
       .subscribe((response) => {
         this.message.set(response.message);
         this.challengeId.set(null);

@@ -4,42 +4,9 @@ import { roleGuard } from './core/guards/role.guard';
 
 export const routes: Routes = [
   {
-    path: 'login',
-    loadComponent: () =>
-      import('./features/usuario/pages/login/login.page').then((m) => m.LoginPage),
-  },
-  {
-    path: 'login/verificar',
-    loadComponent: () =>
-      import('./features/usuario/pages/login-verify/login-verify.page').then(
-        (m) => m.LoginVerifyPage,
-      ),
-  },
-  {
-    path: 'registro',
-    loadComponent: () =>
-      import('./features/usuario/pages/register/register.page').then((m) => m.RegisterPage),
-  },
-  {
-    path: 'registro/verificar',
-    loadComponent: () =>
-      import('./features/usuario/pages/register-verify/register-verify.page').then(
-        (m) => m.RegisterVerifyPage,
-      ),
-  },
-  {
-    path: 'recuperar',
-    loadComponent: () =>
-      import('./features/usuario/pages/recovery-request/recovery-request.page').then(
-        (m) => m.RecoveryRequestPage,
-      ),
-  },
-  {
-    path: 'recuperar/restablecer',
-    loadComponent: () =>
-      import('./features/usuario/pages/recovery-reset/recovery-reset.page').then(
-        (m) => m.RecoveryResetPage,
-      ),
+    path: '',
+    loadChildren: () =>
+      import('./features/usuario/usuario.routes').then((m) => m.usuarioPublicRoutes),
   },
   {
     path: '',
@@ -49,13 +16,13 @@ export const routes: Routes = [
     children: [
       {
         path: '',
-        loadComponent: () =>
-          import('./features/dashboard/dashboard.page').then((m) => m.DashboardPage),
+        loadChildren: () =>
+          import('./features/usuario/usuario.routes').then((m) => m.usuarioProtectedRoutes),
       },
       {
-        path: 'seguridad',
-        loadComponent: () =>
-          import('./features/usuario/pages/security/security.page').then((m) => m.SecurityPage),
+        path: '',
+        loadChildren: () =>
+          import('./features/dashboard/dashboard.routes').then((m) => m.dashboardRoutes),
       },
       {
         path: 'offline',
@@ -65,8 +32,7 @@ export const routes: Routes = [
       {
         path: 'admin',
         canActivate: [roleGuard('ADMINISTRADOR')],
-        loadComponent: () =>
-          import('./features/admin/admin.placeholder').then((m) => m.AdminPlaceholderPage),
+        loadChildren: () => import('./features/admin/admin.routes').then((m) => m.adminRoutes),
       },
     ],
   },
