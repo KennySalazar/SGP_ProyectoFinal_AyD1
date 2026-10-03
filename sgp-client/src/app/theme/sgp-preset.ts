@@ -1,7 +1,11 @@
 import { definePreset } from '@primeuix/themes';
-import Aura from '@primeuix/themes/aura';
+import AuraBase from '@primeuix/themes/aura/base';
+import AuraButton from '@primeuix/themes/aura/button';
+import AuraInputText from '@primeuix/themes/aura/inputtext';
+import AuraSelect from '@primeuix/themes/aura/select';
+import AuraTag from '@primeuix/themes/aura/tag';
 
-export const SgpPreset = definePreset(Aura, {
+export const SgpPreset = definePreset(AuraBase, {
   semantic: {
     primary: {
       50: '#eff6ff',
@@ -16,5 +20,11 @@ export const SgpPreset = definePreset(Aura, {
       900: '#172554',
       950: '#0b1739',
     },
+  },
+  components: {
+    button: AuraButton,
+    inputtext: AuraInputText,
+    select: AuraSelect,
+    tag: AuraTag,
   },
 });
