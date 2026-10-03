@@ -19,7 +19,6 @@ public class AdminBootstrap {
 
   @EventListener(ApplicationReadyEvent.class)
   public void provisionAdmin() {
-    adminProvisioningService.provisionAdmin(
-        properties.getEmail(), properties.getInitialPassword());
+    adminProvisioningService.provisionAdmin(properties.getEmail(), properties.getInitialPassword());
   }
 }

@@ -36,5 +36,4 @@ public class GmailEmailService implements EmailService {
           "No fue posible enviar el correo de verificacion");
     }
   }
-
 }
