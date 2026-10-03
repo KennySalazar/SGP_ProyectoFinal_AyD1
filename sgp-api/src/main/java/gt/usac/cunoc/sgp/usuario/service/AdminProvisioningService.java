@@ -36,8 +36,7 @@ public class AdminProvisioningService {
     UserAccount admin = users.findByEmail(email).orElse(null);
     if (admin == null) {
       users.save(
-          new UserAccount(
-              email, passwordEncoder.encode(initialPassword), adminRole, true, true));
+          new UserAccount(email, passwordEncoder.encode(initialPassword), adminRole, true, true));
       return;
     }
     admin.setRole(adminRole);
