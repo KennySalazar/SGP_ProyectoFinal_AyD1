@@ -46,8 +46,28 @@
     <section aria-live="polite">
       @if (vista() === 'lista') {
       <h2>{{ 'puentes.catalogo.list' | transloco }}</h2>
-      <p>{{ 'puentes.catalogo.listPending' | transloco }}</p>
-      } @else {
+      @if (!cargando() && !errorConsulta()) { @if (pagina(); as resultado) {
+      <p-table [value]="resultado.content" dataKey="id" [tableStyle]="{ 'min-width': '32rem' }">
+        <ng-template #header>
+          <tr>
+            <th scope="col">{{ 'puentes.name' | transloco }}</th>
+            <th scope="col">{{ 'puentes.department' | transloco }}</th>
+            <th scope="col">{{ 'puentes.municipality' | transloco }}</th>
+            <th scope="col">{{ 'puentes.state' | transloco }}</th>
+          </tr>
+        </ng-template>
+        <ng-template #body let-puente>
+          <tr>
+            <th scope="row" class="nombre-puente">{{ puente.nombre }}</th>
+            <td>{{ puente.departamento.nombre }}</td>
+            <td>{{ puente.municipio.nombre }}</td>
+            <td>
+              <p-tag [value]="puente.estadoActual" [severity]="severidad(puente.estadoActual)" />
+            </td>
+          </tr>
+        </ng-template>
+      </p-table>
+      } } } @else {
       <h2>{{ 'puentes.catalogo.map' | transloco }}</h2>
       <p>{{ 'puentes.catalogo.mapPending' | transloco }}</p>
       }

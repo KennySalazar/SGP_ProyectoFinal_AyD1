@@ -36,3 +36,10 @@ button[aria-pressed='false'] {
 h2 {
   color: var(--sgp-navy-900);
 }
+
+.nombre-puente {
+  color: var(--sgp-navy-900);
+  text-align: left;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
