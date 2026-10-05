@@ -4,6 +4,7 @@ import { FormBuilder, ReactiveFormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { ButtonModule } from 'primeng/button';
+import { PaginatorModule, PaginatorState } from 'primeng/paginator';
 import { SelectModule } from 'primeng/select';
 import { TableModule } from 'primeng/table';
 import { TagModule } from 'primeng/tag';
@@ -23,6 +24,7 @@ import { PuenteApiService } from '../../services/puente-api.service';
   imports: [
     TranslocoPipe,
     ButtonModule,
+    PaginatorModule,
     SelectModule,
     TableModule,
     TagModule,
@@ -47,6 +49,8 @@ export class CatalogoPuentesPage {
   readonly cargandoDepartamentos = signal(false);
   readonly errorDepartamentos = signal(false);
   readonly estados: EstadoPuente[] = ['Bueno', 'Regular', 'Malo', 'Sin evaluar'];
+  readonly tamaniosPagina = [10, 20, 50, 100];
+  readonly tamanioPagina = signal(20);
 
   readonly vista = signal<'lista' | 'mapa'>('lista');
   readonly pagina = signal<PaginaResponse<PuenteCatalogoResponse> | null>(null);
@@ -90,6 +94,7 @@ export class CatalogoPuentesPage {
       ...(departamentoId ? { departamentoId } : {}),
       ...(estado ? { estado } : {}),
       pagina: 0,
+      tamanio: this.tamanioPagina(),
     };
     this.cargarCatalogo();
   }
@@ -97,7 +102,31 @@ export class CatalogoPuentesPage {
   limpiarFiltros(): void {
     if (this.cargando()) return;
     this.filtros.reset();
-    this.consultaAplicada = { pagina: 0 };
+    this.consultaAplicada = { pagina: 0, tamanio: this.tamanioPagina() };
+    this.cargarCatalogo();
+  }
+
+  cambiarPagina(evento: PaginatorState): void {
+    if (this.cargando()) return;
+    const tamanio = evento.rows;
+    const pagina = evento.page;
+    if (
+      tamanio === undefined ||
+      pagina === undefined ||
+      !Number.isInteger(tamanio) ||
+      tamanio < 1 ||
+      tamanio > 100 ||
+      !Number.isInteger(pagina) ||
+      pagina < 0
+    )
+      return;
+
+    const cambioTamanio = tamanio !== this.tamanioPagina();
+    const nuevaPagina = cambioTamanio ? 0 : pagina;
+    if (!cambioTamanio && nuevaPagina === (this.consultaAplicada.pagina ?? 0)) return;
+
+    this.tamanioPagina.set(tamanio);
+    this.consultaAplicada = { ...this.consultaAplicada, pagina: nuevaPagina, tamanio };
     this.cargarCatalogo();
   }
 

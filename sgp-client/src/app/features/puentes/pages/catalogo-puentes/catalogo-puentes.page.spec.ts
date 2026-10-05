@@ -2,8 +2,10 @@ import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { Pipe, PipeTransform } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { By } from '@angular/platform-browser';
 import { provideRouter } from '@angular/router';
 import { TranslocoPipe } from '@jsverse/transloco';
+import { Paginator } from 'primeng/paginator';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { CatalogoPuentesPage } from './catalogo-puentes.page';
 import { EstadoPuente } from '../../models/puente.models';
@@ -43,6 +45,136 @@ describe('Base compartida del catálogo HU014', () => {
   });
 
   afterEach(() => http.verify());
+
+  function responderPagina(number = 0, size = 20, totalElements = 41): void {
+    http
+      .expectOne((req) => req.url === '/api/v1/puentes')
+      .flush({
+        content: [],
+        number,
+        size,
+        totalElements,
+        totalPages: Math.ceil(totalElements / size),
+        first: number === 0,
+        last: (number + 1) * size >= totalElements,
+        empty: true,
+      });
+    fixture.detectChanges();
+  }
+
+  it('navega con los controles y utiliza la página y el total del backend', () => {
+    responderPagina();
+    expect(fixture.nativeElement.querySelector('.p-paginator-prev').disabled).toBe(true);
+    fixture.nativeElement.querySelector('.p-paginator-next').click();
+    const siguiente = http.expectOne((req) => req.url === '/api/v1/puentes');
+    expect(siguiente.request.params.get('pagina')).toBe('1');
+    expect(siguiente.request.params.get('tamanio')).toBe('20');
+    siguiente.flush({
+      content: [
+        {
+          id: 'puente-21',
+          nombre: 'Puente página 2',
+          departamento: { nombre: 'Guatemala' },
+          municipio: { nombre: 'Amatitlán' },
+          estadoActual: 'Sin evaluar',
+        },
+      ],
+      number: 1,
+      size: 20,
+      totalElements: 41,
+      totalPages: 3,
+      first: false,
+      last: false,
+      empty: false,
+    });
+    fixture.detectChanges();
+    const paginator = fixture.debugElement.query(By.directive(Paginator))
+      .componentInstance as Paginator;
+    expect(paginator.first).toBe(20);
+    expect(paginator.totalRecords).toBe(41);
+    expect(fixture.nativeElement.querySelector('tbody').textContent).toContain('Puente página 2');
+    fixture.nativeElement.querySelector('.p-paginator-prev').click();
+    responderPagina();
+    page.cambiarPagina({ page: 2, rows: 20 });
+    responderPagina(2);
+    expect(fixture.nativeElement.querySelector('.p-paginator-next').disabled).toBe(true);
+  });
+
+  it('conserva filtros aplicados al paginar e ignora cambios del formulario sin enviar', () => {
+    responderPagina();
+    page.filtros.patchValue({ departamentoId: 'departamento-1', estado: 'Regular' });
+    page.aplicarFiltros();
+    responderPagina();
+    page.filtros.patchValue({ departamentoId: 'departamento-2', estado: 'Malo' });
+    page.cambiarPagina({ page: 1, rows: 20 });
+    const request = http.expectOne((req) => req.url === '/api/v1/puentes');
+    expect(request.request.params.get('departamentoId')).toBe('departamento-1');
+    expect(request.request.params.get('estado')).toBe('Regular');
+    expect(request.request.params.get('pagina')).toBe('1');
+    request.flush({ content: [], number: 1, size: 20, totalElements: 41 });
+  });
+
+  it('reinicia en página cero al cambiar tamaño, aplicar o limpiar filtros', () => {
+    responderPagina();
+    page.cambiarPagina({ page: 1, rows: 20 });
+    responderPagina(1);
+    const paginator = fixture.debugElement.query(By.directive(Paginator))
+      .componentInstance as Paginator;
+    expect(paginator.rowsPerPageOptions).toEqual([10, 20, 50, 100]);
+    paginator.onPageChange.emit({ page: 1, rows: 100 });
+    const cambio = http.expectOne((req) => req.url === '/api/v1/puentes');
+    expect(cambio.request.params.get('pagina')).toBe('0');
+    expect(cambio.request.params.get('tamanio')).toBe('100');
+    cambio.flush({ content: [], number: 0, size: 100, totalElements: 250 });
+    page.cambiarPagina({ page: 1, rows: 100 });
+    responderPagina(1, 100, 250);
+    page.filtros.patchValue({ estado: 'Bueno' });
+    page.aplicarFiltros();
+    const aplicado = http.expectOne((req) => req.url === '/api/v1/puentes');
+    expect(aplicado.request.params.get('pagina')).toBe('0');
+    expect(aplicado.request.params.get('tamanio')).toBe('100');
+    aplicado.flush({ content: [], number: 0, size: 100, totalElements: 250 });
+    page.cambiarPagina({ page: 1, rows: 100 });
+    responderPagina(1, 100, 250);
+    page.limpiarFiltros();
+    const limpio = http.expectOne((req) => req.url === '/api/v1/puentes');
+    expect(limpio.request.params.keys().sort()).toEqual(['pagina', 'tamanio']);
+    expect(limpio.request.params.get('pagina')).toBe('0');
+    expect(limpio.request.params.get('tamanio')).toBe('100');
+    limpio.flush({ content: [], number: 0, size: 100, totalElements: 0 });
+  });
+
+  it('rechaza eventos inválidos y evita solicitudes duplicadas al paginar', () => {
+    responderPagina();
+    for (const rows of [0, -1, 101, 1.5, NaN]) page.cambiarPagina({ page: 1, rows });
+    for (const pagina of [-1, 1.5, NaN]) page.cambiarPagina({ page: pagina, rows: 20 });
+    page.cambiarPagina({ rows: 20 });
+    page.cambiarPagina({ page: 1 });
+    page.cambiarPagina({ page: 0, rows: 20 });
+    http.expectNone((req) => req.url === '/api/v1/puentes');
+    page.cambiarPagina({ page: 1, rows: 20 });
+    page.cambiarPagina({ page: 2, rows: 50 });
+    responderPagina(1);
+    page.cambiarPagina({ page: 1, rows: 20 });
+    http.expectNone((req) => req.url === '/api/v1/puentes');
+  });
+
+  it('reintenta la página solicitada después de un error', () => {
+    responderPagina();
+    page.cambiarPagina({ page: 1, rows: 20 });
+    http
+      .expectOne((req) => req.url === '/api/v1/puentes')
+      .flush({}, { status: 503, statusText: 'Service Unavailable' });
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('p-paginator')).toBeNull();
+    page.cargarCatalogo();
+    const request = http.expectOne((req) => req.url === '/api/v1/puentes');
+    expect(request.request.params.get('pagina')).toBe('1');
+    expect(request.request.params.get('tamanio')).toBe('20');
+    request.flush({ content: [], number: 1, size: 20, totalElements: 41 });
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('p-paginator')).not.toBeNull();
+  });
 
   it('comparte una consulta al alternar entre lista y mapa', () => {
     const response = {

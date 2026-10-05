@@ -172,6 +172,8 @@
       "clearFilters": "Limpiar filtros",
       "retryDepartments": "Reintentar departamentos",
       "noResults": "No se encontraron puentes con los filtros seleccionados.",
+      "pageSize": "Registros por página",
+      "pageReport": "{first}–{last} de {totalRecords} puentes",
       "list": "Lista",
       "map": "Mapa",
       "loading": "Cargando catálogo...",
