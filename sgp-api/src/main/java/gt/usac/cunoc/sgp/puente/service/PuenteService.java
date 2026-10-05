@@ -3,6 +3,7 @@ package gt.usac.cunoc.sgp.puente.service;
 import gt.usac.cunoc.sgp.common.exception.ApiException;
 import gt.usac.cunoc.sgp.common.util.UuidV7Generator;
 import gt.usac.cunoc.sgp.puente.dto.CrearPuenteRequest;
+import gt.usac.cunoc.sgp.puente.dto.PuenteCatalogoResponse;
 import gt.usac.cunoc.sgp.puente.dto.PuenteResponse;
 import gt.usac.cunoc.sgp.puente.entity.Departamento;
 import gt.usac.cunoc.sgp.puente.entity.Municipio;
@@ -17,11 +18,14 @@ import jakarta.validation.Validator;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.Locale;
+import java.util.Set;
 import java.util.UUID;
 import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.GeometryFactory;
 import org.locationtech.jts.geom.PrecisionModel;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
@@ -128,6 +132,28 @@ public class PuenteService {
 
     Puente guardado = puentes.saveAndFlush(puente);
     return mapper.toAltaResponse(guardado, utm);
+  }
+
+  @Transactional(readOnly = true)
+  public Page<PuenteCatalogoResponse> listarCatalogo(
+      UUID departamentoId, String estado, int pagina, int tamanio) {
+    if (pagina < 0 || tamanio < 1 || tamanio > 100) {
+      throw validacion(
+          "paginacion_invalida",
+          "La página debe ser mayor o igual a 0 y el tamaño debe estar entre 1 y 100.");
+    }
+    if (estado != null && !Set.of("Bueno", "Regular", "Malo", "Sin evaluar").contains(estado)) {
+      throw validacion("estado_invalido", "El estado debe ser Bueno, Regular, Malo o Sin evaluar.");
+    }
+
+    var pageable =
+        PageRequest.of(pagina, tamanio, Sort.by(Sort.Order.asc("nombre"), Sort.Order.asc("id")));
+
+    // Hasta implementar inspecciones publicadas, todos los puentes están sin evaluar.
+    if (estado != null && !"Sin evaluar".equals(estado)) {
+      return Page.empty(pageable);
+    }
+    return puentes.findCatalogoActivo(departamentoId, pageable).map(mapper::toCatalogoResponse);
   }
 
   private ApiException validacion(String codigo, String detalle) {

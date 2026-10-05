@@ -426,6 +426,60 @@ class PuenteRegistroIntegrationTest {
   }
 
   @Test
+  void catalogoPublicoExcluyeBajasYFiltraDepartamento() {
+    var activo =
+        puenteService.registrar(
+            solicitud(departamentoId, "14.481", "-90.615", false), ADMINISTRADOR_ID);
+    var inactivo =
+        puenteService.registrar(
+            solicitud(departamentoId, "14.501", "-90.615", false), ADMINISTRADOR_ID);
+    jdbc.update(
+        """
+        UPDATE puente SET activo = false, inactivado_en = CURRENT_TIMESTAMP,
+          inactivado_por_id = ?, motivo_inactivacion = 'Baja de prueba'
+        WHERE id = ?
+        """,
+        ADMINISTRADOR_ID,
+        inactivo.id());
+
+    SecurityContextHolder.clearContext();
+    var resultado = puenteService.listarCatalogo(departamentoId, "Sin evaluar", 0, 100);
+    assertThat(resultado.getTotalElements()).isEqualTo(1);
+    var publico = resultado.getContent().getFirst();
+    assertThat(publico.id()).isEqualTo(activo.id());
+    assertThat(publico.departamento().id()).isEqualTo(departamentoId);
+    assertThat(publico.municipio().id()).isEqualTo(municipioId);
+    assertThat(publico.latitud()).isEqualTo(14.481);
+    assertThat(publico.longitud()).isEqualTo(-90.615);
+    assertThat(publico.estadoActual()).isEqualTo("Sin evaluar");
+    assertThat(publico.activo()).isTrue();
+
+    UUID otroDepartamento =
+        jdbc.queryForObject("SELECT id FROM departamento WHERE codigo_ine = '02'", UUID.class);
+    assertThat(puenteService.listarCatalogo(otroDepartamento, null, 0, 20).getContent()).isEmpty();
+    assertThat(puenteService.listarCatalogo(null, null, 0, 20).getTotalElements()).isEqualTo(1);
+  }
+
+  @Test
+  void catalogoPaginaSinRepetirPuentesConElMismoNombre() {
+    puenteService.registrar(
+        solicitud(departamentoId, "14.481", "-90.615", false), ADMINISTRADOR_ID);
+    puenteService.registrar(
+        solicitud(departamentoId, "14.501", "-90.615", false), ADMINISTRADOR_ID);
+    SecurityContextHolder.clearContext();
+
+    var primera = puenteService.listarCatalogo(null, null, 0, 1);
+    var segunda = puenteService.listarCatalogo(null, null, 1, 1);
+    assertThat(primera.getTotalElements()).isEqualTo(2);
+    assertThat(primera.getTotalPages()).isEqualTo(2);
+    assertThat(primera.getContent()).hasSize(1);
+    assertThat(segunda.getContent()).hasSize(1);
+    assertThat(primera.getContent().getFirst().id())
+        .isNotEqualTo(segunda.getContent().getFirst().id());
+    assertThat(puenteService.listarCatalogo(null, null, 2, 1).getContent()).isEmpty();
+  }
+
+  @Test
   void excluyeDepartamentosInactivosDelCatalogo() {
     long totalActivos =
         jdbc.queryForObject("SELECT COUNT(*) FROM departamento WHERE activo = true", Long.class);
