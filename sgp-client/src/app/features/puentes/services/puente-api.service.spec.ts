@@ -34,6 +34,38 @@ describe('PuenteApiService', () => {
     request.flush({ content: [] });
   });
 
+  it('consulta el catalogo publico con filtros y paginacion', () => {
+    service
+      .listarCatalogo({
+        departamentoId: 'departamento-1',
+        estado: 'Sin evaluar',
+        pagina: 2,
+        tamanio: 100,
+      })
+      .subscribe();
+    const request = http.expectOne((req) => req.url === '/api/v1/puentes');
+    expect(request.request.method).toBe('GET');
+    expect(request.request.params.get('departamentoId')).toBe('departamento-1');
+    expect(request.request.params.get('estado')).toBe('Sin evaluar');
+    expect(request.request.params.get('pagina')).toBe('2');
+    expect(request.request.params.get('tamanio')).toBe('100');
+    request.flush({ content: [] });
+  });
+
+  it('omite filtros ausentes y usa la paginacion predeterminada', () => {
+    service.listarCatalogo().subscribe();
+    const request = http.expectOne((req) => req.url === '/api/v1/puentes');
+    expect(request.request.params.keys().sort()).toEqual(['pagina', 'tamanio']);
+    expect(request.request.params.get('pagina')).toBe('0');
+    expect(request.request.params.get('tamanio')).toBe('20');
+    request.flush({ content: [] });
+  });
+
+  it.each([0, 101, -1, 1.5])('no solicita tamaños invalidos: %s', (tamanio) => {
+    expect(() => service.listarCatalogo({ tamanio })).toThrow(RangeError);
+    http.expectNone('/api/v1/puentes');
+  });
+
   it('consulta municipios del departamento seleccionado', () => {
     service.listarMunicipios('departamento-1').subscribe();
 

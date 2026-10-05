@@ -162,6 +162,18 @@
   },
 
   "puentes": {
+    "catalogo": {
+      "title": "Catálogo de puentes",
+      "description": "Consulta pública del inventario de puentes activos.",
+      "view": "Vista del catálogo",
+      "list": "Lista",
+      "map": "Mapa",
+      "loading": "Cargando catálogo...",
+      "failed": "No fue posible cargar el catálogo.",
+      "total": "Puentes activos registrados: {{total}}",
+      "listPending": "La vista de lista está pendiente de implementación.",
+      "mapPending": "La vista de mapa está pendiente de implementación."
+    },
     "kicker": "INVENTARIO DE PUENTES",
     "title": "Registrar puente",
     "description": "Registra los datos y la ubicacion del puente para iniciar su ficha permanente.",

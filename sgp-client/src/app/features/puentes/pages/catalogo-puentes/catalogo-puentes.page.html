@@ -1,0 +1,56 @@
+<main class="catalogo">
+  <header class="page-heading">
+    <div>
+      <p class="page-kicker">{{ 'puentes.kicker' | transloco }}</p>
+      <h1 class="page-title">{{ 'puentes.catalogo.title' | transloco }}</h1>
+      <p class="page-description">{{ 'puentes.catalogo.description' | transloco }}</p>
+    </div>
+    <a pButton routerLink="/login">{{ 'auth.login.title' | transloco }}</a>
+  </header>
+
+  <section class="surface-card catalogo-panel">
+    <div class="selector" role="group" [attr.aria-label]="'puentes.catalogo.view' | transloco">
+      <button
+        pButton
+        type="button"
+        [attr.aria-pressed]="vista() === 'lista'"
+        (click)="vista.set('lista')"
+      >
+        <i class="pi pi-list" aria-hidden="true"></i>
+        {{ 'puentes.catalogo.list' | transloco }}
+      </button>
+      <button
+        pButton
+        type="button"
+        [attr.aria-pressed]="vista() === 'mapa'"
+        (click)="vista.set('mapa')"
+      >
+        <i class="pi pi-map" aria-hidden="true"></i>
+        {{ 'puentes.catalogo.map' | transloco }}
+      </button>
+    </div>
+
+    @if (cargando()) {
+    <p role="status">{{ 'puentes.catalogo.loading' | transloco }}</p>
+    } @else if (errorConsulta()) {
+    <p role="alert">{{ 'puentes.catalogo.failed' | transloco }}</p>
+    <button pButton type="button" (click)="cargarCatalogo()">
+      {{ 'puentes.retry' | transloco }}
+    </button>
+    } @else if (pagina(); as resultado) {
+    <p role="status">
+      {{ 'puentes.catalogo.total' | transloco: { total: resultado.totalElements } }}
+    </p>
+    }
+
+    <section aria-live="polite">
+      @if (vista() === 'lista') {
+      <h2>{{ 'puentes.catalogo.list' | transloco }}</h2>
+      <p>{{ 'puentes.catalogo.listPending' | transloco }}</p>
+      } @else {
+      <h2>{{ 'puentes.catalogo.map' | transloco }}</h2>
+      <p>{{ 'puentes.catalogo.mapPending' | transloco }}</p>
+      }
+    </section>
+  </section>
+</main>

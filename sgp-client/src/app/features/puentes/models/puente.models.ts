@@ -61,6 +61,27 @@ export interface PuenteResponse {
   creadoEn: string;
 }
 
+export type EstadoPuente = 'Bueno' | 'Regular' | 'Malo' | 'Sin evaluar';
+
+export interface PuenteCatalogoResponse {
+  id: string;
+  codigo: string;
+  nombre: string;
+  departamento: DepartamentoResponse;
+  municipio: MunicipioResponse;
+  latitud: number | null;
+  longitud: number | null;
+  activo: boolean;
+  estadoActual: EstadoPuente;
+}
+
+export interface ConsultaCatalogoPuentes {
+  departamentoId?: string;
+  estado?: EstadoPuente;
+  pagina?: number;
+  tamanio?: number;
+}
+
 export interface PuenteCercanoResponse {
   id: string;
   codigo: string;
