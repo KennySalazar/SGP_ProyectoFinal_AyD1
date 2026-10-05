@@ -14,10 +14,21 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 @Order(Ordered.HIGHEST_PRECEDENCE)
 @RestControllerAdvice(basePackages = "gt.usac.cunoc.sgp.puente.controller")
 public class PuenteExceptionHandler {
+
+  @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+  public ResponseEntity<ProblemDetail> handleParametroInvalido(
+      MethodArgumentTypeMismatchException exception, HttpServletRequest request) {
+    ProblemDetail problem = validationProblem(request);
+    problem.setProperty(
+        "errores",
+        java.util.List.of(Map.of("campo", exception.getName(), "mensaje", "Valor invalido")));
+    return response(problem);
+  }
 
   @ExceptionHandler(MethodArgumentNotValidException.class)
   public ResponseEntity<ProblemDetail> handleValidation(

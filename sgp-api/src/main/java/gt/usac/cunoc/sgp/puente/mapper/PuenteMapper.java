@@ -3,6 +3,7 @@ package gt.usac.cunoc.sgp.puente.mapper;
 import gt.usac.cunoc.sgp.puente.dto.CoordenadaUtmResponse;
 import gt.usac.cunoc.sgp.puente.dto.DepartamentoResponse;
 import gt.usac.cunoc.sgp.puente.dto.MunicipioResponse;
+import gt.usac.cunoc.sgp.puente.dto.PuenteCatalogoResponse;
 import gt.usac.cunoc.sgp.puente.dto.PuenteCercanoResponse;
 import gt.usac.cunoc.sgp.puente.dto.PuenteResponse;
 import gt.usac.cunoc.sgp.puente.entity.Departamento;
@@ -16,6 +17,12 @@ import org.mapstruct.ReportingPolicy;
 
 @Mapper(componentModel = "spring", unmappedTargetPolicy = ReportingPolicy.ERROR)
 public interface PuenteMapper {
+
+  @Mapping(target = "departamento", source = "municipio.departamento")
+  @Mapping(target = "latitud", expression = "java(puente.getUbicacion().getY())")
+  @Mapping(target = "longitud", expression = "java(puente.getUbicacion().getX())")
+  @Mapping(target = "estadoActual", constant = "Sin evaluar")
+  PuenteCatalogoResponse toCatalogoResponse(Puente puente);
 
   DepartamentoResponse toDepartamentoResponse(Departamento departamento);
 

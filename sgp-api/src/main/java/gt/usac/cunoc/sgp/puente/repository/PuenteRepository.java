@@ -13,6 +13,15 @@ import org.springframework.data.repository.query.Param;
 public interface PuenteRepository extends JpaRepository<Puente, UUID> {
 
   @EntityGraph(attributePaths = {"municipio", "municipio.departamento"})
+  @Query(
+      """
+      SELECT p FROM Puente p
+      WHERE p.activo = true
+        AND (:departamentoId IS NULL OR p.municipio.departamento.id = :departamentoId)
+      """)
+  Page<Puente> findCatalogoActivo(@Param("departamentoId") UUID departamentoId, Pageable pageable);
+
+  @EntityGraph(attributePaths = {"municipio", "municipio.departamento"})
   Optional<Puente> findByIdAndActivoTrue(UUID id);
 
   @Query(
