@@ -30,7 +30,50 @@
       </button>
     </div>
 
-    @if (cargando()) {
+    <form class="filtros" [formGroup]="filtros" (ngSubmit)="aplicarFiltros()">
+      <label for="catalogo-departamento">
+        <span>{{ 'puentes.department' | transloco }}</span>
+        <p-select
+          inputId="catalogo-departamento"
+          formControlName="departamentoId"
+          [options]="departamentos()"
+          optionLabel="nombre"
+          optionValue="id"
+          [showClear]="true"
+          [loading]="cargandoDepartamentos()"
+          [placeholder]="'puentes.catalogo.allDepartments' | transloco"
+        />
+      </label>
+      <label for="catalogo-estado">
+        <span>{{ 'puentes.state' | transloco }}</span>
+        <p-select
+          inputId="catalogo-estado"
+          formControlName="estado"
+          [options]="estados"
+          [showClear]="true"
+          [placeholder]="'puentes.catalogo.allStates' | transloco"
+        />
+      </label>
+      <div class="filtros-acciones">
+        <button pButton type="submit" [disabled]="cargando()">
+          {{ 'puentes.catalogo.applyFilters' | transloco }}
+        </button>
+        <button pButton type="button" [disabled]="cargando()" (click)="limpiarFiltros()">
+          {{ 'puentes.catalogo.clearFilters' | transloco }}
+        </button>
+      </div>
+    </form>
+    @if (errorDepartamentos()) {
+    <p role="alert">{{ 'puentes.departmentsFailed' | transloco }}</p>
+    <button
+      pButton
+      type="button"
+      (click)="cargarDepartamentos()"
+      [disabled]="cargandoDepartamentos()"
+    >
+      {{ 'puentes.catalogo.retryDepartments' | transloco }}
+    </button>
+    } @if (cargando()) {
     <p role="status">{{ 'puentes.catalogo.loading' | transloco }}</p>
     } @else if (errorConsulta()) {
     <p role="alert">{{ 'puentes.catalogo.failed' | transloco }}</p>
@@ -64,6 +107,11 @@
             <td>
               <p-tag [value]="puente.estadoActual" [severity]="severidad(puente.estadoActual)" />
             </td>
+          </tr>
+        </ng-template>
+        <ng-template #emptymessage>
+          <tr>
+            <td colspan="4"><p role="status">{{ 'puentes.catalogo.noResults' | transloco }}</p></td>
           </tr>
         </ng-template>
       </p-table>

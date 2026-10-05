@@ -19,7 +19,6 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/v1/catalogos")
 @PreAuthorize("hasRole('ADMINISTRADOR')")
 @Tag(name = "Catálogos territoriales", description = "Departamentos y municipios del INE")
-@SecurityRequirement(name = "bearerAuth")
 public class CatalogoTerritorialController {
 
   private final CatalogoTerritorialService catalogoTerritorialService;
@@ -29,7 +28,10 @@ public class CatalogoTerritorialController {
   }
 
   @GetMapping("/departamentos")
-  @Operation(summary = "Listar departamentos activos")
+  @PreAuthorize("permitAll()")
+  @Operation(
+      summary = "Listar departamentos activos",
+      description = "Consulta pública sin autenticación para el filtro del catálogo de puentes.")
   public Page<DepartamentoResponse> listarDepartamentos(
       @RequestParam(defaultValue = "0") int pagina,
       @RequestParam(defaultValue = "100") int tamanio) {
@@ -37,6 +39,7 @@ public class CatalogoTerritorialController {
   }
 
   @GetMapping("/departamentos/{departamentoId}/municipios")
+  @SecurityRequirement(name = "bearerAuth")
   @Operation(summary = "Listar municipios activos de un departamento")
   public Page<MunicipioResponse> listarMunicipios(
       @PathVariable UUID departamentoId,

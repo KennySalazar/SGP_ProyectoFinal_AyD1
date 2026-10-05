@@ -12,7 +12,9 @@ import gt.usac.cunoc.sgp.common.security.JwtAuthenticationFilter;
 import gt.usac.cunoc.sgp.common.security.JwtService;
 import gt.usac.cunoc.sgp.common.security.ProblemAccessDeniedHandler;
 import gt.usac.cunoc.sgp.common.security.ProblemAuthenticationEntryPoint;
+import gt.usac.cunoc.sgp.puente.dto.DepartamentoResponse;
 import gt.usac.cunoc.sgp.puente.dto.PuenteCatalogoResponse;
+import gt.usac.cunoc.sgp.puente.service.CatalogoTerritorialService;
 import gt.usac.cunoc.sgp.puente.service.PuenteService;
 import gt.usac.cunoc.sgp.usuario.repository.UserAccountRepository;
 import java.time.Clock;
@@ -31,7 +33,7 @@ import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
 
 @WebMvcTest(
-    controllers = PuenteController.class,
+    controllers = {PuenteController.class, CatalogoTerritorialController.class},
     properties = "app.cors.allowed-origins=http://localhost:4200")
 @Import({
   SecurityConfiguration.class,
@@ -44,6 +46,7 @@ class PuenteCatalogoControllerTest {
 
   @Autowired private MockMvc mvc;
   @MockBean private PuenteService service;
+  @MockBean private CatalogoTerritorialService territorios;
   @MockBean private JwtService jwtService;
   @MockBean private UserAccountRepository users;
   @MockBean private Clock clock;
@@ -94,6 +97,32 @@ class PuenteCatalogoControllerTest {
   @Test
   void registroSigueRequiriendoAutenticacion() throws Exception {
     mvc.perform(post("/api/v1/puentes")).andExpect(status().isUnauthorized());
+  }
+
+  @Test
+  void visitanteConsultaDepartamentosParaFiltrar() throws Exception {
+    when(territorios.listarDepartamentos(0, 100))
+        .thenReturn(
+            new PageImpl<>(
+                List.of(new DepartamentoResponse(UUID.randomUUID(), "01", "Guatemala")),
+                PageRequest.of(0, 100),
+                1));
+    mvc.perform(get("/api/v1/catalogos/departamentos"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.content[0].nombre").value("Guatemala"));
+  }
+
+  @Test
+  void municipiosSiguenRequiriendoAutenticacion() throws Exception {
+    mvc.perform(get("/api/v1/catalogos/departamentos/" + UUID.randomUUID() + "/municipios"))
+        .andExpect(status().isUnauthorized());
+  }
+
+  @Test
+  @WithMockUser(roles = "ESTUDIANTE")
+  void municipiosSiguenRestringidosAlAdministrador() throws Exception {
+    mvc.perform(get("/api/v1/catalogos/departamentos/" + UUID.randomUUID() + "/municipios"))
+        .andExpect(status().isForbidden());
   }
 
   @ParameterizedTest
