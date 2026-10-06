@@ -12,7 +12,15 @@ import {
   signal,
 } from '@angular/core';
 import type { Map as Mapa, Marker, Popup } from 'maplibre-gl';
+import { cargarEstilosMaplibre, resolverMaplibre } from '../../utils/maplibre';
 import { CoordenadaGeografica, PuntoMapa, coordenadaValida } from '../../utils/ubicacion-guatemala';
+
+// Seis decimales equivalen a ~11 cm: suficiente para ubicar un puente y evita campos de 15 dígitos.
+const FACTOR_DECIMALES = 1e6;
+
+function redondear(valor: number): number {
+  return Math.round(valor * FACTOR_DECIMALES) / FACTOR_DECIMALES;
+}
 
 @Component({
   selector: 'app-selector-ubicacion',
@@ -63,9 +71,11 @@ export class SelectorUbicacionComponent implements AfterViewInit, OnChanges, OnD
   private async inicializar(): Promise<void> {
     try {
       // Carga MapLibre al abrir el selector.
-      const libreria = await import('maplibre-gl');
+      const libreria = resolverMaplibre(await import('maplibre-gl'));
 
       if (this.destruido) return;
+
+      cargarEstilosMaplibre(libreria.getVersion(), () => this.mapa?.resize());
 
       this.libreria = libreria;
       this.mapa = new libreria.Map({
@@ -128,12 +138,16 @@ export class SelectorUbicacionComponent implements AfterViewInit, OnChanges, OnD
   private seleccionar(latitud: number, longitud: number): void {
     if (this.deshabilitado) return;
 
-    // Normaliza la longitud sin reducir la precisión de la coordenada.
-    const longitudNormalizada = ((((longitud + 180) % 360) + 360) % 360) - 180;
+    // Solo normaliza si el mapa devolvió una longitud fuera de rango; la fórmula agrega ruido
+    // de punto flotante (-90.7 pasaría a -90.69999999999999).
+    const longitudNormalizada =
+      longitud >= -180 && longitud <= 180
+        ? longitud
+        : ((((longitud + 180) % 360) + 360) % 360) - 180;
 
     this.coordenadaSeleccionada.emit({
-      latitud,
-      longitud: longitudNormalizada,
+      latitud: redondear(latitud),
+      longitud: redondear(longitudNormalizada),
     });
   }
 
