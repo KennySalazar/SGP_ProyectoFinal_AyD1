@@ -257,6 +257,33 @@
     "indexWeights": "Pesos del indice",
     "indexWeightsNote": "Configuracion versionada y calibracion.",
     "audit": "Auditoria",
-    "auditNote": "Consulta de acciones y trazabilidad."
+    "auditNote": "Consulta de acciones y trazabilidad.",
+    "courses": {
+      "kicker": "OFERTA ACADÉMICA",
+      "title": "Catálogo de cursos",
+      "description": "Crea y finaliza las ofertas académicas disponibles para inscripción.",
+      "create": "Crear curso",
+      "requiredNote": "Nombre, período, catedrático y fechas son obligatorios.",
+      "name": "Asignatura",
+      "period": "Período",
+      "professor": "Catedrático responsable",
+      "selectProfessor": "Selecciona un catedrático",
+      "startDate": "Fecha de inicio",
+      "endDate": "Fecha de fin",
+      "saving": "Guardando...",
+      "created": "Curso creado como VIGENTE.",
+      "updated": "Curso actualizado correctamente.",
+      "finalized": "Curso finalizado correctamente.",
+      "list": "Cursos registrados",
+      "refresh": "Actualizar",
+      "loading": "Cargando cursos...",
+      "empty": "Todavía no hay cursos registrados.",
+      "status": "Estado",
+      "actions": "Acciones",
+      "finalize": "Finalizar",
+      "edit": "Editar curso",
+      "save": "Guardar cambios",
+      "cancel": "Cancelar edición"
+    }
   }
 }

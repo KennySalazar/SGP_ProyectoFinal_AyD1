@@ -4,6 +4,6 @@ export const adminRoutes: Routes = [
   {
     path: '',
     loadComponent: () =>
-      import('./pages/admin/admin.placeholder').then((m) => m.AdminPlaceholderPage),
+      import('./pages/catalogo-cursos/catalogo-cursos.page').then((m) => m.CatalogoCursosPage),
   },
 ];

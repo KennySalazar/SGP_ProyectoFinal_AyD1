@@ -1,6 +1,8 @@
 package gt.usac.cunoc.sgp.usuario.repository;
 
 import gt.usac.cunoc.sgp.usuario.entity.UserAccount;
+import gt.usac.cunoc.sgp.usuario.model.RoleName;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.EntityGraph;
@@ -13,4 +15,7 @@ public interface UserAccountRepository extends JpaRepository<UserAccount, UUID> 
 
   @EntityGraph(attributePaths = "role")
   Optional<UserAccount> findWithRoleById(UUID id);
+
+  @EntityGraph(attributePaths = "role")
+  List<UserAccount> findByRole_NameAndActiveTrueOrderByEmailAsc(RoleName roleName);
 }
