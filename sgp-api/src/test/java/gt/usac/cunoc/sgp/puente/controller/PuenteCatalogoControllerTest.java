@@ -1,6 +1,7 @@
 package gt.usac.cunoc.sgp.puente.controller;
 
 import static org.mockito.Mockito.when;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -12,10 +13,14 @@ import gt.usac.cunoc.sgp.common.security.JwtAuthenticationFilter;
 import gt.usac.cunoc.sgp.common.security.JwtService;
 import gt.usac.cunoc.sgp.common.security.ProblemAccessDeniedHandler;
 import gt.usac.cunoc.sgp.common.security.ProblemAuthenticationEntryPoint;
+import gt.usac.cunoc.sgp.puente.dto.CandidatoTerritorialResponse;
 import gt.usac.cunoc.sgp.puente.dto.DepartamentoResponse;
+import gt.usac.cunoc.sgp.puente.dto.MunicipioResponse;
 import gt.usac.cunoc.sgp.puente.dto.PuenteCatalogoResponse;
+import gt.usac.cunoc.sgp.puente.dto.UbicacionTerritorialResponse;
 import gt.usac.cunoc.sgp.puente.service.CatalogoTerritorialService;
 import gt.usac.cunoc.sgp.puente.service.PuenteService;
+import gt.usac.cunoc.sgp.puente.service.UbicacionTerritorialService;
 import gt.usac.cunoc.sgp.usuario.repository.UserAccountRepository;
 import java.time.Clock;
 import java.util.List;
@@ -33,7 +38,11 @@ import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
 
 @WebMvcTest(
-    controllers = {PuenteController.class, CatalogoTerritorialController.class},
+    controllers = {
+      PuenteController.class,
+      CatalogoTerritorialController.class,
+      UbicacionTerritorialController.class
+    },
     properties = "app.cors.allowed-origins=http://localhost:4200")
 @Import({
   SecurityConfiguration.class,
@@ -47,6 +56,7 @@ class PuenteCatalogoControllerTest {
   @Autowired private MockMvc mvc;
   @MockBean private PuenteService service;
   @MockBean private CatalogoTerritorialService territorios;
+  @MockBean private UbicacionTerritorialService ubicaciones;
   @MockBean private JwtService jwtService;
   @MockBean private UserAccountRepository users;
   @MockBean private Clock clock;
@@ -118,11 +128,78 @@ class PuenteCatalogoControllerTest {
         .andExpect(status().isUnauthorized());
   }
 
-  @Test
-  @WithMockUser(roles = "ESTUDIANTE")
-  void municipiosSiguenRestringidosAlAdministrador() throws Exception {
-    mvc.perform(get("/api/v1/catalogos/departamentos/" + UUID.randomUUID() + "/municipios"))
+  @ParameterizedTest
+  @ValueSource(strings = {"ESTUDIANTE", "PROFESIONAL_EXTERNO"})
+  void municipiosNoEstanDisponiblesParaRolesSinPermiso(String rol) throws Exception {
+    mvc.perform(
+            get("/api/v1/catalogos/departamentos/" + UUID.randomUUID() + "/municipios")
+                .with(user("usuario").roles(rol)))
         .andExpect(status().isForbidden());
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"ADMINISTRADOR", "CATEDRATICO"})
+  void administradorYCatedraticoConsultanMunicipios(String rol) throws Exception {
+    UUID departamentoId = UUID.randomUUID();
+    when(territorios.listarMunicipios(departamentoId, 0, 100))
+        .thenReturn(
+            new PageImpl<>(
+                List.of(new MunicipioResponse(UUID.randomUUID(), departamentoId, "0101", "Guate")),
+                PageRequest.of(0, 100),
+                1));
+
+    mvc.perform(
+            get("/api/v1/catalogos/departamentos/" + departamentoId + "/municipios")
+                .with(user("usuario").roles(rol)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.content[0].nombre").value("Guate"));
+  }
+
+  @Test
+  void ubicacionRequiereAutenticacion() throws Exception {
+    mvc.perform(
+            get("/api/v1/catalogos/ubicacion")
+                .param("latitud", "14.481")
+                .param("longitud", "-90.615"))
+        .andExpect(status().isUnauthorized());
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"ESTUDIANTE", "PROFESIONAL_EXTERNO"})
+  void ubicacionNoEstaDisponibleParaRolesSinPermiso(String rol) throws Exception {
+    mvc.perform(
+            get("/api/v1/catalogos/ubicacion")
+                .param("latitud", "14.481")
+                .param("longitud", "-90.615")
+                .with(user("usuario").roles(rol)))
+        .andExpect(status().isForbidden());
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"ADMINISTRADOR", "CATEDRATICO"})
+  void administradorYCatedraticoResuelvenUbicacion(String rol) throws Exception {
+    UUID departamentoId = UUID.randomUUID();
+    when(ubicaciones.resolver(14.481, -90.615))
+        .thenReturn(
+            new UbicacionTerritorialResponse(
+                14.481,
+                -90.615,
+                "15N",
+                false,
+                List.of(
+                    new CandidatoTerritorialResponse(
+                        new DepartamentoResponse(departamentoId, "01", "Guatemala"),
+                        new MunicipioResponse(
+                            UUID.randomUUID(), departamentoId, "0101", "Guatemala")))));
+
+    mvc.perform(
+            get("/api/v1/catalogos/ubicacion")
+                .param("latitud", "14.481")
+                .param("longitud", "-90.615")
+                .with(user("usuario").roles(rol)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.zonaUtm").value("15N"))
+        .andExpect(jsonPath("$.candidatos[0].municipio.nombre").value("Guatemala"));
   }
 
   @ParameterizedTest

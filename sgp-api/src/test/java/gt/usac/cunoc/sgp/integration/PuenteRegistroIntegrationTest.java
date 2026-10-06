@@ -40,6 +40,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -668,6 +669,30 @@ class PuenteRegistroIntegrationTest {
       assertThat(resultado.getContent()).noneMatch(item -> item.id().equals(municipioId));
     } finally {
       jdbc.update("UPDATE municipio SET activo = true WHERE id = ?", municipioId);
+    }
+  }
+
+  @Test
+  @WithMockUser(roles = "CATEDRATICO")
+  void catedraticoListaMunicipiosDelDepartamento() {
+    var resultado = catalogoTerritorialService.listarMunicipios(departamentoId, 0, 100);
+
+    assertThat(resultado.getContent()).isNotEmpty();
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"ESTUDIANTE", "PROFESIONAL_EXTERNO"})
+  void rolesSinPermisoNoListanMunicipios(String rol) {
+    SecurityContextHolder.getContext()
+        .setAuthentication(
+            new UsernamePasswordAuthenticationToken(
+                "usuario", "n/a", List.of(new SimpleGrantedAuthority("ROLE_" + rol))));
+
+    try {
+      assertThatThrownBy(() -> catalogoTerritorialService.listarMunicipios(departamentoId, 0, 100))
+          .isInstanceOf(AccessDeniedException.class);
+    } finally {
+      SecurityContextHolder.clearContext();
     }
   }
 

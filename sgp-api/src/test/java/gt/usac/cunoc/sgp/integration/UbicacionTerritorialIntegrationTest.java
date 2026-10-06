@@ -196,6 +196,20 @@ class UbicacionTerritorialIntegrationTest {
     assertThrows(AccessDeniedException.class, () -> service.resolver(14.481, -90.615));
   }
 
+  @Test
+  @WithMockUser(roles = "PROFESIONAL_EXTERNO")
+  void rechazaConsultaAlProfesionalExterno() {
+    assertThrows(AccessDeniedException.class, () -> service.resolver(14.481, -90.615));
+  }
+
+  @Test
+  @WithMockUser(roles = "CATEDRATICO")
+  void permiteConsultaAlCatedratico() {
+    var respuesta = service.resolver(14.481, -90.615);
+
+    assertFalse(respuesta.candidatos().isEmpty());
+  }
+
   @TestConfiguration
   @EnableMethodSecurity
   static class Config {}

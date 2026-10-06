@@ -39,6 +39,7 @@ public class CatalogoTerritorialController {
   }
 
   @GetMapping("/departamentos/{departamentoId}/municipios")
+  @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'CATEDRATICO')")
   @SecurityRequirement(name = "bearerAuth")
   @Operation(summary = "Listar municipios activos de un departamento")
   public Page<MunicipioResponse> listarMunicipios(
