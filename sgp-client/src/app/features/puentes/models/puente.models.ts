@@ -24,7 +24,7 @@ export interface MunicipioResponse {
   nombre: string;
 }
 
-export interface CrearPuenteRequest {
+export interface PuenteFormValores {
   nombre: string;
   departamentoId: string;
   municipioId: string;
@@ -32,6 +32,14 @@ export interface CrearPuenteRequest {
   kilometraje: number | null;
   latitud: number;
   longitud: number;
+}
+
+export type PuenteFormInicial = Pick<
+  PuenteFormValores,
+  'nombre' | 'ruta' | 'kilometraje' | 'latitud' | 'longitud'
+>;
+
+export interface CrearPuenteRequest extends PuenteFormValores {
   confirmarCercania: boolean;
 }
 

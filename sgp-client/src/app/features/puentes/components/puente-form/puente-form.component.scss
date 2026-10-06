@@ -1,0 +1,77 @@
+:host {
+  display: block;
+}
+
+.bridge-card {
+  padding: clamp(1.25rem, 3vw, 2rem);
+}
+
+h2,
+h3 {
+  color: var(--sgp-navy-900);
+}
+
+h2 {
+  margin: 0;
+  font-size: 1.2rem;
+}
+
+h3 {
+  margin: 2rem 0 0;
+  font-size: 1.05rem;
+}
+
+.note {
+  margin: 0.75rem 0 1.5rem;
+  color: var(--sgp-steel-500);
+  line-height: 1.6;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1.25rem;
+}
+
+.field {
+  display: grid;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+label,
+.field > span {
+  color: var(--sgp-navy-900);
+  font-weight: 700;
+}
+
+input,
+p-select {
+  width: 100%;
+  min-width: 0;
+}
+
+.validation {
+  color: #b91c1c;
+}
+
+.feedback {
+  margin-top: 1rem;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 1.5rem;
+}
+
+@media (max-width: 700px) {
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .actions {
+    flex-direction: column;
+  }
+}

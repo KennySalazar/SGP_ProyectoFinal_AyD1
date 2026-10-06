@@ -40,6 +40,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -271,6 +272,35 @@ class PuenteRegistroIntegrationTest {
             "SELECT ultimo_correlativo_puente FROM municipio WHERE id = ?",
             Integer.class,
             municipio));
+  }
+
+  @Test
+  void validaUbicacionDentroDeGuatemalaYDelMunicipio() {
+    puenteService.validarDentroDeGuatemala(14.481, -90.615);
+    puenteService.validarUbicacionEnMunicipio(municipioId, 14.481, -90.615);
+  }
+
+  @Test
+  void validacionDirectaRechazaPuntoFueraDeGuatemala() {
+    var excepcion =
+        assertThrows(ApiException.class, () -> puenteService.validarDentroDeGuatemala(0, 0));
+
+    assertEquals(HttpStatus.UNPROCESSABLE_ENTITY, excepcion.getStatus());
+    assertEquals("ubicacion_fuera_de_guatemala", excepcion.getCode());
+  }
+
+  @Test
+  void validacionDirectaRechazaPuntoDeOtroMunicipio() {
+    UUID acatenango =
+        jdbc.queryForObject("SELECT id FROM municipio WHERE codigo_ine = '0411'", UUID.class);
+
+    var excepcion =
+        assertThrows(
+            ApiException.class,
+            () -> puenteService.validarUbicacionEnMunicipio(acatenango, 14.844673, -91.521161));
+
+    assertEquals(HttpStatus.UNPROCESSABLE_ENTITY, excepcion.getStatus());
+    assertEquals("ubicacion_municipio_incongruente", excepcion.getCode());
   }
 
   @ParameterizedTest
@@ -668,6 +698,30 @@ class PuenteRegistroIntegrationTest {
       assertThat(resultado.getContent()).noneMatch(item -> item.id().equals(municipioId));
     } finally {
       jdbc.update("UPDATE municipio SET activo = true WHERE id = ?", municipioId);
+    }
+  }
+
+  @Test
+  @WithMockUser(roles = "CATEDRATICO")
+  void catedraticoListaMunicipiosDelDepartamento() {
+    var resultado = catalogoTerritorialService.listarMunicipios(departamentoId, 0, 100);
+
+    assertThat(resultado.getContent()).isNotEmpty();
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"ESTUDIANTE", "PROFESIONAL_EXTERNO"})
+  void rolesSinPermisoNoListanMunicipios(String rol) {
+    SecurityContextHolder.getContext()
+        .setAuthentication(
+            new UsernamePasswordAuthenticationToken(
+                "usuario", "n/a", List.of(new SimpleGrantedAuthority("ROLE_" + rol))));
+
+    try {
+      assertThatThrownBy(() -> catalogoTerritorialService.listarMunicipios(departamentoId, 0, 100))
+          .isInstanceOf(AccessDeniedException.class);
+    } finally {
+      SecurityContextHolder.clearContext();
     }
   }
 

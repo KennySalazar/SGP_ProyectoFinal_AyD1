@@ -74,21 +74,7 @@ public class PuenteService {
     double latitud = request.latitud().doubleValue();
     double longitud = request.longitud().doubleValue();
 
-    Boolean dentroDeGuatemala = puentes.estaDentroDeGuatemala(latitud, longitud);
-
-    if (dentroDeGuatemala == null) {
-      throw new ApiException(
-          HttpStatus.SERVICE_UNAVAILABLE,
-          "limite_territorial_no_disponible",
-          "Validación territorial no disponible",
-          "No está cargado el límite territorial de Guatemala.");
-    }
-
-    if (!dentroDeGuatemala) {
-      throw validacion(
-          "ubicacion_fuera_de_guatemala",
-          "Las coordenadas deben estar dentro del territorio de Guatemala.");
-    }
+    validarDentroDeGuatemala(latitud, longitud);
 
     Departamento departamento =
         departamentos
@@ -110,22 +96,7 @@ public class PuenteService {
           "El municipio no pertenece al departamento seleccionado");
     }
 
-    Boolean perteneceAlMunicipio =
-        municipios.ubicacionPerteneceAlMunicipio(municipio.getId(), latitud, longitud);
-
-    if (perteneceAlMunicipio == null) {
-      throw new ApiException(
-          HttpStatus.SERVICE_UNAVAILABLE,
-          "limite_municipal_no_disponible",
-          "Validación municipal no disponible",
-          "No está cargado el límite geográfico del municipio seleccionado.");
-    }
-
-    if (!perteneceAlMunicipio) {
-      throw validacion(
-          "ubicacion_municipio_incongruente",
-          "Las coordenadas no corresponden al municipio seleccionado.");
-    }
+    validarUbicacionEnMunicipio(municipio.getId(), latitud, longitud);
 
     var cercanos = puentes.findCercanos(latitud, longitud, PageRequest.of(0, 100));
     if (cercanos.hasContent() && !request.confirmarCercania()) {
@@ -238,6 +209,45 @@ public class PuenteService {
         mapper.toCoordenadaUtmResponse(
             puentes.calcularUtm(guardado.getUbicacion().getY(), guardado.getUbicacion().getX()));
     return mapper.toAltaResponse(guardado, utm);
+  }
+
+  @Transactional(readOnly = true)
+  public void validarDentroDeGuatemala(double latitud, double longitud) {
+    Boolean dentroDeGuatemala = puentes.estaDentroDeGuatemala(latitud, longitud);
+
+    if (dentroDeGuatemala == null) {
+      throw new ApiException(
+          HttpStatus.SERVICE_UNAVAILABLE,
+          "limite_territorial_no_disponible",
+          "Validación territorial no disponible",
+          "No está cargado el límite territorial de Guatemala.");
+    }
+
+    if (!dentroDeGuatemala) {
+      throw validacion(
+          "ubicacion_fuera_de_guatemala",
+          "Las coordenadas deben estar dentro del territorio de Guatemala.");
+    }
+  }
+
+  @Transactional(readOnly = true)
+  public void validarUbicacionEnMunicipio(UUID municipioId, double latitud, double longitud) {
+    Boolean perteneceAlMunicipio =
+        municipios.ubicacionPerteneceAlMunicipio(municipioId, latitud, longitud);
+
+    if (perteneceAlMunicipio == null) {
+      throw new ApiException(
+          HttpStatus.SERVICE_UNAVAILABLE,
+          "limite_municipal_no_disponible",
+          "Validación municipal no disponible",
+          "No está cargado el límite geográfico del municipio seleccionado.");
+    }
+
+    if (!perteneceAlMunicipio) {
+      throw validacion(
+          "ubicacion_municipio_incongruente",
+          "Las coordenadas no corresponden al municipio seleccionado.");
+    }
   }
 
   @Transactional(readOnly = true)

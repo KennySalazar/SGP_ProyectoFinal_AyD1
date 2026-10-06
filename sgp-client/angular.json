@@ -27,7 +27,14 @@
                 "input": "public"
               }
             ],
-            "styles": ["node_modules/maplibre-gl/dist/maplibre-gl.css", "src/styles.scss"],
+            "styles": [
+              "src/styles.scss",
+              {
+                "input": "node_modules/maplibre-gl/dist/maplibre-gl.css",
+                "bundleName": "maplibre",
+                "inject": false
+              }
+            ],
             "serviceWorker": "ngsw-config.json"
           },
           "configurations": {

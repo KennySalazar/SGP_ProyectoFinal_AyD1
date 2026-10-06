@@ -43,6 +43,7 @@ public class CatalogoTerritorialService {
         .map(puenteMapper::toDepartamentoResponse);
   }
 
+  @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'CATEDRATICO')")
   public Page<MunicipioResponse> listarMunicipios(UUID departamentoId, int pagina, int tamanio) {
     Pageable pageable = crearPaginacion(pagina, tamanio);
 

@@ -13,7 +13,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/v1/catalogos")
-@PreAuthorize("hasRole('ADMINISTRADOR')")
+@PreAuthorize("hasAnyRole('ADMINISTRADOR', 'CATEDRATICO')")
 @Tag(name = "Catálogos territoriales")
 @SecurityRequirement(name = "bearerAuth")
 public class UbicacionTerritorialController {
