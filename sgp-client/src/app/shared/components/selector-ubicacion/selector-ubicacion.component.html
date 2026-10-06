@@ -1,0 +1,31 @@
+<div class="selector">
+  <div
+    #contenedor
+    class="mapa"
+    role="region"
+    aria-label="Mapa para seleccionar la ubicación del puente"
+  ></div>
+
+  @if (cargando()) {
+    <p role="status">Cargando mapa…</p>
+  }
+
+  @if (errorMapa()) {
+    <p class="error" role="alert">
+      No se pudo cargar el mapa completo. Puedes ingresar las coordenadas en los campos del
+      formulario.
+    </p>
+  }
+
+  <p class="ayuda">
+    Haz clic para seleccionar una ubicación y arrastra el marcador azul para ajustarla. También
+    puedes ingresar las coordenadas con el teclado.
+  </p>
+
+  @if (cercanos.length > 0) {
+    <p class="ayuda">
+      Los marcadores naranjas representan los puentes cercanos. Selecciónalos para consultar su
+      identificación.
+    </p>
+  }
+</div>

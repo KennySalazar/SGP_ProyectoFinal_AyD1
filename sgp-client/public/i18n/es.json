@@ -161,7 +161,6 @@
     "controls": "Controles de diagnostico",
     "basePrepared": "Base preparada"
   },
-
   "puentes": {
     "catalogo": {
       "explore": "Explorar catálogo de puentes",
@@ -205,8 +204,15 @@
     "departmentsFailed": "No fue posible cargar los departamentos.",
     "municipalitiesFailed": "No fue posible cargar los municipios.",
     "retry": "Reintentar",
+    "clearLocation": "Quitar ubicación",
     "territoryNote": "El municipio debe pertenecer al departamento seleccionado.",
     "noMunicipalities": "Este departamento no tiene municipios activos disponibles.",
+    "territoryFromPoint": "El departamento y municipio se determinan por las coordenadas. Selecciona primero una ubicación en el mapa o ingresa las coordenadas de tu GPS.",
+    "resolvingLocation": "Consultando el departamento y municipio de la ubicación…",
+    "locationMultipleCandidates": "El punto está cubierto por varios límites municipales. Selecciona el departamento y municipio correspondiente entre las opciones disponibles.",
+    "locationLookupFailed": "No se pudo consultar la ubicación territorial. Reintenta antes de guardar.",
+    "locationWithoutMunicipality": "No se encontró un municipio disponible para estas coordenadas.",
+    "mapCoordinatesNote": "Selecciona el punto en el mapa o ingresa las coordenadas de tu GPS. La ubicación debe estar dentro de Guatemala.",
     "data": "Datos del puente",
     "name": "Nombre",
     "route": "Ruta",

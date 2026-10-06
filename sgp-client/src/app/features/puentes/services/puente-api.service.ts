@@ -9,11 +9,23 @@ import {
   PaginaResponse,
   PuenteCatalogoResponse,
   PuenteResponse,
+  UbicacionTerritorialResponse,
 } from '../models/puente.models';
+
 
 @Injectable({ providedIn: 'root' })
 export class PuenteApiService {
   private readonly http = inject(HttpClient);
+
+  resolverUbicacion(
+  latitud: number,
+  longitud: number,
+): Observable<UbicacionTerritorialResponse> {
+  return this.http.get<UbicacionTerritorialResponse>(
+    '/api/v1/catalogos/ubicacion',
+    { params: { latitud, longitud } },
+  );
+}
 
   listarCatalogo(
     consulta: ConsultaCatalogoPuentes = {},
