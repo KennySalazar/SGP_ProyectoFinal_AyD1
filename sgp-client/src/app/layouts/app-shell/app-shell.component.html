@@ -15,6 +15,7 @@
     </header>
 
     <section class="route-content">
+      <ng-content />
       <router-outlet />
     </section>
   </main>
@@ -33,6 +34,15 @@
       <nav>
         <a routerLink="/" [routerLinkActiveOptions]="{ exact: true }" routerLinkActive="active">
           <i class="pi pi-home"></i><span>{{ 'nav.home' | transloco }}</span>
+        </a>
+        <a
+          routerLink="/puentes"
+          [routerLinkActiveOptions]="{ exact: true }"
+          routerLinkActive="active"
+          ariaCurrentWhenActive="page"
+        >
+          <i class="pi pi-list" aria-hidden="true"></i
+          ><span>{{ 'nav.bridgeCatalog' | transloco }}</span>
         </a>
         <a routerLink="/offline" routerLinkActive="active">
           <i class="pi pi-cloud"></i><span>{{ 'nav.offline' | transloco }}</span>
@@ -63,7 +73,12 @@
       </div>
     </div>
 
-    <button class="logout" type="button" (click)="logout()">
+    <button
+      class="logout"
+      type="button"
+      [attr.aria-label]="'nav.logout' | transloco"
+      (click)="logout()"
+    >
       <i class="pi pi-sign-out"></i>
       <span>{{ 'nav.logout' | transloco }}</span>
     </button>

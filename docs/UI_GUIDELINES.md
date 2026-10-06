@@ -52,6 +52,9 @@ Esta guía reúne las reglas visuales y de experiencia que ya están implementad
 
 - Las rutas públicas de autenticación usan `AuthCardComponent`: panel visual navy a la izquierda y tarjeta de formulario de hasta `31rem` a la derecha.
 - Las rutas autenticadas usan `AppShellComponent`: sidebar sticky de `292px`, barra superior sticky de `76px` y contenido de hasta `1280px`.
+- El catálogo público `/puentes` reutiliza `AppShellComponent` mediante contenido
+  proyectado cuando existe sesión; sin sesión conserva una presentación pública.
+  El shell mantiene su `router-outlet` para las demás rutas, sin exigir autenticación al catálogo.
 - Cada pantalla autenticada inicia con `.page-heading`, `.page-kicker`, `.page-title` y `.page-description`, salvo composiciones equivalentes del dashboard.
 - El contenido se organiza en grids y tarjetas blancas con bordes sutiles, radios entre `16px` y `20px` y sombras de baja opacidad.
 - Las tarjetas agrupan información relacionada; sus cabeceras suelen separar título, contexto y estado mediante borde inferior.

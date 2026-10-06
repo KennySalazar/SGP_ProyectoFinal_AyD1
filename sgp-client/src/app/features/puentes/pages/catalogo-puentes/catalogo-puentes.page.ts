@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, DestroyRef, inject, signal } from '@angular/core';
+import { NgTemplateOutlet } from '@angular/common';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormBuilder, ReactiveFormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
@@ -17,11 +18,15 @@ import {
   PuenteCatalogoResponse,
 } from '../../models/puente.models';
 import { PuenteApiService } from '../../services/puente-api.service';
+import { AuthStore } from '../../../../core/services/auth.store';
+import { AppShellComponent } from '../../../../layouts/app-shell/app-shell.component';
 
 @Component({
   selector: 'app-catalogo-puentes-page',
   standalone: true,
   imports: [
+    NgTemplateOutlet,
+    AppShellComponent,
     TranslocoPipe,
     ButtonModule,
     PaginatorModule,
@@ -36,6 +41,7 @@ import { PuenteApiService } from '../../services/puente-api.service';
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class CatalogoPuentesPage {
+  readonly auth = inject(AuthStore);
   private readonly api = inject(PuenteApiService);
   private readonly destroyRef = inject(DestroyRef);
   private readonly fb = inject(FormBuilder);
@@ -51,9 +57,32 @@ export class CatalogoPuentesPage {
   readonly estados: EstadoPuente[] = ['Bueno', 'Regular', 'Malo', 'Sin evaluar'];
   readonly tamaniosPagina = [10, 20, 50, 100];
   readonly tamanioPagina = signal(20);
+  readonly selectorTamanio = this.fb.nonNullable.control(20);
+  readonly hayFiltrosAplicados = signal(false);
+  readonly estiloPanelSelector = {
+    // El panel se adjunta al body: garantizar una superficie opaca sin depender del tema.
+    backgroundColor: '#ffffff',
+    color: '#40546b',
+    opacity: '1',
+    border: '1px solid #d8e2ec',
+    borderRadius: '12px',
+    boxShadow: '0 12px 32px rgba(7, 20, 38, 0.16)',
+    padding: '0.35rem',
+  };
+  readonly atributosBotonPagina = {
+    style: { minWidth: '44px', minHeight: '44px', margin: '0 0.15rem', borderRadius: '8px' },
+  };
+  readonly estiloPaginador = {
+    first: this.atributosBotonPagina,
+    prev: this.atributosBotonPagina,
+    page: this.atributosBotonPagina,
+    next: this.atributosBotonPagina,
+    last: this.atributosBotonPagina,
+  };
 
   readonly vista = signal<'lista' | 'mapa'>('lista');
   readonly pagina = signal<PaginaResponse<PuenteCatalogoResponse> | null>(null);
+  readonly puenteSeleccionado = signal<PuenteCatalogoResponse | null>(null);
   readonly cargando = signal(false);
   readonly errorConsulta = signal(false);
   private readonly severidadEstado: Record<
@@ -96,6 +125,7 @@ export class CatalogoPuentesPage {
       pagina: 0,
       tamanio: this.tamanioPagina(),
     };
+    this.hayFiltrosAplicados.set(!!(departamentoId || estado));
     this.cargarCatalogo();
   }
 
@@ -103,6 +133,7 @@ export class CatalogoPuentesPage {
     if (this.cargando()) return;
     this.filtros.reset();
     this.consultaAplicada = { pagina: 0, tamanio: this.tamanioPagina() };
+    this.hayFiltrosAplicados.set(false);
     this.cargarCatalogo();
   }
 
@@ -136,6 +167,7 @@ export class CatalogoPuentesPage {
 
   cargarCatalogo(): void {
     if (this.cargando()) return;
+    this.puenteSeleccionado.set(null);
     this.cargando.set(true);
     this.errorConsulta.set(false);
     this.api
@@ -145,7 +177,10 @@ export class CatalogoPuentesPage {
         finalize(() => this.cargando.set(false)),
       )
       .subscribe({
-        next: (pagina) => this.pagina.set(pagina),
+        next: (pagina) => {
+          this.selectorTamanio.setValue(pagina.size, { emitEvent: false });
+          this.pagina.set(pagina);
+        },
         error: () => this.errorConsulta.set(true),
       });
   }

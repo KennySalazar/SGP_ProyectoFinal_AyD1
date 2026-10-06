@@ -97,6 +97,7 @@ describe('Rutas públicas y protegidas de puentes', () => {
 
 describe('Lista integrada en el catálogo público sin sesión', () => {
   let http: HttpTestingController;
+  const usuario = signal<{ role: string; email: string } | null>(null);
   const refresh = vi.fn();
   const estados: EstadoPuente[] = ['Bueno', 'Regular', 'Malo', 'Sin evaluar'];
   const puentes = estados.map((estadoActual, index) => ({
@@ -120,6 +121,7 @@ describe('Lista integrada en el catálogo público sin sesión', () => {
 
   beforeEach(() => {
     refresh.mockReset();
+    usuario.set(null);
     TestBed.configureTestingModule({
       providers: [
         provideRouter(routes),
@@ -128,15 +130,19 @@ describe('Lista integrada en el catálogo público sin sesión', () => {
         {
           provide: AuthStore,
           useValue: {
-            user: signal(null),
-            authenticated: () => false,
-            accessToken: () => null,
+            user: usuario,
+            authenticated: () => usuario() !== null,
+            accessToken: () => (usuario() ? 'token-test' : null),
           },
         },
         { provide: TokenRefreshService, useValue: { refresh } },
       ],
     });
     TestBed.overrideComponent(CatalogoPuentesPage, {
+      remove: { imports: [TranslocoPipe] },
+      add: { imports: [TraduccionTestPipe] },
+    });
+    TestBed.overrideComponent(AppShellComponent, {
       remove: { imports: [TranslocoPipe] },
       add: { imports: [TraduccionTestPipe] },
     });
@@ -152,14 +158,14 @@ describe('Lista integrada en el catálogo público sin sesión', () => {
     const harness = await RouterTestingHarness.create();
     const page = await harness.navigateByUrl('/puentes', CatalogoPuentesPage);
     const departamentos = http.expectOne((req) => req.url === '/api/v1/catalogos/departamentos');
-    expect(departamentos.request.headers.has('Authorization')).toBe(false);
+    expect(departamentos.request.headers.has('Authorization')).toBe(usuario() !== null);
     departamentos.flush({ content: [puentes[0].departamento] });
     return { harness, page };
   }
 
   function responderCatalogo(number = 0, content = puentes, totalElements = 24) {
     const request = http.expectOne((req) => req.url === '/api/v1/puentes');
-    expect(request.request.headers.has('Authorization')).toBe(false);
+    expect(request.request.headers.has('Authorization')).toBe(usuario() !== null);
     request.flush({
       content,
       number,
@@ -191,7 +197,7 @@ describe('Lista integrada en el catálogo público sin sesión', () => {
     expect(element.querySelector('a')?.getAttribute('href')).toBe('/login');
   });
 
-  it('integra filtros y paginación y conserva la lista al alternar vistas sin nuevas consultas', async () => {
+  it('integra filtros y paginación sin consultar nuevamente al pulsar el mapa pendiente', async () => {
     const { harness, page } = await abrirCatalogo();
     responderCatalogo();
     page.filtros.patchValue({ departamentoId: 'departamento-1', estado: 'Sin evaluar' });
@@ -212,7 +218,8 @@ describe('Lista integrada en el catálogo público sin sesión', () => {
       harness.routeNativeElement!.querySelectorAll<HTMLButtonElement>('.selector button');
     selector[1].click();
     harness.detectChanges();
-    expect(harness.routeNativeElement!.querySelector('p-table')).toBeNull();
+    expect(selector[1].disabled).toBe(true);
+    expect(harness.routeNativeElement!.querySelector('p-table')).not.toBeNull();
     selector[0].click();
     harness.detectChanges();
     expect(harness.routeNativeElement!.querySelector('tbody')?.textContent).toContain(
@@ -232,7 +239,47 @@ describe('Lista integrada en el catálogo público sin sesión', () => {
     harness.detectChanges();
     expect(
       harness.routeNativeElement!.querySelector('tbody [role="status"]')?.textContent,
-    ).toContain('puentes.catalogo.noResults');
+    ).toContain('puentes.catalogo.emptyCatalog');
+  });
+
+  it.each(['ADMINISTRADOR', 'ESTUDIANTE', 'CATEDRATICO', 'PROFESIONAL_EXTERNO'])(
+    'muestra el layout y acceso al catálogo para %s sin pedir iniciar sesión',
+    async (role) => {
+      usuario.set({ role, email: 'usuario@example.test' });
+      const { harness } = await abrirCatalogo();
+      responderCatalogo();
+      harness.detectChanges();
+      const element = harness.routeNativeElement!;
+      expect(element.querySelectorAll('app-shell')).toHaveLength(1);
+      expect(element.querySelectorAll('main')).toHaveLength(1);
+      expect(element.querySelector('a[href="/login"]')).toBeNull();
+      const enlace = element.querySelector('nav a[href="/puentes"]');
+      expect(enlace?.textContent).toContain('nav.bridgeCatalog');
+      expect(enlace?.classList.contains('active')).toBe(true);
+      expect(element.querySelector('.user-data')?.textContent).toContain('usuario@example.test');
+      expect(element.querySelector('header.page-heading a[href="/puentes/nuevo"]') !== null).toBe(
+        role === 'ADMINISTRADOR',
+      );
+      expect(element.querySelector('nav a[href="/puentes/nuevo"]') !== null).toBe(
+        role === 'ADMINISTRADOR',
+      );
+      expect(element.querySelector('p-table')).not.toBeNull();
+    },
+  );
+
+  it('vuelve a la presentación pública si la sesión se pierde sin duplicar consultas', async () => {
+    usuario.set({ role: 'ESTUDIANTE', email: 'usuario@example.test' });
+    const { harness } = await abrirCatalogo();
+    responderCatalogo();
+    harness.detectChanges();
+    expect(harness.routeNativeElement!.querySelector('app-shell')).not.toBeNull();
+    usuario.set(null);
+    harness.detectChanges();
+    expect(harness.routeNativeElement!.querySelector('app-shell')).toBeNull();
+    expect(harness.routeNativeElement!.querySelector('a[href="/login"]')).not.toBeNull();
+    expect(harness.routeNativeElement!.querySelectorAll('main')).toHaveLength(1);
+    expect(harness.routeNativeElement!.querySelector('p-table')).not.toBeNull();
+    http.expectNone((req) => req.url === '/api/v1/puentes');
   });
 
   it('permite reintentar errores sin sesión ni solicitudes de renovación', async () => {

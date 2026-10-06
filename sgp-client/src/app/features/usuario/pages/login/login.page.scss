@@ -15,3 +15,21 @@
 .input-wrap input {
   padding-left: 2.55rem;
 }
+
+.catalogo-acceso {
+  margin-top: 1.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--sgp-border);
+  text-align: center;
+
+  p {
+    color: var(--sgp-steel-700);
+    line-height: 1.5;
+  }
+
+  a {
+    width: 100%;
+    justify-content: center;
+    text-decoration: none;
+  }
+}

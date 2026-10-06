@@ -6,7 +6,7 @@ import { By } from '@angular/platform-browser';
 import { provideRouter } from '@angular/router';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { Paginator } from 'primeng/paginator';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { CatalogoPuentesPage } from './catalogo-puentes.page';
 import { EstadoPuente } from '../../models/puente.models';
 
@@ -44,7 +44,45 @@ describe('Base compartida del catálogo HU014', () => {
       });
   });
 
-  afterEach(() => http.verify());
+  afterEach(() => {
+    http.verify();
+    fixture.destroy();
+    vi.unstubAllGlobals();
+  });
+
+  it('abre departamentos con panel opaco y opciones etiquetadas fuera de la tabla', async () => {
+    // JSDOM no implementa matchMedia; el overlay lo usa para el modo responsive.
+    vi.stubGlobal(
+      'matchMedia',
+      vi.fn((media: string) => ({
+        matches: false,
+        media,
+        onchange: null,
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        dispatchEvent: vi.fn(),
+      })),
+    );
+    http.expectOne((req) => req.url === '/api/v1/puentes').flush({ content: [], totalElements: 0 });
+    fixture.detectChanges();
+    fixture.nativeElement.querySelector('#catalogo-departamento').click();
+    fixture.detectChanges();
+    await fixture.whenStable();
+    const panel = document.body.querySelector('.p-select-overlay') as HTMLElement;
+    expect(panel).not.toBeNull();
+    expect(panel.style.backgroundColor).toBe('rgb(255, 255, 255)');
+    expect(panel.style.opacity).toBe('1');
+    expect(panel.closest('.tabla-contenedor')).toBeNull();
+    const opciones = panel.querySelectorAll<HTMLElement>('.opcion-catalogo');
+    expect(opciones).toHaveLength(2);
+    expect(opciones[0].textContent).toContain('Guatemala');
+    opciones[0].click();
+    fixture.detectChanges();
+    expect(page.filtros.controls.departamentoId.value).toBe('departamento-1');
+    http.expectNone((req) => req.url === '/api/v1/puentes');
+  });
 
   function responderPagina(number = 0, size = 20, totalElements = 41): void {
     http
@@ -118,10 +156,9 @@ describe('Base compartida del catálogo HU014', () => {
     responderPagina();
     page.cambiarPagina({ page: 1, rows: 20 });
     responderPagina(1);
-    const paginator = fixture.debugElement.query(By.directive(Paginator))
-      .componentInstance as Paginator;
-    expect(paginator.rowsPerPageOptions).toEqual([10, 20, 50, 100]);
-    paginator.onPageChange.emit({ page: 1, rows: 100 });
+    expect(page.tamaniosPagina).toEqual([10, 20, 50, 100]);
+    const selector = fixture.debugElement.query(By.css('.tamanio-pagina p-select'));
+    selector.triggerEventHandler('onChange', { value: 100 });
     const cambio = http.expectOne((req) => req.url === '/api/v1/puentes');
     expect(cambio.request.params.get('pagina')).toBe('0');
     expect(cambio.request.params.get('tamanio')).toBe('100');
@@ -197,7 +234,7 @@ describe('Base compartida del catálogo HU014', () => {
     http.expectNone('/api/v1/puentes');
   });
 
-  it('el selector cambia la sección y comunica la opción seleccionada', () => {
+  it('destaca la lista y mantiene el mapa pendiente deshabilitado', () => {
     http.expectOne((req) => req.url === '/api/v1/puentes').flush({ content: [], totalElements: 0 });
     fixture.detectChanges();
     const buttons: NodeListOf<HTMLButtonElement> =
@@ -205,11 +242,10 @@ describe('Base compartida del catálogo HU014', () => {
     expect(buttons[0].getAttribute('aria-pressed')).toBe('true');
     buttons[1].click();
     fixture.detectChanges();
-    expect(buttons[0].getAttribute('aria-pressed')).toBe('false');
-    expect(buttons[1].getAttribute('aria-pressed')).toBe('true');
-    expect(fixture.nativeElement.querySelector('h2').textContent).toContain('puentes.catalogo.map');
-    buttons[0].click();
-    fixture.detectChanges();
+    expect(buttons[0].getAttribute('aria-pressed')).toBe('true');
+    expect(buttons[1].getAttribute('aria-pressed')).toBe('false');
+    expect(buttons[1].disabled).toBe(true);
+    expect(buttons[1].textContent).toContain('puentes.catalogo.comingSoon');
     expect(fixture.nativeElement.querySelector('h2').textContent).toContain(
       'puentes.catalogo.list',
     );
@@ -252,6 +288,12 @@ describe('Base compartida del catálogo HU014', () => {
       fixture.nativeElement.querySelectorAll('tbody tr');
     expect(rows).toHaveLength(4);
     rows.forEach((row, index) => {
+      expect(row.classList.contains('fila-catalogo')).toBe(true);
+      row.querySelectorAll('th, td').forEach((cell) => {
+        const estilo = getComputedStyle(cell);
+        expect(estilo.borderBottomStyle).toBe('solid');
+        expect(estilo.borderBottomWidth).toBe('1px');
+      });
       expect(row.querySelector('th[scope="row"]')?.textContent).toContain(`Puente ${index}`);
       expect(row.textContent).toContain('Guatemala');
       expect(row.textContent).toContain('Amatitlán');
@@ -259,7 +301,16 @@ describe('Base compartida del catálogo HU014', () => {
         estados[index],
       );
     });
-    expect(fixture.nativeElement.querySelectorAll('thead th[scope="col"]')).toHaveLength(4);
+    expect(fixture.nativeElement.querySelectorAll('thead th[scope="col"]')).toHaveLength(5);
+    expect(fixture.nativeElement.querySelector('.tabla-contenedor')?.getAttribute('tabindex')).toBe(
+      '0',
+    );
+    expect(fixture.nativeElement.querySelector('.estado-puente')?.getAttribute('data-estado')).toBe(
+      'Bueno',
+    );
+    expect(fixture.nativeElement.querySelector('.resultados-cabecera h2')?.textContent).toContain(
+      'puentes.catalogo.listTitle',
+    );
     expect(fixture.nativeElement.querySelector('img')).toBeNull();
     expect(fixture.nativeElement.textContent).not.toContain('fotografia-privada.jpg');
     expect(fixture.nativeElement.textContent).not.toContain('Daño detallado privado');
@@ -312,7 +363,106 @@ describe('Base compartida del catálogo HU014', () => {
     request.flush({ content: [], totalElements: 0 });
     fixture.detectChanges();
     expect(fixture.nativeElement.querySelector('tbody [role="status"]').textContent).toContain(
+      'puentes.catalogo.emptyCatalog',
+    );
+  });
+
+  function responderConPuentes(number = 0, size = 20): void {
+    const content = [0, 1].map((indice) => ({
+      id: `uuid-privado-${indice}`,
+      nombre: `Puente ${indice}`,
+      departamento: { id: 'departamento-1', codigoIne: '01', nombre: 'Guatemala' },
+      municipio: { id: 'municipio-1', codigoIne: '0114', nombre: 'Amatitlán' },
+      estadoActual: 'Sin evaluar',
+    }));
+    http
+      .expectOne((req) => req.url === '/api/v1/puentes')
+      .flush({
+        content,
+        number,
+        size,
+        totalElements: 42,
+        totalPages: Math.ceil(42 / size),
+      });
+    fixture.detectChanges();
+  }
+
+  it('selecciona una sola fila con clic o teclado y permite desmarcarla sin consultar la API', () => {
+    responderConPuentes();
+    const rows: NodeListOf<HTMLTableRowElement> =
+      fixture.nativeElement.querySelectorAll('tbody tr');
+    rows[0].click();
+    fixture.detectChanges();
+    expect(page.puenteSeleccionado()?.nombre).toBe('Puente 0');
+    expect(rows[0].classList.contains('fila-seleccionada')).toBe(true);
+    expect(rows[0].getAttribute('aria-selected')).toBe('true');
+    expect(rows[0].querySelector('.pi-check')).not.toBeNull();
+    rows[1].dispatchEvent(new KeyboardEvent('keydown', { code: 'Enter', bubbles: true }));
+    fixture.detectChanges();
+    expect(page.puenteSeleccionado()?.nombre).toBe('Puente 1');
+    expect(rows[0].classList.contains('fila-seleccionada')).toBe(false);
+    expect(rows[0].getAttribute('aria-selected')).toBe('false');
+    expect(rows[1].classList.contains('fila-seleccionada')).toBe(true);
+    expect(fixture.nativeElement.querySelector('.seleccion-catalogo').textContent).toContain(
+      'puentes.catalogo.selectedBridge',
+    );
+    rows[1].dispatchEvent(new KeyboardEvent('keydown', { code: 'Space', bubbles: true }));
+    fixture.detectChanges();
+    expect(page.puenteSeleccionado()).toBeNull();
+    expect(fixture.nativeElement.querySelector('.fila-seleccionada')).toBeNull();
+    http.expectNone((req) => req.url === '/api/v1/puentes');
+  });
+
+  it('numera por posición entre páginas y reinicia numeración y selección al filtrar', () => {
+    const numeros = () =>
+      Array.from(
+        fixture.nativeElement.querySelectorAll('.numero-puente') as NodeListOf<HTMLElement>,
+      ).map((celda) => celda.textContent?.trim());
+    responderConPuentes();
+    expect(numeros()).toEqual(['1', '2']);
+    expect(fixture.nativeElement.textContent).not.toContain('uuid-privado');
+    fixture.nativeElement.querySelector('tbody tr').click();
+    page.cambiarPagina({ page: 1, rows: 20 });
+    expect(page.puenteSeleccionado()).toBeNull();
+    responderConPuentes(1);
+    expect(numeros()).toEqual(['21', '22']);
+    fixture.nativeElement.querySelector('tbody tr').click();
+    page.filtros.patchValue({ estado: 'Sin evaluar' });
+    page.aplicarFiltros();
+    expect(page.puenteSeleccionado()).toBeNull();
+    responderConPuentes();
+    expect(numeros()).toEqual(['1', '2']);
+    page.cambiarPagina({ page: 0, rows: 10 });
+    responderConPuentes(0, 10);
+    page.cambiarPagina({ page: 1, rows: 10 });
+    responderConPuentes(1, 10);
+    expect(numeros()).toEqual(['11', '12']);
+  });
+
+  it('distingue catálogo vacío de filtros sin resultados según los filtros aplicados', () => {
+    responderPagina(0, 20, 0);
+    expect(fixture.nativeElement.querySelector('p-paginator')).toBeNull();
+    expect(fixture.nativeElement.querySelector('tbody').textContent).toContain(
+      'puentes.catalogo.emptyCatalog',
+    );
+    page.filtros.patchValue({ estado: 'Malo' });
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('tbody').textContent).toContain(
+      'puentes.catalogo.emptyCatalog',
+    );
+    page.aplicarFiltros();
+    responderPagina(0, 20, 0);
+    expect(fixture.nativeElement.querySelector('tbody').textContent).toContain(
       'puentes.catalogo.noResults',
+    );
+    expect(fixture.nativeElement.querySelector('p-paginator')).toBeNull();
+    fixture.nativeElement.querySelector('.sin-resultados button').click();
+    const request = http.expectOne((req) => req.url === '/api/v1/puentes');
+    expect(request.request.params.has('estado')).toBe(false);
+    request.flush({ content: [], totalElements: 0 });
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('tbody').textContent).toContain(
+      'puentes.catalogo.emptyCatalog',
     );
   });
 
