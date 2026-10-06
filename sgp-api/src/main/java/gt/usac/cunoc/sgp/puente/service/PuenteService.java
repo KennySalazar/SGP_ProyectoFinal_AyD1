@@ -106,6 +106,23 @@ public class PuenteService {
           "El municipio no pertenece al departamento seleccionado");
     }
 
+    Boolean perteneceAlMunicipio =
+        municipios.ubicacionPerteneceAlMunicipio(municipio.getId(), latitud, longitud);
+
+    if (perteneceAlMunicipio == null) {
+      throw new ApiException(
+          HttpStatus.SERVICE_UNAVAILABLE,
+          "limite_municipal_no_disponible",
+          "Validación municipal no disponible",
+          "No está cargado el límite geográfico del municipio seleccionado.");
+    }
+
+    if (!perteneceAlMunicipio) {
+      throw validacion(
+          "ubicacion_municipio_incongruente",
+          "Las coordenadas no corresponden al municipio seleccionado.");
+    }
+
     var cercanos = puentes.findCercanos(latitud, longitud, PageRequest.of(0, 100));
     if (cercanos.hasContent() && !request.confirmarCercania()) {
       throw new CercaniaPuenteException(cercanos.map(mapper::toPuenteCercanoResponse));
