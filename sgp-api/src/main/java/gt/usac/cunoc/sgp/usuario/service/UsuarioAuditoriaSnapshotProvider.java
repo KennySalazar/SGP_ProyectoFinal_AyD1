@@ -7,7 +7,7 @@ import gt.usac.cunoc.sgp.usuario.repository.UserAccountRepository;
 import java.util.UUID;
 import org.springframework.stereotype.Component;
 
-/** Campos de usuario permitidos en auditoria aca  nunca incluye credenciales ni tokens jsjs */
+/** Campos de usuario permitidos en auditoria aca nunca incluye credenciales ni tokens jsjs */
 @Component
 public class UsuarioAuditoriaSnapshotProvider implements AuditoriaSnapshotProvider {
   private final UserAccountRepository usuarios;

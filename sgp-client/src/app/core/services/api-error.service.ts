@@ -13,9 +13,7 @@ export class ApiErrorService implements OnDestroy {
   normalize(error: HttpErrorResponse): string {
     this.cancelarTemporizador();
 
-    const problem = error.error as
-      | (ProblemDetails & { code?: string })
-      | null;
+    const problem = error.error as (ProblemDetails & { code?: string }) | null;
 
     const message =
       problem?.detail ??

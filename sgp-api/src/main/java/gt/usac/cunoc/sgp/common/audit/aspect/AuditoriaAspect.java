@@ -24,7 +24,6 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 /**
  * Aspecto {@code @Around} que registra las acciones anotadas con {@link Auditable} (HU-006,
  * DT-BD-12).
- *
  */
 @Aspect
 @Component
