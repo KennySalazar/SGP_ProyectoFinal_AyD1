@@ -11,6 +11,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import gt.usac.cunoc.sgp.common.security.JwtData;
 import gt.usac.cunoc.sgp.puente.dto.CrearPuenteRequest;
+import gt.usac.cunoc.sgp.puente.dto.DarBajaPuenteRequest;
 import gt.usac.cunoc.sgp.puente.exception.PuenteExceptionHandler;
 import gt.usac.cunoc.sgp.puente.service.PuenteService;
 import gt.usac.cunoc.sgp.usuario.model.RoleName;
@@ -105,6 +106,89 @@ class PuenteControllerSecurityTest {
         .andExpect(status().isCreated());
 
     verify(puenteService).registrar(any(CrearPuenteRequest.class), eq(USUARIO_ID));
+  }
+
+  @ParameterizedTest
+  @EnumSource(value = RoleName.class, names = "ADMINISTRADOR", mode = EnumSource.Mode.EXCLUDE)
+  void rechazaBajaARolesDistintosDeAdministrador(RoleName rol) throws Exception {
+    var authentication = autenticar(rol);
+    UUID puenteId = UUID.randomUUID();
+
+    mockMvc
+        .perform(
+            post("/api/v1/puentes/" + puenteId + "/baja")
+                .principal(authentication)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                    { "motivo": "demolido" }
+                    """))
+        .andExpect(status().isForbidden());
+
+    verifyNoInteractions(puenteService);
+  }
+
+  @Test
+  void permiteAdministradorDarDeBajaConMotivoValido() throws Exception {
+    var authentication = autenticar(RoleName.ADMINISTRADOR);
+    UUID puenteId = UUID.randomUUID();
+
+    mockMvc
+        .perform(
+            post("/api/v1/puentes/" + puenteId + "/baja")
+                .principal(authentication)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                    { "motivo": "demolido" }
+                    """))
+        .andExpect(status().isOk());
+
+    verify(puenteService).darDeBaja(eq(puenteId), any(DarBajaPuenteRequest.class), eq(USUARIO_ID));
+  }
+
+  @Test
+  void rechazaBajaSinMotivoCon422() throws Exception {
+    var authentication = autenticar(RoleName.ADMINISTRADOR);
+    UUID puenteId = UUID.randomUUID();
+
+    mockMvc
+        .perform(
+            post("/api/v1/puentes/" + puenteId + "/baja")
+                .principal(authentication)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                    { "motivo": "   " }
+                    """))
+        .andExpect(status().isUnprocessableEntity());
+
+    verifyNoInteractions(puenteService);
+  }
+
+  @ParameterizedTest
+  @EnumSource(value = RoleName.class, names = "ADMINISTRADOR", mode = EnumSource.Mode.EXCLUDE)
+  void rechazaReactivarARolesDistintosDeAdministrador(RoleName rol) throws Exception {
+    var authentication = autenticar(rol);
+    UUID puenteId = UUID.randomUUID();
+
+    mockMvc
+        .perform(post("/api/v1/puentes/" + puenteId + "/reactivar").principal(authentication))
+        .andExpect(status().isForbidden());
+
+    verifyNoInteractions(puenteService);
+  }
+
+  @Test
+  void permiteAdministradorReactivar() throws Exception {
+    var authentication = autenticar(RoleName.ADMINISTRADOR);
+    UUID puenteId = UUID.randomUUID();
+
+    mockMvc
+        .perform(post("/api/v1/puentes/" + puenteId + "/reactivar").principal(authentication))
+        .andExpect(status().isOk());
+
+    verify(puenteService).reactivar(eq(puenteId), eq(USUARIO_ID));
   }
 
   private UsernamePasswordAuthenticationToken autenticar(RoleName rol) {

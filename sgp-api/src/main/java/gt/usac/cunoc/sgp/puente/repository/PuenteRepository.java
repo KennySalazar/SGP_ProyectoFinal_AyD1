@@ -22,7 +22,22 @@ public interface PuenteRepository extends JpaRepository<Puente, UUID> {
   Page<Puente> findCatalogoActivo(@Param("departamentoId") UUID departamentoId, Pageable pageable);
 
   @EntityGraph(attributePaths = {"municipio", "municipio.departamento"})
+  @Query(
+      """
+          SELECT p FROM Puente p
+          WHERE (:activo IS NULL OR p.activo = :activo)
+            AND (:departamentoId IS NULL OR p.municipio.departamento.id = :departamentoId)
+          """)
+  Page<Puente> findCatalogo(
+      @Param("departamentoId") UUID departamentoId,
+      @Param("activo") Boolean activo,
+      Pageable pageable);
+
+  @EntityGraph(attributePaths = {"municipio", "municipio.departamento"})
   Optional<Puente> findByIdAndActivoTrue(UUID id);
+
+  @EntityGraph(attributePaths = {"municipio", "municipio.departamento"})
+  Optional<Puente> findPuenteConRelacionesById(UUID id);
 
   @Query(
       value =

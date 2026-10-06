@@ -188,7 +188,35 @@
       "loading": "Cargando catálogo...",
       "failed": "No fue posible cargar el catálogo.",
       "total": "Puentes encontrados: {{total}}",
-      "mapPending": "La vista de mapa está pendiente de implementación."
+      "mapPending": "La vista de mapa está pendiente de implementación.",
+      "actions": "Acciones",
+      "filterActivity": "Estado en catálogo",
+      "filterActiveOnly": "Solo activos",
+      "filterInactiveOnly": "Solo inactivos",
+      "filterAll": "Todos",
+      "deactivate": "Dar de baja",
+      "reactivate": "Reactivar",
+      "inactiveStatus": "Inactivo"
+    },
+    "baja": {
+      "title": "Dar de baja puente",
+      "bridgePrompt": "¿Deseas dar de baja el puente {{nombre}} ({{codigo}})?",
+      "warning": "El puente quedará marcado como inactivo y no aparecerá en el catálogo público, pero su historial se conservará.",
+      "reasonLabel": "Motivo documentado",
+      "reasonPlaceholder": "Indica el motivo (ej. demolido, sustituido, registro duplicado)...",
+      "reasonRequired": "El motivo de baja es obligatorio.",
+      "confirm": "Confirmar baja",
+      "cancel": "Cancelar",
+      "success": "El puente {{nombre}} fue dado de baja correctamente.",
+      "failed": "No fue posible dar de baja el puente."
+    },
+    "reactivar": {
+      "title": "Reactivar puente",
+      "prompt": "¿Deseas reactivar el puente {{nombre}} ({{codigo}})? Volverá a estar visible en el catálogo público activo.",
+      "confirm": "Confirmar reactivación",
+      "cancel": "Cancelar",
+      "success": "El puente {{nombre}} fue reactivado correctamente.",
+      "failed": "No fue posible reactivar el puente."
     },
     "kicker": "INVENTARIO DE PUENTES",
     "title": "Registrar puente",

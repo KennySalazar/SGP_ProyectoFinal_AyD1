@@ -1,9 +1,11 @@
 import { definePreset } from '@primeuix/themes';
 import AuraBase from '@primeuix/themes/aura/base';
 import AuraButton from '@primeuix/themes/aura/button';
+import AuraDialog from '@primeuix/themes/aura/dialog';
 import AuraInputText from '@primeuix/themes/aura/inputtext';
 import AuraSelect from '@primeuix/themes/aura/select';
 import AuraTag from '@primeuix/themes/aura/tag';
+import AuraTextarea from '@primeuix/themes/aura/textarea';
 
 export const SgpPreset = definePreset(AuraBase, {
   semantic: {
@@ -23,8 +25,10 @@ export const SgpPreset = definePreset(AuraBase, {
   },
   components: {
     button: AuraButton,
+    dialog: AuraDialog,
     inputtext: AuraInputText,
     select: AuraSelect,
     tag: AuraTag,
+    textarea: AuraTextarea,
   },
 });

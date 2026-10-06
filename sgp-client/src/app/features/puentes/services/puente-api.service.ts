@@ -43,9 +43,11 @@ export class PuenteApiService {
         'La página debe ser mayor o igual a 0 y el tamaño debe estar entre 1 y 100.',
       );
     }
-    const params: Record<string, string | number> = { pagina, tamanio };
+    const params: Record<string, string | number | boolean> = { pagina, tamanio };
     if (consulta.departamentoId) params['departamentoId'] = consulta.departamentoId;
     if (consulta.estado) params['estado'] = consulta.estado;
+    if (consulta.activo !== undefined) params['activo'] = consulta.activo;
+    if (consulta.todos) params['todos'] = true;
     return this.http.get<PaginaResponse<PuenteCatalogoResponse>>('/api/v1/puentes', { params });
   }
 
@@ -68,5 +70,18 @@ export class PuenteApiService {
 
   registrar(request: CrearPuenteRequest): Observable<PuenteResponse> {
     return this.http.post<PuenteResponse>('/api/v1/puentes', request);
+  }
+
+  darDeBaja(id: string, motivo: string): Observable<PuenteResponse> {
+    return this.http.post<PuenteResponse>(`/api/v1/puentes/${encodeURIComponent(id)}/baja`, {
+      motivo,
+    });
+  }
+
+  reactivar(id: string): Observable<PuenteResponse> {
+    return this.http.post<PuenteResponse>(
+      `/api/v1/puentes/${encodeURIComponent(id)}/reactivar`,
+      {},
+    );
   }
 }

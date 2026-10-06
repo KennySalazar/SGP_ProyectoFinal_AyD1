@@ -78,6 +78,8 @@ export interface PuenteCatalogoResponse {
 export interface ConsultaCatalogoPuentes {
   departamentoId?: string;
   estado?: EstadoPuente;
+  activo?: boolean;
+  todos?: boolean;
   pagina?: number;
   tamanio?: number;
 }
