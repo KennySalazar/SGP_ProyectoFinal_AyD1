@@ -147,4 +147,44 @@ describe('PuenteApiService', () => {
 
     request.flush({});
   });
+
+  it('consulta el catalogo filtrando por activo', () => {
+    service.listarCatalogo({ activo: false }).subscribe();
+
+    const request = http.expectOne((req) => req.url === '/api/v1/puentes');
+    expect(request.request.method).toBe('GET');
+    expect(request.request.params.get('activo')).toBe('false');
+
+    request.flush({ content: [] });
+  });
+
+  it('consulta el catalogo filtrando por todos los puentes', () => {
+    service.listarCatalogo({ todos: true }).subscribe();
+
+    const request = http.expectOne((req) => req.url === '/api/v1/puentes');
+    expect(request.request.method).toBe('GET');
+    expect(request.request.params.get('todos')).toBe('true');
+
+    request.flush({ content: [] });
+  });
+
+  it('envia el motivo al dar de baja un puente', () => {
+    service.darDeBaja('puente-1', 'demolido').subscribe();
+
+    const request = http.expectOne('/api/v1/puentes/puente-1/baja');
+    expect(request.request.method).toBe('POST');
+    expect(request.request.body).toEqual({ motivo: 'demolido' });
+
+    request.flush({});
+  });
+
+  it('envia la peticion para reactivar un puente', () => {
+    service.reactivar('puente-1').subscribe();
+
+    const request = http.expectOne('/api/v1/puentes/puente-1/reactivar');
+    expect(request.request.method).toBe('POST');
+    expect(request.request.body).toEqual({});
+
+    request.flush({});
+  });
 });

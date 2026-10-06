@@ -1,14 +1,16 @@
 import { ChangeDetectionStrategy, Component, DestroyRef, inject, signal } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { FormBuilder, ReactiveFormsModule } from '@angular/forms';
+import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { ButtonModule } from 'primeng/button';
+import { DialogModule } from 'primeng/dialog';
 import { PaginatorModule, PaginatorState } from 'primeng/paginator';
 import { SelectModule } from 'primeng/select';
 import { TableModule } from 'primeng/table';
 import { TagModule } from 'primeng/tag';
+import { TextareaModule } from 'primeng/textarea';
 import { finalize } from 'rxjs';
 import {
   ConsultaCatalogoPuentes,
@@ -29,10 +31,12 @@ import { AppShellComponent } from '../../../../layouts/app-shell/app-shell.compo
     AppShellComponent,
     TranslocoPipe,
     ButtonModule,
+    DialogModule,
     PaginatorModule,
     SelectModule,
     TableModule,
     TagModule,
+    TextareaModule,
     RouterLink,
     ReactiveFormsModule,
   ],
@@ -51,6 +55,12 @@ export class CatalogoPuentesPage {
     departamentoId: this.fb.control<string | null>(null),
     estado: this.fb.control<EstadoPuente | null>(null),
   });
+  readonly filtroActividad = this.fb.control<'activos' | 'inactivos' | 'todos'>('activos');
+  readonly opcionesActividad = [
+    { etiqueta: 'puentes.catalogo.filterActiveOnly', valor: 'activos' as const },
+    { etiqueta: 'puentes.catalogo.filterInactiveOnly', valor: 'inactivos' as const },
+    { etiqueta: 'puentes.catalogo.filterAll', valor: 'todos' as const },
+  ];
   readonly departamentos = signal<DepartamentoResponse[]>([]);
   readonly cargandoDepartamentos = signal(false);
   readonly errorDepartamentos = signal(false);
@@ -59,6 +69,20 @@ export class CatalogoPuentesPage {
   readonly tamanioPagina = signal(20);
   readonly selectorTamanio = this.fb.nonNullable.control(20);
   readonly hayFiltrosAplicados = signal(false);
+
+  readonly mostrarModalBaja = signal(false);
+  readonly mostrarModalReactivar = signal(false);
+  readonly puenteParaAccion = signal<PuenteCatalogoResponse | null>(null);
+  readonly procesandoAccion = signal(false);
+  readonly accionExitosa = signal<'baja' | 'reactivar' | null>(null);
+  readonly errorAccion = signal<'baja' | 'reactivar' | null>(null);
+  readonly nombrePuenteAccion = signal<string | null>(null);
+  readonly formBaja = this.fb.group({
+    motivo: this.fb.control('', {
+      nonNullable: true,
+      validators: [Validators.required, Validators.maxLength(1000)],
+    }),
+  });
   readonly estiloPanelSelector = {
     // El panel se adjunta al body: garantizar una superficie opaca sin depender del tema.
     backgroundColor: '#ffffff',
@@ -119,22 +143,116 @@ export class CatalogoPuentesPage {
   aplicarFiltros(): void {
     if (this.cargando()) return;
     const { departamentoId, estado } = this.filtros.getRawValue();
+    const esAdmin = this.auth.user()?.role === 'ADMINISTRADOR';
+    const actividad = esAdmin ? (this.filtroActividad.value ?? 'activos') : 'activos';
     this.consultaAplicada = {
       ...(departamentoId ? { departamentoId } : {}),
       ...(estado ? { estado } : {}),
+      ...(esAdmin && actividad === 'activos' ? { activo: true } : {}),
+      ...(esAdmin && actividad === 'inactivos' ? { activo: false } : {}),
+      ...(esAdmin && actividad === 'todos' ? { todos: true } : {}),
       pagina: 0,
       tamanio: this.tamanioPagina(),
     };
-    this.hayFiltrosAplicados.set(!!(departamentoId || estado));
+    this.hayFiltrosAplicados.set(
+      !!(departamentoId || estado || (esAdmin && actividad !== 'activos')),
+    );
     this.cargarCatalogo();
   }
 
   limpiarFiltros(): void {
     if (this.cargando()) return;
     this.filtros.reset();
+    this.filtroActividad.setValue('activos');
     this.consultaAplicada = { pagina: 0, tamanio: this.tamanioPagina() };
     this.hayFiltrosAplicados.set(false);
     this.cargarCatalogo();
+  }
+
+  abrirModalBaja(puente: PuenteCatalogoResponse, evento?: Event): void {
+    evento?.stopPropagation();
+    this.accionExitosa.set(null);
+    this.errorAccion.set(null);
+    this.puenteParaAccion.set(puente);
+    this.formBaja.reset({ motivo: '' });
+    this.mostrarModalBaja.set(true);
+  }
+
+  cerrarModalBaja(): void {
+    if (this.procesandoAccion()) return;
+    this.mostrarModalBaja.set(false);
+    this.puenteParaAccion.set(null);
+    this.formBaja.reset({ motivo: '' });
+  }
+
+  confirmarBaja(): void {
+    const puente = this.puenteParaAccion();
+    const motivo = this.formBaja.controls.motivo.value.trim();
+    if (!puente || !motivo || this.procesandoAccion()) return;
+
+    this.procesandoAccion.set(true);
+    this.errorAccion.set(null);
+
+    this.api
+      .darDeBaja(puente.id, motivo)
+      .pipe(
+        takeUntilDestroyed(this.destroyRef),
+        finalize(() => this.procesandoAccion.set(false)),
+      )
+      .subscribe({
+        next: () => {
+          this.mostrarModalBaja.set(false);
+          this.puenteParaAccion.set(null);
+          this.formBaja.reset({ motivo: '' });
+          this.nombrePuenteAccion.set(puente.nombre);
+          this.accionExitosa.set('baja');
+          this.cargarCatalogo();
+        },
+        error: () => {
+          this.errorAccion.set('baja');
+        },
+      });
+  }
+
+  abrirModalReactivar(puente: PuenteCatalogoResponse, evento?: Event): void {
+    evento?.stopPropagation();
+    this.accionExitosa.set(null);
+    this.errorAccion.set(null);
+    this.puenteParaAccion.set(puente);
+    this.mostrarModalReactivar.set(true);
+  }
+
+  cerrarModalReactivar(): void {
+    if (this.procesandoAccion()) return;
+    this.mostrarModalReactivar.set(false);
+    this.puenteParaAccion.set(null);
+  }
+
+  confirmarReactivar(): void {
+    const puente = this.puenteParaAccion();
+    if (!puente || this.procesandoAccion()) return;
+
+    this.procesandoAccion.set(true);
+    this.errorAccion.set(null);
+
+    this.api
+      .reactivar(puente.id)
+      .pipe(
+        takeUntilDestroyed(this.destroyRef),
+        finalize(() => this.procesandoAccion.set(false)),
+      )
+      .subscribe({
+        next: () => {
+          this.mostrarModalReactivar.set(false);
+          this.puenteParaAccion.set(null);
+          this.nombrePuenteAccion.set(puente.nombre);
+          this.accionExitosa.set('reactivar');
+          this.cargarCatalogo();
+        },
+        error: () => {
+          this.errorAccion.set('reactivar');
+        },
+      });
   }
 
   cambiarPagina(evento: PaginatorState): void {

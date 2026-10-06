@@ -10,6 +10,7 @@ import org.springframework.core.annotation.Order;
 import org.springframework.http.MediaType;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -19,6 +20,17 @@ import org.springframework.web.method.annotation.MethodArgumentTypeMismatchExcep
 @Order(Ordered.HIGHEST_PRECEDENCE)
 @RestControllerAdvice(basePackages = "gt.usac.cunoc.sgp.puente.controller")
 public class PuenteExceptionHandler {
+
+  @ExceptionHandler(HttpMessageNotReadableException.class)
+  public ResponseEntity<ProblemDetail> handleHttpNotReadable(
+      HttpMessageNotReadableException exception, HttpServletRequest request) {
+    ProblemDetail problem = validationProblem(request);
+    problem.setProperty(
+        "errores",
+        java.util.List.of(
+            Map.of("campo", "solicitud", "mensaje", "El cuerpo de la solicitud es obligatorio")));
+    return response(problem);
+  }
 
   @ExceptionHandler(MethodArgumentTypeMismatchException.class)
   public ResponseEntity<ProblemDetail> handleParametroInvalido(

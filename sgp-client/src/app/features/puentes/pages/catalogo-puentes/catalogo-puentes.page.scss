@@ -167,13 +167,23 @@ h2 {
   width: 8%;
 }
 .col-nombre {
-  width: 37%;
+  width: 32%;
 }
 .col-ubicacion {
-  width: 20%;
+  width: 18%;
 }
 .col-estado {
-  width: 15%;
+  width: 12%;
+}
+.col-acciones {
+  width: 12%;
+  white-space: nowrap;
+}
+
+.btn-accion-tabla {
+  gap: 0.35rem;
+  font-size: 0.85rem;
+  min-height: 38px;
 }
 
 .estado-puente {
@@ -326,4 +336,80 @@ h2 {
   .selector button {
     flex-wrap: wrap;
   }
+}
+
+.aviso-exito,
+.aviso-error {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.75rem 1rem;
+  border-radius: 10px;
+  margin-bottom: 1rem;
+  font-size: 0.9rem;
+  font-weight: 500;
+  border: 1px solid transparent;
+  i {
+    font-size: 1.1rem;
+  }
+}
+
+.aviso-exito {
+  background: #dcfce7;
+  color: #166534;
+  border-color: #bbf7d0;
+  i {
+    color: #16a34a;
+  }
+}
+
+.aviso-error {
+  background: #fee2e2;
+  color: #991b1b;
+  border-color: #fecaca;
+  i {
+    color: #dc2626;
+  }
+}
+
+.dialog-contenido {
+  display: grid;
+  gap: 1rem;
+}
+
+.dialog-aviso {
+  font-weight: 600;
+  color: var(--sgp-navy-900);
+}
+
+.dialog-advertencia {
+  display: flex;
+  gap: 0.5rem;
+  padding: 0.65rem 0.85rem;
+  background: var(--sgp-surface-soft);
+  border: 1px solid var(--sgp-border);
+  border-radius: 8px;
+  font-size: 0.85rem;
+
+  i {
+    color: var(--sgp-blue-600);
+  }
+}
+
+.dialog-label {
+  display: grid;
+  gap: 0.4rem;
+  font-weight: 600;
+}
+
+.dialog-textarea {
+  resize: vertical;
+  min-height: 80px;
+  font: inherit;
+}
+
+.dialog-acciones {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
 }

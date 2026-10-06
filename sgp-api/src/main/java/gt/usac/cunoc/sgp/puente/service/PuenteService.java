@@ -5,6 +5,7 @@ import gt.usac.cunoc.sgp.common.audit.model.AccionAuditoria;
 import gt.usac.cunoc.sgp.common.exception.ApiException;
 import gt.usac.cunoc.sgp.common.util.UuidV7Generator;
 import gt.usac.cunoc.sgp.puente.dto.CrearPuenteRequest;
+import gt.usac.cunoc.sgp.puente.dto.DarBajaPuenteRequest;
 import gt.usac.cunoc.sgp.puente.dto.PuenteCatalogoResponse;
 import gt.usac.cunoc.sgp.puente.dto.PuenteResponse;
 import gt.usac.cunoc.sgp.puente.entity.Departamento;
@@ -170,9 +171,84 @@ public class PuenteService {
     return mapper.toAltaResponse(guardado, utm);
   }
 
+  @Transactional
+  @PreAuthorize("hasRole('ADMINISTRADOR')")
+  public PuenteResponse darDeBaja(UUID id, DarBajaPuenteRequest request, UUID administradorId) {
+    var errores = validator.validate(request);
+    if (!errores.isEmpty()) {
+      throw new ConstraintViolationException(errores);
+    }
+
+    Puente puente =
+        puentes
+            .findPuenteConRelacionesById(id)
+            .orElseThrow(
+                () ->
+                    new ApiException(
+                        HttpStatus.NOT_FOUND,
+                        "puente_no_encontrado",
+                        "Puente no encontrado",
+                        "No existe un puente con el identificador proporcionado."));
+
+    if (!puente.isActivo()) {
+      throw new ApiException(
+          HttpStatus.CONFLICT,
+          "puente_ya_inactivo",
+          "Puente ya inactivo",
+          "El puente ya se encuentra dado de baja.");
+    }
+
+    Instant ahora = clock.instant();
+    puente.darDeBaja(request.motivo().strip(), administradorId, ahora);
+    Puente guardado = puentes.saveAndFlush(puente);
+
+    var utm =
+        mapper.toCoordenadaUtmResponse(
+            puentes.calcularUtm(guardado.getUbicacion().getY(), guardado.getUbicacion().getX()));
+    return mapper.toAltaResponse(guardado, utm);
+  }
+
+  @Transactional
+  @PreAuthorize("hasRole('ADMINISTRADOR')")
+  public PuenteResponse reactivar(UUID id, UUID administradorId) {
+    Puente puente =
+        puentes
+            .findPuenteConRelacionesById(id)
+            .orElseThrow(
+                () ->
+                    new ApiException(
+                        HttpStatus.NOT_FOUND,
+                        "puente_no_encontrado",
+                        "Puente no encontrado",
+                        "No existe un puente con el identificador proporcionado."));
+
+    if (puente.isActivo()) {
+      throw new ApiException(
+          HttpStatus.CONFLICT,
+          "puente_ya_activo",
+          "Puente ya activo",
+          "El puente ya se encuentra activo.");
+    }
+
+    Instant ahora = clock.instant();
+    puente.reactivar(ahora);
+    Puente guardado = puentes.saveAndFlush(puente);
+
+    var utm =
+        mapper.toCoordenadaUtmResponse(
+            puentes.calcularUtm(guardado.getUbicacion().getY(), guardado.getUbicacion().getX()));
+    return mapper.toAltaResponse(guardado, utm);
+  }
+
   @Transactional(readOnly = true)
   public Page<PuenteCatalogoResponse> listarCatalogo(
       UUID departamentoId, String estado, int pagina, int tamanio) {
+    return listarCatalogo(departamentoId, estado, Boolean.TRUE, pagina, tamanio);
+  }
+
+  @Transactional(readOnly = true)
+  public Page<PuenteCatalogoResponse> listarCatalogo(
+      UUID departamentoId, String estado, Boolean activo, int pagina, int tamanio) {
     if (pagina < 0 || tamanio < 1 || tamanio > 100) {
       throw validacion(
           "paginacion_invalida",
@@ -189,7 +265,7 @@ public class PuenteService {
     if (estado != null && !"Sin evaluar".equals(estado)) {
       return Page.empty(pageable);
     }
-    return puentes.findCatalogoActivo(departamentoId, pageable).map(mapper::toCatalogoResponse);
+    return puentes.findCatalogo(departamentoId, activo, pageable).map(mapper::toCatalogoResponse);
   }
 
   private ApiException validacion(String codigo, String detalle) {
