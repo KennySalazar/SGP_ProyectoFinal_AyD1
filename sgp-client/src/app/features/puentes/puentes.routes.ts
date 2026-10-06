@@ -24,4 +24,24 @@ export const puentesRoutes: Routes = [
       },
     ],
   },
+  {
+    path: '',
+    canActivate: [authGuard, roleGuard('CATEDRATICO')],
+    loadComponent: () =>
+      import('../../layouts/app-shell/app-shell.component').then((m) => m.AppShellComponent),
+    children: [
+      {
+        path: 'solicitudes',
+        loadComponent: () =>
+          import('./pages/mis-solicitudes/mis-solicitudes.page').then((m) => m.MisSolicitudesPage),
+      },
+      {
+        path: 'solicitudes/nueva',
+        loadComponent: () =>
+          import('./pages/solicitar-alta-puente/solicitar-alta-puente.page').then(
+            (m) => m.SolicitarAltaPuentePage,
+          ),
+      },
+    ],
+  },
 ];

@@ -1,0 +1,79 @@
+<header class="page-heading">
+  <p class="page-kicker">{{ 'puentes.kicker' | transloco }}</p>
+  <h1 class="page-title">{{ 'puentes.solicitud.title' | transloco }}</h1>
+  <p class="page-description">{{ 'puentes.solicitud.description' | transloco }}</p>
+</header>
+
+@if (solicitudCreada(); as solicitud) {
+<section class="surface-card solicitud-card">
+  <h2 class="success" role="status">
+    <i class="pi pi-check-circle" aria-hidden="true"></i>
+    {{ 'puentes.solicitud.success' | transloco }}
+  </h2>
+  <p class="note">{{ 'puentes.solicitud.successNote' | transloco }}</p>
+
+  <dl class="result-grid">
+    <div>
+      <dt>{{ 'puentes.name' | transloco }}</dt>
+      <dd>{{ solicitud.nombre }}</dd>
+    </div>
+    <div>
+      <dt>{{ 'puentes.state' | transloco }}</dt>
+      <dd>{{ 'puentes.solicitud.estado.' + solicitud.estado | transloco }}</dd>
+    </div>
+    <div>
+      <dt>{{ 'puentes.department' | transloco }}</dt>
+      <dd>{{ solicitud.departamento.nombre }}</dd>
+    </div>
+    <div>
+      <dt>{{ 'puentes.municipality' | transloco }}</dt>
+      <dd>{{ solicitud.municipio.nombre }}</dd>
+    </div>
+    <div>
+      <dt>{{ 'puentes.route' | transloco }}</dt>
+      <dd>{{ solicitud.ruta }}</dd>
+    </div>
+    <div>
+      <dt>{{ 'puentes.solicitud.requestedAt' | transloco }}</dt>
+      <dd>{{ fechaGuatemala(solicitud.creadoEn) }}</dd>
+    </div>
+  </dl>
+
+  <div class="actions">
+    <a pButton routerLink="/puentes/solicitudes">
+      <i class="pi pi-list" aria-hidden="true"></i>
+      {{ 'puentes.solicitud.viewMine' | transloco }}
+    </a>
+    <button pButton type="button" severity="secondary" (click)="solicitarOtra()">
+      {{ 'puentes.solicitud.another' | transloco }}
+    </button>
+  </div>
+</section>
+} @else {
+<app-puente-form
+  etiquetaEnviar="puentes.solicitud.submit"
+  [guardando]="guardando()"
+  [erroresServidor]="erroresCampos()"
+  [errorTerritorioServidor]="errorTerritorio()"
+  (enviar)="solicitar($event)"
+  (cambio)="alCambiarFormulario()"
+>
+  <label class="field justificacion">
+    <span>{{ 'puentes.solicitud.justification' | transloco }}</span>
+    <textarea
+      pTextarea
+      [formControl]="justificacion"
+      rows="4"
+      maxlength="2000"
+      [placeholder]="'puentes.solicitud.justificationPlaceholder' | transloco"
+    ></textarea>
+    @if (mensajeJustificacion(); as mensaje) {
+    <small class="validation">{{ mensaje }}</small>
+    }
+  </label>
+
+  @if (errorSolicitud(); as mensaje) {
+  <p class="feedback error" role="alert">{{ mensaje }}</p>
+  }
+</app-puente-form>
+}

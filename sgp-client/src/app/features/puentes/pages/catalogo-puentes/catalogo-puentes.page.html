@@ -20,6 +20,10 @@
       <a pButton routerLink="/puentes/nuevo"
         ><i class="pi pi-plus" aria-hidden="true"></i>{{ 'nav.registerBridge' | transloco }}</a
       >
+      } @else if (auth.user()?.role === 'CATEDRATICO') {
+      <a pButton routerLink="/puentes/solicitudes/nueva"
+        ><i class="pi pi-send" aria-hidden="true"></i>{{ 'puentes.solicitud.title' | transloco }}</a
+      >
       }
     </header>
 

@@ -1,0 +1,84 @@
+:host {
+  display: block;
+}
+
+.solicitud-card {
+  padding: clamp(1.25rem, 3vw, 2rem);
+}
+
+h2 {
+  margin: 0;
+  color: var(--sgp-navy-900);
+  font-size: 1.2rem;
+}
+
+.success {
+  color: #15803d;
+}
+
+.note {
+  margin: 0.75rem 0 1.5rem;
+  color: var(--sgp-steel-500);
+  line-height: 1.6;
+}
+
+.result-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1.25rem;
+  margin: 1.5rem 0;
+}
+
+dt {
+  color: var(--sgp-steel-500);
+  font-size: 0.9rem;
+}
+
+dd {
+  margin: 0.4rem 0 0;
+  color: var(--sgp-navy-900);
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.justificacion {
+  display: grid;
+  gap: 0.5rem;
+  margin-top: 1.5rem;
+  color: var(--sgp-navy-900);
+  font-weight: 600;
+
+  textarea {
+    width: 100%;
+    resize: vertical;
+  }
+}
+
+.validation {
+  color: #b91c1c;
+}
+
+.error {
+  color: #b91c1c;
+}
+
+.feedback {
+  margin-top: 1rem;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 1.5rem;
+}
+
+@media (max-width: 700px) {
+  .result-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .actions {
+    flex-direction: column;
+  }
+}

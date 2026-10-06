@@ -1,0 +1,77 @@
+<header class="page-heading">
+  <div>
+    <p class="page-kicker">{{ 'puentes.kicker' | transloco }}</p>
+    <h1 class="page-title">{{ 'puentes.solicitud.mineTitle' | transloco }}</h1>
+    <p class="page-description">{{ 'puentes.solicitud.mineDescription' | transloco }}</p>
+  </div>
+  <a pButton routerLink="/puentes/solicitudes/nueva">
+    <i class="pi pi-plus" aria-hidden="true"></i>
+    {{ 'puentes.solicitud.new' | transloco }}
+  </a>
+</header>
+
+<section class="surface-card solicitudes-panel" aria-live="polite">
+  @if (cargando()) {
+  <p role="status">{{ 'puentes.solicitud.loading' | transloco }}</p>
+  } @else if (error()) {
+  <p role="alert">{{ 'puentes.solicitud.loadFailed' | transloco }}</p>
+  <button pButton type="button" (click)="cargar(resultado()?.number ?? 0)">
+    {{ 'puentes.retry' | transloco }}
+  </button>
+  } @else if (resultado(); as pagina) { @if (pagina.content.length === 0) {
+  <div class="sin-resultados">
+    <i class="pi pi-inbox" aria-hidden="true"></i>
+    <p role="status">{{ 'puentes.solicitud.empty' | transloco }}</p>
+  </div>
+  } @else {
+  <h2 id="solicitudes-titulo">{{ 'puentes.solicitud.listTitle' | transloco }}</h2>
+  <div class="tabla-contenedor" role="region" tabindex="0" aria-labelledby="solicitudes-titulo">
+    <p-table
+      [value]="pagina.content"
+      dataKey="id"
+      [tableStyle]="{ 'min-width': '48rem', width: '100%' }"
+    >
+      <ng-template #header>
+        <tr>
+          <th scope="col">{{ 'puentes.name' | transloco }}</th>
+          <th scope="col">{{ 'puentes.municipality' | transloco }}</th>
+          <th scope="col" class="no-cortar">{{ 'puentes.route' | transloco }}</th>
+          <th scope="col">{{ 'puentes.solicitud.requestedAt' | transloco }}</th>
+          <th scope="col" class="no-cortar">{{ 'puentes.state' | transloco }}</th>
+          <th scope="col">{{ 'puentes.solicitud.decisionReason' | transloco }}</th>
+        </tr>
+      </ng-template>
+      <ng-template #body let-solicitud>
+        <tr>
+          <th scope="row">{{ solicitud.nombre }}</th>
+          <td>{{ solicitud.municipio.nombre }}, {{ solicitud.departamento.nombre }}</td>
+          <td class="no-cortar">{{ solicitud.ruta }}</td>
+          <td>{{ fechaGuatemala(solicitud.creadoEn) }}</td>
+          <td class="no-cortar">
+            <p-tag
+              [attr.data-estado]="solicitud.estado"
+              [value]="'puentes.solicitud.estado.' + solicitud.estado | transloco"
+              [severity]="severidad(solicitud.estado)"
+            />
+          </td>
+          <td class="motivo">{{ solicitud.motivoDecision ?? '—' }}</td>
+        </tr>
+      </ng-template>
+    </p-table>
+  </div>
+
+  <div class="paginacion">
+    <p class="reporte-pagina" role="status">
+      {{ 'puentes.solicitud.pageRange' | transloco: { first: pagina.number * pagina.size + 1, last:
+      pagina.number * pagina.size + pagina.content.length, total: pagina.totalElements } }}
+    </p>
+    <p-paginator
+      [first]="pagina.number * pagina.size"
+      [rows]="pagina.size"
+      [totalRecords]="pagina.totalElements"
+      [pageLinkSize]="3"
+      (onPageChange)="cambiarPagina($event)"
+    />
+  </div>
+  } }
+</section>

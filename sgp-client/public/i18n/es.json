@@ -20,6 +20,7 @@
     "operation": "OPERACION",
     "home": "Inicio",
     "registerBridge": "Registrar puente",
+    "myBridgeRequests": "Mis solicitudes de puente",
     "bridgeCatalog": "Catálogo de puentes",
     "offline": "Offline",
     "security": "Seguridad",
@@ -162,6 +163,35 @@
     "basePrepared": "Base preparada"
   },
   "puentes": {
+    "solicitud": {
+      "title": "Solicitar alta de puente",
+      "description": "Propón un puente que no está en el catálogo. El Administrador evaluará tu solicitud.",
+      "submit": "Enviar solicitud",
+      "justification": "Justificación (opcional)",
+      "justificationPlaceholder": "Explica por qué el puente debe incluirse en el catálogo.",
+      "justificationInvalid": "La justificación no debe superar 2000 caracteres.",
+      "saveFailed": "No se pudo enviar la solicitud. Inténtalo de nuevo.",
+      "success": "Solicitud enviada correctamente",
+      "successNote": "Tu solicitud está pendiente de revisión. El puente no aparecerá en el catálogo hasta que el Administrador la apruebe.",
+      "requestedAt": "Fecha de solicitud",
+      "viewMine": "Ver mis solicitudes",
+      "another": "Solicitar otro puente",
+      "new": "Nueva solicitud",
+      "mineTitle": "Mis solicitudes de puente",
+      "mineDescription": "Consulta el estado de las solicitudes de alta que has enviado.",
+      "listTitle": "Solicitudes enviadas",
+      "loading": "Cargando solicitudes...",
+      "loadFailed": "No se pudieron cargar tus solicitudes.",
+      "empty": "Todavía no has enviado solicitudes de alta de puente.",
+      "decisionReason": "Motivo de la decisión",
+      "pageRange": "{{first}}–{{last}} de {{total}} solicitudes",
+      "estado": {
+        "PENDIENTE": "Pendiente",
+        "APROBADA": "Aprobada",
+        "RECHAZADA": "Rechazada",
+        "CANCELADA": "Cancelada"
+      }
+    },
     "catalogo": {
       "explore": "Explorar catálogo de puentes",
       "publicAccess": "Consulta el catálogo sin iniciar sesión.",
