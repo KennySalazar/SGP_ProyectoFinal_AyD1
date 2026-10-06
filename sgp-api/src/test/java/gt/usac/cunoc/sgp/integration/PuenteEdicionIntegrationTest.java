@@ -8,9 +8,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import gt.usac.cunoc.sgp.common.audit.aspect.AuditoriaAspect;
-import gt.usac.cunoc.sgp.common.audit.entity.Auditoria;
 import gt.usac.cunoc.sgp.common.audit.mapper.AuditoriaMapperImpl;
-import gt.usac.cunoc.sgp.common.audit.model.AccionAuditoria;
 import gt.usac.cunoc.sgp.common.audit.repository.AuditoriaRepository;
 import gt.usac.cunoc.sgp.common.audit.service.AuditoriaConsultaService;
 import gt.usac.cunoc.sgp.common.audit.service.AuditoriaSnapshotService;
@@ -22,7 +20,6 @@ import gt.usac.cunoc.sgp.puente.dto.CrearPuenteRequest;
 import gt.usac.cunoc.sgp.puente.dto.PuenteResponse;
 import gt.usac.cunoc.sgp.puente.exception.CercaniaPuenteException;
 import gt.usac.cunoc.sgp.puente.mapper.PuenteMapperImpl;
-import gt.usac.cunoc.sgp.puente.repository.PuenteRepository;
 import gt.usac.cunoc.sgp.puente.service.CatalogoTerritorialService;
 import gt.usac.cunoc.sgp.puente.service.PuenteAuditoriaSnapshotProvider;
 import gt.usac.cunoc.sgp.puente.service.PuenteService;
@@ -152,12 +149,7 @@ class PuenteEdicionIntegrationTest {
   }
 
   private void autenticar(UUID usuarioId) {
-    var jwtData =
-        new JwtData(
-            "admin.edicion@ejemplo.com",
-            usuarioId,
-            RoleName.ADMINISTRADOR,
-            1);
+    var jwtData = new JwtData("admin.edicion@ejemplo.com", usuarioId, RoleName.ADMINISTRADOR, 1);
     var token =
         new UsernamePasswordAuthenticationToken(
             "admin.edicion@ejemplo.com",
