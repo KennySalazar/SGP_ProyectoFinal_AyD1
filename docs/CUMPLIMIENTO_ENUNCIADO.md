@@ -32,6 +32,7 @@
 | GIN para JSONB consultado | Preparado | V1 incluye ejemplo GIN de auditoria; se agregan los indices de inspeccion cuando exista el JSONB. |
 | Baja logica | Pendiente de entidades de dominio | Usuario usa `activo`; puentes/ordenes se implementan despues. |
 | Auditoria por aspectos | Implementado para acciones actuales de usuario y puente | Aspecto `@Around`, snapshots seguros y escritura tras confirmar la transaccion; futuras acciones de dominio deben declararse auditables. |
+| Consulta de bitácora HU-007 | Implementada | `/admin/bitacora`, filtros combinados por usuario y fechas, paginación hasta 100 y detalle legible. API restringida al Administrador. Ver `docs/HU007.md`. |
 
 ## 3. Seguridad y autenticacion
 

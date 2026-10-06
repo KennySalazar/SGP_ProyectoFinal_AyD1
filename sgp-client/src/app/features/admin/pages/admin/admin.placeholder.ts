@@ -1,10 +1,12 @@
 import { ChangeDetectionStrategy, Component } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
+import { RouterLink } from '@angular/router';
+import { ButtonModule } from 'primeng/button';
 
 @Component({
   selector: 'app-admin-placeholder',
   standalone: true,
-  imports: [TranslocoPipe],
+  imports: [TranslocoPipe, RouterLink, ButtonModule],
   template: `
     <header class="page-heading">
       <p class="page-kicker">{{ 'admin.kicker' | transloco }}</p>
@@ -42,7 +44,7 @@ import { TranslocoPipe } from '@jsverse/transloco';
           <strong>{{ 'admin.audit' | transloco }}</strong
           ><span>{{ 'admin.auditNote' | transloco }}</span>
         </div>
-        <small>{{ 'common.pending' | transloco }}</small>
+        <a pButton routerLink="/admin/bitacora">{{ 'auditoria.open' | transloco }}</a>
       </article>
     </section>
   `,

@@ -9,11 +9,15 @@ import gt.usac.cunoc.sgp.common.audit.mapper.AuditoriaMapper;
 import gt.usac.cunoc.sgp.common.audit.model.AccionAuditoria;
 import gt.usac.cunoc.sgp.common.audit.repository.AuditoriaRepository;
 import gt.usac.cunoc.sgp.common.exception.ApiException;
+import gt.usac.cunoc.sgp.common.util.EmailNormalizer;
+import gt.usac.cunoc.sgp.usuario.entity.UserAccount;
+import gt.usac.cunoc.sgp.usuario.repository.UserAccountRepository;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -29,14 +33,29 @@ public class AuditoriaConsultaService {
 
   private final AuditoriaRepository repositorio;
   private final AuditoriaMapper mapper;
+  private final UserAccountRepository usuarios;
 
-  public AuditoriaConsultaService(AuditoriaRepository repositorio, AuditoriaMapper mapper) {
+  public AuditoriaConsultaService(
+      AuditoriaRepository repositorio, AuditoriaMapper mapper, UserAccountRepository usuarios) {
     this.repositorio = repositorio;
     this.mapper = mapper;
+    this.usuarios = usuarios;
   }
 
   public Page<AuditoriaResponse> consultar(
       UUID usuarioId,
+      String entidad,
+      String accion,
+      Instant desde,
+      Instant hasta,
+      int pagina,
+      int tamanio) {
+    return consultar(usuarioId, null, entidad, accion, desde, hasta, pagina, tamanio);
+  }
+
+  public Page<AuditoriaResponse> consultar(
+      UUID usuarioId,
+      String usuarioEmail,
       String entidad,
       String accion,
       Instant desde,
@@ -66,10 +85,19 @@ public class AuditoriaConsultaService {
             pagina, tamanio, Sort.by(Sort.Order.desc("creadoEn"), Sort.Order.desc("id")));
 
     Specification<Auditoria> filtros = Specification.where(null);
-    if (usuarioId != null)
+    UUID actor = usuarioId;
+    if (usuarioEmail != null && !usuarioEmail.isBlank()) {
+      var usuario = usuarios.findByEmail(EmailNormalizer.normalize(usuarioEmail));
+      if (usuario.isEmpty() || (actor != null && !actor.equals(usuario.get().getId()))) {
+        return Page.empty(pageable);
+      }
+      actor = usuario.get().getId();
+    }
+    UUID filtroUsuario = actor;
+    if (filtroUsuario != null)
       filtros =
           filtros.and(
-              (raiz, consulta, criterio) -> criterio.equal(raiz.get("usuarioId"), usuarioId));
+              (raiz, consulta, criterio) -> criterio.equal(raiz.get("usuarioId"), filtroUsuario));
     if (entidad != null && !entidad.isBlank())
       filtros =
           filtros.and((raiz, consulta, criterio) -> criterio.equal(raiz.get("entidad"), entidad));
@@ -88,7 +116,21 @@ public class AuditoriaConsultaService {
               (raiz, consulta, criterio) ->
                   criterio.lessThanOrEqualTo(raiz.get("creadoEn"), hasta));
 
-    return repositorio.findAll(filtros, pageable).map(mapper::toResponse);
+    var registros = repositorio.findAll(filtros, pageable);
+    var ids =
+        registros.stream()
+            .map(Auditoria::getUsuarioId)
+            .filter(Objects::nonNull)
+            .distinct()
+            .toList();
+    Map<UUID, String> correos = new LinkedHashMap<>();
+    if (!ids.isEmpty()) {
+      usuarios
+          .findAllById(ids)
+          .forEach(usuario -> correos.put(usuario.getId(), usuario.getEmail()));
+    }
+    return registros.map(
+        registro -> mapper.toResponse(registro, correos.get(registro.getUsuarioId())));
   }
 
   public AuditoriaDetalleResponse detalle(UUID id) {
@@ -102,22 +144,29 @@ public class AuditoriaConsultaService {
                         "auditoria_no_encontrada",
                         "Registro no encontrado",
                         "El registro de auditoría no existe."));
-    Map<String, String> anteriores = new LinkedHashMap<>();
-    Map<String, String> posteriores = new LinkedHashMap<>();
+    Map<String, JsonNode> anteriores = new LinkedHashMap<>();
+    Map<String, JsonNode> posteriores = new LinkedHashMap<>();
     aplanar("", registro.getValoresAnteriores(), anteriores);
     aplanar("", registro.getValoresPosteriores(), posteriores);
     List<CambioAuditoria> cambios = new ArrayList<>();
     for (String campo : posteriores.keySet()) {
-      if (!java.util.Objects.equals(anteriores.get(campo), posteriores.get(campo))) {
-        cambios.add(new CambioAuditoria(campo, anteriores.get(campo), posteriores.get(campo)));
+      if (!anteriores.containsKey(campo)
+          || !Objects.equals(anteriores.get(campo), posteriores.get(campo))) {
+        cambios.add(
+            new CambioAuditoria(
+                campo, textoLegible(anteriores.get(campo)), textoLegible(posteriores.get(campo))));
       }
     }
     for (String campo : anteriores.keySet()) {
       if (!posteriores.containsKey(campo)) {
-        cambios.add(new CambioAuditoria(campo, anteriores.get(campo), null));
+        cambios.add(new CambioAuditoria(campo, textoLegible(anteriores.get(campo)), null));
       }
     }
-    AuditoriaResponse resumen = mapper.toResponse(registro);
+    String correo =
+        registro.getUsuarioId() == null
+            ? null
+            : usuarios.findById(registro.getUsuarioId()).map(UserAccount::getEmail).orElse(null);
+    AuditoriaResponse resumen = mapper.toResponse(registro, correo);
     return new AuditoriaDetalleResponse(
         resumen.id(),
         resumen.usuarioId(),
@@ -126,12 +175,13 @@ public class AuditoriaConsultaService {
         resumen.entidadId(),
         resumen.procesoAutomatico(),
         resumen.creadoEn(),
-        cambios);
+        cambios,
+        correo);
   }
 
-  private void aplanar(String prefijo, JsonNode nodo, Map<String, String> destino) {
-    if (nodo == null || nodo.isNull()) return;
-    if (nodo.isObject()) {
+  private void aplanar(String prefijo, JsonNode nodo, Map<String, JsonNode> destino) {
+    if (nodo == null) return;
+    if (nodo.isObject() && !nodo.isEmpty()) {
       nodo.fields()
           .forEachRemaining(
               campo ->
@@ -139,11 +189,19 @@ public class AuditoriaConsultaService {
                       prefijo.isEmpty() ? campo.getKey() : prefijo + "." + campo.getKey(),
                       campo.getValue(),
                       destino));
-    } else if (nodo.isArray()) {
+    } else if (nodo.isArray() && !nodo.isEmpty()) {
       for (int i = 0; i < nodo.size(); i++) aplanar(prefijo + "[" + i + "]", nodo.get(i), destino);
     } else {
-      destino.put(prefijo, nodo.asText());
+      destino.put(prefijo.isEmpty() ? "valor" : prefijo, nodo);
     }
+  }
+
+  private String textoLegible(JsonNode nodo) {
+    if (nodo == null || nodo.isNull()) return null;
+    if (nodo.isBoolean()) return nodo.asBoolean() ? "Sí" : "No";
+    if (nodo.isArray()) return "Lista vacía";
+    if (nodo.isObject()) return "Sin campos";
+    return nodo.asText();
   }
 
   private AccionAuditoria convertirAccion(String accion) {

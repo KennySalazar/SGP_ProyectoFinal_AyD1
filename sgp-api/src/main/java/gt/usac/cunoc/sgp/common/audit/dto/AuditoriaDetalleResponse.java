@@ -13,4 +13,5 @@ public record AuditoriaDetalleResponse(
     UUID entidadId,
     String procesoAutomatico,
     OffsetDateTime creadoEn,
-    List<CambioAuditoria> cambios) {}
+    List<CambioAuditoria> cambios,
+    String usuarioEmail) {}
