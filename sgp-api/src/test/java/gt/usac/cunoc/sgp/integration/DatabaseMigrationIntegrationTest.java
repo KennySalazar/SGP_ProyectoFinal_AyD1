@@ -58,8 +58,8 @@ class DatabaseMigrationIntegrationTest {
       assertTrue(indexExists(statement, "idx_limite_territorial_geometria_gist"));
 
       try (ResultSet limite =
-                   statement.executeQuery(
-                           """
+          statement.executeQuery(
+              """
                            SELECT codigo,
                                   ST_SRID(geometria) AS srid,
                                   ST_IsValid(geometria) AS valida,

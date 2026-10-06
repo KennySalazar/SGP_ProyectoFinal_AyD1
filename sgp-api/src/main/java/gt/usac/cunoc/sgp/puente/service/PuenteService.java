@@ -70,21 +70,20 @@ public class PuenteService {
     double latitud = request.latitud().doubleValue();
     double longitud = request.longitud().doubleValue();
 
-    Boolean dentroDeGuatemala =
-            puentes.estaDentroDeGuatemala(latitud, longitud);
+    Boolean dentroDeGuatemala = puentes.estaDentroDeGuatemala(latitud, longitud);
 
     if (dentroDeGuatemala == null) {
       throw new ApiException(
-              HttpStatus.SERVICE_UNAVAILABLE,
-              "limite_territorial_no_disponible",
-              "Validación territorial no disponible",
-              "No está cargado el límite territorial de Guatemala.");
+          HttpStatus.SERVICE_UNAVAILABLE,
+          "limite_territorial_no_disponible",
+          "Validación territorial no disponible",
+          "No está cargado el límite territorial de Guatemala.");
     }
 
     if (!dentroDeGuatemala) {
       throw validacion(
-              "ubicacion_fuera_de_guatemala",
-              "Las coordenadas deben estar dentro del territorio de Guatemala.");
+          "ubicacion_fuera_de_guatemala",
+          "Las coordenadas deben estar dentro del territorio de Guatemala.");
     }
 
     Departamento departamento =

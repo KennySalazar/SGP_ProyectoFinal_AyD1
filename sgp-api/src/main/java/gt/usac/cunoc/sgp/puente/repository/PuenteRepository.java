@@ -14,20 +14,19 @@ public interface PuenteRepository extends JpaRepository<Puente, UUID> {
 
   @EntityGraph(attributePaths = {"municipio", "municipio.departamento"})
   @Query(
-          """
+      """
           SELECT p FROM Puente p
           WHERE p.activo = true
             AND (:departamentoId IS NULL OR p.municipio.departamento.id = :departamentoId)
           """)
-  Page<Puente> findCatalogoActivo(
-          @Param("departamentoId") UUID departamentoId, Pageable pageable);
+  Page<Puente> findCatalogoActivo(@Param("departamentoId") UUID departamentoId, Pageable pageable);
 
   @EntityGraph(attributePaths = {"municipio", "municipio.departamento"})
   Optional<Puente> findByIdAndActivoTrue(UUID id);
 
   @Query(
-          value =
-                  """
+      value =
+          """
                   SELECT p.id AS id,
                          p.codigo AS codigo,
                          p.nombre AS nombre,
@@ -46,8 +45,8 @@ public interface PuenteRepository extends JpaRepository<Puente, UUID> {
                     AND ST_Distance(p.ubicacion, q.punto) < 100
                   ORDER BY ST_Distance(p.ubicacion, q.punto), p.id
                   """,
-          countQuery =
-                  """
+      countQuery =
+          """
                   SELECT count(*)
                   FROM puente p
                   CROSS JOIN (
@@ -59,15 +58,13 @@ public interface PuenteRepository extends JpaRepository<Puente, UUID> {
                   WHERE ST_DWithin(p.ubicacion, q.punto, 100)
                     AND ST_Distance(p.ubicacion, q.punto) < 100
                   """,
-          nativeQuery = true)
+      nativeQuery = true)
   Page<PuenteCercanoProjection> findCercanos(
-          @Param("latitud") double latitud,
-          @Param("longitud") double longitud,
-          Pageable pageable);
+      @Param("latitud") double latitud, @Param("longitud") double longitud, Pageable pageable);
 
   @Query(
-          value =
-                  """
+      value =
+          """
                   SELECT q.zona AS zona,
                          q.epsg AS epsg,
                          ST_X(q.punto) AS este,
@@ -81,14 +78,13 @@ public interface PuenteRepository extends JpaRepository<Puente, UUID> {
                              ) AS punto
                   ) q
                   """,
-          nativeQuery = true)
+      nativeQuery = true)
   CoordenadaUtmProjection calcularUtm(
-          @Param("latitud") double latitud,
-          @Param("longitud") double longitud);
+      @Param("latitud") double latitud, @Param("longitud") double longitud);
 
   @Query(
-          value =
-                  """
+      value =
+          """
                   SELECT ST_Covers(
                       geometria,
                       ST_SetSRID(ST_MakePoint(:longitud, :latitud), 4326)
@@ -96,10 +92,9 @@ public interface PuenteRepository extends JpaRepository<Puente, UUID> {
                   FROM limite_territorial
                   WHERE codigo = 'GTM'
                   """,
-          nativeQuery = true)
+      nativeQuery = true)
   Boolean estaDentroDeGuatemala(
-          @Param("latitud") double latitud,
-          @Param("longitud") double longitud);
+      @Param("latitud") double latitud, @Param("longitud") double longitud);
 
   interface PuenteCercanoProjection {
 
