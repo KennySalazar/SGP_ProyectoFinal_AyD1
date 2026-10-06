@@ -2,6 +2,7 @@ package gt.usac.cunoc.sgp.puente.controller;
 
 import gt.usac.cunoc.sgp.common.exception.ApiException;
 import gt.usac.cunoc.sgp.common.security.JwtData;
+import gt.usac.cunoc.sgp.puente.dto.ActualizarPuenteRequest;
 import gt.usac.cunoc.sgp.puente.dto.CrearPuenteRequest;
 import gt.usac.cunoc.sgp.puente.dto.DarBajaPuenteRequest;
 import gt.usac.cunoc.sgp.puente.dto.PuenteCatalogoResponse;
@@ -20,6 +21,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -85,6 +87,41 @@ public class PuenteController {
     PuenteResponse response = puenteService.registrar(request, jwtData.userId());
 
     return ResponseEntity.status(HttpStatus.CREATED).body(response);
+  }
+
+  @GetMapping("/{id}")
+  @SecurityRequirement(name = "bearerAuth")
+  @PreAuthorize("hasRole('ADMINISTRADOR')")
+  @Operation(
+      summary = "Obtener un puente por su identificador",
+      description = "Retorna los datos de un puente activo para administradores.")
+  public ResponseEntity<PuenteResponse> obtenerPorId(@PathVariable UUID id) {
+    return ResponseEntity.ok(puenteService.obtenerPorId(id));
+  }
+
+  @PutMapping("/{id}")
+  @SecurityRequirement(name = "bearerAuth")
+  @PreAuthorize("hasRole('ADMINISTRADOR')")
+  @Operation(
+      summary = "Actualizar los datos generales de un puente",
+      description =
+          "Actualiza nombre, ruta, kilometraje y coordenadas de un puente existente. "
+              + "El código y los datos calculados son inmutables.")
+  public ResponseEntity<PuenteResponse> actualizar(
+      @PathVariable UUID id,
+      @Valid @RequestBody ActualizarPuenteRequest request,
+      Authentication authentication) {
+
+    if (authentication == null || !(authentication.getDetails() instanceof JwtData jwtData)) {
+      throw new ApiException(
+          HttpStatus.UNAUTHORIZED,
+          "authentication_required",
+          "Autenticación requerida",
+          "Se requiere una sesión válida para actualizar un puente.");
+    }
+
+    PuenteResponse response = puenteService.actualizar(id, request, jwtData.userId());
+    return ResponseEntity.ok(response);
   }
 
   @PostMapping("/{id}/baja")

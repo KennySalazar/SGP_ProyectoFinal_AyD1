@@ -80,6 +80,49 @@ public interface PuenteRepository extends JpaRepository<Puente, UUID> {
   @Query(
       value =
           """
+                  SELECT p.id AS id,
+                         p.codigo AS codigo,
+                         p.nombre AS nombre,
+                         p.activo AS activo,
+                         ST_Distance(p.ubicacion, q.punto) AS "distanciaMetros",
+                         ST_Y(CAST(p.ubicacion AS geometry)) AS latitud,
+                         ST_X(CAST(p.ubicacion AS geometry)) AS longitud
+                  FROM puente p
+                  CROSS JOIN (
+                      SELECT CAST(
+                          ST_SetSRID(ST_MakePoint(:longitud, :latitud), 4326)
+                          AS geography
+                      ) AS punto
+                  ) q
+                  WHERE p.id <> :excluirId
+                    AND ST_DWithin(p.ubicacion, q.punto, 100)
+                    AND ST_Distance(p.ubicacion, q.punto) < 100
+                  ORDER BY ST_Distance(p.ubicacion, q.punto), p.id
+                  """,
+      countQuery =
+          """
+                  SELECT count(*)
+                  FROM puente p
+                  CROSS JOIN (
+                      SELECT CAST(
+                          ST_SetSRID(ST_MakePoint(:longitud, :latitud), 4326)
+                          AS geography
+                      ) AS punto
+                  ) q
+                  WHERE p.id <> :excluirId
+                    AND ST_DWithin(p.ubicacion, q.punto, 100)
+                    AND ST_Distance(p.ubicacion, q.punto) < 100
+                  """,
+      nativeQuery = true)
+  Page<PuenteCercanoProjection> findCercanosExcluyendoPuente(
+      @Param("latitud") double latitud,
+      @Param("longitud") double longitud,
+      @Param("excluirId") UUID excluirId,
+      Pageable pageable);
+
+  @Query(
+      value =
+          """
                   SELECT q.zona AS zona,
                          q.epsg AS epsg,
                          ST_X(q.punto) AS este,

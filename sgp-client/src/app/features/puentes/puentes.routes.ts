@@ -22,6 +22,11 @@ export const puentesRoutes: Routes = [
             (m) => m.RegistrarPuentePage,
           ),
       },
+      {
+        path: ':id/editar',
+        loadComponent: () =>
+          import('./pages/editar-puente/editar-puente.page').then((m) => m.EditarPuentePage),
+      },
     ],
   },
 ];

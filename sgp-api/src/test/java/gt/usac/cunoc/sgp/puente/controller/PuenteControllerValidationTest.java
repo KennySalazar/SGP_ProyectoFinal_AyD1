@@ -4,12 +4,14 @@ import static org.hamcrest.Matchers.hasItem;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import gt.usac.cunoc.sgp.puente.exception.PuenteExceptionHandler;
 import gt.usac.cunoc.sgp.puente.service.PuenteService;
+import java.util.UUID;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -20,6 +22,8 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 class PuenteControllerValidationTest {
+
+  private static final UUID PUENTE_ID = UUID.fromString("019a0000-0000-7000-8000-000000000010");
 
   private PuenteService puenteService;
   private MockMvc mockMvc;
@@ -48,6 +52,28 @@ class PuenteControllerValidationTest {
         .andExpect(jsonPath("$.title").isNotEmpty())
         .andExpect(jsonPath("$.detail").isNotEmpty())
         .andExpect(jsonPath("$.instance").value("/api/v1/puentes"))
+        .andExpect(jsonPath("$..campo", hasItem(campo)));
+
+    verifyNoInteractions(puenteService);
+  }
+
+  @ParameterizedTest(name = "Actualizacion - {0}")
+  @MethodSource("solicitudesInvalidas")
+  void rechazaDatosInvalidosEnActualizacionConProblemDetail(
+      String escenario, String solicitud, String campo) throws Exception {
+
+    mockMvc
+        .perform(
+            put("/api/v1/puentes/" + PUENTE_ID)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(solicitud))
+        .andExpect(status().isUnprocessableEntity())
+        .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+        .andExpect(jsonPath("$.status").value(422))
+        .andExpect(jsonPath("$.type").isNotEmpty())
+        .andExpect(jsonPath("$.title").isNotEmpty())
+        .andExpect(jsonPath("$.detail").isNotEmpty())
+        .andExpect(jsonPath("$.instance").value("/api/v1/puentes/" + PUENTE_ID))
         .andExpect(jsonPath("$..campo", hasItem(campo)));
 
     verifyNoInteractions(puenteService);

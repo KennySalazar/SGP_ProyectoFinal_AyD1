@@ -124,10 +124,8 @@ h2 {
 .fila-catalogo > th,
 .fila-catalogo > td {
   padding: 0.85rem 1rem;
-  background: #ffffff;
-  background: var(--sgp-surface, #ffffff);
-  border-bottom: 1px solid #d8e2ec;
-  border-bottom-color: var(--sgp-border, #d8e2ec);
+  background: var(--sgp-surface);
+  border-bottom: 1px solid var(--sgp-border);
 }
 
 .seleccion-catalogo {
@@ -164,20 +162,26 @@ h2 {
 }
 
 .col-numero {
-  width: 8%;
+  width: 7%;
 }
 .col-nombre {
-  width: 32%;
+  width: 27%;
 }
 .col-ubicacion {
-  width: 18%;
+  width: 17%;
 }
 .col-estado {
   width: 12%;
 }
 .col-acciones {
-  width: 12%;
+  width: 20%;
   white-space: nowrap;
+}
+
+.acciones-fila {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
 }
 
 .btn-accion-tabla {
@@ -198,19 +202,19 @@ h2 {
   font-weight: 600;
   line-height: 1.4;
   white-space: normal;
-}
 
-.estado-puente[data-estado='Bueno'] {
-  background: var(--p-tag-success-background, #dcfce7);
-  color: var(--p-tag-success-color, #166534);
-}
-.estado-puente[data-estado='Regular'] {
-  background: var(--p-tag-warn-background, #fef3c7);
-  color: var(--p-tag-warn-color, #92400e);
-}
-.estado-puente[data-estado='Malo'] {
-  background: var(--p-tag-danger-background, #fee2e2);
-  color: var(--p-tag-danger-color, #991b1b);
+  &[data-estado='Bueno'] {
+    background: var(--p-tag-success-background, #dcfce7);
+    color: var(--p-tag-success-color, #166534);
+  }
+  &[data-estado='Regular'] {
+    background: var(--p-tag-warn-background, #fef3c7);
+    color: var(--p-tag-warn-color, #92400e);
+  }
+  &[data-estado='Malo'] {
+    background: var(--p-tag-danger-background, #fee2e2);
+    color: var(--p-tag-danger-color, #991b1b);
+  }
 }
 
 .opcion-catalogo {

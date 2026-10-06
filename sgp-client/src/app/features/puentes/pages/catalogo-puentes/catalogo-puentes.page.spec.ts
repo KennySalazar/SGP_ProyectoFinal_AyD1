@@ -593,9 +593,10 @@ describe('Baja lógica y reactivación de puentes por administrador', () => {
     const filas = fixture.nativeElement.querySelectorAll('tbody tr');
     expect(filas).toHaveLength(2);
 
-    const btnBaja = filas[0].querySelector('.btn-accion-tabla');
-    expect(btnBaja).not.toBeNull();
-    expect(btnBaja.textContent).toContain('puentes.catalogo.deactivate');
+    const botonesFilaActiva = filas[0].querySelectorAll('.btn-accion-tabla');
+    expect(botonesFilaActiva).toHaveLength(2);
+    expect(botonesFilaActiva[0].textContent).toContain('puentes.catalogo.edit');
+    expect(botonesFilaActiva[1].textContent).toContain('puentes.catalogo.deactivate');
 
     const btnReactivar = filas[1].querySelector('.btn-accion-tabla');
     expect(btnReactivar).not.toBeNull();
