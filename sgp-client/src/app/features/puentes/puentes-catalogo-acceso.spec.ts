@@ -18,6 +18,7 @@ import { CatalogoPuentesPage } from './pages/catalogo-puentes/catalogo-puentes.p
 import { RegistrarPuentePage } from './pages/registrar-puente/registrar-puente.page';
 import { PuenteApiService } from './services/puente-api.service';
 import { EstadoPuente } from './models/puente.models';
+import { MapaPuentesComponent } from './pages/catalogo-puentes/mapa-puentes/mapa-puentes.component';
 
 @Component({ selector: 'app-destino-test', template: '' })
 class DestinoTest {}
@@ -121,6 +122,7 @@ describe('Lista integrada en el catálogo público sin sesión', () => {
 
   beforeEach(() => {
     refresh.mockReset();
+    vi.spyOn(MapaPuentesComponent.prototype, 'ngAfterViewInit').mockResolvedValue();
     usuario.set(null);
     TestBed.configureTestingModule({
       providers: [
@@ -146,12 +148,20 @@ describe('Lista integrada en el catálogo público sin sesión', () => {
       remove: { imports: [TranslocoPipe] },
       add: { imports: [TraduccionTestPipe] },
     });
+    TestBed.overrideComponent(MapaPuentesComponent, {
+      set: {
+        template: '',
+        imports: [],
+        providers: [{ provide: TranslocoService, useValue: { translate: (key: string) => key } }],
+      },
+    });
     http = TestBed.inject(HttpTestingController);
   });
 
   afterEach(() => {
     http.verify();
     expect(refresh).not.toHaveBeenCalled();
+    vi.restoreAllMocks();
   });
 
   async function abrirCatalogo() {
@@ -197,7 +207,7 @@ describe('Lista integrada en el catálogo público sin sesión', () => {
     expect(element.querySelector('a')?.getAttribute('href')).toBe('/login');
   });
 
-  it('integra filtros y paginación sin consultar nuevamente al pulsar el mapa pendiente', async () => {
+  it('integra filtros y paginación con la activación del mapa público', async () => {
     const { harness, page } = await abrirCatalogo();
     responderCatalogo();
     page.filtros.patchValue({ departamentoId: 'departamento-1', estado: 'Sin evaluar' });
@@ -217,9 +227,13 @@ describe('Lista integrada en el catálogo público sin sesión', () => {
     const selector =
       harness.routeNativeElement!.querySelectorAll<HTMLButtonElement>('.selector button');
     selector[1].click();
+    const mapa = http.expectOne((req) => req.url === '/api/v1/puentes');
+    expect(mapa.request.params.get('tamanio')).toBe('100');
+    expect(mapa.request.params.get('estado')).toBe('Sin evaluar');
+    mapa.flush({ content: [puentes[3]], number: 0, totalPages: 1 });
     harness.detectChanges();
-    expect(selector[1].disabled).toBe(true);
-    expect(harness.routeNativeElement!.querySelector('p-table')).not.toBeNull();
+    expect(selector[1].disabled).toBe(false);
+    expect(harness.routeNativeElement!.querySelector('app-mapa-puentes')).not.toBeNull();
     selector[0].click();
     harness.detectChanges();
     expect(harness.routeNativeElement!.querySelector('tbody')?.textContent).toContain(
