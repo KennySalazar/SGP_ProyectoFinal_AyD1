@@ -276,12 +276,15 @@ nav a.active i {
   }
   .sidebar-section {
     padding: 0;
+    min-width: 0;
+    overflow-x: auto;
   }
   nav {
     display: flex;
     gap: 0.25rem;
   }
   nav a {
+    flex-shrink: 0;
     min-width: 64px;
     min-height: 56px;
     display: grid;

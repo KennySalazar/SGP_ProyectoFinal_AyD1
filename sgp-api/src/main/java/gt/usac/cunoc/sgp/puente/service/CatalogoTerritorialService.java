@@ -34,6 +34,7 @@ public class CatalogoTerritorialService {
     this.puenteMapper = puenteMapper;
   }
 
+  @PreAuthorize("permitAll()")
   public Page<DepartamentoResponse> listarDepartamentos(int pagina, int tamanio) {
     Pageable pageable = crearPaginacion(pagina, tamanio);
 

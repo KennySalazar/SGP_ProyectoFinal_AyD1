@@ -3,15 +3,39 @@ import { inject, Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
 import {
   CrearPuenteRequest,
+  ConsultaCatalogoPuentes,
   DepartamentoResponse,
   MunicipioResponse,
   PaginaResponse,
+  PuenteCatalogoResponse,
   PuenteResponse,
 } from '../models/puente.models';
 
 @Injectable({ providedIn: 'root' })
 export class PuenteApiService {
   private readonly http = inject(HttpClient);
+
+  listarCatalogo(
+    consulta: ConsultaCatalogoPuentes = {},
+  ): Observable<PaginaResponse<PuenteCatalogoResponse>> {
+    const pagina = consulta.pagina ?? 0;
+    const tamanio = consulta.tamanio ?? 20;
+    if (
+      !Number.isInteger(pagina) ||
+      pagina < 0 ||
+      !Number.isInteger(tamanio) ||
+      tamanio < 1 ||
+      tamanio > 100
+    ) {
+      throw new RangeError(
+        'La página debe ser mayor o igual a 0 y el tamaño debe estar entre 1 y 100.',
+      );
+    }
+    const params: Record<string, string | number> = { pagina, tamanio };
+    if (consulta.departamentoId) params['departamentoId'] = consulta.departamentoId;
+    if (consulta.estado) params['estado'] = consulta.estado;
+    return this.http.get<PaginaResponse<PuenteCatalogoResponse>>('/api/v1/puentes', { params });
+  }
 
   listarDepartamentos(pagina = 0, tamanio = 100): Observable<PaginaResponse<DepartamentoResponse>> {
     return this.http.get<PaginaResponse<DepartamentoResponse>>('/api/v1/catalogos/departamentos', {

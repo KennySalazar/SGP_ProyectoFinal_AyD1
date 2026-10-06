@@ -6,6 +6,10 @@ import { usuarioProtectedRoutes, usuarioPublicRoutes } from './features/usuario/
 export const routes: Routes = [
   ...usuarioPublicRoutes,
   {
+    path: 'puentes',
+    loadChildren: () => import('./features/puentes/puentes.routes').then((m) => m.puentesRoutes),
+  },
+  {
     path: '',
     canActivate: [authGuard],
     loadComponent: () =>
@@ -18,12 +22,6 @@ export const routes: Routes = [
           import('./offline/pages/diagnostics/diagnostics.page').then((m) => m.DiagnosticsPage),
       },
 
-      {
-        path: 'puentes',
-        canActivate: [roleGuard('ADMINISTRADOR')],
-        loadChildren: () =>
-          import('./features/puentes/puentes.routes').then((m) => m.puentesRoutes),
-      },
       {
         path: 'admin',
         canActivate: [roleGuard('ADMINISTRADOR')],

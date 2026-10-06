@@ -35,4 +35,11 @@
     <a routerLink="/registro">{{ 'auth.register.title' | transloco }}</a
     ><a routerLink="/recuperar">{{ 'auth.login.forgot' | transloco }}</a>
   </div>
+  <div class="catalogo-acceso">
+    <p>{{ 'puentes.catalogo.publicAccess' | transloco }}</p>
+    <a pButton routerLink="/puentes" severity="secondary" [outlined]="true">
+      <i class="pi pi-list" aria-hidden="true"></i>
+      <span>{{ 'puentes.catalogo.explore' | transloco }}</span>
+    </a>
+  </div>
 </app-auth-card>

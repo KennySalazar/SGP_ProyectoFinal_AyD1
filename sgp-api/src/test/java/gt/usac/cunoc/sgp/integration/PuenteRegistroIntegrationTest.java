@@ -470,6 +470,7 @@ class PuenteRegistroIntegrationTest {
 
   @Test
   void listaDepartamentosActivosConPaginacion() {
+    SecurityContextHolder.clearContext();
     long totalActivos =
         jdbc.queryForObject("SELECT COUNT(*) FROM departamento WHERE activo = true", Long.class);
 

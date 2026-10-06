@@ -1,0 +1,254 @@
+@if (auth.authenticated()) {
+<app-shell><ng-container [ngTemplateOutlet]="contenido" /></app-shell>
+} @else {
+<main><ng-container [ngTemplateOutlet]="contenido" /></main>
+}
+
+<ng-template #contenido>
+  <div class="catalogo" [class.catalogo-autenticado]="auth.authenticated()">
+    <header class="page-heading">
+      <div>
+        <p class="page-kicker">{{ 'puentes.kicker' | transloco }}</p>
+        <h1 class="page-title">{{ 'puentes.catalogo.title' | transloco }}</h1>
+        <p class="page-description">{{ 'puentes.catalogo.description' | transloco }}</p>
+      </div>
+      @if (!auth.authenticated()) {
+      <a pButton routerLink="/login"
+        ><i class="pi pi-sign-in" aria-hidden="true"></i>{{ 'auth.login.title' | transloco }}</a
+      >
+      } @else if (auth.user()?.role === 'ADMINISTRADOR') {
+      <a pButton routerLink="/puentes/nuevo"
+        ><i class="pi pi-plus" aria-hidden="true"></i>{{ 'nav.registerBridge' | transloco }}</a
+      >
+      }
+    </header>
+
+    <section class="surface-card catalogo-panel">
+      <div class="selector" role="group" [attr.aria-label]="'puentes.catalogo.view' | transloco">
+        <button
+          pButton
+          type="button"
+          [attr.aria-pressed]="vista() === 'lista'"
+          class="vista-activa"
+          (click)="vista.set('lista')"
+        >
+          <i class="pi pi-list" aria-hidden="true"></i>
+          {{ 'puentes.catalogo.list' | transloco }}
+        </button>
+        <button pButton type="button" [attr.aria-pressed]="vista() === 'mapa'" disabled>
+          <i class="pi pi-map" aria-hidden="true"></i>
+          {{ 'puentes.catalogo.map' | transloco }}
+          <span class="proximamente">{{ 'puentes.catalogo.comingSoon' | transloco }}</span>
+        </button>
+      </div>
+
+      <form class="filtros" [formGroup]="filtros" (ngSubmit)="aplicarFiltros()">
+        <label for="catalogo-departamento">
+          <span>{{ 'puentes.department' | transloco }}</span>
+          <p-select
+            inputId="catalogo-departamento"
+            formControlName="departamentoId"
+            [options]="departamentos()"
+            optionLabel="nombre"
+            optionValue="id"
+            [showClear]="true"
+            appendTo="body"
+            [panelStyle]="estiloPanelSelector"
+            [loading]="cargandoDepartamentos()"
+            [placeholder]="'puentes.catalogo.allDepartments' | transloco"
+          >
+            <ng-template #item let-departamento
+              ><span class="opcion-catalogo">{{ departamento.nombre }}</span></ng-template
+            >
+          </p-select>
+        </label>
+        <label for="catalogo-estado">
+          <span>{{ 'puentes.state' | transloco }}</span>
+          <p-select
+            inputId="catalogo-estado"
+            formControlName="estado"
+            [options]="estados"
+            [showClear]="true"
+            appendTo="body"
+            [panelStyle]="estiloPanelSelector"
+            [placeholder]="'puentes.catalogo.allStates' | transloco"
+          >
+            <ng-template #item let-estado
+              ><span class="opcion-catalogo">{{ estado }}</span></ng-template
+            >
+          </p-select>
+        </label>
+        <div class="filtros-acciones">
+          <button pButton class="accion-primaria" type="submit" [disabled]="cargando()">
+            <i class="pi pi-filter" aria-hidden="true"></i>
+            {{ 'puentes.catalogo.applyFilters' | transloco }}
+          </button>
+          <button
+            pButton
+            type="button"
+            severity="secondary"
+            class="accion-secundaria"
+            [outlined]="true"
+            [disabled]="cargando()"
+            (click)="limpiarFiltros()"
+          >
+            {{ 'puentes.catalogo.clearFilters' | transloco }}
+          </button>
+        </div>
+      </form>
+      @if (errorDepartamentos()) {
+      <p role="alert">{{ 'puentes.departmentsFailed' | transloco }}</p>
+      <button
+        pButton
+        type="button"
+        (click)="cargarDepartamentos()"
+        [disabled]="cargandoDepartamentos()"
+      >
+        {{ 'puentes.catalogo.retryDepartments' | transloco }}
+      </button>
+      } @if (cargando()) {
+      <p role="status">{{ 'puentes.catalogo.loading' | transloco }}</p>
+      } @else if (errorConsulta()) {
+      <p role="alert">{{ 'puentes.catalogo.failed' | transloco }}</p>
+      <button pButton type="button" (click)="cargarCatalogo()">
+        {{ 'puentes.retry' | transloco }}
+      </button>
+      }
+
+      <section aria-live="polite">
+        @if (vista() === 'lista') {
+        <div class="resultados-cabecera">
+          <h2 id="catalogo-lista-titulo">{{ 'puentes.catalogo.listTitle' | transloco }}</h2>
+          @if (!cargando() && !errorConsulta()) { @if (pagina(); as resultado) {
+          <p role="status">
+            {{ 'puentes.catalogo.total' | transloco: { total: resultado.totalElements } }}
+          </p>
+          } }
+        </div>
+        @if (!cargando() && !errorConsulta()) { @if (pagina(); as resultado) { @if
+        (resultado.content.length > 0) {
+        <p class="seleccion-catalogo" role="status">
+          @if (puenteSeleccionado(); as seleccionado) { {{ 'puentes.catalogo.selectedBridge' |
+          transloco: { nombre: seleccionado.nombre } }} } @else { {{
+          'puentes.catalogo.selectionHint' | transloco }} }
+        </p>
+        }
+        <div
+          class="tabla-contenedor"
+          role="region"
+          tabindex="0"
+          aria-labelledby="catalogo-lista-titulo"
+        >
+          <p-table
+            [pt]="{ tableContainer: { style: { overflow: 'visible' } } }"
+            [value]="resultado.content"
+            dataKey="id"
+            selectionMode="single"
+            [metaKeySelection]="false"
+            [selection]="puenteSeleccionado()"
+            (selectionChange)="puenteSeleccionado.set($event)"
+            [tableStyle]="{ 'min-width': '44rem', width: '100%', 'table-layout': 'fixed', 'border-collapse': 'collapse' }"
+          >
+            <ng-template #header>
+              <tr>
+                <th scope="col" class="col-numero">
+                  {{ 'puentes.catalogo.rowNumber' | transloco }}
+                </th>
+                <th scope="col" class="col-nombre">{{ 'puentes.name' | transloco }}</th>
+                <th scope="col" class="col-ubicacion">{{ 'puentes.department' | transloco }}</th>
+                <th scope="col" class="col-ubicacion">{{ 'puentes.municipality' | transloco }}</th>
+                <th scope="col" class="col-estado">{{ 'puentes.state' | transloco }}</th>
+              </tr>
+            </ng-template>
+            <ng-template #body let-puente let-indice="rowIndex">
+              <tr
+                class="fila-catalogo"
+                [pSelectableRow]="puente"
+                [pSelectableRowIndex]="indice"
+                [class.fila-seleccionada]="puenteSeleccionado()?.id === puente.id"
+                [attr.aria-selected]="puenteSeleccionado()?.id === puente.id"
+              >
+                <td class="numero-puente">
+                  {{ resultado.number * resultado.size + indice + 1 }} @if (puenteSeleccionado()?.id
+                  === puente.id) {
+                  <i class="pi pi-check" aria-hidden="true"></i>
+                  }
+                </td>
+                <th scope="row" class="nombre-puente">{{ puente.nombre }}</th>
+                <td>{{ puente.departamento.nombre }}</td>
+                <td>{{ puente.municipio.nombre }}</td>
+                <td>
+                  <p-tag
+                    class="estado-puente"
+                    [attr.data-estado]="puente.estadoActual"
+                    [value]="puente.estadoActual"
+                    [severity]="severidad(puente.estadoActual)"
+                  />
+                </td>
+              </tr>
+            </ng-template>
+            <ng-template #emptymessage>
+              <tr>
+                <td colspan="5">
+                  <div class="sin-resultados">
+                    <i class="pi pi-search" aria-hidden="true"></i>
+                    <p role="status">
+                      {{ (hayFiltrosAplicados() ? 'puentes.catalogo.noResults' :
+                      'puentes.catalogo.emptyCatalog') | transloco }}
+                    </p>
+                    @if (hayFiltrosAplicados()) {
+                    <button
+                      pButton
+                      type="button"
+                      severity="secondary"
+                      [outlined]="true"
+                      (click)="limpiarFiltros()"
+                    >
+                      {{ 'puentes.catalogo.clearFilters' | transloco }}
+                    </button>
+                    }
+                  </div>
+                </td>
+              </tr>
+            </ng-template>
+          </p-table>
+        </div>
+        @if (resultado.totalElements > 0) {
+        <div class="paginacion">
+          <p class="reporte-pagina" role="status">
+            {{ 'puentes.catalogo.pageRange' | transloco: { first: resultado.number * resultado.size
+            + 1, last: resultado.number * resultado.size + resultado.content.length, total:
+            resultado.totalElements } }}
+          </p>
+          <p-paginator
+            [pt]="estiloPaginador"
+            [first]="resultado.number * resultado.size"
+            [rows]="resultado.size"
+            [totalRecords]="resultado.totalElements"
+            [pageLinkSize]="3"
+            (onPageChange)="cambiarPagina($event)"
+          />
+          <label class="tamanio-pagina" for="catalogo-tamanio">
+            <span>{{ 'puentes.catalogo.pageSize' | transloco }}</span>
+            <p-select
+              inputId="catalogo-tamanio"
+              [options]="tamaniosPagina"
+              [formControl]="selectorTamanio"
+              (onChange)="cambiarPagina({ page: 0, rows: $event.value })"
+              appendTo="body"
+              [panelStyle]="estiloPanelSelector"
+            >
+              <ng-template #item let-tamanio
+                ><span class="opcion-catalogo">{{ tamanio }}</span></ng-template
+              >
+            </p-select>
+          </label>
+        </div>
+        } } } } @else {
+        <h2>{{ 'puentes.catalogo.map' | transloco }}</h2>
+        <p>{{ 'puentes.catalogo.mapPending' | transloco }}</p>
+        }
+      </section>
+    </section>
+  </div>
+</ng-template>
