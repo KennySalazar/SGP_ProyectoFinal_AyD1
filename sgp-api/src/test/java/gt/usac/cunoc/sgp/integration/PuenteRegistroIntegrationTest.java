@@ -29,6 +29,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
@@ -191,6 +192,60 @@ class PuenteRegistroIntegrationTest {
             "SELECT count(*) FROM inspeccion WHERE puente_id = ?", Long.class, response.id()));
   }
 
+  @ParameterizedTest
+  @CsvSource({"14.481, -90.615, 15", "14.8, -89.55, 16"})
+  void permiteRegistrarDentroDeGuatemala(String latitud, String longitud, int zonaEsperada) {
+
+    var respuesta =
+        puenteService.registrar(
+            solicitud(departamentoId, latitud, longitud, false), ADMINISTRADOR_ID);
+
+    assertThat(respuesta.utm().zona()).isEqualTo(zonaEsperada);
+    assertTrue(respuesta.activo());
+    assertEquals("Sin evaluar", respuesta.estadoActual());
+    assertEquals(1L, puenteRepository.count());
+    assertEquals(1, correlativoActual());
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void rechazaUbicacionExteriorSinConsumirCorrelativo(boolean confirmarCercania) {
+    var excepcion =
+        assertThrows(
+            ApiException.class,
+            () ->
+                puenteService.registrar(
+                    solicitud(departamentoId, "0", "0", confirmarCercania), ADMINISTRADOR_ID));
+
+    assertEquals(HttpStatus.UNPROCESSABLE_ENTITY, excepcion.getStatus());
+    assertEquals("ubicacion_fuera_de_guatemala", excepcion.getCode());
+    assertEquals(0L, puenteRepository.count());
+    assertEquals(0, correlativoActual());
+  }
+
+  @Test
+  void aceptaPuntoSobreElLimiteTerritorial() {
+    var coordenadas =
+        jdbc.queryForMap(
+            """
+                    SELECT ST_Y(punto) AS latitud,
+                           ST_X(punto) AS longitud
+                    FROM (
+                        SELECT ST_PointN(
+                            ST_ExteriorRing(ST_GeometryN(geometria, 1)),
+                            1
+                        ) AS punto
+                        FROM limite_territorial
+                        WHERE codigo = 'GTM'
+                    ) limite
+                    """);
+
+    double latitud = ((Number) coordenadas.get("latitud")).doubleValue();
+    double longitud = ((Number) coordenadas.get("longitud")).doubleValue();
+
+    assertEquals(Boolean.TRUE, puenteRepository.estaDentroDeGuatemala(latitud, longitud));
+  }
+
   @Test
   void rechazaMunicipioDeOtroDepartamentoSinConsumirCorrelativo() {
     UUID otroDepartamento =
@@ -223,6 +278,18 @@ class PuenteRegistroIntegrationTest {
     double distancia = cercanos.getContent().getFirst().getDistanciaMetros();
 
     assertTrue(distancia > 10 && distancia < 12);
+
+    var cercano = cercanos.getContent().getFirst();
+
+    assertEquals(14.481, cercano.getLatitud(), 0.0000001);
+    assertEquals(-90.615, cercano.getLongitud(), 0.0000001);
+
+    var respuestaCercano = new PuenteMapperImpl().toPuenteCercanoResponse(cercano);
+
+    assertEquals(primero.id(), respuestaCercano.id());
+    assertEquals(14.481, respuestaCercano.latitud(), 0.0000001);
+    assertEquals(-90.615, respuestaCercano.longitud(), 0.0000001);
+    assertEquals(distancia, respuestaCercano.distanciaMetros(), 0.0000001);
 
     assertThrows(
         CercaniaPuenteException.class,
@@ -335,9 +402,7 @@ class PuenteRegistroIntegrationTest {
             primero.id());
 
     double latitud = ((Number) coordenadas.get("latitud")).doubleValue();
-
     double longitud = ((Number) coordenadas.get("longitud")).doubleValue();
-
     double distanciaReal = ((Number) coordenadas.get("distancia")).doubleValue();
 
     assertEquals(distanciaObjetivo, distanciaReal, 0.001);
@@ -356,7 +421,6 @@ class PuenteRegistroIntegrationTest {
 
     try {
       var primera = executor.submit(() -> registrarConcurrentemente("14.481", preparados, iniciar));
-
       var segunda = executor.submit(() -> registrarConcurrentemente("14.501", preparados, iniciar));
 
       assertTrue(preparados.await(10, TimeUnit.SECONDS));
@@ -410,7 +474,6 @@ class PuenteRegistroIntegrationTest {
         jdbc.queryForObject("SELECT COUNT(*) FROM departamento WHERE activo = true", Long.class);
 
     var primeraPagina = catalogoTerritorialService.listarDepartamentos(0, 5);
-
     var segundaPagina = catalogoTerritorialService.listarDepartamentos(1, 5);
 
     assertThat(primeraPagina.getTotalElements()).isEqualTo(totalActivos);
@@ -430,22 +493,28 @@ class PuenteRegistroIntegrationTest {
     var activo =
         puenteService.registrar(
             solicitud(departamentoId, "14.481", "-90.615", false), ADMINISTRADOR_ID);
+
     var inactivo =
         puenteService.registrar(
             solicitud(departamentoId, "14.501", "-90.615", false), ADMINISTRADOR_ID);
+
     jdbc.update(
         """
-        UPDATE puente SET activo = false, inactivado_en = CURRENT_TIMESTAMP,
-          inactivado_por_id = ?, motivo_inactivacion = 'Baja de prueba'
-        WHERE id = ?
-        """,
+            UPDATE puente SET activo = false, inactivado_en = CURRENT_TIMESTAMP,
+              inactivado_por_id = ?, motivo_inactivacion = 'Baja de prueba'
+            WHERE id = ?
+            """,
         ADMINISTRADOR_ID,
         inactivo.id());
 
     SecurityContextHolder.clearContext();
+
     var resultado = puenteService.listarCatalogo(departamentoId, "Sin evaluar", 0, 100);
+
     assertThat(resultado.getTotalElements()).isEqualTo(1);
+
     var publico = resultado.getContent().getFirst();
+
     assertThat(publico.id()).isEqualTo(activo.id());
     assertThat(publico.departamento().id()).isEqualTo(departamentoId);
     assertThat(publico.municipio().id()).isEqualTo(municipioId);
@@ -456,6 +525,7 @@ class PuenteRegistroIntegrationTest {
 
     UUID otroDepartamento =
         jdbc.queryForObject("SELECT id FROM departamento WHERE codigo_ine = '02'", UUID.class);
+
     assertThat(puenteService.listarCatalogo(otroDepartamento, null, 0, 20).getContent()).isEmpty();
     assertThat(puenteService.listarCatalogo(null, null, 0, 20).getTotalElements()).isEqualTo(1);
   }
@@ -464,18 +534,23 @@ class PuenteRegistroIntegrationTest {
   void catalogoPaginaSinRepetirPuentesConElMismoNombre() {
     puenteService.registrar(
         solicitud(departamentoId, "14.481", "-90.615", false), ADMINISTRADOR_ID);
+
     puenteService.registrar(
         solicitud(departamentoId, "14.501", "-90.615", false), ADMINISTRADOR_ID);
+
     SecurityContextHolder.clearContext();
 
     var primera = puenteService.listarCatalogo(null, null, 0, 1);
     var segunda = puenteService.listarCatalogo(null, null, 1, 1);
+
     assertThat(primera.getTotalElements()).isEqualTo(2);
     assertThat(primera.getTotalPages()).isEqualTo(2);
     assertThat(primera.getContent()).hasSize(1);
     assertThat(segunda.getContent()).hasSize(1);
+
     assertThat(primera.getContent().getFirst().id())
         .isNotEqualTo(segunda.getContent().getFirst().id());
+
     assertThat(puenteService.listarCatalogo(null, null, 2, 1).getContent()).isEmpty();
   }
 
@@ -490,7 +565,6 @@ class PuenteRegistroIntegrationTest {
       var resultado = catalogoTerritorialService.listarDepartamentos(0, 100);
 
       assertThat(resultado.getTotalElements()).isEqualTo(totalActivos - 1);
-
       assertThat(resultado.getContent()).noneMatch(item -> item.id().equals(departamentoId));
     } finally {
       jdbc.update("UPDATE departamento SET activo = true WHERE id = ?", departamentoId);
@@ -515,7 +589,6 @@ class PuenteRegistroIntegrationTest {
       var resultado = catalogoTerritorialService.listarMunicipios(departamentoId, 0, 100);
 
       assertThat(resultado.getTotalElements()).isEqualTo(totalMunicipios - 1);
-
       assertThat(resultado.getContent()).isNotEmpty();
 
       assertThat(resultado.getContent())
@@ -582,6 +655,7 @@ class PuenteRegistroIntegrationTest {
   private String registrarConcurrentemente(
       String latitud, CountDownLatch preparados, CountDownLatch iniciar)
       throws InterruptedException {
+
     var authentication =
         new UsernamePasswordAuthenticationToken(
             "admin.hu009@ejemplo.com",
@@ -610,6 +684,7 @@ class PuenteRegistroIntegrationTest {
 
   private CrearPuenteRequest solicitud(
       UUID departamento, String latitud, String longitud, boolean confirmarCercania) {
+
     return new CrearPuenteRequest(
         "Puente de prueba HU009",
         departamento,

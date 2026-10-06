@@ -37,7 +37,7 @@ class DatabaseMigrationIntegrationTest {
             .load();
 
     var result = flyway.migrate();
-    assertEquals(12, result.migrationsExecuted);
+    assertEquals(13, result.migrationsExecuted);
     flyway.validate();
 
     try (Connection connection =
@@ -53,6 +53,25 @@ class DatabaseMigrationIntegrationTest {
       assertTrue(tableExists(statement, "usuario_profesional"));
       assertTrue(tableExists(statement, "departamento"));
       assertTrue(tableExists(statement, "municipio"));
+      assertTrue(tableExists(statement, "limite_territorial"));
+      assertEquals(1, rowCount(statement, "limite_territorial"));
+      assertTrue(indexExists(statement, "idx_limite_territorial_geometria_gist"));
+
+      try (ResultSet limite =
+          statement.executeQuery(
+              """
+                           SELECT codigo,
+                                  ST_SRID(geometria) AS srid,
+                                  ST_IsValid(geometria) AS valida,
+                                  ST_IsEmpty(geometria) AS vacia
+                           FROM limite_territorial
+                           """)) {
+        assertTrue(limite.next());
+        assertEquals("GTM", limite.getString("codigo"));
+        assertEquals(4326, limite.getInt("srid"));
+        assertTrue(limite.getBoolean("valida"));
+        assertFalse(limite.getBoolean("vacia"));
+      }
       assertTrue(tableExists(statement, "asignatura"));
       assertTrue(tableExists(statement, "puente"));
       assertTrue(tableExists(statement, "version_formulario"));
