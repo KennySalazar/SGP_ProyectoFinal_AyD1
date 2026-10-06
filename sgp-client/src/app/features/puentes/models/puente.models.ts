@@ -88,6 +88,8 @@ export interface PuenteCercanoResponse {
   nombre: string;
   activo: boolean;
   distanciaMetros: number;
+  latitud: number;
+  longitud: number;
 }
 
 export interface PuenteProblemDetails extends ProblemDetails {
@@ -98,4 +100,17 @@ export interface PuenteProblemDetails extends ProblemDetails {
   totalPaginas?: number;
   pagina?: number;
   tamanoPagina?: number;
+}
+
+export interface CandidatoTerritorialResponse {
+  departamento: DepartamentoResponse;
+  municipio: MunicipioResponse;
+}
+
+export interface UbicacionTerritorialResponse {
+  latitud: number;
+  longitud: number;
+  zonaUtm: string;
+  requiereSeleccion: boolean;
+  candidatos: CandidatoTerritorialResponse[];
 }

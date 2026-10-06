@@ -1,7 +1,7 @@
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { CrearPuenteRequest } from '../models/puente.models';
 import { PuenteApiService } from './puente-api.service';
 
@@ -22,7 +22,7 @@ describe('PuenteApiService', () => {
     http.verify();
   });
 
-  it('consulta departamentos con la paginacion indicada', () => {
+  it('consulta departamentos con la paginación indicada', () => {
     service.listarDepartamentos(1, 20).subscribe();
 
     const request = http.expectOne((req) => req.url === '/api/v1/catalogos/departamentos');
@@ -34,7 +34,7 @@ describe('PuenteApiService', () => {
     request.flush({ content: [] });
   });
 
-  it('consulta el catalogo publico con filtros y paginacion', () => {
+  it('consulta el catálogo público con filtros y paginación', () => {
     service
       .listarCatalogo({
         departamentoId: 'departamento-1',
@@ -43,26 +43,33 @@ describe('PuenteApiService', () => {
         tamanio: 100,
       })
       .subscribe();
+
     const request = http.expectOne((req) => req.url === '/api/v1/puentes');
+
     expect(request.request.method).toBe('GET');
     expect(request.request.params.get('departamentoId')).toBe('departamento-1');
     expect(request.request.params.get('estado')).toBe('Sin evaluar');
     expect(request.request.params.get('pagina')).toBe('2');
     expect(request.request.params.get('tamanio')).toBe('100');
+
     request.flush({ content: [] });
   });
 
-  it('omite filtros ausentes y usa la paginacion predeterminada', () => {
+  it('omite filtros ausentes y usa la paginación predeterminada', () => {
     service.listarCatalogo().subscribe();
+
     const request = http.expectOne((req) => req.url === '/api/v1/puentes');
+
     expect(request.request.params.keys().sort()).toEqual(['pagina', 'tamanio']);
     expect(request.request.params.get('pagina')).toBe('0');
     expect(request.request.params.get('tamanio')).toBe('20');
+
     request.flush({ content: [] });
   });
 
-  it.each([0, 101, -1, 1.5])('no solicita tamaños invalidos: %s', (tamanio) => {
+  it.each([0, 101, -1, 1.5])('no solicita tamaños inválidos: %s', (tamanio) => {
     expect(() => service.listarCatalogo({ tamanio })).toThrow(RangeError);
+
     http.expectNone('/api/v1/puentes');
   });
 
@@ -80,7 +87,46 @@ describe('PuenteApiService', () => {
     request.flush({ content: [] });
   });
 
-  it('envia los datos y la confirmacion al registrar', () => {
+  it('resuelve la ubicación territorial usando latitud y longitud', () => {
+    const respuesta = {
+      latitud: 14.481,
+      longitud: -90.615,
+      zonaUtm: '15N',
+      requiereSeleccion: false,
+      candidatos: [
+        {
+          departamento: {
+            id: 'departamento-1',
+            codigoIne: '01',
+            nombre: 'Guatemala',
+          },
+          municipio: {
+            id: 'municipio-1',
+            departamentoId: 'departamento-1',
+            codigoIne: '0114',
+            nombre: 'Amatitlán',
+          },
+        },
+      ],
+    };
+
+    const recibido = vi.fn();
+
+    service.resolverUbicacion(14.481, -90.615).subscribe(recibido);
+
+    const request = http.expectOne((req) => req.url === '/api/v1/catalogos/ubicacion');
+
+    expect(request.request.method).toBe('GET');
+    expect(request.request.params.get('latitud')).toBe('14.481');
+    expect(request.request.params.get('longitud')).toBe('-90.615');
+
+    request.flush(respuesta);
+
+    expect(recibido).toHaveBeenCalledTimes(1);
+    expect(recibido).toHaveBeenCalledWith(respuesta);
+  });
+
+  it('envía los datos y la confirmación al registrar', () => {
     const body: CrearPuenteRequest = {
       nombre: 'Puente HU9',
       departamentoId: 'departamento-1',

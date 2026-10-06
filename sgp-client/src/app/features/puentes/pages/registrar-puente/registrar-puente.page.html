@@ -122,22 +122,17 @@
     </div>
 
     <h3>{{ 'puentes.territory' | transloco }}</h3>
-    <p class="note">{{ 'puentes.territoryNote' | transloco }}</p>
+    <p class="note">{{ 'puentes.territoryFromPoint' | transloco }}</p>
 
-    @if (cargandoDepartamentos()) {
-    <p role="status">{{ 'puentes.loadingDepartments' | transloco }}</p>
-    } @if (errorDepartamentos()) {
-    <div class="feedback" role="alert">
-      <p>{{ 'puentes.departmentsFailed' | transloco }}</p>
-      <button pButton type="button" (click)="cargarDepartamentos()">
-        {{ 'puentes.retry' | transloco }}
-      </button>
-    </div>
+    @if (resolviendoUbicacion()) {
+    <p role="status">{{ 'puentes.resolvingLocation' | transloco }}</p>
+    } @if (territorio()?.requiereSeleccion) {
+    <p class="feedback" role="status">{{ 'puentes.locationMultipleCandidates' | transloco }}</p>
     }
 
     <div class="form-grid">
       <div class="field">
-        <label for="departamentoId">{{ 'puentes.department' | transloco }}</label>
+        <label for="departamentoId"> {{ 'puentes.department' | transloco }} </label>
         <p-select
           inputId="departamentoId"
           formControlName="departamentoId"
@@ -147,8 +142,8 @@
           [placeholder]="'puentes.selectDepartment' | transloco"
           [filter]="true"
           filterBy="nombre"
-          [showClear]="true"
-          [loading]="cargandoDepartamentos()"
+          [showClear]="false"
+          [loading]="resolviendoUbicacion()"
         />
         @if (mensajeCampo('departamentoId'); as mensaje) {
         <small class="validation">{{ mensaje }}</small>
@@ -156,22 +151,18 @@
       </div>
 
       <div class="field">
-        <label for="municipioId">{{ 'puentes.municipality' | transloco }}</label>
+        <label for="municipioId"> {{ 'puentes.municipality' | transloco }} </label>
         <p-select
           inputId="municipioId"
           formControlName="municipioId"
           [options]="municipios()"
           optionLabel="nombre"
           optionValue="id"
-          [placeholder]="
-              (form.controls.departamentoId.value
-                ? 'puentes.selectMunicipality'
-                : 'puentes.departmentFirst') | transloco
-            "
+          [placeholder]="'puentes.selectMunicipality' | transloco"
           [filter]="true"
           filterBy="nombre"
-          [showClear]="true"
-          [loading]="cargandoMunicipios()"
+          [showClear]="false"
+          [loading]="resolviendoUbicacion()"
         />
         @if (mensajeCampo('municipioId'); as mensaje) {
         <small class="validation">{{ mensaje }}</small>
@@ -179,22 +170,41 @@
       </div>
     </div>
 
-    @if (cargandoMunicipios()) {
-    <p role="status">{{ 'puentes.loadingMunicipalities' | transloco }}</p>
-    } @if (errorMunicipios()) {
-    <div class="feedback" role="alert">
-      <p>{{ 'puentes.municipalitiesFailed' | transloco }}</p>
-      <button pButton type="button" (click)="reintentarMunicipios()">
-        {{ 'puentes.retry' | transloco }}
-      </button>
-    </div>
-    } @else if ( form.controls.departamentoId.value && !cargandoMunicipios() && municipios().length
-    === 0 ) {
-    <p role="status">{{ 'puentes.noMunicipalities' | transloco }}</p>
-    }
-
     <h3>{{ 'puentes.coordinates' | transloco }}</h3>
-    <p class="note">{{ 'puentes.coordinatesNote' | transloco }}</p>
+    <p class="note">{{ 'puentes.mapCoordinatesNote' | transloco }}</p>
+
+    <app-selector-ubicacion
+      [latitud]="form.controls.latitud.value"
+      [longitud]="form.controls.longitud.value"
+      [deshabilitado]="guardando()"
+      [cercanos]="puntosCercanos()"
+      (coordenadaSeleccionada)="seleccionarCoordenada($event)"
+    />
+
+    @if (
+  form.controls.latitud.value !== null ||
+  form.controls.longitud.value !== null
+) {
+  <div class="actions">
+    <button
+      pButton
+      type="button"
+      severity="secondary"
+      [disabled]="guardando()"
+      (click)="quitarUbicacion()"
+    >
+      <i class="pi pi-times" aria-hidden="true"></i>
+      {{ 'puentes.clearLocation' | transloco }}
+    </button>
+  </div>
+}
+
+     @if (zonaUtm(); as zona) {
+    <p role="status">
+      {{ 'puentes.zone' | transloco }} UTM:
+      <strong>{{ zona }}</strong>
+    </p>
+    }
 
     <div class="form-grid">
       <label class="field">
@@ -257,9 +267,15 @@
       }
 
       <div class="actions">
-        <button pButton type="button" [disabled]="guardando()" (click)="confirmarRegistro()">
+        <button
+          pButton
+          type="button"
+          [disabled]="guardando() || form.invalid || !ubicacionValidada()"
+          (click)="confirmarRegistro()"
+        >
           {{ 'puentes.confirm' | transloco }}
         </button>
+
         <button
           pButton
           type="button"
@@ -276,15 +292,7 @@
       <button
         pButton
         type="submit"
-        [disabled]="
-              form.invalid ||
-              guardando() ||
-              cargandoDepartamentos() ||
-              cargandoMunicipios() ||
-              errorDepartamentos() ||
-              errorMunicipios() ||
-              municipios().length === 0
-            "
+        [disabled]="guardando() || form.invalid || !ubicacionValidada()"
       >
         <i class="pi pi-save" aria-hidden="true"></i>
         {{ (guardando() ? 'puentes.saving' : 'puentes.register') | transloco }}
