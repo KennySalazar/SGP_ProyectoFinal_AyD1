@@ -274,6 +274,35 @@ class PuenteRegistroIntegrationTest {
             municipio));
   }
 
+  @Test
+  void validaUbicacionDentroDeGuatemalaYDelMunicipio() {
+    puenteService.validarDentroDeGuatemala(14.481, -90.615);
+    puenteService.validarUbicacionEnMunicipio(municipioId, 14.481, -90.615);
+  }
+
+  @Test
+  void validacionDirectaRechazaPuntoFueraDeGuatemala() {
+    var excepcion =
+        assertThrows(ApiException.class, () -> puenteService.validarDentroDeGuatemala(0, 0));
+
+    assertEquals(HttpStatus.UNPROCESSABLE_ENTITY, excepcion.getStatus());
+    assertEquals("ubicacion_fuera_de_guatemala", excepcion.getCode());
+  }
+
+  @Test
+  void validacionDirectaRechazaPuntoDeOtroMunicipio() {
+    UUID acatenango =
+        jdbc.queryForObject("SELECT id FROM municipio WHERE codigo_ine = '0411'", UUID.class);
+
+    var excepcion =
+        assertThrows(
+            ApiException.class,
+            () -> puenteService.validarUbicacionEnMunicipio(acatenango, 14.844673, -91.521161));
+
+    assertEquals(HttpStatus.UNPROCESSABLE_ENTITY, excepcion.getStatus());
+    assertEquals("ubicacion_municipio_incongruente", excepcion.getCode());
+  }
+
   @ParameterizedTest
   @ValueSource(booleans = {false, true})
   void rechazaUbicacionExteriorSinConsumirCorrelativo(boolean confirmarCercania) {
