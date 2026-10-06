@@ -1,5 +1,7 @@
 package gt.usac.cunoc.sgp.puente.service;
 
+import gt.usac.cunoc.sgp.common.audit.aspect.Auditable;
+import gt.usac.cunoc.sgp.common.audit.model.AccionAuditoria;
 import gt.usac.cunoc.sgp.common.exception.ApiException;
 import gt.usac.cunoc.sgp.common.util.UuidV7Generator;
 import gt.usac.cunoc.sgp.puente.dto.CrearPuenteRequest;
@@ -61,6 +63,7 @@ public class PuenteService {
 
   @Transactional
   @PreAuthorize("hasRole('ADMINISTRADOR')")
+  @Auditable(accion = AccionAuditoria.CREAR, entidad = "puente")
   public PuenteResponse registrar(CrearPuenteRequest request, UUID administradorId) {
     var errores = validator.validate(request);
     if (!errores.isEmpty()) {

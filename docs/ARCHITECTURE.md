@@ -107,7 +107,10 @@ Responsabilidades:
 - `security/`: autenticación, JWT y configuración transversal de seguridad.
 - `util/`: utilidades realmente compartidas entre varios dominios.
 
-La infraestructura transversal de auditoría deberá permanecer también dentro de `common/` cuando sea implementada.
+La infraestructura transversal de auditoría reside en `common/audit/`. Sus paquetes
+`aspect/`, `controller/`, `dto/`, `entity/`, `mapper/`, `model/`, `repository/` y
+`service/` separan las responsabilidades; cada dominio aporta proyecciones seguras
+de sus entidades.
 
 Las clases y reglas específicas de una funcionalidad deben permanecer dentro de su dominio correspondiente.
 

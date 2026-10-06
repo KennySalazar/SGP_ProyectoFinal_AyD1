@@ -1,5 +1,7 @@
 package gt.usac.cunoc.sgp.usuario.service;
 
+import gt.usac.cunoc.sgp.common.audit.aspect.Auditable;
+import gt.usac.cunoc.sgp.common.audit.model.AccionAuditoria;
 import gt.usac.cunoc.sgp.common.exception.ApiException;
 import gt.usac.cunoc.sgp.common.security.JwtService;
 import gt.usac.cunoc.sgp.common.util.EmailNormalizer;
@@ -61,6 +63,12 @@ public class AuthService {
   }
 
   @Transactional
+  @Auditable(
+      accion = AccionAuditoria.CREAR,
+      entidad = "usuario",
+      tipo = UserAccount.class,
+      emailArgIndex = 0,
+      actorEsEntidad = true)
   public ChallengeResponse register(RegisterRequest request) {
     String email = EmailNormalizer.normalize(request.email());
     if (users.findByEmail(email).isPresent())
@@ -98,6 +106,12 @@ public class AuthService {
   }
 
   @Transactional(noRollbackFor = ApiException.class)
+  @Auditable(
+      accion = AccionAuditoria.CAMBIAR_ESTADO,
+      entidad = "usuario",
+      tipo = UserAccount.class,
+      emailArgIndex = 0,
+      actorEsEntidad = true)
   public MessageResponse verifyRegistration(String rawEmail, UUID challengeId, String code) {
     UserAccount user = requireUser(rawEmail);
     if (user.isVerified())
@@ -172,6 +186,12 @@ public class AuthService {
   }
 
   @Transactional(noRollbackFor = ApiException.class)
+  @Auditable(
+      accion = AccionAuditoria.MODIFICAR,
+      entidad = "usuario",
+      tipo = UserAccount.class,
+      emailArgIndex = 0,
+      actorEsEntidad = true)
   public MessageResponse verifyRecovery(String email, String code, String newPassword) {
     UserAccount user = users.findByEmail(EmailNormalizer.normalize(email)).orElse(null);
     if (user == null || !user.isActive() || !user.isVerified()) throw invalidOtp();
@@ -183,6 +203,11 @@ public class AuthService {
   }
 
   @Transactional
+  @Auditable(
+      accion = AccionAuditoria.MODIFICAR,
+      entidad = "usuario",
+      tipo = UserAccount.class,
+      emailArgIndex = 0)
   public PasswordChangeFlowResult changePassword(String rawEmail, ChangePasswordRequest request) {
 
     UserAccount user = requireUser(rawEmail);
@@ -251,6 +276,11 @@ public class AuthService {
   }
 
   @Transactional(noRollbackFor = ApiException.class)
+  @Auditable(
+      accion = AccionAuditoria.CAMBIAR_ESTADO,
+      entidad = "usuario",
+      tipo = UserAccount.class,
+      emailArgIndex = 0)
   public MessageResponse confirmTwoFactorChange(
       String rawEmail, UUID challengeId, String code, OtpPurpose purpose) {
 

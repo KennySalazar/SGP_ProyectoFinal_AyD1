@@ -50,6 +50,8 @@ class DatabaseMigrationIntegrationTest {
       assertTrue(tableExists(statement, "usuario"));
       assertTrue(tableExists(statement, "rol"));
       assertTrue(tableExists(statement, "auditoria"));
+      assertTrue(columnExists(statement, "auditoria", "proceso_automatico"));
+      assertTrue(indexExists(statement, "idx_auditoria_creado"));
       assertTrue(tableExists(statement, "usuario_profesional"));
       assertTrue(tableExists(statement, "departamento"));
       assertTrue(tableExists(statement, "municipio"));
