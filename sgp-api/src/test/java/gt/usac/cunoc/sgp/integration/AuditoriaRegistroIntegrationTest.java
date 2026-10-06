@@ -13,6 +13,7 @@ import static org.mockito.Mockito.when;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import gt.usac.cunoc.sgp.common.audit.aspect.Auditable;
 import gt.usac.cunoc.sgp.common.audit.aspect.AuditoriaAspect;
+import gt.usac.cunoc.sgp.common.audit.entity.Auditoria;
 import gt.usac.cunoc.sgp.common.audit.mapper.AuditoriaMapperImpl;
 import gt.usac.cunoc.sgp.common.audit.model.AccionAuditoria;
 import gt.usac.cunoc.sgp.common.audit.repository.AuditoriaRepository;
@@ -297,15 +298,35 @@ class AuditoriaRegistroIntegrationTest {
             solicitud(departamentoId, "14.481", "-90.615", false), ADMINISTRADOR_ID);
     SecurityContextHolder.clearContext();
     adminProvisioningService.provisionAdmin("admin.hu006.otro@ejemplo.com", "Auditoria2026");
+    // Y otra acción del mismo administrador fuera del rango consultado
+    auditoriaRepository.save(
+        new Auditoria(
+            UUID.randomUUID(),
+            ADMINISTRADOR_ID,
+            AccionAuditoria.MODIFICAR,
+            "puente",
+            puente.id(),
+            null,
+            null,
+            null,
+            AHORA.minusSeconds(60)));
 
     // Cuando se combinan el usuario y un rango que incluye la fecha de registro
     var pagina =
         auditoriaConsulta.consultar(
-            ADMINISTRADOR_ID, null, null, AHORA.minusSeconds(1), AHORA.plusSeconds(1), 0, 100);
+            null,
+            " ADMIN.HU006@EJEMPLO.COM ",
+            null,
+            null,
+            AHORA.minusSeconds(1),
+            AHORA.plusSeconds(1),
+            0,
+            100);
 
     // Entonces aparece solo su registro y el detalle contiene campos, no JSON crudo
     assertEquals(1, pagina.getTotalElements());
     assertEquals(puente.id(), pagina.getContent().get(0).entidadId());
+    assertEquals("admin.hu006@ejemplo.com", pagina.getContent().get(0).usuarioEmail());
     var detalle = auditoriaConsulta.detalle(pagina.getContent().get(0).id());
     assertTrue(
         detalle.cambios().stream()
@@ -315,6 +336,36 @@ class AuditoriaRegistroIntegrationTest {
             .consultar(
                 ADMINISTRADOR_ID, null, null, AHORA.plusSeconds(1), AHORA.plusSeconds(2), 0, 10)
             .isEmpty());
+  }
+
+  @Test
+  @DisplayName("Escenario: la bitácora pagina registros por fecha descendente en PostgreSQL")
+  void listadoPaginadoOrdenadoPorFecha() {
+    // Dado tres acciones de un usuario en fechas distintas
+    for (int segundo = 0; segundo < 3; segundo++) {
+      auditoriaRepository.save(
+          new Auditoria(
+              UUID.randomUUID(),
+              ADMINISTRADOR_ID,
+              AccionAuditoria.MODIFICAR,
+              "puente",
+              UUID.randomUUID(),
+              null,
+              null,
+              null,
+              AHORA.plusSeconds(segundo)));
+    }
+    // Cuando se consulta la primera página con dos registros
+    var primera = auditoriaConsulta.consultar(null, null, null, null, null, 0, 2);
+    // Entonces se muestran primero los eventos más recientes y el total es tres
+    assertEquals(3, primera.getTotalElements());
+    assertEquals(2, primera.getContent().size());
+    assertEquals(AHORA.plusSeconds(2), primera.getContent().get(0).creadoEn().toInstant());
+    assertEquals(AHORA.plusSeconds(1), primera.getContent().get(1).creadoEn().toInstant());
+    // Y la segunda página contiene el evento restante, sin duplicados
+    var segunda = auditoriaConsulta.consultar(null, null, null, null, null, 1, 2);
+    assertEquals(1, segunda.getContent().size());
+    assertEquals(AHORA, segunda.getContent().getFirst().creadoEn().toInstant());
   }
 
   @Test

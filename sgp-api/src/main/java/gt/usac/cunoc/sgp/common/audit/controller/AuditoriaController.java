@@ -35,11 +35,12 @@ public class AuditoriaController {
       summary = "Consultar la auditoría",
       description =
           "Listado paginado de acciones auditables, ordenado por fecha descendente. "
-              + "Filtros opcionales por usuarioId (UUID), entidad y accion. "
+              + "Filtros opcionales por usuarioId (UUID), usuarioEmail, entidad y accion. "
               + "Fechas desde/hasta con zona horaria ISO-8601. "
               + "Página desde 0, tamaño entre 1 y 100.")
   public Page<AuditoriaResponse> consultar(
       @RequestParam(required = false) UUID usuarioId,
+      @RequestParam(required = false) String usuarioEmail,
       @RequestParam(required = false) String entidad,
       @RequestParam(required = false) String accion,
       @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
@@ -50,6 +51,7 @@ public class AuditoriaController {
       @RequestParam(defaultValue = "20") int tamanio) {
     return consulta.consultar(
         usuarioId,
+        usuarioEmail,
         entidad,
         accion,
         desde == null ? null : desde.toInstant(),

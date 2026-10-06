@@ -14,4 +14,5 @@ public record AuditoriaResponse(
     JsonNode valoresAnteriores,
     JsonNode valoresPosteriores,
     String procesoAutomatico,
-    OffsetDateTime creadoEn) {}
+    OffsetDateTime creadoEn,
+    String usuarioEmail) {}
