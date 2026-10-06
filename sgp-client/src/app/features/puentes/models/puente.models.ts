@@ -43,6 +43,11 @@ export interface CrearPuenteRequest extends PuenteFormValores {
   confirmarCercania: boolean;
 }
 
+export interface ActualizarPuenteRequest extends PuenteFormValores {
+  confirmarCercania: boolean;
+  codigo?: string;
+}
+
 export interface UtmResponse {
   zona: number;
   hemisferio: string;

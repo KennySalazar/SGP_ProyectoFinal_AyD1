@@ -4,6 +4,7 @@ import gt.usac.cunoc.sgp.common.audit.aspect.Auditable;
 import gt.usac.cunoc.sgp.common.audit.model.AccionAuditoria;
 import gt.usac.cunoc.sgp.common.exception.ApiException;
 import gt.usac.cunoc.sgp.common.util.UuidV7Generator;
+import gt.usac.cunoc.sgp.puente.dto.ActualizarPuenteRequest;
 import gt.usac.cunoc.sgp.puente.dto.CrearPuenteRequest;
 import gt.usac.cunoc.sgp.puente.dto.DarBajaPuenteRequest;
 import gt.usac.cunoc.sgp.puente.dto.PuenteCatalogoResponse;
@@ -25,6 +26,7 @@ import java.util.Set;
 import java.util.UUID;
 import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.GeometryFactory;
+import org.locationtech.jts.geom.Point;
 import org.locationtech.jts.geom.PrecisionModel;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -139,6 +141,109 @@ public class PuenteService {
             ahora);
 
     Puente guardado = puentes.saveAndFlush(puente);
+    return mapper.toAltaResponse(guardado, utm);
+  }
+
+  @Transactional(readOnly = true)
+  @PreAuthorize("hasRole('ADMINISTRADOR')")
+  public PuenteResponse obtenerPorId(UUID id) {
+    Puente puente =
+        puentes
+            .findPuenteConRelacionesById(id)
+            .filter(Puente::isActivo)
+            .orElseThrow(
+                () ->
+                    new ApiException(
+                        HttpStatus.NOT_FOUND,
+                        "puente_no_encontrado",
+                        "Puente no encontrado",
+                        "El puente no existe o esta inactivo"));
+
+    double latitud = puente.getUbicacion().getY();
+    double longitud = puente.getUbicacion().getX();
+    var utm = mapper.toCoordenadaUtmResponse(puentes.calcularUtm(latitud, longitud));
+    return mapper.toAltaResponse(puente, utm);
+  }
+
+  @Transactional
+  @PreAuthorize("hasRole('ADMINISTRADOR')")
+  @Auditable(
+      accion = AccionAuditoria.MODIFICAR,
+      entidad = "puente",
+      tipo = Puente.class,
+      idArg = "id")
+  public PuenteResponse actualizar(UUID id, ActualizarPuenteRequest request, UUID administradorId) {
+    var errores = validator.validate(request);
+    if (!errores.isEmpty()) {
+      throw new ConstraintViolationException(errores);
+    }
+
+    Puente puente =
+        puentes
+            .findPuenteConRelacionesById(id)
+            .filter(Puente::isActivo)
+            .orElseThrow(
+                () ->
+                    new ApiException(
+                        HttpStatus.NOT_FOUND,
+                        "puente_no_encontrado",
+                        "Puente no encontrado",
+                        "El puente no existe o esta inactivo"));
+
+    if (request.codigo() != null
+        && !request.codigo().isBlank()
+        && !request.codigo().trim().equals(puente.getCodigo())) {
+      throw validacion(
+          "codigo_inmutable", "El codigo del puente es inmutable y no puede modificarse");
+    }
+
+    double latitud = request.latitud().doubleValue();
+    double longitud = request.longitud().doubleValue();
+
+    validarDentroDeGuatemala(latitud, longitud);
+
+    Departamento departamento =
+        departamentos
+            .findByIdAndActivoTrue(request.departamentoId())
+            .orElseThrow(
+                () ->
+                    validacion(
+                        "departamento_invalido", "El departamento no existe o esta inactivo"));
+
+    Municipio municipio =
+        municipios
+            .findActivoByIdForUpdate(request.municipioId())
+            .orElseThrow(
+                () -> validacion("municipio_invalido", "El municipio no existe o esta inactivo"));
+
+    if (!municipio.getDepartamento().getId().equals(departamento.getId())) {
+      throw validacion(
+          "municipio_departamento_incongruente",
+          "El municipio no pertenece al departamento seleccionado");
+    }
+
+    validarUbicacionEnMunicipio(municipio.getId(), latitud, longitud);
+
+    var cercanos =
+        puentes.findCercanosExcluyendoPuente(latitud, longitud, id, PageRequest.of(0, 100));
+    if (cercanos.hasContent() && !request.confirmarCercania()) {
+      throw new CercaniaPuenteException(cercanos.map(mapper::toPuenteCercanoResponse));
+    }
+
+    Instant ahora = clock.instant();
+    Point nuevaUbicacion = GEOMETRY_FACTORY.createPoint(new Coordinate(longitud, latitud));
+
+    puente.actualizarDatosGenerales(
+        request.nombre().strip(),
+        request.ruta().strip(),
+        request.kilometraje(),
+        municipio,
+        nuevaUbicacion,
+        ahora);
+
+    Puente guardado = puentes.saveAndFlush(puente);
+
+    var utm = mapper.toCoordenadaUtmResponse(puentes.calcularUtm(latitud, longitud));
     return mapper.toAltaResponse(guardado, utm);
   }
 
