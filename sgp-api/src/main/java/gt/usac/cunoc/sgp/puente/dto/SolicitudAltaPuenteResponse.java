@@ -18,4 +18,6 @@ public record SolicitudAltaPuenteResponse(
     EstadoSolicitudAltaPuente estado,
     String motivoDecision,
     OffsetDateTime revisadoEn,
+    UUID puenteCreadoId,
+    String puenteCreadoCodigo,
     OffsetDateTime creadoEn) {}

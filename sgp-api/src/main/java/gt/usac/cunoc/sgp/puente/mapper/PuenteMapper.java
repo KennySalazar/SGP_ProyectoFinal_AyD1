@@ -56,6 +56,14 @@ public interface PuenteMapper {
   @Mapping(target = "departamento", source = "municipio.departamento")
   @Mapping(target = "latitud", expression = "java(solicitud.getUbicacion().getY())")
   @Mapping(target = "longitud", expression = "java(solicitud.getUbicacion().getX())")
+  @Mapping(
+      target = "puenteCreadoId",
+      expression =
+          "java(solicitud.getPuenteCreado() == null ? null : solicitud.getPuenteCreado().getId())")
+  @Mapping(
+      target = "puenteCreadoCodigo",
+      expression =
+          "java(solicitud.getPuenteCreado() == null ? null : solicitud.getPuenteCreado().getCodigo())")
   SolicitudAltaPuenteResponse toSolicitudResponse(SolicitudAltaPuente solicitud);
 
   default OffsetDateTime aHoraGuatemala(Instant instante) {

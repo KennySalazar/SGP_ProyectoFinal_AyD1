@@ -12,8 +12,11 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import gt.usac.cunoc.sgp.common.security.JwtData;
+import gt.usac.cunoc.sgp.puente.dto.AprobarSolicitudAltaPuenteRequest;
 import gt.usac.cunoc.sgp.puente.dto.CrearSolicitudAltaPuenteRequest;
+import gt.usac.cunoc.sgp.puente.dto.RechazarSolicitudAltaPuenteRequest;
 import gt.usac.cunoc.sgp.puente.exception.PuenteExceptionHandler;
+import gt.usac.cunoc.sgp.puente.model.EstadoSolicitudAltaPuente;
 import gt.usac.cunoc.sgp.puente.service.SolicitudAltaPuenteService;
 import gt.usac.cunoc.sgp.usuario.model.RoleName;
 import java.util.List;
@@ -152,6 +155,130 @@ class SolicitudAltaPuenteControllerSecurityTest {
         .andExpect(status().isOk());
 
     verify(service).listarMias(USUARIO_ID, 0, 20);
+  }
+
+  @ParameterizedTest
+  @EnumSource(value = RoleName.class, names = "ADMINISTRADOR", mode = EnumSource.Mode.EXCLUDE)
+  void rechazaLaRevisionARolesDistintosDeAdministrador(RoleName rol) throws Exception {
+    var authentication = autenticar(rol);
+    UUID id = UUID.randomUUID();
+
+    mockMvc
+        .perform(get("/api/v1/solicitudes-puente").principal(authentication))
+        .andExpect(status().isForbidden());
+    mockMvc
+        .perform(get("/api/v1/solicitudes-puente/" + id).principal(authentication))
+        .andExpect(status().isForbidden());
+    mockMvc
+        .perform(
+            post("/api/v1/solicitudes-puente/" + id + "/aprobar")
+                .principal(authentication)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"confirmarCercania\": false}"))
+        .andExpect(status().isForbidden());
+    mockMvc
+        .perform(
+            post("/api/v1/solicitudes-puente/" + id + "/rechazar")
+                .principal(authentication)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"motivo\": \"No procede\"}"))
+        .andExpect(status().isForbidden());
+
+    verifyNoInteractions(service);
+  }
+
+  @Test
+  void permiteAlAdministradorListarConPendientePorDefecto() throws Exception {
+    var authentication = autenticar(RoleName.ADMINISTRADOR);
+    when(service.listarParaRevision(null, 0, 20))
+        .thenReturn(new PageImpl<>(List.of(), PageRequest.of(0, 20), 0));
+
+    mockMvc
+        .perform(get("/api/v1/solicitudes-puente").principal(authentication))
+        .andExpect(status().isOk());
+
+    verify(service).listarParaRevision(null, 0, 20);
+  }
+
+  @Test
+  void permiteFiltrarPorEstadoYRechazaUnEstadoInvalido() throws Exception {
+    var authentication = autenticar(RoleName.ADMINISTRADOR);
+    when(service.listarParaRevision(EstadoSolicitudAltaPuente.RECHAZADA, 1, 5))
+        .thenReturn(new PageImpl<>(List.of(), PageRequest.of(1, 5), 0));
+
+    mockMvc
+        .perform(
+            get("/api/v1/solicitudes-puente")
+                .param("estado", "RECHAZADA")
+                .param("pagina", "1")
+                .param("tamanio", "5")
+                .principal(authentication))
+        .andExpect(status().isOk());
+    mockMvc
+        .perform(
+            get("/api/v1/solicitudes-puente").param("estado", "OTRA").principal(authentication))
+        .andExpect(status().isUnprocessableEntity());
+  }
+
+  @Test
+  void permiteAlAdministradorConsultarElDetalle() throws Exception {
+    var authentication = autenticar(RoleName.ADMINISTRADOR);
+    UUID id = UUID.randomUUID();
+
+    mockMvc
+        .perform(get("/api/v1/solicitudes-puente/" + id).principal(authentication))
+        .andExpect(status().isOk());
+
+    verify(service).obtenerParaRevision(id);
+  }
+
+  @Test
+  void permiteAlAdministradorAprobarYObtieneSuIdDeJwtData() throws Exception {
+    var authentication = autenticar(RoleName.ADMINISTRADOR);
+    UUID id = UUID.randomUUID();
+
+    mockMvc
+        .perform(
+            post("/api/v1/solicitudes-puente/" + id + "/aprobar")
+                .principal(authentication)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"confirmarCercania\": true}"))
+        .andExpect(status().isOk());
+
+    verify(service)
+        .aprobar(eq(id), eq(new AprobarSolicitudAltaPuenteRequest(true)), eq(USUARIO_ID));
+  }
+
+  @Test
+  void permiteAlAdministradorRechazarConMotivo() throws Exception {
+    var authentication = autenticar(RoleName.ADMINISTRADOR);
+    UUID id = UUID.randomUUID();
+
+    mockMvc
+        .perform(
+            post("/api/v1/solicitudes-puente/" + id + "/rechazar")
+                .principal(authentication)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"motivo\": \"Ya existe\"}"))
+        .andExpect(status().isOk());
+
+    verify(service)
+        .rechazar(eq(id), eq(new RechazarSolicitudAltaPuenteRequest("Ya existe")), eq(USUARIO_ID));
+  }
+
+  @Test
+  void rechazarSinMotivoDevuelve422() throws Exception {
+    var authentication = autenticar(RoleName.ADMINISTRADOR);
+
+    mockMvc
+        .perform(
+            post("/api/v1/solicitudes-puente/" + UUID.randomUUID() + "/rechazar")
+                .principal(authentication)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"motivo\": \"   \"}"))
+        .andExpect(status().isUnprocessableEntity());
+
+    verifyNoInteractions(service);
   }
 
   private UsernamePasswordAuthenticationToken autenticar(RoleName rol) {

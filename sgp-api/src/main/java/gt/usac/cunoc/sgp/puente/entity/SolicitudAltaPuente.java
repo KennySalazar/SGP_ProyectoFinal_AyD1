@@ -51,11 +51,18 @@ public class SolicitudAltaPuente {
   @Column(nullable = false, length = 20)
   private EstadoSolicitudAltaPuente estado;
 
+  @Column(name = "revisado_por_id")
+  private UUID revisadoPorId;
+
   @Column(name = "revisado_en")
   private Instant revisadoEn;
 
   @Column(name = "motivo_decision", columnDefinition = "text")
   private String motivoDecision;
+
+  @ManyToOne(fetch = FetchType.LAZY)
+  @JoinColumn(name = "puente_creado_id")
+  private Puente puenteCreado;
 
   @Column(name = "creado_en", nullable = false, updatable = false)
   private Instant creadoEn;
@@ -92,6 +99,22 @@ public class SolicitudAltaPuente {
     this.actualizadoEn = creadoEn;
   }
 
+  public void aprobar(UUID administradorId, Puente puente, Instant ahora) {
+    this.estado = EstadoSolicitudAltaPuente.APROBADA;
+    this.revisadoPorId = administradorId;
+    this.revisadoEn = ahora;
+    this.puenteCreado = puente;
+    this.actualizadoEn = ahora;
+  }
+
+  public void rechazar(UUID administradorId, String motivo, Instant ahora) {
+    this.estado = EstadoSolicitudAltaPuente.RECHAZADA;
+    this.revisadoPorId = administradorId;
+    this.revisadoEn = ahora;
+    this.motivoDecision = motivo;
+    this.actualizadoEn = ahora;
+  }
+
   public UUID getId() {
     return id;
   }
@@ -126,6 +149,14 @@ public class SolicitudAltaPuente {
 
   public EstadoSolicitudAltaPuente getEstado() {
     return estado;
+  }
+
+  public UUID getRevisadoPorId() {
+    return revisadoPorId;
+  }
+
+  public Puente getPuenteCreado() {
+    return puenteCreado;
   }
 
   public Instant getRevisadoEn() {
