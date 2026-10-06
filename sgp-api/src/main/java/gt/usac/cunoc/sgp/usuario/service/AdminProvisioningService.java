@@ -1,5 +1,7 @@
 package gt.usac.cunoc.sgp.usuario.service;
 
+import gt.usac.cunoc.sgp.common.audit.aspect.Auditable;
+import gt.usac.cunoc.sgp.common.audit.model.AccionAuditoria;
 import gt.usac.cunoc.sgp.common.util.EmailNormalizer;
 import gt.usac.cunoc.sgp.usuario.entity.Role;
 import gt.usac.cunoc.sgp.usuario.entity.UserAccount;
@@ -25,6 +27,12 @@ public class AdminProvisioningService {
   }
 
   @Transactional
+  @Auditable(
+      accion = AccionAuditoria.CREAR,
+      entidad = "usuario",
+      proceso = "provision-admin",
+      tipo = UserAccount.class,
+      emailArgIndex = 0)
   public void provisionAdmin(String rawEmail, String initialPassword) {
     if (!PasswordPolicy.isValid(initialPassword))
       throw new IllegalStateException("INITIAL_ADMIN_PASSWORD no cumple la politica de contraseña");
