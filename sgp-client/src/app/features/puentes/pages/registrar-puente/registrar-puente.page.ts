@@ -20,15 +20,7 @@ import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { ButtonModule } from 'primeng/button';
 import { InputTextModule } from 'primeng/inputtext';
 import { SelectModule } from 'primeng/select';
-import {
-  Subject,
-  catchError,
-  finalize,
-  map,
-  of,
-  switchMap,
-  timer,
-} from 'rxjs';
+import { Subject, catchError, finalize, map, of, switchMap, timer } from 'rxjs';
 import { ApiErrorService } from '../../../../core/services/api-error.service';
 import { SelectorUbicacionComponent } from '../../../../shared/components/selector-ubicacion/selector-ubicacion.component';
 import {
@@ -57,19 +49,12 @@ function kilometrajeValido(control: AbstractControl): ValidationErrors | null {
 
   if (value === null || value === '') return null;
 
-  if (
-    typeof value !== 'number' ||
-    !Number.isFinite(value) ||
-    value < 0 ||
-    value > 9999999.999
-  ) {
+  if (typeof value !== 'number' || !Number.isFinite(value) || value < 0 || value > 9999999.999) {
     return { kilometraje: true };
   }
 
   const scaled = value * 1000;
-  return Math.abs(scaled - Math.round(scaled)) < 0.000001
-    ? null
-    : { kilometraje: true };
+  return Math.abs(scaled - Math.round(scaled)) < 0.000001 ? null : { kilometraje: true };
 }
 
 @Component({
@@ -95,8 +80,7 @@ export class RegistrarPuentePage {
   private readonly apiErrors = inject(ApiErrorService);
   private readonly transloco = inject(TranslocoService);
 
-  private readonly consultasUbicacion =
-    new Subject<CoordenadaGeografica | null>();
+  private readonly consultasUbicacion = new Subject<CoordenadaGeografica | null>();
 
   private ultimaCoordenada = '';
   private solicitudPendiente: CrearPuenteRequest | null = null;
@@ -133,22 +117,10 @@ export class RegistrarPuentePage {
   );
 
   readonly form = this.fb.group({
-    nombre: this.fb.nonNullable.control('', [
-      textoObligatorio,
-      Validators.maxLength(200),
-    ]),
-    departamentoId: this.fb.nonNullable.control(
-      { value: '', disabled: true },
-      Validators.required,
-    ),
-    municipioId: this.fb.nonNullable.control(
-      { value: '', disabled: true },
-      Validators.required,
-    ),
-    ruta: this.fb.nonNullable.control('', [
-      textoObligatorio,
-      Validators.maxLength(100),
-    ]),
+    nombre: this.fb.nonNullable.control('', [textoObligatorio, Validators.maxLength(200)]),
+    departamentoId: this.fb.nonNullable.control({ value: '', disabled: true }, Validators.required),
+    municipioId: this.fb.nonNullable.control({ value: '', disabled: true }, Validators.required),
+    ruta: this.fb.nonNullable.control('', [textoObligatorio, Validators.maxLength(100)]),
     kilometraje: this.fb.control<number | null>(null, kilometrajeValido),
     latitud: this.fb.control<number | null>(null, [
       Validators.required,
@@ -170,17 +142,10 @@ export class RegistrarPuentePage {
 
           // Cada nuevo punto cancela la espera y la petición anterior.
           return timer(300).pipe(
-            switchMap(() =>
-              this.api.resolverUbicacion(
-                coordenada.latitud,
-                coordenada.longitud,
-              ),
-            ),
+            switchMap(() => this.api.resolverUbicacion(coordenada.latitud, coordenada.longitud)),
             map((respuesta) => ({ coordenada, respuesta })),
             catchError((error: HttpErrorResponse) => {
-              this.errorUbicacion.set(
-                this.detalleError(error, 'puentes.locationLookupFailed'),
-              );
+              this.errorUbicacion.set(this.detalleError(error, 'puentes.locationLookupFailed'));
               return of(null);
             }),
           );
@@ -201,9 +166,7 @@ export class RegistrarPuentePage {
         }
 
         if (resultado.respuesta.candidatos.length === 0) {
-          this.errorUbicacion.set(
-            this.transloco.translate('puentes.locationWithoutMunicipality'),
-          );
+          this.errorUbicacion.set(this.transloco.translate('puentes.locationWithoutMunicipality'));
           return;
         }
 
@@ -211,10 +174,7 @@ export class RegistrarPuentePage {
 
         const departamentos = this.departamentos();
         if (departamentos.length === 1) {
-          this.form.controls.departamentoId.setValue(
-            departamentos[0].id,
-            { emitEvent: false },
-          );
+          this.form.controls.departamentoId.setValue(departamentos[0].id, { emitEvent: false });
           this.actualizarMunicipios(departamentos[0].id);
         }
 
@@ -228,14 +188,12 @@ export class RegistrarPuentePage {
         this.sincronizarControlesTerritoriales();
       });
 
-    this.form.valueChanges
-      .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe(() => {
-        this.cancelarConfirmacion();
-        this.erroresCampos.set({});
-        this.errorRegistro.set(null);
-        this.consultarSiCambioCoordenada();
-      });
+    this.form.valueChanges.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(() => {
+      this.cancelarConfirmacion();
+      this.erroresCampos.set({});
+      this.errorRegistro.set(null);
+      this.consultarSiCambioCoordenada();
+    });
   }
 
   seleccionarCoordenada(coordenada: CoordenadaGeografica): void {
@@ -318,17 +276,17 @@ export class RegistrarPuentePage {
   }
 
   quitarUbicacion(): void {
-  if (this.guardando() || this.puenteRegistrado()) return;
+    if (this.guardando() || this.puenteRegistrado()) return;
 
-  this.form.patchValue({
-    latitud: null,
-    longitud: null,
-  });
+    this.form.patchValue({
+      latitud: null,
+      longitud: null,
+    });
 
-  this.form.controls.latitud.markAsUntouched();
-  this.form.controls.longitud.markAsUntouched();
-  this.apiErrors.clear();
-}
+    this.form.controls.latitud.markAsUntouched();
+    this.form.controls.longitud.markAsUntouched();
+    this.apiErrors.clear();
+  }
 
   confirmarRegistro(): void {
     const request = this.solicitudPendiente;
@@ -400,17 +358,10 @@ export class RegistrarPuentePage {
     this.territorio.set(null);
     this.municipios.set([]);
     this.errorUbicacion.set(null);
-    this.form.patchValue(
-      { departamentoId: '', municipioId: '' },
-      { emitEvent: false },
-    );
+    this.form.patchValue({ departamentoId: '', municipioId: '' }, { emitEvent: false });
     this.sincronizarControlesTerritoriales();
 
-    if (
-      latitud === null ||
-      longitud === null ||
-      !coordenadaValida(latitud, longitud)
-    ) {
+    if (latitud === null || longitud === null || !coordenadaValida(latitud, longitud)) {
       this.resolviendoUbicacion.set(false);
       this.consultasUbicacion.next(null);
       return;
@@ -426,10 +377,9 @@ export class RegistrarPuentePage {
       .map((candidato) => candidato.municipio);
 
     this.municipios.set(opciones);
-    this.form.controls.municipioId.setValue(
-      opciones.length === 1 ? opciones[0].id : '',
-      { emitEvent: false },
-    );
+    this.form.controls.municipioId.setValue(opciones.length === 1 ? opciones[0].id : '', {
+      emitEvent: false,
+    });
   }
 
   private sincronizarControlesTerritoriales(): void {
@@ -449,16 +399,9 @@ export class RegistrarPuentePage {
     }
   }
 
-  private detalleError(
-    error: HttpErrorResponse,
-    clavePredeterminada: string,
-  ): string {
+  private detalleError(error: HttpErrorResponse, clavePredeterminada: string): string {
     const problem = error.error as PuenteProblemDetails | null;
-    return (
-      problem?.detail ??
-      problem?.title ??
-      this.transloco.translate(clavePredeterminada)
-    );
+    return problem?.detail ?? problem?.title ?? this.transloco.translate(clavePredeterminada);
   }
 
   private enviar(request: CrearPuenteRequest): void {
@@ -518,20 +461,13 @@ export class RegistrarPuentePage {
           ) {
             this.territorio.set(null);
             this.municipios.set([]);
-            this.form.patchValue(
-              { departamentoId: '', municipioId: '' },
-              { emitEvent: false },
-            );
-            this.errorUbicacion.set(
-              this.detalleError(error, 'puentes.locationLookupFailed'),
-            );
+            this.form.patchValue({ departamentoId: '', municipioId: '' }, { emitEvent: false });
+            this.errorUbicacion.set(this.detalleError(error, 'puentes.locationLookupFailed'));
             this.sincronizarControlesTerritoriales();
           }
 
           this.erroresCampos.set(campos);
-          this.errorRegistro.set(
-            this.detalleError(error, 'puentes.saveFailed'),
-          );
+          this.errorRegistro.set(this.detalleError(error, 'puentes.saveFailed'));
         },
       });
   }

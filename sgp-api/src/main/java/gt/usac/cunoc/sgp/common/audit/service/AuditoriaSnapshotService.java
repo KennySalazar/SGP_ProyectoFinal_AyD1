@@ -9,9 +9,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/**
- * Construye los JSON de valores anteriores y posteriores de la auditoria.
- */
+/** Construye los JSON de valores anteriores y posteriores de la auditoria. */
 @Service
 public class AuditoriaSnapshotService {
 

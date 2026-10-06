@@ -181,25 +181,20 @@
       (coordenadaSeleccionada)="seleccionarCoordenada($event)"
     />
 
-    @if (
-  form.controls.latitud.value !== null ||
-  form.controls.longitud.value !== null
-) {
-  <div class="actions">
-    <button
-      pButton
-      type="button"
-      severity="secondary"
-      [disabled]="guardando()"
-      (click)="quitarUbicacion()"
-    >
-      <i class="pi pi-times" aria-hidden="true"></i>
-      {{ 'puentes.clearLocation' | transloco }}
-    </button>
-  </div>
-}
-
-     @if (zonaUtm(); as zona) {
+    @if ( form.controls.latitud.value !== null || form.controls.longitud.value !== null ) {
+    <div class="actions">
+      <button
+        pButton
+        type="button"
+        severity="secondary"
+        [disabled]="guardando()"
+        (click)="quitarUbicacion()"
+      >
+        <i class="pi pi-times" aria-hidden="true"></i>
+        {{ 'puentes.clearLocation' | transloco }}
+      </button>
+    </div>
+    } @if (zonaUtm(); as zona) {
     <p role="status">
       {{ 'puentes.zone' | transloco }} UTM:
       <strong>{{ zona }}</strong>

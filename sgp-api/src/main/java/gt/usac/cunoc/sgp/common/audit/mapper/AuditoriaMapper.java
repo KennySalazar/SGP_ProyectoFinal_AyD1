@@ -13,5 +13,5 @@ public interface AuditoriaMapper {
       target = "creadoEn",
       expression =
           "java(auditoria.getCreadoEn().atZone(java.time.ZoneId.of(\"America/Guatemala\")).toOffsetDateTime())")
-    AuditoriaResponse toResponse(Auditoria auditoria);
+  AuditoriaResponse toResponse(Auditoria auditoria);
 }

@@ -1,8 +1,5 @@
 import { provideHttpClient } from '@angular/common/http';
-import {
-  HttpTestingController,
-  provideHttpClientTesting,
-} from '@angular/common/http/testing';
+import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 import { TranslocoService } from '@jsverse/transloco';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -27,10 +24,7 @@ describe('RegistrarPuentePage: HU009', () => {
     nombre: 'Amatitlán',
   };
 
-  function territorio(
-    latitud = 14.481,
-    longitud = -90.615,
-  ): UbicacionTerritorialResponse {
+  function territorio(latitud = 14.481, longitud = -90.615): UbicacionTerritorialResponse {
     return {
       latitud,
       longitud,
@@ -40,9 +34,7 @@ describe('RegistrarPuentePage: HU009', () => {
     };
   }
 
-  function resolverPunto(
-    respuesta: UbicacionTerritorialResponse = territorio(),
-  ): void {
+  function resolverPunto(respuesta: UbicacionTerritorialResponse = territorio()): void {
     page.seleccionarCoordenada({
       latitud: respuesta.latitud,
       longitud: respuesta.longitud,
@@ -50,17 +42,11 @@ describe('RegistrarPuentePage: HU009', () => {
 
     vi.advanceTimersByTime(300);
 
-    const request = http.expectOne(
-      (req) => req.url === '/api/v1/catalogos/ubicacion',
-    );
+    const request = http.expectOne((req) => req.url === '/api/v1/catalogos/ubicacion');
 
     expect(request.request.method).toBe('GET');
-    expect(request.request.params.get('latitud')).toBe(
-      String(respuesta.latitud),
-    );
-    expect(request.request.params.get('longitud')).toBe(
-      String(respuesta.longitud),
-    );
+    expect(request.request.params.get('latitud')).toBe(String(respuesta.latitud));
+    expect(request.request.params.get('longitud')).toBe(String(respuesta.longitud));
 
     request.flush(respuesta);
   }
@@ -242,9 +228,7 @@ describe('RegistrarPuentePage: HU009', () => {
     http.expectNone((req) => req.url === '/api/v1/catalogos/ubicacion');
 
     vi.advanceTimersByTime(1);
-    http
-      .expectOne((req) => req.url === '/api/v1/catalogos/ubicacion')
-      .flush(territorio());
+    http.expectOne((req) => req.url === '/api/v1/catalogos/ubicacion').flush(territorio());
 
     expect(page.ubicacionValidada()).toBe(true);
   });
@@ -256,9 +240,7 @@ describe('RegistrarPuentePage: HU009', () => {
     page.seleccionarCoordenada({ latitud: 14.482, longitud: -90.616 });
     vi.advanceTimersByTime(300);
 
-    const request = http.expectOne(
-      (req) => req.url === '/api/v1/catalogos/ubicacion',
-    );
+    const request = http.expectOne((req) => req.url === '/api/v1/catalogos/ubicacion');
 
     expect(request.request.params.get('latitud')).toBe('14.482');
     expect(request.request.params.get('longitud')).toBe('-90.616');
@@ -273,9 +255,7 @@ describe('RegistrarPuentePage: HU009', () => {
     page.seleccionarCoordenada({ latitud: 14.481, longitud: -90.615 });
     vi.advanceTimersByTime(300);
 
-    const anterior = http.expectOne(
-      (req) => req.url === '/api/v1/catalogos/ubicacion',
-    );
+    const anterior = http.expectOne((req) => req.url === '/api/v1/catalogos/ubicacion');
 
     page.seleccionarCoordenada({ latitud: 14.482, longitud: -90.616 });
 
@@ -294,9 +274,7 @@ describe('RegistrarPuentePage: HU009', () => {
     page.form.patchValue({ latitud: 14.481, longitud: -90.615 });
     vi.advanceTimersByTime(300);
 
-    http
-      .expectOne((req) => req.url === '/api/v1/catalogos/ubicacion')
-      .flush(territorio());
+    http.expectOne((req) => req.url === '/api/v1/catalogos/ubicacion').flush(territorio());
 
     expect(page.ubicacionValidada()).toBe(true);
   });
@@ -348,9 +326,7 @@ describe('RegistrarPuentePage: HU009', () => {
 
     page.registrar();
 
-    expect(page.errorUbicacion()).toBe(
-      'Las coordenadas deben estar dentro de Guatemala.',
-    );
+    expect(page.errorUbicacion()).toBe('Las coordenadas deben estar dentro de Guatemala.');
     expect(page.resolviendoUbicacion()).toBe(false);
     expect(page.ubicacionValidada()).toBe(false);
     http.expectNone('/api/v1/puentes');
@@ -372,10 +348,7 @@ describe('RegistrarPuentePage: HU009', () => {
 
     http
       .expectOne((req) => req.url === '/api/v1/catalogos/ubicacion')
-      .flush(
-        { detail: 'Error temporal.' },
-        { status: 503, statusText: 'Service Unavailable' },
-      );
+      .flush({ detail: 'Error temporal.' }, { status: 503, statusText: 'Service Unavailable' });
 
     expect(page.errorUbicacion()).toBe('Error temporal.');
 
@@ -386,9 +359,7 @@ describe('RegistrarPuentePage: HU009', () => {
 
     vi.advanceTimersByTime(300);
 
-    http
-      .expectOne((req) => req.url === '/api/v1/catalogos/ubicacion')
-      .flush(territorio());
+    http.expectOne((req) => req.url === '/api/v1/catalogos/ubicacion').flush(territorio());
 
     expect(page.ubicacionValidada()).toBe(true);
   });
@@ -491,9 +462,7 @@ describe('RegistrarPuentePage: HU009', () => {
     http.expectOne('/api/v1/puentes').flush(
       {
         detail: 'Revisa los campos indicados.',
-        errores: [
-          { campo: 'ruta', mensaje: 'La ruta indicada no es válida.' },
-        ],
+        errores: [{ campo: 'ruta', mensaje: 'La ruta indicada no es válida.' }],
       },
       { status: 422, statusText: 'Unprocessable Entity' },
     );
@@ -557,9 +526,7 @@ describe('RegistrarPuentePage: HU009', () => {
     page.seleccionarCoordenada({ latitud: 14.481, longitud: -90.615 });
     vi.advanceTimersByTime(300);
 
-    const request = http.expectOne(
-      (req) => req.url === '/api/v1/catalogos/ubicacion',
-    );
+    const request = http.expectOne((req) => req.url === '/api/v1/catalogos/ubicacion');
 
     page.quitarUbicacion();
 
@@ -580,10 +547,9 @@ describe('RegistrarPuentePage: HU009', () => {
     expect(page.form.getRawValue().latitud).toBe(14.481);
     expect(page.form.getRawValue().longitud).toBe(-90.615);
 
-    http.expectOne('/api/v1/puentes').flush(
-      { detail: 'Error temporal.' },
-      { status: 503, statusText: 'Service Unavailable' },
-    );
+    http
+      .expectOne('/api/v1/puentes')
+      .flush({ detail: 'Error temporal.' }, { status: 503, statusText: 'Service Unavailable' });
 
     expect(page.guardando()).toBe(false);
   });
@@ -592,10 +558,12 @@ describe('RegistrarPuentePage: HU009', () => {
     formularioValido();
     page.registrar();
 
-    http.expectOne('/api/v1/puentes').flush(
-      { id: 'puente-nuevo', codigo: 'GT-01-0114-0001' },
-      { status: 201, statusText: 'Created' },
-    );
+    http
+      .expectOne('/api/v1/puentes')
+      .flush(
+        { id: 'puente-nuevo', codigo: 'GT-01-0114-0001' },
+        { status: 201, statusText: 'Created' },
+      );
 
     page.registrarOtro();
 
