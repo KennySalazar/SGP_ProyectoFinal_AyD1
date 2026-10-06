@@ -42,6 +42,26 @@
         </button>
       </div>
 
+      @if (accionExitosa() === 'baja') {
+      <div class="aviso-exito" role="status">
+        <i class="pi pi-check-circle" aria-hidden="true"></i>
+        <span>{{ 'puentes.baja.success' | transloco: { nombre: nombrePuenteAccion() } }}</span>
+      </div>
+      } @if (accionExitosa() === 'reactivar') {
+      <div class="aviso-exito" role="status">
+        <i class="pi pi-check-circle" aria-hidden="true"></i>
+        <span>{{ 'puentes.reactivar.success' | transloco: { nombre: nombrePuenteAccion() } }}</span>
+      </div>
+      } @if (errorAccion(); as err) {
+      <div class="aviso-error" role="alert">
+        <i class="pi pi-exclamation-circle" aria-hidden="true"></i>
+        <span
+          >{{ (err === 'baja' ? 'puentes.baja.failed' : 'puentes.reactivar.failed') | transloco
+          }}</span
+        >
+      </div>
+      }
+
       <form class="filtros" [formGroup]="filtros" (ngSubmit)="aplicarFiltros()">
         <label for="catalogo-departamento">
           <span>{{ 'puentes.department' | transloco }}</span>
@@ -78,6 +98,28 @@
             >
           </p-select>
         </label>
+        @if (auth.user()?.role === 'ADMINISTRADOR') {
+        <label for="catalogo-actividad">
+          <span>{{ 'puentes.catalogo.filterActivity' | transloco }}</span>
+          <p-select
+            inputId="catalogo-actividad"
+            [formControl]="filtroActividad"
+            [options]="opcionesActividad"
+            optionLabel="etiqueta"
+            optionValue="valor"
+            appendTo="body"
+            [panelStyle]="estiloPanelSelector"
+          >
+            <ng-template #selectedItem let-opcion>
+              {{ opcion?.etiqueta ? (opcion.etiqueta | transloco) :
+              ('puentes.catalogo.filterActiveOnly' | transloco) }}
+            </ng-template>
+            <ng-template #item let-opcion>
+              <span class="opcion-catalogo">{{ opcion.etiqueta | transloco }}</span>
+            </ng-template>
+          </p-select>
+        </label>
+        }
         <div class="filtros-acciones">
           <button pButton class="accion-primaria" type="submit" [disabled]="cargando()">
             <i class="pi pi-filter" aria-hidden="true"></i>
@@ -158,6 +200,11 @@
                 <th scope="col" class="col-ubicacion">{{ 'puentes.department' | transloco }}</th>
                 <th scope="col" class="col-ubicacion">{{ 'puentes.municipality' | transloco }}</th>
                 <th scope="col" class="col-estado">{{ 'puentes.state' | transloco }}</th>
+                @if (auth.user()?.role === 'ADMINISTRADOR') {
+                <th scope="col" class="col-acciones">
+                  {{ 'puentes.catalogo.actions' | transloco }}
+                </th>
+                }
               </tr>
             </ng-template>
             <ng-template #body let-puente let-indice="rowIndex">
@@ -180,16 +227,47 @@
                 <td>
                   <p-tag
                     class="estado-puente"
-                    [attr.data-estado]="puente.estadoActual"
-                    [value]="puente.estadoActual"
-                    [severity]="severidad(puente.estadoActual)"
+                    [attr.data-estado]="puente.activo ? puente.estadoActual : 'Inactivo'"
+                    [value]="puente.activo ? puente.estadoActual : ('puentes.catalogo.inactiveStatus' | transloco)"
+                    [severity]="puente.activo ? severidad(puente.estadoActual) : 'danger'"
                   />
                 </td>
+                @if (auth.user()?.role === 'ADMINISTRADOR') {
+                <td class="col-acciones">
+                  @if (puente.activo) {
+                  <button
+                    pButton
+                    type="button"
+                    severity="danger"
+                    [outlined]="true"
+                    class="btn-accion-tabla"
+                    (click)="abrirModalBaja(puente, $event)"
+                    [attr.aria-label]="'puentes.catalogo.deactivate' | transloco"
+                  >
+                    <i class="pi pi-ban" aria-hidden="true"></i>
+                    <span>{{ 'puentes.catalogo.deactivate' | transloco }}</span>
+                  </button>
+                  } @else {
+                  <button
+                    pButton
+                    type="button"
+                    severity="success"
+                    [outlined]="true"
+                    class="btn-accion-tabla"
+                    (click)="abrirModalReactivar(puente, $event)"
+                    [attr.aria-label]="'puentes.catalogo.reactivate' | transloco"
+                  >
+                    <i class="pi pi-refresh" aria-hidden="true"></i>
+                    <span>{{ 'puentes.catalogo.reactivate' | transloco }}</span>
+                  </button>
+                  }
+                </td>
+                }
               </tr>
             </ng-template>
             <ng-template #emptymessage>
               <tr>
-                <td colspan="5">
+                <td [attr.colspan]="auth.user()?.role === 'ADMINISTRADOR' ? 6 : 5">
                   <div class="sin-resultados">
                     <i class="pi pi-search" aria-hidden="true"></i>
                     <p role="status">
@@ -250,5 +328,108 @@
         }
       </section>
     </section>
+
+    <!-- Modal para dar de baja un puente -->
+    <p-dialog
+      [visible]="mostrarModalBaja()"
+      (visibleChange)="!$event && cerrarModalBaja()"
+      [modal]="true"
+      appendTo="body"
+      [header]="'puentes.baja.title' | transloco"
+      [style]="{ width: '90%', maxWidth: '520px' }"
+      [draggable]="false"
+      [resizable]="false"
+    >
+      <div class="dialog-contenido">
+        @if (puenteParaAccion(); as puente) {
+        <p class="dialog-aviso">
+          {{ 'puentes.baja.bridgePrompt' | transloco: { nombre: puente.nombre, codigo: puente.codigo
+          } }}
+        </p>
+        <p class="dialog-advertencia">
+          <i class="pi pi-info-circle" aria-hidden="true"></i>
+          {{ 'puentes.baja.warning' | transloco }}
+        </p>
+        <form [formGroup]="formBaja" (ngSubmit)="confirmarBaja()">
+          <label for="motivo-baja" class="dialog-label">
+            <span>{{ 'puentes.baja.reasonLabel' | transloco }} *</span>
+            <textarea
+              id="motivo-baja"
+              pTextarea
+              formControlName="motivo"
+              rows="4"
+              maxlength="1000"
+              class="dialog-textarea"
+              [placeholder]="'puentes.baja.reasonPlaceholder' | transloco"
+            ></textarea>
+          </label>
+          <div class="dialog-acciones">
+            <button
+              pButton
+              type="button"
+              severity="secondary"
+              [outlined]="true"
+              (click)="cerrarModalBaja()"
+              [disabled]="procesandoAccion()"
+            >
+              {{ 'puentes.baja.cancel' | transloco }}
+            </button>
+            <button
+              pButton
+              type="submit"
+              severity="danger"
+              [disabled]="formBaja.invalid || procesandoAccion()"
+              [loading]="procesandoAccion()"
+            >
+              {{ 'puentes.baja.confirm' | transloco }}
+            </button>
+          </div>
+        </form>
+        }
+      </div>
+    </p-dialog>
+
+    <!-- Modal para reactivar un puente -->
+    <p-dialog
+      [visible]="mostrarModalReactivar()"
+      (visibleChange)="!$event && cerrarModalReactivar()"
+      [modal]="true"
+      appendTo="body"
+      [header]="'puentes.reactivar.title' | transloco"
+      [style]="{ width: '90%', maxWidth: '500px' }"
+      [draggable]="false"
+      [resizable]="false"
+    >
+      <div class="dialog-contenido">
+        @if (puenteParaAccion(); as puente) {
+        <p class="dialog-aviso">
+          {{ 'puentes.reactivar.prompt' | transloco: { nombre: puente.nombre, codigo: puente.codigo
+          } }}
+        </p>
+        <div class="dialog-acciones">
+          <button
+            pButton
+            type="button"
+            severity="secondary"
+            [outlined]="true"
+            (click)="cerrarModalReactivar()"
+            [disabled]="procesandoAccion()"
+          >
+            {{ 'puentes.reactivar.cancel' | transloco }}
+          </button>
+          <button
+            pButton
+            type="button"
+            severity="success"
+            (click)="confirmarReactivar()"
+            [disabled]="procesandoAccion()"
+            [loading]="procesandoAccion()"
+          >
+            {{ 'puentes.reactivar.confirm' | transloco }}
+          </button>
+        </div>
+        }
+      </div>
+    </p-dialog>
   </div>
 </ng-template>

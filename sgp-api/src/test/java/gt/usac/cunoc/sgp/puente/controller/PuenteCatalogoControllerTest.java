@@ -132,4 +132,22 @@ class PuenteCatalogoControllerTest {
         .andExpect(status().isUnprocessableEntity())
         .andExpect(jsonPath("$.code").value("validation_error"));
   }
+
+  @Test
+  @WithMockUser(roles = "ADMINISTRADOR")
+  void administradorPuedeConsultarPuentesInactivos() throws Exception {
+    when(service.listarCatalogo(null, null, false, 0, 20))
+        .thenReturn(new PageImpl<>(List.of(), PageRequest.of(0, 20), 0));
+
+    mvc.perform(get("/api/v1/puentes").param("activo", "false")).andExpect(status().isOk());
+  }
+
+  @Test
+  @WithMockUser(roles = "ADMINISTRADOR")
+  void administradorPuedeConsultarTodosLosPuentes() throws Exception {
+    when(service.listarCatalogo(null, null, null, 0, 20))
+        .thenReturn(new PageImpl<>(List.of(), PageRequest.of(0, 20), 0));
+
+    mvc.perform(get("/api/v1/puentes").param("todos", "true")).andExpect(status().isOk());
+  }
 }
