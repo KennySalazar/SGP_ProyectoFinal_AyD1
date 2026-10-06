@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import gt.usac.cunoc.sgp.common.exception.ApiException;
@@ -107,14 +108,15 @@ class CursoServiceTest {
   }
 
   @Test
-  void actualizaCursoSinCambiarSuIdentificador() {
+  void actualizaCursoUsandoNuevaAsignaturaSinMutarLaOriginal() {
     UUID id = UUID.randomUUID();
-    Asignatura asignatura = mock(Asignatura.class);
+    Asignatura asignaturaOriginal = mock(Asignatura.class);
+    Asignatura nuevaAsignatura = mock(Asignatura.class);
     UserAccount catedratico = mock(UserAccount.class);
     Role role = mock(Role.class);
     Curso curso =
         new Curso(
-            asignatura,
+            asignaturaOriginal,
             "2026-1",
             null,
             LocalDate.of(2026, 1, 1),
@@ -131,6 +133,8 @@ class CursoServiceTest {
     when(cursos.existsByAsignatura_NombreIgnoreCaseAndPeriodoAndIdNot(
             "Diseno de Sistemas", "2026-2", id))
         .thenReturn(false);
+    when(asignaturas.findByNombreIgnoreCase("Diseno de Sistemas"))
+        .thenReturn(Optional.of(nuevaAsignatura));
     when(usuarios.findWithRoleById(request.catedraticoId())).thenReturn(Optional.of(catedratico));
     when(catedratico.isActive()).thenReturn(true);
     when(catedratico.getRole()).thenReturn(role);
@@ -140,7 +144,49 @@ class CursoServiceTest {
 
     assertThat(curso.getPeriodo()).isEqualTo("2026-2");
     assertThat(curso.getCatedratico()).isSameAs(catedratico);
-    verify(asignatura).renombrar("Diseno de Sistemas", Instant.parse("2026-10-06T00:00:00Z"));
+    assertThat(curso.getAsignatura()).isSameAs(nuevaAsignatura);
+    verifyNoInteractions(asignaturaOriginal);
+  }
+
+  @Test
+  void creaYAsociaAsignaturaSolicitadaAlActualizarSinMutarLaOriginal() {
+    UUID id = UUID.randomUUID();
+    Asignatura asignaturaOriginal = mock(Asignatura.class);
+    UserAccount catedratico = mock(UserAccount.class);
+    Role role = mock(Role.class);
+    Curso curso =
+        new Curso(
+            asignaturaOriginal,
+            "2026-1",
+            null,
+            LocalDate.of(2026, 1, 1),
+            LocalDate.of(2026, 5, 1),
+            Instant.parse("2026-01-01T00:00:00Z"));
+    ActualizarCursoRequest request =
+        new ActualizarCursoRequest(
+            "Arquitectura de Sistemas",
+            "2026-2",
+            UUID.randomUUID(),
+            LocalDate.of(2026, 7, 1),
+            LocalDate.of(2026, 11, 1));
+    when(cursos.findById(id)).thenReturn(Optional.of(curso));
+    when(cursos.existsByAsignatura_NombreIgnoreCaseAndPeriodoAndIdNot(
+            "Arquitectura de Sistemas", "2026-2", id))
+        .thenReturn(false);
+    when(asignaturas.findByNombreIgnoreCase("Arquitectura de Sistemas"))
+        .thenReturn(Optional.empty());
+    when(asignaturas.save(any(Asignatura.class))).thenAnswer(invocation -> invocation.getArgument(0));
+    when(usuarios.findWithRoleById(request.catedraticoId())).thenReturn(Optional.of(catedratico));
+    when(catedratico.isActive()).thenReturn(true);
+    when(catedratico.getRole()).thenReturn(role);
+    when(role.getName()).thenReturn(RoleName.CATEDRATICO);
+
+    service.actualizar(id, request);
+
+    assertThat(curso.getAsignatura()).isNotSameAs(asignaturaOriginal);
+    assertThat(curso.getAsignatura().getNombre()).isEqualTo("Arquitectura de Sistemas");
+    verify(asignaturas).save(any(Asignatura.class));
+    verifyNoInteractions(asignaturaOriginal);
   }
 
   @Test

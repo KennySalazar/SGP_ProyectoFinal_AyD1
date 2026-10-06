@@ -103,8 +103,15 @@ public class CursoService {
     }
 
     Instant ahora = clock.instant();
-    curso.getAsignatura().renombrar(nombre, ahora);
+    Asignatura asignatura =
+        asignaturas
+            .findByNombreIgnoreCase(nombre)
+            .orElseGet(
+                () ->
+                    asignaturas.save(
+                        new Asignatura("ASIG-" + UUID.randomUUID().toString().replace("-", ""), nombre, ahora)));
     curso.actualizar(
+        asignatura,
         periodo,
         buscarCatedratico(request.catedraticoId()),
         request.fechaInicio(),

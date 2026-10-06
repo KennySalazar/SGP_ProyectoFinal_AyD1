@@ -74,11 +74,13 @@ public class Curso {
   }
 
   public void actualizar(
+      Asignatura asignatura,
       String periodo,
       UserAccount catedratico,
       LocalDate fechaInicio,
       LocalDate fechaFin,
       Instant ahora) {
+    this.asignatura = asignatura;
     this.periodo = periodo;
     this.catedratico = catedratico;
     this.fechaInicio = fechaInicio;
