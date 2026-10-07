@@ -50,6 +50,13 @@ export const puentesRoutes: Routes = [
       import('../../layouts/app-shell/app-shell.component').then((m) => m.AppShellComponent),
     children: [
       {
+        path: 'asignaciones',
+        loadComponent: () =>
+          import('./pages/asignaciones-puentes/asignaciones-puentes.page').then(
+            (m) => m.AsignacionesPuentesPage,
+          ),
+      },
+      {
         path: 'solicitudes',
         loadComponent: () =>
           import('./pages/mis-solicitudes/mis-solicitudes.page').then((m) => m.MisSolicitudesPage),
@@ -66,6 +73,21 @@ export const puentesRoutes: Routes = [
         loadComponent: () =>
           import('./pages/detalle-solicitud/detalle-solicitud.page').then(
             (m) => m.DetalleSolicitudPage,
+          ),
+      },
+    ],
+  },
+  {
+    path: '',
+    canActivate: [authGuard, roleGuard('ESTUDIANTE')],
+    loadComponent: () =>
+      import('../../layouts/app-shell/app-shell.component').then((m) => m.AppShellComponent),
+    children: [
+      {
+        path: 'mis-asignaciones',
+        loadComponent: () =>
+          import('./pages/mis-puentes-asignados/mis-puentes-asignados.page').then(
+            (m) => m.MisPuentesAsignadosPage,
           ),
       },
     ],

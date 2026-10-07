@@ -4,12 +4,15 @@ import { Observable, forkJoin, map, of, switchMap } from 'rxjs';
 import { PuntoMapa } from '../../../shared/utils/ubicacion-guatemala';
 import {
   ActualizarPuenteRequest,
+  AsignacionPuenteResponse,
   CrearPuenteRequest,
   ConsultaCatalogoPuentes,
   DepartamentoResponse,
+  EstudianteAsignableResponse,
   MunicipioResponse,
   PaginaResponse,
   PuenteCatalogoResponse,
+  PuenteAsignableResponse,
   PuenteResponse,
   UbicacionTerritorialResponse,
 } from '../models/puente.models';
@@ -118,5 +121,35 @@ export class PuenteApiService {
 
   actualizar(id: string, request: ActualizarPuenteRequest): Observable<PuenteResponse> {
     return this.http.put<PuenteResponse>(`/api/v1/puentes/${encodeURIComponent(id)}`, request);
+  }
+
+  listarEstudiantesAsignables(): Observable<EstudianteAsignableResponse[]> {
+    return this.http.get<EstudianteAsignableResponse[]>('/api/v1/asignaciones-puentes/estudiantes');
+  }
+
+  listarPuentesAsignables(): Observable<PuenteAsignableResponse[]> {
+    return this.http.get<PuenteAsignableResponse[]>('/api/v1/asignaciones-puentes/puentes');
+  }
+
+  listarAsignaciones(): Observable<AsignacionPuenteResponse[]> {
+    return this.http.get<AsignacionPuenteResponse[]>('/api/v1/asignaciones-puentes');
+  }
+
+  asignarPuente(request: {
+    cursoEstudianteId: string;
+    puenteId: string;
+  }): Observable<{ message: string }> {
+    return this.http.post<{ message: string }>('/api/v1/asignaciones-puentes', request);
+  }
+
+  revocarAsignacion(asignacionId: string, motivo: string): Observable<{ message: string }> {
+    return this.http.patch<{ message: string }>(
+      `/api/v1/asignaciones-puentes/${encodeURIComponent(asignacionId)}/revocar`,
+      { motivo },
+    );
+  }
+
+  listarMisPuentesAsignados(): Observable<AsignacionPuenteResponse[]> {
+    return this.http.get<AsignacionPuenteResponse[]>('/api/v1/asignaciones-puentes/mis-puentes');
   }
 }

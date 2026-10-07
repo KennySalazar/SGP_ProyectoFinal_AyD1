@@ -25,7 +25,12 @@
     "bridgeCatalog": "Catálogo de puentes",
     "offline": "Offline",
     "security": "Seguridad",
+    "administration": "Administracion",
+    "pendingStudents": "Activar estudiantes",
+    "bridgeAssignments": "Asignar puentes",
+    "myAssignedBridges": "Mis puentes asignados",
     "users": "Usuarios",
+
     "logout": "Cerrar sesion"
   },
   "connectivity": {
@@ -183,6 +188,63 @@
     "controls": "Controles de diagnostico",
     "basePrepared": "Base preparada"
   },
+  "studentActivation": {
+    "kicker": "GESTION ACADÉMICA",
+    "title": "Activar estudiantes",
+    "description": "Vincula estudiantes con correo verificado a uno de tus cursos vigentes.",
+    "formTitle": "Activación y vinculación",
+    "formNote": "Selecciona un estudiante pendiente, el curso vigente y su sección.",
+    "student": "Estudiante pendiente",
+    "course": "Curso vigente",
+    "section": "Sección",
+    "selectStudent": "Selecciona un estudiante",
+    "selectCourse": "Selecciona un curso",
+    "activate": "Activar y vincular",
+    "activating": "Activando...",
+    "refresh": "Actualizar",
+    "loading": "Cargando estudiantes pendientes...",
+    "empty": "No hay estudiantes pendientes de activación.",
+    "noCourses": "No tienes cursos vigentes disponibles para vincular estudiantes."
+  },
+
+  "bridgeAssignments": {
+    "kicker": "GESTION ACADÉMICA",
+    "title": "Asignar puentes",
+    "description": "Asigna puentes activos a estudiantes activos vinculados a tus cursos vigentes.",
+    "formTitle": "Nueva asignación",
+    "formNote": "Selecciona un estudiante de uno de tus cursos vigentes y un puente activo.",
+    "student": "Estudiante y curso",
+    "bridge": "Puente activo",
+    "selectStudent": "Selecciona un estudiante",
+    "selectBridge": "Selecciona un puente",
+    "assign": "Asignar puente",
+    "assigning": "Asignando...",
+    "refresh": "Actualizar",
+    "loading": "Cargando asignaciones...",
+    "noStudents": "No hay estudiantes activos vinculados a tus cursos vigentes.",
+    "noBridges": "No hay puentes activos disponibles para asignar.",
+    "activeTitle": "Asignaciones activas",
+    "activeNote": "Las asignaciones revocadas dejan de estar disponibles para el estudiante.",
+    "empty": "No hay asignaciones activas.",
+    "revoke": "Revocar",
+    "revokeTitle": "Revocar asignación",
+    "reason": "Motivo de revocación",
+    "confirmRevoke": "Confirmar revocación",
+    "revoking": "Revocando...",
+    "cancel": "Cancelar"
+  },
+
+  "myAssignedBridges": {
+    "kicker": "TRABAJO ACADÉMICO",
+    "title": "Mis puentes asignados",
+    "description": "Consulta los puentes activos que tienes asignados en tus cursos vigentes.",
+    "listTitle": "Puentes disponibles",
+    "listNote": "Solo se muestran asignaciones que no han sido revocadas.",
+    "refresh": "Actualizar",
+    "loading": "Cargando puentes asignados...",
+    "empty": "No tienes puentes asignados actualmente."
+  },
+
   "puentes": {
     "revision": {
       "title": "Revisión de solicitudes de alta",
@@ -504,7 +566,44 @@
     }
   },
   "admin": {
-    "kicker": "CONFIGURACION DEL SISTEMA"
+    "kicker": "CONFIGURACION DEL SISTEMA",
+    "title": "Administracion",
+    "description": "Espacio reservado para la gestion administrativa y tecnica requerida por el proyecto.",
+    "usersRoles": "Usuarios y roles",
+    "usersRolesNote": "Invitaciones, activacion y baja logica.",
+    "formVersions": "Versiones de formulario",
+    "formVersionsNote": "JSON Schema, publicacion y mapeo historico.",
+    "indexWeights": "Pesos del indice",
+    "indexWeightsNote": "Configuracion versionada y calibracion.",
+    "audit": "Auditoria",
+    "auditNote": "Consulta de acciones y trazabilidad.",
+    "courses": {
+      "kicker": "OFERTA ACADÉMICA",
+      "title": "Catálogo de cursos",
+      "description": "Crea y finaliza las ofertas académicas disponibles para inscripción.",
+      "create": "Crear curso",
+      "requiredNote": "Nombre, período, catedrático y fechas son obligatorios.",
+      "name": "Asignatura",
+      "period": "Período",
+      "professor": "Catedrático responsable",
+      "selectProfessor": "Selecciona un catedrático",
+      "startDate": "Fecha de inicio",
+      "endDate": "Fecha de fin",
+      "saving": "Guardando...",
+      "created": "Curso creado como VIGENTE.",
+      "updated": "Curso actualizado correctamente.",
+      "finalized": "Curso finalizado correctamente.",
+      "list": "Cursos registrados",
+      "refresh": "Actualizar",
+      "loading": "Cargando cursos...",
+      "empty": "Todavía no hay cursos registrados.",
+      "status": "Estado",
+      "actions": "Acciones",
+      "finalize": "Finalizar",
+      "edit": "Editar curso",
+      "save": "Guardar cambios",
+      "cancel": "Cancelar edición"
+    }
   },
   "invitaciones": {
     "open": "Gestionar invitaciones",

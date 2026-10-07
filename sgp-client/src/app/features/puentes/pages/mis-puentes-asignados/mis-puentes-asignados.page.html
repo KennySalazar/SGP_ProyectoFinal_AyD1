@@ -1,0 +1,32 @@
+<header class="page-heading">
+  <p class="page-kicker">{{ 'myAssignedBridges.kicker' | transloco }}</p>
+  <h1 class="page-title">{{ 'myAssignedBridges.title' | transloco }}</h1>
+  <p class="page-description">{{ 'myAssignedBridges.description' | transloco }}</p>
+</header>
+
+<section class="surface-card bridges-card">
+  <div class="section-head">
+    <div>
+      <h2>{{ 'myAssignedBridges.listTitle' | transloco }}</h2>
+      <p>{{ 'myAssignedBridges.listNote' | transloco }}</p>
+    </div>
+    <button pButton type="button" severity="secondary" [outlined]="true" (click)="cargar()">
+      {{ 'myAssignedBridges.refresh' | transloco }}
+    </button>
+  </div>
+
+  @if (cargando()) {
+  <p role="status">{{ 'myAssignedBridges.loading' | transloco }}</p>
+  } @else if (puentes().length === 0) {
+  <p role="status">{{ 'myAssignedBridges.empty' | transloco }}</p>
+  } @else {
+  <div class="bridge-list">
+    @for (puente of puentes(); track puente.id) {
+    <article class="bridge-row">
+      <strong>{{ puente.puenteCodigo }} — {{ puente.puenteNombre }}</strong>
+      <span>{{ puente.cursoNombre }} · {{ puente.periodo }}</span>
+    </article>
+    }
+  </div>
+  }
+</section>

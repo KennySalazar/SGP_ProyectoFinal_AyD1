@@ -1,4 +1,5 @@
 import { Routes } from '@angular/router';
+import { roleGuard } from '../../core/guards/role.guard';
 
 export const usuarioPublicRoutes: Routes = [
   {
@@ -40,5 +41,13 @@ export const usuarioProtectedRoutes: Routes = [
   {
     path: 'seguridad',
     loadComponent: () => import('./pages/security/security.page').then((m) => m.SecurityPage),
+  },
+  {
+    path: 'estudiantes/pendientes',
+    canActivate: [roleGuard('CATEDRATICO')],
+    loadComponent: () =>
+      import('./pages/activacion-estudiantes/activacion-estudiantes.page').then(
+        (m) => m.ActivacionEstudiantesPage,
+      ),
   },
 ];

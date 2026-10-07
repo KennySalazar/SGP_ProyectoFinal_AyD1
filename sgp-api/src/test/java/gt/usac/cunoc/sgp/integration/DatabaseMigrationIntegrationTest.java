@@ -37,7 +37,8 @@ class DatabaseMigrationIntegrationTest {
             .load();
 
     var result = flyway.migrate();
-    assertEquals(15, result.migrationsExecuted);
+    assertEquals(16, result.migrationsExecuted);
+
     flyway.validate();
 
     try (Connection connection =
@@ -90,6 +91,8 @@ class DatabaseMigrationIntegrationTest {
       assertTrue(tableExists(statement, "operacion_idempotente"));
       assertEquals("character varying", tokenHashType(statement));
       assertTrue(columnExists(statement, "curso", "asignatura_id"));
+      assertFalse(columnExists(statement, "curso", "seccion"));
+      assertTrue(columnExists(statement, "curso_estudiante", "seccion"));
       assertFalse(columnExists(statement, "curso", "codigo"));
       assertFalse(columnExists(statement, "curso", "nombre"));
       assertTrue(columnExists(statement, "usuario_profesional", "numero_colegiado"));

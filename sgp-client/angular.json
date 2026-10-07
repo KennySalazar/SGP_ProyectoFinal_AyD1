@@ -35,6 +35,7 @@
                 "inject": false
               }
             ],
+
             "serviceWorker": "ngsw-config.json"
           },
           "configurations": {

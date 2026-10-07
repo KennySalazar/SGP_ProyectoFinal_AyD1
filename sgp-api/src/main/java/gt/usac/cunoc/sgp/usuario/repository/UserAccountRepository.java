@@ -3,6 +3,7 @@ package gt.usac.cunoc.sgp.usuario.repository;
 import gt.usac.cunoc.sgp.usuario.entity.UserAccount;
 import gt.usac.cunoc.sgp.usuario.model.RoleName;
 import jakarta.persistence.LockModeType;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.domain.Page;
@@ -20,6 +21,13 @@ public interface UserAccountRepository extends JpaRepository<UserAccount, UUID> 
 
   @EntityGraph(attributePaths = "role")
   Optional<UserAccount> findWithRoleById(UUID id);
+
+  @EntityGraph(attributePaths = "role")
+  List<UserAccount> findByRole_NameAndActiveTrueOrderByEmailAsc(RoleName roleName);
+
+  @EntityGraph(attributePaths = "role")
+  List<UserAccount> findByRole_NameAndActiveTrueAndVerifiedTrueAndActivatedFalseOrderByEmailAsc(
+      RoleName roleName);
 
   /** Bloquea la cuenta para que dos administradores no la modifiquen al mismo tiempo. */
   @Lock(LockModeType.PESSIMISTIC_WRITE)

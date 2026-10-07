@@ -8,6 +8,17 @@ import {
 } from '../../../core/models/auth.models';
 import { InvitacionPublica } from '../models/invitacion.models';
 
+export interface EstudiantePendienteResponse {
+  id: string;
+  email: string;
+}
+
+export interface CursoDisponibleResponse {
+  id: string;
+  nombre: string;
+  periodo: string;
+}
+
 @Injectable({ providedIn: 'root' })
 export class UsuarioApiService {
   private readonly http = inject(HttpClient);
@@ -75,5 +86,23 @@ export class UsuarioApiService {
       ? '/api/v1/auth/2fa/disable/verify'
       : '/api/v1/auth/2fa/enable/verify';
     return this.http.post<MessageResponse>(endpoint, { challengeId, otp });
+  }
+
+  listarEstudiantesPendientes(): Observable<EstudiantePendienteResponse[]> {
+    return this.http.get<EstudiantePendienteResponse[]>(
+      '/api/v1/activaciones-estudiantes/pendientes',
+    );
+  }
+
+  listarCursosVigentes(): Observable<CursoDisponibleResponse[]> {
+    return this.http.get<CursoDisponibleResponse[]>('/api/v1/activaciones-estudiantes/cursos');
+  }
+
+  activarEstudiante(request: {
+    estudianteId: string;
+    cursoId: string;
+    seccion: string;
+  }): Observable<MessageResponse> {
+    return this.http.post<MessageResponse>('/api/v1/activaciones-estudiantes', request);
   }
 }

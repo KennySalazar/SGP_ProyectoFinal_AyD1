@@ -1,0 +1,118 @@
+<header class="page-heading">
+  <p class="page-kicker">{{ 'bridgeAssignments.kicker' | transloco }}</p>
+  <h1 class="page-title">{{ 'bridgeAssignments.title' | transloco }}</h1>
+  <p class="page-description">{{ 'bridgeAssignments.description' | transloco }}</p>
+</header>
+
+@if (exito(); as mensaje) {
+<p class="feedback success" role="status"><i class="pi pi-check-circle"></i>{{ mensaje }}</p>
+}
+
+<section class="surface-card assignment-card">
+  <div class="section-head">
+    <div>
+      <h2>{{ 'bridgeAssignments.formTitle' | transloco }}</h2>
+      <p>{{ 'bridgeAssignments.formNote' | transloco }}</p>
+    </div>
+    <button pButton type="button" severity="secondary" [outlined]="true" (click)="cargar()">
+      {{ 'bridgeAssignments.refresh' | transloco }}
+    </button>
+  </div>
+
+  @if (cargando()) {
+  <p role="status">{{ 'bridgeAssignments.loading' | transloco }}</p>
+  } @else if (estudiantes().length === 0) {
+  <p role="status">{{ 'bridgeAssignments.noStudents' | transloco }}</p>
+  } @else if (puentes().length === 0) {
+  <p role="status">{{ 'bridgeAssignments.noBridges' | transloco }}</p>
+  } @else {
+  <form [formGroup]="form" (ngSubmit)="asignar()" novalidate>
+    <div class="field">
+      <label for="cursoEstudianteId">{{ 'bridgeAssignments.student' | transloco }}</label>
+      <p-select
+        inputId="cursoEstudianteId"
+        formControlName="cursoEstudianteId"
+        [options]="estudiantes()"
+        optionLabel="etiqueta"
+        optionValue="cursoEstudianteId"
+        [placeholder]="'bridgeAssignments.selectStudent' | transloco"
+      />
+    </div>
+    <div class="field">
+      <label for="puenteId">{{ 'bridgeAssignments.bridge' | transloco }}</label>
+      <p-select
+        inputId="puenteId"
+        formControlName="puenteId"
+        [options]="puentes()"
+        optionLabel="etiqueta"
+        optionValue="id"
+        [placeholder]="'bridgeAssignments.selectBridge' | transloco"
+      />
+    </div>
+    <button pButton type="submit" [disabled]="form.invalid || guardando()">
+      <i class="pi pi-link"></i>
+      <span
+        >{{ (guardando() ? 'bridgeAssignments.assigning' : 'bridgeAssignments.assign') | transloco
+        }}</span
+      >
+    </button>
+  </form>
+  }
+</section>
+
+<section class="surface-card assignment-card list-card">
+  <div class="section-head">
+    <div>
+      <h2>{{ 'bridgeAssignments.activeTitle' | transloco }}</h2>
+      <p>{{ 'bridgeAssignments.activeNote' | transloco }}</p>
+    </div>
+  </div>
+  @if (asignaciones().length === 0) {
+  <p role="status">{{ 'bridgeAssignments.empty' | transloco }}</p>
+  } @else {
+  <div class="assignment-list">
+    @for (asignacion of asignaciones(); track asignacion.id) {
+    <article class="assignment-row">
+      <div>
+        <strong>{{ asignacion.puenteCodigo }} — {{ asignacion.puenteNombre }}</strong>
+        <span>{{ asignacion.estudianteEmail }}</span>
+        <small>{{ asignacion.cursoNombre }} · {{ asignacion.periodo }}</small>
+      </div>
+      <button
+        pButton
+        type="button"
+        severity="secondary"
+        [outlined]="true"
+        (click)="seleccionarRevocacion(asignacion)"
+      >
+        {{ 'bridgeAssignments.revoke' | transloco }}
+      </button>
+    </article>
+    }
+  </div>
+  } @if (asignacionARevocar(); as asignacion) {
+  <form class="revoke-form" [formGroup]="revocacionForm" (ngSubmit)="revocar()" novalidate>
+    <h3>{{ 'bridgeAssignments.revokeTitle' | transloco }}</h3>
+    <p>{{ asignacion.puenteCodigo }} — {{ asignacion.puenteNombre }}</p>
+    <label>
+      <span>{{ 'bridgeAssignments.reason' | transloco }}</span>
+      <input pInputText formControlName="motivo" maxlength="1000" autocomplete="off" />
+    </label>
+    <div class="revoke-actions">
+      <button pButton type="submit" [disabled]="revocacionForm.invalid || guardando()">
+        {{ (guardando() ? 'bridgeAssignments.revoking' : 'bridgeAssignments.confirmRevoke') |
+        transloco }}
+      </button>
+      <button
+        pButton
+        type="button"
+        severity="secondary"
+        [outlined]="true"
+        (click)="cancelarRevocacion()"
+      >
+        {{ 'bridgeAssignments.cancel' | transloco }}
+      </button>
+    </div>
+  </form>
+  }
+</section>

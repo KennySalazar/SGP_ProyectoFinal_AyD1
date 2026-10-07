@@ -16,6 +16,11 @@ export const adminRoutes: Routes = [
     loadComponent: () => import('./pages/bitacora/bitacora.page').then((m) => m.BitacoraPage),
   },
   {
+    path: 'cursos',
+    loadComponent: () =>
+      import('./pages/catalogo-cursos/catalogo-cursos.page').then((m) => m.CatalogoCursosPage),
+  },
+  {
     path: '',
     pathMatch: 'full',
     loadComponent: () => import('./pages/usuarios/usuarios.page').then((m) => m.UsuariosPage),
