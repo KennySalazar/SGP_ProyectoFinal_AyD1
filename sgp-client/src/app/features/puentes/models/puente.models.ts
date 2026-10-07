@@ -90,6 +90,33 @@ export interface PuenteCercanoResponse {
   distanciaMetros: number;
 }
 
+export interface EstudianteAsignableResponse {
+  cursoEstudianteId: string;
+  estudianteId: string;
+  estudianteEmail: string;
+  cursoId: string;
+  cursoNombre: string;
+  periodo: string;
+}
+
+export interface PuenteAsignableResponse {
+  id: string;
+  codigo: string;
+  nombre: string;
+}
+
+export interface AsignacionPuenteResponse {
+  id: string;
+  cursoEstudianteId: string;
+  estudianteEmail: string;
+  cursoNombre: string;
+  periodo: string;
+  puenteId: string;
+  puenteCodigo: string;
+  puenteNombre: string;
+  asignadoEn: string;
+}
+
 export interface PuenteProblemDetails extends ProblemDetails {
   code?: string;
   requiereConfirmacion?: boolean;

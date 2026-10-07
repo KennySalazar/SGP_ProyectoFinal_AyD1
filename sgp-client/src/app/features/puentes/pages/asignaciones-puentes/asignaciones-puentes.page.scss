@@ -1,0 +1,105 @@
+.assignment-card {
+  margin-bottom: 1rem;
+  padding: 1.35rem;
+}
+
+.section-head,
+.assignment-row,
+.revoke-actions {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.section-head {
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--sgp-border);
+}
+
+h2,
+h3 {
+  margin: 0;
+  color: var(--sgp-navy-900);
+}
+
+.section-head p,
+.assignment-card > p,
+.assignment-row span,
+.assignment-row small,
+.revoke-form p {
+  color: var(--sgp-steel-700);
+}
+
+form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+label,
+.field {
+  display: grid;
+  gap: 0.45rem;
+  color: var(--sgp-navy-900);
+  font-weight: 700;
+}
+
+form > button {
+  grid-column: 1 / -1;
+  justify-content: center;
+}
+
+button {
+  min-height: 44px;
+}
+
+.feedback {
+  margin: 0 0 1rem;
+  padding: 0.9rem 1rem;
+  border-radius: 12px;
+}
+
+.success {
+  background: #ecfdf5;
+  color: #166534;
+}
+
+.feedback i {
+  margin-right: 0.5rem;
+}
+
+.assignment-list {
+  display: grid;
+}
+
+.assignment-row {
+  align-items: center;
+  padding: 1rem 0;
+  border-bottom: 1px solid var(--sgp-border);
+}
+
+.assignment-row div {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.revoke-form {
+  grid-template-columns: 1fr;
+  padding-top: 1rem;
+}
+
+.revoke-actions {
+  justify-content: start;
+}
+
+@media (max-width: 760px) {
+  .section-head,
+  .assignment-row,
+  .revoke-actions,
+  form {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+}

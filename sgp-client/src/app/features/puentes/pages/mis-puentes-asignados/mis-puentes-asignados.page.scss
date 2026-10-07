@@ -1,0 +1,44 @@
+.bridges-card {
+  padding: 1.35rem;
+}
+
+.section-head {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 1rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--sgp-border);
+}
+
+h2 {
+  margin: 0;
+  color: var(--sgp-navy-900);
+}
+
+.section-head p,
+.bridges-card > p,
+.bridge-row span {
+  color: var(--sgp-steel-700);
+}
+
+button {
+  min-height: 44px;
+}
+
+.bridge-list {
+  display: grid;
+}
+
+.bridge-row {
+  display: grid;
+  gap: 0.3rem;
+  padding: 1rem 0;
+  border-bottom: 1px solid var(--sgp-border);
+}
+
+@media (max-width: 760px) {
+  .section-head {
+    display: grid;
+  }
+}

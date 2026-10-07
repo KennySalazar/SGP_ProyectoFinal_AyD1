@@ -64,6 +64,14 @@
           <a routerLink="/estudiantes/pendientes" routerLinkActive="active">
             <i class="pi pi-users"></i><span>{{ 'nav.pendingStudents' | transloco }}</span>
           </a>
+          <a routerLink="/puentes/asignaciones" routerLinkActive="active">
+            <i class="pi pi-link"></i><span>{{ 'nav.bridgeAssignments' | transloco }}</span>
+          </a>
+        }
+        @if (auth.user()?.role === 'ESTUDIANTE') {
+          <a routerLink="/puentes/mis-asignaciones" routerLinkActive="active">
+            <i class="pi pi-map-marker"></i><span>{{ 'nav.myAssignedBridges' | transloco }}</span>
+          </a>
         }
       </nav>
     </div>

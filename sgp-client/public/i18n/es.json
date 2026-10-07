@@ -25,6 +25,8 @@
     "security": "Seguridad",
     "administration": "Administracion",
     "pendingStudents": "Activar estudiantes",
+    "bridgeAssignments": "Asignar puentes",
+    "myAssignedBridges": "Mis puentes asignados",
     "logout": "Cerrar sesion"
   },
   "connectivity": {
@@ -179,6 +181,44 @@
     "loading": "Cargando estudiantes pendientes...",
     "empty": "No hay estudiantes pendientes de activación.",
     "noCourses": "No tienes cursos vigentes disponibles para vincular estudiantes."
+  },
+
+  "bridgeAssignments": {
+    "kicker": "GESTION ACADÉMICA",
+    "title": "Asignar puentes",
+    "description": "Asigna puentes activos a estudiantes activos vinculados a tus cursos vigentes.",
+    "formTitle": "Nueva asignación",
+    "formNote": "Selecciona un estudiante de uno de tus cursos vigentes y un puente activo.",
+    "student": "Estudiante y curso",
+    "bridge": "Puente activo",
+    "selectStudent": "Selecciona un estudiante",
+    "selectBridge": "Selecciona un puente",
+    "assign": "Asignar puente",
+    "assigning": "Asignando...",
+    "refresh": "Actualizar",
+    "loading": "Cargando asignaciones...",
+    "noStudents": "No hay estudiantes activos vinculados a tus cursos vigentes.",
+    "noBridges": "No hay puentes activos disponibles para asignar.",
+    "activeTitle": "Asignaciones activas",
+    "activeNote": "Las asignaciones revocadas dejan de estar disponibles para el estudiante.",
+    "empty": "No hay asignaciones activas.",
+    "revoke": "Revocar",
+    "revokeTitle": "Revocar asignación",
+    "reason": "Motivo de revocación",
+    "confirmRevoke": "Confirmar revocación",
+    "revoking": "Revocando...",
+    "cancel": "Cancelar"
+  },
+
+  "myAssignedBridges": {
+    "kicker": "TRABAJO ACADÉMICO",
+    "title": "Mis puentes asignados",
+    "description": "Consulta los puentes activos que tienes asignados en tus cursos vigentes.",
+    "listTitle": "Puentes disponibles",
+    "listNote": "Solo se muestran asignaciones que no han sido revocadas.",
+    "refresh": "Actualizar",
+    "loading": "Cargando puentes asignados...",
+    "empty": "No tienes puentes asignados actualmente."
   },
 
   "puentes": {
