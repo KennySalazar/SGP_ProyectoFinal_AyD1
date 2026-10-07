@@ -145,7 +145,6 @@ public class PuenteService {
   }
 
   @Transactional(readOnly = true)
-  @PreAuthorize("hasRole('ADMINISTRADOR')")
   public PuenteResponse obtenerPorId(UUID id) {
     Puente puente =
         puentes

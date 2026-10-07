@@ -69,7 +69,10 @@ public class SecurityConfiguration {
             authorize -> {
               authorize
                   .requestMatchers(
-                      HttpMethod.GET, "/api/v1/puentes", "/api/v1/catalogos/departamentos")
+                      HttpMethod.GET,
+                      "/api/v1/puentes",
+                      "/api/v1/puentes/*",
+                      "/api/v1/catalogos/departamentos")
                   .permitAll()
                   .requestMatchers(
                       "/api/v1/auth/register",

@@ -170,9 +170,7 @@
         @if (!cargando() && !errorConsulta()) { @if (pagina(); as resultado) { @if
         (resultado.content.length > 0) {
         <p class="seleccion-catalogo" role="status">
-          @if (puenteSeleccionado(); as seleccionado) { {{ 'puentes.catalogo.selectedBridge' |
-          transloco: { nombre: seleccionado.nombre } }} } @else { {{
-          'puentes.catalogo.selectionHint' | transloco }} }
+          {{ 'puentes.catalogo.selectionHint' | transloco }}
         </p>
         }
         <div
@@ -185,10 +183,6 @@
             [pt]="{ tableContainer: { style: { overflow: 'visible' } } }"
             [value]="resultado.content"
             dataKey="id"
-            selectionMode="single"
-            [metaKeySelection]="false"
-            [selection]="puenteSeleccionado()"
-            (selectionChange)="puenteSeleccionado.set($event)"
             [tableStyle]="{ 'min-width': '44rem', width: '100%', 'table-layout': 'fixed', 'border-collapse': 'collapse' }"
           >
             <ng-template #header>
@@ -208,20 +202,13 @@
               </tr>
             </ng-template>
             <ng-template #body let-puente let-indice="rowIndex">
-              <tr
-                class="fila-catalogo"
-                [pSelectableRow]="puente"
-                [pSelectableRowIndex]="indice"
-                [class.fila-seleccionada]="puenteSeleccionado()?.id === puente.id"
-                [attr.aria-selected]="puenteSeleccionado()?.id === puente.id"
-              >
-                <td class="numero-puente">
-                  {{ resultado.number * resultado.size + indice + 1 }} @if (puenteSeleccionado()?.id
-                  === puente.id) {
-                  <i class="pi pi-check" aria-hidden="true"></i>
-                  }
-                </td>
-                <th scope="row" class="nombre-puente">{{ puente.nombre }}</th>
+              <tr class="fila-catalogo">
+                <td class="numero-puente">{{ resultado.number * resultado.size + indice + 1 }}</td>
+                <th scope="row" class="nombre-puente">
+                  <a [routerLink]="['/puentes', puente.id]" class="enlace-puente">
+                    {{ puente.nombre }}
+                  </a>
+                </th>
                 <td>{{ puente.departamento.nombre }}</td>
                 <td>{{ puente.municipio.nombre }}</td>
                 <td>

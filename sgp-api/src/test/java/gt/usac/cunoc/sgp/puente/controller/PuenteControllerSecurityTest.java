@@ -148,27 +148,25 @@ class PuenteControllerSecurityTest {
   }
 
   @ParameterizedTest
-  @EnumSource(value = RoleName.class, names = "ADMINISTRADOR", mode = EnumSource.Mode.EXCLUDE)
-  void rechazaRolesDistintosDeAdministradorEnConsulta(RoleName rol) throws Exception {
+  @EnumSource(RoleName.class)
+  void permiteCualquierRolEnConsulta(RoleName rol) throws Exception {
     var authentication = autenticar(rol);
-    UUID puenteId = UUID.randomUUID();
-
-    mockMvc
-        .perform(get("/api/v1/puentes/" + puenteId).principal(authentication))
-        .andExpect(status().isForbidden());
-
-    verifyNoInteractions(puenteService);
-  }
-
-  @Test
-  void permiteAdministradorEnConsulta() throws Exception {
-    var authentication = autenticar(RoleName.ADMINISTRADOR);
     UUID puenteId = UUID.randomUUID();
     when(puenteService.obtenerPorId(puenteId)).thenReturn(mock(PuenteResponse.class));
 
     mockMvc
         .perform(get("/api/v1/puentes/" + puenteId).principal(authentication))
         .andExpect(status().isOk());
+
+    verify(puenteService).obtenerPorId(puenteId);
+  }
+
+  @Test
+  void permiteConsultaSinAutenticacion() throws Exception {
+    UUID puenteId = UUID.randomUUID();
+    when(puenteService.obtenerPorId(puenteId)).thenReturn(mock(PuenteResponse.class));
+
+    mockMvc.perform(get("/api/v1/puentes/" + puenteId)).andExpect(status().isOk());
 
     verify(puenteService).obtenerPorId(puenteId);
   }

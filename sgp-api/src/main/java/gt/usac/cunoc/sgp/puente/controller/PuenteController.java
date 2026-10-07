@@ -90,11 +90,9 @@ public class PuenteController {
   }
 
   @GetMapping("/{id}")
-  @SecurityRequirement(name = "bearerAuth")
-  @PreAuthorize("hasRole('ADMINISTRADOR')")
   @Operation(
       summary = "Obtener un puente por su identificador",
-      description = "Retorna los datos de un puente activo para administradores.")
+      description = "Retorna los datos de la ficha de un puente activo.")
   public ResponseEntity<PuenteResponse> obtenerPorId(@PathVariable UUID id) {
     return ResponseEntity.ok(puenteService.obtenerPorId(id));
   }
