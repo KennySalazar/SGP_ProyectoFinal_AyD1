@@ -1,0 +1,65 @@
+<header class="page-heading">
+  <p class="page-kicker">{{ 'studentActivation.kicker' | transloco }}</p>
+  <h1 class="page-title">{{ 'studentActivation.title' | transloco }}</h1>
+  <p class="page-description">{{ 'studentActivation.description' | transloco }}</p>
+</header>
+
+@if (exito(); as mensaje) {
+<p class="feedback success" role="status"><i class="pi pi-check-circle"></i>{{ mensaje }}</p>
+}
+
+<section class="surface-card activation-card">
+  <div class="section-head">
+    <div>
+      <h2>{{ 'studentActivation.formTitle' | transloco }}</h2>
+      <p>{{ 'studentActivation.formNote' | transloco }}</p>
+    </div>
+    <button pButton type="button" severity="secondary" [outlined]="true" (click)="cargar()">
+      {{ 'studentActivation.refresh' | transloco }}
+    </button>
+  </div>
+
+  @if (cargando()) {
+  <p role="status">{{ 'studentActivation.loading' | transloco }}</p>
+  } @else if (estudiantes().length === 0) {
+  <p role="status">{{ 'studentActivation.empty' | transloco }}</p>
+  } @else if (cursos().length === 0) {
+  <p role="status">{{ 'studentActivation.noCourses' | transloco }}</p>
+  } @else {
+  <form [formGroup]="form" (ngSubmit)="activar()" novalidate>
+    <div class="field">
+      <label for="estudianteId">{{ 'studentActivation.student' | transloco }}</label>
+      <p-select
+        inputId="estudianteId"
+        formControlName="estudianteId"
+        [options]="estudiantes()"
+        optionLabel="email"
+        optionValue="id"
+        [placeholder]="'studentActivation.selectStudent' | transloco"
+      />
+    </div>
+    <div class="field">
+      <label for="cursoId">{{ 'studentActivation.course' | transloco }}</label>
+      <p-select
+        inputId="cursoId"
+        formControlName="cursoId"
+        [options]="cursos()"
+        optionLabel="nombre"
+        optionValue="id"
+        [placeholder]="'studentActivation.selectCourse' | transloco"
+      />
+    </div>
+    <label>
+      <span>{{ 'studentActivation.section' | transloco }}</span>
+      <input pInputText formControlName="seccion" maxlength="30" autocomplete="off" />
+    </label>
+    <button pButton type="submit" [disabled]="form.invalid || guardando()">
+      <i class="pi pi-user-plus"></i>
+      <span
+        >{{ (guardando() ? 'studentActivation.activating' : 'studentActivation.activate') |
+        transloco }}</span
+      >
+    </button>
+  </form>
+  }
+</section>

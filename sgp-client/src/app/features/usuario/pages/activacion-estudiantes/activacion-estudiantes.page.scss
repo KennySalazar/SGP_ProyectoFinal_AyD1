@@ -1,0 +1,72 @@
+.activation-card {
+  padding: 1.35rem;
+}
+
+.section-head {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 1rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--sgp-border);
+}
+
+h2 {
+  margin: 0;
+  color: var(--sgp-navy-900);
+}
+
+.section-head p,
+.activation-card > p {
+  color: var(--sgp-steel-700);
+}
+
+form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+label,
+.field {
+  display: grid;
+  gap: 0.45rem;
+  color: var(--sgp-navy-900);
+  font-weight: 700;
+}
+
+form > button {
+  grid-column: 1 / -1;
+  justify-content: center;
+}
+
+button {
+  min-height: 44px;
+}
+
+.feedback {
+  margin: 0 0 1rem;
+  padding: 0.9rem 1rem;
+  border-radius: 12px;
+}
+
+.success {
+  background: #ecfdf5;
+  color: #166534;
+}
+
+.feedback i {
+  margin-right: 0.5rem;
+}
+
+@media (max-width: 760px) {
+  .section-head,
+  form {
+    grid-template-columns: 1fr;
+  }
+
+  .section-head {
+    display: grid;
+  }
+}

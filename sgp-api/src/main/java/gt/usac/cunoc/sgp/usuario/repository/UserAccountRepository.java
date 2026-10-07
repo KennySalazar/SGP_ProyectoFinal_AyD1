@@ -18,4 +18,8 @@ public interface UserAccountRepository extends JpaRepository<UserAccount, UUID> 
 
   @EntityGraph(attributePaths = "role")
   List<UserAccount> findByRole_NameAndActiveTrueOrderByEmailAsc(RoleName roleName);
+
+  @EntityGraph(attributePaths = "role")
+  List<UserAccount> findByRole_NameAndActiveTrueAndVerifiedTrueAndActivatedFalseOrderByEmailAsc(
+      RoleName roleName);
 }

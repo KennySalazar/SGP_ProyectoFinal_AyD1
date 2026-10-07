@@ -24,6 +24,7 @@
     "offline": "Offline",
     "security": "Seguridad",
     "administration": "Administracion",
+    "pendingStudents": "Activar estudiantes",
     "logout": "Cerrar sesion"
   },
   "connectivity": {
@@ -160,6 +161,24 @@
     "localStorage": "ALMACENAMIENTO LOCAL",
     "controls": "Controles de diagnostico",
     "basePrepared": "Base preparada"
+  },
+  "studentActivation": {
+    "kicker": "GESTION ACADÉMICA",
+    "title": "Activar estudiantes",
+    "description": "Vincula estudiantes con correo verificado a uno de tus cursos vigentes.",
+    "formTitle": "Activación y vinculación",
+    "formNote": "Selecciona un estudiante pendiente, el curso vigente y su sección.",
+    "student": "Estudiante pendiente",
+    "course": "Curso vigente",
+    "section": "Sección",
+    "selectStudent": "Selecciona un estudiante",
+    "selectCourse": "Selecciona un curso",
+    "activate": "Activar y vincular",
+    "activating": "Activando...",
+    "refresh": "Actualizar",
+    "loading": "Cargando estudiantes pendientes...",
+    "empty": "No hay estudiantes pendientes de activación.",
+    "noCourses": "No tienes cursos vigentes disponibles para vincular estudiantes."
   },
 
   "puentes": {

@@ -60,6 +60,11 @@
             <span>{{ 'nav.registerBridge' | transloco }}</span>
           </a>
         }
+        @if (auth.user()?.role === 'CATEDRATICO') {
+          <a routerLink="/estudiantes/pendientes" routerLinkActive="active">
+            <i class="pi pi-users"></i><span>{{ 'nav.pendingStudents' | transloco }}</span>
+          </a>
+        }
       </nav>
     </div>
 
