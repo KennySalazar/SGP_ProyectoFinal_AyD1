@@ -1,0 +1,412 @@
+{
+  "identificacion": {
+    "nombre_puente": "Puente Samalá",
+    "codigo": "0901-0001",
+    "ruta": "CA-2",
+    "kilometraje": 200.5,
+    "departamento": "Quetzaltenango",
+    "municipio": "Quetzaltenango",
+    "ruta_pavimentada": "SI",
+    "alineamiento_horizontal": "TANGENTE",
+    "esviaje": false,
+    "coordenadas_utm": {
+      "zona": 15,
+      "norte": 1635000,
+      "este": 650000
+    },
+    "nombre_inspector": "Ana López",
+    "fecha_inspeccion": "2026-10-05"
+  },
+  "datos_generales": {
+    "longitud_m": 40,
+    "numero_tramos": 2,
+    "ancho_rodadura_m": 7.2,
+    "ancho_acera_derecha_m": 1,
+    "ancho_acera_izquierda_m": 0,
+    "tipologia_puente": "Vigas y losa",
+    "altura_libre_superior_m": null,
+    "altura_libre_sobre_cauce_m": 6,
+    "tipo_cruce": "RIO",
+    "numero_vias_por_sentido": 1,
+    "material_superestructura": "CONCRETO_PRETENSADO",
+    "material_subestructura": "CONCRETO_REFORZADO",
+    "anio_construccion": 1985
+  },
+  "tramos": [
+    {
+      "instancia_id": "b5c6beac-f80f-4d8d-afc2-b81b7676f625",
+      "orden": 1,
+      "longitud_m": 20,
+      "tipo_seccion": "Viga T"
+    },
+    {
+      "instancia_id": "62cc95e6-8829-4b8e-8cb5-b05bf1005869",
+      "orden": 2,
+      "longitud_m": 20,
+      "tipo_seccion": "Viga T"
+    }
+  ],
+  "subestructura": {
+    "estribo_entrada": {
+      "cortina_superior": {
+        "existencia": "PRESENTE",
+        "material": "CONCRETO_REFORZADO",
+        "altura_m": 1.2,
+        "ancho_m": 0.3,
+        "grietas_una_direccion": "LEVE",
+        "grietas_dos_direcciones": "NO_PRESENTA",
+        "perdida_petreos_golpe": "NO_PRESENTA",
+        "exposicion_acero": "NO_PRESENTA"
+      },
+      "cortina_inferior": {
+        "existencia": "PRESENTE",
+        "material": "CONCRETO_REFORZADO",
+        "altura_m": 1.2,
+        "ancho_m": 0.3,
+        "grietas_una_direccion": "LEVE",
+        "grietas_dos_direcciones": "NO_PRESENTA",
+        "perdida_petreos_golpe": "NO_PRESENTA",
+        "exposicion_acero": "NO_PRESENTA"
+      },
+      "viga_apoyo": {
+        "existencia": "PRESENTE",
+        "material": "CONCRETO_REFORZADO",
+        "altura_m": 1.2,
+        "ancho_m": 0.3,
+        "grietas_una_direccion": "LEVE",
+        "grietas_dos_direcciones": "NO_PRESENTA",
+        "perdida_petreos_golpe": "NO_PRESENTA",
+        "exposicion_acero": "NO_PRESENTA"
+      },
+      "apoyos": {
+        "existencia": "PRESENTE",
+        "material": "NEOPRENO",
+        "neopreno_aplastado": "NO_PRESENTA",
+        "fuera_de_lugar": "NO_PRESENTA",
+        "oxidado": "NO_PRESENTA",
+        "falta_perno": "NO_PRESENTA",
+        "perno_roto": "NO_PRESENTA"
+      },
+      "columnas": {
+        "existencia": "NO_APLICA"
+      },
+      "cuerpo_muro_gravedad": {
+        "existencia": "PRESENTE",
+        "material": "CONCRETO_CICLOPEO",
+        "altura_m": 1.2,
+        "ancho_m": 0.3,
+        "grietas_una_direccion": "LEVE",
+        "grietas_dos_direcciones": "NO_PRESENTA",
+        "perdida_petreos_golpe": "NO_PRESENTA"
+      },
+      "aletones": {
+        "aguas_arriba": {
+          "existencia": "PRESENTE",
+          "material": "CONCRETO_REFORZADO",
+          "ancho_m": 0.3,
+          "grietas_una_direccion": "LEVE",
+          "grietas_dos_direcciones": "NO_PRESENTA",
+          "perdida_petreos_golpe": "NO_PRESENTA",
+          "exposicion_acero": "NO_PRESENTA",
+          "largo_m": 1.2
+        },
+        "aguas_abajo": {
+          "existencia": "PRESENTE",
+          "material": "CONCRETO_REFORZADO",
+          "ancho_m": 0.3,
+          "grietas_una_direccion": "LEVE",
+          "grietas_dos_direcciones": "NO_PRESENTA",
+          "perdida_petreos_golpe": "NO_PRESENTA",
+          "exposicion_acero": "NO_PRESENTA",
+          "largo_m": 1.2
+        }
+      },
+      "socavacion": {
+        "aguas_arriba": "NO_HAY",
+        "aguas_abajo": "SIN_EXPOSICION"
+      }
+    },
+    "estribo_salida": {
+      "cortina_superior": {
+        "existencia": "PRESENTE",
+        "material": "CONCRETO_REFORZADO",
+        "altura_m": 1.2,
+        "ancho_m": 0.3,
+        "grietas_una_direccion": "LEVE",
+        "grietas_dos_direcciones": "NO_PRESENTA",
+        "perdida_petreos_golpe": "NO_PRESENTA",
+        "exposicion_acero": "NO_PRESENTA"
+      },
+      "cortina_inferior": {
+        "existencia": "PRESENTE",
+        "material": "CONCRETO_REFORZADO",
+        "altura_m": 1.2,
+        "ancho_m": 0.3,
+        "grietas_una_direccion": "LEVE",
+        "grietas_dos_direcciones": "NO_PRESENTA",
+        "perdida_petreos_golpe": "NO_PRESENTA",
+        "exposicion_acero": "NO_PRESENTA"
+      },
+      "viga_apoyo": {
+        "existencia": "PRESENTE",
+        "material": "CONCRETO_REFORZADO",
+        "altura_m": 1.2,
+        "ancho_m": 0.3,
+        "grietas_una_direccion": "LEVE",
+        "grietas_dos_direcciones": "NO_PRESENTA",
+        "perdida_petreos_golpe": "NO_PRESENTA",
+        "exposicion_acero": "NO_PRESENTA"
+      },
+      "apoyos": {
+        "existencia": "PRESENTE",
+        "material": "NEOPRENO",
+        "neopreno_aplastado": "NO_PRESENTA",
+        "fuera_de_lugar": "NO_PRESENTA",
+        "oxidado": "NO_PRESENTA",
+        "falta_perno": "NO_PRESENTA",
+        "perno_roto": "NO_PRESENTA"
+      },
+      "columnas": {
+        "existencia": "NO_APLICA"
+      },
+      "cuerpo_muro_gravedad": {
+        "existencia": "PRESENTE",
+        "material": "CONCRETO_CICLOPEO",
+        "altura_m": 1.2,
+        "ancho_m": 0.3,
+        "grietas_una_direccion": "LEVE",
+        "grietas_dos_direcciones": "NO_PRESENTA",
+        "perdida_petreos_golpe": "NO_PRESENTA"
+      },
+      "aletones": {
+        "aguas_arriba": {
+          "existencia": "PRESENTE",
+          "material": "CONCRETO_REFORZADO",
+          "ancho_m": 0.3,
+          "grietas_una_direccion": "LEVE",
+          "grietas_dos_direcciones": "NO_PRESENTA",
+          "perdida_petreos_golpe": "NO_PRESENTA",
+          "exposicion_acero": "NO_PRESENTA",
+          "largo_m": 1.2
+        },
+        "aguas_abajo": {
+          "existencia": "PRESENTE",
+          "material": "CONCRETO_REFORZADO",
+          "ancho_m": 0.3,
+          "grietas_una_direccion": "LEVE",
+          "grietas_dos_direcciones": "NO_PRESENTA",
+          "perdida_petreos_golpe": "NO_PRESENTA",
+          "exposicion_acero": "NO_PRESENTA",
+          "largo_m": 1.2
+        }
+      },
+      "socavacion": {
+        "aguas_arriba": "NO_HAY",
+        "aguas_abajo": "SIN_EXPOSICION"
+      }
+    },
+    "pilas": [
+      {
+        "instancia_id": "be78b9ec-7e80-4170-a64d-22f49d7576dc",
+        "orden": 1,
+        "viga_cabezal": {
+          "existencia": "PRESENTE",
+          "material": "CONCRETO_REFORZADO",
+          "altura_m": 1.2,
+          "ancho_m": 0.3,
+          "grietas_una_direccion": "LEVE",
+          "grietas_dos_direcciones": "NO_PRESENTA",
+          "perdida_petreos_golpe": "NO_PRESENTA",
+          "exposicion_acero": "NO_PRESENTA"
+        },
+        "columnas": {
+          "existencia": "PRESENTE",
+          "material": "CONCRETO_REFORZADO",
+          "altura_m": 1.2,
+          "ancho_m": 0.3,
+          "grietas_una_direccion": "LEVE",
+          "grietas_dos_direcciones": "NO_PRESENTA",
+          "perdida_petreos_golpe": "NO_PRESENTA",
+          "exposicion_acero": "NO_PRESENTA"
+        },
+        "cuerpo_muro_gravedad": {
+          "existencia": "NO_APLICA"
+        },
+        "apoyos": {
+          "existencia": "PRESENTE",
+          "material": "NEOPRENO",
+          "neopreno_aplastado": "NO_PRESENTA",
+          "fuera_de_lugar": "NO_PRESENTA",
+          "oxidado": "NO_PRESENTA",
+          "falta_perno": "NO_PRESENTA",
+          "perno_roto": "NO_PRESENTA"
+        },
+        "socavacion": {
+          "aguas_arriba": "CON_EXPOSICION",
+          "aguas_abajo": "ASENTAMIENTO_ESTRUCTURA"
+        }
+      }
+    ]
+  },
+  "superestructura": {
+    "losa_rodamiento": {
+      "existencia": "PRESENTE",
+      "material": "CONCRETO_REFORZADO",
+      "grietas_una_direccion": "NO_PRESENTA",
+      "grietas_dos_direcciones": "NO_PRESENTA",
+      "desprendimiento_agregados": "LEVE",
+      "baches": "NO_PRESENTA",
+      "exposicion_acero": "NO_PRESENTA"
+    },
+    "elemento_portante_concreto": {
+      "existencia": "PRESENTE",
+      "grietas_diagonal": "SEVERO",
+      "grietas_verticales": "NO_PRESENTA",
+      "perdida_petreos_golpe": "NO_PRESENTA",
+      "exposicion_acero": "NO_PRESENTA",
+      "otros": {
+        "descripcion": "Eflorescencia",
+        "severidad": "LEVE"
+      }
+    },
+    "elemento_portante_acero": {
+      "existencia": "NO_APLICA"
+    },
+    "diafragmas_concreto": {
+      "existencia": "NO_APLICA"
+    },
+    "diafragmas_acero": {
+      "existencia": "PRESENTE",
+      "oxido": "MODERADO",
+      "faltan_pernos": "NO_PRESENTA",
+      "elemento_golpeado": "NO_PRESENTA",
+      "elemento_cortado": "NO_PRESENTA",
+      "pintura": "LEVE"
+    },
+    "estructura_tipo_cercha": {
+      "existencia": "NO_APLICA"
+    },
+    "drenaje": {
+      "existencia": "PRESENTE",
+      "estado": "OBSTRUIDOS"
+    }
+  },
+  "elementos_no_estructurales": {
+    "pasamanos_barandal": {
+      "existencia": "PRESENTE",
+      "lado": "AMBOS",
+      "material": "ACERO",
+      "ausencia_seccion": "NO_PRESENTA",
+      "deformacion_elemento": "LEVE",
+      "golpeado_longitud_m": 2.5,
+      "pintura": "MODERADO"
+    },
+    "postes_barandal": {
+      "existencia": "PRESENTE",
+      "lado": "DERECHO",
+      "material": "CONCRETO_REFORZADO",
+      "ausencia_seccion": "NO_PRESENTA",
+      "deformacion_elemento": "NO_PRESENTA",
+      "golpeados_cantidad": 1,
+      "pintura": "NO_PRESENTA"
+    },
+    "barreras": {
+      "existencia": "NO_APLICA"
+    },
+    "junta_entrada": {
+      "existencia": "PRESENTE",
+      "material": "ACERO",
+      "falta_elemento": false,
+      "junta_limpia": true
+    },
+    "junta_salida": {
+      "existencia": "PRESENTE",
+      "material": "ACERO",
+      "falta_elemento": false,
+      "junta_limpia": true,
+      "danos": {
+        "descripcion": "Sello desprendido",
+        "severidad": "MODERADO"
+      }
+    },
+    "juntas_intermedias": {
+      "existencia": "PRESENTE",
+      "material": "ACERO",
+      "falta_elemento": false,
+      "junta_limpia": true
+    },
+    "losa_acceso_entrada": {
+      "existencia": "PRESENTE",
+      "material": "CONCRETO_REFORZADO",
+      "buen_estado": true
+    },
+    "losa_acceso_salida": {
+      "existencia": "PRESENTE",
+      "material": "CONCRETO_REFORZADO",
+      "buen_estado": false,
+      "asentado": "MODERADO",
+      "fisurado": "NO_PRESENTA",
+      "bache": "NO_PRESENTA"
+    },
+    "obras_proteccion": {
+      "aguas_arriba": {
+        "existencia": "PRESENTE",
+        "material": "OTRO",
+        "tipo": "Gaviones",
+        "largo_m": 15
+      },
+      "aguas_abajo": {
+        "existencia": "NO_APLICA"
+      }
+    }
+  },
+  "caracteristicas_cauce": {
+    "aplica": true,
+    "tipo_cuerpo_agua": "RIO",
+    "nombre_rio": "Samalá",
+    "estado_cauce": {
+      "condiciones": [
+        "ASOLVADO_SEDIMENTADO",
+        "EROSIONADO"
+      ]
+    },
+    "estado_zona_adyacente_estribos": {
+      "condiciones": [
+        "LIMPIO"
+      ]
+    },
+    "encauzamiento": "CURVA",
+    "desbordamiento": {
+      "ha_presentado": true,
+      "frecuencia_anios": 5,
+      "fecha_ultimo": "2024-06-10"
+    }
+  },
+  "otros": {
+    "senalizacion": {
+      "informativa": {
+        "existe": true,
+        "estado": "BUENO"
+      },
+      "preventiva": {
+        "existe": false
+      },
+      "reglamentaria": {
+        "existe": true,
+        "estado": "MALO"
+      },
+      "horizontal": {
+        "existe": false
+      }
+    },
+    "alumbrado_artificial_existe": false,
+    "drenajes_aledanos": {
+      "existe": true,
+      "estado": "MALO"
+    },
+    "recomendaciones": {
+      "mantenimiento": "Limpieza de drenajes",
+      "reparacion": "Reparar grieta en viga"
+    }
+  }
+}

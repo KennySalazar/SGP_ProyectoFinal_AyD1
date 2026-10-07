@@ -1,0 +1,68 @@
+{
+  "$comment": "Borrador HU-016 / DT-BD-02. Contenido propuesto para version_formulario.vinculos_almacenamiento. Cada puntero (RFC 6901, sobre el documento del formulario) listado aquí se persiste SOLO en la columna indicada y se excluye de inspeccion.datos. Todo puntero no listado se persiste en inspeccion.datos (JSONB). Las columnas tipadas son nullable porque los borradores pueden estar incompletos; la obligatoriedad la impone el esquema al enviar.",
+  "formulario": "sieca-v1",
+  "columnas": [
+    { "puntero": "/identificacion/fecha_inspeccion", "columna": "inspeccion.fecha_inspeccion" },
+    { "puntero": "/identificacion/nombre_inspector", "columna": "inspeccion.nombre_autor_capturado", "origen": "Usuario autenticado; solo lectura en el formulario" },
+
+    { "puntero": "/identificacion/ruta_pavimentada", "columna": "inspeccion_dato_tecnico.ruta_pavimentada" },
+    { "puntero": "/identificacion/alineamiento_horizontal", "columna": "inspeccion_dato_tecnico.alineamiento_horizontal" },
+    { "puntero": "/identificacion/esviaje", "columna": "inspeccion_dato_tecnico.esviaje" },
+    { "puntero": "/identificacion/poblacion_antes", "columna": "inspeccion_dato_tecnico.poblacion_antes" },
+    { "puntero": "/identificacion/poblacion_despues", "columna": "inspeccion_dato_tecnico.poblacion_despues" },
+
+    { "puntero": "/datos_generales/longitud_m", "columna": "inspeccion_dato_tecnico.longitud_m" },
+    { "puntero": "/datos_generales/numero_tramos", "columna": "inspeccion_dato_tecnico.numero_tramos" },
+    { "puntero": "/datos_generales/ancho_rodadura_m", "columna": "inspeccion_dato_tecnico.ancho_rodadura_m" },
+    { "puntero": "/datos_generales/ancho_acera_derecha_m", "columna": "inspeccion_dato_tecnico.ancho_acera_derecha_m" },
+    { "puntero": "/datos_generales/ancho_acera_izquierda_m", "columna": "inspeccion_dato_tecnico.ancho_acera_izquierda_m" },
+    { "puntero": "/datos_generales/altura_libre_superior_m", "columna": "inspeccion_dato_tecnico.altura_libre_superior_m" },
+    { "puntero": "/datos_generales/altura_libre_sobre_cauce_m", "columna": "inspeccion_dato_tecnico.altura_libre_sobre_cauce_m" },
+    { "puntero": "/datos_generales/tipologia_puente", "columna": "inspeccion_dato_tecnico.tipologia_puente" },
+    { "puntero": "/datos_generales/tipo_cruce", "columna": "inspeccion_dato_tecnico.tipo_cruce", "nota": "Se guarda el código; /datos_generales/tipo_cruce_otro queda en JSONB" },
+    { "puntero": "/datos_generales/numero_vias_por_sentido", "columna": "inspeccion_dato_tecnico.numero_vias_por_sentido" },
+    { "puntero": "/datos_generales/material_superestructura", "columna": "inspeccion_dato_tecnico.material_superestructura" },
+    { "puntero": "/datos_generales/material_subestructura", "columna": "inspeccion_dato_tecnico.material_subestructura" },
+    { "puntero": "/datos_generales/carga_diseno", "columna": "inspeccion_dato_tecnico.carga_diseno" },
+    { "puntero": "/datos_generales/anio_construccion", "columna": "inspeccion_dato_tecnico.anio_construccion" },
+    { "puntero": "/datos_generales/trafico_vehiculos_dia", "columna": "inspeccion_dato_tecnico.trafico_vehiculos_dia" },
+    { "puntero": "/datos_generales/porcentaje_camiones_buses", "columna": "inspeccion_dato_tecnico.porcentaje_camiones_buses" },
+
+    { "puntero": "/caracteristicas_cauce/tipo_cuerpo_agua", "columna": "inspeccion_dato_tecnico.tipo_cuerpo_agua", "nota": "Se guarda el código; /caracteristicas_cauce/tipo_cuerpo_agua_otro queda en JSONB" },
+    { "puntero": "/caracteristicas_cauce/nombre_rio", "columna": "inspeccion_dato_tecnico.nombre_rio" },
+    { "puntero": "/caracteristicas_cauce/encauzamiento", "columna": "inspeccion_dato_tecnico.encauzamiento" },
+    { "puntero": "/caracteristicas_cauce/desbordamiento/ha_presentado", "columna": "inspeccion_dato_tecnico.antecedente_desbordamiento" },
+    { "puntero": "/caracteristicas_cauce/desbordamiento/frecuencia_anios", "columna": "inspeccion_dato_tecnico.frecuencia_desbordamiento_anios" },
+    { "puntero": "/caracteristicas_cauce/desbordamiento/fecha_ultimo", "columna": "inspeccion_dato_tecnico.fecha_ultimo_desbordamiento" },
+
+    { "puntero": "/otros/alumbrado_artificial_existe", "columna": "inspeccion_dato_tecnico.alumbrado_existe" },
+    { "puntero": "/otros/drenajes_aledanos/existe", "columna": "inspeccion_dato_tecnico.drenajes_aledanos_existen" }
+  ],
+  "repetibles": [
+    {
+      "puntero": "/tramos",
+      "tabla": "inspeccion_tramo",
+      "campos": {
+        "instancia_id": "instancia_elemento_id",
+        "orden": "orden",
+        "longitud_m": "longitud_m",
+        "tipo_seccion": "tipo_seccion"
+      }
+    }
+  ],
+  "instantanea_inventario": {
+    "columna": "inspeccion.identificacion_capturada",
+    "$comment": "Copia de solo lectura del inventario al crear la inspección; no se edita en el formulario.",
+    "campos": {
+      "/identificacion/nombre_puente": "puente.nombre",
+      "/identificacion/codigo": "puente.codigo",
+      "/identificacion/ruta": "puente.ruta",
+      "/identificacion/kilometraje": "puente.kilometraje",
+      "/identificacion/departamento": "departamento.nombre (vía puente.municipio_id)",
+      "/identificacion/municipio": "municipio.nombre (vía puente.municipio_id)"
+    }
+  },
+  "derivados_no_persistidos": [
+    { "puntero": "/datos_generales/fecha_ultima_evaluacion", "origen": "MAX(inspeccion.fecha_inspeccion) de las inspecciones PUBLICADAS del puente" }
+  ]
+}
