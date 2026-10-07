@@ -37,7 +37,8 @@ class DatabaseMigrationIntegrationTest {
             .load();
 
     var result = flyway.migrate();
-    assertEquals(14, result.migrationsExecuted);
+    assertEquals(16, result.migrationsExecuted);
+
     flyway.validate();
 
     try (Connection connection =
@@ -50,6 +51,8 @@ class DatabaseMigrationIntegrationTest {
       assertTrue(tableExists(statement, "usuario"));
       assertTrue(tableExists(statement, "rol"));
       assertTrue(tableExists(statement, "auditoria"));
+      assertTrue(columnExists(statement, "auditoria", "proceso_automatico"));
+      assertTrue(indexExists(statement, "idx_auditoria_creado"));
       assertTrue(tableExists(statement, "usuario_profesional"));
       assertTrue(tableExists(statement, "departamento"));
       assertTrue(tableExists(statement, "municipio"));
@@ -110,6 +113,35 @@ class DatabaseMigrationIntegrationTest {
       assertEquals(22, rowCount(statement, "departamento"));
       assertEquals(340, rowCount(statement, "municipio"));
       assertTrue(municipiosCorrespondenADepartamento(statement));
+
+      assertTrue(tableExists(statement, "municipio_limite"));
+      assertEquals(340, rowCount(statement, "municipio_limite"));
+      assertTrue(indexExists(statement, "idx_municipio_limite_geometria_gist"));
+
+      try (ResultSet limites =
+          statement.executeQuery(
+              """
+                           SELECT
+                               NOT EXISTS (
+                                   SELECT 1
+                                   FROM municipio_limite
+                                   WHERE ST_SRID(geometria) <> 4326
+                                      OR NOT ST_IsValid(geometria)
+                                      OR ST_IsEmpty(geometria)
+                                      OR ST_GeometryType(geometria) <> 'ST_MultiPolygon'
+                               ) AS geometr ias_validas,
+                               NOT EXISTS (
+                                   SELECT 1
+                                   FROM municipio m
+                                   LEFT JOIN municipio_limite l ON l.municipio_id = m.id
+                                   WHERE l.municipio_id IS NULL
+                               ) AS catalogo_completo
+                           """
+                  .replace("geometr ias_validas", "geometrias_validas"))) {
+        assertTrue(limites.next());
+        assertTrue(limites.getBoolean("geometrias_validas"));
+        assertTrue(limites.getBoolean("catalogo_completo"));
+      }
     }
   }
 

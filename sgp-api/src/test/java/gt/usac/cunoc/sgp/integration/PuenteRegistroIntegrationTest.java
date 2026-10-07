@@ -40,6 +40,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -193,18 +194,113 @@ class PuenteRegistroIntegrationTest {
   }
 
   @ParameterizedTest
-  @CsvSource({"14.481, -90.615, 15", "14.8, -89.55, 16"})
-  void permiteRegistrarDentroDeGuatemala(String latitud, String longitud, int zonaEsperada) {
+  @CsvSource({"01, 0114, 14.481, -90.615, 15", "20, 2001, 14.8, -89.55, 16"})
+  void permiteRegistrarDentroDelMunicipioEnAmbasZonasUtm(
+      String codigoDepartamento,
+      String codigoMunicipio,
+      String latitud,
+      String longitud,
+      int zonaEsperada) {
 
-    var respuesta =
-        puenteService.registrar(
-            solicitud(departamentoId, latitud, longitud, false), ADMINISTRADOR_ID);
+    UUID departamento =
+        jdbc.queryForObject(
+            "SELECT id FROM departamento WHERE codigo_ine = ?", UUID.class, codigoDepartamento);
+
+    UUID municipio =
+        jdbc.queryForObject(
+            "SELECT id FROM municipio WHERE codigo_ine = ?", UUID.class, codigoMunicipio);
+
+    var request =
+        new CrearPuenteRequest(
+            "Puente de prueba HU009",
+            departamento,
+            municipio,
+            "CA-9",
+            null,
+            new BigDecimal(latitud),
+            new BigDecimal(longitud),
+            false);
+
+    var respuesta = puenteService.registrar(request, ADMINISTRADOR_ID);
 
     assertThat(respuesta.utm().zona()).isEqualTo(zonaEsperada);
+    assertEquals(departamento, respuesta.departamento().id());
+    assertEquals(municipio, respuesta.municipio().id());
     assertTrue(respuesta.activo());
     assertEquals("Sin evaluar", respuesta.estadoActual());
     assertEquals(1L, puenteRepository.count());
-    assertEquals(1, correlativoActual());
+
+    assertEquals(
+        1,
+        jdbc.queryForObject(
+            "SELECT ultimo_correlativo_puente FROM municipio WHERE id = ?",
+            Integer.class,
+            municipio));
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void rechazaCoordenadasDeQuetzaltenangoConMunicipioAcatenango(boolean confirmarCercania) {
+
+    UUID departamento =
+        jdbc.queryForObject("SELECT id FROM departamento WHERE codigo_ine = '04'", UUID.class);
+
+    UUID municipio =
+        jdbc.queryForObject("SELECT id FROM municipio WHERE codigo_ine = '0411'", UUID.class);
+
+    var request =
+        new CrearPuenteRequest(
+            "Puente con ubicación incongruente",
+            departamento,
+            municipio,
+            "CA-1",
+            null,
+            new BigDecimal("14.844673"),
+            new BigDecimal("-91.521161"),
+            confirmarCercania);
+
+    var excepcion =
+        assertThrows(ApiException.class, () -> puenteService.registrar(request, ADMINISTRADOR_ID));
+
+    assertEquals(HttpStatus.UNPROCESSABLE_ENTITY, excepcion.getStatus());
+    assertEquals("ubicacion_municipio_incongruente", excepcion.getCode());
+    assertEquals(0L, puenteRepository.count());
+
+    assertEquals(
+        0,
+        jdbc.queryForObject(
+            "SELECT ultimo_correlativo_puente FROM municipio WHERE id = ?",
+            Integer.class,
+            municipio));
+  }
+
+  @Test
+  void validaUbicacionDentroDeGuatemalaYDelMunicipio() {
+    puenteService.validarDentroDeGuatemala(14.481, -90.615);
+    puenteService.validarUbicacionEnMunicipio(municipioId, 14.481, -90.615);
+  }
+
+  @Test
+  void validacionDirectaRechazaPuntoFueraDeGuatemala() {
+    var excepcion =
+        assertThrows(ApiException.class, () -> puenteService.validarDentroDeGuatemala(0, 0));
+
+    assertEquals(HttpStatus.UNPROCESSABLE_ENTITY, excepcion.getStatus());
+    assertEquals("ubicacion_fuera_de_guatemala", excepcion.getCode());
+  }
+
+  @Test
+  void validacionDirectaRechazaPuntoDeOtroMunicipio() {
+    UUID acatenango =
+        jdbc.queryForObject("SELECT id FROM municipio WHERE codigo_ine = '0411'", UUID.class);
+
+    var excepcion =
+        assertThrows(
+            ApiException.class,
+            () -> puenteService.validarUbicacionEnMunicipio(acatenango, 14.844673, -91.521161));
+
+    assertEquals(HttpStatus.UNPROCESSABLE_ENTITY, excepcion.getStatus());
+    assertEquals("ubicacion_municipio_incongruente", excepcion.getCode());
   }
 
   @ParameterizedTest
@@ -381,6 +477,7 @@ class PuenteRegistroIntegrationTest {
   @ParameterizedTest
   @CsvSource({"99.99, true", "100.01, false", "101.0, false"})
   void aplicaLimiteDeCercaniaEnMetros(double distanciaObjetivo, boolean esperaAdvertencia) {
+
     var primero =
         puenteService.registrar(
             solicitud(departamentoId, "14.481", "-90.615", false), ADMINISTRADOR_ID);
@@ -421,7 +518,8 @@ class PuenteRegistroIntegrationTest {
 
     try {
       var primera = executor.submit(() -> registrarConcurrentemente("14.481", preparados, iniciar));
-      var segunda = executor.submit(() -> registrarConcurrentemente("14.501", preparados, iniciar));
+
+      var segunda = executor.submit(() -> registrarConcurrentemente("14.470", preparados, iniciar));
 
       assertTrue(preparados.await(10, TimeUnit.SECONDS));
       iniciar.countDown();
@@ -471,6 +569,7 @@ class PuenteRegistroIntegrationTest {
   @Test
   void listaDepartamentosActivosConPaginacion() {
     SecurityContextHolder.clearContext();
+
     long totalActivos =
         jdbc.queryForObject("SELECT COUNT(*) FROM departamento WHERE activo = true", Long.class);
 
@@ -497,7 +596,7 @@ class PuenteRegistroIntegrationTest {
 
     var inactivo =
         puenteService.registrar(
-            solicitud(departamentoId, "14.501", "-90.615", false), ADMINISTRADOR_ID);
+            solicitud(departamentoId, "14.470", "-90.615", false), ADMINISTRADOR_ID);
 
     jdbc.update(
         """
@@ -528,6 +627,7 @@ class PuenteRegistroIntegrationTest {
         jdbc.queryForObject("SELECT id FROM departamento WHERE codigo_ine = '02'", UUID.class);
 
     assertThat(puenteService.listarCatalogo(otroDepartamento, null, 0, 20).getContent()).isEmpty();
+
     assertThat(puenteService.listarCatalogo(null, null, 0, 20).getTotalElements()).isEqualTo(1);
   }
 
@@ -537,7 +637,7 @@ class PuenteRegistroIntegrationTest {
         solicitud(departamentoId, "14.481", "-90.615", false), ADMINISTRADOR_ID);
 
     puenteService.registrar(
-        solicitud(departamentoId, "14.501", "-90.615", false), ADMINISTRADOR_ID);
+        solicitud(departamentoId, "14.470", "-90.615", false), ADMINISTRADOR_ID);
 
     SecurityContextHolder.clearContext();
 
@@ -602,6 +702,30 @@ class PuenteRegistroIntegrationTest {
   }
 
   @Test
+  @WithMockUser(roles = "CATEDRATICO")
+  void catedraticoListaMunicipiosDelDepartamento() {
+    var resultado = catalogoTerritorialService.listarMunicipios(departamentoId, 0, 100);
+
+    assertThat(resultado.getContent()).isNotEmpty();
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"ESTUDIANTE", "PROFESIONAL_EXTERNO"})
+  void rolesSinPermisoNoListanMunicipios(String rol) {
+    SecurityContextHolder.getContext()
+        .setAuthentication(
+            new UsernamePasswordAuthenticationToken(
+                "usuario", "n/a", List.of(new SimpleGrantedAuthority("ROLE_" + rol))));
+
+    try {
+      assertThatThrownBy(() -> catalogoTerritorialService.listarMunicipios(departamentoId, 0, 100))
+          .isInstanceOf(AccessDeniedException.class);
+    } finally {
+      SecurityContextHolder.clearContext();
+    }
+  }
+
+  @Test
   void rechazaConsultaDeMunicipiosDeDepartamentoInexistente() {
     UUID departamentoInexistente = UUID.randomUUID();
 
@@ -635,6 +759,7 @@ class PuenteRegistroIntegrationTest {
   @ParameterizedTest
   @CsvSource({"-1, 10", "0, 0", "0, 101"})
   void rechazaPaginacionInvalidaEnAmbosCatalogos(int pagina, int tamanio) {
+
     assertThatThrownBy(() -> catalogoTerritorialService.listarDepartamentos(pagina, tamanio))
         .isInstanceOfSatisfying(
             ApiException.class,

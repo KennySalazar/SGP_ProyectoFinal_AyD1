@@ -22,7 +22,22 @@ public interface PuenteRepository extends JpaRepository<Puente, UUID> {
   Page<Puente> findCatalogoActivo(@Param("departamentoId") UUID departamentoId, Pageable pageable);
 
   @EntityGraph(attributePaths = {"municipio", "municipio.departamento"})
+  @Query(
+      """
+          SELECT p FROM Puente p
+          WHERE (:activo IS NULL OR p.activo = :activo)
+            AND (:departamentoId IS NULL OR p.municipio.departamento.id = :departamentoId)
+          """)
+  Page<Puente> findCatalogo(
+      @Param("departamentoId") UUID departamentoId,
+      @Param("activo") Boolean activo,
+      Pageable pageable);
+
+  @EntityGraph(attributePaths = {"municipio", "municipio.departamento"})
   Optional<Puente> findByIdAndActivoTrue(UUID id);
+
+  @EntityGraph(attributePaths = {"municipio", "municipio.departamento"})
+  Optional<Puente> findPuenteConRelacionesById(UUID id);
 
   @Query(
       value =
@@ -61,6 +76,49 @@ public interface PuenteRepository extends JpaRepository<Puente, UUID> {
       nativeQuery = true)
   Page<PuenteCercanoProjection> findCercanos(
       @Param("latitud") double latitud, @Param("longitud") double longitud, Pageable pageable);
+
+  @Query(
+      value =
+          """
+                  SELECT p.id AS id,
+                         p.codigo AS codigo,
+                         p.nombre AS nombre,
+                         p.activo AS activo,
+                         ST_Distance(p.ubicacion, q.punto) AS "distanciaMetros",
+                         ST_Y(CAST(p.ubicacion AS geometry)) AS latitud,
+                         ST_X(CAST(p.ubicacion AS geometry)) AS longitud
+                  FROM puente p
+                  CROSS JOIN (
+                      SELECT CAST(
+                          ST_SetSRID(ST_MakePoint(:longitud, :latitud), 4326)
+                          AS geography
+                      ) AS punto
+                  ) q
+                  WHERE p.id <> :excluirId
+                    AND ST_DWithin(p.ubicacion, q.punto, 100)
+                    AND ST_Distance(p.ubicacion, q.punto) < 100
+                  ORDER BY ST_Distance(p.ubicacion, q.punto), p.id
+                  """,
+      countQuery =
+          """
+                  SELECT count(*)
+                  FROM puente p
+                  CROSS JOIN (
+                      SELECT CAST(
+                          ST_SetSRID(ST_MakePoint(:longitud, :latitud), 4326)
+                          AS geography
+                      ) AS punto
+                  ) q
+                  WHERE p.id <> :excluirId
+                    AND ST_DWithin(p.ubicacion, q.punto, 100)
+                    AND ST_Distance(p.ubicacion, q.punto) < 100
+                  """,
+      nativeQuery = true)
+  Page<PuenteCercanoProjection> findCercanosExcluyendoPuente(
+      @Param("latitud") double latitud,
+      @Param("longitud") double longitud,
+      @Param("excluirId") UUID excluirId,
+      Pageable pageable);
 
   @Query(
       value =

@@ -1,0 +1,117 @@
+.bitacora {
+  padding: 1.5rem;
+}
+.filtros {
+  display: grid;
+  grid-template-columns: minmax(200px, 2fr) repeat(2, minmax(140px, 1fr));
+  gap: 1rem;
+}
+label {
+  display: grid;
+  gap: 0.5rem;
+  color: var(--sgp-steel-700);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+input {
+  width: 100%;
+  min-width: 0;
+}
+.acciones-filtro {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  grid-column: 1 / -1;
+}
+.validation {
+  grid-column: 1 / -1;
+  color: #b91c1c;
+  margin: 0;
+}
+.nota {
+  color: var(--sgp-steel-500);
+  font-size: 0.8rem;
+}
+.resumen {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  margin: 1.5rem 0;
+}
+.tabla-contenedor {
+  overflow-x: auto;
+}
+:host ::ng-deep .p-datatable td {
+  overflow-wrap: anywhere;
+}
+.metadatos {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+dt {
+  font-size: 0.8rem;
+  color: var(--sgp-steel-500);
+}
+dd {
+  margin: 0.3rem 0 0;
+  overflow-wrap: anywhere;
+  color: var(--sgp-navy-900);
+}
+.cambios {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+.cambios caption {
+  text-align: left;
+  font-weight: 700;
+  margin: 1rem 0;
+}
+.cambios th,
+.cambios td {
+  border-bottom: 1px solid var(--sgp-border);
+  padding: 0.75rem;
+  vertical-align: top;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.cambios thead {
+  background: var(--sgp-surface-soft);
+}
+@media (max-width: 760px) {
+  .bitacora {
+    padding: 1rem;
+  }
+  .filtros,
+  .metadatos {
+    grid-template-columns: 1fr;
+  }
+  .resumen {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
+
+.grupo-detalle {
+  margin-top: 1rem;
+  border: 1px solid var(--sgp-border);
+  border-radius: 12px;
+  overflow: hidden;
+}
+.grupo-detalle summary {
+  padding: 0.9rem;
+  min-height: 44px;
+  cursor: pointer;
+  font-weight: 700;
+  color: var(--sgp-navy-900);
+  background: var(--sgp-surface-soft);
+}
+.grupo-detalle summary:focus-visible {
+  outline: 2px solid var(--sgp-blue-600);
+  outline-offset: -2px;
+}
+.grupo-detalle caption {
+  padding: 0 0.75rem;
+}

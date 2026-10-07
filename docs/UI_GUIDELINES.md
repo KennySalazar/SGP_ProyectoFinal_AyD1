@@ -77,7 +77,9 @@ Esta guía reúne las reglas visuales y de experiencia que ya están implementad
 - La acción principal utiliza `pButton`, texto explícito e icono PrimeIcons; en formularios se centra y ocupa todo el ancho.
 - Los iconos complementan la etiqueta y no sustituyen el texto, excepto el cierre de aviso y el logout compacto en viewport reducido, ambos con contexto accesible o visual.
 - El estado deshabilitado deriva de la validez del formulario.
-- No existe todavía un patrón consolidado para botones peligrosos, confirmaciones destructivas, acciones secundarias ni estado de carga. Estas variantes no deben inventarse como estándar actual.
+- Las acciones irreversibles o que restringen el acceso (verificar un colegiado, desactivar o cambiar el rol de un usuario) se confirman en un `p-dialog` modal que muestra los datos afectados y explica la consecuencia. Sus botones son Cancelar (secundario, contorneado) y la acción explícita; los errores del servidor se muestran dentro del diálogo y no en el aviso global.
+- La acción que retira el acceso a una cuenta usa `severity="danger"` con contorno en la tabla y relleno en el diálogo de confirmación. Las acciones reversibles, como reactivar, se ejecutan sin diálogo.
+- Mientras una acción está en curso, su botón se deshabilita y su texto cambia a una forma en gerundio (por ejemplo, "Desactivando..."). No existe todavía un patrón de spinner ni skeleton.
 
 ## Mensajes y retroalimentación
 
@@ -90,7 +92,7 @@ Esta guía reúne las reglas visuales y de experiencia que ya están implementad
 
 ## Componentes PrimeNG
 
-- Los componentes usados actualmente son Button, InputText y Tag.
+- Los componentes usados actualmente son Button, InputText, Select, Textarea, Table, Paginator, Tag y Dialog.
 - Deben preferirse componentes PrimeNG cuando exista un componente adecuado, aplicando el preset y los estilos globales del proyecto antes de crear controles personalizados.
 - PrimeIcons es la fuente de iconos de acciones, navegación, estados e información.
 - `p-tag` se usa para estados compactos con severidad semántica, actualmente en el estado de 2FA.

@@ -1,12 +1,26 @@
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
-import { TestBed } from '@angular/core/testing';
-import { TranslocoService } from '@jsverse/transloco';
+import { Pipe, PipeTransform } from '@angular/core';
+import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { By } from '@angular/platform-browser';
+import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiErrorService } from '../../../../core/services/api-error.service';
+import { SelectorUbicacionComponent } from '../../../../shared/components/selector-ubicacion/selector-ubicacion.component';
+import { SelectorUbicacionStubComponent } from '../../../../shared/components/selector-ubicacion/selector-ubicacion.testing';
+import { PuenteFormComponent } from '../../components/puente-form/puente-form.component';
+import { UbicacionTerritorialResponse } from '../../models/puente.models';
 import { RegistrarPuentePage } from './registrar-puente.page';
 
+@Pipe({ name: 'transloco' })
+class TraduccionTestPipe implements PipeTransform {
+  transform(key: string): string {
+    return key;
+  }
+}
+
 describe('RegistrarPuentePage: HU009', () => {
+  let fixture: ComponentFixture<RegistrarPuentePage>;
   let page: RegistrarPuentePage;
   let http: HttpTestingController;
 
@@ -20,50 +34,53 @@ describe('RegistrarPuentePage: HU009', () => {
     id: 'municipio-1',
     departamentoId: departamento.id,
     codigoIne: '0114',
-    nombre: 'Amatitlan',
+    nombre: 'Amatitlán',
   };
 
-  function pagina<T>(content: T[]) {
+  function territorio(latitud = 14.481, longitud = -90.615): UbicacionTerritorialResponse {
     return {
-      content,
-      totalElements: content.length,
-      totalPages: content.length > 0 ? 1 : 0,
-      number: 0,
-      size: 100,
-      first: true,
-      last: true,
-      empty: content.length === 0,
+      latitud,
+      longitud,
+      zonaUtm: '15N',
+      requiereSeleccion: false,
+      candidatos: [{ departamento, municipio }],
     };
   }
 
+  function formulario(): PuenteFormComponent {
+    return fixture.debugElement.query(By.directive(PuenteFormComponent)).componentInstance;
+  }
+
+  function resolverPunto(respuesta: UbicacionTerritorialResponse = territorio()): void {
+    formulario().seleccionarCoordenada({
+      latitud: respuesta.latitud,
+      longitud: respuesta.longitud,
+    });
+
+    vi.advanceTimersByTime(300);
+
+    http.expectOne((req) => req.url === '/api/v1/catalogos/ubicacion').flush(respuesta);
+  }
+
   function formularioValido(): void {
-    page.form.controls.departamentoId.setValue(departamento.id);
-
-    http
-      .expectOne(
-        (req) => req.url === `/api/v1/catalogos/departamentos/${departamento.id}/municipios`,
-      )
-      .flush(pagina([municipio]));
-
-    page.form.patchValue({
+    formulario().form.patchValue({
       nombre: '  Puente HU9  ',
-      municipioId: municipio.id,
       ruta: '  CA-9  ',
       kilometraje: null,
-      latitud: 14.481,
-      longitud: -90.615,
     });
+
+    resolverPunto();
   }
 
   function mostrarAdvertencia(): void {
-    page.registrar();
+    formulario().enviarFormulario();
 
     http.expectOne('/api/v1/puentes').flush(
       {
         type: 'about:blank',
         title: 'Hay puentes cercanos',
         status: 409,
-        detail: 'Se requiere confirmar la cercania.',
+        detail: 'Se requiere confirmar la cercanía.',
         code: 'puente_cercano',
         requiereConfirmacion: true,
         puentesCercanos: [
@@ -73,15 +90,56 @@ describe('RegistrarPuentePage: HU009', () => {
             nombre: 'Puente existente',
             activo: true,
             distanciaMetros: 11.1,
+            latitud: 14.4811,
+            longitud: -90.615,
           },
         ],
         totalPuentesCercanos: 1,
       },
       { status: 409, statusText: 'Conflict' },
     );
+
+    fixture.detectChanges();
+  }
+
+  function puenteCompleto() {
+    return {
+      id: 'puente-nuevo',
+      codigo: 'GT-01-0114-0001',
+      nombre: 'Puente HU9',
+      departamento,
+      municipio,
+      ruta: 'CA-9',
+      kilometraje: null,
+      latitud: 14.481,
+      longitud: -90.615,
+      utm: { zona: 15, hemisferio: 'N', epsg: 32615, este: 100.5, norte: 200.5 },
+      activo: true,
+      estadoActual: 'Sin evaluar',
+      indiceCondicionActual: null,
+      fechaUltimaInspeccion: null,
+      creadoEn: '2026-10-06T12:00:00Z',
+    };
+  }
+
+  function cargarPuentesExistentes(puentes: object[] = []): void {
+    http
+      .expectOne((req) => req.url === '/api/v1/puentes')
+      .flush({
+        content: puentes,
+        totalElements: puentes.length,
+        totalPages: 1,
+        number: 0,
+        size: 100,
+        first: true,
+        last: true,
+        empty: puentes.length === 0,
+      });
   }
 
   beforeEach(() => {
+    vi.useFakeTimers();
+
     TestBed.configureTestingModule({
       providers: [
         provideHttpClient(),
@@ -96,98 +154,49 @@ describe('RegistrarPuentePage: HU009', () => {
         },
       ],
     });
+    TestBed.overrideComponent(RegistrarPuentePage, {
+      remove: { imports: [TranslocoPipe] },
+      add: { imports: [TraduccionTestPipe] },
+    });
+    TestBed.overrideComponent(PuenteFormComponent, {
+      remove: { imports: [TranslocoPipe, SelectorUbicacionComponent] },
+      add: { imports: [TraduccionTestPipe, SelectorUbicacionStubComponent] },
+    });
 
     http = TestBed.inject(HttpTestingController);
-
-    page = TestBed.runInInjectionContext(() => new RegistrarPuentePage());
-
-    http
-      .expectOne((req) => req.url === '/api/v1/catalogos/departamentos')
-      .flush(pagina([departamento]));
+    fixture = TestBed.createComponent(RegistrarPuentePage);
+    page = fixture.componentInstance;
+    fixture.detectChanges();
+    cargarPuentesExistentes();
   });
 
   afterEach(() => {
-    http.verify();
+    try {
+      http.verify();
+    } finally {
+      fixture.destroy();
+      TestBed.resetTestingModule();
+      vi.clearAllTimers();
+      vi.useRealTimers();
+    }
   });
 
-  it.each(['', '   '])('no envia el registro cuando ruta contiene "%s"', (ruta) => {
-    formularioValido();
-    page.form.controls.ruta.setValue(ruta);
+  it('no envía el registro mientras el formulario no sea válido', () => {
+    formulario().enviarFormulario();
 
-    page.registrar();
-
-    expect(page.form.controls.ruta.hasError('required')).toBe(true);
-    expect(page.mensajeCampo('ruta')).toBe('puentes.required');
     http.expectNone('/api/v1/puentes');
   });
 
-  it.each([
-    { latitud: 91, longitud: -90.615, campo: 'latitud' as const },
-    { latitud: 14.481, longitud: -181, campo: 'longitud' as const },
-  ])('rechaza coordenadas fuera de rango: $campo', (datos) => {
-    formularioValido();
-    page.form.patchValue({
-      latitud: datos.latitud,
-      longitud: datos.longitud,
-    });
-
-    page.registrar();
-
-    expect(page.form.controls[datos.campo].invalid).toBe(true);
-    http.expectNone('/api/v1/puentes');
-  });
-
-  it('limpia el municipio al cambiar de departamento', () => {
+  it('envía los datos mínimos y evita solicitudes duplicadas', () => {
     formularioValido();
 
-    page.form.controls.departamentoId.setValue('departamento-2');
+    formulario().enviarFormulario();
+    formulario().enviarFormulario();
 
-    expect(page.form.controls.municipioId.value).toBe('');
-    expect(page.form.controls.municipioId.disabled).toBe(true);
-    expect(page.municipios()).toEqual([]);
-    expect(page.cargandoMunicipios()).toBe(true);
+    const requests = http.match('/api/v1/puentes');
+    expect(requests).toHaveLength(1);
 
-    http
-      .expectOne((req) => req.url === '/api/v1/catalogos/departamentos/departamento-2/municipios')
-      .flush(
-        pagina([
-          {
-            ...municipio,
-            id: 'municipio-2',
-            departamentoId: 'departamento-2',
-          },
-        ]),
-      );
-
-    expect(page.form.controls.municipioId.enabled).toBe(true);
-    expect(page.form.controls.municipioId.value).toBe('');
-    expect(page.cargandoMunicipios()).toBe(false);
-  });
-
-  it('rechaza un municipio que no pertenece al departamento', () => {
-    formularioValido();
-    page.municipios.set([{ ...municipio, departamentoId: 'departamento-2' }]);
-
-    page.registrar();
-
-    expect(page.erroresCampos()['municipioId']).toBe('puentes.invalidTerritory');
-    http.expectNone('/api/v1/puentes');
-  });
-
-  it('espera confirmacion antes de reenviar un puente cercano', () => {
-    formularioValido();
-    mostrarAdvertencia();
-
-    expect(page.advertencia()?.requiereConfirmacion).toBe(true);
-    expect(page.puenteRegistrado()).toBeNull();
-    expect(page.guardando()).toBe(false);
-    http.expectNone('/api/v1/puentes');
-
-    page.confirmarRegistro();
-
-    const request = http.expectOne('/api/v1/puentes');
-
-    expect(request.request.body).toEqual({
+    expect(requests[0].request.body).toEqual({
       nombre: 'Puente HU9',
       departamentoId: departamento.id,
       municipioId: municipio.id,
@@ -195,121 +204,155 @@ describe('RegistrarPuentePage: HU009', () => {
       kilometraje: null,
       latitud: 14.481,
       longitud: -90.615,
-      confirmarCercania: true,
+      confirmarCercania: false,
     });
 
-    request.flush(
+    expect(page.guardando()).toBe(true);
+    fixture.detectChanges();
+    expect(formulario().form.disabled).toBe(true);
+
+    requests[0].flush(puenteCompleto(), { status: 201, statusText: 'Created' });
+
+    expect(page.puenteRegistrado()?.codigo).toBe('GT-01-0114-0001');
+    expect(page.guardando()).toBe(false);
+  });
+
+  it('espera confirmación y expone los puntos cercanos para el mapa', () => {
+    formularioValido();
+    mostrarAdvertencia();
+
+    expect(page.advertencia()?.requiereConfirmacion).toBe(true);
+    expect(page.puntosCercanos()).toEqual([
       {
-        id: 'puente-nuevo',
-        codigo: 'GT-01-0114-0002',
-        activo: true,
-        estadoActual: 'Sin evaluar',
+        id: 'puente-existente',
+        titulo: 'GT-01-0114-0001 — Puente existente',
+        latitud: 14.4811,
+        longitud: -90.615,
       },
+    ]);
+
+    http.expectNone('/api/v1/puentes');
+
+    page.confirmarRegistro();
+
+    const request = http.expectOne('/api/v1/puentes');
+    expect(request.request.body.confirmarCercania).toBe(true);
+
+    request.flush(
+      { ...puenteCompleto(), codigo: 'GT-01-0114-0002' },
       { status: 201, statusText: 'Created' },
     );
 
     expect(page.puenteRegistrado()?.codigo).toBe('GT-01-0114-0002');
     expect(page.advertencia()).toBeNull();
-    expect(page.guardando()).toBe(false);
   });
 
-  it('volver al formulario conserva datos y cancela la confirmacion', () => {
+  it('cancelar la confirmación conserva los datos', () => {
     formularioValido();
-    const datos = page.form.getRawValue();
+    const datos = formulario().form.getRawValue();
     mostrarAdvertencia();
 
     page.cancelarConfirmacion();
     page.confirmarRegistro();
+    fixture.detectChanges();
 
     expect(page.advertencia()).toBeNull();
-    expect(page.form.getRawValue()).toEqual(datos);
-    expect(page.puenteRegistrado()).toBeNull();
+    expect(formulario().form.getRawValue()).toEqual(datos);
     http.expectNone('/api/v1/puentes');
   });
 
-  it('editar los datos invalida una confirmacion pendiente', () => {
+  it('editar los datos invalida una confirmación pendiente', () => {
     formularioValido();
     mostrarAdvertencia();
 
-    page.form.controls.nombre.setValue('Otro nombre');
+    formulario().form.controls.nombre.setValue('Otro nombre');
     page.confirmarRegistro();
 
     expect(page.advertencia()).toBeNull();
     http.expectNone('/api/v1/puentes');
   });
 
-  it('muestra el error de campo recibido en una respuesta 422', () => {
+  it('muestra los errores de campo recibidos en una respuesta 422', () => {
     formularioValido();
-    page.registrar();
+    formulario().enviarFormulario();
 
     http.expectOne('/api/v1/puentes').flush(
       {
-        type: 'about:blank',
-        title: 'Error de validacion',
-        status: 422,
         detail: 'Revisa los campos indicados.',
-        errores: [
-          {
-            campo: 'ruta',
-            mensaje: 'La ruta indicada no es valida.',
-          },
-        ],
+        errores: [{ campo: 'ruta', mensaje: 'La ruta indicada no es válida.' }],
       },
       { status: 422, statusText: 'Unprocessable Entity' },
     );
+    fixture.detectChanges();
 
-    expect(page.mensajeCampo('ruta')).toBe('La ruta indicada no es valida.');
+    expect(formulario().mensajeCampo('ruta')).toBe('La ruta indicada no es válida.');
     expect(page.errorRegistro()).toBe('Revisa los campos indicados.');
-    expect(page.form.enabled).toBe(true);
     expect(page.guardando()).toBe(false);
+    expect(formulario().form.controls.ruta.enabled).toBe(true);
     expect(page.puenteRegistrado()).toBeNull();
   });
 
-  it('evita solicitudes duplicadas mientras guarda', () => {
+  it('invalida el territorio si el backend rechaza la congruencia municipal', () => {
     formularioValido();
+    formulario().enviarFormulario();
 
-    page.registrar();
-    page.registrar();
-
-    const requests = http.match('/api/v1/puentes');
-
-    expect(requests).toHaveLength(1);
-    expect(requests[0].request.body.confirmarCercania).toBe(false);
-    expect(page.guardando()).toBe(true);
-    expect(page.form.disabled).toBe(true);
-
-    requests[0].flush(
-      { detail: 'Servicio temporalmente no disponible.' },
-      { status: 503, statusText: 'Service Unavailable' },
+    http.expectOne('/api/v1/puentes').flush(
+      {
+        code: 'ubicacion_municipio_incongruente',
+        detail: 'Las coordenadas no corresponden al municipio seleccionado.',
+      },
+      { status: 422, statusText: 'Unprocessable Entity' },
     );
+    fixture.detectChanges();
 
-    expect(page.guardando()).toBe(false);
-    expect(page.form.enabled).toBe(true);
-    expect(page.errorRegistro()).toBe('Servicio temporalmente no disponible.');
+    expect(formulario().territorio()).toBeNull();
+    expect(formulario().form.controls.departamentoId.value).toBe('');
+    expect(formulario().form.controls.municipioId.value).toBe('');
+    expect(formulario().ubicacionValidada()).toBe(false);
+
+    formulario().enviarFormulario();
+    http.expectNone('/api/v1/puentes');
   });
 
-  it('permite reintentar la carga de municipios despues de un error', () => {
-    page.form.controls.departamentoId.setValue(departamento.id);
+  it('quitar la ubicación cancela la confirmación pendiente y los puntos cercanos', () => {
+    formularioValido();
+    mostrarAdvertencia();
+
+    formulario().quitarUbicacion();
+
+    expect(page.advertencia()).toBeNull();
+    expect(page.puntosCercanos()).toEqual([]);
+
+    page.confirmarRegistro();
+    http.expectNone('/api/v1/puentes');
+  });
+
+  it('registrar otro puente restablece formulario y ubicación', () => {
+    formularioValido();
+    formulario().enviarFormulario();
 
     http
-      .expectOne(
-        (req) => req.url === `/api/v1/catalogos/departamentos/${departamento.id}/municipios`,
-      )
-      .flush({ detail: 'Error temporal.' }, { status: 503, statusText: 'Service Unavailable' });
+      .expectOne('/api/v1/puentes')
+      .flush(puenteCompleto(), { status: 201, statusText: 'Created' });
+    fixture.detectChanges();
 
-    expect(page.errorMunicipios()).toBe(true);
-    expect(page.form.controls.municipioId.disabled).toBe(true);
+    expect(fixture.nativeElement.querySelector('app-puente-form')).toBeNull();
 
-    page.reintentarMunicipios();
+    page.registrarOtro();
+    fixture.detectChanges();
+    // El formulario nuevo vuelve a cargar los puentes, incluido el recién registrado.
+    cargarPuentesExistentes([]);
 
-    http
-      .expectOne(
-        (req) => req.url === `/api/v1/catalogos/departamentos/${departamento.id}/municipios`,
-      )
-      .flush(pagina([municipio]));
-
-    expect(page.errorMunicipios()).toBe(false);
-    expect(page.municipios()).toEqual([municipio]);
-    expect(page.form.controls.municipioId.enabled).toBe(true);
+    expect(page.puenteRegistrado()).toBeNull();
+    expect(formulario().territorio()).toBeNull();
+    expect(formulario().form.getRawValue()).toEqual({
+      nombre: '',
+      departamentoId: '',
+      municipioId: '',
+      ruta: '',
+      kilometraje: null,
+      latitud: null,
+      longitud: null,
+    });
   });
 });

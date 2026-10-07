@@ -6,11 +6,16 @@ import gt.usac.cunoc.sgp.puente.dto.MunicipioResponse;
 import gt.usac.cunoc.sgp.puente.dto.PuenteCatalogoResponse;
 import gt.usac.cunoc.sgp.puente.dto.PuenteCercanoResponse;
 import gt.usac.cunoc.sgp.puente.dto.PuenteResponse;
+import gt.usac.cunoc.sgp.puente.dto.SolicitudAltaPuenteResponse;
 import gt.usac.cunoc.sgp.puente.entity.Departamento;
 import gt.usac.cunoc.sgp.puente.entity.Municipio;
 import gt.usac.cunoc.sgp.puente.entity.Puente;
+import gt.usac.cunoc.sgp.puente.entity.SolicitudAltaPuente;
 import gt.usac.cunoc.sgp.puente.repository.PuenteRepository.CoordenadaUtmProjection;
 import gt.usac.cunoc.sgp.puente.repository.PuenteRepository.PuenteCercanoProjection;
+import java.time.Instant;
+import java.time.OffsetDateTime;
+import java.time.ZoneId;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.mapstruct.ReportingPolicy;
@@ -46,4 +51,24 @@ public interface PuenteMapper {
       expression =
           "java(puente.getCreadoEn().atZone(java.time.ZoneId.of(\"America/Guatemala\")).toOffsetDateTime())")
   PuenteResponse toAltaResponse(Puente puente, CoordenadaUtmResponse utm);
+
+  @Mapping(target = "nombre", source = "nombrePropuesto")
+  @Mapping(target = "departamento", source = "municipio.departamento")
+  @Mapping(target = "latitud", expression = "java(solicitud.getUbicacion().getY())")
+  @Mapping(target = "longitud", expression = "java(solicitud.getUbicacion().getX())")
+  @Mapping(
+      target = "puenteCreadoId",
+      expression =
+          "java(solicitud.getPuenteCreado() == null ? null : solicitud.getPuenteCreado().getId())")
+  @Mapping(
+      target = "puenteCreadoCodigo",
+      expression =
+          "java(solicitud.getPuenteCreado() == null ? null : solicitud.getPuenteCreado().getCodigo())")
+  SolicitudAltaPuenteResponse toSolicitudResponse(SolicitudAltaPuente solicitud);
+
+  default OffsetDateTime aHoraGuatemala(Instant instante) {
+    return instante == null
+        ? null
+        : instante.atZone(ZoneId.of("America/Guatemala")).toOffsetDateTime();
+  }
 }

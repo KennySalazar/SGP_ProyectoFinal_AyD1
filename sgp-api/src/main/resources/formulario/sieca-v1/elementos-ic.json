@@ -1,0 +1,964 @@
+{
+  "$comment": "Borrador HU-017. Catálogo de elementos evaluables del formulario sieca-v1 para la configuración del Índice de Condición. Los pesos están en null a propósito: no hay valores aprobados académicamente. Al aprobarse el acta, cada elemento con peso se carga como una fila de configuracion_ic_elemento (version_formulario_id, elemento_ref, peso, descripcion); un elemento excluido del IC simplemente no tiene fila (la BD exige peso > 0). Generado a partir de las anotaciones x-sgp-evaluable del esquema.",
+  "formulario": "sieca-v1",
+  "estado": "BORRADOR_SIN_CALIBRAR",
+  "elementos": [
+    {
+      "id": "E01",
+      "elemento_ref": "/subestructura/estribo_entrada/cortina_superior",
+      "nombre": "Sub-estructura › Estribo de entrada › Cortina superior",
+      "seccion": "subestructura",
+      "repetible": false,
+      "portante": false,
+      "fundamento_portante": null,
+      "indicadores": [
+        "grietas_una_direccion",
+        "grietas_dos_direcciones",
+        "perdida_petreos_golpe",
+        "exposicion_acero",
+        "otros"
+      ],
+      "peso": null,
+      "criterio_peso": null
+    },
+    {
+      "id": "E02",
+      "elemento_ref": "/subestructura/estribo_entrada/cortina_inferior",
+      "nombre": "Sub-estructura › Estribo de entrada › Cortina inferior",
+      "seccion": "subestructura",
+      "repetible": false,
+      "portante": false,
+      "fundamento_portante": null,
+      "indicadores": [
+        "grietas_una_direccion",
+        "grietas_dos_direcciones",
+        "perdida_petreos_golpe",
+        "exposicion_acero",
+        "otros"
+      ],
+      "peso": null,
+      "criterio_peso": null
+    },
+    {
+      "id": "E03",
+      "elemento_ref": "/subestructura/estribo_entrada/viga_apoyo",
+      "nombre": "Sub-estructura › Estribo de entrada › Viga de apoyo",
+      "seccion": "subestructura",
+      "repetible": false,
+      "portante": true,
+      "fundamento_portante": "Viga: recibe directamente los extremos de las vigas de la superestructura (Anexo 1 del manual, 1.1.1.2).",
+      "indicadores": [
+        "grietas_una_direccion",
+        "grietas_dos_direcciones",
+        "perdida_petreos_golpe",
+        "exposicion_acero",
+        "otros"
+      ],
+      "peso": null,
+      "criterio_peso": null
+    },
+    {
+      "id": "E04",
+      "elemento_ref": "/subestructura/estribo_entrada/apoyos",
+      "nombre": "Sub-estructura › Estribo de entrada › Apoyos",
+      "seccion": "subestructura",
+      "repetible": false,
+      "portante": false,
+      "fundamento_portante": null,
+      "indicadores": [
+        "neopreno_aplastado",
+        "fuera_de_lugar",
+        "oxidado",
+        "falta_perno",
+        "perno_roto",
+        "otros"
+      ],
+      "peso": null,
+      "criterio_peso": null
+    },
+    {
+      "id": "E05",
+      "elemento_ref": "/subestructura/estribo_entrada/columnas",
+      "nombre": "Sub-estructura › Estribo de entrada › Columnas",
+      "seccion": "subestructura",
+      "repetible": false,
+      "portante": true,
+      "fundamento_portante": "Columna: soporta toda la estructura sobre el suelo (Anexo 1 del manual, 1.1.1.3 y 1.1.2.2).",
+      "indicadores": [
+        "grietas_una_direccion",
+        "grietas_dos_direcciones",
+        "perdida_petreos_golpe",
+        "exposicion_acero",
+        "otros"
+      ],
+      "peso": null,
+      "criterio_peso": null
+    },
+    {
+      "id": "E06",
+      "elemento_ref": "/subestructura/estribo_entrada/cuerpo_muro_gravedad",
+      "nombre": "Sub-estructura › Estribo de entrada › Cuerpo (muro de gravedad)",
+      "seccion": "subestructura",
+      "repetible": false,
+      "portante": true,
+      "fundamento_portante": "PROPUESTA DEL EQUIPO: el manual define 'columna o cuerpo' como la parte que soporta toda la estructura (Anexo 1 del manual, 1.1.1.3); el muro de gravedad cumple la misma función que las columnas. Confirmar.",
+      "indicadores": [
+        "grietas_una_direccion",
+        "grietas_dos_direcciones",
+        "perdida_petreos_golpe",
+        "otros"
+      ],
+      "peso": null,
+      "criterio_peso": null
+    },
+    {
+      "id": "E07",
+      "elemento_ref": "/subestructura/estribo_entrada/aletones/aguas_arriba",
+      "nombre": "Sub-estructura › Estribo de entrada › Aletones › Aletón aguas arriba",
+      "seccion": "subestructura",
+      "repetible": false,
+      "portante": false,
+      "fundamento_portante": null,
+      "indicadores": [
+        "grietas_una_direccion",
+        "grietas_dos_direcciones",
+        "perdida_petreos_golpe",
+        "exposicion_acero",
+        "otros"
+      ],
+      "peso": null,
+      "criterio_peso": null
+    },
+    {
+      "id": "E08",
+      "elemento_ref": "/subestructura/estribo_entrada/aletones/aguas_abajo",
+      "nombre": "Sub-estructura › Estribo de entrada › Aletones › Aletón aguas abajo",
+      "seccion": "subestructura",
+      "repetible": false,
+      "portante": false,
+      "fundamento_portante": null,
+      "indicadores": [
+        "grietas_una_direccion",
+        "grietas_dos_direcciones",
+        "perdida_petreos_golpe",
+        "exposicion_acero",
+        "otros"
+      ],
+      "peso": null,
+      "criterio_peso": null
+    },
+    {
+      "id": "E09",
+      "elemento_ref": "/subestructura/estribo_entrada/socavacion",
+      "nombre": "Sub-estructura › Estribo de entrada › Socavación",
+      "seccion": "subestructura",
+      "repetible": false,
+      "portante": false,
+      "fundamento_portante": null,
+      "indicadores": [
+        "aguas_arriba",
+        "aguas_abajo"
+      ],
+      "peso": null,
+      "criterio_peso": null
+    },
+    {
+      "id": "E10",
+      "elemento_ref": "/subestructura/estribo_salida/cortina_superior",
+      "nombre": "Sub-estructura › Estribo de salida › Cortina superior",
+      "seccion": "subestructura",
+      "repetible": false,
+      "portante": false,
+      "fundamento_portante": null,
+      "indicadores": [
+        "grietas_una_direccion",
+        "grietas_dos_direcciones",
+        "perdida_petreos_golpe",
+        "exposicion_acero",
+        "otros"
+      ],
+      "peso": null,
+      "criterio_peso": null
+    },
+    {
+      "id": "E11",
+      "elemento_ref": "/subestructura/estribo_salida/cortina_inferior",
+      "nombre": "Sub-estructura › Estribo de salida › Cortina inferior",
+      "seccion": "subestructura",
+      "repetible": false,
+      "portante": false,
+      "fundamento_portante": null,
+      "indicadores": [
+        "grietas_una_direccion",
+        "grietas_dos_direcciones",
+        "perdida_petreos_golpe",
+        "exposicion_acero",
+        "otros"
+      ],
+      "peso": null,
+      "criterio_peso": null
+    },
+    {
+      "id": "E12",
+      "elemento_ref": "/subestructura/estribo_salida/viga_apoyo",
+      "nombre": "Sub-estructura › Estribo de salida › Viga de apoyo",
+      "seccion": "subestructura",
+      "repetible": false,
+      "portante": true,
+      "fundamento_portante": "Viga: recibe directamente los extremos de las vigas de la superestructura (Anexo 1 del manual, 1.1.1.2).",
+      "indicadores": [
+        "grietas_una_direccion",
+        "grietas_dos_direcciones",
+        "perdida_petreos_golpe",
+        "exposicion_acero",
+        "otros"
+      ],
+      "peso": null,
+      "criterio_peso": null
+    },
+    {
+      "id": "E13",
+      "elemento_ref": "/subestructura/estribo_salida/apoyos",
+      "nombre": "Sub-estructura › Estribo de salida › Apoyos",
+      "seccion": "subestructura",
+      "repetible": false,
+      "portante": false,
+      "fundamento_portante": null,
+      "indicadores": [
+        "neopreno_aplastado",
+        "fuera_de_lugar",
+        "oxidado",
+        "falta_perno",
+        "perno_roto",
+        "otros"
+      ],
+      "peso": null,
+      "criterio_peso": null
+    },
+    {
+      "id": "E14",
+      "elemento_ref": "/subestructura/estribo_salida/columnas",
+      "nombre": "Sub-estructura › Estribo de salida › Columnas",
+      "seccion": "subestructura",
+      "repetible": false,
+      "portante": true,
+      "fundamento_portante": "Columna: soporta toda la estructura sobre el suelo (Anexo 1 del manual, 1.1.1.3 y 1.1.2.2).",
+      "indicadores": [
+        "grietas_una_direccion",
+        "grietas_dos_direcciones",
+        "perdida_petreos_golpe",
+        "exposicion_acero",
+        "otros"
+      ],
+      "peso": null,
+      "criterio_peso": null
+    },
+    {
+      "id": "E15",
+      "elemento_ref": "/subestructura/estribo_salida/cuerpo_muro_gravedad",
+      "nombre": "Sub-estructura › Estribo de salida › Cuerpo (muro de gravedad)",
+      "seccion": "subestructura",
+      "repetible": false,
+      "portante": true,
+      "fundamento_portante": "PROPUESTA DEL EQUIPO: el manual define 'columna o cuerpo' como la parte que soporta toda la estructura (Anexo 1 del manual, 1.1.1.3); el muro de gravedad cumple la misma función que las columnas. Confirmar.",
+      "indicadores": [
+        "grietas_una_direccion",
+        "grietas_dos_direcciones",
+        "perdida_petreos_golpe",
+        "otros"
+      ],
+      "peso": null,
+      "criterio_peso": null
+    },
+    {
+      "id": "E16",
+      "elemento_ref": "/subestructura/estribo_salida/aletones/aguas_arriba",
+      "nombre": "Sub-estructura › Estribo de salida › Aletones › Aletón aguas arriba",
+      "seccion": "subestructura",
+      "repetible": false,
+      "portante": false,
+      "fundamento_portante": null,
+      "indicadores": [
+        "grietas_una_direccion",
+        "grietas_dos_direcciones",
+        "perdida_petreos_golpe",
+        "exposicion_acero",
+        "otros"
+      ],
+      "peso": null,
+      "criterio_peso": null
+    },
+    {
+      "id": "E17",
+      "elemento_ref": "/subestructura/estribo_salida/aletones/aguas_abajo",
+      "nombre": "Sub-estructura › Estribo de salida › Aletones › Aletón aguas abajo",
+      "seccion": "subestructura",
+      "repetible": false,
+      "portante": false,
+      "fundamento_portante": null,
+      "indicadores": [
+        "grietas_una_direccion",
+        "grietas_dos_direcciones",
+        "perdida_petreos_golpe",
+        "exposicion_acero",
+        "otros"
+      ],
+      "peso": null,
+      "criterio_peso": null
+    },
+    {
+      "id": "E18",
+      "elemento_ref": "/subestructura/estribo_salida/socavacion",
+      "nombre": "Sub-estructura › Estribo de salida › Socavación",
+      "seccion": "subestructura",
+      "repetible": false,
+      "portante": false,
+      "fundamento_portante": null,
+      "indicadores": [
+        "aguas_arriba",
+        "aguas_abajo"
+      ],
+      "peso": null,
+      "criterio_peso": null
+    },
+    {
+      "id": "E19",
+      "elemento_ref": "/subestructura/pilas/viga_cabezal",
+      "nombre": "Sub-estructura › Pilas › Viga cabezal",
+      "seccion": "subestructura",
+      "repetible": true,
+      "portante": true,
+      "fundamento_portante": "Viga: en ella descansan las vigas de las superestructuras (Anexo 1 del manual, 1.1.2.1).",
+      "indicadores": [
+        "grietas_una_direccion",
+        "grietas_dos_direcciones",
+        "perdida_petreos_golpe",
+        "exposicion_acero",
+        "otros"
+      ],
+      "peso": null,
+      "criterio_peso": null
+    },
+    {
+      "id": "E20",
+      "elemento_ref": "/subestructura/pilas/columnas",
+      "nombre": "Sub-estructura › Pilas › Columnas",
+      "seccion": "subestructura",
+      "repetible": true,
+      "portante": true,
+      "fundamento_portante": "Columna: soporta toda la estructura sobre el suelo (Anexo 1 del manual, 1.1.1.3 y 1.1.2.2).",
+      "indicadores": [
+        "grietas_una_direccion",
+        "grietas_dos_direcciones",
+        "perdida_petreos_golpe",
+        "exposicion_acero",
+        "otros"
+      ],
+      "peso": null,
+      "criterio_peso": null
+    },
+    {
+      "id": "E21",
+      "elemento_ref": "/subestructura/pilas/cuerpo_muro_gravedad",
+      "nombre": "Sub-estructura › Pilas › Cuerpo (muro de gravedad)",
+      "seccion": "subestructura",
+      "repetible": true,
+      "portante": true,
+      "fundamento_portante": "PROPUESTA DEL EQUIPO: el manual define 'columna o cuerpo' como la parte que soporta toda la estructura (Anexo 1 del manual, 1.1.1.3); el muro de gravedad cumple la misma función que las columnas. Confirmar.",
+      "indicadores": [
+        "grietas_una_direccion",
+        "grietas_dos_direcciones",
+        "perdida_petreos_golpe",
+        "otros"
+      ],
+      "peso": null,
+      "criterio_peso": null
+    },
+    {
+      "id": "E22",
+      "elemento_ref": "/subestructura/pilas/apoyos",
+      "nombre": "Sub-estructura › Pilas › Apoyos",
+      "seccion": "subestructura",
+      "repetible": true,
+      "portante": false,
+      "fundamento_portante": null,
+      "indicadores": [
+        "neopreno_aplastado",
+        "fuera_de_lugar",
+        "oxidado",
+        "falta_perno",
+        "perno_roto",
+        "otros"
+      ],
+      "peso": null,
+      "criterio_peso": null
+    },
+    {
+      "id": "E23",
+      "elemento_ref": "/subestructura/pilas/socavacion",
+      "nombre": "Sub-estructura › Pilas › Socavación",
+      "seccion": "subestructura",
+      "repetible": true,
+      "portante": false,
+      "fundamento_portante": null,
+      "indicadores": [
+        "aguas_arriba",
+        "aguas_abajo"
+      ],
+      "peso": null,
+      "criterio_peso": null
+    },
+    {
+      "id": "E24",
+      "elemento_ref": "/superestructura/losa_rodamiento",
+      "nombre": "Super-estructura › Losa de rodamiento",
+      "seccion": "superestructura",
+      "repetible": false,
+      "portante": false,
+      "fundamento_portante": null,
+      "indicadores": [
+        "grietas_una_direccion",
+        "grietas_dos_direcciones",
+        "desprendimiento_agregados",
+        "baches",
+        "exposicion_acero",
+        "otros"
+      ],
+      "peso": null,
+      "criterio_peso": null
+    },
+    {
+      "id": "E25",
+      "elemento_ref": "/superestructura/elemento_portante_concreto",
+      "nombre": "Super-estructura › Elemento portante de concreto",
+      "seccion": "superestructura",
+      "repetible": false,
+      "portante": true,
+      "fundamento_portante": "Viga longitudinal: soporta todas las cargas vivas y muertas transferidas desde la losa (Anexo 1 del manual, 1.2.2).",
+      "indicadores": [
+        "grietas_diagonal",
+        "grietas_verticales",
+        "perdida_petreos_golpe",
+        "exposicion_acero",
+        "otros"
+      ],
+      "peso": null,
+      "criterio_peso": null
+    },
+    {
+      "id": "E26",
+      "elemento_ref": "/superestructura/elemento_portante_acero",
+      "nombre": "Super-estructura › Elemento portante de acero",
+      "seccion": "superestructura",
+      "repetible": false,
+      "portante": true,
+      "fundamento_portante": "Viga longitudinal: soporta todas las cargas vivas y muertas transferidas desde la losa (Anexo 1 del manual, 1.2.2).",
+      "indicadores": [
+        "oxido",
+        "faltan_pernos",
+        "elemento_golpeado",
+        "elemento_cortado",
+        "pintura",
+        "otros"
+      ],
+      "peso": null,
+      "criterio_peso": null
+    },
+    {
+      "id": "E27",
+      "elemento_ref": "/superestructura/diafragmas_concreto",
+      "nombre": "Super-estructura › Diafragmas concreto",
+      "seccion": "superestructura",
+      "repetible": false,
+      "portante": false,
+      "fundamento_portante": null,
+      "indicadores": [
+        "grietas_diagonal",
+        "grietas_verticales",
+        "perdida_petreos_golpe",
+        "exposicion_acero",
+        "otros"
+      ],
+      "peso": null,
+      "criterio_peso": null
+    },
+    {
+      "id": "E28",
+      "elemento_ref": "/superestructura/diafragmas_acero",
+      "nombre": "Super-estructura › Diafragmas acero",
+      "seccion": "superestructura",
+      "repetible": false,
+      "portante": false,
+      "fundamento_portante": null,
+      "indicadores": [
+        "oxido",
+        "faltan_pernos",
+        "elemento_golpeado",
+        "elemento_cortado",
+        "pintura",
+        "otros"
+      ],
+      "peso": null,
+      "criterio_peso": null
+    },
+    {
+      "id": "E29",
+      "elemento_ref": "/superestructura/estructura_tipo_cercha",
+      "nombre": "Super-estructura › Estructura tipo cercha",
+      "seccion": "superestructura",
+      "repetible": false,
+      "portante": true,
+      "fundamento_portante": "Cercha: elemento portante principal en puentes tipo cercha (señalado en HU-017).",
+      "indicadores": [
+        "oxido",
+        "faltan_pernos",
+        "elemento_golpeado",
+        "elemento_cortado",
+        "pintura",
+        "otros"
+      ],
+      "peso": null,
+      "criterio_peso": null
+    },
+    {
+      "id": "E30",
+      "elemento_ref": "/superestructura/drenaje",
+      "nombre": "Super-estructura › Drenaje superestructura",
+      "seccion": "superestructura",
+      "repetible": false,
+      "portante": false,
+      "fundamento_portante": null,
+      "indicadores": [
+        "estado"
+      ],
+      "peso": null,
+      "criterio_peso": null
+    },
+    {
+      "id": "E31",
+      "elemento_ref": "/elementos_no_estructurales/pasamanos_barandal",
+      "nombre": "Elementos no estructurales › Pasamanos barandal (especificar lado)",
+      "seccion": "elementos_no_estructurales",
+      "repetible": false,
+      "portante": false,
+      "fundamento_portante": null,
+      "indicadores": [
+        "ausencia_seccion",
+        "deformacion_elemento",
+        "golpeado_longitud_m",
+        "pintura",
+        "otros"
+      ],
+      "peso": null,
+      "criterio_peso": null
+    },
+    {
+      "id": "E32",
+      "elemento_ref": "/elementos_no_estructurales/postes_barandal",
+      "nombre": "Elementos no estructurales › Postes barandal (especificar lado)",
+      "seccion": "elementos_no_estructurales",
+      "repetible": false,
+      "portante": false,
+      "fundamento_portante": null,
+      "indicadores": [
+        "ausencia_seccion",
+        "deformacion_elemento",
+        "golpeados_cantidad",
+        "pintura",
+        "otros"
+      ],
+      "peso": null,
+      "criterio_peso": null
+    },
+    {
+      "id": "E33",
+      "elemento_ref": "/elementos_no_estructurales/barreras",
+      "nombre": "Elementos no estructurales › Barreras",
+      "seccion": "elementos_no_estructurales",
+      "repetible": false,
+      "portante": false,
+      "fundamento_portante": null,
+      "indicadores": [
+        "grietas_una_direccion",
+        "grietas_dos_direcciones",
+        "golpeado_longitud_m",
+        "pintura",
+        "otros"
+      ],
+      "peso": null,
+      "criterio_peso": null
+    },
+    {
+      "id": "E34",
+      "elemento_ref": "/elementos_no_estructurales/junta_entrada",
+      "nombre": "Elementos no estructurales › Junta (entrada)",
+      "seccion": "elementos_no_estructurales",
+      "repetible": false,
+      "portante": false,
+      "fundamento_portante": null,
+      "indicadores": [
+        "falta_elemento",
+        "junta_limpia",
+        "danos"
+      ],
+      "peso": null,
+      "criterio_peso": null
+    },
+    {
+      "id": "E35",
+      "elemento_ref": "/elementos_no_estructurales/junta_salida",
+      "nombre": "Elementos no estructurales › Junta (salida)",
+      "seccion": "elementos_no_estructurales",
+      "repetible": false,
+      "portante": false,
+      "fundamento_portante": null,
+      "indicadores": [
+        "falta_elemento",
+        "junta_limpia",
+        "danos"
+      ],
+      "peso": null,
+      "criterio_peso": null
+    },
+    {
+      "id": "E36",
+      "elemento_ref": "/elementos_no_estructurales/juntas_intermedias",
+      "nombre": "Elementos no estructurales › Juntas intermedias",
+      "seccion": "elementos_no_estructurales",
+      "repetible": false,
+      "portante": false,
+      "fundamento_portante": null,
+      "indicadores": [
+        "falta_elemento",
+        "junta_limpia",
+        "danos"
+      ],
+      "peso": null,
+      "criterio_peso": null
+    },
+    {
+      "id": "E37",
+      "elemento_ref": "/elementos_no_estructurales/losa_acceso_entrada",
+      "nombre": "Elementos no estructurales › Losa acceso (entrada)",
+      "seccion": "elementos_no_estructurales",
+      "repetible": false,
+      "portante": false,
+      "fundamento_portante": null,
+      "indicadores": [
+        "buen_estado",
+        "asentado",
+        "fisurado",
+        "bache"
+      ],
+      "peso": null,
+      "criterio_peso": null
+    },
+    {
+      "id": "E38",
+      "elemento_ref": "/elementos_no_estructurales/losa_acceso_salida",
+      "nombre": "Elementos no estructurales › Losa acceso (salida)",
+      "seccion": "elementos_no_estructurales",
+      "repetible": false,
+      "portante": false,
+      "fundamento_portante": null,
+      "indicadores": [
+        "buen_estado",
+        "asentado",
+        "fisurado",
+        "bache"
+      ],
+      "peso": null,
+      "criterio_peso": null
+    },
+    {
+      "id": "E39",
+      "elemento_ref": "/caracteristicas_cauce/estado_cauce",
+      "nombre": "Características del cauce › Estado del cauce",
+      "seccion": "caracteristicas_cauce",
+      "repetible": false,
+      "portante": false,
+      "fundamento_portante": null,
+      "indicadores": [
+        "condiciones"
+      ],
+      "peso": null,
+      "criterio_peso": null
+    },
+    {
+      "id": "E40",
+      "elemento_ref": "/caracteristicas_cauce/estado_zona_adyacente_estribos",
+      "nombre": "Características del cauce › Estado zona adyacente a estribos",
+      "seccion": "caracteristicas_cauce",
+      "repetible": false,
+      "portante": false,
+      "fundamento_portante": null,
+      "indicadores": [
+        "condiciones"
+      ],
+      "peso": null,
+      "criterio_peso": null
+    },
+    {
+      "id": "E41",
+      "elemento_ref": "/otros/senalizacion/informativa",
+      "nombre": "Otros › Señalización › Informativa",
+      "seccion": "otros",
+      "repetible": false,
+      "portante": false,
+      "fundamento_portante": null,
+      "indicadores": [
+        "existe",
+        "estado"
+      ],
+      "peso": null,
+      "criterio_peso": null
+    },
+    {
+      "id": "E42",
+      "elemento_ref": "/otros/senalizacion/preventiva",
+      "nombre": "Otros › Señalización › Preventiva",
+      "seccion": "otros",
+      "repetible": false,
+      "portante": false,
+      "fundamento_portante": null,
+      "indicadores": [
+        "existe",
+        "estado"
+      ],
+      "peso": null,
+      "criterio_peso": null
+    },
+    {
+      "id": "E43",
+      "elemento_ref": "/otros/senalizacion/reglamentaria",
+      "nombre": "Otros › Señalización › Reglamentaria",
+      "seccion": "otros",
+      "repetible": false,
+      "portante": false,
+      "fundamento_portante": null,
+      "indicadores": [
+        "existe",
+        "estado"
+      ],
+      "peso": null,
+      "criterio_peso": null
+    },
+    {
+      "id": "E44",
+      "elemento_ref": "/otros/senalizacion/horizontal",
+      "nombre": "Otros › Señalización › Horizontal",
+      "seccion": "otros",
+      "repetible": false,
+      "portante": false,
+      "fundamento_portante": null,
+      "indicadores": [
+        "existe",
+        "estado"
+      ],
+      "peso": null,
+      "criterio_peso": null
+    },
+    {
+      "id": "E45",
+      "elemento_ref": "/otros/drenajes_aledanos",
+      "nombre": "Otros › Drenajes aledaños al puente",
+      "seccion": "otros",
+      "repetible": false,
+      "portante": false,
+      "fundamento_portante": null,
+      "indicadores": [
+        "existe",
+        "estado"
+      ],
+      "peso": null,
+      "criterio_peso": null
+    }
+  ],
+  "reglas_evaluacion_ic": {
+    "$comment": "Estructura propuesta para version_formulario.reglas_evaluacion_ic. Los valores tomados de los criterios de aceptación de HU-018 (RN-IC-05) están fijados; todo valor null queda pendiente del acta de calibración.",
+    "version_algoritmo": "ic-sieca-v1-borrador",
+    "escala_severidad": {
+      "$comment": "Calificación numérica por nivel. NO_PRESENTA = 0 viene de HU-018 (todos los elementos con calificación 0 dan IC = 100); el resto queda pendiente.",
+      "NO_PRESENTA": 0,
+      "LEVE": null,
+      "MODERADO": null,
+      "SEVERO": null
+    },
+    "conversion_indicadores": {
+      "booleanos": {
+        "junta.falta_elemento=true": null,
+        "junta.junta_limpia=false": null,
+        "senal.existe=false": null
+      },
+      "enumerados": {
+        "drenaje.estado": {
+          "LIMPIOS": null,
+          "OBSTRUIDOS": null
+        },
+        "socavacion.nivel": {
+          "NO_HAY": null,
+          "SIN_EXPOSICION": null,
+          "CON_EXPOSICION": null,
+          "ASENTAMIENTO_ESTRUCTURA": null
+        },
+        "condicionesCauce": {
+          "LIMPIO": null,
+          "ASOLVADO_SEDIMENTADO": null,
+          "EROSIONADO": null,
+          "OTRO": null
+        },
+        "estado_bueno_malo": {
+          "BUENO": null,
+          "MALO": null
+        }
+      },
+      "numericos": {
+        "golpeado_longitud_m": {
+          "umbrales_m": {
+            "LEVE": null,
+            "MODERADO": null,
+            "SEVERO": null
+          }
+        },
+        "golpeados_cantidad": {
+          "umbrales": {
+            "LEVE": null,
+            "MODERADO": null,
+            "SEVERO": null
+          }
+        }
+      },
+      "otros_y_danos": "Se usa la severidad declarada por el inspector en otros/danos"
+    },
+    "agregacion": {
+      "$comment": "Los elementos con existencia NO_APLICA no tienen calificación. Un elemento AUSENTE que no es portante también necesita una regla (p. ej. calificación máxima).",
+      "indicadores_de_un_elemento": null,
+      "instancias_repetibles": null,
+      "elementos_que_no_aplican": null,
+      "elementos_ausentes_no_portantes": null
+    },
+    "rangos_estado": {
+      "$comment": "Restricciones de los ejemplos de HU-018: IC 80 y 75 son BUENO; 60 y 50 son REGULAR; 30 y 0 son MALO. Por tanto el límite BUENO/REGULAR está en (60, 75] y el límite REGULAR/MALO en (30, 50].",
+      "BUENO": null,
+      "REGULAR": null,
+      "MALO": null
+    },
+    "reglas_anulacion": [
+      {
+        "id": "RN-IC-05a",
+        "descripcion": "Socavación con exposición de cimentación en un estribo",
+        "elementos": [
+          "/subestructura/estribo_entrada/socavacion",
+          "/subestructura/estribo_salida/socavacion"
+        ],
+        "condicion": {
+          "indicadores": [
+            "aguas_arriba",
+            "aguas_abajo"
+          ],
+          "algun_valor_en": [
+            "CON_EXPOSICION"
+          ]
+        },
+        "estado_resultante": "MALO",
+        "pendiente": "Confirmar si también aplica a la socavación de pilas (/subestructura/pilas/socavacion)."
+      },
+      {
+        "id": "RN-IC-05b",
+        "descripcion": "Asentamiento de estructura reportado",
+        "elementos": [
+          "/subestructura/estribo_entrada/socavacion",
+          "/subestructura/estribo_salida/socavacion",
+          "/subestructura/pilas/socavacion"
+        ],
+        "condicion": {
+          "indicadores": [
+            "aguas_arriba",
+            "aguas_abajo"
+          ],
+          "algun_valor_en": [
+            "ASENTAMIENTO_ESTRUCTURA"
+          ]
+        },
+        "estado_resultante": "MALO",
+        "pendiente": null
+      },
+      {
+        "id": "RN-IC-05c",
+        "descripcion": "Elemento portante cortado o con pérdida de sección",
+        "elementos": [
+          "/subestructura/estribo_entrada/viga_apoyo",
+          "/subestructura/estribo_entrada/columnas",
+          "/subestructura/estribo_entrada/cuerpo_muro_gravedad",
+          "/subestructura/estribo_salida/viga_apoyo",
+          "/subestructura/estribo_salida/columnas",
+          "/subestructura/estribo_salida/cuerpo_muro_gravedad",
+          "/subestructura/pilas/viga_cabezal",
+          "/subestructura/pilas/columnas",
+          "/subestructura/pilas/cuerpo_muro_gravedad",
+          "/superestructura/elemento_portante_concreto",
+          "/superestructura/elemento_portante_acero",
+          "/superestructura/estructura_tipo_cercha"
+        ],
+        "condicion": {
+          "elementos_acero": {
+            "elementos": [
+              "/superestructura/elemento_portante_acero",
+              "/superestructura/estructura_tipo_cercha"
+            ],
+            "indicador": "elemento_cortado",
+            "algun_valor_en": [
+              "LEVE",
+              "MODERADO",
+              "SEVERO"
+            ]
+          },
+          "elementos_concreto": {
+            "elementos": [
+              "/subestructura/estribo_entrada/viga_apoyo",
+              "/subestructura/estribo_entrada/columnas",
+              "/subestructura/estribo_entrada/cuerpo_muro_gravedad",
+              "/subestructura/estribo_salida/viga_apoyo",
+              "/subestructura/estribo_salida/columnas",
+              "/subestructura/estribo_salida/cuerpo_muro_gravedad",
+              "/subestructura/pilas/viga_cabezal",
+              "/subestructura/pilas/columnas",
+              "/subestructura/pilas/cuerpo_muro_gravedad",
+              "/superestructura/elemento_portante_concreto"
+            ],
+            "indicador": "perdida_petreos_golpe",
+            "algun_valor_en": [
+              "SEVERO"
+            ]
+          }
+        },
+        "estado_resultante": "MALO",
+        "pendiente": "PROPUESTA DEL EQUIPO: el formulario SIECA no tiene columna 'pérdida de sección' para elementos de concreto; se propone 'Pérdida de pétreos por golpe' en SEVERO. Para acero se propone cualquier grado de 'Elemento cortado'. Confirmar con el Catedrático."
+      },
+      {
+        "id": "RN-IC-05d",
+        "descripcion": "Falta totalmente un elemento portante",
+        "elementos": [
+          "/subestructura/estribo_entrada/viga_apoyo",
+          "/subestructura/estribo_entrada/columnas",
+          "/subestructura/estribo_entrada/cuerpo_muro_gravedad",
+          "/subestructura/estribo_salida/viga_apoyo",
+          "/subestructura/estribo_salida/columnas",
+          "/subestructura/estribo_salida/cuerpo_muro_gravedad",
+          "/subestructura/pilas/viga_cabezal",
+          "/subestructura/pilas/columnas",
+          "/subestructura/pilas/cuerpo_muro_gravedad",
+          "/superestructura/elemento_portante_concreto",
+          "/superestructura/elemento_portante_acero",
+          "/superestructura/estructura_tipo_cercha"
+        ],
+        "condicion": {
+          "campo": "existencia",
+          "igual_a": "AUSENTE"
+        },
+        "estado_resultante": "MALO",
+        "pendiente": null
+      }
+    ]
+  }
+}

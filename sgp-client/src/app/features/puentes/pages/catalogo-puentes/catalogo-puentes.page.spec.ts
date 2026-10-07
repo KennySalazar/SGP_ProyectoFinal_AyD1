@@ -1,14 +1,16 @@
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
-import { Pipe, PipeTransform } from '@angular/core';
+import { Pipe, PipeTransform, signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
 import { provideRouter } from '@angular/router';
-import { TranslocoPipe } from '@jsverse/transloco';
+import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { Paginator } from 'primeng/paginator';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { CatalogoPuentesPage } from './catalogo-puentes.page';
-import { EstadoPuente } from '../../models/puente.models';
+import { EstadoPuente, PuenteCatalogoResponse } from '../../models/puente.models';
+import { AuthStore } from '../../../../core/services/auth.store';
+import { AppShellComponent } from '../../../../layouts/app-shell/app-shell.component';
 
 @Pipe({ name: 'transloco' })
 class TraduccionTestPipe implements PipeTransform {
@@ -387,33 +389,22 @@ describe('Base compartida del catálogo HU014', () => {
     fixture.detectChanges();
   }
 
-  it('selecciona una sola fila con clic o teclado y permite desmarcarla sin consultar la API', () => {
+  it('muestra la sugerencia para seleccionar un puente por su nombre y no renderiza marca de selección en filas', () => {
     responderConPuentes();
     const rows: NodeListOf<HTMLTableRowElement> =
       fixture.nativeElement.querySelectorAll('tbody tr');
-    rows[0].click();
-    fixture.detectChanges();
-    expect(page.puenteSeleccionado()?.nombre).toBe('Puente 0');
-    expect(rows[0].classList.contains('fila-seleccionada')).toBe(true);
-    expect(rows[0].getAttribute('aria-selected')).toBe('true');
-    expect(rows[0].querySelector('.pi-check')).not.toBeNull();
-    rows[1].dispatchEvent(new KeyboardEvent('keydown', { code: 'Enter', bubbles: true }));
-    fixture.detectChanges();
-    expect(page.puenteSeleccionado()?.nombre).toBe('Puente 1');
+    expect(rows.length).toBe(2);
+    expect(rows[0].querySelector('.pi-check')).toBeNull();
     expect(rows[0].classList.contains('fila-seleccionada')).toBe(false);
-    expect(rows[0].getAttribute('aria-selected')).toBe('false');
-    expect(rows[1].classList.contains('fila-seleccionada')).toBe(true);
     expect(fixture.nativeElement.querySelector('.seleccion-catalogo').textContent).toContain(
-      'puentes.catalogo.selectedBridge',
+      'puentes.catalogo.selectionHint',
     );
-    rows[1].dispatchEvent(new KeyboardEvent('keydown', { code: 'Space', bubbles: true }));
-    fixture.detectChanges();
-    expect(page.puenteSeleccionado()).toBeNull();
-    expect(fixture.nativeElement.querySelector('.fila-seleccionada')).toBeNull();
+    const enlace = rows[0].querySelector('.nombre-puente a');
+    expect(enlace).not.toBeNull();
     http.expectNone((req) => req.url === '/api/v1/puentes');
   });
 
-  it('numera por posición entre páginas y reinicia numeración y selección al filtrar', () => {
+  it('numera por posición entre páginas y reinicia numeración al filtrar', () => {
     const numeros = () =>
       Array.from(
         fixture.nativeElement.querySelectorAll('.numero-puente') as NodeListOf<HTMLElement>,
@@ -421,15 +412,11 @@ describe('Base compartida del catálogo HU014', () => {
     responderConPuentes();
     expect(numeros()).toEqual(['1', '2']);
     expect(fixture.nativeElement.textContent).not.toContain('uuid-privado');
-    fixture.nativeElement.querySelector('tbody tr').click();
     page.cambiarPagina({ page: 1, rows: 20 });
-    expect(page.puenteSeleccionado()).toBeNull();
     responderConPuentes(1);
     expect(numeros()).toEqual(['21', '22']);
-    fixture.nativeElement.querySelector('tbody tr').click();
     page.filtros.patchValue({ estado: 'Sin evaluar' });
     page.aplicarFiltros();
-    expect(page.puenteSeleccionado()).toBeNull();
     responderConPuentes();
     expect(numeros()).toEqual(['1', '2']);
     page.cambiarPagina({ page: 0, rows: 10 });
@@ -494,5 +481,214 @@ describe('Base compartida del catálogo HU014', () => {
     http.expectOne((req) => req.url === '/api/v1/catalogos/departamentos').flush({ content: [] });
     expect(page.errorDepartamentos()).toBe(false);
     expect(page.cargandoDepartamentos()).toBe(false);
+  });
+});
+
+describe('Baja lógica y reactivación de puentes por administrador', () => {
+  let page: CatalogoPuentesPage;
+  let http: HttpTestingController;
+  let fixture: ComponentFixture<CatalogoPuentesPage>;
+  const usuario = signal<{ role: string; email: string } | null>({
+    role: 'ADMINISTRADOR',
+    email: 'admin@sgp.local',
+  });
+
+  const puenteActivo: PuenteCatalogoResponse = {
+    id: 'puente-1',
+    codigo: 'GT-01-0114-0001',
+    nombre: 'Puente Activo',
+    departamento: { id: 'dep-1', codigoIne: '01', nombre: 'Guatemala' },
+    municipio: { id: 'mun-1', departamentoId: 'dep-1', codigoIne: '0114', nombre: 'Amatitlán' },
+    latitud: 14.5,
+    longitud: -90.5,
+    activo: true,
+    estadoActual: 'Sin evaluar',
+  };
+
+  const puenteInactivo: PuenteCatalogoResponse = {
+    id: 'puente-2',
+    codigo: 'GT-01-0114-0002',
+    nombre: 'Puente Demolido',
+    departamento: { id: 'dep-1', codigoIne: '01', nombre: 'Guatemala' },
+    municipio: { id: 'mun-1', departamentoId: 'dep-1', codigoIne: '0114', nombre: 'Amatitlán' },
+    latitud: 14.5,
+    longitud: -90.5,
+    activo: false,
+    estadoActual: 'Sin evaluar',
+  };
+
+  beforeEach(() => {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      providers: [
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        provideRouter([]),
+        { provide: TranslocoService, useValue: { translate: (key: string) => key } },
+        {
+          provide: AuthStore,
+          useValue: {
+            user: usuario,
+            authenticated: () => usuario() !== null,
+            accessToken: () => 'fake-jwt',
+          },
+        },
+      ],
+    });
+    TestBed.overrideComponent(CatalogoPuentesPage, {
+      remove: { imports: [TranslocoPipe] },
+      add: { imports: [TraduccionTestPipe] },
+    });
+    TestBed.overrideComponent(AppShellComponent, {
+      set: { template: '<ng-content />' },
+    });
+    http = TestBed.inject(HttpTestingController);
+    fixture = TestBed.createComponent(CatalogoPuentesPage);
+    page = fixture.componentInstance;
+    fixture.detectChanges();
+    http.expectOne((req) => req.url === '/api/v1/catalogos/departamentos').flush({ content: [] });
+  });
+
+  afterEach(() => {
+    http.verify();
+    fixture.destroy();
+  });
+
+  it('muestra la columna de acciones para el administrador', () => {
+    http
+      .expectOne((req) => req.url === '/api/v1/puentes')
+      .flush({
+        content: [puenteActivo, puenteInactivo],
+        totalElements: 2,
+        number: 0,
+        size: 20,
+        totalPages: 1,
+        first: true,
+        last: true,
+        empty: false,
+      });
+    fixture.detectChanges();
+
+    const headers = fixture.nativeElement.querySelectorAll('th');
+    const headerAcciones = Array.from<Element>(headers).find((h) =>
+      h.textContent?.includes('puentes.catalogo.actions'),
+    );
+    expect(headerAcciones).toBeDefined();
+
+    const filas = fixture.nativeElement.querySelectorAll('tbody tr');
+    expect(filas).toHaveLength(2);
+
+    const botonesFilaActiva = filas[0].querySelectorAll('.btn-accion-tabla');
+    expect(botonesFilaActiva).toHaveLength(2);
+    expect(botonesFilaActiva[0].textContent).toContain('puentes.catalogo.edit');
+    expect(botonesFilaActiva[1].textContent).toContain('puentes.catalogo.deactivate');
+
+    const btnReactivar = filas[1].querySelector('.btn-accion-tabla');
+    expect(btnReactivar).not.toBeNull();
+    expect(btnReactivar.textContent).toContain('puentes.catalogo.reactivate');
+  });
+
+  it('abre modal de baja y completa la operacion con motivo', () => {
+    http
+      .expectOne((req) => req.url === '/api/v1/puentes')
+      .flush({
+        content: [puenteActivo],
+        totalElements: 1,
+        number: 0,
+        size: 20,
+        totalPages: 1,
+        first: true,
+        last: true,
+        empty: false,
+      });
+    fixture.detectChanges();
+
+    expect(page.mostrarModalBaja()).toBe(false);
+
+    page.abrirModalBaja(puenteActivo);
+    expect(page.mostrarModalBaja()).toBe(true);
+    expect(page.puenteParaAccion()?.id).toBe(puenteActivo.id);
+
+    page.formBaja.controls.motivo.setValue('demolido');
+    page.confirmarBaja();
+
+    const reqBaja = http.expectOne('/api/v1/puentes/puente-1/baja');
+    expect(reqBaja.request.method).toBe('POST');
+    expect(reqBaja.request.body).toEqual({ motivo: 'demolido' });
+    reqBaja.flush({ ...puenteActivo, activo: false });
+
+    expect(page.mostrarModalBaja()).toBe(false);
+    expect(page.accionExitosa()).toBe('baja');
+
+    const reqRecarga = http.expectOne((req) => req.url === '/api/v1/puentes');
+    reqRecarga.flush({
+      content: [],
+      totalElements: 0,
+      number: 0,
+      size: 20,
+      totalPages: 0,
+      first: true,
+      last: true,
+      empty: true,
+    });
+  });
+
+  it('abre modal de reactivacion y completa la operacion', () => {
+    http
+      .expectOne((req) => req.url === '/api/v1/puentes')
+      .flush({
+        content: [puenteInactivo],
+        totalElements: 1,
+        number: 0,
+        size: 20,
+        totalPages: 1,
+        first: true,
+        last: true,
+        empty: false,
+      });
+    fixture.detectChanges();
+
+    page.abrirModalReactivar(puenteInactivo);
+    expect(page.mostrarModalReactivar()).toBe(true);
+
+    page.confirmarReactivar();
+
+    const reqReactivar = http.expectOne('/api/v1/puentes/puente-2/reactivar');
+    expect(reqReactivar.request.method).toBe('POST');
+    reqReactivar.flush({ ...puenteInactivo, activo: true });
+
+    expect(page.mostrarModalReactivar()).toBe(false);
+    expect(page.accionExitosa()).toBe('reactivar');
+
+    const reqRecarga = http.expectOne((req) => req.url === '/api/v1/puentes');
+    reqRecarga.flush({
+      content: [puenteActivo],
+      totalElements: 1,
+      number: 0,
+      size: 20,
+      totalPages: 1,
+      first: true,
+      last: true,
+      empty: false,
+    });
+  });
+
+  it('aplica filtro de actividad al enviar el formulario', () => {
+    http.expectOne((req) => req.url === '/api/v1/puentes').flush({ content: [], totalElements: 0 });
+
+    page.filtroActividad.setValue('inactivos');
+    page.aplicarFiltros();
+
+    const request = http.expectOne((req) => req.url === '/api/v1/puentes');
+    expect(request.request.params.get('activo')).toBe('false');
+    request.flush({ content: [], totalElements: 0 });
+
+    page.filtroActividad.setValue('todos');
+    page.aplicarFiltros();
+
+    const requestTodos = http.expectOne((req) => req.url === '/api/v1/puentes');
+    expect(requestTodos.request.params.get('todos')).toBe('true');
+    expect(requestTodos.request.params.has('activo')).toBe(false);
+    requestTodos.flush({ content: [], totalElements: 0 });
   });
 });

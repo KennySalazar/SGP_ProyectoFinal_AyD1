@@ -1,0 +1,10 @@
+Datos: geoBoundaries GTM ADM0
+Identificador: GTM-ADM0-84631641
+Año representado: 2017
+Fuente original: OpenStreetMap, Wambacher
+Licencia declarada: Open Data Commons Open Database License 1.0
+Atribución: © OpenStreetMap contributors
+Licencia y atribución: https://www.openstreetmap.org/copyright
+Distribución: https://www.geoboundaries.org/
+Versión del repositorio: 9469f09
+Archivo sin simplificar: geoBoundaries-GTM-ADM0.geojson

@@ -1,0 +1,144 @@
+<header class="page-heading">
+  <p class="page-kicker">{{ 'puentes.kicker' | transloco }}</p>
+  <h1 class="page-title">{{ 'puentes.revision.detailTitle' | transloco }}</h1>
+  <p class="page-description">{{ 'puentes.revision.detailDescription' | transloco }}</p>
+</header>
+
+<p class="volver">
+  <a routerLink="/puentes/solicitudes/revision">
+    <i class="pi pi-arrow-left" aria-hidden="true"></i>
+    {{ 'puentes.revision.back' | transloco }}
+  </a>
+</p>
+
+@if (decision(); as resultado) {
+<section class="surface-card revision-card">
+  @if (resultado.estado === 'APROBADA') {
+  <h2 class="success" role="status">
+    <i class="pi pi-check-circle" aria-hidden="true"></i>
+    {{ 'puentes.revision.approved' | transloco }}
+  </h2>
+  <p class="note">
+    {{ 'puentes.revision.approvedNote' | transloco: { codigo: resultado.puenteCreadoCodigo } }}
+  </p>
+  } @else {
+  <h2 class="rejected" role="status">
+    <i class="pi pi-times-circle" aria-hidden="true"></i>
+    {{ 'puentes.revision.rejected' | transloco }}
+  </h2>
+  <p class="note">{{ 'puentes.revision.rejectedNote' | transloco }}</p>
+  }
+  <div class="actions">
+    <a pButton routerLink="/puentes/solicitudes/revision">
+      <i class="pi pi-list" aria-hidden="true"></i>
+      {{ 'puentes.revision.backToList' | transloco }}
+    </a>
+  </div>
+</section>
+} @else if (cargando() && !detalle()) {
+<p role="status">{{ 'puentes.revision.loadingDetail' | transloco }}</p>
+} @else if (errorCarga(); as mensaje) {
+<section class="surface-card revision-card">
+  <p role="alert">{{ mensaje }}</p>
+  <button pButton type="button" (click)="cargar()">{{ 'puentes.retry' | transloco }}</button>
+</section>
+} @else if (detalle(); as datos) {
+<app-solicitud-ficha
+  [solicitud]="datos.solicitud"
+  [mostrarSolicitante]="true"
+  [solicitanteEmail]="datos.solicitanteEmail"
+  [mostrarRevisor]="true"
+  [revisadoPorEmail]="datos.revisadoPorEmail"
+  [cercanos]="puntosCercanos()"
+>
+  @if (hayCercanos()) {
+  <section class="proximity" role="alert">
+    <h3>{{ 'puentes.proximityTitle' | transloco }}</h3>
+    <p>{{ 'puentes.revision.proximityNote' | transloco }}</p>
+    <p>{{ 'puentes.proximityTotal' | transloco: { total: datos.totalPuentesCercanos } }}</p>
+
+    <ul>
+      @for (cercano of datos.puentesCercanos; track cercano.id) {
+      <li>
+        <strong>{{ cercano.codigo }} — {{ cercano.nombre }}</strong>
+        <span>
+          {{ 'puentes.distance' | transloco }}: {{ cercano.distanciaMetros | number: '1.1-1' }} m ·
+          {{ (cercano.activo ? 'puentes.active' : 'puentes.inactive') | transloco }}
+        </span>
+      </li>
+      }
+    </ul>
+
+    @if (datos.totalPuentesCercanos > datos.puentesCercanos.length) {
+    <p>{{ 'puentes.proximityLimit' | transloco: { cantidad: datos.puentesCercanos.length } }}</p>
+    }
+  </section>
+  } @if (errorDecision(); as mensaje) {
+  <p class="feedback error" role="alert">{{ mensaje }}</p>
+  } @if (pendiente()) { @if (rechazando()) {
+  <section class="reject-panel">
+    <label class="field">
+      <span>{{ 'puentes.revision.reasonLabel' | transloco }} *</span>
+      <textarea
+        pTextarea
+        [formControl]="motivo"
+        rows="4"
+        maxlength="1000"
+        [placeholder]="'puentes.revision.reasonPlaceholder' | transloco"
+      ></textarea>
+      @if (mensajeMotivo(); as mensaje) {
+      <small class="validation">{{ mensaje }}</small>
+      }
+    </label>
+    <div class="actions">
+      <button
+        pButton
+        type="button"
+        severity="danger"
+        [disabled]="procesando()"
+        [loading]="procesando()"
+        (click)="rechazar()"
+      >
+        <i class="pi pi-times" aria-hidden="true"></i>
+        {{ 'puentes.revision.confirmReject' | transloco }}
+      </button>
+      <button
+        pButton
+        type="button"
+        severity="secondary"
+        [outlined]="true"
+        [disabled]="procesando()"
+        (click)="cancelarRechazo()"
+      >
+        {{ 'puentes.revision.cancel' | transloco }}
+      </button>
+    </div>
+  </section>
+  } @else {
+  <div class="actions">
+    <button
+      pButton
+      type="button"
+      [disabled]="procesando()"
+      [loading]="procesando()"
+      (click)="aprobar()"
+    >
+      <i class="pi pi-check" aria-hidden="true"></i>
+      {{ (hayCercanos() ? 'puentes.revision.approveAnyway' : 'puentes.revision.approve') | transloco
+      }}
+    </button>
+    <button
+      pButton
+      type="button"
+      severity="danger"
+      [outlined]="true"
+      [disabled]="procesando()"
+      (click)="abrirRechazo()"
+    >
+      <i class="pi pi-times" aria-hidden="true"></i>
+      {{ 'puentes.revision.reject' | transloco }}
+    </button>
+  </div>
+  } }
+</app-solicitud-ficha>
+}

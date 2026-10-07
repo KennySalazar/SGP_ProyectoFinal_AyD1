@@ -1,0 +1,100 @@
+<header class="page-heading">
+  <p class="page-kicker">{{ 'puentes.kicker' | transloco }}</p>
+  <h1 class="page-title">{{ 'puentes.revision.title' | transloco }}</h1>
+  <p class="page-description">{{ 'puentes.revision.description' | transloco }}</p>
+</header>
+
+<section class="surface-card revision-panel" aria-live="polite">
+  <div class="selector" role="group" [attr.aria-label]="'puentes.revision.filterLabel' | transloco">
+    @for (opcion of estados; track opcion) {
+    <button
+      pButton
+      type="button"
+      [attr.aria-pressed]="estado() === opcion"
+      [severity]="estado() === opcion ? 'primary' : 'secondary'"
+      [outlined]="estado() !== opcion"
+      (click)="filtrar(opcion)"
+    >
+      {{ 'puentes.solicitud.estado.' + opcion | transloco }}
+    </button>
+    }
+  </div>
+
+  @if (cargando()) {
+  <p role="status">{{ 'puentes.revision.loading' | transloco }}</p>
+  } @else if (error()) {
+  <p role="alert">{{ 'puentes.revision.loadFailed' | transloco }}</p>
+  <button pButton type="button" (click)="cargar(resultado()?.number ?? 0)">
+    {{ 'puentes.retry' | transloco }}
+  </button>
+  } @else if (resultado(); as pagina) { @if (pagina.content.length === 0) {
+  <div class="sin-resultados">
+    <i class="pi pi-inbox" aria-hidden="true"></i>
+    <p role="status">{{ 'puentes.revision.empty' | transloco }}</p>
+  </div>
+  } @else {
+  <h2 id="revision-titulo">{{ 'puentes.revision.listTitle' | transloco }}</h2>
+  <div class="tabla-contenedor" role="region" tabindex="0" aria-labelledby="revision-titulo">
+    <p-table
+      [value]="pagina.content"
+      dataKey="solicitud.id"
+      [tableStyle]="{ 'min-width': '52rem', width: '100%' }"
+    >
+      <ng-template #header>
+        <tr>
+          <th scope="col">{{ 'puentes.name' | transloco }}</th>
+          <th scope="col">{{ 'puentes.revision.requester' | transloco }}</th>
+          <th scope="col">{{ 'puentes.municipality' | transloco }}</th>
+          <th scope="col" class="no-cortar">{{ 'puentes.solicitud.requestedAt' | transloco }}</th>
+          <th scope="col" class="no-cortar">{{ 'puentes.state' | transloco }}</th>
+          <th scope="col">
+            <span class="sr-only">{{ 'puentes.catalogo.actions' | transloco }}</span>
+          </th>
+        </tr>
+      </ng-template>
+      <ng-template #body let-fila>
+        <tr>
+          <th scope="row">{{ fila.solicitud.nombre }}</th>
+          <td>{{ fila.solicitanteEmail ?? '—' }}</td>
+          <td>{{ fila.solicitud.municipio.nombre }}, {{ fila.solicitud.departamento.nombre }}</td>
+          <td class="no-cortar">{{ fechaGuatemala(fila.solicitud.creadoEn) }}</td>
+          <td class="no-cortar">
+            <p-tag
+              [attr.data-estado]="fila.solicitud.estado"
+              [value]="'puentes.solicitud.estado.' + fila.solicitud.estado | transloco"
+              [severity]="severidad(fila.solicitud.estado)"
+            />
+          </td>
+          <td class="no-cortar">
+            <a
+              pButton
+              size="small"
+              [routerLink]="['/puentes/solicitudes/revision', fila.solicitud.id]"
+              [attr.aria-label]="
+                ('puentes.revision.review' | transloco) + ': ' + fila.solicitud.nombre
+              "
+            >
+              <i class="pi pi-search" aria-hidden="true"></i>
+              {{ 'puentes.revision.review' | transloco }}
+            </a>
+          </td>
+        </tr>
+      </ng-template>
+    </p-table>
+  </div>
+
+  <div class="paginacion">
+    <p class="reporte-pagina" role="status">
+      {{ 'puentes.solicitud.pageRange' | transloco: { first: pagina.number * pagina.size + 1, last:
+      pagina.number * pagina.size + pagina.content.length, total: pagina.totalElements } }}
+    </p>
+    <p-paginator
+      [first]="pagina.number * pagina.size"
+      [rows]="pagina.size"
+      [totalRecords]="pagina.totalElements"
+      [pageLinkSize]="3"
+      (onPageChange)="cambiarPagina($event)"
+    />
+  </div>
+  } }
+</section>

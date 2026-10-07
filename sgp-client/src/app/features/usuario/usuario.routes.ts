@@ -30,6 +30,11 @@ export const usuarioPublicRoutes: Routes = [
     loadComponent: () =>
       import('./pages/recovery-reset/recovery-reset.page').then((m) => m.RecoveryResetPage),
   },
+  {
+    path: 'activar-cuenta',
+    loadComponent: () =>
+      import('./pages/activar-cuenta/activar-cuenta.page').then((m) => m.ActivarCuentaPage),
+  },
 ];
 
 export const usuarioProtectedRoutes: Routes = [

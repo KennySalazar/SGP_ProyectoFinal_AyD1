@@ -24,7 +24,7 @@ export interface MunicipioResponse {
   nombre: string;
 }
 
-export interface CrearPuenteRequest {
+export interface PuenteFormValores {
   nombre: string;
   departamentoId: string;
   municipioId: string;
@@ -32,7 +32,55 @@ export interface CrearPuenteRequest {
   kilometraje: number | null;
   latitud: number;
   longitud: number;
+}
+
+export type PuenteFormInicial = Pick<
+  PuenteFormValores,
+  'nombre' | 'ruta' | 'kilometraje' | 'latitud' | 'longitud'
+>;
+
+export interface CrearPuenteRequest extends PuenteFormValores {
   confirmarCercania: boolean;
+}
+
+export interface CrearSolicitudAltaPuenteRequest extends PuenteFormValores {
+  justificacion: string | null;
+}
+
+export type EstadoSolicitudAltaPuente = 'PENDIENTE' | 'APROBADA' | 'RECHAZADA' | 'CANCELADA';
+
+export interface SolicitudAltaPuenteResponse {
+  id: string;
+  nombre: string;
+  departamento: DepartamentoResponse;
+  municipio: MunicipioResponse;
+  ruta: string;
+  kilometraje: number | null;
+  latitud: number;
+  longitud: number;
+  justificacion: string | null;
+  estado: EstadoSolicitudAltaPuente;
+  motivoDecision: string | null;
+  revisadoEn: string | null;
+  puenteCreadoId: string | null;
+  puenteCreadoCodigo: string | null;
+  creadoEn: string;
+}
+
+export interface SolicitudRevisionResponse {
+  solicitud: SolicitudAltaPuenteResponse;
+  solicitanteEmail: string | null;
+  revisadoPorEmail: string | null;
+}
+
+export interface SolicitudRevisionDetalleResponse extends SolicitudRevisionResponse {
+  puentesCercanos: PuenteCercanoResponse[];
+  totalPuentesCercanos: number;
+}
+
+export interface ActualizarPuenteRequest extends PuenteFormValores {
+  confirmarCercania: boolean;
+  codigo?: string;
 }
 
 export interface UtmResponse {
@@ -78,6 +126,8 @@ export interface PuenteCatalogoResponse {
 export interface ConsultaCatalogoPuentes {
   departamentoId?: string;
   estado?: EstadoPuente;
+  activo?: boolean;
+  todos?: boolean;
   pagina?: number;
   tamanio?: number;
 }
@@ -88,6 +138,8 @@ export interface PuenteCercanoResponse {
   nombre: string;
   activo: boolean;
   distanciaMetros: number;
+  latitud: number;
+  longitud: number;
 }
 
 export interface EstudianteAsignableResponse {
@@ -125,4 +177,17 @@ export interface PuenteProblemDetails extends ProblemDetails {
   totalPaginas?: number;
   pagina?: number;
   tamanoPagina?: number;
+}
+
+export interface CandidatoTerritorialResponse {
+  departamento: DepartamentoResponse;
+  municipio: MunicipioResponse;
+}
+
+export interface UbicacionTerritorialResponse {
+  latitud: number;
+  longitud: number;
+  zonaUtm: string;
+  requiereSeleccion: boolean;
+  candidatos: CandidatoTerritorialResponse[];
 }

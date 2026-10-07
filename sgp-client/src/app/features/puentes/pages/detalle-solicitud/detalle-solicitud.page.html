@@ -1,0 +1,23 @@
+<header class="page-heading">
+  <p class="page-kicker">{{ 'puentes.kicker' | transloco }}</p>
+  <h1 class="page-title">{{ 'puentes.solicitud.detailTitle' | transloco }}</h1>
+  <p class="page-description">{{ 'puentes.solicitud.detailDescription' | transloco }}</p>
+</header>
+
+<p class="volver">
+  <a routerLink="/puentes/solicitudes">
+    <i class="pi pi-arrow-left" aria-hidden="true"></i>
+    {{ 'puentes.solicitud.backToMine' | transloco }}
+  </a>
+</p>
+
+@if (cargando() && !solicitud()) {
+<p role="status">{{ 'puentes.solicitud.loadingDetail' | transloco }}</p>
+} @else if (error(); as mensaje) {
+<section class="surface-card mensaje">
+  <p role="alert">{{ mensaje }}</p>
+  <button pButton type="button" (click)="cargar()">{{ 'puentes.retry' | transloco }}</button>
+</section>
+} @else if (solicitud(); as datos) {
+<app-solicitud-ficha [solicitud]="datos" />
+}

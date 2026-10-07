@@ -1,0 +1,265 @@
+.ficha-publica {
+  min-height: 100vh;
+  padding: 2rem 1.5rem;
+  background: #eef3f8;
+}
+
+.ficha-contenedor {
+  max-width: 1000px;
+  margin: 0 auto;
+
+  &.ficha-autenticada {
+    padding: 1.5rem 0;
+  }
+}
+
+.barra-publica {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--sgp-border);
+}
+
+.link-volver {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--sgp-blue-600);
+  font-weight: 600;
+  text-decoration: none;
+
+  &:hover {
+    text-decoration: underline;
+  }
+}
+
+.estado-mensaje {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  padding: 3rem 1.5rem;
+  text-align: center;
+  color: var(--sgp-steel-700);
+
+  i {
+    font-size: 2rem;
+  }
+
+  &.estado-error {
+    i {
+      color: #dc2626;
+    }
+    h2 {
+      margin: 0;
+      color: var(--sgp-navy-900);
+      font-size: 1.25rem;
+    }
+  }
+}
+
+.page-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1.5rem;
+  margin-bottom: 1.75rem;
+  flex-wrap: wrap;
+}
+
+.page-kicker {
+  margin: 0 0 0.25rem;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--sgp-blue-600);
+}
+
+.page-title {
+  margin: 0 0 0.4rem;
+  font-size: clamp(1.6rem, 2.5vw, 2.2rem);
+  font-weight: 800;
+  color: var(--sgp-navy-900);
+}
+
+.page-description {
+  margin: 0;
+  font-size: 0.95rem;
+  color: var(--sgp-steel-700);
+}
+
+.acciones-encabezado {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.ficha-grid {
+  display: grid;
+  gap: 1.5rem;
+}
+
+.ficha-seccion {
+  padding: 1.5rem;
+  border-radius: 16px;
+  background: var(--sgp-surface);
+  border: 1px solid var(--sgp-border);
+}
+
+.seccion-titulo {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin: 0 0 1.25rem;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--sgp-navy-900);
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid var(--sgp-border);
+
+  i {
+    color: var(--sgp-blue-600);
+    font-size: 1.15rem;
+  }
+}
+
+.condicion-resumen {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1.25rem;
+  margin-bottom: 1rem;
+}
+
+.condicion-bloque {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.dato-etiqueta {
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--sgp-steel-500);
+}
+
+.dato-valor {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--sgp-navy-900);
+  margin: 0;
+
+  &.ic-valor {
+    font-size: 1.25rem;
+    color: var(--sgp-blue-600);
+  }
+
+  &.valor-codigo {
+    font-family: monospace;
+    font-size: 1.1rem;
+    color: var(--sgp-navy-950);
+  }
+}
+
+.estado-tag {
+  align-self: flex-start;
+  &[data-estado='Sin evaluar'] {
+    background: #f1f5f9;
+    color: #475569;
+    border: 1px solid #cbd5e1;
+  }
+}
+
+.nota-calculado {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.65rem 0.85rem;
+  background: var(--sgp-surface-soft);
+  border: 1px solid var(--sgp-border);
+  border-radius: 8px;
+  font-size: 0.85rem;
+  color: var(--sgp-steel-700);
+
+  i {
+    color: var(--sgp-blue-600);
+    flex-shrink: 0;
+  }
+}
+
+.datos-lista {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1.25rem;
+  margin: 0;
+
+  &.coordenadas-lista {
+    margin-bottom: 1.25rem;
+  }
+}
+
+.dato-fila {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.mapa-panel {
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid var(--sgp-border);
+  min-height: 280px;
+}
+
+.aviso-restringido {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  padding: 1.25rem;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+
+  > i {
+    font-size: 1.75rem;
+    color: var(--sgp-steel-500);
+    flex-shrink: 0;
+  }
+}
+
+.restringido-detalle {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  align-items: flex-start;
+}
+
+.restringido-texto {
+  margin: 0;
+  font-size: 0.95rem;
+  color: var(--sgp-steel-700);
+}
+
+.aviso-vacio {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1rem;
+  background: var(--sgp-surface-soft);
+  border: 1px solid var(--sgp-border);
+  border-radius: 10px;
+  color: var(--sgp-steel-700);
+  font-size: 0.9rem;
+
+  i {
+    color: var(--sgp-blue-600);
+  }
+
+  p {
+    margin: 0;
+  }
+}

@@ -47,6 +47,15 @@ public class Puente {
   @Column(nullable = false)
   private boolean activo;
 
+  @Column(name = "inactivado_en")
+  private Instant inactivadoEn;
+
+  @Column(name = "inactivado_por_id")
+  private UUID inactivadoPorId;
+
+  @Column(name = "motivo_inactivacion", length = 1000)
+  private String motivoInactivacion;
+
   @Column(name = "creado_por_id", nullable = false, updatable = false)
   private UUID creadoPorId;
 
@@ -121,6 +130,49 @@ public class Puente {
 
   public boolean isActivo() {
     return activo;
+  }
+
+  public Instant getInactivadoEn() {
+    return inactivadoEn;
+  }
+
+  public UUID getInactivadoPorId() {
+    return inactivadoPorId;
+  }
+
+  public String getMotivoInactivacion() {
+    return motivoInactivacion;
+  }
+
+  public void darDeBaja(String motivo, UUID usuarioId, Instant ahora) {
+    this.activo = false;
+    this.motivoInactivacion = motivo;
+    this.inactivadoPorId = usuarioId;
+    this.inactivadoEn = ahora;
+    this.actualizadoEn = ahora;
+  }
+
+  public void reactivar(Instant ahora) {
+    this.activo = true;
+    this.motivoInactivacion = null;
+    this.inactivadoPorId = null;
+    this.inactivadoEn = null;
+    this.actualizadoEn = ahora;
+  }
+
+  public void actualizarDatosGenerales(
+      String nombre,
+      String ruta,
+      BigDecimal kilometraje,
+      Municipio municipio,
+      Point ubicacion,
+      Instant ahora) {
+    this.nombre = nombre;
+    this.ruta = ruta;
+    this.kilometraje = kilometraje;
+    this.municipio = municipio;
+    this.ubicacion = ubicacion;
+    this.actualizadoEn = ahora;
   }
 
   public UUID getCreadoPorId() {

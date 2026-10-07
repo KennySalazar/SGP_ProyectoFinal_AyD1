@@ -11,6 +11,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 @EnableConfigurationProperties({
   JwtProperties.class,
   OtpProperties.class,
+  InvitacionProperties.class,
   BootstrapProperties.class,
   RefreshCookieProperties.class
 })

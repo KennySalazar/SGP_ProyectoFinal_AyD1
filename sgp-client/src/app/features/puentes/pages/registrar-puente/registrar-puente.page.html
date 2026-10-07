@@ -82,215 +82,58 @@
   </button>
 </section>
 } @else {
-<form [formGroup]="form" (ngSubmit)="registrar()" novalidate>
-  <section class="surface-card bridge-card">
-    <h2>{{ 'puentes.data' | transloco }}</h2>
-    <p class="note">{{ 'puentes.requiredNote' | transloco }}</p>
+<app-puente-form
+  [mostrarExistentes]="true"
+  [guardando]="guardando()"
+  [erroresServidor]="erroresCampos()"
+  [errorTerritorioServidor]="errorTerritorio()"
+  [cercanos]="puntosCercanos()"
+  [ocultarAcciones]="advertencia() !== null"
+  (enviar)="registrar($event)"
+  (cambio)="alCambiarFormulario()"
+>
+  @if (errorRegistro(); as mensaje) {
+  <p class="feedback error" role="alert">{{ mensaje }}</p>
+  } @if (advertencia(); as aviso) {
+  <section class="proximity" role="alert">
+    <h3>{{ 'puentes.proximityTitle' | transloco }}</h3>
+    <p>{{ 'puentes.proximityNote' | transloco }}</p>
+    <p>{{ 'puentes.proximityTotal' | transloco: { total: aviso.totalPuentesCercanos ?? 0 } }}</p>
 
-    <div class="form-grid">
-      <label class="field">
-        <span>{{ 'puentes.name' | transloco }}</span>
-        <input pInputText formControlName="nombre" maxlength="200" autocomplete="off" />
-        @if (mensajeCampo('nombre'); as mensaje) {
-        <small class="validation">{{ mensaje }}</small>
-        }
-      </label>
-
-      <label class="field">
-        <span>{{ 'puentes.route' | transloco }}</span>
-        <input pInputText formControlName="ruta" maxlength="100" autocomplete="off" />
-        @if (mensajeCampo('ruta'); as mensaje) {
-        <small class="validation">{{ mensaje }}</small>
-        }
-      </label>
-
-      <label class="field">
-        <span>{{ 'puentes.kilometer' | transloco }}</span>
-        <input
-          pInputText
-          type="number"
-          formControlName="kilometraje"
-          min="0"
-          max="9999999.999"
-          step="0.001"
-          inputmode="decimal"
-        />
-        @if (mensajeCampo('kilometraje'); as mensaje) {
-        <small class="validation">{{ mensaje }}</small>
-        }
-      </label>
-    </div>
-
-    <h3>{{ 'puentes.territory' | transloco }}</h3>
-    <p class="note">{{ 'puentes.territoryNote' | transloco }}</p>
-
-    @if (cargandoDepartamentos()) {
-    <p role="status">{{ 'puentes.loadingDepartments' | transloco }}</p>
-    } @if (errorDepartamentos()) {
-    <div class="feedback" role="alert">
-      <p>{{ 'puentes.departmentsFailed' | transloco }}</p>
-      <button pButton type="button" (click)="cargarDepartamentos()">
-        {{ 'puentes.retry' | transloco }}
-      </button>
-    </div>
-    }
-
-    <div class="form-grid">
-      <div class="field">
-        <label for="departamentoId">{{ 'puentes.department' | transloco }}</label>
-        <p-select
-          inputId="departamentoId"
-          formControlName="departamentoId"
-          [options]="departamentos()"
-          optionLabel="nombre"
-          optionValue="id"
-          [placeholder]="'puentes.selectDepartment' | transloco"
-          [filter]="true"
-          filterBy="nombre"
-          [showClear]="true"
-          [loading]="cargandoDepartamentos()"
-        />
-        @if (mensajeCampo('departamentoId'); as mensaje) {
-        <small class="validation">{{ mensaje }}</small>
-        }
-      </div>
-
-      <div class="field">
-        <label for="municipioId">{{ 'puentes.municipality' | transloco }}</label>
-        <p-select
-          inputId="municipioId"
-          formControlName="municipioId"
-          [options]="municipios()"
-          optionLabel="nombre"
-          optionValue="id"
-          [placeholder]="
-              (form.controls.departamentoId.value
-                ? 'puentes.selectMunicipality'
-                : 'puentes.departmentFirst') | transloco
-            "
-          [filter]="true"
-          filterBy="nombre"
-          [showClear]="true"
-          [loading]="cargandoMunicipios()"
-        />
-        @if (mensajeCampo('municipioId'); as mensaje) {
-        <small class="validation">{{ mensaje }}</small>
-        }
-      </div>
-    </div>
-
-    @if (cargandoMunicipios()) {
-    <p role="status">{{ 'puentes.loadingMunicipalities' | transloco }}</p>
-    } @if (errorMunicipios()) {
-    <div class="feedback" role="alert">
-      <p>{{ 'puentes.municipalitiesFailed' | transloco }}</p>
-      <button pButton type="button" (click)="reintentarMunicipios()">
-        {{ 'puentes.retry' | transloco }}
-      </button>
-    </div>
-    } @else if ( form.controls.departamentoId.value && !cargandoMunicipios() && municipios().length
-    === 0 ) {
-    <p role="status">{{ 'puentes.noMunicipalities' | transloco }}</p>
-    }
-
-    <h3>{{ 'puentes.coordinates' | transloco }}</h3>
-    <p class="note">{{ 'puentes.coordinatesNote' | transloco }}</p>
-
-    <div class="form-grid">
-      <label class="field">
-        <span>{{ 'puentes.latitude' | transloco }}</span>
-        <input
-          pInputText
-          type="number"
-          formControlName="latitud"
-          min="-90"
-          max="90"
-          step="any"
-          inputmode="decimal"
-        />
-        @if (mensajeCampo('latitud'); as mensaje) {
-        <small class="validation">{{ mensaje }}</small>
-        }
-      </label>
-
-      <label class="field">
-        <span>{{ 'puentes.longitude' | transloco }}</span>
-        <input
-          pInputText
-          type="number"
-          formControlName="longitud"
-          min="-180"
-          max="180"
-          step="any"
-          inputmode="decimal"
-        />
-        @if (mensajeCampo('longitud'); as mensaje) {
-        <small class="validation">{{ mensaje }}</small>
-        }
-      </label>
-    </div>
-
-    @if (errorRegistro(); as mensaje) {
-    <p class="feedback error" role="alert">{{ mensaje }}</p>
-    } @if (advertencia(); as aviso) {
-    <section class="proximity" role="alert">
-      <h3>{{ 'puentes.proximityTitle' | transloco }}</h3>
-      <p>{{ 'puentes.proximityNote' | transloco }}</p>
-      <p>{{ 'puentes.proximityTotal' | transloco: { total: aviso.totalPuentesCercanos ?? 0 } }}</p>
-
-      <ul>
-        @for (cercano of aviso.puentesCercanos ?? []; track cercano.id) {
-        <li>
-          <strong>{{ cercano.codigo }} — {{ cercano.nombre }}</strong>
-          <span>
-            {{ 'puentes.distance' | transloco }}: {{ cercano.distanciaMetros | number: '1.1-1' }} m
-            · {{ (cercano.activo ? 'puentes.active' : 'puentes.inactive') | transloco }}
-          </span>
-        </li>
-        }
-      </ul>
-
-      @if ( (aviso.totalPuentesCercanos ?? 0) > (aviso.puentesCercanos?.length ?? 0) ) {
-      <p>
-        {{ 'puentes.proximityLimit' | transloco: { cantidad: aviso.puentesCercanos?.length ?? 0 } }}
-      </p>
+    <ul>
+      @for (cercano of aviso.puentesCercanos ?? []; track cercano.id) {
+      <li>
+        <strong>{{ cercano.codigo }} — {{ cercano.nombre }}</strong>
+        <span>
+          {{ 'puentes.distance' | transloco }}: {{ cercano.distanciaMetros | number: '1.1-1' }} m ·
+          {{ (cercano.activo ? 'puentes.active' : 'puentes.inactive') | transloco }}
+        </span>
+      </li>
       }
+    </ul>
 
-      <div class="actions">
-        <button pButton type="button" [disabled]="guardando()" (click)="confirmarRegistro()">
-          {{ 'puentes.confirm' | transloco }}
-        </button>
-        <button
-          pButton
-          type="button"
-          severity="secondary"
-          [disabled]="guardando()"
-          (click)="cancelarConfirmacion()"
-        >
-          {{ 'puentes.cancelConfirmation' | transloco }}
-        </button>
-      </div>
-    </section>
-    } @else {
+    @if ( (aviso.totalPuentesCercanos ?? 0) > (aviso.puentesCercanos?.length ?? 0) ) {
+    <p>
+      {{ 'puentes.proximityLimit' | transloco: { cantidad: aviso.puentesCercanos?.length ?? 0 } }}
+    </p>
+    }
+
     <div class="actions">
+      <button pButton type="button" [disabled]="guardando()" (click)="confirmarRegistro()">
+        {{ 'puentes.confirm' | transloco }}
+      </button>
+
       <button
         pButton
-        type="submit"
-        [disabled]="
-              form.invalid ||
-              guardando() ||
-              cargandoDepartamentos() ||
-              cargandoMunicipios() ||
-              errorDepartamentos() ||
-              errorMunicipios() ||
-              municipios().length === 0
-            "
+        type="button"
+        severity="secondary"
+        [disabled]="guardando()"
+        (click)="cancelarConfirmacion()"
       >
-        <i class="pi pi-save" aria-hidden="true"></i>
-        {{ (guardando() ? 'puentes.saving' : 'puentes.register') | transloco }}
+        {{ 'puentes.cancelConfirmation' | transloco }}
       </button>
     </div>
-    }
   </section>
-</form>
+  }
+</app-puente-form>
 }

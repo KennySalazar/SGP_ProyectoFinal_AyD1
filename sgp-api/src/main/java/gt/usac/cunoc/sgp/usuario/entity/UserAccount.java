@@ -59,6 +59,15 @@ public class UserAccount {
   @JoinColumn(name = "rol_id", nullable = false)
   private Role role;
 
+  @Column(name = "desactivado_en")
+  private Instant desactivadoEn;
+
+  @Column(name = "desactivado_por_id")
+  private UUID desactivadoPorId;
+
+  @Column(name = "motivo_desactivacion", length = 1000)
+  private String motivoDesactivacion;
+
   @Column(name = "creado_en", nullable = false, updatable = false)
   private Instant createdAt;
 
@@ -145,6 +154,42 @@ public class UserAccount {
 
   public void deactivate() {
     active = false;
+  }
+
+  /**
+   * Baja lógica (RN-USR-08): la cuenta se conserva para que sus registros sigan atribuidos.
+   * Invalida los tokens de acceso emitidos.
+   */
+  public void desactivar(UUID administradorId, String motivo, Instant ahora) {
+    active = false;
+    desactivadoEn = ahora;
+    desactivadoPorId = administradorId;
+    motivoDesactivacion = motivo;
+    tokenVersion++;
+  }
+
+  /** Recupera el acceso con el mismo rol que tenía antes de la baja. */
+  public void reactivar() {
+    active = true;
+    desactivadoEn = null;
+    desactivadoPorId = null;
+    motivoDesactivacion = null;
+  }
+
+  public Instant getDesactivadoEn() {
+    return desactivadoEn;
+  }
+
+  public UUID getDesactivadoPorId() {
+    return desactivadoPorId;
+  }
+
+  public String getMotivoDesactivacion() {
+    return motivoDesactivacion;
+  }
+
+  public Instant getCreatedAt() {
+    return createdAt;
   }
 
   public void setPasswordHash(String passwordHash) {
