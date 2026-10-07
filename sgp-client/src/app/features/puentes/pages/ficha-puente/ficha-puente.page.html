@@ -1,0 +1,214 @@
+@if (auth.authenticated()) {
+<app-shell><ng-container [ngTemplateOutlet]="contenido" /></app-shell>
+} @else {
+<main class="ficha-publica"><ng-container [ngTemplateOutlet]="contenido" /></main>
+}
+
+<ng-template #contenido>
+  <div class="ficha-contenedor" [class.ficha-autenticada]="auth.authenticated()">
+    @if (!auth.authenticated()) {
+    <div class="barra-publica">
+      <a routerLink="/puentes" class="link-volver">
+        <i class="pi pi-arrow-left" aria-hidden="true"></i>
+        <span>{{ 'puentes.ficha.back' | transloco }}</span>
+      </a>
+      <a pButton routerLink="/login">
+        <i class="pi pi-sign-in" aria-hidden="true"></i>
+        <span>{{ 'auth.login.title' | transloco }}</span>
+      </a>
+    </div>
+    } @if (cargando()) {
+    <div class="estado-mensaje surface-card" role="status">
+      <i class="pi pi-spin pi-spinner" aria-hidden="true"></i>
+      <p>{{ 'puentes.ficha.loading' | transloco }}</p>
+    </div>
+    } @else if (error() || !puente()) {
+    <div class="estado-mensaje estado-error surface-card" role="alert">
+      <i class="pi pi-exclamation-circle" aria-hidden="true"></i>
+      <h2>{{ 'puentes.ficha.notFound' | transloco }}</h2>
+      <a pButton routerLink="/puentes" class="btn-volver">
+        <i class="pi pi-arrow-left" aria-hidden="true"></i>
+        <span>{{ 'puentes.ficha.back' | transloco }}</span>
+      </a>
+    </div>
+    } @else { @let p = puente()!;
+    <header class="page-heading">
+      <div>
+        <p class="page-kicker">{{ 'puentes.ficha.kicker' | transloco }}</p>
+        <h1 class="page-title">{{ p.nombre }}</h1>
+        <p class="page-description">
+          {{ p.codigo }} · {{ p.ruta }} · {{ p.departamento.nombre }}, {{ p.municipio.nombre }}
+        </p>
+      </div>
+      <div class="acciones-encabezado">
+        @if (auth.authenticated()) {
+        <a
+          pButton
+          severity="secondary"
+          [outlined]="true"
+          routerLink="/puentes"
+          class="btn-volver-catalogo"
+        >
+          <i class="pi pi-arrow-left" aria-hidden="true"></i>
+          <span>{{ 'puentes.ficha.back' | transloco }}</span>
+        </a>
+        } @if (auth.user()?.role === 'ADMINISTRADOR' && p.activo) {
+        <a pButton [routerLink]="['/puentes', p.id, 'editar']">
+          <i class="pi pi-pencil" aria-hidden="true"></i>
+          <span>{{ 'puentes.catalogo.edit' | transloco }}</span>
+        </a>
+        }
+      </div>
+    </header>
+
+    <div class="ficha-grid">
+      <!-- Seccion 1: Estado de condicion tecnica (RN-INV-09, RN-INV-10) -->
+      <section class="surface-card ficha-seccion seccion-condicion">
+        <h2 class="seccion-titulo">
+          <i class="pi pi-chart-bar" aria-hidden="true"></i>
+          {{ 'puentes.ficha.statusSection' | transloco }}
+        </h2>
+        <div class="condicion-resumen">
+          <div class="condicion-bloque">
+            <span class="dato-etiqueta">{{ 'puentes.state' | transloco }}</span>
+            <p-tag
+              class="estado-tag"
+              [attr.data-estado]="p.activo ? (p.estadoActual || 'Sin evaluar') : 'Inactivo'"
+              [value]="p.activo ? (p.estadoActual || ('puentes.ficha.notEvaluated' | transloco)) : ('puentes.catalogo.inactiveStatus' | transloco)"
+              [severity]="p.activo ? severidadEstado(p.estadoActual) : 'danger'"
+            />
+          </div>
+          <div class="condicion-bloque">
+            <span class="dato-etiqueta">{{ 'puentes.ficha.conditionIndex' | transloco }}</span>
+            <span class="dato-valor ic-valor">
+              {{ p.indiceCondicionActual !== null ? p.indiceCondicionActual :
+              ('puentes.ficha.notAvailable' | transloco) }}
+            </span>
+          </div>
+          <div class="condicion-bloque">
+            <span class="dato-etiqueta">{{ 'puentes.ficha.lastInspection' | transloco }}</span>
+            <span class="dato-valor">
+              {{ p.fechaUltimaInspeccion ? p.fechaUltimaInspeccion : ('puentes.ficha.noInspections'
+              | transloco) }}
+            </span>
+          </div>
+        </div>
+        <div class="nota-calculado">
+          <i class="pi pi-info-circle" aria-hidden="true"></i>
+          <span>{{ 'puentes.ficha.calculatedNote' | transloco }}</span>
+        </div>
+      </section>
+
+      <!-- Seccion 2: Datos generales -->
+      <section class="surface-card ficha-seccion">
+        <h2 class="seccion-titulo">
+          <i class="pi pi-id-card" aria-hidden="true"></i>
+          {{ 'puentes.ficha.generalSection' | transloco }}
+        </h2>
+        <dl class="datos-lista">
+          <div class="dato-fila">
+            <dt class="dato-etiqueta">{{ 'puentes.code' | transloco }}</dt>
+            <dd class="dato-valor valor-codigo">{{ p.codigo }}</dd>
+          </div>
+          <div class="dato-fila">
+            <dt class="dato-etiqueta">{{ 'puentes.name' | transloco }}</dt>
+            <dd class="dato-valor">{{ p.nombre }}</dd>
+          </div>
+          <div class="dato-fila">
+            <dt class="dato-etiqueta">{{ 'puentes.department' | transloco }}</dt>
+            <dd class="dato-valor">{{ p.departamento.nombre }}</dd>
+          </div>
+          <div class="dato-fila">
+            <dt class="dato-etiqueta">{{ 'puentes.municipality' | transloco }}</dt>
+            <dd class="dato-valor">{{ p.municipio.nombre }}</dd>
+          </div>
+          <div class="dato-fila">
+            <dt class="dato-etiqueta">{{ 'puentes.route' | transloco }}</dt>
+            <dd class="dato-valor">{{ p.ruta }}</dd>
+          </div>
+          <div class="dato-fila">
+            <dt class="dato-etiqueta">{{ 'puentes.kilometer' | transloco }}</dt>
+            <dd class="dato-valor">
+              {{ p.kilometraje !== null ? (p.kilometraje + ' km') : ('puentes.ficha.notAvailable' |
+              transloco) }}
+            </dd>
+          </div>
+          <div class="dato-fila">
+            <dt class="dato-etiqueta">{{ 'puentes.catalogo.filterActivity' | transloco }}</dt>
+            <dd class="dato-valor">
+              <p-tag
+                [value]="p.activo ? ('puentes.active' | transloco) : ('puentes.inactive' | transloco)"
+                [severity]="p.activo ? 'success' : 'danger'"
+              />
+            </dd>
+          </div>
+        </dl>
+      </section>
+
+      <!-- Seccion 3: Ubicacion y coordenadas -->
+      <section class="surface-card ficha-seccion">
+        <h2 class="seccion-titulo">
+          <i class="pi pi-map-marker" aria-hidden="true"></i>
+          {{ 'puentes.ficha.locationSection' | transloco }}
+        </h2>
+        <dl class="datos-lista coordenadas-lista">
+          <div class="dato-fila">
+            <dt class="dato-etiqueta">{{ 'puentes.latitude' | transloco }}</dt>
+            <dd class="dato-valor">{{ p.latitud }}</dd>
+          </div>
+          <div class="dato-fila">
+            <dt class="dato-etiqueta">{{ 'puentes.longitude' | transloco }}</dt>
+            <dd class="dato-valor">{{ p.longitud }}</dd>
+          </div>
+          @if (p.utm) {
+          <div class="dato-fila">
+            <dt class="dato-etiqueta">{{ 'puentes.zone' | transloco }}</dt>
+            <dd class="dato-valor">{{ p.utm.zona }}</dd>
+          </div>
+          <div class="dato-fila">
+            <dt class="dato-etiqueta">{{ 'puentes.east' | transloco }}</dt>
+            <dd class="dato-valor">{{ p.utm.este }}</dd>
+          </div>
+          <div class="dato-fila">
+            <dt class="dato-etiqueta">{{ 'puentes.north' | transloco }}</dt>
+            <dd class="dato-valor">{{ p.utm.norte }}</dd>
+          </div>
+          }
+        </dl>
+        <div class="mapa-panel">
+          <app-selector-ubicacion
+            [latitud]="p.latitud"
+            [longitud]="p.longitud"
+            [deshabilitado]="true"
+          />
+        </div>
+      </section>
+
+      <!-- Seccion 4: Fotografias e informes tecnicos (RN-USR-10) -->
+      <section class="surface-card ficha-seccion">
+        <h2 class="seccion-titulo">
+          <i class="pi pi-images" aria-hidden="true"></i>
+          {{ 'puentes.ficha.documentationSection' | transloco }}
+        </h2>
+        @if (!auth.authenticated()) {
+        <div class="aviso-restringido" role="status">
+          <i class="pi pi-lock" aria-hidden="true"></i>
+          <div class="restringido-detalle">
+            <p class="restringido-texto">{{ 'puentes.ficha.restrictedNotice' | transloco }}</p>
+            <a pButton routerLink="/login" class="btn-login-restringido">
+              <i class="pi pi-sign-in" aria-hidden="true"></i>
+              <span>{{ 'puentes.ficha.restrictedLogin' | transloco }}</span>
+            </a>
+          </div>
+        </div>
+        } @else {
+        <div class="aviso-vacio" role="status">
+          <i class="pi pi-info-circle" aria-hidden="true"></i>
+          <p>{{ 'puentes.ficha.noDocumentation' | transloco }}</p>
+        </div>
+        }
+      </section>
+    </div>
+    }
+  </div>
+</ng-template>

@@ -29,4 +29,9 @@ export const puentesRoutes: Routes = [
       },
     ],
   },
+  {
+    path: ':id',
+    loadComponent: () =>
+      import('./pages/ficha-puente/ficha-puente.page').then((m) => m.FichaPuentePage),
+  },
 ];

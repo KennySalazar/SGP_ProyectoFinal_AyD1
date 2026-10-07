@@ -221,7 +221,15 @@
                   <i class="pi pi-check" aria-hidden="true"></i>
                   }
                 </td>
-                <th scope="row" class="nombre-puente">{{ puente.nombre }}</th>
+                <th scope="row" class="nombre-puente">
+                  <a
+                    [routerLink]="['/puentes', puente.id]"
+                    class="enlace-puente"
+                    (click)="$event.stopPropagation()"
+                  >
+                    {{ puente.nombre }}
+                  </a>
+                </th>
                 <td>{{ puente.departamento.nombre }}</td>
                 <td>{{ puente.municipio.nombre }}</td>
                 <td>

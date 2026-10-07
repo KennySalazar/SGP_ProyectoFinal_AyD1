@@ -197,6 +197,7 @@
       "edit": "Editar",
       "deactivate": "Dar de baja",
       "reactivate": "Reactivar",
+      "viewDetails": "Ver ficha",
       "inactiveStatus": "Inactivo"
     },
     "baja": {
@@ -297,7 +298,28 @@
     "proximityEditNote": "Se encontraron puentes a menos de 100 metros de la nueva ubicacion. Revisa los resultados y confirma si deseas actualizar este puente.",
     "confirmUpdate": "Confirmar y actualizar",
     "backToForm": "Volver al formulario",
-    "continueEditing": "Continuar editando"
+    "continueEditing": "Continuar editando",
+    "ficha": {
+      "kicker": "INVENTARIO DE PUENTES",
+      "title": "Ficha del puente",
+      "description": "Informacion general, ubicacion y estado de condicion tecnica.",
+      "loading": "Cargando ficha del puente...",
+      "notFound": "No se encontro el puente solicitado o se encuentra inactivo.",
+      "generalSection": "Datos generales",
+      "locationSection": "Ubicacion y coordenadas",
+      "statusSection": "Estado de condicion tecnica",
+      "conditionIndex": "Indice de condicion (IC)",
+      "lastInspection": "Ultima inspeccion",
+      "noInspections": "Sin inspecciones publicadas",
+      "notAvailable": "No disponible",
+      "notEvaluated": "Sin evaluar",
+      "calculatedNote": "El estado actual, el indice de condicion y la fecha de ultima inspeccion se derivan exclusivamente de la ultima inspeccion publicada.",
+      "documentationSection": "Fotografias e informes tecnicos",
+      "restrictedNotice": "Las fotografias e informes tecnicos detallados estan restringidos a usuarios registrados.",
+      "restrictedLogin": "Iniciar sesion para acceder",
+      "noDocumentation": "No hay fotografias ni informes tecnicos publicados para este puente.",
+      "back": "Volver al catalogo"
+    }
   },
   "auditoria": {
     "title": "Bitácora de auditoría",
