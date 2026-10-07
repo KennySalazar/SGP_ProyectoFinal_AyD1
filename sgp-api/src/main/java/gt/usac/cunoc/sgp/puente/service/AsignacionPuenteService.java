@@ -71,14 +71,20 @@ public class AsignacionPuenteService {
   @PreAuthorize("hasRole('CATEDRATICO')")
   public List<PuenteAsignableResponse> listarPuentesAsignables(String emailCatedratico) {
     buscarCatedratico(emailCatedratico);
-    return puentes.findCatalogoActivo(null, org.springframework.data.domain.Pageable.unpaged()).stream()
-        .map(puente -> new PuenteAsignableResponse(puente.getId(), puente.getCodigo(), puente.getNombre()))
+    return puentes
+        .findCatalogoActivo(null, org.springframework.data.domain.Pageable.unpaged())
+        .stream()
+        .map(
+            puente ->
+                new PuenteAsignableResponse(puente.getId(), puente.getCodigo(), puente.getNombre()))
         .toList();
   }
 
   @PreAuthorize("hasRole('CATEDRATICO')")
   public List<AsignacionPuenteResponse> listarAsignaciones(String emailCatedratico) {
-    return asignaciones.findActivasByCatedraticoId(buscarCatedratico(emailCatedratico).getId()).stream()
+    return asignaciones
+        .findActivasByCatedraticoId(buscarCatedratico(emailCatedratico).getId())
+        .stream()
         .map(this::respuesta)
         .toList();
   }
@@ -173,7 +179,8 @@ public class AsignacionPuenteService {
         .toList();
   }
 
-  private void validarInscripcion(AsignacionPuenteRepository.InscripcionAsignableProjection inscripcion) {
+  private void validarInscripcion(
+      AsignacionPuenteRepository.InscripcionAsignableProjection inscripcion) {
     if (!inscripcion.getCursoActivo()) {
       throw new ApiException(
           HttpStatus.UNPROCESSABLE_ENTITY,
@@ -208,7 +215,8 @@ public class AsignacionPuenteService {
   private UserAccount buscarCatedratico(String email) {
     return usuarios
         .findByEmail(email)
-        .filter(usuario -> usuario.isActive() && usuario.getRole().getName() == RoleName.CATEDRATICO)
+        .filter(
+            usuario -> usuario.isActive() && usuario.getRole().getName() == RoleName.CATEDRATICO)
         .orElseThrow(
             () ->
                 new ApiException(

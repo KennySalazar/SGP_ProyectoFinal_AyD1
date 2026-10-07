@@ -1,8 +1,8 @@
 package gt.usac.cunoc.sgp.curso.service;
 
 import gt.usac.cunoc.sgp.common.exception.ApiException;
-import gt.usac.cunoc.sgp.curso.dto.CatedraticoResponse;
 import gt.usac.cunoc.sgp.curso.dto.ActualizarCursoRequest;
+import gt.usac.cunoc.sgp.curso.dto.CatedraticoResponse;
 import gt.usac.cunoc.sgp.curso.dto.CrearCursoRequest;
 import gt.usac.cunoc.sgp.curso.dto.CursoResponse;
 import gt.usac.cunoc.sgp.curso.entity.Asignatura;
@@ -50,9 +50,7 @@ public class CursoService {
   }
 
   public Page<CursoResponse> listar(int pagina, int tamanio) {
-    return cursos
-        .findAll(paginacion(pagina, tamanio))
-        .map(mapper::toResponse);
+    return cursos.findAll(paginacion(pagina, tamanio)).map(mapper::toResponse);
   }
 
   public List<CatedraticoResponse> listarCatedraticos() {
@@ -79,7 +77,10 @@ public class CursoService {
             .orElseGet(
                 () ->
                     asignaturas.save(
-                        new Asignatura("ASIG-" + UUID.randomUUID().toString().replace("-", ""), nombre, ahora)));
+                        new Asignatura(
+                            "ASIG-" + UUID.randomUUID().toString().replace("-", ""),
+                            nombre,
+                            ahora)));
 
     Curso curso =
         cursos.save(
@@ -109,7 +110,10 @@ public class CursoService {
             .orElseGet(
                 () ->
                     asignaturas.save(
-                        new Asignatura("ASIG-" + UUID.randomUUID().toString().replace("-", ""), nombre, ahora)));
+                        new Asignatura(
+                            "ASIG-" + UUID.randomUUID().toString().replace("-", ""),
+                            nombre,
+                            ahora)));
     curso.actualizar(
         asignatura,
         periodo,
@@ -164,7 +168,8 @@ public class CursoService {
   private UserAccount buscarCatedratico(UUID id) {
     return usuarios
         .findWithRoleById(id)
-        .filter(usuario -> usuario.isActive() && usuario.getRole().getName() == RoleName.CATEDRATICO)
+        .filter(
+            usuario -> usuario.isActive() && usuario.getRole().getName() == RoleName.CATEDRATICO)
         .orElseThrow(
             () ->
                 new ApiException(

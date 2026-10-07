@@ -52,7 +52,9 @@ public class ActivacionEstudianteService {
         .findByRole_NameAndActiveTrueAndVerifiedTrueAndActivatedFalseOrderByEmailAsc(
             RoleName.ESTUDIANTE)
         .stream()
-        .map(estudiante -> new EstudiantePendienteResponse(estudiante.getId(), estudiante.getEmail()))
+        .map(
+            estudiante ->
+                new EstudiantePendienteResponse(estudiante.getId(), estudiante.getEmail()))
         .toList();
   }
 
@@ -97,8 +99,7 @@ public class ActivacionEstudianteService {
     Instant ahora = clock.instant();
     CursoEstudiante inscripcion =
         inscripciones.save(
-            new CursoEstudiante(
-                curso, estudiante, request.seccion().trim(), catedratico, ahora));
+            new CursoEstudiante(curso, estudiante, request.seccion().trim(), catedratico, ahora));
     estudiante.activate();
     auditoria.register(
         catedratico.getId(),
@@ -116,7 +117,8 @@ public class ActivacionEstudianteService {
   private UserAccount buscarCatedratico(String email) {
     return usuarios
         .findByEmail(email)
-        .filter(usuario -> usuario.isActive() && usuario.getRole().getName() == RoleName.CATEDRATICO)
+        .filter(
+            usuario -> usuario.isActive() && usuario.getRole().getName() == RoleName.CATEDRATICO)
         .orElseThrow(
             () ->
                 new ApiException(
@@ -130,9 +132,7 @@ public class ActivacionEstudianteService {
     return usuarios
         .findWithRoleById(id)
         .filter(
-            usuario ->
-                usuario.getRole().getName() == RoleName.ESTUDIANTE
-                    && usuario.isVerified())
+            usuario -> usuario.getRole().getName() == RoleName.ESTUDIANTE && usuario.isVerified())
         .orElseThrow(
             () ->
                 new ApiException(

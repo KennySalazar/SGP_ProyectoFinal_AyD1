@@ -55,7 +55,9 @@ class ActivacionEstudianteControllerSecurityTest {
     org.mockito.Mockito.reset(service);
     SecurityContextHolder.clearContext();
     mockMvc =
-        MockMvcBuilders.standaloneSetup(controller).setControllerAdvice(new SecurityAdvice()).build();
+        MockMvcBuilders.standaloneSetup(controller)
+            .setControllerAdvice(new SecurityAdvice())
+            .build();
   }
 
   @AfterEach
@@ -105,7 +107,9 @@ class ActivacionEstudianteControllerSecurityTest {
   private UsernamePasswordAuthenticationToken autenticar(RoleName role) {
     var authentication =
         new UsernamePasswordAuthenticationToken(
-            "usuario@ejemplo.com", null, List.of(new SimpleGrantedAuthority("ROLE_" + role.name())));
+            "usuario@ejemplo.com",
+            null,
+            List.of(new SimpleGrantedAuthority("ROLE_" + role.name())));
     authentication.setDetails(new JwtData("usuario@ejemplo.com", UUID.randomUUID(), role, 0));
     SecurityContextHolder.getContext().setAuthentication(authentication);
     return authentication;

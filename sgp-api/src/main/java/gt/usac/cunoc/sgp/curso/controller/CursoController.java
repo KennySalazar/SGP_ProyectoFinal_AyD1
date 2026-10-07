@@ -1,7 +1,7 @@
 package gt.usac.cunoc.sgp.curso.controller;
 
-import gt.usac.cunoc.sgp.curso.dto.CatedraticoResponse;
 import gt.usac.cunoc.sgp.curso.dto.ActualizarCursoRequest;
+import gt.usac.cunoc.sgp.curso.dto.CatedraticoResponse;
 import gt.usac.cunoc.sgp.curso.dto.CrearCursoRequest;
 import gt.usac.cunoc.sgp.curso.dto.CursoResponse;
 import gt.usac.cunoc.sgp.curso.service.CursoService;
@@ -41,7 +41,8 @@ public class CursoController {
   @GetMapping
   @Operation(summary = "Listar cursos")
   public Page<CursoResponse> listar(
-      @RequestParam(defaultValue = "0") int pagina, @RequestParam(defaultValue = "20") int tamanio) {
+      @RequestParam(defaultValue = "0") int pagina,
+      @RequestParam(defaultValue = "20") int tamanio) {
     return cursoService.listar(pagina, tamanio);
   }
 

@@ -246,7 +246,6 @@
   },
 
   "puentes": {
-
     "revision": {
       "title": "Revisión de solicitudes de alta",
       "description": "Revisa las solicitudes de los Catedráticos y decide si el puente entra al catálogo.",

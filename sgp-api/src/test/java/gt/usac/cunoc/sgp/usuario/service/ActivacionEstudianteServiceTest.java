@@ -61,7 +61,8 @@ class ActivacionEstudianteServiceTest {
 
     var response = service.activar("catedratico@ejemplo.com", request);
 
-    assertThat(response.message()).isEqualTo("Estudiante activado y vinculado al curso correctamente");
+    assertThat(response.message())
+        .isEqualTo("Estudiante activado y vinculado al curso correctamente");
     verify(estudiante).activate();
     verify(inscripciones).save(any(CursoEstudiante.class));
     verify(auditoria)
@@ -92,7 +93,8 @@ class ActivacionEstudianteServiceTest {
                     "catedratico@ejemplo.com",
                     new ActivarEstudianteRequest(estudianteId, cursoId, "A")))
         .isInstanceOfSatisfying(
-            ApiException.class, exception -> assertThat(exception.getCode()).isEqualTo("curso_finalizado"));
+            ApiException.class,
+            exception -> assertThat(exception.getCode()).isEqualTo("curso_finalizado"));
 
     verifyNoInteractions(inscripciones, auditoria);
   }
@@ -108,7 +110,8 @@ class ActivacionEstudianteServiceTest {
     when(usuarios.findWithRoleById(estudianteId)).thenReturn(Optional.of(estudiante));
     when(cursos.findByIdAndCatedratico_Id(cursoId, catedratico.getId()))
         .thenReturn(Optional.of(curso));
-    when(inscripciones.existsByEstudiante_IdAndEstado(any(UUID.class), eq("ACTIVO"))).thenReturn(true);
+    when(inscripciones.existsByEstudiante_IdAndEstado(any(UUID.class), eq("ACTIVO")))
+        .thenReturn(true);
 
     assertThatThrownBy(
             () ->

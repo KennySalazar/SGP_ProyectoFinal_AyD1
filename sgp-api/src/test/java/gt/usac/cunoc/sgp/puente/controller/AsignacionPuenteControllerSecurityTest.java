@@ -10,7 +10,6 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import gt.usac.cunoc.sgp.common.security.JwtData;
-import gt.usac.cunoc.sgp.puente.controller.AsignacionPuenteController;
 import gt.usac.cunoc.sgp.puente.dto.AsignarPuenteRequest;
 import gt.usac.cunoc.sgp.puente.service.AsignacionPuenteService;
 import gt.usac.cunoc.sgp.usuario.model.RoleName;
@@ -57,7 +56,10 @@ class AsignacionPuenteControllerSecurityTest {
   void setUp() {
     reset(service);
     SecurityContextHolder.clearContext();
-    mockMvc = MockMvcBuilders.standaloneSetup(controller).setControllerAdvice(new SecurityAdvice()).build();
+    mockMvc =
+        MockMvcBuilders.standaloneSetup(controller)
+            .setControllerAdvice(new SecurityAdvice())
+            .build();
   }
 
   @AfterEach
@@ -120,7 +122,9 @@ class AsignacionPuenteControllerSecurityTest {
   private UsernamePasswordAuthenticationToken autenticar(RoleName role) {
     var authentication =
         new UsernamePasswordAuthenticationToken(
-            "usuario@ejemplo.com", null, List.of(new SimpleGrantedAuthority("ROLE_" + role.name())));
+            "usuario@ejemplo.com",
+            null,
+            List.of(new SimpleGrantedAuthority("ROLE_" + role.name())));
     authentication.setDetails(new JwtData("usuario@ejemplo.com", UUID.randomUUID(), role, 0));
     SecurityContextHolder.getContext().setAuthentication(authentication);
     return authentication;

@@ -63,7 +63,8 @@ public class AsignacionPuenteController {
   @Operation(summary = "Asignar un puente activo a un estudiante vinculado")
   public ResponseEntity<MessageResponse> asignar(
       Authentication authentication, @Valid @RequestBody AsignarPuenteRequest request) {
-    return ResponseEntity.status(HttpStatus.CREATED).body(asignaciones.asignar(authentication.getName(), request));
+    return ResponseEntity.status(HttpStatus.CREATED)
+        .body(asignaciones.asignar(authentication.getName(), request));
   }
 
   @PatchMapping("/{asignacionId}/revocar")

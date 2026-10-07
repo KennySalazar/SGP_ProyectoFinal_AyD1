@@ -175,7 +175,8 @@ class CursoServiceTest {
         .thenReturn(false);
     when(asignaturas.findByNombreIgnoreCase("Arquitectura de Sistemas"))
         .thenReturn(Optional.empty());
-    when(asignaturas.save(any(Asignatura.class))).thenAnswer(invocation -> invocation.getArgument(0));
+    when(asignaturas.save(any(Asignatura.class)))
+        .thenAnswer(invocation -> invocation.getArgument(0));
     when(usuarios.findWithRoleById(request.catedraticoId())).thenReturn(Optional.of(catedratico));
     when(catedratico.isActive()).thenReturn(true);
     when(catedratico.getRole()).thenReturn(role);
@@ -205,7 +206,8 @@ class CursoServiceTest {
 
     assertThatThrownBy(() -> service.finalizar(id))
         .isInstanceOfSatisfying(
-            ApiException.class, exception -> assertThat(exception.getCode()).isEqualTo("curso_finalizado"));
+            ApiException.class,
+            exception -> assertThat(exception.getCode()).isEqualTo("curso_finalizado"));
   }
 
   private CrearCursoRequest request() {

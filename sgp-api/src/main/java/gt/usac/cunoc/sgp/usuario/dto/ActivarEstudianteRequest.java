@@ -6,6 +6,4 @@ import jakarta.validation.constraints.Size;
 import java.util.UUID;
 
 public record ActivarEstudianteRequest(
-    @NotNull UUID estudianteId,
-    @NotNull UUID cursoId,
-    @NotBlank @Size(max = 30) String seccion) {}
+    @NotNull UUID estudianteId, @NotNull UUID cursoId, @NotBlank @Size(max = 30) String seccion) {}

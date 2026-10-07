@@ -92,7 +92,8 @@ class AsignacionPuenteServiceTest {
                     "catedratico@ejemplo.com",
                     new AsignarPuenteRequest(inscripcionId, UUID.randomUUID())))
         .isInstanceOfSatisfying(
-            ApiException.class, exception -> assertThat(exception.getCode()).isEqualTo("curso_finalizado"));
+            ApiException.class,
+            exception -> assertThat(exception.getCode()).isEqualTo("curso_finalizado"));
 
     verifyNoInteractions(puentes, auditoria);
     verify(asignaciones, never()).save(any(AsignacionPuente.class));
@@ -115,7 +116,8 @@ class AsignacionPuenteServiceTest {
                 service.asignar(
                     "catedratico@ejemplo.com", new AsignarPuenteRequest(inscripcionId, puenteId)))
         .isInstanceOfSatisfying(
-            ApiException.class, exception -> assertThat(exception.getCode()).isEqualTo("puente_inactivo"));
+            ApiException.class,
+            exception -> assertThat(exception.getCode()).isEqualTo("puente_inactivo"));
 
     verify(asignaciones, never()).save(any(AsignacionPuente.class));
     verifyNoInteractions(auditoria);
