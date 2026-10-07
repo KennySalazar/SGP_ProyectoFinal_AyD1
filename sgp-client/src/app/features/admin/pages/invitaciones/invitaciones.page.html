@@ -1,0 +1,157 @@
+<header class="page-heading">
+  <p class="page-kicker">{{ 'admin.kicker' | transloco }}</p>
+  <h1 class="page-title">{{ 'invitaciones.title' | transloco }}</h1>
+  <p class="page-description">{{ 'invitaciones.description' | transloco }}</p>
+</header>
+
+<section class="surface-card invitar-card" aria-labelledby="invitar-titulo">
+  <h2 id="invitar-titulo">{{ 'invitaciones.formTitle' | transloco }}</h2>
+  <form class="invitar-form" [formGroup]="form" (ngSubmit)="invitar()">
+    <label>
+      <span>{{ 'common.email' | transloco }}</span>
+      <input
+        pInputText
+        type="email"
+        formControlName="email"
+        autocomplete="off"
+        maxlength="320"
+        [placeholder]="'common.emailPlaceholder' | transloco"
+      />
+      @if (form.controls.email.touched && form.controls.email.invalid) {
+      <small class="validation">{{ 'invitaciones.invalidEmail' | transloco }}</small>
+      }
+    </label>
+    <label for="invitacion-rol">
+      <span>{{ 'invitaciones.role' | transloco }}</span>
+      <p-select
+        inputId="invitacion-rol"
+        formControlName="rol"
+        [options]="roles"
+        optionValue="valor"
+        [ariaLabel]="'invitaciones.role' | transloco"
+      >
+        <ng-template #selectedItem let-opcion>{{ opcion.etiqueta | transloco }}</ng-template>
+        <ng-template #item let-opcion>{{ opcion.etiqueta | transloco }}</ng-template>
+      </p-select>
+    </label>
+    <button pButton type="submit" [disabled]="form.invalid || enviando()">
+      <i class="pi pi-send" aria-hidden="true"></i>
+      <span>{{ (enviando() ? 'invitaciones.sending' : 'invitaciones.send') | transloco }}</span>
+    </button>
+  </form>
+  <p class="nota">
+    <i class="pi pi-info-circle" aria-hidden="true"></i> {{ 'invitaciones.note' | transloco }}
+  </p>
+
+  @if (invitacionEnviada(); as invitacion) {
+  <p class="confirmacion" role="status">
+    <i class="pi pi-check-circle" aria-hidden="true"></i>
+    {{ 'invitaciones.sent' | transloco: { email: invitacion.email, fecha:
+    fechaGuatemala(invitacion.expiraEn) } }}
+  </p>
+  } @if (errorEnvio(); as mensaje) {
+  <p class="error" role="alert">{{ mensaje }}</p>
+  }
+</section>
+
+<section class="surface-card lista-card" aria-live="polite">
+  <h2 id="lista-titulo">{{ 'invitaciones.listTitle' | transloco }}</h2>
+  <div class="selector" role="group" [attr.aria-label]="'invitaciones.filterLabel' | transloco">
+    @for (opcion of estados; track opcion) {
+    <button
+      pButton
+      type="button"
+      [attr.aria-pressed]="estado() === opcion"
+      [severity]="estado() === opcion ? 'primary' : 'secondary'"
+      [outlined]="estado() !== opcion"
+      (click)="filtrar(opcion)"
+    >
+      {{ claveEstado(opcion) | transloco }}
+    </button>
+    }
+  </div>
+
+  @if (reenvioExitoso(); as invitacion) {
+  <p class="confirmacion" role="status">
+    <i class="pi pi-check-circle" aria-hidden="true"></i>
+    {{ 'invitaciones.resent' | transloco: { email: invitacion.email, fecha:
+    fechaGuatemala(invitacion.expiraEn) } }}
+  </p>
+  } @if (cargando()) {
+  <p role="status">{{ 'invitaciones.loading' | transloco }}</p>
+  } @else if (errorLista()) {
+  <div class="error" role="alert">
+    <p>{{ 'invitaciones.loadFailed' | transloco }}</p>
+    <button pButton type="button" severity="secondary" (click)="cargar(resultado()?.number ?? 0)">
+      {{ 'invitaciones.retry' | transloco }}
+    </button>
+  </div>
+  } @else if (resultado(); as pagina) { @if (pagina.content.length === 0) {
+  <div class="sin-resultados">
+    <i class="pi pi-inbox" aria-hidden="true"></i>
+    <p role="status">{{ 'invitaciones.empty' | transloco }}</p>
+  </div>
+  } @else {
+  <div class="tabla-contenedor" role="region" tabindex="0" aria-labelledby="lista-titulo">
+    <p-table [value]="pagina.content" dataKey="id" [tableStyle]="{ 'min-width': '48rem' }">
+      <ng-template #header>
+        <tr>
+          <th scope="col">{{ 'common.email' | transloco }}</th>
+          <th scope="col">{{ 'invitaciones.role' | transloco }}</th>
+          <th scope="col" class="no-cortar">{{ 'invitaciones.state' | transloco }}</th>
+          <th scope="col" class="no-cortar">{{ 'invitaciones.sentAt' | transloco }}</th>
+          <th scope="col" class="no-cortar">{{ 'invitaciones.expiresAt' | transloco }}</th>
+          <th scope="col">
+            <span class="sr-only">{{ 'invitaciones.actions' | transloco }}</span>
+          </th>
+        </tr>
+      </ng-template>
+      <ng-template #body let-invitacion>
+        <tr>
+          <th scope="row">{{ invitacion.email }}</th>
+          <td>{{ 'invitaciones.roles.' + invitacion.rol | transloco }}</td>
+          <td class="no-cortar">
+            <p-tag
+              [attr.data-estado]="invitacion.estado"
+              [value]="'invitaciones.estados.' + invitacion.estado | transloco"
+              [severity]="severidad(invitacion.estado)"
+            />
+          </td>
+          <td class="no-cortar">{{ fechaGuatemala(invitacion.creadoEn) }}</td>
+          <td class="no-cortar">{{ fechaGuatemala(invitacion.expiraEn) }}</td>
+          <td class="no-cortar">
+            @if (puedeReenviar(invitacion)) {
+            <button
+              pButton
+              type="button"
+              size="small"
+              severity="secondary"
+              [disabled]="reenviando() !== null"
+              (click)="reenviar(invitacion)"
+              [attr.aria-label]="('invitaciones.resend' | transloco) + ': ' + invitacion.email"
+            >
+              <i class="pi pi-refresh" aria-hidden="true"></i>
+              {{ (reenviando() === invitacion.id ? 'invitaciones.resending' : 'invitaciones.resend')
+              | transloco }}
+            </button>
+            }
+          </td>
+        </tr>
+      </ng-template>
+    </p-table>
+  </div>
+
+  <div class="paginacion">
+    <p class="reporte-pagina" role="status">
+      {{ 'invitaciones.total' | transloco: { total: pagina.totalElements } }}
+    </p>
+    <p-paginator
+      [first]="pagina.number * pagina.size"
+      [rows]="pagina.size"
+      [totalRecords]="pagina.totalElements"
+      [pageLinkSize]="3"
+      (onPageChange)="cambiarPagina($event)"
+    />
+  </div>
+  } }
+</section>

@@ -1,0 +1,82 @@
+<app-auth-card
+  [title]="'auth.activation.title' | transloco"
+  [subtitle]="'auth.activation.subtitle' | transloco"
+>
+  @switch (estado()) { @case ('validando') {
+  <p class="note" role="status">
+    <i class="pi pi-spin pi-spinner" aria-hidden="true"></i>
+    {{ 'auth.activation.validating' | transloco }}
+  </p>
+  } @case ('lista') { @if (invitacion(); as datos) {
+  <dl class="invitacion" [attr.aria-label]="'auth.activation.invitationData' | transloco">
+    <div>
+      <dt>{{ 'common.email' | transloco }}</dt>
+      <dd>{{ datos.email }}</dd>
+    </div>
+    <div>
+      <dt>{{ 'auth.activation.role' | transloco }}</dt>
+      <dd>{{ 'invitaciones.roles.' + datos.rol | transloco }}</dd>
+    </div>
+  </dl>
+  }
+  <form [formGroup]="form" (ngSubmit)="activar()">
+    <label
+      >{{ 'common.password' | transloco }}<input
+        pInputText
+        type="password"
+        formControlName="password"
+        autocomplete="new-password"
+        maxlength="72"
+        [placeholder]="'common.minPasswordPlaceholder' | transloco"
+    /></label>
+    @if (form.controls.password.touched && form.controls.password.invalid) {
+    <small class="validation">{{ 'auth.register.rule' | transloco }}</small>
+    }
+    <label
+      >{{ 'auth.activation.confirm' | transloco }}<input
+        pInputText
+        type="password"
+        formControlName="confirmacion"
+        autocomplete="new-password"
+        maxlength="72"
+        [placeholder]="'common.confirmPasswordPlaceholder' | transloco"
+    /></label>
+    @if (form.controls.confirmacion.touched && form.hasError('noCoinciden')) {
+    <small class="validation">{{ 'auth.activation.mismatch' | transloco }}</small>
+    }
+    <p class="note"><i class="pi pi-info-circle"></i> {{ 'auth.register.rule' | transloco }}</p>
+    @if (errorContrasena(); as mensaje) {
+    <p class="validation" role="alert">{{ mensaje }}</p>
+    }
+    <button pButton class="primary" type="submit" [disabled]="form.invalid || enviando()">
+      <i class="pi pi-user-plus"></i
+      ><span
+        >{{ (enviando() ? 'auth.activation.activating' : 'auth.activation.action') | transloco
+        }}</span
+      >
+    </button>
+  </form>
+  } @case ('activada') {
+  <p class="note success" role="status">
+    <i class="pi pi-check-circle"></i> {{ 'auth.activation.success' | transloco }}
+  </p>
+  <div class="links"><a routerLink="/login">{{ 'auth.login.title' | transloco }}</a></div>
+  } @case ('vencida') {
+  <p class="note warning" role="alert">
+    <i class="pi pi-clock"></i> {{ 'auth.activation.expired' | transloco }}
+  </p>
+  <div class="links"><a routerLink="/login">{{ 'auth.recovery.back' | transloco }}</a></div>
+  } @case ('invalida') {
+  <p class="note danger" role="alert">
+    <i class="pi pi-times-circle"></i> {{ 'auth.activation.invalid' | transloco }}
+  </p>
+  <div class="links"><a routerLink="/login">{{ 'auth.recovery.back' | transloco }}</a></div>
+  } @case ('error') {
+  <div class="note danger" role="alert">
+    <p><i class="pi pi-exclamation-triangle"></i> {{ 'auth.activation.failed' | transloco }}</p>
+    <button pButton type="button" severity="secondary" (click)="validar()">
+      {{ 'auth.activation.retry' | transloco }}
+    </button>
+  </div>
+  } }
+</app-auth-card>

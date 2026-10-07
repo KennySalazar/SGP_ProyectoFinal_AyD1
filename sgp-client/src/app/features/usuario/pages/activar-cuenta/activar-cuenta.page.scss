@@ -1,0 +1,42 @@
+@use '../../../../shared/components/form-controls/form-controls.scss';
+.note i {
+  margin-right: 0.35rem;
+}
+.note p {
+  margin: 0 0 0.75rem;
+}
+.success {
+  background: #edf9f1;
+  border-color: #cdebd8;
+  color: #166534;
+}
+.warning {
+  background: #fffbeb;
+  border-color: #fde68a;
+  color: #92400e;
+}
+.danger {
+  background: #fff1f2;
+  border-color: #fecaca;
+  color: #9f1239;
+}
+.invitacion {
+  display: grid;
+  gap: 0.7rem;
+  margin: 0 0 1.1rem;
+  padding: 0.8rem 0.9rem;
+  border: 1px solid #dce7f1;
+  border-radius: 10px;
+  background: #f5f8fb;
+}
+.invitacion dt {
+  color: #53687e;
+  font-size: 0.75rem;
+  font-weight: 750;
+}
+.invitacion dd {
+  margin: 0.15rem 0 0;
+  color: #0b1f33;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}

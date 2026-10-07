@@ -89,6 +89,22 @@
       "subtitle": "Usa el codigo OTP de recuperacion para establecer una nueva contrasena.",
       "success": "Contrasena restablecida correctamente.",
       "action": "Restablecer contrasena"
+    },
+    "activation": {
+      "title": "Activar cuenta",
+      "subtitle": "Define tu contraseña para aceptar la invitación al Sistema de Gestión de Puentes.",
+      "validating": "Verificando el enlace de invitación...",
+      "invitationData": "Datos de la invitación",
+      "role": "Rol asignado",
+      "confirm": "Confirmar contraseña",
+      "mismatch": "Las contraseñas no coinciden.",
+      "action": "Activar cuenta",
+      "activating": "Activando...",
+      "success": "Tu cuenta fue activada. Ya puedes iniciar sesión con tu correo y la contraseña que definiste.",
+      "expired": "El enlace de invitación venció. Solicita al Administrador que reenvíe la invitación.",
+      "invalid": "El enlace de invitación no es válido o ya fue utilizado. Si necesitas acceso, comunícate con el Administrador.",
+      "failed": "No fue posible verificar la invitación. Revisa tu conexión e intenta de nuevo.",
+      "retry": "Reintentar"
     }
   },
   "dashboard": {
@@ -495,5 +511,49 @@
     "indexWeightsNote": "Configuracion versionada y calibracion.",
     "audit": "Auditoria",
     "auditNote": "Consulta de acciones y trazabilidad."
+  },
+  "invitaciones": {
+    "open": "Gestionar invitaciones",
+    "title": "Invitaciones de usuarios",
+    "description": "Invita a Catedráticos por correo electrónico. Estos roles no pueden autorregistrarse; la cuenta se activa cuando la persona define su contraseña desde el enlace recibido.",
+    "formTitle": "Nueva invitación",
+    "role": "Rol",
+    "send": "Enviar invitación",
+    "sending": "Enviando...",
+    "note": "El enlace es de un solo uso y vence a las 72 horas. Mientras no se active, la cuenta no puede iniciar sesión.",
+    "invalidEmail": "Ingresa un correo electrónico válido.",
+    "sent": "Invitación enviada a {{email}}. El enlace vence el {{fecha}}.",
+    "resent": "Se envió un nuevo enlace a {{email}}. Vence el {{fecha}}; el enlace anterior ya no es válido.",
+    "listTitle": "Invitaciones enviadas",
+    "filterLabel": "Filtrar invitaciones por estado",
+    "loading": "Cargando invitaciones...",
+    "loadFailed": "No fue posible cargar las invitaciones.",
+    "retry": "Reintentar",
+    "empty": "No hay invitaciones con este estado.",
+    "state": "Estado",
+    "sentAt": "Enviada",
+    "expiresAt": "Vence",
+    "actions": "Acciones",
+    "resend": "Reenviar",
+    "resending": "Reenviando...",
+    "total": "{{total}} invitaciones en total",
+    "estados": {
+      "TODAS": "Todas",
+      "PENDIENTE": "Pendiente",
+      "VENCIDA": "Vencida",
+      "ACEPTADA": "Aceptada",
+      "CANCELADA": "Reemplazada"
+    },
+    "roles": {
+      "ADMINISTRADOR": "Administrador",
+      "CATEDRATICO": "Catedrático",
+      "PROFESIONAL_EXTERNO": "Profesional externo",
+      "ESTUDIANTE": "Estudiante"
+    },
+    "errores": {
+      "email_already_registered": "Este correo ya tiene una cuenta registrada en el sistema.",
+      "invitacion_pendiente": "Este correo ya tiene una invitación sin aceptar. Usa la acción Reenviar en la lista.",
+      "envio": "No fue posible enviar la invitación."
+    }
   }
 }

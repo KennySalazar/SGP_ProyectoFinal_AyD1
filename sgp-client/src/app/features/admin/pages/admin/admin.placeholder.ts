@@ -20,7 +20,7 @@ import { ButtonModule } from 'primeng/button';
           <strong>{{ 'admin.usersRoles' | transloco }}</strong
           ><span>{{ 'admin.usersRolesNote' | transloco }}</span>
         </div>
-        <small>{{ 'common.pending' | transloco }}</small>
+        <a pButton routerLink="/admin/invitaciones">{{ 'invitaciones.open' | transloco }}</a>
       </article>
       <article>
         <i class="pi pi-file-edit"></i>

@@ -190,6 +190,13 @@ class InvitacionCatedraticoIntegrationTest {
         .contains("http://localhost:4200/activar-cuenta?token=")
         .contains("09/10/2026 12:00");
     String token = ultimoToken();
+    assertThat(correos.enviados.get(0).asunto()).contains("Invitación");
+    assertThat(correos.enviados.get(0).html())
+        .contains("href=\"http://localhost:4200/activar-cuenta?token=" + token + "\"")
+        .contains("Catedrático")
+        .contains("catedratico@usac.edu.gt")
+        .contains("09/10/2026 12:00")
+        .doesNotContain("{{");
     assertThat(
             jdbc.queryForObject(
                 "SELECT token_hash FROM invitacion_usuario WHERE id = ?",
@@ -476,7 +483,7 @@ class InvitacionCatedraticoIntegrationTest {
     SecurityContextHolder.setContext(context);
   }
 
-  record CorreoEnviado(String destinatario, String asunto, String cuerpo) {}
+  record CorreoEnviado(String destinatario, String asunto, String cuerpo, String html) {}
 
   /** Sustituye el SMTP real y conserva los correos para leer el enlace de activación. */
   static class CorreoCapturado implements EmailService {
@@ -498,7 +505,14 @@ class InvitacionCatedraticoIntegrationTest {
             "Servicio de correo no disponible",
             "No fue posible enviar el correo");
       }
-      enviados.add(new CorreoEnviado(recipient, subject, body));
+      enviados.add(new CorreoEnviado(recipient, subject, body, null));
+    }
+
+    @Override
+    public void sendHtml(String recipient, String subject, String text, String html) {
+      send(recipient, subject, text);
+      CorreoEnviado enviado = enviados.remove(enviados.size() - 1);
+      enviados.add(new CorreoEnviado(recipient, subject, text, html));
     }
   }
 

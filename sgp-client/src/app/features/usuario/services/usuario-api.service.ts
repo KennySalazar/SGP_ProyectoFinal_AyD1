@@ -6,6 +6,7 @@ import {
   LoginResponse,
   MessageResponse,
 } from '../../../core/models/auth.models';
+import { InvitacionPublica } from '../models/invitacion.models';
 
 @Injectable({ providedIn: 'root' })
 export class UsuarioApiService {
@@ -47,6 +48,14 @@ export class UsuarioApiService {
     newPassword: string;
   }): Observable<MessageResponse> {
     return this.http.post<MessageResponse>('/api/v1/auth/password-recovery/verify', data);
+  }
+
+  validarInvitacion(token: string): Observable<InvitacionPublica> {
+    return this.http.post<InvitacionPublica>('/api/v1/invitaciones/validacion', { token });
+  }
+
+  aceptarInvitacion(token: string, password: string): Observable<MessageResponse> {
+    return this.http.post<MessageResponse>('/api/v1/invitaciones/aceptacion', { token, password });
   }
 
   requestTwoFactorChange(
