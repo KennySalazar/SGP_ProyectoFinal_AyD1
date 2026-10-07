@@ -12,6 +12,11 @@ export class AuthStore {
   readonly accessToken = this.tokenState.asReadonly();
   readonly user = this.userState.asReadonly();
   readonly authenticated = computed(() => this.tokenState() !== null && this.userState() !== null);
+  /** Profesional Externo cuyo colegiado aún no verifica el Administrador: no puede inspeccionar. */
+  readonly colegiadoPendiente = computed(() => {
+    const user = this.userState();
+    return user?.role === 'PROFESIONAL_EXTERNO' && user.colegiadoVerificado !== true;
+  });
 
   setAccessToken(token: string | null): void {
     this.tokenState.set(token);

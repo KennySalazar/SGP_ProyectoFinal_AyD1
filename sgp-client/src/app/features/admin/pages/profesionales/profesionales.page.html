@@ -1,0 +1,164 @@
+<header class="page-heading">
+  <p class="page-kicker">{{ 'admin.kicker' | transloco }}</p>
+  <h1 class="page-title">{{ 'profesionales.title' | transloco }}</h1>
+  <p class="page-description">{{ 'profesionales.description' | transloco }}</p>
+</header>
+
+<section class="surface-card lista-card" aria-live="polite">
+  <div class="cabecera">
+    <h2 id="profesionales-titulo">{{ 'profesionales.listTitle' | transloco }}</h2>
+    <a pButton severity="secondary" [outlined]="true" routerLink="/admin/invitaciones">
+      <i class="pi pi-send" aria-hidden="true"></i>
+      <span>{{ 'profesionales.invite' | transloco }}</span>
+    </a>
+  </div>
+  <div class="selector" role="group" [attr.aria-label]="'profesionales.filterLabel' | transloco">
+    @for (opcion of filtros; track opcion) {
+    <button
+      pButton
+      type="button"
+      [attr.aria-pressed]="filtro() === opcion"
+      [severity]="filtro() === opcion ? 'primary' : 'secondary'"
+      [outlined]="filtro() !== opcion"
+      (click)="filtrar(opcion)"
+    >
+      {{ 'profesionales.filtros.' + opcion | transloco }}
+    </button>
+    }
+  </div>
+
+  @if (verificado(); as profesional) {
+  <p class="confirmacion" role="status">
+    <i class="pi pi-check-circle" aria-hidden="true"></i>
+    {{ 'profesionales.verified' | transloco: { email: profesional.email } }}
+  </p>
+  } @if (cargando()) {
+  <p role="status">{{ 'profesionales.loading' | transloco }}</p>
+  } @else if (errorLista()) {
+  <div class="error" role="alert">
+    <p>{{ 'profesionales.loadFailed' | transloco }}</p>
+    <button pButton type="button" severity="secondary" (click)="cargar(resultado()?.number ?? 0)">
+      {{ 'profesionales.retry' | transloco }}
+    </button>
+  </div>
+  } @else if (resultado(); as pagina) { @if (pagina.content.length === 0) {
+  <div class="sin-resultados">
+    <i class="pi pi-id-card" aria-hidden="true"></i>
+    <p role="status">{{ 'profesionales.empty' | transloco }}</p>
+  </div>
+  } @else {
+  <div class="tabla-contenedor" role="region" tabindex="0" aria-labelledby="profesionales-titulo">
+    <p-table [value]="pagina.content" dataKey="usuarioId" [tableStyle]="{ 'min-width': '52rem' }">
+      <ng-template #header>
+        <tr>
+          <th scope="col">{{ 'common.email' | transloco }}</th>
+          <th scope="col" class="no-cortar">{{ 'profesionales.colegiado' | transloco }}</th>
+          <th scope="col" class="no-cortar">{{ 'profesionales.account' | transloco }}</th>
+          <th scope="col" class="no-cortar">{{ 'profesionales.verification' | transloco }}</th>
+          <th scope="col">
+            <span class="sr-only">{{ 'profesionales.actions' | transloco }}</span>
+          </th>
+        </tr>
+      </ng-template>
+      <ng-template #body let-profesional>
+        <tr>
+          <th scope="row">{{ profesional.email }}</th>
+          <td class="no-cortar">{{ profesional.numeroColegiado }}</td>
+          <td class="no-cortar">
+            {{ (profesional.cuentaActivada ? 'profesionales.accountActive' :
+            'profesionales.accountPending') | transloco }}
+          </td>
+          <td class="no-cortar">
+            <p-tag
+              [attr.data-verificado]="profesional.colegiadoVerificado"
+              [value]="
+                (profesional.colegiadoVerificado
+                  ? 'profesionales.estado.VERIFICADO'
+                  : 'profesionales.estado.PENDIENTE'
+                ) | transloco
+              "
+              [severity]="profesional.colegiadoVerificado ? 'success' : 'warn'"
+            />
+            @if (profesional.colegiadoVerificadoEn) {
+            <small class="fecha">{{ fechaGuatemala(profesional.colegiadoVerificadoEn) }}</small>
+            }
+          </td>
+          <td class="no-cortar">
+            @if (!profesional.colegiadoVerificado) {
+            <button
+              pButton
+              type="button"
+              size="small"
+              (click)="confirmarVerificacion(profesional)"
+              [attr.aria-label]="('profesionales.verify' | transloco) + ': ' + profesional.email"
+            >
+              <i class="pi pi-verified" aria-hidden="true"></i>
+              {{ 'profesionales.verify' | transloco }}
+            </button>
+            }
+          </td>
+        </tr>
+      </ng-template>
+    </p-table>
+  </div>
+
+  <div class="paginacion">
+    <p class="reporte-pagina" role="status">
+      {{ 'profesionales.total' | transloco: { total: pagina.totalElements } }}
+    </p>
+    <p-paginator
+      [first]="pagina.number * pagina.size"
+      [rows]="pagina.size"
+      [totalRecords]="pagina.totalElements"
+      [pageLinkSize]="3"
+      (onPageChange)="cambiarPagina($event)"
+    />
+  </div>
+  } }
+</section>
+
+<p-dialog
+  [header]="'profesionales.confirmTitle' | transloco"
+  [visible]="porVerificar() !== null"
+  (visibleChange)="!$event && cancelarVerificacion()"
+  [modal]="true"
+  [style]="{ width: 'min(520px, 95vw)' }"
+  [draggable]="false"
+  [resizable]="false"
+>
+  @if (porVerificar(); as profesional) {
+  <p class="dialogo-texto">{{ 'profesionales.confirmText' | transloco }}</p>
+  <dl class="datos">
+    <div>
+      <dt>{{ 'common.email' | transloco }}</dt>
+      <dd>{{ profesional.email }}</dd>
+    </div>
+    <div>
+      <dt>{{ 'profesionales.colegiado' | transloco }}</dt>
+      <dd>{{ profesional.numeroColegiado }}</dd>
+    </div>
+  </dl>
+  @if (errorVerificacion(); as mensaje) {
+  <p class="error" role="alert">{{ mensaje }}</p>
+  }
+  <div class="acciones">
+    <button
+      pButton
+      type="button"
+      severity="secondary"
+      [outlined]="true"
+      [disabled]="verificando()"
+      (click)="cancelarVerificacion()"
+    >
+      {{ 'profesionales.cancel' | transloco }}
+    </button>
+    <button pButton type="button" [disabled]="verificando()" (click)="verificar()">
+      <i class="pi pi-verified" aria-hidden="true"></i>
+      <span
+        >{{ (verificando() ? 'profesionales.verifying' : 'profesionales.confirm') | transloco
+        }}</span
+      >
+    </button>
+  </div>
+  }
+</p-dialog>

@@ -8,6 +8,8 @@ export interface UserSession {
   activated: boolean;
   active: boolean;
   twoFactorEnabled: boolean;
+  /** Solo aplica al Profesional Externo; nulo para los demás roles (RN-USR-04). */
+  colegiadoVerificado?: boolean | null;
 }
 
 export interface LoginResponse {

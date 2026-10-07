@@ -7,6 +7,11 @@ export const adminRoutes: Routes = [
       import('./pages/invitaciones/invitaciones.page').then((m) => m.InvitacionesPage),
   },
   {
+    path: 'profesionales',
+    loadComponent: () =>
+      import('./pages/profesionales/profesionales.page').then((m) => m.ProfesionalesPage),
+  },
+  {
     path: 'bitacora',
     loadComponent: () => import('./pages/bitacora/bitacora.page').then((m) => m.BitacoraPage),
   },

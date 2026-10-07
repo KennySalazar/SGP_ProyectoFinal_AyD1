@@ -146,7 +146,11 @@
     "unevaluated": "Sin evaluar",
     "noPublishedInspection": "Sin inspeccion publicada",
     "basePrepared": "Base preparada",
-    "toImplement": "Por implementar"
+    "toImplement": "Por implementar",
+    "colegiadoPendiente": {
+      "title": "Tu número de colegiado está pendiente de verificación.",
+      "note": "Puedes usar el sistema, pero las acciones de inspección se habilitarán cuando el Administrador verifique tu colegiado."
+    }
   },
   "security": {
     "kicker": "CONTROL DE ACCESO",
@@ -510,12 +514,14 @@
     "indexWeights": "Pesos del indice",
     "indexWeightsNote": "Configuracion versionada y calibracion.",
     "audit": "Auditoria",
-    "auditNote": "Consulta de acciones y trazabilidad."
+    "auditNote": "Consulta de acciones y trazabilidad.",
+    "professionals": "Profesionales externos",
+    "professionalsNote": "Verificación del número de colegiado."
   },
   "invitaciones": {
     "open": "Gestionar invitaciones",
     "title": "Invitaciones de usuarios",
-    "description": "Invita a Catedráticos por correo electrónico. Estos roles no pueden autorregistrarse; la cuenta se activa cuando la persona define su contraseña desde el enlace recibido.",
+    "description": "Invita a Catedráticos y Profesionales Externos por correo electrónico. Estos roles no pueden autorregistrarse; la cuenta se activa cuando la persona define su contraseña desde el enlace recibido.",
     "formTitle": "Nueva invitación",
     "role": "Rol",
     "send": "Enviar invitación",
@@ -553,7 +559,48 @@
     "errores": {
       "email_already_registered": "Este correo ya tiene una cuenta registrada en el sistema.",
       "invitacion_pendiente": "Este correo ya tiene una invitación sin aceptar. Usa la acción Reenviar en la lista.",
-      "envio": "No fue posible enviar la invitación."
-    }
+      "envio": "No fue posible enviar la invitación.",
+      "colegiado_duplicado": "Este número de colegiado ya está asociado a otra cuenta.",
+      "colegiado_requerido": "El número de colegiado es obligatorio para el Profesional Externo."
+    },
+    "colegiado": "Número de colegiado",
+    "colegiadoPlaceholder": "Ej. 12345",
+    "invalidColegiado": "Ingresa el número de colegiado (solo letras, dígitos y guiones).",
+    "colegiadoNote": "El Profesional Externo podrá iniciar sesión, pero no podrá inspeccionar hasta que verifiques su colegiado en Profesionales externos."
+  },
+  "profesionales": {
+    "open": "Verificar colegiados",
+    "title": "Profesionales externos",
+    "description": "Verifica el número de colegiado de cada Profesional Externo. Hasta entonces puede iniciar sesión, pero no realizar acciones de inspección.",
+    "listTitle": "Profesionales registrados",
+    "invite": "Invitar profesional",
+    "filterLabel": "Filtrar profesionales por verificación",
+    "filtros": {
+      "PENDIENTES": "Pendientes",
+      "VERIFICADOS": "Verificados",
+      "TODOS": "Todos"
+    },
+    "loading": "Cargando profesionales...",
+    "loadFailed": "No fue posible cargar los profesionales.",
+    "retry": "Reintentar",
+    "empty": "No hay profesionales en esta categoría.",
+    "colegiado": "Colegiado",
+    "account": "Cuenta",
+    "accountActive": "Activada",
+    "accountPending": "Pendiente de activación",
+    "verification": "Colegiado",
+    "estado": {
+      "VERIFICADO": "Verificado",
+      "PENDIENTE": "Pendiente de verificación"
+    },
+    "actions": "Acciones",
+    "verify": "Verificar colegiado",
+    "verified": "Colegiado de {{email}} verificado. La cuenta quedó completamente habilitada.",
+    "total": "{{total}} profesionales en total",
+    "confirmTitle": "Verificar colegiado",
+    "confirmText": "Confirma que validaste el número de colegiado en el registro profesional. La verificación habilita las acciones de inspección y no se puede deshacer.",
+    "confirm": "Confirmar verificación",
+    "verifying": "Verificando...",
+    "cancel": "Cancelar"
   }
 }

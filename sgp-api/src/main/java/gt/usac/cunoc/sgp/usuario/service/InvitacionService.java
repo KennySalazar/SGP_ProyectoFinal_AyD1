@@ -28,8 +28,12 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Base64;
 import java.util.EnumSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -44,13 +48,15 @@ public class InvitacionService {
 
   private static final String ENTIDAD = "invitacion_usuario";
 
-  /** Roles habilitados para invitación; HU-002 y HU-004 amplían esta lista. */
-  private static final Set<RoleName> ROLES_INVITABLES = EnumSet.of(RoleName.CATEDRATICO);
+  /** Roles habilitados para invitación; HU-004 amplía esta lista. */
+  private static final Set<RoleName> ROLES_INVITABLES =
+      EnumSet.of(RoleName.CATEDRATICO, RoleName.PROFESIONAL_EXTERNO);
 
   private final InvitacionUsuarioRepository invitaciones;
   private final UserAccountRepository users;
   private final RoleRepository roles;
   private final CuentaInvitadaService cuentas;
+  private final ProfesionalService profesionales;
   private final InvitacionEmailService invitacionEmailService;
   private final InvitacionMapper mapper;
   private final InvitacionProperties properties;
@@ -62,6 +68,7 @@ public class InvitacionService {
       UserAccountRepository users,
       RoleRepository roles,
       CuentaInvitadaService cuentas,
+      ProfesionalService profesionales,
       InvitacionEmailService invitacionEmailService,
       InvitacionMapper mapper,
       InvitacionProperties properties,
@@ -70,6 +77,7 @@ public class InvitacionService {
     this.users = users;
     this.roles = roles;
     this.cuentas = cuentas;
+    this.profesionales = profesionales;
     this.invitacionEmailService = invitacionEmailService;
     this.mapper = mapper;
     this.properties = properties;
@@ -85,13 +93,22 @@ public class InvitacionService {
           HttpStatus.UNPROCESSABLE_ENTITY,
           "rol_no_invitable",
           "Rol no invitable",
-          "Solo se pueden enviar invitaciones para el rol Catedratico.");
+          "Solo se pueden enviar invitaciones para los roles Catedratico y Profesional externo.");
     }
+    boolean esProfesional = request.rol() == RoleName.PROFESIONAL_EXTERNO;
+    String numeroColegiado = validarColegiado(request, esProfesional);
 
     String email = EmailNormalizer.normalize(request.email());
     UserAccount existente = users.findByEmail(email).orElse(null);
     if (existente != null) {
       throw correoRegistrado(existente);
+    }
+    if (esProfesional && profesionales.colegiadoRegistrado(numeroColegiado)) {
+      throw new ApiException(
+          HttpStatus.CONFLICT,
+          "colegiado_duplicado",
+          "Colegiado ya registrado",
+          "El numero de colegiado ya esta asociado a otra cuenta.");
     }
 
     Role rol =
@@ -100,7 +117,12 @@ public class InvitacionService {
             .orElseThrow(() -> new IllegalStateException("Falta el rol " + request.rol()));
 
     UserAccount cuenta = cuentas.crearPendiente(email, rol);
-    return emitir(email, rol, cuenta.getId(), administradorId);
+    if (esProfesional) {
+      // La cuenta queda pendiente de verificación de colegiado hasta que el Administrador la
+      // apruebe.
+      profesionales.registrar(cuenta.getId(), numeroColegiado);
+    }
+    return emitir(email, rol, cuenta.getId(), administradorId, numeroColegiado);
   }
 
   /**
@@ -131,8 +153,13 @@ public class InvitacionService {
     // nueva.
     invitaciones.saveAndFlush(anterior);
 
+    UUID usuarioId = anterior.getUsuarioCreadoId();
     return emitir(
-        anterior.getEmail(), anterior.getRol(), anterior.getUsuarioCreadoId(), administradorId);
+        anterior.getEmail(),
+        anterior.getRol(),
+        usuarioId,
+        administradorId,
+        usuarioId == null ? null : profesionales.colegiadosDe(List.of(usuarioId)).get(usuarioId));
   }
 
   @Transactional(readOnly = true)
@@ -151,9 +178,21 @@ public class InvitacionService {
         PageRequest.of(
             pagina, tamanio, Sort.by(Sort.Order.desc("creadoEn"), Sort.Order.desc("id")));
 
-    return invitaciones
-        .findByEstado(estado == null ? null : estado.name(), ahora, pageable)
-        .map(invitacion -> mapper.toResponse(invitacion, invitacion.estado(ahora)));
+    Page<InvitacionUsuario> resultado =
+        invitaciones.findByEstado(estado == null ? null : estado.name(), ahora, pageable);
+    Map<UUID, String> colegiados =
+        profesionales.colegiadosDe(
+            resultado.getContent().stream()
+                .map(InvitacionUsuario::getUsuarioCreadoId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet()));
+
+    return resultado.map(
+        invitacion ->
+            mapper.toResponse(
+                invitacion,
+                invitacion.estado(ahora),
+                colegiados.get(invitacion.getUsuarioCreadoId())));
   }
 
   /** Permite al invitado comprobar su enlace antes de definir la contraseña. */
@@ -193,7 +232,8 @@ public class InvitacionService {
     return new MessageResponse("La cuenta fue activada. Ya puede iniciar sesion.");
   }
 
-  private InvitacionResponse emitir(String email, Role rol, UUID usuarioId, UUID administradorId) {
+  private InvitacionResponse emitir(
+      String email, Role rol, UUID usuarioId, UUID administradorId, String numeroColegiado) {
     Instant ahora = clock.instant();
     String token = generarToken();
 
@@ -212,7 +252,28 @@ public class InvitacionService {
     // Si el correo falla, la transacción se revierte y no queda una cuenta sin invitación.
     invitacionEmailService.enviarInvitacion(email, rol.getName(), token, guardada.getExpiraEn());
 
-    return mapper.toResponse(guardada, guardada.estado(ahora));
+    return mapper.toResponse(guardada, guardada.estado(ahora), numeroColegiado);
+  }
+
+  /** El colegiado es obligatorio para el Profesional Externo y no aplica a los demás roles. */
+  private String validarColegiado(CrearInvitacionRequest request, boolean esProfesional) {
+    String numeroColegiado = ProfesionalService.normalizarColegiado(request.numeroColegiado());
+    boolean informado = numeroColegiado != null && !numeroColegiado.isEmpty();
+    if (esProfesional && !informado) {
+      throw new ApiException(
+          HttpStatus.UNPROCESSABLE_ENTITY,
+          "colegiado_requerido",
+          "Colegiado requerido",
+          "El numero de colegiado es obligatorio para el rol Profesional externo.");
+    }
+    if (!esProfesional && informado) {
+      throw new ApiException(
+          HttpStatus.UNPROCESSABLE_ENTITY,
+          "colegiado_no_aplica",
+          "Colegiado no aplica",
+          "El numero de colegiado solo aplica al rol Profesional externo.");
+    }
+    return esProfesional ? numeroColegiado : null;
   }
 
   private void exigirPendiente(InvitacionUsuario invitacion, Instant ahora) {

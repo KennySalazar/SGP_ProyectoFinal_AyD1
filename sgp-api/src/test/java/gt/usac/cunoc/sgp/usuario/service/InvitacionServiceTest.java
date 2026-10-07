@@ -28,6 +28,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.NullSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.http.HttpStatus;
 
@@ -41,6 +42,7 @@ class InvitacionServiceTest {
   private final UserAccountRepository users = mock(UserAccountRepository.class);
   private final RoleRepository roles = mock(RoleRepository.class);
   private final CuentaInvitadaService cuentas = mock(CuentaInvitadaService.class);
+  private final ProfesionalService profesionales = mock(ProfesionalService.class);
   private final InvitacionEmailService correos = mock(InvitacionEmailService.class);
 
   private final InvitacionService service =
@@ -49,18 +51,22 @@ class InvitacionServiceTest {
           users,
           roles,
           cuentas,
+          profesionales,
           correos,
           mock(InvitacionMapper.class),
           new InvitacionProperties(),
           Clock.fixed(AHORA, ZoneOffset.UTC));
 
   @ParameterizedTest
-  @EnumSource(value = RoleName.class, names = "CATEDRATICO", mode = EnumSource.Mode.EXCLUDE)
+  @EnumSource(
+      value = RoleName.class,
+      names = {"CATEDRATICO", "PROFESIONAL_EXTERNO"},
+      mode = EnumSource.Mode.EXCLUDE)
   void rechazaRolesQueAunNoSonInvitables(RoleName rol) {
     assertThatThrownBy(
             () ->
                 service.invitar(
-                    new CrearInvitacionRequest("persona@usac.edu.gt", rol), ADMINISTRADOR_ID))
+                    new CrearInvitacionRequest("persona@usac.edu.gt", rol, null), ADMINISTRADOR_ID))
         .isInstanceOfSatisfying(
             ApiException.class,
             e -> {
@@ -68,7 +74,7 @@ class InvitacionServiceTest {
               assertThat(e.getCode()).isEqualTo("rol_no_invitable");
             });
 
-    verifyNoInteractions(users, cuentas, correos, invitaciones);
+    verifyNoInteractions(users, cuentas, profesionales, correos, invitaciones);
   }
 
   @Test
@@ -80,7 +86,8 @@ class InvitacionServiceTest {
     assertThatThrownBy(
             () ->
                 service.invitar(
-                    new CrearInvitacionRequest("  Catedratico@USAC.edu.gt ", RoleName.CATEDRATICO),
+                    new CrearInvitacionRequest(
+                        "  Catedratico@USAC.edu.gt ", RoleName.CATEDRATICO, null),
                     ADMINISTRADOR_ID))
         .isInstanceOfSatisfying(
             ApiException.class,
@@ -104,7 +111,8 @@ class InvitacionServiceTest {
     assertThatThrownBy(
             () ->
                 service.invitar(
-                    new CrearInvitacionRequest("catedratico@usac.edu.gt", RoleName.CATEDRATICO),
+                    new CrearInvitacionRequest(
+                        "catedratico@usac.edu.gt", RoleName.CATEDRATICO, null),
                     ADMINISTRADOR_ID))
         .isInstanceOfSatisfying(
             ApiException.class,
@@ -112,6 +120,58 @@ class InvitacionServiceTest {
               assertThat(e.getStatus()).isEqualTo(HttpStatus.CONFLICT);
               assertThat(e.getCode()).isEqualTo("invitacion_pendiente");
             });
+  }
+
+  @ParameterizedTest
+  @NullSource
+  @ValueSource(strings = {"", "   "})
+  void profesionalExternoRequiereNumeroDeColegiado(String numeroColegiado) {
+    assertThatThrownBy(
+            () ->
+                service.invitar(
+                    new CrearInvitacionRequest(
+                        "ingeniero@ejemplo.com", RoleName.PROFESIONAL_EXTERNO, numeroColegiado),
+                    ADMINISTRADOR_ID))
+        .isInstanceOfSatisfying(
+            ApiException.class,
+            e -> {
+              assertThat(e.getStatus()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+              assertThat(e.getCode()).isEqualTo("colegiado_requerido");
+            });
+    verifyNoInteractions(users, cuentas, profesionales, correos);
+  }
+
+  @Test
+  void elColegiadoNoAplicaAlCatedratico() {
+    assertThatThrownBy(
+            () ->
+                service.invitar(
+                    new CrearInvitacionRequest(
+                        "catedratico@usac.edu.gt", RoleName.CATEDRATICO, "12345"),
+                    ADMINISTRADOR_ID))
+        .isInstanceOfSatisfying(
+            ApiException.class, e -> assertThat(e.getCode()).isEqualTo("colegiado_no_aplica"));
+    verifyNoInteractions(users, cuentas, profesionales, correos);
+  }
+
+  @Test
+  void rechazaColegiadoAsociadoAOtraCuentaCon409SinCrearNada() {
+    when(users.findByEmail("ingeniero@ejemplo.com")).thenReturn(Optional.empty());
+    when(profesionales.colegiadoRegistrado("12345")).thenReturn(true);
+
+    assertThatThrownBy(
+            () ->
+                service.invitar(
+                    new CrearInvitacionRequest(
+                        "ingeniero@ejemplo.com", RoleName.PROFESIONAL_EXTERNO, " 12345 "),
+                    ADMINISTRADOR_ID))
+        .isInstanceOfSatisfying(
+            ApiException.class,
+            e -> {
+              assertThat(e.getStatus()).isEqualTo(HttpStatus.CONFLICT);
+              assertThat(e.getCode()).isEqualTo("colegiado_duplicado");
+            });
+    verifyNoInteractions(cuentas, correos);
   }
 
   @ParameterizedTest
