@@ -1,0 +1,40 @@
+:host {
+  display: block;
+}
+
+.proximity {
+  margin-top: 1.5rem;
+  padding: 1.25rem;
+  border: 1px solid #fcd34d;
+  border-radius: 16px;
+  background: #fffbeb;
+  color: #78350f;
+}
+
+h3 {
+  margin: 0;
+  color: inherit;
+  font-size: 1.05rem;
+}
+
+p {
+  line-height: 1.6;
+}
+
+.aviso-inactivos {
+  font-weight: 600;
+}
+
+ul {
+  padding-left: 1.25rem;
+}
+
+li {
+  margin: 0.75rem 0;
+  overflow-wrap: anywhere;
+}
+
+li span {
+  display: block;
+  margin-top: 0.35rem;
+}

@@ -1,5 +1,12 @@
 import { HttpErrorResponse } from '@angular/common/http';
-import { ChangeDetectionStrategy, Component, DestroyRef, inject, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  DestroyRef,
+  computed,
+  inject,
+  signal,
+} from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormControl, ReactiveFormsModule, Validators } from '@angular/forms';
 import { RouterLink } from '@angular/router';
@@ -8,6 +15,11 @@ import { ButtonModule } from 'primeng/button';
 import { TextareaModule } from 'primeng/textarea';
 import { finalize } from 'rxjs';
 import { ApiErrorService } from '../../../../core/services/api-error.service';
+import { PuntoMapa } from '../../../../shared/utils/ubicacion-guatemala';
+import {
+  AvisoCercaniaComponent,
+  puntosDeCercanos,
+} from '../../components/aviso-cercania/aviso-cercania.component';
 import { PuenteFormComponent } from '../../components/puente-form/puente-form.component';
 import {
   PuenteFormValores,
@@ -26,6 +38,7 @@ const CODIGOS_UBICACION_RECHAZADA = [
   selector: 'app-solicitar-alta-puente-page',
   standalone: true,
   imports: [
+    AvisoCercaniaComponent,
     TranslocoPipe,
     ReactiveFormsModule,
     RouterLink,
@@ -48,15 +61,40 @@ export class SolicitarAltaPuentePage {
     validators: [Validators.maxLength(2000)],
   });
 
+  /** Datos del formulario a la espera de que el Catedrático confirme la advertencia de cercanía. */
+  private valoresPendientes: PuenteFormValores | null = null;
+
   readonly guardando = signal(false);
   readonly erroresCampos = signal<Record<string, string>>({});
   readonly errorSolicitud = signal<string | null>(null);
   readonly errorTerritorio = signal<string | null>(null);
+  readonly advertencia = signal<PuenteProblemDetails | null>(null);
   readonly solicitudCreada = signal<SolicitudAltaPuenteResponse | null>(null);
+
+  readonly puntosCercanos = computed<PuntoMapa[]>(() =>
+    puntosDeCercanos(this.advertencia()?.puentesCercanos ?? []),
+  );
 
   solicitar(valores: PuenteFormValores): void {
     if (this.guardando() || this.solicitudCreada()) return;
 
+    this.enviar(valores, false);
+  }
+
+  confirmarSolicitud(): void {
+    const valores = this.valoresPendientes;
+
+    if (!valores || !this.advertencia() || this.guardando() || this.solicitudCreada()) return;
+
+    this.enviar(valores, true);
+  }
+
+  cancelarConfirmacion(): void {
+    this.advertencia.set(null);
+    this.valoresPendientes = null;
+  }
+
+  private enviar(valores: PuenteFormValores, confirmarCercania: boolean): void {
     if (this.justificacion.invalid) {
       this.justificacion.markAsTouched();
       return;
@@ -66,10 +104,16 @@ export class SolicitarAltaPuentePage {
     this.justificacion.disable({ emitEvent: false });
     this.errorSolicitud.set(null);
     this.erroresCampos.set({});
+    this.cancelarConfirmacion();
     this.apiErrors.clear();
 
     this.api
-      .crear({ ...valores, justificacion: this.justificacion.value.trim() || null })
+      .crear({
+        ...valores,
+        // Se lee al enviar: así la justificación editada mientras se muestra el aviso no se pierde.
+        justificacion: this.justificacion.value.trim() || null,
+        confirmarCercania,
+      })
       .pipe(
         finalize(() => {
           this.guardando.set(false);
@@ -79,11 +123,12 @@ export class SolicitarAltaPuentePage {
       )
       .subscribe({
         next: (solicitud) => this.solicitudCreada.set(solicitud),
-        error: (error: HttpErrorResponse) => this.mostrarError(error),
+        error: (error: HttpErrorResponse) => this.mostrarError(error, valores),
       });
   }
 
   alCambiarFormulario(): void {
+    this.cancelarConfirmacion();
     this.erroresCampos.set({});
     this.errorSolicitud.set(null);
     this.errorTerritorio.set(null);
@@ -113,8 +158,20 @@ export class SolicitarAltaPuentePage {
     }).format(new Date(fecha));
   }
 
-  private mostrarError(error: HttpErrorResponse): void {
+  private mostrarError(error: HttpErrorResponse, valores: PuenteFormValores): void {
     const problem = error.error as PuenteProblemDetails | null;
+
+    if (
+      error.status === 409 &&
+      problem?.code === 'puente_cercano' &&
+      problem.requiereConfirmacion === true
+    ) {
+      this.apiErrors.clear();
+      this.valoresPendientes = valores;
+      this.advertencia.set(problem);
+      return;
+    }
+
     const detalle: string =
       problem?.detail ?? problem?.title ?? this.transloco.translate('puentes.solicitud.saveFailed');
     const campos: Record<string, string> = {};

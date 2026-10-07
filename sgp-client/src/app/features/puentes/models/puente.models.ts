@@ -45,6 +45,7 @@ export interface CrearPuenteRequest extends PuenteFormValores {
 
 export interface CrearSolicitudAltaPuenteRequest extends PuenteFormValores {
   justificacion: string | null;
+  confirmarCercania: boolean;
 }
 
 export type EstadoSolicitudAltaPuente = 'PENDIENTE' | 'APROBADA' | 'RECHAZADA' | 'CANCELADA';
