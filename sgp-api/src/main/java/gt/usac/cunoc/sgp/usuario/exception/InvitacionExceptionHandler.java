@@ -3,6 +3,7 @@ package gt.usac.cunoc.sgp.usuario.exception;
 import gt.usac.cunoc.sgp.common.exception.ProblemDetails;
 import gt.usac.cunoc.sgp.usuario.controller.InvitacionController;
 import gt.usac.cunoc.sgp.usuario.controller.ProfesionalController;
+import gt.usac.cunoc.sgp.usuario.controller.UsuarioController;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.List;
 import java.util.Map;
@@ -17,11 +18,17 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 /**
- * Errores de entrada de invitaciones y profesionales que el manejador global trataría como 500:
- * cuerpo ilegible (por ejemplo, un rol inexistente) y parámetros con tipo inválido.
+ * Errores de entrada de la gestión de usuarios, invitaciones y profesionales que el manejador
+ * global trataría como 500: cuerpo ilegible (por ejemplo, un rol inexistente) y parámetros con tipo
+ * inválido.
  */
 @Order(Ordered.HIGHEST_PRECEDENCE)
-@RestControllerAdvice(assignableTypes = {InvitacionController.class, ProfesionalController.class})
+@RestControllerAdvice(
+    assignableTypes = {
+      InvitacionController.class,
+      ProfesionalController.class,
+      UsuarioController.class
+    })
 public class InvitacionExceptionHandler {
 
   @ExceptionHandler(HttpMessageNotReadableException.class)

@@ -16,6 +16,8 @@ public interface UsuarioProfesionalRepository extends JpaRepository<UsuarioProfe
 
   boolean existsByNumeroColegiado(String numeroColegiado);
 
+  boolean existsByNumeroColegiadoAndUsuarioIdNot(String numeroColegiado, UUID usuarioId);
+
   /** Bloquea la fila para que dos verificaciones simultáneas no se registren dos veces. */
   @Lock(LockModeType.PESSIMISTIC_WRITE)
   @Query("select p from UsuarioProfesional p join fetch p.usuario where p.usuarioId = :usuarioId")

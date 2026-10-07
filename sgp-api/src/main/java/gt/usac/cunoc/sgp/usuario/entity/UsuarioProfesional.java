@@ -67,6 +67,20 @@ public class UsuarioProfesional {
     this.actualizadoEn = ahora;
   }
 
+  /**
+   * Asigna otro número de colegiado. Un número distinto pierde la verificación anterior, porque el
+   * Administrador debe validarlo de nuevo (RN-USR-04).
+   */
+  public void reasignarColegiado(String numeroColegiado, Instant ahora) {
+    if (numeroColegiado.equals(this.numeroColegiado)) {
+      return;
+    }
+    this.numeroColegiado = numeroColegiado;
+    this.colegiadoVerificadoEn = null;
+    this.colegiadoVerificadoPorId = null;
+    this.actualizadoEn = ahora;
+  }
+
   public UUID getUsuarioId() {
     return usuarioId;
   }
