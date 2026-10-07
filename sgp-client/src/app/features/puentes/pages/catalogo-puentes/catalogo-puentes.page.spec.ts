@@ -389,33 +389,22 @@ describe('Base compartida del catálogo HU014', () => {
     fixture.detectChanges();
   }
 
-  it('selecciona una sola fila con clic o teclado y permite desmarcarla sin consultar la API', () => {
+  it('muestra la sugerencia para seleccionar un puente por su nombre y no renderiza marca de selección en filas', () => {
     responderConPuentes();
     const rows: NodeListOf<HTMLTableRowElement> =
       fixture.nativeElement.querySelectorAll('tbody tr');
-    rows[0].click();
-    fixture.detectChanges();
-    expect(page.puenteSeleccionado()?.nombre).toBe('Puente 0');
-    expect(rows[0].classList.contains('fila-seleccionada')).toBe(true);
-    expect(rows[0].getAttribute('aria-selected')).toBe('true');
-    expect(rows[0].querySelector('.pi-check')).not.toBeNull();
-    rows[1].dispatchEvent(new KeyboardEvent('keydown', { code: 'Enter', bubbles: true }));
-    fixture.detectChanges();
-    expect(page.puenteSeleccionado()?.nombre).toBe('Puente 1');
+    expect(rows.length).toBe(2);
+    expect(rows[0].querySelector('.pi-check')).toBeNull();
     expect(rows[0].classList.contains('fila-seleccionada')).toBe(false);
-    expect(rows[0].getAttribute('aria-selected')).toBe('false');
-    expect(rows[1].classList.contains('fila-seleccionada')).toBe(true);
     expect(fixture.nativeElement.querySelector('.seleccion-catalogo').textContent).toContain(
-      'puentes.catalogo.selectedBridge',
+      'puentes.catalogo.selectionHint',
     );
-    rows[1].dispatchEvent(new KeyboardEvent('keydown', { code: 'Space', bubbles: true }));
-    fixture.detectChanges();
-    expect(page.puenteSeleccionado()).toBeNull();
-    expect(fixture.nativeElement.querySelector('.fila-seleccionada')).toBeNull();
+    const enlace = rows[0].querySelector('.nombre-puente a');
+    expect(enlace).not.toBeNull();
     http.expectNone((req) => req.url === '/api/v1/puentes');
   });
 
-  it('numera por posición entre páginas y reinicia numeración y selección al filtrar', () => {
+  it('numera por posición entre páginas y reinicia numeración al filtrar', () => {
     const numeros = () =>
       Array.from(
         fixture.nativeElement.querySelectorAll('.numero-puente') as NodeListOf<HTMLElement>,
@@ -423,15 +412,11 @@ describe('Base compartida del catálogo HU014', () => {
     responderConPuentes();
     expect(numeros()).toEqual(['1', '2']);
     expect(fixture.nativeElement.textContent).not.toContain('uuid-privado');
-    fixture.nativeElement.querySelector('tbody tr').click();
     page.cambiarPagina({ page: 1, rows: 20 });
-    expect(page.puenteSeleccionado()).toBeNull();
     responderConPuentes(1);
     expect(numeros()).toEqual(['21', '22']);
-    fixture.nativeElement.querySelector('tbody tr').click();
     page.filtros.patchValue({ estado: 'Sin evaluar' });
     page.aplicarFiltros();
-    expect(page.puenteSeleccionado()).toBeNull();
     responderConPuentes();
     expect(numeros()).toEqual(['1', '2']);
     page.cambiarPagina({ page: 0, rows: 10 });

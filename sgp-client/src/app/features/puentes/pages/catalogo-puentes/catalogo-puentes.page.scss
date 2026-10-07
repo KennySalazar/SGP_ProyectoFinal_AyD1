@@ -136,32 +136,8 @@ h2 {
   font-size: 0.9rem;
 }
 
-.fila-catalogo {
-  cursor: pointer;
-}
-
-.fila-catalogo:focus-visible {
-  outline: 2px solid var(--sgp-blue-600);
-  outline-offset: -2px;
-}
-
-.fila-catalogo.fila-seleccionada > th,
-.fila-catalogo.fila-seleccionada > td {
-  background: #eff6ff;
-  color: var(--sgp-navy-900);
-}
-
-.fila-seleccionada > .numero-puente {
-  box-shadow: inset 3px 0 var(--sgp-blue-600);
-}
-
 .numero-puente {
   font-variant-numeric: tabular-nums;
-
-  i {
-    margin-left: 0.25rem;
-    color: var(--sgp-blue-600);
-  }
 }
 
 .col-numero {

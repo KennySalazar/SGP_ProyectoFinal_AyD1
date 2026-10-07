@@ -283,4 +283,32 @@ describe('FichaPuentePage', () => {
     expect(errorBox).not.toBeNull();
     expect(errorBox.nativeElement.textContent).toContain('puentes.ficha.notFound');
   });
+
+  it('muestra etiqueta de kilometraje y notAvailable (N/A) cuando campos opcionales no tienen datos', () => {
+    iniciarComponente();
+    fixture.detectChanges();
+
+    const puenteSinOpcionales: PuenteResponse = {
+      ...puenteSinEvaluar,
+      kilometraje: null,
+    };
+    const peticion = http.expectOne('/api/v1/puentes/puente-sin-evaluar');
+    peticion.flush(puenteSinOpcionales);
+    fixture.detectChanges();
+
+    const etiquetas = fixture.debugElement
+      .queryAll(By.css('.dato-etiqueta'))
+      .map((el) => el.nativeElement.textContent.trim());
+    expect(etiquetas).toContain('puentes.ficha.kilometer');
+
+    const filas = fixture.debugElement.queryAll(By.css('.dato-fila'));
+    const filaKm = filas.find((f) =>
+      f
+        .query(By.css('.dato-etiqueta'))
+        ?.nativeElement.textContent.includes('puentes.ficha.kilometer'),
+    );
+    expect(filaKm?.query(By.css('.dato-valor'))?.nativeElement.textContent.trim()).toBe(
+      'puentes.ficha.notAvailable',
+    );
+  });
 });

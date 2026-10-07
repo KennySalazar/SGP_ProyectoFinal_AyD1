@@ -127,7 +127,7 @@
             <dd class="dato-valor">{{ p.ruta }}</dd>
           </div>
           <div class="dato-fila">
-            <dt class="dato-etiqueta">{{ 'puentes.kilometer' | transloco }}</dt>
+            <dt class="dato-etiqueta">{{ 'puentes.ficha.kilometer' | transloco }}</dt>
             <dd class="dato-valor">
               {{ p.kilometraje !== null ? (p.kilometraje + ' km') : ('puentes.ficha.notAvailable' |
               transloco) }}
@@ -160,20 +160,24 @@
             <dt class="dato-etiqueta">{{ 'puentes.longitude' | transloco }}</dt>
             <dd class="dato-valor">{{ p.longitud }}</dd>
           </div>
-          @if (p.utm) {
           <div class="dato-fila">
             <dt class="dato-etiqueta">{{ 'puentes.zone' | transloco }}</dt>
-            <dd class="dato-valor">{{ p.utm.zona }}</dd>
+            <dd class="dato-valor">
+              {{ p.utm ? p.utm.zona : ('puentes.ficha.notAvailable' | transloco) }}
+            </dd>
           </div>
           <div class="dato-fila">
             <dt class="dato-etiqueta">{{ 'puentes.east' | transloco }}</dt>
-            <dd class="dato-valor">{{ p.utm.este }}</dd>
+            <dd class="dato-valor">
+              {{ p.utm ? p.utm.este : ('puentes.ficha.notAvailable' | transloco) }}
+            </dd>
           </div>
           <div class="dato-fila">
             <dt class="dato-etiqueta">{{ 'puentes.north' | transloco }}</dt>
-            <dd class="dato-valor">{{ p.utm.norte }}</dd>
+            <dd class="dato-valor">
+              {{ p.utm ? p.utm.norte : ('puentes.ficha.notAvailable' | transloco) }}
+            </dd>
           </div>
-          }
         </dl>
         <div class="mapa-panel">
           <app-selector-ubicacion
