@@ -5,5 +5,6 @@ import java.util.List;
 public record SolicitudRevisionDetalleResponse(
     SolicitudAltaPuenteResponse solicitud,
     String solicitanteEmail,
+    String revisadoPorEmail,
     List<PuenteCercanoResponse> puentesCercanos,
     long totalPuentesCercanos) {}

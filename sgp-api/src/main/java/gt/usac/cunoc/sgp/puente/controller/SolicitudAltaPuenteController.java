@@ -72,6 +72,18 @@ public class SolicitudAltaPuenteController {
     return solicitudService.listarMias(usuarioId(authentication), pagina, tamanio);
   }
 
+  @GetMapping("/mias/{id}")
+  @PreAuthorize("hasRole('CATEDRATICO')")
+  @Operation(
+      summary = "Consultar el detalle de una solicitud propia",
+      description =
+          "Devuelve la solicitud con su estado, el motivo de rechazo y el código del puente creado. "
+              + "Una solicitud de otro usuario responde 404.")
+  public SolicitudAltaPuenteResponse obtenerMia(
+      @PathVariable UUID id, Authentication authentication) {
+    return solicitudService.obtenerMia(id, usuarioId(authentication));
+  }
+
   @GetMapping
   @PreAuthorize("hasRole('ADMINISTRADOR')")
   @Operation(

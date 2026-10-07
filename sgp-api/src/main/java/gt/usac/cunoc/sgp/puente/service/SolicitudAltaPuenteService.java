@@ -8,6 +8,7 @@ import gt.usac.cunoc.sgp.notificacion.service.NotificacionService;
 import gt.usac.cunoc.sgp.puente.dto.AprobarSolicitudAltaPuenteRequest;
 import gt.usac.cunoc.sgp.puente.dto.CrearPuenteRequest;
 import gt.usac.cunoc.sgp.puente.dto.CrearSolicitudAltaPuenteRequest;
+import gt.usac.cunoc.sgp.puente.dto.PuenteCercanoResponse;
 import gt.usac.cunoc.sgp.puente.dto.RechazarSolicitudAltaPuenteRequest;
 import gt.usac.cunoc.sgp.puente.dto.SolicitudAltaPuenteResponse;
 import gt.usac.cunoc.sgp.puente.dto.SolicitudRevisionDetalleResponse;
@@ -26,11 +27,14 @@ import jakarta.validation.ConstraintViolationException;
 import jakarta.validation.Validator;
 import java.math.BigDecimal;
 import java.time.Clock;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.GeometryFactory;
 import org.locationtech.jts.geom.PrecisionModel;
@@ -175,13 +179,18 @@ public class SolicitudAltaPuenteService {
         solicitudes.findByEstado(filtro, PageRequest.of(pagina, tamanio, orden));
     Map<UUID, String> correos =
         correosDe(
-            resultado.getContent().stream().map(SolicitudAltaPuente::getSolicitadoPorId).toList());
+            resultado.getContent().stream()
+                .flatMap(
+                    solicitud ->
+                        Stream.of(solicitud.getSolicitadoPorId(), solicitud.getRevisadoPorId()))
+                .toList());
 
     return resultado.map(
         solicitud ->
             new SolicitudRevisionResponse(
                 mapper.toSolicitudResponse(solicitud),
-                correos.get(solicitud.getSolicitadoPorId())));
+                correos.get(solicitud.getSolicitadoPorId()),
+                correos.get(solicitud.getRevisadoPorId())));
   }
 
   @Transactional(readOnly = true)
@@ -190,18 +199,39 @@ public class SolicitudAltaPuenteService {
     SolicitudAltaPuente solicitud =
         solicitudes.findConRelacionesById(id).orElseThrow(this::solicitudNoEncontrada);
 
-    // Misma advertencia de posible duplicado (RN-INV-06) que el alta directa.
-    var cercanos =
-        puentes.findCercanos(
-            solicitud.getUbicacion().getY(),
-            solicitud.getUbicacion().getX(),
-            PageRequest.of(0, 100));
+    Map<UUID, String> correos =
+        correosDe(Arrays.asList(solicitud.getSolicitadoPorId(), solicitud.getRevisadoPorId()));
+
+    // Misma advertencia de posible duplicado (RN-INV-06) que el alta directa. Solo tiene sentido
+    // mientras la solicitud está pendiente: en una aprobada el puente creado sería su propio
+    // "cercano".
+    Page<PuenteCercanoResponse> cercanos =
+        solicitud.getEstado() == EstadoSolicitudAltaPuente.PENDIENTE
+            ? puentes
+                .findCercanos(
+                    solicitud.getUbicacion().getY(),
+                    solicitud.getUbicacion().getX(),
+                    PageRequest.of(0, 100))
+                .map(mapper::toPuenteCercanoResponse)
+            : Page.empty();
 
     return new SolicitudRevisionDetalleResponse(
         mapper.toSolicitudResponse(solicitud),
-        correosDe(List.of(solicitud.getSolicitadoPorId())).get(solicitud.getSolicitadoPorId()),
-        cercanos.map(mapper::toPuenteCercanoResponse).getContent(),
+        correos.get(solicitud.getSolicitadoPorId()),
+        correos.get(solicitud.getRevisadoPorId()),
+        cercanos.getContent(),
         cercanos.getTotalElements());
+  }
+
+  /** Detalle de una solicitud propia; las ajenas se tratan como inexistentes. */
+  @Transactional(readOnly = true)
+  @PreAuthorize("hasRole('CATEDRATICO')")
+  public SolicitudAltaPuenteResponse obtenerMia(UUID id, UUID catedraticoId) {
+    return solicitudes
+        .findConRelacionesById(id)
+        .filter(solicitud -> solicitud.getSolicitadoPorId().equals(catedraticoId))
+        .map(mapper::toSolicitudResponse)
+        .orElseThrow(this::solicitudNoEncontrada);
   }
 
   /**
@@ -307,7 +337,9 @@ public class SolicitudAltaPuenteService {
   }
 
   private Map<UUID, String> correosDe(List<UUID> usuarioIds) {
-    return usuarios.findAllById(usuarioIds.stream().distinct().toList()).stream()
+    return usuarios
+        .findAllById(usuarioIds.stream().filter(Objects::nonNull).distinct().toList())
+        .stream()
         .collect(Collectors.toMap(UserAccount::getId, UserAccount::getEmail, (a, b) -> a));
   }
 

@@ -480,6 +480,70 @@ class SolicitudAltaPuenteIntegrationTest {
 
   @Test
   @WithMockUser(roles = "ADMINISTRADOR")
+  void unaSolicitudResueltaNoMuestraAdvertenciaDeCercaniaYIndicaQuienLaRevisó() {
+    var aprobada = crearSolicitud("Aprobada", "14.481", "-90.615");
+    solicitudService.aprobar(
+        aprobada.id(), new AprobarSolicitudAltaPuenteRequest(false), ADMINISTRADOR_ID);
+    var rechazada = crearSolicitud("Rechazada", "14.49", "-90.62");
+    solicitudService.rechazar(
+        rechazada.id(), new RechazarSolicitudAltaPuenteRequest("No procede"), ADMINISTRADOR_ID);
+    var pendiente = crearSolicitud("Pendiente", "14.5", "-90.63");
+
+    var detalleAprobada = solicitudService.obtenerParaRevision(aprobada.id());
+    assertThat(detalleAprobada.puentesCercanos()).isEmpty();
+    assertThat(detalleAprobada.totalPuentesCercanos()).isZero();
+    assertThat(detalleAprobada.revisadoPorEmail()).isEqualTo("admin.hu010@ejemplo.com");
+    assertThat(detalleAprobada.solicitud().puenteCreadoCodigo()).isEqualTo("GT-01-0114-0001");
+
+    var detalleRechazada = solicitudService.obtenerParaRevision(rechazada.id());
+    assertThat(detalleRechazada.puentesCercanos()).isEmpty();
+    assertThat(detalleRechazada.revisadoPorEmail()).isEqualTo("admin.hu010@ejemplo.com");
+    assertThat(detalleRechazada.solicitud().motivoDecision()).isEqualTo("No procede");
+
+    assertThat(solicitudService.obtenerParaRevision(pendiente.id()).revisadoPorEmail()).isNull();
+
+    var rechazadas =
+        solicitudService.listarParaRevision(EstadoSolicitudAltaPuente.RECHAZADA, 0, 20);
+    assertThat(rechazadas.getContent())
+        .extracting(r -> r.revisadoPorEmail())
+        .containsExactly("admin.hu010@ejemplo.com");
+  }
+
+  @Test
+  void elCatedraticoConsultaElDetalleDeSuSolicitudPeroNoElDeOtro() {
+    var propia = crearSolicitud("Propia", "14.481", "-90.615");
+    var ajena =
+        comoCatedratico(
+            () ->
+                solicitudService.crear(
+                    solicitud("Ajena", departamentoId, municipioId, "14.49", "-90.62", null),
+                    OTRO_CATEDRATICO_ID));
+
+    var detalle = solicitudService.obtenerMia(propia.id(), CATEDRATICO_ID);
+    assertThat(detalle.nombre()).isEqualTo("Propia");
+    assertThat(detalle.estado()).isEqualTo(EstadoSolicitudAltaPuente.PENDIENTE);
+
+    assertThatThrownBy(() -> solicitudService.obtenerMia(ajena.id(), CATEDRATICO_ID))
+        .isInstanceOfSatisfying(
+            ApiException.class,
+            e -> {
+              assertThat(e.getStatus()).isEqualTo(HttpStatus.NOT_FOUND);
+              assertThat(e.getCode()).isEqualTo("solicitud_no_encontrada");
+            });
+    assertThatThrownBy(() -> solicitudService.obtenerMia(UUID.randomUUID(), CATEDRATICO_ID))
+        .isInstanceOfSatisfying(
+            ApiException.class, e -> assertThat(e.getCode()).isEqualTo("solicitud_no_encontrada"));
+  }
+
+  @Test
+  @WithMockUser(roles = "ADMINISTRADOR")
+  void elAdministradorNoUsaElDetalleDelCatedratico() {
+    assertThatThrownBy(() -> solicitudService.obtenerMia(UUID.randomUUID(), ADMINISTRADOR_ID))
+        .isInstanceOf(AccessDeniedException.class);
+  }
+
+  @Test
+  @WithMockUser(roles = "ADMINISTRADOR")
   void elDetalleIncluyeLosPuentesCercanosDeLaMismaAdvertenciaQueElAltaDirecta() {
     var existente = crearSolicitud("Existente", "14.481", "-90.615");
     var aprobada =

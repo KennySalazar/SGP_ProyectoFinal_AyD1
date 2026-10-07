@@ -144,6 +144,31 @@ class SolicitudAltaPuenteControllerSecurityTest {
     verifyNoInteractions(service);
   }
 
+  @ParameterizedTest
+  @EnumSource(value = RoleName.class, names = "CATEDRATICO", mode = EnumSource.Mode.EXCLUDE)
+  void rechazaElDetallePropioARolesDistintosDeCatedratico(RoleName rol) throws Exception {
+    var authentication = autenticar(rol);
+
+    mockMvc
+        .perform(
+            get("/api/v1/solicitudes-puente/mias/" + UUID.randomUUID()).principal(authentication))
+        .andExpect(status().isForbidden());
+
+    verifyNoInteractions(service);
+  }
+
+  @Test
+  void permiteAlCatedraticoConsultarElDetalleDeSuSolicitud() throws Exception {
+    var authentication = autenticar(RoleName.CATEDRATICO);
+    UUID id = UUID.randomUUID();
+
+    mockMvc
+        .perform(get("/api/v1/solicitudes-puente/mias/" + id).principal(authentication))
+        .andExpect(status().isOk());
+
+    verify(service).obtenerMia(id, USUARIO_ID);
+  }
+
   @Test
   void permiteCatedraticoConsultarSusSolicitudes() throws Exception {
     var authentication = autenticar(RoleName.CATEDRATICO);
