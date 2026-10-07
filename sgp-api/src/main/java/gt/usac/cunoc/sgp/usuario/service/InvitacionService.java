@@ -96,7 +96,8 @@ public class InvitacionService {
           "Solo se pueden enviar invitaciones para los roles Catedratico y Profesional externo.");
     }
     boolean esProfesional = request.rol() == RoleName.PROFESIONAL_EXTERNO;
-    String numeroColegiado = validarColegiado(request, esProfesional);
+    String numeroColegiado =
+        ProfesionalService.colegiadoParaRol(request.rol(), request.numeroColegiado());
 
     String email = EmailNormalizer.normalize(request.email());
     UserAccount existente = users.findByEmail(email).orElse(null);
@@ -104,11 +105,7 @@ public class InvitacionService {
       throw correoRegistrado(existente);
     }
     if (esProfesional && profesionales.colegiadoRegistrado(numeroColegiado)) {
-      throw new ApiException(
-          HttpStatus.CONFLICT,
-          "colegiado_duplicado",
-          "Colegiado ya registrado",
-          "El numero de colegiado ya esta asociado a otra cuenta.");
+      throw ProfesionalService.colegiadoDuplicado();
     }
 
     Role rol =
@@ -253,27 +250,6 @@ public class InvitacionService {
     invitacionEmailService.enviarInvitacion(email, rol.getName(), token, guardada.getExpiraEn());
 
     return mapper.toResponse(guardada, guardada.estado(ahora), numeroColegiado);
-  }
-
-  /** El colegiado es obligatorio para el Profesional Externo y no aplica a los demás roles. */
-  private String validarColegiado(CrearInvitacionRequest request, boolean esProfesional) {
-    String numeroColegiado = ProfesionalService.normalizarColegiado(request.numeroColegiado());
-    boolean informado = numeroColegiado != null && !numeroColegiado.isEmpty();
-    if (esProfesional && !informado) {
-      throw new ApiException(
-          HttpStatus.UNPROCESSABLE_ENTITY,
-          "colegiado_requerido",
-          "Colegiado requerido",
-          "El numero de colegiado es obligatorio para el rol Profesional externo.");
-    }
-    if (!esProfesional && informado) {
-      throw new ApiException(
-          HttpStatus.UNPROCESSABLE_ENTITY,
-          "colegiado_no_aplica",
-          "Colegiado no aplica",
-          "El numero de colegiado solo aplica al rol Profesional externo.");
-    }
-    return esProfesional ? numeroColegiado : null;
   }
 
   private void exigirPendiente(InvitacionUsuario invitacion, Instant ahora) {

@@ -55,7 +55,8 @@ public class ProfesionalController {
               + "acciones de inspección (RN-USR-04). Un colegiado ya verificado responde 409.")
   public ProfesionalResponse verificarColegiado(
       @PathVariable UUID usuarioId, Authentication authentication) {
-    return profesionalService.verificarColegiado(usuarioId, administradorId(authentication));
+    profesionalService.verificarColegiado(usuarioId, administradorId(authentication));
+    return profesionalService.obtener(usuarioId);
   }
 
   private UUID administradorId(Authentication authentication) {

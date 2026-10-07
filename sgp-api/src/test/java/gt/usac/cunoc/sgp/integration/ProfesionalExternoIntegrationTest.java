@@ -220,8 +220,8 @@ class ProfesionalExternoIntegrationTest {
     autenticar(ADMINISTRADOR_ID, "admin.hu002@ejemplo.com", RoleName.ADMINISTRADOR);
     auditoriaRepository.deleteAll();
 
-    ProfesionalResponse verificado =
-        profesionalService.verificarColegiado(invitacion.usuarioId(), ADMINISTRADOR_ID);
+    profesionalService.verificarColegiado(invitacion.usuarioId(), ADMINISTRADOR_ID);
+    ProfesionalResponse verificado = profesionalService.obtener(invitacion.usuarioId());
 
     assertThat(verificado.colegiadoVerificado()).isTrue();
     assertThat(verificado.colegiadoVerificadoPorId()).isEqualTo(ADMINISTRADOR_ID);
@@ -245,6 +245,11 @@ class ProfesionalExternoIntegrationTest {
     assertThat(registro.getUsuarioId()).isEqualTo(ADMINISTRADOR_ID);
     assertThat(registro.getValoresAnteriores().get("colegiadoVerificado").asBoolean()).isFalse();
     assertThat(registro.getValoresPosteriores().get("colegiadoVerificado").asBoolean()).isTrue();
+    // Antes y después tienen el mismo formato: solo cambian los datos de la verificación.
+    var antes = registro.getValoresAnteriores();
+    var despues = registro.getValoresPosteriores();
+    assertThat(despues.size()).isEqualTo(antes.size());
+    assertThat(despues.get("numeroColegiado")).isEqualTo(antes.get("numeroColegiado"));
 
     // No se verifica dos veces.
     assertThatThrownBy(

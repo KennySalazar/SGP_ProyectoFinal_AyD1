@@ -15,6 +15,7 @@ import java.util.Collection;
 import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -52,6 +53,31 @@ public class ProfesionalService {
     return numeroColegiado == null ? null : numeroColegiado.strip().toUpperCase(Locale.ROOT);
   }
 
+  /**
+   * Valida y normaliza el colegiado según el rol: obligatorio para el Profesional Externo y no
+   * aplicable a los demás roles. Devuelve nulo cuando el rol no lo usa.
+   */
+  public static String colegiadoParaRol(RoleName rol, String numeroColegiado) {
+    String numero = normalizarColegiado(numeroColegiado);
+    boolean informado = numero != null && !numero.isEmpty();
+    boolean esProfesional = rol == RoleName.PROFESIONAL_EXTERNO;
+    if (esProfesional && !informado) {
+      throw new ApiException(
+          HttpStatus.UNPROCESSABLE_ENTITY,
+          "colegiado_requerido",
+          "Colegiado requerido",
+          "El numero de colegiado es obligatorio para el rol Profesional externo.");
+    }
+    if (!esProfesional && informado) {
+      throw new ApiException(
+          HttpStatus.UNPROCESSABLE_ENTITY,
+          "colegiado_no_aplica",
+          "Colegiado no aplica",
+          "El numero de colegiado solo aplica al rol Profesional externo.");
+    }
+    return esProfesional ? numero : null;
+  }
+
   public boolean colegiadoRegistrado(String numeroColegiado) {
     return profesionales.existsByNumeroColegiado(normalizarColegiado(numeroColegiado));
   }
@@ -72,6 +98,45 @@ public class ProfesionalService {
     return mapper.toProfesionalResponse(profesionales.saveAndFlush(profesional));
   }
 
+  /**
+   * Asigna el colegiado a una cuenta que pasa a ser Profesional Externo. Si ya tuvo un registro se
+   * reutiliza; un número distinto queda pendiente de verificación (RN-USR-04).
+   */
+  @Transactional
+  @PreAuthorize("hasRole('ADMINISTRADOR')")
+  @Auditable(
+      accion = AccionAuditoria.CREAR,
+      entidad = ENTIDAD,
+      tipo = UsuarioProfesional.class,
+      idArg = "usuarioId")
+  public void asignarColegiado(UUID usuarioId, String numeroColegiado) {
+    String numero = normalizarColegiado(numeroColegiado);
+    if (profesionales.existsByNumeroColegiadoAndUsuarioIdNot(numero, usuarioId)) {
+      throw colegiadoDuplicado();
+    }
+    UsuarioProfesional profesional =
+        profesionales
+            .findById(usuarioId)
+            .map(
+                existente -> {
+                  existente.reasignarColegiado(numero, clock.instant());
+                  return existente;
+                })
+            .orElseGet(
+                () ->
+                    new UsuarioProfesional(
+                        users.getReferenceById(usuarioId), numero, clock.instant()));
+    profesionales.saveAndFlush(profesional);
+  }
+
+  public static ApiException colegiadoDuplicado() {
+    return new ApiException(
+        HttpStatus.CONFLICT,
+        "colegiado_duplicado",
+        "Colegiado ya registrado",
+        "El numero de colegiado ya esta asociado a otra cuenta.");
+  }
+
   @Transactional
   @PreAuthorize("hasRole('ADMINISTRADOR')")
   @Auditable(
@@ -79,17 +144,11 @@ public class ProfesionalService {
       entidad = ENTIDAD,
       tipo = UsuarioProfesional.class,
       idArg = "usuarioId")
-  public ProfesionalResponse verificarColegiado(UUID usuarioId, UUID administradorId) {
+  public void verificarColegiado(UUID usuarioId, UUID administradorId) {
     UsuarioProfesional profesional =
         profesionales
             .findByUsuarioIdForUpdate(usuarioId)
-            .orElseThrow(
-                () ->
-                    new ApiException(
-                        HttpStatus.NOT_FOUND,
-                        "profesional_no_encontrado",
-                        "Profesional no encontrado",
-                        "No existe un Profesional Externo con el identificador proporcionado."));
+            .orElseThrow(this::profesionalNoEncontrado);
 
     if (profesional.isColegiadoVerificado()) {
       throw new ApiException(
@@ -100,7 +159,25 @@ public class ProfesionalService {
     }
 
     profesional.verificarColegiado(administradorId, clock.instant());
-    return mapper.toProfesionalResponse(profesionales.saveAndFlush(profesional));
+    profesionales.saveAndFlush(profesional);
+  }
+
+  /** Datos actuales del profesional; las operaciones auditadas no devuelven datos. */
+  @Transactional(readOnly = true)
+  @PreAuthorize("hasRole('ADMINISTRADOR')")
+  public ProfesionalResponse obtener(UUID usuarioId) {
+    return profesionales
+        .findById(usuarioId)
+        .map(mapper::toProfesionalResponse)
+        .orElseThrow(this::profesionalNoEncontrado);
+  }
+
+  private ApiException profesionalNoEncontrado() {
+    return new ApiException(
+        HttpStatus.NOT_FOUND,
+        "profesional_no_encontrado",
+        "Profesional no encontrado",
+        "No existe un Profesional Externo con el identificador proporcionado.");
   }
 
   @Transactional(readOnly = true)
@@ -119,6 +196,13 @@ public class ProfesionalService {
     return profesionales
         .findByVerificacion(verificado, pageable)
         .map(mapper::toProfesionalResponse);
+  }
+
+  /** Datos de colegiado de varios usuarios en una sola consulta, para los listados. */
+  @Transactional(readOnly = true)
+  public Map<UUID, UsuarioProfesional> profesionalesDe(Collection<UUID> usuarioIds) {
+    return profesionales.findAllById(usuarioIds).stream()
+        .collect(Collectors.toMap(UsuarioProfesional::getUsuarioId, Function.identity()));
   }
 
   /** Colegiados de varios usuarios en una sola consulta, para evitar N+1 en los listados. */

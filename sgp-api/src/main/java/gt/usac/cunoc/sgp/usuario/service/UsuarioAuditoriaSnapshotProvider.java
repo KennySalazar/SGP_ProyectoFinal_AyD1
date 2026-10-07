@@ -40,7 +40,8 @@ public class UsuarioAuditoriaSnapshotProvider implements AuditoriaSnapshotProvid
         usuario.isActivated(),
         usuario.isActive(),
         usuario.isTwoFactorEnabled(),
-        usuario.getTokenVersion());
+        usuario.getTokenVersion(),
+        usuario.getMotivoDesactivacion());
   }
 
   public record UsuarioSnapshot(
@@ -51,5 +52,6 @@ public class UsuarioAuditoriaSnapshotProvider implements AuditoriaSnapshotProvid
       boolean activado,
       boolean activo,
       boolean dosFactoresHabilitado,
-      int versionToken) {}
+      int versionToken,
+      String motivoDesactivacion) {}
 }
