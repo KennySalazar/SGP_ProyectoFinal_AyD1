@@ -86,6 +86,8 @@ export class PuenteFormComponent {
   readonly erroresServidor = input<Record<string, string>>({});
   readonly errorTerritorioServidor = input<string | null>(null);
   readonly cercanos = input<readonly PuntoMapa[]>([]);
+  /** Carga los puentes registrados y los muestra en el mapa antes de elegir un punto. */
+  readonly mostrarExistentes = input(false);
   readonly valoresIniciales = input<PuenteFormInicial | null>(null);
   readonly ocultarAcciones = input(false);
   readonly etiquetaEnviar = input('puentes.register');
@@ -99,6 +101,7 @@ export class PuenteFormComponent {
   private ultimaCoordenada = '';
 
   readonly territorio = signal<UbicacionTerritorialResponse | null>(null);
+  readonly existentes = signal<PuntoMapa[]>([]);
   readonly resolviendoUbicacion = signal(false);
   readonly errorUbicacion = signal<string | null>(null);
 
@@ -160,6 +163,21 @@ export class PuenteFormComponent {
         this.errorUbicacion.set(mensaje);
         this.sincronizarControlesTerritoriales();
       });
+    });
+
+    effect(() => {
+      if (!this.mostrarExistentes()) return;
+
+      untracked(() =>
+        this.api
+          .listarPuntosMapa()
+          .pipe(
+            // El contexto del mapa es opcional: sin él, el formulario sigue funcionando.
+            catchError(() => of([] as PuntoMapa[])),
+            takeUntilDestroyed(this.destroyRef),
+          )
+          .subscribe((puntos) => this.existentes.set(puntos)),
+      );
     });
 
     effect(() => {

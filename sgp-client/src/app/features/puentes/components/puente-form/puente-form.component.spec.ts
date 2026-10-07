@@ -588,4 +588,51 @@ describe('PuenteFormComponent: formulario compartido de puentes', () => {
 
     expect(selector().deshabilitado()).toBe(true);
   });
+
+  describe('puentes existentes en el mapa', () => {
+    it('no los consulta salvo que se pida', () => {
+      http.expectNone('/api/v1/puentes');
+      expect(selector().existentes()).toEqual([]);
+    });
+
+    it('los carga al abrir y los entrega al mapa', () => {
+      fixture.componentRef.setInput('mostrarExistentes', true);
+      fixture.detectChanges();
+
+      http
+        .expectOne((req) => req.url === '/api/v1/puentes')
+        .flush({
+          content: [
+            { id: 'p1', codigo: 'GT-01-0101-0001', nombre: 'Uno', latitud: 14.6, longitud: -90.5 },
+          ],
+          totalElements: 1,
+          totalPages: 1,
+          number: 0,
+          size: 100,
+          first: true,
+          last: true,
+          empty: false,
+        });
+      fixture.detectChanges();
+
+      expect(selector().existentes()).toEqual([
+        { id: 'p1', titulo: 'GT-01-0101-0001 — Uno', latitud: 14.6, longitud: -90.5 },
+      ]);
+    });
+
+    it('si la consulta falla, el formulario sigue funcionando sin ellos', () => {
+      fixture.componentRef.setInput('mostrarExistentes', true);
+      fixture.detectChanges();
+
+      http
+        .expectOne((req) => req.url === '/api/v1/puentes')
+        .flush(null, { status: 500, statusText: 'Server Error' });
+      fixture.detectChanges();
+
+      expect(selector().existentes()).toEqual([]);
+      formularioValido();
+      component.enviarFormulario();
+      expect(enviados).toHaveLength(1);
+    });
+  });
 });

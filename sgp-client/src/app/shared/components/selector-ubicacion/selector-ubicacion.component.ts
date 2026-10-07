@@ -8,6 +8,7 @@ import {
   OnChanges,
   OnDestroy,
   Output,
+  SimpleChanges,
   ViewChild,
   signal,
 } from '@angular/core';
@@ -37,6 +38,12 @@ export class SelectorUbicacionComponent implements AfterViewInit, OnChanges, OnD
   @Input() longitud: number | null = null;
   @Input() deshabilitado = false;
   @Input() cercanos: readonly PuntoMapa[] = [];
+  /** Puentes ya registrados, para que se vea el contexto antes de elegir un punto. */
+  @Input() existentes: readonly PuntoMapa[] = [];
+  /** Solo muestra el punto: sin clics, sin arrastre y sin la ayuda para seleccionar. */
+  @Input() soloLectura = false;
+  /** Si se indica y hay una coordenada válida, el mapa abre acercado sobre ella. */
+  @Input() zoom: number | null = null;
 
   @Output() readonly coordenadaSeleccionada = new EventEmitter<CoordenadaGeografica>();
 
@@ -47,6 +54,7 @@ export class SelectorUbicacionComponent implements AfterViewInit, OnChanges, OnD
   private mapa: Mapa | null = null;
   private marcador: Marker | null = null;
   private marcadoresCercanos: Marker[] = [];
+  private marcadoresExistentes: Marker[] = [];
   private observador: ResizeObserver | null = null;
   private destruido = false;
 
@@ -54,9 +62,14 @@ export class SelectorUbicacionComponent implements AfterViewInit, OnChanges, OnD
     void this.inicializar();
   }
 
-  ngOnChanges(): void {
+  ngOnChanges(cambios: SimpleChanges): void {
     this.sincronizarMarcador();
-    this.sincronizarCercanos();
+
+    // Con cientos de marcadores existentes, solo se rehacen cuando cambian sus propias entradas.
+    if (cambios['cercanos'] || cambios['existentes']) {
+      this.sincronizarCercanos();
+      this.sincronizarExistentes();
+    }
   }
 
   ngOnDestroy(): void {
@@ -64,6 +77,7 @@ export class SelectorUbicacionComponent implements AfterViewInit, OnChanges, OnD
     this.observador?.disconnect();
     this.marcador?.remove();
     this.limpiarCercanos();
+    this.limpiarExistentes();
     this.mapa?.remove();
     this.mapa = null;
   }
@@ -78,10 +92,12 @@ export class SelectorUbicacionComponent implements AfterViewInit, OnChanges, OnD
       cargarEstilosMaplibre(libreria.getVersion(), () => this.mapa?.resize());
 
       this.libreria = libreria;
+      const acercar = this.zoom !== null && coordenadaValida(this.latitud, this.longitud);
+
       this.mapa = new libreria.Map({
         container: this.contenedor.nativeElement,
-        center: [-90.3, 15.5],
-        zoom: 6,
+        center: acercar ? [this.longitud as number, this.latitud as number] : [-90.3, 15.5],
+        zoom: acercar ? (this.zoom as number) : 6,
         renderWorldCopies: false,
         style: {
           version: 8,
@@ -127,6 +143,7 @@ export class SelectorUbicacionComponent implements AfterViewInit, OnChanges, OnD
 
       this.sincronizarMarcador();
       this.sincronizarCercanos();
+      this.sincronizarExistentes();
     } catch {
       if (!this.destruido) {
         this.cargando.set(false);
@@ -136,7 +153,7 @@ export class SelectorUbicacionComponent implements AfterViewInit, OnChanges, OnD
   }
 
   private seleccionar(latitud: number, longitud: number): void {
-    if (this.deshabilitado) return;
+    if (this.deshabilitado || this.soloLectura) return;
 
     // Solo normaliza si el mapa devolvió una longitud fuera de rango; la fórmula agrega ruido
     // de punto flotante (-90.7 pasaría a -90.69999999999999).
@@ -149,6 +166,10 @@ export class SelectorUbicacionComponent implements AfterViewInit, OnChanges, OnD
       latitud: redondear(latitud),
       longitud: redondear(longitudNormalizada),
     });
+  }
+
+  private get arrastrable(): boolean {
+    return !this.deshabilitado && !this.soloLectura;
   }
 
   private sincronizarMarcador(): void {
@@ -168,7 +189,7 @@ export class SelectorUbicacionComponent implements AfterViewInit, OnChanges, OnD
     if (!this.marcador) {
       const marcador = new libreria.Marker({
         color: '#2563eb',
-        draggable: !this.deshabilitado,
+        draggable: this.arrastrable,
       })
         .setLngLat(posicion)
         .addTo(mapa);
@@ -182,7 +203,7 @@ export class SelectorUbicacionComponent implements AfterViewInit, OnChanges, OnD
 
       this.marcador = marcador;
     } else {
-      this.marcador.setLngLat(posicion).setDraggable(!this.deshabilitado);
+      this.marcador.setLngLat(posicion).setDraggable(this.arrastrable);
     }
 
     // También centra el mapa cuando se pegan coordenadas de un GPS.
@@ -212,6 +233,41 @@ export class SelectorUbicacionComponent implements AfterViewInit, OnChanges, OnD
       marcador.getElement().setAttribute('aria-label', cercano.titulo);
       this.marcadoresCercanos.push(marcador);
     }
+  }
+
+  private sincronizarExistentes(): void {
+    this.limpiarExistentes();
+
+    const mapa = this.mapa;
+    const libreria = this.libreria;
+
+    if (!mapa || !libreria) return;
+
+    // Los cercanos ya se destacan en naranja; no se dibujan dos veces.
+    const cercanos = new Set(this.cercanos.map((cercano) => cercano.id));
+
+    for (const existente of this.existentes) {
+      if (cercanos.has(existente.id)) continue;
+      if (!coordenadaValida(existente.latitud, existente.longitud)) continue;
+
+      const popup: Popup = new libreria.Popup({ offset: 25 }).setText(existente.titulo);
+
+      const marcador = new libreria.Marker({ color: '#64748b' })
+        .setLngLat([existente.longitud, existente.latitud])
+        .setPopup(popup)
+        .addTo(mapa);
+
+      marcador.getElement().setAttribute('aria-label', existente.titulo);
+      this.marcadoresExistentes.push(marcador);
+    }
+  }
+
+  private limpiarExistentes(): void {
+    for (const marcador of this.marcadoresExistentes) {
+      marcador.remove();
+    }
+
+    this.marcadoresExistentes = [];
   }
 
   private limpiarCercanos(): void {

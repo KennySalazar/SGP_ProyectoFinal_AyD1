@@ -95,6 +95,7 @@
       [longitud]="form.controls.longitud.value"
       [deshabilitado]="guardando()"
       [cercanos]="cercanos()"
+      [existentes]="existentes()"
       (coordenadaSeleccionada)="seleccionarCoordenada($event)"
     />
 
@@ -165,6 +166,7 @@
           <i class="pi pi-save" aria-hidden="true"></i>
           {{ (guardando() ? etiquetaEnviando() : etiquetaEnviar()) | transloco }}
         </button>
+        <ng-content select="[formAcciones]" />
       </div>
     }
   </section>
