@@ -1,6 +1,7 @@
 package gt.usac.cunoc.sgp.puente.controller;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.reset;
@@ -9,12 +10,15 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import gt.usac.cunoc.sgp.common.security.JwtData;
 import gt.usac.cunoc.sgp.puente.dto.AprobarSolicitudAltaPuenteRequest;
 import gt.usac.cunoc.sgp.puente.dto.CrearSolicitudAltaPuenteRequest;
+import gt.usac.cunoc.sgp.puente.dto.PuenteCercanoResponse;
 import gt.usac.cunoc.sgp.puente.dto.RechazarSolicitudAltaPuenteRequest;
+import gt.usac.cunoc.sgp.puente.exception.CercaniaPuenteException;
 import gt.usac.cunoc.sgp.puente.exception.PuenteExceptionHandler;
 import gt.usac.cunoc.sgp.puente.model.EstadoSolicitudAltaPuente;
 import gt.usac.cunoc.sgp.puente.service.SolicitudAltaPuenteService;
@@ -124,6 +128,49 @@ class SolicitudAltaPuenteControllerSecurityTest {
         .andExpect(status().isCreated());
 
     verify(service).crear(any(CrearSolicitudAltaPuenteRequest.class), eq(USUARIO_ID));
+  }
+
+  @Test
+  void respondeConflictoConLosPuentesCercanosHastaConfirmar() throws Exception {
+    var authentication = autenticar(RoleName.CATEDRATICO);
+    var cercano =
+        new PuenteCercanoResponse(
+            UUID.randomUUID(), "GT-01-0114-0001", "Existente", false, 7.7, 14.4811, -90.615);
+    when(service.crear(any(CrearSolicitudAltaPuenteRequest.class), eq(USUARIO_ID)))
+        .thenThrow(
+            new CercaniaPuenteException(
+                new PageImpl<>(List.of(cercano), PageRequest.of(0, 100), 1)));
+
+    mockMvc
+        .perform(
+            post("/api/v1/solicitudes-puente")
+                .principal(authentication)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(SOLICITUD))
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.code").value("puente_cercano"))
+        .andExpect(jsonPath("$.requiereConfirmacion").value(true))
+        .andExpect(jsonPath("$.totalPuentesCercanos").value(1))
+        .andExpect(jsonPath("$.puentesCercanos[0].codigo").value("GT-01-0114-0001"))
+        .andExpect(jsonPath("$.puentesCercanos[0].activo").value(false));
+  }
+
+  @Test
+  void aceptaConfirmarCercaniaEnLaSolicitud() throws Exception {
+    var authentication = autenticar(RoleName.CATEDRATICO);
+
+    mockMvc
+        .perform(
+            post("/api/v1/solicitudes-puente")
+                .principal(authentication)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    SOLICITUD.replace(
+                        "\"justificacion\"", "\"confirmarCercania\": true, \"justificacion\"")))
+        .andExpect(status().isCreated());
+
+    verify(service)
+        .crear(argThat(CrearSolicitudAltaPuenteRequest::confirmarCercania), eq(USUARIO_ID));
   }
 
   @Test

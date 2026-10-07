@@ -48,7 +48,8 @@ public class SolicitudAltaPuenteController {
       summary = "Solicitar el alta de un puente",
       description =
           "Crea una solicitud en estado PENDIENTE para que el Administrador la evalúe. "
-              + "El puente no existe en el catálogo hasta que la solicitud sea aprobada.")
+              + "El puente no existe en el catálogo hasta que la solicitud sea aprobada. "
+              + "Si hay puentes a menos de 100 metros responde 409 hasta que se envíe confirmarCercania.")
   public ResponseEntity<SolicitudAltaPuenteResponse> crear(
       @Valid @RequestBody CrearSolicitudAltaPuenteRequest request, Authentication authentication) {
     SolicitudAltaPuenteResponse response =

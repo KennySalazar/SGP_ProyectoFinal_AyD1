@@ -33,4 +33,5 @@ public record CrearSolicitudAltaPuenteRequest(
         @DecimalMax(value = "180", message = "La longitud debe ser menor o igual a 180")
         BigDecimal longitud,
     @Size(max = 2000, message = "La justificación no debe superar 2000 caracteres")
-        String justificacion) {}
+        String justificacion,
+    boolean confirmarCercania) {}
