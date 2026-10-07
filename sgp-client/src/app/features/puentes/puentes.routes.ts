@@ -36,6 +36,11 @@ export const puentesRoutes: Routes = [
             (m) => m.RevisarSolicitudPage,
           ),
       },
+      {
+        path: ':id/editar',
+        loadComponent: () =>
+          import('./pages/editar-puente/editar-puente.page').then((m) => m.EditarPuentePage),
+      },
     ],
   },
   {
@@ -64,5 +69,11 @@ export const puentesRoutes: Routes = [
           ),
       },
     ],
+  },
+  // Debe ir al final: `:id` coincidiría con cualquier segmento, incluido `solicitudes`.
+  {
+    path: ':id',
+    loadComponent: () =>
+      import('./pages/ficha-puente/ficha-puente.page').then((m) => m.FichaPuentePage),
   },
 ];

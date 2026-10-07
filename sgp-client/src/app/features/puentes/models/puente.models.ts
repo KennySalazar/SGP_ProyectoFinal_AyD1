@@ -78,6 +78,11 @@ export interface SolicitudRevisionDetalleResponse extends SolicitudRevisionRespo
   totalPuentesCercanos: number;
 }
 
+export interface ActualizarPuenteRequest extends PuenteFormValores {
+  confirmarCercania: boolean;
+  codigo?: string;
+}
+
 export interface UtmResponse {
   zona: number;
   hemisferio: string;

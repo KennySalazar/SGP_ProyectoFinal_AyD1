@@ -8,6 +8,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import gt.usac.cunoc.sgp.common.config.SecurityConfiguration;
+import gt.usac.cunoc.sgp.common.exception.ApiException;
 import gt.usac.cunoc.sgp.common.security.AuthRateLimitFilter;
 import gt.usac.cunoc.sgp.common.security.JwtAuthenticationFilter;
 import gt.usac.cunoc.sgp.common.security.JwtService;
@@ -17,12 +18,14 @@ import gt.usac.cunoc.sgp.puente.dto.CandidatoTerritorialResponse;
 import gt.usac.cunoc.sgp.puente.dto.DepartamentoResponse;
 import gt.usac.cunoc.sgp.puente.dto.MunicipioResponse;
 import gt.usac.cunoc.sgp.puente.dto.PuenteCatalogoResponse;
+import gt.usac.cunoc.sgp.puente.dto.PuenteResponse;
 import gt.usac.cunoc.sgp.puente.dto.UbicacionTerritorialResponse;
 import gt.usac.cunoc.sgp.puente.service.CatalogoTerritorialService;
 import gt.usac.cunoc.sgp.puente.service.PuenteService;
 import gt.usac.cunoc.sgp.puente.service.UbicacionTerritorialService;
 import gt.usac.cunoc.sgp.usuario.repository.UserAccountRepository;
 import java.time.Clock;
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -34,6 +37,7 @@ import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.Import;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -226,5 +230,59 @@ class PuenteCatalogoControllerTest {
         .thenReturn(new PageImpl<>(List.of(), PageRequest.of(0, 20), 0));
 
     mvc.perform(get("/api/v1/puentes").param("todos", "true")).andExpect(status().isOk());
+  }
+
+  @Test
+  void visitanteConsultaFichaDetalleSinAutenticacion() throws Exception {
+    UUID puenteId = UUID.randomUUID();
+    var depto = new DepartamentoResponse(UUID.randomUUID(), "01", "Guatemala");
+    var muni = new MunicipioResponse(UUID.randomUUID(), depto.id(), "0101", "Guatemala");
+    var puente =
+        new PuenteResponse(
+            puenteId,
+            "GT-01-0101-0001",
+            "Puente La Asunción",
+            depto,
+            muni,
+            "CA-1 Occidente",
+            java.math.BigDecimal.valueOf(15.5),
+            14.62843,
+            -90.52271,
+            null,
+            true,
+            "Sin evaluar",
+            null,
+            null,
+            OffsetDateTime.now());
+
+    when(service.obtenerPorId(puenteId)).thenReturn(puente);
+
+    mvc.perform(get("/api/v1/puentes/{id}", puenteId))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.id").value(puenteId.toString()))
+        .andExpect(jsonPath("$.codigo").value("GT-01-0101-0001"))
+        .andExpect(jsonPath("$.nombre").value("Puente La Asunción"))
+        .andExpect(jsonPath("$.estadoActual").value("Sin evaluar"))
+        .andExpect(jsonPath("$.indiceCondicionActual").doesNotExist())
+        .andExpect(jsonPath("$.fechaUltimaInspeccion").doesNotExist())
+        .andExpect(jsonPath("$.fotografias").doesNotExist())
+        .andExpect(jsonPath("$.danos").doesNotExist())
+        .andExpect(jsonPath("$.creadoPorId").doesNotExist());
+  }
+
+  @Test
+  void consultarFichaInexistenteDevuelve404() throws Exception {
+    UUID puenteId = UUID.randomUUID();
+    when(service.obtenerPorId(puenteId))
+        .thenThrow(
+            new ApiException(
+                HttpStatus.NOT_FOUND,
+                "puente_no_encontrado",
+                "Puente no encontrado",
+                "El puente no existe o esta inactivo"));
+
+    mvc.perform(get("/api/v1/puentes/{id}", puenteId))
+        .andExpect(status().isNotFound())
+        .andExpect(jsonPath("$.code").value("puente_no_encontrado"));
   }
 }

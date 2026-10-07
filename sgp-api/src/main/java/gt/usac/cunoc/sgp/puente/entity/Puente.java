@@ -160,6 +160,21 @@ public class Puente {
     this.actualizadoEn = ahora;
   }
 
+  public void actualizarDatosGenerales(
+      String nombre,
+      String ruta,
+      BigDecimal kilometraje,
+      Municipio municipio,
+      Point ubicacion,
+      Instant ahora) {
+    this.nombre = nombre;
+    this.ruta = ruta;
+    this.kilometraje = kilometraje;
+    this.municipio = municipio;
+    this.ubicacion = ubicacion;
+    this.actualizadoEn = ahora;
+  }
+
   public UUID getCreadoPorId() {
     return creadoPorId;
   }

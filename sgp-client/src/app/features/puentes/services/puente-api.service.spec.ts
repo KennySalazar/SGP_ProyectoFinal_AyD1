@@ -243,4 +243,34 @@ describe('PuenteApiService', () => {
       adicionales.forEach((r) => r.flush(pagina([], 50)));
     });
   });
+
+  it('obtiene un puente por su identificador', () => {
+    service.obtenerPorId('puente-1').subscribe();
+
+    const request = http.expectOne('/api/v1/puentes/puente-1');
+    expect(request.request.method).toBe('GET');
+
+    request.flush({});
+  });
+
+  it('actualiza los datos de un puente', () => {
+    const payload = {
+      nombre: 'Puente Editado',
+      departamentoId: 'depto-1',
+      municipioId: 'muni-1',
+      ruta: 'CA-1',
+      kilometraje: 15.5,
+      latitud: 14.481,
+      longitud: -90.615,
+      confirmarCercania: false,
+    };
+
+    service.actualizar('puente-1', payload).subscribe();
+
+    const request = http.expectOne('/api/v1/puentes/puente-1');
+    expect(request.request.method).toBe('PUT');
+    expect(request.request.body).toEqual(payload);
+
+    request.flush({});
+  });
 });

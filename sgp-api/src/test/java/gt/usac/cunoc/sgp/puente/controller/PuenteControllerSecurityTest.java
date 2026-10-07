@@ -6,12 +6,17 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import gt.usac.cunoc.sgp.common.security.JwtData;
+import gt.usac.cunoc.sgp.puente.dto.ActualizarPuenteRequest;
 import gt.usac.cunoc.sgp.puente.dto.CrearPuenteRequest;
 import gt.usac.cunoc.sgp.puente.dto.DarBajaPuenteRequest;
+import gt.usac.cunoc.sgp.puente.dto.PuenteResponse;
 import gt.usac.cunoc.sgp.puente.exception.PuenteExceptionHandler;
 import gt.usac.cunoc.sgp.puente.service.PuenteService;
 import gt.usac.cunoc.sgp.usuario.model.RoleName;
@@ -106,6 +111,64 @@ class PuenteControllerSecurityTest {
         .andExpect(status().isCreated());
 
     verify(puenteService).registrar(any(CrearPuenteRequest.class), eq(USUARIO_ID));
+  }
+
+  @ParameterizedTest
+  @EnumSource(value = RoleName.class, names = "ADMINISTRADOR", mode = EnumSource.Mode.EXCLUDE)
+  void rechazaRolesDistintosDeAdministradorEnActualizacion(RoleName rol) throws Exception {
+    var authentication = autenticar(rol);
+    UUID puenteId = UUID.randomUUID();
+
+    mockMvc
+        .perform(
+            put("/api/v1/puentes/" + puenteId)
+                .principal(authentication)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(SOLICITUD))
+        .andExpect(status().isForbidden());
+
+    verifyNoInteractions(puenteService);
+  }
+
+  @Test
+  void permiteAdministradorEnActualizacion() throws Exception {
+    var authentication = autenticar(RoleName.ADMINISTRADOR);
+    UUID puenteId = UUID.randomUUID();
+
+    mockMvc
+        .perform(
+            put("/api/v1/puentes/" + puenteId)
+                .principal(authentication)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(SOLICITUD))
+        .andExpect(status().isOk());
+
+    verify(puenteService)
+        .actualizar(eq(puenteId), any(ActualizarPuenteRequest.class), eq(USUARIO_ID));
+  }
+
+  @ParameterizedTest
+  @EnumSource(RoleName.class)
+  void permiteCualquierRolEnConsulta(RoleName rol) throws Exception {
+    var authentication = autenticar(rol);
+    UUID puenteId = UUID.randomUUID();
+    when(puenteService.obtenerPorId(puenteId)).thenReturn(mock(PuenteResponse.class));
+
+    mockMvc
+        .perform(get("/api/v1/puentes/" + puenteId).principal(authentication))
+        .andExpect(status().isOk());
+
+    verify(puenteService).obtenerPorId(puenteId);
+  }
+
+  @Test
+  void permiteConsultaSinAutenticacion() throws Exception {
+    UUID puenteId = UUID.randomUUID();
+    when(puenteService.obtenerPorId(puenteId)).thenReturn(mock(PuenteResponse.class));
+
+    mockMvc.perform(get("/api/v1/puentes/" + puenteId)).andExpect(status().isOk());
+
+    verify(puenteService).obtenerPorId(puenteId);
   }
 
   @ParameterizedTest

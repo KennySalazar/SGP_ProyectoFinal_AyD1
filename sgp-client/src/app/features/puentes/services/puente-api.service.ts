@@ -3,6 +3,7 @@ import { inject, Injectable } from '@angular/core';
 import { Observable, forkJoin, map, of, switchMap } from 'rxjs';
 import { PuntoMapa } from '../../../shared/utils/ubicacion-guatemala';
 import {
+  ActualizarPuenteRequest,
   CrearPuenteRequest,
   ConsultaCatalogoPuentes,
   DepartamentoResponse,
@@ -109,5 +110,13 @@ export class PuenteApiService {
       `/api/v1/puentes/${encodeURIComponent(id)}/reactivar`,
       {},
     );
+  }
+
+  obtenerPorId(id: string): Observable<PuenteResponse> {
+    return this.http.get<PuenteResponse>(`/api/v1/puentes/${encodeURIComponent(id)}`);
+  }
+
+  actualizar(id: string, request: ActualizarPuenteRequest): Observable<PuenteResponse> {
+    return this.http.put<PuenteResponse>(`/api/v1/puentes/${encodeURIComponent(id)}`, request);
   }
 }

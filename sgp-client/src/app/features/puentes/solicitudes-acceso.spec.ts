@@ -89,4 +89,15 @@ describe('Acceso a las solicitudes de alta de puente: HU010', () => {
       expect(TestBed.inject(Router).serializeUrl(resultado as UrlTree)).toBe('/');
     },
   );
+
+  it('mantiene la ruta de la ficha `:id` al final para no capturar `solicitudes`', () => {
+    const indiceFicha = puentesRoutes.findIndex((ruta) => ruta.path === ':id');
+    const indiceSolicitudes = puentesRoutes.findIndex((ruta) =>
+      ruta.children?.some((hija) => hija.path === 'solicitudes'),
+    );
+
+    expect(indiceFicha).toBe(puentesRoutes.length - 1);
+    expect(indiceSolicitudes).toBeGreaterThan(-1);
+    expect(indiceSolicitudes).toBeLessThan(indiceFicha);
+  });
 });
