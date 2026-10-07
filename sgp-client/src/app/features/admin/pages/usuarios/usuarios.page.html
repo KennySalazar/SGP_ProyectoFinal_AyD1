@@ -1,0 +1,318 @@
+<header class="page-heading">
+  <p class="page-kicker">{{ 'admin.kicker' | transloco }}</p>
+  <h1 class="page-title">{{ 'usuarios.title' | transloco }}</h1>
+  <p class="page-description">{{ 'usuarios.description' | transloco }}</p>
+</header>
+
+<nav class="accesos" [attr.aria-label]="'usuarios.otherTools' | transloco">
+  <a pButton severity="secondary" [outlined]="true" routerLink="/admin/invitaciones">
+    <i class="pi pi-send" aria-hidden="true"></i>
+    <span>{{ 'invitaciones.open' | transloco }}</span>
+  </a>
+  <a pButton severity="secondary" [outlined]="true" routerLink="/admin/profesionales">
+    <i class="pi pi-id-card" aria-hidden="true"></i>
+    <span>{{ 'profesionales.open' | transloco }}</span>
+  </a>
+  <a pButton severity="secondary" [outlined]="true" routerLink="/admin/bitacora">
+    <i class="pi pi-history" aria-hidden="true"></i>
+    <span>{{ 'auditoria.open' | transloco }}</span>
+  </a>
+</nav>
+
+<section class="surface-card lista-card" aria-live="polite">
+  <h2 id="usuarios-titulo">{{ 'usuarios.listTitle' | transloco }}</h2>
+
+  <div class="filtros">
+    <label for="usuarios-rol">
+      <span>{{ 'invitaciones.role' | transloco }}</span>
+      <p-select
+        inputId="usuarios-rol"
+        [formControl]="filtroRol"
+        [options]="opcionesRol"
+        optionValue="valor"
+        [ariaLabel]="'invitaciones.role' | transloco"
+      >
+        <ng-template #selectedItem let-opcion>{{ opcion.etiqueta | transloco }}</ng-template>
+        <ng-template #item let-opcion>{{ opcion.etiqueta | transloco }}</ng-template>
+      </p-select>
+    </label>
+    <div class="selector" role="group" [attr.aria-label]="'usuarios.filterLabel' | transloco">
+      @for (opcion of estados; track opcion) {
+      <button
+        pButton
+        type="button"
+        [attr.aria-pressed]="estado() === opcion"
+        [severity]="estado() === opcion ? 'primary' : 'secondary'"
+        [outlined]="estado() !== opcion"
+        (click)="filtrarEstado(opcion)"
+      >
+        {{ claveEstado(opcion) | transloco }}
+      </button>
+      }
+    </div>
+  </div>
+
+  @if (confirmacion(); as aviso) {
+  <p class="confirmacion" role="status">
+    <i class="pi pi-check-circle" aria-hidden="true"></i>
+    {{ aviso.clave | transloco: { email: aviso.email } }}
+  </p>
+  } @if (cargando()) {
+  <p role="status">{{ 'usuarios.loading' | transloco }}</p>
+  } @else if (errorLista()) {
+  <div class="error" role="alert">
+    <p>{{ 'usuarios.loadFailed' | transloco }}</p>
+    <button pButton type="button" severity="secondary" (click)="cargar(resultado()?.number ?? 0)">
+      {{ 'usuarios.retry' | transloco }}
+    </button>
+  </div>
+  } @else if (resultado(); as pagina) { @if (pagina.content.length === 0) {
+  <div class="sin-resultados">
+    <i class="pi pi-users" aria-hidden="true"></i>
+    <p role="status">{{ 'usuarios.empty' | transloco }}</p>
+  </div>
+  } @else {
+  <div class="tabla-contenedor" role="region" tabindex="0" aria-labelledby="usuarios-titulo">
+    <p-table [value]="pagina.content" dataKey="id" [tableStyle]="{ 'min-width': '60rem' }">
+      <ng-template #header>
+        <tr>
+          <th scope="col">{{ 'common.email' | transloco }}</th>
+          <th scope="col" class="no-cortar">{{ 'invitaciones.role' | transloco }}</th>
+          <th scope="col" class="no-cortar">{{ 'usuarios.state' | transloco }}</th>
+          <th scope="col" class="no-cortar">{{ 'profesionales.colegiado' | transloco }}</th>
+          <th scope="col">
+            <span class="sr-only">{{ 'usuarios.actions' | transloco }}</span>
+          </th>
+        </tr>
+      </ng-template>
+      <ng-template #body let-usuario>
+        <tr>
+          <th scope="row">
+            {{ usuario.email }} @if (esUsuarioActual(usuario)) {
+            <small class="tu-cuenta">{{ 'usuarios.you' | transloco }}</small>
+            } @if (usuario.motivoDesactivacion) {
+            <small class="motivo"
+              >{{ 'usuarios.reason' | transloco }}: {{ usuario.motivoDesactivacion }}</small
+            >
+            }
+          </th>
+          <td class="no-cortar">{{ 'invitaciones.roles.' + usuario.rol | transloco }}</td>
+          <td class="no-cortar">
+            <p-tag
+              [attr.data-estado]="usuario.estado"
+              [value]="'usuarios.estados.' + usuario.estado | transloco"
+              [severity]="severidad(usuario.estado)"
+            />
+          </td>
+          <td class="no-cortar">
+            @if (usuario.numeroColegiado) { {{ usuario.numeroColegiado }}
+            <small class="colegiado-estado"
+              >{{ (usuario.colegiadoVerificado ? 'profesionales.estado.VERIFICADO' :
+              'profesionales.estado.PENDIENTE') | transloco }}</small
+            >
+            } @else { — }
+          </td>
+          <td class="no-cortar acciones-fila">
+            @if (!esUsuarioActual(usuario)) {
+            <button
+              pButton
+              type="button"
+              size="small"
+              severity="secondary"
+              [outlined]="true"
+              (click)="abrirCambioRol(usuario)"
+              [attr.aria-label]="('usuarios.changeRole' | transloco) + ': ' + usuario.email"
+            >
+              <i class="pi pi-user-edit" aria-hidden="true"></i>
+              {{ 'usuarios.changeRole' | transloco }}
+            </button>
+            @if (usuario.activo) {
+            <button
+              pButton
+              type="button"
+              size="small"
+              severity="danger"
+              [outlined]="true"
+              (click)="abrirDesactivacion(usuario)"
+              [attr.aria-label]="('usuarios.deactivate' | transloco) + ': ' + usuario.email"
+            >
+              <i class="pi pi-ban" aria-hidden="true"></i>
+              {{ 'usuarios.deactivate' | transloco }}
+            </button>
+            } @else {
+            <button
+              pButton
+              type="button"
+              size="small"
+              [disabled]="reactivando() !== null"
+              (click)="reactivar(usuario)"
+              [attr.aria-label]="('usuarios.reactivate' | transloco) + ': ' + usuario.email"
+            >
+              <i class="pi pi-replay" aria-hidden="true"></i>
+              {{ (reactivando() === usuario.id ? 'usuarios.reactivating' : 'usuarios.reactivate') |
+              transloco }}
+            </button>
+            } }
+          </td>
+        </tr>
+      </ng-template>
+    </p-table>
+  </div>
+
+  <div class="paginacion">
+    <p class="reporte-pagina" role="status">
+      {{ 'usuarios.total' | transloco: { total: pagina.totalElements } }}
+    </p>
+    <p-paginator
+      [first]="pagina.number * pagina.size"
+      [rows]="pagina.size"
+      [totalRecords]="pagina.totalElements"
+      [pageLinkSize]="3"
+      (onPageChange)="cambiarPagina($event)"
+    />
+  </div>
+  } }
+</section>
+
+<p-dialog
+  [header]="'usuarios.deactivateTitle' | transloco"
+  [visible]="porDesactivar() !== null"
+  (visibleChange)="!$event && cerrarDesactivacion()"
+  [modal]="true"
+  [style]="{ width: 'min(540px, 95vw)' }"
+  [draggable]="false"
+  [resizable]="false"
+>
+  @if (porDesactivar(); as usuario) {
+  <p class="dialogo-texto">{{ 'usuarios.deactivateText' | transloco }}</p>
+  <dl class="datos">
+    <div>
+      <dt>{{ 'common.email' | transloco }}</dt>
+      <dd>{{ usuario.email }}</dd>
+    </div>
+    <div>
+      <dt>{{ 'invitaciones.role' | transloco }}</dt>
+      <dd>{{ 'invitaciones.roles.' + usuario.rol | transloco }}</dd>
+    </div>
+  </dl>
+  <label class="campo">
+    <span>{{ 'usuarios.reasonOptional' | transloco }}</span>
+    <textarea
+      pTextarea
+      [formControl]="motivo"
+      rows="3"
+      maxlength="1000"
+      [placeholder]="'usuarios.reasonPlaceholder' | transloco"
+    ></textarea>
+  </label>
+  @if (errorDesactivacion(); as mensaje) {
+  <p class="error" role="alert">{{ mensaje }}</p>
+  }
+  <div class="acciones">
+    <button
+      pButton
+      type="button"
+      severity="secondary"
+      [outlined]="true"
+      [disabled]="desactivando()"
+      (click)="cerrarDesactivacion()"
+    >
+      {{ 'usuarios.cancel' | transloco }}
+    </button>
+    <button
+      pButton
+      type="button"
+      severity="danger"
+      [disabled]="desactivando() || motivo.invalid"
+      (click)="desactivar()"
+    >
+      <i class="pi pi-ban" aria-hidden="true"></i>
+      <span
+        >{{ (desactivando() ? 'usuarios.deactivating' : 'usuarios.confirmDeactivate') | transloco
+        }}</span
+      >
+    </button>
+  </div>
+  }
+</p-dialog>
+
+<p-dialog
+  [header]="'usuarios.changeRoleTitle' | transloco"
+  [visible]="porCambiarRol() !== null"
+  (visibleChange)="!$event && cerrarCambioRol()"
+  [modal]="true"
+  [style]="{ width: 'min(540px, 95vw)' }"
+  [draggable]="false"
+  [resizable]="false"
+>
+  @if (porCambiarRol(); as usuario) {
+  <dl class="datos">
+    <div>
+      <dt>{{ 'common.email' | transloco }}</dt>
+      <dd>{{ usuario.email }}</dd>
+    </div>
+    <div>
+      <dt>{{ 'usuarios.currentRole' | transloco }}</dt>
+      <dd>{{ 'invitaciones.roles.' + usuario.rol | transloco }}</dd>
+    </div>
+  </dl>
+  <form class="cambio-rol" [formGroup]="cambioRol" (ngSubmit)="cambiarRol()">
+    <label class="campo" for="usuarios-nuevo-rol">
+      <span>{{ 'usuarios.newRole' | transloco }}</span>
+      <p-select
+        inputId="usuarios-nuevo-rol"
+        formControlName="rol"
+        [options]="rolesDisponibles()"
+        optionValue="valor"
+        appendTo="body"
+        [placeholder]="'usuarios.selectRole' | transloco"
+        [ariaLabel]="'usuarios.newRole' | transloco"
+      >
+        <ng-template #selectedItem let-opcion>{{ opcion.etiqueta | transloco }}</ng-template>
+        <ng-template #item let-opcion>{{ opcion.etiqueta | transloco }}</ng-template>
+      </p-select>
+    </label>
+    @if (nuevoRolEsProfesional()) {
+    <label class="campo">
+      <span>{{ 'invitaciones.colegiado' | transloco }}</span>
+      <input
+        pInputText
+        type="text"
+        formControlName="numeroColegiado"
+        autocomplete="off"
+        maxlength="50"
+        [placeholder]="'invitaciones.colegiadoPlaceholder' | transloco"
+      />
+      @if (cambioRol.controls.numeroColegiado.touched && cambioRol.controls.numeroColegiado.invalid)
+      {
+      <small class="validation">{{ 'invitaciones.invalidColegiado' | transloco }}</small>
+      }
+    </label>
+    <p class="nota">{{ 'usuarios.colegiadoNote' | transloco }}</p>
+    }
+    <p class="nota">{{ 'usuarios.changeRoleNote' | transloco }}</p>
+    @if (errorCambioRol(); as mensaje) {
+    <p class="error" role="alert">{{ mensaje }}</p>
+    }
+    <div class="acciones">
+      <button
+        pButton
+        type="button"
+        severity="secondary"
+        [outlined]="true"
+        [disabled]="cambiandoRol()"
+        (click)="cerrarCambioRol()"
+      >
+        {{ 'usuarios.cancel' | transloco }}
+      </button>
+      <button pButton type="submit" [disabled]="cambiandoRol() || cambioRol.invalid">
+        <i class="pi pi-user-edit" aria-hidden="true"></i>
+        <span
+          >{{ (cambiandoRol() ? 'usuarios.changingRole' : 'usuarios.confirmChangeRole') | transloco
+          }}</span
+        >
+      </button>
+    </div>
+  </form>
+  }
+</p-dialog>

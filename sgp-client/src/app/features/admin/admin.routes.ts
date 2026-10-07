@@ -18,7 +18,6 @@ export const adminRoutes: Routes = [
   {
     path: '',
     pathMatch: 'full',
-    loadComponent: () =>
-      import('./pages/admin/admin.placeholder').then((m) => m.AdminPlaceholderPage),
+    loadComponent: () => import('./pages/usuarios/usuarios.page').then((m) => m.UsuariosPage),
   },
 ];

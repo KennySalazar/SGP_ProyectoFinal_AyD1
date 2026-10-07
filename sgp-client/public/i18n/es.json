@@ -25,7 +25,7 @@
     "bridgeCatalog": "Catálogo de puentes",
     "offline": "Offline",
     "security": "Seguridad",
-    "administration": "Administracion",
+    "users": "Usuarios",
     "logout": "Cerrar sesion"
   },
   "connectivity": {
@@ -504,19 +504,7 @@
     }
   },
   "admin": {
-    "kicker": "CONFIGURACION DEL SISTEMA",
-    "title": "Administracion",
-    "description": "Espacio reservado para la gestion administrativa y tecnica requerida por el proyecto.",
-    "usersRoles": "Usuarios y roles",
-    "usersRolesNote": "Invitaciones, activacion y baja logica.",
-    "formVersions": "Versiones de formulario",
-    "formVersionsNote": "JSON Schema, publicacion y mapeo historico.",
-    "indexWeights": "Pesos del indice",
-    "indexWeightsNote": "Configuracion versionada y calibracion.",
-    "audit": "Auditoria",
-    "auditNote": "Consulta de acciones y trazabilidad.",
-    "professionals": "Profesionales externos",
-    "professionalsNote": "Verificación del número de colegiado."
+    "kicker": "CONFIGURACION DEL SISTEMA"
   },
   "invitaciones": {
     "open": "Gestionar invitaciones",
@@ -602,5 +590,50 @@
     "confirm": "Confirmar verificación",
     "verifying": "Verificando...",
     "cancel": "Cancelar"
+  },
+  "usuarios": {
+    "title": "Gestión de usuarios",
+    "description": "Consulta las cuentas del sistema, cambia su rol y gestiona su acceso. Una cuenta desactivada nunca se elimina: sus inspecciones y comentarios siguen atribuidos.",
+    "otherTools": "Otras herramientas de administración",
+    "listTitle": "Usuarios registrados",
+    "todosLosRoles": "Todos los roles",
+    "filterLabel": "Filtrar usuarios por estado",
+    "estados": {
+      "TODOS": "Todos",
+      "ACTIVO": "Activo",
+      "PENDIENTE": "Pendiente",
+      "INACTIVO": "Inactivo"
+    },
+    "state": "Estado",
+    "actions": "Acciones",
+    "you": "Tu cuenta",
+    "reason": "Motivo",
+    "loading": "Cargando usuarios...",
+    "loadFailed": "No fue posible cargar los usuarios.",
+    "retry": "Reintentar",
+    "empty": "No hay usuarios con estos filtros.",
+    "total": "{{total}} usuarios en total",
+    "changeRole": "Cambiar rol",
+    "deactivate": "Desactivar",
+    "reactivate": "Reactivar",
+    "reactivating": "Reactivando...",
+    "cancel": "Cancelar",
+    "deactivateTitle": "Desactivar usuario",
+    "deactivateText": "La cuenta no se elimina: deja de poder iniciar sesión, se cierran sus sesiones abiertas y sus registros siguen atribuidos. Podrás reactivarla después con el mismo rol.",
+    "reasonOptional": "Motivo (opcional)",
+    "reasonPlaceholder": "Ej. Finalizó su participación en el curso",
+    "confirmDeactivate": "Desactivar cuenta",
+    "deactivating": "Desactivando...",
+    "changeRoleTitle": "Cambiar rol",
+    "currentRole": "Rol actual",
+    "newRole": "Nuevo rol",
+    "selectRole": "Selecciona el nuevo rol",
+    "colegiadoNote": "El colegiado quedará pendiente de verificación: el usuario no podrá inspeccionar hasta que lo verifiques en Profesionales externos.",
+    "changeRoleNote": "Se cerrarán las sesiones del usuario para que vuelva a ingresar con los permisos del nuevo rol.",
+    "confirmChangeRole": "Cambiar rol",
+    "changingRole": "Cambiando...",
+    "desactivado": "La cuenta de {{email}} fue desactivada.",
+    "reactivado": "La cuenta de {{email}} fue reactivada con su mismo rol.",
+    "rolCambiado": "Se cambió el rol de {{email}}."
   }
 }

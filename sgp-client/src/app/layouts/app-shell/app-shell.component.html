@@ -52,7 +52,7 @@
         </a>
         @if (auth.user()?.role === 'ADMINISTRADOR') {
           <a routerLink="/admin" routerLinkActive="active">
-            <i class="pi pi-cog"></i><span>{{ 'nav.administration' | transloco }}</span>
+            <i class="pi pi-users"></i><span>{{ 'nav.users' | transloco }}</span>
           </a>
 
           <a routerLink="/puentes/nuevo" routerLinkActive="active">
