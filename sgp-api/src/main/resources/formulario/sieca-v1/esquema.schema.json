@@ -1,0 +1,737 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:sgp:formulario:sieca-v1",
+  "title": "Formulario para Evaluación Técnica de Puentes (SIECA)",
+  "description": "Borrador HU-016. Transcripción del formulario del Manual Centroamericano de Gestión del Riesgo en Puentes (SIECA, sección 4.5.4, hojas 1 a 5). Este documento define la completitud exigida para enviar una inspección; los borradores pueden guardarse incompletos.",
+  "$comment": "Convenciones: (1) elemento_ref = ruta de propiedades del dato separadas por '/', sin índices de arreglo; las instancias repetibles se distinguen por instancia_id (instancia_elemento_id en BD). (2) 'x-sgp-evaluable' marca los elementos que participan en el Índice de Condición (HU-017). (3) 'x-sgp-fuente' indica hoja y fila del manual. (4) 'existencia' (PRESENTE/NO_APLICA/AUSENTE) encabeza cada fila de elemento. (5) 'readOnly' marca datos precargados del inventario (tabla puente) o de la sesión.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "identificacion",
+    "datos_generales",
+    "tramos",
+    "subestructura",
+    "superestructura",
+    "elementos_no_estructurales",
+    "caracteristicas_cauce",
+    "otros"
+  ],
+  "properties": {
+    "identificacion": {
+      "title": "1. Identificación del puente",
+      "x-sgp-fuente": "Hoja 1, sección 1; encabezado y pie de las hojas 1 a 5",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "nombre_puente",
+        "codigo",
+        "ruta",
+        "departamento",
+        "municipio",
+        "ruta_pavimentada",
+        "alineamiento_horizontal",
+        "esviaje",
+        "coordenadas_utm",
+        "nombre_inspector",
+        "fecha_inspeccion"
+      ],
+      "properties": {
+        "nombre_puente": { "title": "Nombre puente", "type": "string", "minLength": 1, "maxLength": 200, "readOnly": true },
+        "codigo": { "title": "Código", "type": "string", "minLength": 1, "maxLength": 40, "readOnly": true },
+        "ruta": { "title": "Ruta", "type": "string", "minLength": 1, "maxLength": 100, "readOnly": true },
+        "kilometraje": { "title": "Kilometraje", "type": ["number", "null"], "minimum": 0, "readOnly": true },
+        "departamento": { "title": "Departamento/Provincia", "type": "string", "minLength": 1, "maxLength": 100, "readOnly": true },
+        "municipio": { "title": "Municipio/Cantón/Distrito", "type": "string", "minLength": 1, "maxLength": 100, "readOnly": true },
+        "ruta_pavimentada": { "title": "Ruta pavimentada", "type": "string", "enum": ["SI", "NO", "PARCIAL"] },
+        "alineamiento_horizontal": { "title": "Alineamiento horizontal", "type": "string", "enum": ["TANGENTE", "CURVA"] },
+        "esviaje": { "title": "Esviaje / sesgo", "type": "boolean" },
+        "coordenadas_utm": {
+          "title": "Coordenadas UTM",
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["norte", "este"],
+          "properties": {
+            "zona": { "title": "Zona UTM", "description": "Agregado por SGP: el manual no pide la zona, pero sin ella la coordenada es ambigua. Guatemala abarca las zonas 15 y 16.", "type": "integer", "enum": [15, 16] },
+            "norte": { "title": "Norte (m)", "type": "number", "minimum": 0, "maximum": 10000000 },
+            "este": { "title": "Este (m)", "type": "number", "minimum": 100000, "maximum": 900000 }
+          }
+        },
+        "poblacion_antes": { "title": "Población ANTES del puente (nombre)", "type": "string", "maxLength": 200 },
+        "poblacion_despues": { "title": "Población DESPUÉS del puente (nombre)", "type": "string", "maxLength": 200 },
+        "nombre_inspector": { "title": "Nombre de inspector", "type": "string", "minLength": 1, "maxLength": 200, "readOnly": true },
+        "fecha_inspeccion": { "title": "Fecha inspección", "type": "string", "format": "date" }
+      }
+    },
+    "datos_generales": {
+      "title": "2. Datos generales",
+      "x-sgp-fuente": "Hoja 1, sección 2",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "longitud_m",
+        "numero_tramos",
+        "ancho_rodadura_m",
+        "ancho_acera_derecha_m",
+        "ancho_acera_izquierda_m",
+        "tipologia_puente",
+        "altura_libre_sobre_cauce_m",
+        "tipo_cruce",
+        "numero_vias_por_sentido",
+        "material_superestructura",
+        "material_subestructura"
+      ],
+      "properties": {
+        "longitud_m": { "title": "Longitud (m)", "type": "number", "exclusiveMinimum": 0, "maximum": 5000 },
+        "numero_tramos": { "title": "Número de tramos", "description": "Debe coincidir con la cantidad de elementos de 'tramos' (validación del servicio).", "type": "integer", "minimum": 1, "maximum": 100 },
+        "ancho_rodadura_m": { "title": "Ancho rodadura (m)", "type": "number", "exclusiveMinimum": 0, "maximum": 50 },
+        "ancho_acera_derecha_m": { "title": "Ancho acera derecha (m)", "description": "0 si no existe acera.", "type": "number", "minimum": 0, "maximum": 10 },
+        "ancho_acera_izquierda_m": { "title": "Ancho acera izquierda (m)", "description": "0 si no existe acera.", "type": "number", "minimum": 0, "maximum": 10 },
+        "tipologia_puente": { "title": "Tipología puente", "type": "string", "minLength": 1, "maxLength": 100, "examples": ["Vigas y losa", "Losa", "Cercha", "Bailey", "Arco", "Colgante"] },
+        "altura_libre_superior_m": { "title": "Altura libre superior (m)", "description": "Gálibo vertical sobre la rodadura; null si no hay estructura superior.", "type": ["number", "null"], "minimum": 0, "maximum": 50 },
+        "altura_libre_sobre_cauce_m": { "title": "Altura libre sobre río (m)", "type": "number", "minimum": 0, "maximum": 300 },
+        "tipo_cruce": { "title": "Puente sobre", "description": "Sobre río, quebrada, carretera, línea férrea, etc.", "type": "string", "enum": ["RIO", "QUEBRADA", "CARRETERA", "LINEA_FERREA", "OTRO"] },
+        "tipo_cruce_otro": { "title": "Puente sobre (otro, especificar)", "type": "string", "minLength": 1, "maxLength": 100 },
+        "numero_vias_por_sentido": { "title": "Número de vías en cada sentido", "type": "integer", "minimum": 1, "maximum": 10 },
+        "material_superestructura": { "title": "Material superestructura", "$ref": "#/$defs/material" },
+        "material_subestructura": { "title": "Material subestructura", "$ref": "#/$defs/material" },
+        "carga_diseno": { "title": "Carga de diseño", "type": "string", "maxLength": 100, "examples": ["HS20-44", "HL-93"] },
+        "anio_construccion": { "title": "Año de construcción", "description": "null si se desconoce. El servicio valida que no sea posterior al año actual.", "type": ["integer", "null"], "minimum": 1800, "maximum": 2100 },
+        "trafico_vehiculos_dia": { "title": "Tráfico (veh/día)", "type": ["integer", "null"], "minimum": 0 },
+        "porcentaje_camiones_buses": { "title": "% camiones y buses", "type": ["number", "null"], "minimum": 0, "maximum": 100 },
+        "fecha_ultima_evaluacion": { "title": "Fecha última evaluación", "description": "Precargada con la última inspección publicada del puente; null si no existe.", "type": ["string", "null"], "format": "date", "readOnly": true }
+      },
+      "if": { "properties": { "tipo_cruce": { "const": "OTRO" } }, "required": ["tipo_cruce"] },
+      "then": { "required": ["tipo_cruce_otro"] }
+    },
+    "tramos": {
+      "title": "3. Tramos",
+      "x-sgp-fuente": "Hoja 1, sección 3 (Tramo 1, Tramo 2, Tramo 3, Otros)",
+      "description": "El manual muestra tres columnas y 'Otros'; se modela como lista para admitir cualquier número de tramos.",
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 100,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["instancia_id", "orden", "longitud_m", "tipo_seccion"],
+        "properties": {
+          "instancia_id": { "$ref": "#/$defs/instanciaId" },
+          "orden": { "title": "Número de tramo", "type": "integer", "minimum": 1 },
+          "longitud_m": { "title": "Longitud tramo (m)", "type": "number", "exclusiveMinimum": 0, "maximum": 5000 },
+          "tipo_seccion": { "title": "Tipo de sección", "type": "string", "minLength": 1, "maxLength": 100 }
+        }
+      }
+    },
+    "subestructura": {
+      "title": "4. Sub-estructura",
+      "x-sgp-fuente": "Hoja 1 (estribo de entrada) y hoja 2 (estribo de salida y pilas)",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["estribo_entrada", "estribo_salida", "pilas"],
+      "properties": {
+        "estribo_entrada": { "title": "Estribo de entrada", "$ref": "#/$defs/estribo" },
+        "estribo_salida": { "title": "Estribo de salida", "$ref": "#/$defs/estribo" },
+        "pilas": {
+          "title": "Pilas",
+          "description": "El manual muestra un bloque PILAS; se repite por cada pila. Lista vacía para puentes de un solo tramo.",
+          "type": "array",
+          "maxItems": 99,
+          "items": { "$ref": "#/$defs/pila" }
+        }
+      }
+    },
+    "superestructura": {
+      "title": "5. Super-estructura",
+      "x-sgp-fuente": "Hoja 3, sección 5",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "losa_rodamiento",
+        "elemento_portante_concreto",
+        "elemento_portante_acero",
+        "diafragmas_concreto",
+        "diafragmas_acero",
+        "estructura_tipo_cercha",
+        "drenaje"
+      ],
+      "properties": {
+        "losa_rodamiento": { "title": "Losa de rodamiento", "$ref": "#/$defs/losaRodamiento" },
+        "elemento_portante_concreto": { "title": "Elemento portante de concreto", "$ref": "#/$defs/elementoSuperConcreto" },
+        "elemento_portante_acero": { "title": "Elemento portante de acero", "$ref": "#/$defs/elementoSuperAcero" },
+        "diafragmas_concreto": { "title": "Diafragmas concreto", "$ref": "#/$defs/elementoSuperConcreto" },
+        "diafragmas_acero": { "title": "Diafragmas acero", "$ref": "#/$defs/elementoSuperAcero" },
+        "estructura_tipo_cercha": { "title": "Estructura tipo cercha", "description": "En el manual: 'Estructura Tipo Sercha'.", "$ref": "#/$defs/elementoSuperAcero" },
+        "drenaje": {
+          "title": "Drenaje superestructura",
+          "x-sgp-evaluable": true,
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["existencia"],
+          "properties": {
+            "existencia": { "$ref": "#/$defs/existencia" },
+            "estado": { "title": "Estado", "type": "string", "enum": ["LIMPIOS", "OBSTRUIDOS"] }
+          },
+          "if": { "$ref": "#/$defs/siPresente" },
+          "then": { "required": ["estado"] }
+        },
+        "observaciones": { "title": "Observaciones (hoja 3)", "type": "string", "maxLength": 4000 }
+      }
+    },
+    "elementos_no_estructurales": {
+      "title": "6. Elementos no estructurales",
+      "x-sgp-fuente": "Hoja 3, sección 6, y hoja 4 (obras de protección)",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "pasamanos_barandal",
+        "postes_barandal",
+        "barreras",
+        "junta_entrada",
+        "junta_salida",
+        "juntas_intermedias",
+        "losa_acceso_entrada",
+        "losa_acceso_salida",
+        "obras_proteccion"
+      ],
+      "properties": {
+        "pasamanos_barandal": {
+          "title": "Pasamanos barandal (especificar lado)",
+          "x-sgp-evaluable": true,
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["existencia"],
+          "properties": {
+            "existencia": { "$ref": "#/$defs/existencia" },
+            "lado": { "$ref": "#/$defs/lado" },
+            "material": { "$ref": "#/$defs/material" },
+            "ausencia_seccion": { "title": "Ausencia de sección", "$ref": "#/$defs/severidad" },
+            "deformacion_elemento": { "title": "Deformación de elemento", "$ref": "#/$defs/severidad" },
+            "golpeado_longitud_m": { "title": "Golpeado (longitud, m)", "description": "0 si no hay tramos golpeados.", "type": "number", "minimum": 0, "maximum": 5000 },
+            "pintura": { "title": "Pintura", "$ref": "#/$defs/severidad" },
+            "otros": { "$ref": "#/$defs/otroDano" }
+          },
+          "if": { "$ref": "#/$defs/siPresente" },
+          "then": { "required": ["lado", "material", "ausencia_seccion", "deformacion_elemento", "golpeado_longitud_m", "pintura"] }
+        },
+        "postes_barandal": {
+          "title": "Postes barandal (especificar lado)",
+          "x-sgp-evaluable": true,
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["existencia"],
+          "properties": {
+            "existencia": { "$ref": "#/$defs/existencia" },
+            "lado": { "$ref": "#/$defs/lado" },
+            "material": { "$ref": "#/$defs/material" },
+            "ausencia_seccion": { "title": "Ausencia de sección", "$ref": "#/$defs/severidad" },
+            "deformacion_elemento": { "title": "Deformación de elemento", "$ref": "#/$defs/severidad" },
+            "golpeados_cantidad": { "title": "Golpeados (cuántos)", "type": "integer", "minimum": 0, "maximum": 10000 },
+            "pintura": { "title": "Pintura", "$ref": "#/$defs/severidad" },
+            "otros": { "$ref": "#/$defs/otroDano" }
+          },
+          "if": { "$ref": "#/$defs/siPresente" },
+          "then": { "required": ["lado", "material", "ausencia_seccion", "deformacion_elemento", "golpeados_cantidad", "pintura"] }
+        },
+        "barreras": {
+          "title": "Barreras",
+          "x-sgp-evaluable": true,
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["existencia"],
+          "properties": {
+            "existencia": { "$ref": "#/$defs/existencia" },
+            "material": { "$ref": "#/$defs/material" },
+            "grietas_una_direccion": { "title": "Grietas en una dirección", "$ref": "#/$defs/severidad" },
+            "grietas_dos_direcciones": { "title": "Grietas en dos direcciones", "$ref": "#/$defs/severidad" },
+            "golpeado_longitud_m": { "title": "Golpeado (longitud, m)", "type": "number", "minimum": 0, "maximum": 5000 },
+            "pintura": { "title": "Pintura", "$ref": "#/$defs/severidad" },
+            "otros": { "$ref": "#/$defs/otroDano" }
+          },
+          "if": { "$ref": "#/$defs/siPresente" },
+          "then": { "required": ["material", "grietas_una_direccion", "grietas_dos_direcciones", "golpeado_longitud_m", "pintura"] }
+        },
+        "junta_entrada": { "title": "Junta (entrada)", "$ref": "#/$defs/junta" },
+        "junta_salida": { "title": "Junta (salida)", "$ref": "#/$defs/junta" },
+        "juntas_intermedias": { "title": "Juntas intermedias", "description": "Una sola fila en el manual; describe el conjunto de juntas intermedias.", "$ref": "#/$defs/junta" },
+        "losa_acceso_entrada": { "title": "Losa acceso (entrada)", "$ref": "#/$defs/losaAcceso" },
+        "losa_acceso_salida": { "title": "Losa acceso (salida)", "$ref": "#/$defs/losaAcceso" },
+        "obras_proteccion": {
+          "title": "Obras de protección",
+          "x-sgp-fuente": "Hoja 4, parte superior",
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["aguas_arriba", "aguas_abajo"],
+          "properties": {
+            "aguas_arriba": { "title": "Obras protección (aguas arriba)", "$ref": "#/$defs/obraProteccion" },
+            "aguas_abajo": { "title": "Obras protección (aguas abajo)", "$ref": "#/$defs/obraProteccion" },
+            "observaciones": { "title": "Observaciones (hoja 4)", "description": "Los daños de estas obras deberán reportarse en el cuadro de observaciones.", "type": "string", "maxLength": 4000 }
+          }
+        },
+        "observaciones": { "title": "Observaciones (hoja 3, elementos no estructurales)", "type": "string", "maxLength": 4000 }
+      }
+    },
+    "caracteristicas_cauce": {
+      "title": "7. Características del cauce",
+      "x-sgp-fuente": "Hoja 4, sección 7",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["aplica"],
+      "properties": {
+        "aplica": { "title": "El puente cruza un cuerpo de agua", "description": "Agregado por SGP: permite omitir la sección en pasos sobre carretera o línea férrea.", "type": "boolean" },
+        "tipo_cuerpo_agua": { "title": "Tipo de cuerpo de agua existente adyacente al puente", "type": "string", "enum": ["RIO", "QUEBRADA", "OTRO"] },
+        "tipo_cuerpo_agua_otro": { "title": "Tipo de cuerpo de agua (otro, especificar)", "type": "string", "minLength": 1, "maxLength": 50 },
+        "nombre_rio": { "title": "Nombre río", "type": "string", "minLength": 1, "maxLength": 200 },
+        "estado_cauce": {
+          "title": "Estado del cauce",
+          "x-sgp-evaluable": true,
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["condiciones"],
+          "properties": {
+            "condiciones": { "$ref": "#/$defs/condicionesCauce" },
+            "otro_descripcion": { "title": "Otros (especificar)", "type": "string", "minLength": 1, "maxLength": 500 }
+          },
+          "if": { "properties": { "condiciones": { "contains": { "const": "OTRO" } } } },
+          "then": { "required": ["otro_descripcion"] }
+        },
+        "estado_zona_adyacente_estribos": {
+          "title": "Estado zona adyacente a estribos",
+          "x-sgp-evaluable": true,
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["condiciones"],
+          "properties": {
+            "condiciones": {
+              "$ref": "#/$defs/condicionesCauce",
+              "items": { "not": { "const": "OTRO" } }
+            }
+          }
+        },
+        "encauzamiento": { "title": "Encauzamiento", "type": "string", "enum": ["RECTO", "CURVA", "INDEFINIDO"] },
+        "desbordamiento": {
+          "title": "Desbordamiento",
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["ha_presentado"],
+          "properties": {
+            "ha_presentado": { "title": "Ha presentado desbordamiento", "type": "boolean" },
+            "frecuencia_anios": { "title": "Frecuencia (años)", "type": "number", "exclusiveMinimum": 0, "maximum": 500 },
+            "fecha_ultimo": { "title": "Fecha último desbordamiento", "description": "Opcional aunque haya desbordamiento: puede desconocerse la fecha exacta.", "type": "string", "format": "date" }
+          },
+          "if": { "properties": { "ha_presentado": { "const": true } } },
+          "then": { "required": ["frecuencia_anios"] },
+          "else": { "properties": { "frecuencia_anios": false, "fecha_ultimo": false } }
+        }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "aplica": { "const": true } } },
+          "then": { "required": ["tipo_cuerpo_agua", "nombre_rio", "estado_cauce", "estado_zona_adyacente_estribos", "encauzamiento", "desbordamiento"] },
+          "else": { "maxProperties": 1 }
+        },
+        {
+          "if": { "properties": { "tipo_cuerpo_agua": { "const": "OTRO" } }, "required": ["tipo_cuerpo_agua"] },
+          "then": { "required": ["tipo_cuerpo_agua_otro"] }
+        }
+      ]
+    },
+    "otros": {
+      "title": "8. Otros",
+      "x-sgp-fuente": "Hoja 4, sección 8, y hoja 5 (recomendaciones)",
+      "$comment": "El 'Reporte fotográfico' de la hoja 5 no es un campo del documento: las fotografías se registran en archivo/archivo_inspeccion (tipo_uso FOTO_INSPECCION) y pueden asociarse a un elemento_ref.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["senalizacion", "alumbrado_artificial_existe", "drenajes_aledanos", "recomendaciones"],
+      "properties": {
+        "senalizacion": {
+          "title": "Señalización",
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["informativa", "preventiva", "reglamentaria", "horizontal"],
+          "properties": {
+            "informativa": { "title": "Informativa", "$ref": "#/$defs/senal" },
+            "preventiva": { "title": "Preventiva", "$ref": "#/$defs/senal" },
+            "reglamentaria": { "title": "Reglamentaria", "$ref": "#/$defs/senal" },
+            "horizontal": { "title": "Horizontal", "$ref": "#/$defs/senal" }
+          }
+        },
+        "alumbrado_artificial_existe": { "title": "Alumbrado artificial (existe)", "type": "boolean" },
+        "drenajes_aledanos": {
+          "title": "Drenajes aledaños al puente",
+          "x-sgp-evaluable": true,
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["existe"],
+          "properties": {
+            "existe": { "title": "Existe", "type": "boolean" },
+            "estado": { "title": "Estado", "type": "string", "enum": ["BUENO", "MALO"] }
+          },
+          "if": { "properties": { "existe": { "const": true } } },
+          "then": { "required": ["estado"] },
+          "else": { "properties": { "estado": false } }
+        },
+        "recomendaciones": {
+          "title": "Recomendaciones",
+          "x-sgp-fuente": "Hoja 5",
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "mantenimiento": { "title": "Mantenimiento", "type": "string", "maxLength": 4000 },
+            "reparacion": { "title": "Reparación", "type": "string", "maxLength": 4000 }
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "instanciaId": {
+      "title": "Identificador de instancia",
+      "description": "UUID generado en el cliente; se persiste como instancia_elemento_id y permite referenciar la instancia desde observaciones, fotos y órdenes.",
+      "type": "string",
+      "format": "uuid",
+      "readOnly": true
+    },
+    "existencia": {
+      "title": "Existencia del elemento",
+      "description": "PRESENTE: el elemento existe y se evalúa. NO_APLICA: el diseño del puente no incluye este elemento (p. ej. estribo con muro de gravedad en lugar de columnas). AUSENTE: el elemento debería existir pero falta totalmente (activa RN-IC-05d si es portante). Solo PRESENTE exige los campos de daño.",
+      "type": "string",
+      "enum": ["PRESENTE", "NO_APLICA", "AUSENTE"]
+    },
+    "siPresente": {
+      "$comment": "Condición reutilizable para if/then.",
+      "properties": { "existencia": { "const": "PRESENTE" } },
+      "required": ["existencia"]
+    },
+    "severidad": {
+      "title": "Severidad del daño",
+      "description": "Escala PROPUESTA por el equipo (el manual solo deja la celda en blanco). Pendiente de validación en el acta de calibración HU-017.",
+      "type": "string",
+      "enum": ["NO_PRESENTA", "LEVE", "MODERADO", "SEVERO"]
+    },
+    "otroDano": {
+      "title": "Otros (especificar)",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["descripcion", "severidad"],
+      "properties": {
+        "descripcion": { "title": "Descripción", "type": "string", "minLength": 1, "maxLength": 500 },
+        "severidad": { "$ref": "#/$defs/severidad" }
+      }
+    },
+    "material": {
+      "title": "Material",
+      "description": "Catálogo tomado del Anexo 1 del manual (materiales de puentes y concreto ciclópeo del muro de gravedad).",
+      "type": "string",
+      "enum": [
+        "CONCRETO_REFORZADO",
+        "CONCRETO_PRETENSADO",
+        "CONCRETO_POSTENSADO",
+        "CONCRETO_CICLOPEO",
+        "ACERO",
+        "MADERA",
+        "PIEDRA_LIGADA_MORTERO",
+        "MIXTO",
+        "OTRO"
+      ]
+    },
+    "lado": {
+      "title": "Lado",
+      "type": "string",
+      "enum": ["DERECHO", "IZQUIERDO", "AMBOS"]
+    },
+    "socavacion": {
+      "title": "Socavación",
+      "description": "Columnas del manual: No hay / Sí, pero no hay exposición / Sí, hay exposición / Asentamiento de estructura, cada una para aguas arriba y aguas abajo.",
+      "x-sgp-evaluable": true,
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["aguas_arriba", "aguas_abajo"],
+      "properties": {
+        "aguas_arriba": { "title": "Aguas arriba", "$ref": "#/$defs/nivelSocavacion" },
+        "aguas_abajo": { "title": "Aguas abajo", "$ref": "#/$defs/nivelSocavacion" }
+      }
+    },
+    "nivelSocavacion": {
+      "type": "string",
+      "enum": ["NO_HAY", "SIN_EXPOSICION", "CON_EXPOSICION", "ASENTAMIENTO_ESTRUCTURA"]
+    },
+    "elementoConcreto": {
+      "title": "Elemento de sub-estructura",
+      "description": "Fila con Material, Altura, Ancho, Grietas en una dirección, Grietas en dos direcciones, Pérdida de pétreos por golpe, Exposición de acero, Otros.",
+      "x-sgp-evaluable": true,
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["existencia"],
+      "properties": {
+        "existencia": { "$ref": "#/$defs/existencia" },
+        "material": { "$ref": "#/$defs/material" },
+        "altura_m": { "title": "Altura (m)", "type": "number", "exclusiveMinimum": 0, "maximum": 200 },
+        "ancho_m": { "title": "Ancho (m)", "type": "number", "exclusiveMinimum": 0, "maximum": 100 },
+        "grietas_una_direccion": { "title": "Grietas en una dirección", "$ref": "#/$defs/severidad" },
+        "grietas_dos_direcciones": { "title": "Grietas en dos direcciones", "$ref": "#/$defs/severidad" },
+        "perdida_petreos_golpe": { "title": "Pérdida de pétreos por golpe", "$ref": "#/$defs/severidad" },
+        "exposicion_acero": { "title": "Exposición de acero", "$ref": "#/$defs/severidad" },
+        "otros": { "$ref": "#/$defs/otroDano" }
+      },
+      "if": { "$ref": "#/$defs/siPresente" },
+      "then": { "required": ["material", "grietas_una_direccion", "grietas_dos_direcciones", "perdida_petreos_golpe", "exposicion_acero"] }
+    },
+    "muroGravedad": {
+      "title": "Cuerpo (muro de gravedad)",
+      "description": "Igual que elementoConcreto pero sin 'Exposición de acero' (así aparece en el manual).",
+      "x-sgp-evaluable": true,
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["existencia"],
+      "properties": {
+        "existencia": { "$ref": "#/$defs/existencia" },
+        "material": { "$ref": "#/$defs/material" },
+        "altura_m": { "title": "Altura (m)", "type": "number", "exclusiveMinimum": 0, "maximum": 200 },
+        "ancho_m": { "title": "Ancho (m)", "type": "number", "exclusiveMinimum": 0, "maximum": 100 },
+        "grietas_una_direccion": { "title": "Grietas en una dirección", "$ref": "#/$defs/severidad" },
+        "grietas_dos_direcciones": { "title": "Grietas en dos direcciones", "$ref": "#/$defs/severidad" },
+        "perdida_petreos_golpe": { "title": "Pérdida de pétreos por golpe", "$ref": "#/$defs/severidad" },
+        "otros": { "$ref": "#/$defs/otroDano" }
+      },
+      "if": { "$ref": "#/$defs/siPresente" },
+      "then": { "required": ["material", "grietas_una_direccion", "grietas_dos_direcciones", "perdida_petreos_golpe"] }
+    },
+    "aleton": {
+      "title": "Aletón",
+      "description": "Igual que elementoConcreto, con 'Largo' en lugar de 'Altura'.",
+      "x-sgp-evaluable": true,
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["existencia"],
+      "properties": {
+        "existencia": { "$ref": "#/$defs/existencia" },
+        "material": { "$ref": "#/$defs/material" },
+        "largo_m": { "title": "Largo (m)", "type": "number", "exclusiveMinimum": 0, "maximum": 200 },
+        "ancho_m": { "title": "Ancho (m)", "type": "number", "exclusiveMinimum": 0, "maximum": 100 },
+        "grietas_una_direccion": { "title": "Grietas en una dirección", "$ref": "#/$defs/severidad" },
+        "grietas_dos_direcciones": { "title": "Grietas en dos direcciones", "$ref": "#/$defs/severidad" },
+        "perdida_petreos_golpe": { "title": "Pérdida de pétreos por golpe", "$ref": "#/$defs/severidad" },
+        "exposicion_acero": { "title": "Exposición de acero", "$ref": "#/$defs/severidad" },
+        "otros": { "$ref": "#/$defs/otroDano" }
+      },
+      "if": { "$ref": "#/$defs/siPresente" },
+      "then": { "required": ["material", "grietas_una_direccion", "grietas_dos_direcciones", "perdida_petreos_golpe", "exposicion_acero"] }
+    },
+    "apoyos": {
+      "title": "Apoyos",
+      "description": "Fila con Material, Neopreno aplastado, Fuera de lugar, Oxidado, Falta perno, Perno roto, Otros. En la fila de apoyos de PILAS el manual dice 'Rotura de perno' en lugar de 'Falta perno'; se asume que es la misma columna (pendiente de confirmar con el Catedrático).",
+      "x-sgp-evaluable": true,
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["existencia"],
+      "properties": {
+        "existencia": { "$ref": "#/$defs/existencia" },
+        "material": {
+          "title": "Material / tipo de apoyo",
+          "description": "Tipos de apoyo descritos en el Anexo 1, 1.1.1.2.",
+          "type": "string",
+          "enum": ["NEOPRENO", "ACERO_BALANCIN", "ACERO_RODILLO", "OTRO"]
+        },
+        "neopreno_aplastado": { "title": "Neopreno aplastado", "$ref": "#/$defs/severidad" },
+        "fuera_de_lugar": { "title": "Fuera de lugar", "$ref": "#/$defs/severidad" },
+        "oxidado": { "title": "Oxidado", "$ref": "#/$defs/severidad" },
+        "falta_perno": { "title": "Falta perno", "$ref": "#/$defs/severidad" },
+        "perno_roto": { "title": "Perno roto", "$ref": "#/$defs/severidad" },
+        "otros": { "$ref": "#/$defs/otroDano" }
+      },
+      "if": { "$ref": "#/$defs/siPresente" },
+      "then": { "required": ["material", "neopreno_aplastado", "fuera_de_lugar", "oxidado", "falta_perno", "perno_roto"] }
+    },
+    "estribo": {
+      "title": "Estribo",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "cortina_superior",
+        "cortina_inferior",
+        "viga_apoyo",
+        "apoyos",
+        "columnas",
+        "cuerpo_muro_gravedad",
+        "aletones",
+        "socavacion"
+      ],
+      "properties": {
+        "cortina_superior": { "title": "Cortina superior", "$ref": "#/$defs/elementoConcreto" },
+        "cortina_inferior": { "title": "Cortina inferior", "$ref": "#/$defs/elementoConcreto" },
+        "viga_apoyo": { "title": "Viga de apoyo", "$ref": "#/$defs/elementoConcreto" },
+        "apoyos": { "title": "Apoyos", "$ref": "#/$defs/apoyos" },
+        "columnas": { "title": "Columnas", "$ref": "#/$defs/elementoConcreto" },
+        "cuerpo_muro_gravedad": { "title": "Cuerpo (muro de gravedad)", "$ref": "#/$defs/muroGravedad" },
+        "aletones": {
+          "title": "Aletones",
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["aguas_arriba", "aguas_abajo"],
+          "properties": {
+            "aguas_arriba": { "title": "Aletón aguas arriba", "$ref": "#/$defs/aleton" },
+            "aguas_abajo": { "title": "Aletón aguas abajo", "$ref": "#/$defs/aleton" }
+          }
+        },
+        "socavacion": { "$ref": "#/$defs/socavacion" }
+      }
+    },
+    "pila": {
+      "title": "Pila",
+      "x-sgp-repetible": true,
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["instancia_id", "orden", "viga_cabezal", "columnas", "cuerpo_muro_gravedad", "apoyos", "socavacion"],
+      "properties": {
+        "instancia_id": { "$ref": "#/$defs/instanciaId" },
+        "orden": { "title": "Número de pila (desde la entrada)", "type": "integer", "minimum": 1 },
+        "viga_cabezal": { "title": "Viga cabezal", "$ref": "#/$defs/elementoConcreto" },
+        "columnas": { "title": "Columnas", "$ref": "#/$defs/elementoConcreto" },
+        "cuerpo_muro_gravedad": { "title": "Cuerpo (muro de gravedad)", "$ref": "#/$defs/muroGravedad" },
+        "apoyos": { "title": "Apoyos", "$ref": "#/$defs/apoyos" },
+        "socavacion": { "$ref": "#/$defs/socavacion" }
+      }
+    },
+    "losaRodamiento": {
+      "title": "Losa de rodamiento",
+      "x-sgp-evaluable": true,
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["existencia"],
+      "properties": {
+        "existencia": { "$ref": "#/$defs/existencia" },
+        "material": { "$ref": "#/$defs/material" },
+        "grietas_una_direccion": { "title": "Grietas en una dirección", "$ref": "#/$defs/severidad" },
+        "grietas_dos_direcciones": { "title": "Grietas en dos direcciones", "$ref": "#/$defs/severidad" },
+        "desprendimiento_agregados": { "title": "Desprendimiento de agregados", "$ref": "#/$defs/severidad" },
+        "baches": { "title": "Baches", "$ref": "#/$defs/severidad" },
+        "exposicion_acero": { "title": "Exposición de acero", "$ref": "#/$defs/severidad" },
+        "otros": { "$ref": "#/$defs/otroDano" }
+      },
+      "if": { "$ref": "#/$defs/siPresente" },
+      "then": { "required": ["material", "grietas_una_direccion", "grietas_dos_direcciones", "desprendimiento_agregados", "baches", "exposicion_acero"] }
+    },
+    "elementoSuperConcreto": {
+      "title": "Elemento de concreto de super-estructura",
+      "description": "Fila con Grietas en diagonal, Grietas verticales, Pérdida de pétreos por golpe, Exposición de acero, Otros.",
+      "x-sgp-evaluable": true,
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["existencia"],
+      "properties": {
+        "existencia": { "$ref": "#/$defs/existencia" },
+        "grietas_diagonal": { "title": "Grietas en diagonal", "$ref": "#/$defs/severidad" },
+        "grietas_verticales": { "title": "Grietas verticales", "$ref": "#/$defs/severidad" },
+        "perdida_petreos_golpe": { "title": "Pérdida de pétreos por golpe", "$ref": "#/$defs/severidad" },
+        "exposicion_acero": { "title": "Exposición de acero", "$ref": "#/$defs/severidad" },
+        "otros": { "$ref": "#/$defs/otroDano" }
+      },
+      "if": { "$ref": "#/$defs/siPresente" },
+      "then": { "required": ["grietas_diagonal", "grietas_verticales", "perdida_petreos_golpe", "exposicion_acero"] }
+    },
+    "elementoSuperAcero": {
+      "title": "Elemento de acero de super-estructura",
+      "description": "Fila con Óxido, Faltan pernos, Elemento golpeado, Elemento cortado, Pintura, Otros.",
+      "x-sgp-evaluable": true,
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["existencia"],
+      "properties": {
+        "existencia": { "$ref": "#/$defs/existencia" },
+        "oxido": { "title": "Óxido", "$ref": "#/$defs/severidad" },
+        "faltan_pernos": { "title": "Faltan pernos", "$ref": "#/$defs/severidad" },
+        "elemento_golpeado": { "title": "Elemento golpeado", "$ref": "#/$defs/severidad" },
+        "elemento_cortado": { "title": "Elemento cortado", "$ref": "#/$defs/severidad" },
+        "pintura": { "title": "Pintura", "$ref": "#/$defs/severidad" },
+        "otros": { "$ref": "#/$defs/otroDano" }
+      },
+      "if": { "$ref": "#/$defs/siPresente" },
+      "then": { "required": ["oxido", "faltan_pernos", "elemento_golpeado", "elemento_cortado", "pintura"] }
+    },
+    "junta": {
+      "title": "Junta",
+      "description": "Fila con Material, Falta elemento, Junta limpia, Daños.",
+      "x-sgp-evaluable": true,
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["existencia"],
+      "properties": {
+        "existencia": { "$ref": "#/$defs/existencia" },
+        "material": { "$ref": "#/$defs/material" },
+        "falta_elemento": { "title": "Falta elemento", "type": "boolean" },
+        "junta_limpia": { "title": "Junta limpia", "type": "boolean" },
+        "danos": { "title": "Daños", "$ref": "#/$defs/otroDano" }
+      },
+      "if": { "$ref": "#/$defs/siPresente" },
+      "then": { "required": ["material", "falta_elemento", "junta_limpia"] }
+    },
+    "losaAcceso": {
+      "title": "Losa de acceso",
+      "description": "Fila con Material, Buen estado, Daños (asentado, fisurado, bache).",
+      "x-sgp-evaluable": true,
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["existencia"],
+      "properties": {
+        "existencia": { "$ref": "#/$defs/existencia" },
+        "material": { "$ref": "#/$defs/material" },
+        "buen_estado": { "title": "Buen estado", "type": "boolean" },
+        "asentado": { "title": "Daño: asentado", "$ref": "#/$defs/severidad" },
+        "fisurado": { "title": "Daño: fisurado", "$ref": "#/$defs/severidad" },
+        "bache": { "title": "Daño: bache", "$ref": "#/$defs/severidad" }
+      },
+      "allOf": [
+        {
+          "if": { "$ref": "#/$defs/siPresente" },
+          "then": { "required": ["material", "buen_estado"] }
+        },
+        {
+          "if": { "properties": { "buen_estado": { "const": false } }, "required": ["buen_estado"] },
+          "then": { "required": ["asentado", "fisurado", "bache"] }
+        }
+      ]
+    },
+    "obraProteccion": {
+      "title": "Obra de protección",
+      "description": "No es evaluable para el IC: el manual no define columnas de daño; los daños se reportan en observaciones.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["existencia"],
+      "properties": {
+        "existencia": { "$ref": "#/$defs/existencia" },
+        "material": { "$ref": "#/$defs/material" },
+        "tipo": { "title": "Tipo", "description": "Gaviones, muro, etc.", "type": "string", "minLength": 1, "maxLength": 100, "examples": ["Gaviones", "Muro"] },
+        "largo_m": { "title": "Largo (m)", "type": "number", "exclusiveMinimum": 0, "maximum": 5000 },
+        "ancho_m": { "title": "Ancho (m)", "type": "number", "exclusiveMinimum": 0, "maximum": 100 },
+        "altura_m": { "title": "Altura (m)", "type": "number", "exclusiveMinimum": 0, "maximum": 100 }
+      },
+      "if": { "$ref": "#/$defs/siPresente" },
+      "then": { "required": ["material", "tipo"] }
+    },
+    "condicionesCauce": {
+      "title": "Condiciones",
+      "description": "Selección múltiple. LIMPIO es excluyente con el resto.",
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "type": "string", "enum": ["LIMPIO", "ASOLVADO_SEDIMENTADO", "EROSIONADO", "OTRO"] },
+      "if": { "contains": { "const": "LIMPIO" } },
+      "then": { "maxItems": 1 }
+    },
+    "senal": {
+      "title": "Tipo de señalización",
+      "description": "Filas del manual: HAY / Estado / NO HAY. La escala de estado se alinea con 'Estado: Bueno / Malo' de drenajes aledaños.",
+      "x-sgp-evaluable": true,
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["existe"],
+      "properties": {
+        "existe": { "title": "Hay", "type": "boolean" },
+        "estado": { "title": "Estado", "type": "string", "enum": ["BUENO", "MALO"] }
+      },
+      "if": { "properties": { "existe": { "const": true } } },
+      "then": { "required": ["estado"] },
+      "else": { "properties": { "estado": false } }
+    }
+  }
+}
