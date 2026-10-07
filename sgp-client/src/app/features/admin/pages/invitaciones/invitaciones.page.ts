@@ -23,7 +23,12 @@ import { InvitacionApiService } from '../../services/invitacion-api.service';
 const TAMANIO_PAGINA = 10;
 
 /** Códigos que se explican junto al formulario en lugar del aviso global. */
-const CODIGOS_CORREO_EN_USO = ['email_already_registered', 'invitacion_pendiente'];
+const CODIGOS_EN_CONTEXTO = [
+  'email_already_registered',
+  'invitacion_pendiente',
+  'colegiado_duplicado',
+  'colegiado_requerido',
+];
 
 type Severidad = 'success' | 'warn' | 'danger' | 'secondary';
 
@@ -60,9 +65,10 @@ export class InvitacionesPage {
     hourCycle: 'h23',
   });
 
-  /** Roles que el backend acepta para invitación; HU-002 y HU-004 amplían esta lista. */
+  /** Roles que el backend acepta para invitación; HU-004 amplía esta lista. */
   readonly roles: { valor: RoleName; etiqueta: string }[] = [
     { valor: 'CATEDRATICO', etiqueta: 'invitaciones.roles.CATEDRATICO' },
+    { valor: 'PROFESIONAL_EXTERNO', etiqueta: 'invitaciones.roles.PROFESIONAL_EXTERNO' },
   ];
   readonly estados: (EstadoInvitacion | null)[] = [
     null,
@@ -75,7 +81,14 @@ export class InvitacionesPage {
   readonly form = this.fb.nonNullable.group({
     email: ['', [Validators.required, Validators.email, Validators.maxLength(320)]],
     rol: this.fb.nonNullable.control<RoleName>('CATEDRATICO', Validators.required),
+    // Solo se habilita para Profesional Externo; deshabilitado no cuenta en la validez.
+    numeroColegiado: this.fb.nonNullable.control({ value: '', disabled: true }, [
+      Validators.required,
+      Validators.maxLength(50),
+      Validators.pattern(/^\s*[A-Za-z0-9-]+\s*$/),
+    ]),
   });
+  readonly esProfesional = signal(false);
 
   readonly enviando = signal(false);
   readonly errorEnvio = signal<string | null>(null);
@@ -96,7 +109,22 @@ export class InvitacionesPage {
   };
 
   constructor() {
+    this.form.controls.rol.valueChanges
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe((rol) => this.ajustarColegiado(rol));
     this.cargar(0);
+  }
+
+  private ajustarColegiado(rol: RoleName): void {
+    const colegiado = this.form.controls.numeroColegiado;
+    const esProfesional = rol === 'PROFESIONAL_EXTERNO';
+    this.esProfesional.set(esProfesional);
+    if (esProfesional) {
+      colegiado.enable();
+    } else {
+      colegiado.reset('');
+      colegiado.disable();
+    }
   }
 
   invitar(): void {
@@ -108,10 +136,14 @@ export class InvitacionesPage {
     this.invitacionEnviada.set(null);
     this.reenvioExitoso.set(null);
     this.apiErrors.clear();
-    const { email, rol } = this.form.getRawValue();
+    const { email, rol, numeroColegiado } = this.form.getRawValue();
 
     this.api
-      .invitar({ email: email.trim(), rol })
+      .invitar({
+        email: email.trim(),
+        rol,
+        ...(rol === 'PROFESIONAL_EXTERNO' ? { numeroColegiado: numeroColegiado.trim() } : {}),
+      })
       .pipe(
         finalize(() => this.enviando.set(false)),
         takeUntilDestroyed(this.destroyRef),
@@ -119,12 +151,12 @@ export class InvitacionesPage {
       .subscribe({
         next: (invitacion) => {
           this.invitacionEnviada.set(invitacion);
-          this.form.reset({ email: '', rol });
+          this.form.reset({ email: '', rol, numeroColegiado: '' });
           this.cargar(0);
         },
         error: (error: HttpErrorResponse) => {
           const problem = error.error as (ProblemDetails & { code?: string }) | null;
-          if (error.status === 409 && CODIGOS_CORREO_EN_USO.includes(problem?.code ?? '')) {
+          if (CODIGOS_EN_CONTEXTO.includes(problem?.code ?? '')) {
             this.errorEnvio.set(this.transloco.translate(`invitaciones.errores.${problem?.code}`));
             this.apiErrors.clear();
             return;

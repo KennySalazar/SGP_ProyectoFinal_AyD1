@@ -6,7 +6,12 @@
 
 <section class="surface-card invitar-card" aria-labelledby="invitar-titulo">
   <h2 id="invitar-titulo">{{ 'invitaciones.formTitle' | transloco }}</h2>
-  <form class="invitar-form" [formGroup]="form" (ngSubmit)="invitar()">
+  <form
+    class="invitar-form"
+    [class.con-colegiado]="esProfesional()"
+    [formGroup]="form"
+    (ngSubmit)="invitar()"
+  >
     <label>
       <span>{{ 'common.email' | transloco }}</span>
       <input
@@ -34,13 +39,30 @@
         <ng-template #item let-opcion>{{ opcion.etiqueta | transloco }}</ng-template>
       </p-select>
     </label>
+    @if (esProfesional()) {
+    <label>
+      <span>{{ 'invitaciones.colegiado' | transloco }}</span>
+      <input
+        pInputText
+        type="text"
+        formControlName="numeroColegiado"
+        autocomplete="off"
+        maxlength="50"
+        [placeholder]="'invitaciones.colegiadoPlaceholder' | transloco"
+      />
+      @if (form.controls.numeroColegiado.touched && form.controls.numeroColegiado.invalid) {
+      <small class="validation">{{ 'invitaciones.invalidColegiado' | transloco }}</small>
+      }
+    </label>
+    }
     <button pButton type="submit" [disabled]="form.invalid || enviando()">
       <i class="pi pi-send" aria-hidden="true"></i>
       <span>{{ (enviando() ? 'invitaciones.sending' : 'invitaciones.send') | transloco }}</span>
     </button>
   </form>
   <p class="nota">
-    <i class="pi pi-info-circle" aria-hidden="true"></i> {{ 'invitaciones.note' | transloco }}
+    <i class="pi pi-info-circle" aria-hidden="true"></i> {{ 'invitaciones.note' | transloco }} @if
+    (esProfesional()) { {{ 'invitaciones.colegiadoNote' | transloco }} }
   </p>
 
   @if (invitacionEnviada(); as invitacion) {
@@ -93,11 +115,12 @@
   </div>
   } @else {
   <div class="tabla-contenedor" role="region" tabindex="0" aria-labelledby="lista-titulo">
-    <p-table [value]="pagina.content" dataKey="id" [tableStyle]="{ 'min-width': '48rem' }">
+    <p-table [value]="pagina.content" dataKey="id" [tableStyle]="{ 'min-width': '54rem' }">
       <ng-template #header>
         <tr>
           <th scope="col">{{ 'common.email' | transloco }}</th>
           <th scope="col">{{ 'invitaciones.role' | transloco }}</th>
+          <th scope="col" class="no-cortar">{{ 'invitaciones.colegiado' | transloco }}</th>
           <th scope="col" class="no-cortar">{{ 'invitaciones.state' | transloco }}</th>
           <th scope="col" class="no-cortar">{{ 'invitaciones.sentAt' | transloco }}</th>
           <th scope="col" class="no-cortar">{{ 'invitaciones.expiresAt' | transloco }}</th>
@@ -110,6 +133,7 @@
         <tr>
           <th scope="row">{{ invitacion.email }}</th>
           <td>{{ 'invitaciones.roles.' + invitacion.rol | transloco }}</td>
+          <td class="no-cortar">{{ invitacion.numeroColegiado ?? '—' }}</td>
           <td class="no-cortar">
             <p-tag
               [attr.data-estado]="invitacion.estado"

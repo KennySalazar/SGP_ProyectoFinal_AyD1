@@ -27,6 +27,7 @@ describe('Característica: invitación de Catedrático HU001', () => {
     estado: 'PENDIENTE',
     usuarioId: 'usuario-1',
     invitadoPorId: 'admin-1',
+    numeroColegiado: null,
     expiraEn: '2026-10-09T12:00:00-06:00',
     aceptadoEn: null,
     canceladoEn: null,
@@ -98,7 +99,7 @@ describe('Característica: invitación de Catedrático HU001', () => {
     // Dado un Administrador en la pantalla de invitaciones
     responderLista([]);
     // Cuando invita a un correo con rol Catedrático
-    page.form.setValue({ email: 'catedratico@usac.edu.gt', rol: 'CATEDRATICO' });
+    page.form.patchValue({ email: 'catedratico@usac.edu.gt', rol: 'CATEDRATICO' });
     page.invitar();
     const request = http.expectOne((req) => req.method === 'POST');
     expect(request.request.url).toBe('/api/v1/invitaciones');
@@ -115,7 +116,7 @@ describe('Característica: invitación de Catedrático HU001', () => {
     // Dado un correo con cuenta activa
     responderLista([]);
     const errores = TestBed.inject(ApiErrorService);
-    page.form.setValue({ email: 'catedratico@usac.edu.gt', rol: 'CATEDRATICO' });
+    page.form.patchValue({ email: 'catedratico@usac.edu.gt', rol: 'CATEDRATICO' });
     // Cuando el Administrador intenta invitarlo
     page.invitar();
     errores.lastMessage.set('mensaje global');
@@ -133,9 +134,67 @@ describe('Característica: invitación de Catedrático HU001', () => {
     expect(page.invitacionEnviada()).toBeNull();
   });
 
+  it('Escenario HU002: invitar a un Profesional Externo exige y envía su colegiado', () => {
+    responderLista([]);
+    // Dado el rol Profesional Externo, el colegiado aparece y es obligatorio
+    page.form.controls.rol.setValue('PROFESIONAL_EXTERNO');
+    fixture.detectChanges();
+    expect(page.esProfesional()).toBe(true);
+    expect(
+      fixture.nativeElement.querySelector('input[formcontrolname="numeroColegiado"]'),
+    ).not.toBeNull();
+    page.form.controls.email.setValue('ingeniero@ejemplo.com');
+    page.invitar();
+    http.expectNone((req) => req.method === 'POST');
+    // Cuando se indica el número de colegiado
+    page.form.controls.numeroColegiado.setValue(' 12345 ');
+    page.invitar();
+    const request = http.expectOne((req) => req.method === 'POST');
+    // Entonces se envía junto con el rol
+    expect(request.request.body).toEqual({
+      email: 'ingeniero@ejemplo.com',
+      rol: 'PROFESIONAL_EXTERNO',
+      numeroColegiado: '12345',
+    });
+    request.flush({ ...pendiente, rol: 'PROFESIONAL_EXTERNO', numeroColegiado: '12345' });
+    responderLista([{ ...pendiente, rol: 'PROFESIONAL_EXTERNO', numeroColegiado: '12345' }]);
+    expect(fixture.nativeElement.textContent).toContain('12345');
+    expect(page.form.controls.numeroColegiado.value).toBe('');
+  });
+
+  it('Escenario HU002: volver a Catedrático oculta y descarta el colegiado', () => {
+    responderLista([]);
+    page.form.controls.rol.setValue('PROFESIONAL_EXTERNO');
+    page.form.controls.numeroColegiado.setValue('12345');
+    page.form.controls.rol.setValue('CATEDRATICO');
+    fixture.detectChanges();
+    expect(page.esProfesional()).toBe(false);
+    expect(page.form.controls.numeroColegiado.disabled).toBe(true);
+    expect(
+      fixture.nativeElement.querySelector('input[formcontrolname="numeroColegiado"]'),
+    ).toBeNull();
+  });
+
+  it('Escenario HU002: un colegiado duplicado se explica junto al formulario', () => {
+    responderLista([]);
+    const errores = TestBed.inject(ApiErrorService);
+    page.form.setValue({
+      email: 'ingeniero@ejemplo.com',
+      rol: 'PROFESIONAL_EXTERNO',
+      numeroColegiado: '12345',
+    });
+    page.invitar();
+    errores.lastMessage.set('mensaje global');
+    http
+      .expectOne((req) => req.method === 'POST')
+      .flush({ status: 409, code: 'colegiado_duplicado' }, { status: 409, statusText: 'Conflict' });
+    expect(page.errorEnvio()).toBe('invitaciones.errores.colegiado_duplicado');
+    expect(errores.lastMessage()).toBeNull();
+  });
+
   it('Escenario: un correo inválido no se envía', () => {
     responderLista([]);
-    page.form.setValue({ email: 'no-es-correo', rol: 'CATEDRATICO' });
+    page.form.patchValue({ email: 'no-es-correo', rol: 'CATEDRATICO' });
     page.invitar();
     http.expectNone((req) => req.method === 'POST');
     fixture.detectChanges();

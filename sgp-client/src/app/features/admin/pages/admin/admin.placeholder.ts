@@ -23,6 +23,14 @@ import { ButtonModule } from 'primeng/button';
         <a pButton routerLink="/admin/invitaciones">{{ 'invitaciones.open' | transloco }}</a>
       </article>
       <article>
+        <i class="pi pi-id-card"></i>
+        <div>
+          <strong>{{ 'admin.professionals' | transloco }}</strong
+          ><span>{{ 'admin.professionalsNote' | transloco }}</span>
+        </div>
+        <a pButton routerLink="/admin/profesionales">{{ 'profesionales.open' | transloco }}</a>
+      </article>
+      <article>
         <i class="pi pi-file-edit"></i>
         <div>
           <strong>{{ 'admin.formVersions' | transloco }}</strong
