@@ -1,0 +1,100 @@
+:host {
+  display: block;
+}
+
+.revision-panel {
+  padding: clamp(1.25rem, 3vw, 2rem);
+}
+
+h2 {
+  margin: 0 0 1rem;
+  color: var(--sgp-navy-900);
+  font-size: 1.2rem;
+}
+
+.tabla-contenedor {
+  overflow-x: auto;
+  background: var(--sgp-surface, #ffffff);
+  border: 1px solid var(--sgp-border);
+  border-radius: 12px;
+
+  &:focus-visible {
+    outline: 2px solid var(--sgp-blue-600);
+    outline-offset: 2px;
+  }
+
+  th,
+  td {
+    padding: 0.85rem 1rem;
+    border-bottom: 1px solid var(--sgp-border);
+    vertical-align: middle;
+    line-height: 1.5;
+    overflow-wrap: break-word;
+    text-align: left;
+  }
+
+  th[scope='col'] {
+    background: var(--sgp-surface-soft);
+    color: var(--sgp-navy-900);
+    font-weight: 600;
+    font-size: 0.85rem;
+  }
+
+  tbody tr:last-child > * {
+    border-bottom: 0;
+  }
+}
+
+.tabla-contenedor .no-cortar {
+  overflow-wrap: normal;
+  white-space: nowrap;
+}
+
+.sin-resultados {
+  display: grid;
+  justify-items: center;
+  gap: 0.5rem;
+  padding: 2rem 1rem;
+  color: var(--sgp-steel-500);
+  text-align: center;
+
+  i {
+    font-size: 2rem;
+  }
+}
+
+.paginacion {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.reporte-pagina {
+  margin: 0;
+  color: var(--sgp-steel-500);
+}
+
+.selector {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 1.25rem;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+}
+
+@media (max-width: 650px) {
+  .selector {
+    flex-direction: column;
+  }
+}

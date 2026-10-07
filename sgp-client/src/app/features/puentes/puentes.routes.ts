@@ -23,12 +23,54 @@ export const puentesRoutes: Routes = [
           ),
       },
       {
+        path: 'solicitudes/revision',
+        loadComponent: () =>
+          import('./pages/revision-solicitudes/revision-solicitudes.page').then(
+            (m) => m.RevisionSolicitudesPage,
+          ),
+      },
+      {
+        path: 'solicitudes/revision/:id',
+        loadComponent: () =>
+          import('./pages/revisar-solicitud/revisar-solicitud.page').then(
+            (m) => m.RevisarSolicitudPage,
+          ),
+      },
+      {
         path: ':id/editar',
         loadComponent: () =>
           import('./pages/editar-puente/editar-puente.page').then((m) => m.EditarPuentePage),
       },
     ],
   },
+  {
+    path: '',
+    canActivate: [authGuard, roleGuard('CATEDRATICO')],
+    loadComponent: () =>
+      import('../../layouts/app-shell/app-shell.component').then((m) => m.AppShellComponent),
+    children: [
+      {
+        path: 'solicitudes',
+        loadComponent: () =>
+          import('./pages/mis-solicitudes/mis-solicitudes.page').then((m) => m.MisSolicitudesPage),
+      },
+      {
+        path: 'solicitudes/nueva',
+        loadComponent: () =>
+          import('./pages/solicitar-alta-puente/solicitar-alta-puente.page').then(
+            (m) => m.SolicitarAltaPuentePage,
+          ),
+      },
+      {
+        path: 'solicitudes/:id',
+        loadComponent: () =>
+          import('./pages/detalle-solicitud/detalle-solicitud.page').then(
+            (m) => m.DetalleSolicitudPage,
+          ),
+      },
+    ],
+  },
+  // Debe ir al final: `:id` coincidiría con cualquier segmento, incluido `solicitudes`.
   {
     path: ':id',
     loadComponent: () =>

@@ -188,6 +188,62 @@ describe('PuenteApiService', () => {
     request.flush({});
   });
 
+  describe('listarPuntosMapa', () => {
+    const puente = (n: number, latitud: number | null = 14.5) => ({
+      id: `p${n}`,
+      codigo: `GT-01-0101-000${n}`,
+      nombre: `Puente ${n}`,
+      latitud,
+      longitud: latitud === null ? null : -90.5,
+    });
+
+    const pagina = (content: object[], totalPages: number, number = 0) => ({
+      content,
+      totalElements: content.length,
+      totalPages,
+      number,
+      size: 100,
+      first: number === 0,
+      last: number === totalPages - 1,
+      empty: content.length === 0,
+    });
+
+    it('con una sola página devuelve los puntos con su identificación', () => {
+      let puntos: unknown;
+      service.listarPuntosMapa().subscribe((resultado) => (puntos = resultado));
+
+      const request = http.expectOne((req) => req.url === '/api/v1/puentes');
+      expect(request.request.params.get('pagina')).toBe('0');
+      expect(request.request.params.get('tamanio')).toBe('100');
+      request.flush(pagina([puente(1), puente(2, null)], 1));
+
+      expect(puntos).toEqual([
+        { id: 'p1', titulo: 'GT-01-0101-0001 — Puente 1', latitud: 14.5, longitud: -90.5 },
+      ]);
+    });
+
+    it('recorre todas las páginas restantes', () => {
+      let puntos: { id: string }[] = [];
+      service.listarPuntosMapa().subscribe((resultado) => (puntos = resultado));
+
+      http.expectOne((req) => req.params.get('pagina') === '0').flush(pagina([puente(1)], 3));
+      http.expectOne((req) => req.params.get('pagina') === '1').flush(pagina([puente(2)], 3, 1));
+      http.expectOne((req) => req.params.get('pagina') === '2').flush(pagina([puente(3)], 3, 2));
+
+      expect(puntos.map((p) => p.id)).toEqual(['p1', 'p2', 'p3']);
+    });
+
+    it('limita la carga a 10 páginas', () => {
+      service.listarPuntosMapa().subscribe();
+
+      http.expectOne((req) => req.params.get('pagina') === '0').flush(pagina([puente(1)], 50));
+      const adicionales = http.match((req) => req.params.get('pagina') !== '0');
+
+      expect(adicionales).toHaveLength(9);
+      adicionales.forEach((r) => r.flush(pagina([], 50)));
+    });
+  });
+
   it('obtiene un puente por su identificador', () => {
     service.obtenerPorId('puente-1').subscribe();
 

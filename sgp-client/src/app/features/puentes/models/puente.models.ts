@@ -43,6 +43,41 @@ export interface CrearPuenteRequest extends PuenteFormValores {
   confirmarCercania: boolean;
 }
 
+export interface CrearSolicitudAltaPuenteRequest extends PuenteFormValores {
+  justificacion: string | null;
+}
+
+export type EstadoSolicitudAltaPuente = 'PENDIENTE' | 'APROBADA' | 'RECHAZADA' | 'CANCELADA';
+
+export interface SolicitudAltaPuenteResponse {
+  id: string;
+  nombre: string;
+  departamento: DepartamentoResponse;
+  municipio: MunicipioResponse;
+  ruta: string;
+  kilometraje: number | null;
+  latitud: number;
+  longitud: number;
+  justificacion: string | null;
+  estado: EstadoSolicitudAltaPuente;
+  motivoDecision: string | null;
+  revisadoEn: string | null;
+  puenteCreadoId: string | null;
+  puenteCreadoCodigo: string | null;
+  creadoEn: string;
+}
+
+export interface SolicitudRevisionResponse {
+  solicitud: SolicitudAltaPuenteResponse;
+  solicitanteEmail: string | null;
+  revisadoPorEmail: string | null;
+}
+
+export interface SolicitudRevisionDetalleResponse extends SolicitudRevisionResponse {
+  puentesCercanos: PuenteCercanoResponse[];
+  totalPuentesCercanos: number;
+}
+
 export interface ActualizarPuenteRequest extends PuenteFormValores {
   confirmarCercania: boolean;
   codigo?: string;

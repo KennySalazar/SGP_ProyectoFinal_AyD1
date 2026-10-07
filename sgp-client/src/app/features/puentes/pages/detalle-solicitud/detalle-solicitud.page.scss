@@ -1,0 +1,16 @@
+:host {
+  display: block;
+}
+
+.volver {
+  margin: 0 0 1rem;
+
+  a {
+    color: var(--sgp-blue-600);
+    font-weight: 600;
+  }
+}
+
+.mensaje {
+  padding: clamp(1.25rem, 3vw, 2rem);
+}

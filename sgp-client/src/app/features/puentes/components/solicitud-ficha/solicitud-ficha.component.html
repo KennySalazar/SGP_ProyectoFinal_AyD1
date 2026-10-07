@@ -1,0 +1,100 @@
+<section class="surface-card ficha">
+  <h2>{{ 'puentes.revision.requestData' | transloco }}</h2>
+
+  <dl class="result-grid">
+    <div>
+      <dt>{{ 'puentes.name' | transloco }}</dt>
+      <dd>{{ solicitud().nombre }}</dd>
+    </div>
+    <div>
+      <dt>{{ 'puentes.state' | transloco }}</dt>
+      <dd>
+        <p-tag
+          [attr.data-estado]="solicitud().estado"
+          [value]="'puentes.solicitud.estado.' + solicitud().estado | transloco"
+          [severity]="severidad(solicitud().estado)"
+        />
+      </dd>
+    </div>
+    @if (mostrarSolicitante()) {
+      <div>
+        <dt>{{ 'puentes.revision.requester' | transloco }}</dt>
+        <dd>{{ solicitanteEmail() ?? '—' }}</dd>
+      </div>
+    }
+    <div>
+      <dt>{{ 'puentes.solicitud.requestedAt' | transloco }}</dt>
+      <dd>{{ fechaGuatemala(solicitud().creadoEn) }}</dd>
+    </div>
+    <div>
+      <dt>{{ 'puentes.department' | transloco }}</dt>
+      <dd>{{ solicitud().departamento.nombre }}</dd>
+    </div>
+    <div>
+      <dt>{{ 'puentes.municipality' | transloco }}</dt>
+      <dd>{{ solicitud().municipio.nombre }}</dd>
+    </div>
+    <div>
+      <dt>{{ 'puentes.route' | transloco }}</dt>
+      <dd>{{ solicitud().ruta }}</dd>
+    </div>
+    <div>
+      <dt>{{ 'puentes.revision.kilometer' | transloco }}</dt>
+      <dd>{{ solicitud().kilometraje ?? '—' }}</dd>
+    </div>
+    <div>
+      <dt>{{ 'puentes.latitude' | transloco }}</dt>
+      <dd>{{ solicitud().latitud }}</dd>
+    </div>
+    <div>
+      <dt>{{ 'puentes.longitude' | transloco }}</dt>
+      <dd>{{ solicitud().longitud }}</dd>
+    </div>
+  </dl>
+
+  <h3>{{ 'puentes.solicitud.justificationLabel' | transloco }}</h3>
+  <p class="note">
+    {{ solicitud().justificacion ?? ('puentes.revision.noJustification' | transloco) }}
+  </p>
+
+  @if (solicitud().estado !== 'PENDIENTE') {
+    <h3>{{ 'puentes.revision.decisionTitle' | transloco }}</h3>
+    <dl class="result-grid">
+      @if (mostrarRevisor()) {
+        <div>
+          <dt>{{ 'puentes.revision.reviewedBy' | transloco }}</dt>
+          <dd>{{ revisadoPorEmail() ?? '—' }}</dd>
+        </div>
+      }
+      @if (solicitud().revisadoEn; as revisadoEn) {
+        <div>
+          <dt>{{ 'puentes.revision.reviewedAt' | transloco }}</dt>
+          <dd>{{ fechaGuatemala(revisadoEn) }}</dd>
+        </div>
+      }
+      @if (solicitud().estado === 'APROBADA') {
+        <div class="ancho">
+          <dt>{{ 'puentes.revision.createdBridge' | transloco }}</dt>
+          <dd>{{ solicitud().puenteCreadoCodigo ?? '—' }}</dd>
+        </div>
+      }
+      @if (solicitud().estado === 'RECHAZADA') {
+        <div class="ancho">
+          <dt>{{ 'puentes.revision.rejectionReason' | transloco }}</dt>
+          <dd>{{ solicitud().motivoDecision ?? '—' }}</dd>
+        </div>
+      }
+    </dl>
+  }
+
+  <h3>{{ 'puentes.revision.mapTitle' | transloco }}</h3>
+  <app-selector-ubicacion
+    [latitud]="solicitud().latitud"
+    [longitud]="solicitud().longitud"
+    [cercanos]="cercanos()"
+    [soloLectura]="true"
+    [zoom]="15"
+  />
+
+  <ng-content />
+</section>

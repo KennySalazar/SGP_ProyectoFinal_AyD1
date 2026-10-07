@@ -1,6 +1,7 @@
 import { HttpClient } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
-import { Observable } from 'rxjs';
+import { Observable, forkJoin, map, of, switchMap } from 'rxjs';
+import { PuntoMapa } from '../../../shared/utils/ubicacion-guatemala';
 import {
   ActualizarPuenteRequest,
   CrearPuenteRequest,
@@ -12,6 +13,9 @@ import {
   PuenteResponse,
   UbicacionTerritorialResponse,
 } from '../models/puente.models';
+
+// Tope de seguridad: 10 páginas de 100 puentes. Más allá conviene un endpoint por zona visible.
+const MAX_PAGINAS_MAPA = 10;
 
 @Injectable({ providedIn: 'root' })
 export class PuenteApiService {
@@ -45,6 +49,33 @@ export class PuenteApiService {
     if (consulta.activo !== undefined) params['activo'] = consulta.activo;
     if (consulta.todos) params['todos'] = true;
     return this.http.get<PaginaResponse<PuenteCatalogoResponse>>('/api/v1/puentes', { params });
+  }
+
+  /** Puentes activos con coordenadas, para mostrarlos en el mapa de los formularios. */
+  listarPuntosMapa(): Observable<PuntoMapa[]> {
+    return this.listarCatalogo({ pagina: 0, tamanio: 100 }).pipe(
+      switchMap((primera) => {
+        const ultima = Math.min(primera.totalPages, MAX_PAGINAS_MAPA);
+        const restantes = Array.from({ length: Math.max(ultima - 1, 0) }, (_, i) =>
+          this.listarCatalogo({ pagina: i + 1, tamanio: 100 }),
+        );
+
+        return (restantes.length > 0 ? forkJoin(restantes) : of([])).pipe(
+          map((paginas) => [primera, ...paginas]),
+        );
+      }),
+      map((paginas) =>
+        paginas
+          .flatMap((pagina) => pagina.content)
+          .filter((puente) => puente.latitud !== null && puente.longitud !== null)
+          .map((puente) => ({
+            id: puente.id,
+            titulo: `${puente.codigo} — ${puente.nombre}`,
+            latitud: puente.latitud as number,
+            longitud: puente.longitud as number,
+          })),
+      ),
+    );
   }
 
   listarDepartamentos(pagina = 0, tamanio = 100): Observable<PaginaResponse<DepartamentoResponse>> {

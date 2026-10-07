@@ -129,7 +129,10 @@ describe('SelectorUbicacionComponent: selector de ubicación en el mapa', () => 
       latitud?: number | null;
       longitud?: number | null;
       deshabilitado?: boolean;
+      soloLectura?: boolean;
+      zoom?: number | null;
       cercanos?: readonly PuntoMapa[];
+      existentes?: readonly PuntoMapa[];
     } = {},
   ): Promise<void> {
     fixture = TestBed.createComponent(SelectorUbicacionComponent);
@@ -222,6 +225,30 @@ describe('SelectorUbicacionComponent: selector de ubicación en el mapa', () => 
     expect(seleccionadas).toEqual([]);
   });
 
+  it('en solo lectura ignora los clics, no permite arrastrar y oculta la ayuda', async () => {
+    await crear({ latitud: 14.481, longitud: -90.615, soloLectura: true });
+
+    mapa().manejadores['click']({ lngLat: { lat: 14.5, lng: -90.5 } });
+
+    expect(seleccionadas).toEqual([]);
+    expect(marcador().arrastrable).toBe(false);
+    expect(fixture.nativeElement.textContent).not.toContain('Haz clic');
+  });
+
+  it('abre el mapa acercado sobre la coordenada cuando se indica el zoom', async () => {
+    await crear({ latitud: 14.481, longitud: -90.615, zoom: 15 });
+
+    expect(mapa().opciones['center']).toEqual([-90.615, 14.481]);
+    expect(mapa().opciones['zoom']).toBe(15);
+  });
+
+  it('mantiene la vista del país si hay zoom pero no hay coordenada válida', async () => {
+    await crear({ zoom: 15 });
+
+    expect(mapa().opciones['center']).toEqual([-90.3, 15.5]);
+    expect(mapa().opciones['zoom']).toBe(6);
+  });
+
   it('muestra el marcador de la coordenada y lo quita si deja de ser válida', async () => {
     await crear({ latitud: 14.481, longitud: -90.615 });
 
@@ -275,6 +302,46 @@ describe('SelectorUbicacionComponent: selector de ubicación en el mapa', () => 
     expect(fake.estado.marcadores).toHaveLength(1);
     expect(marcador().popup?.texto).toBe('GT-01-0114-0001 — Puente A');
     expect(marcador().elemento.getAttribute('aria-label')).toBe('GT-01-0114-0001 — Puente A');
+  });
+
+  it('muestra los puentes existentes en gris y no repite los que ya son cercanos', async () => {
+    const a = { id: 'a', titulo: 'GT-01-0114-0001 — A', latitud: 14.48, longitud: -90.61 };
+    const b = { id: 'b', titulo: 'GT-01-0114-0002 — B', latitud: 14.49, longitud: -90.62 };
+    const invalido = { id: 'c', titulo: 'Inválido', latitud: 95, longitud: -90.61 };
+
+    await crear({ existentes: [a, b, invalido], cercanos: [b] });
+
+    const grises = fake.estado.marcadores.filter((m) => m.opciones.color === '#64748b');
+    const naranjas = fake.estado.marcadores.filter((m) => m.opciones.color === '#d97706');
+    expect(grises).toHaveLength(1);
+    expect(grises[0].popup?.texto).toBe('GT-01-0114-0001 — A');
+    expect(naranjas).toHaveLength(1);
+    expect(fixture.nativeElement.textContent).toContain('marcadores grises');
+  });
+
+  it('no rehace los marcadores existentes cuando solo cambia la coordenada', async () => {
+    const a = { id: 'a', titulo: 'A', latitud: 14.48, longitud: -90.61 };
+    await crear({ existentes: [a] });
+    const antes = fake.estado.marcadores.length;
+
+    fixture.componentRef.setInput('latitud', 14.5);
+    fixture.componentRef.setInput('longitud', -90.5);
+    fixture.detectChanges();
+
+    // Solo se agrega el marcador de la coordenada; el existente no se vuelve a crear.
+    expect(fake.estado.marcadores.length).toBe(antes + 1);
+    expect(fake.estado.marcadores[0].remove).not.toHaveBeenCalled();
+  });
+
+  it('actualiza los existentes cuando llegan después de crear el mapa', async () => {
+    await crear();
+
+    fixture.componentRef.setInput('existentes', [
+      { id: 'a', titulo: 'A', latitud: 14.48, longitud: -90.61 },
+    ]);
+    fixture.detectChanges();
+
+    expect(fake.estado.marcadores.filter((m) => m.opciones.color === '#64748b')).toHaveLength(1);
   });
 
   it('muestra un aviso y no falla cuando el mapa no se puede crear', async () => {

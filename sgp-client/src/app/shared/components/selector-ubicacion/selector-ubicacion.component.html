@@ -17,14 +17,23 @@
     </p>
   }
 
-  <p class="ayuda">
-    Haz clic para seleccionar una ubicación y arrastra el marcador azul para ajustarla. También
-    puedes ingresar las coordenadas con el teclado.
-  </p>
+  @if (!soloLectura) {
+    <p class="ayuda">
+      Haz clic para seleccionar una ubicación y arrastra el marcador azul para ajustarla. También
+      puedes ingresar las coordenadas con el teclado.
+    </p>
+  }
 
   @if (cercanos.length > 0) {
     <p class="ayuda">
       Los marcadores naranjas representan los puentes cercanos. Selecciónalos para consultar su
+      identificación.
+    </p>
+  }
+
+  @if (existentes.length > 0) {
+    <p class="ayuda">
+      Los marcadores grises son puentes ya registrados. Selecciónalos para consultar su
       identificación.
     </p>
   }

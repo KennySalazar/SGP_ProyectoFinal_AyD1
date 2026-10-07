@@ -122,6 +122,21 @@ describe('RegistrarPuentePage: HU009', () => {
     };
   }
 
+  function cargarPuentesExistentes(puentes: object[] = []): void {
+    http
+      .expectOne((req) => req.url === '/api/v1/puentes')
+      .flush({
+        content: puentes,
+        totalElements: puentes.length,
+        totalPages: 1,
+        number: 0,
+        size: 100,
+        first: true,
+        last: true,
+        empty: puentes.length === 0,
+      });
+  }
+
   beforeEach(() => {
     vi.useFakeTimers();
 
@@ -152,6 +167,7 @@ describe('RegistrarPuentePage: HU009', () => {
     fixture = TestBed.createComponent(RegistrarPuentePage);
     page = fixture.componentInstance;
     fixture.detectChanges();
+    cargarPuentesExistentes();
   });
 
   afterEach(() => {
@@ -324,6 +340,8 @@ describe('RegistrarPuentePage: HU009', () => {
 
     page.registrarOtro();
     fixture.detectChanges();
+    // El formulario nuevo vuelve a cargar los puentes, incluido el recién registrado.
+    cargarPuentesExistentes([]);
 
     expect(page.puenteRegistrado()).toBeNull();
     expect(formulario().territorio()).toBeNull();
