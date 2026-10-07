@@ -75,6 +75,11 @@ public class SecurityConfiguration {
                       "/api/v1/catalogos/departamentos")
                   .permitAll()
                   .requestMatchers(
+                      HttpMethod.POST,
+                      "/api/v1/invitaciones/validacion",
+                      "/api/v1/invitaciones/aceptacion")
+                  .permitAll()
+                  .requestMatchers(
                       "/api/v1/auth/register",
                       "/api/v1/auth/register/**",
                       "/api/v1/auth/login",

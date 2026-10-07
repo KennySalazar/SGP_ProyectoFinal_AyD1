@@ -37,7 +37,9 @@ public class AuthRateLimitFilter extends OncePerRequestFilter {
     return !(uri.equals("/api/v1/auth/login")
         || uri.equals("/api/v1/auth/register")
         || uri.equals("/api/v1/auth/password-recovery")
-        || uri.equals("/api/v1/auth/refresh"));
+        || uri.equals("/api/v1/auth/refresh")
+        || uri.equals("/api/v1/invitaciones/validacion")
+        || uri.equals("/api/v1/invitaciones/aceptacion"));
   }
 
   @Override
