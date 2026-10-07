@@ -8,5 +8,5 @@ import org.mapstruct.Mapping;
 @Mapper(componentModel = "spring")
 public interface UserMapper {
   @Mapping(target = "role", expression = "java(user.getRole().getName().name())")
-  UserResponse toResponse(UserAccount user);
+  UserResponse toResponse(UserAccount user, Boolean colegiadoVerificado);
 }

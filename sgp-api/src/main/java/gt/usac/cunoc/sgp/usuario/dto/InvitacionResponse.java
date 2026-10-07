@@ -12,6 +12,7 @@ public record InvitacionResponse(
     EstadoInvitacion estado,
     UUID usuarioId,
     UUID invitadoPorId,
+    String numeroColegiado,
     OffsetDateTime expiraEn,
     OffsetDateTime aceptadoEn,
     OffsetDateTime canceladoEn,

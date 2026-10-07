@@ -29,8 +29,10 @@ import gt.usac.cunoc.sgp.usuario.service.CuentaInvitadaService;
 import gt.usac.cunoc.sgp.usuario.service.InvitacionEmailService;
 import gt.usac.cunoc.sgp.usuario.service.InvitacionService;
 import gt.usac.cunoc.sgp.usuario.service.OtpService;
+import gt.usac.cunoc.sgp.usuario.service.ProfesionalService;
 import gt.usac.cunoc.sgp.usuario.service.RefreshTokenService;
 import gt.usac.cunoc.sgp.usuario.service.UsuarioAuditoriaSnapshotProvider;
+import gt.usac.cunoc.sgp.usuario.service.UsuarioProfesionalAuditoriaSnapshotProvider;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -80,6 +82,8 @@ import org.testcontainers.utility.DockerImageName;
 @Import({
   InvitacionService.class,
   CuentaInvitadaService.class,
+  ProfesionalService.class,
+  UsuarioProfesionalAuditoriaSnapshotProvider.class,
   InvitacionEmailService.class,
   InvitacionMapperImpl.class,
   AuthService.class,
@@ -159,7 +163,7 @@ class InvitacionCatedraticoIntegrationTest {
   void invitacionExitosaCreaCuentaPendienteYEnviaEnlaceDeUnSoloUso() {
     InvitacionResponse response =
         invitacionService.invitar(
-            new CrearInvitacionRequest("  Catedratico@USAC.edu.gt ", RoleName.CATEDRATICO),
+            new CrearInvitacionRequest("  Catedratico@USAC.edu.gt ", RoleName.CATEDRATICO, null),
             ADMINISTRADOR_ID);
 
     // La cuenta existe en estado pendiente de invitación.
@@ -230,7 +234,8 @@ class InvitacionCatedraticoIntegrationTest {
     assertThatThrownBy(
             () ->
                 invitacionService.invitar(
-                    new CrearInvitacionRequest(CORREO, RoleName.CATEDRATICO), ADMINISTRADOR_ID))
+                    new CrearInvitacionRequest(CORREO, RoleName.CATEDRATICO, null),
+                    ADMINISTRADOR_ID))
         .isInstanceOfSatisfying(
             ApiException.class,
             e -> {
@@ -250,7 +255,8 @@ class InvitacionCatedraticoIntegrationTest {
     assertThatThrownBy(
             () ->
                 invitacionService.invitar(
-                    new CrearInvitacionRequest(CORREO, RoleName.CATEDRATICO), ADMINISTRADOR_ID))
+                    new CrearInvitacionRequest(CORREO, RoleName.CATEDRATICO, null),
+                    ADMINISTRADOR_ID))
         .isInstanceOfSatisfying(
             ApiException.class, e -> assertThat(e.getCode()).isEqualTo("invitacion_pendiente"));
   }
@@ -411,7 +417,8 @@ class InvitacionCatedraticoIntegrationTest {
       assertThatThrownBy(
               () ->
                   invitacionService.invitar(
-                      new CrearInvitacionRequest(CORREO, RoleName.CATEDRATICO), CATEDRATICO_ID))
+                      new CrearInvitacionRequest(CORREO, RoleName.CATEDRATICO, null),
+                      CATEDRATICO_ID))
           .isInstanceOf(AccessDeniedException.class);
       assertThatThrownBy(() -> invitacionService.listar(null, 0, 20))
           .isInstanceOf(AccessDeniedException.class);
@@ -440,7 +447,7 @@ class InvitacionCatedraticoIntegrationTest {
 
   private InvitacionResponse invitar() {
     return invitacionService.invitar(
-        new CrearInvitacionRequest(CORREO, RoleName.CATEDRATICO), ADMINISTRADOR_ID);
+        new CrearInvitacionRequest(CORREO, RoleName.CATEDRATICO, null), ADMINISTRADOR_ID);
   }
 
   private String ultimoToken() {

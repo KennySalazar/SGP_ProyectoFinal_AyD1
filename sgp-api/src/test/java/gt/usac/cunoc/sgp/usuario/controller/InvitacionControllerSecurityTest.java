@@ -121,7 +121,7 @@ class InvitacionControllerSecurityTest {
 
     verify(service)
         .invitar(
-            eq(new CrearInvitacionRequest("catedratico@usac.edu.gt", RoleName.CATEDRATICO)),
+            eq(new CrearInvitacionRequest("catedratico@usac.edu.gt", RoleName.CATEDRATICO, null)),
             eq(USUARIO_ID));
   }
 

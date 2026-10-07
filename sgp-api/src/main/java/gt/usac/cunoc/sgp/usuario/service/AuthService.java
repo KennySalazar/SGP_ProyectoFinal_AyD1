@@ -17,12 +17,14 @@ import gt.usac.cunoc.sgp.usuario.dto.RegisterRequest;
 import gt.usac.cunoc.sgp.usuario.dto.UserResponse;
 import gt.usac.cunoc.sgp.usuario.entity.Role;
 import gt.usac.cunoc.sgp.usuario.entity.UserAccount;
+import gt.usac.cunoc.sgp.usuario.entity.UsuarioProfesional;
 import gt.usac.cunoc.sgp.usuario.exception.OtpRateLimitException;
 import gt.usac.cunoc.sgp.usuario.mapper.UserMapper;
 import gt.usac.cunoc.sgp.usuario.model.OtpPurpose;
 import gt.usac.cunoc.sgp.usuario.model.RoleName;
 import gt.usac.cunoc.sgp.usuario.repository.RoleRepository;
 import gt.usac.cunoc.sgp.usuario.repository.UserAccountRepository;
+import gt.usac.cunoc.sgp.usuario.repository.UsuarioProfesionalRepository;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.UUID;
@@ -42,6 +44,7 @@ public class AuthService {
   private final RefreshTokenService refreshTokens;
   private final Clock clock;
   private final UserMapper userMapper;
+  private final UsuarioProfesionalRepository profesionales;
 
   public AuthService(
       UserAccountRepository users,
@@ -51,7 +54,8 @@ public class AuthService {
       JwtService jwtService,
       RefreshTokenService refreshTokens,
       Clock clock,
-      UserMapper userMapper) {
+      UserMapper userMapper,
+      UsuarioProfesionalRepository profesionales) {
     this.users = users;
     this.roles = roles;
     this.passwordEncoder = passwordEncoder;
@@ -60,6 +64,7 @@ public class AuthService {
     this.refreshTokens = refreshTokens;
     this.clock = clock;
     this.userMapper = userMapper;
+    this.profesionales = profesionales;
   }
 
   @Transactional
@@ -300,7 +305,17 @@ public class AuthService {
 
   @Transactional(readOnly = true)
   public UserResponse currentUser(String email) {
-    return userMapper.toResponse(requireUser(email));
+    UserAccount user = requireUser(email);
+    // Solo aplica al Profesional Externo: sin colegiado verificado no puede inspeccionar
+    // (RN-USR-04).
+    Boolean colegiadoVerificado =
+        user.getRole().getName() == RoleName.PROFESIONAL_EXTERNO
+            ? profesionales
+                .findById(user.getId())
+                .map(UsuarioProfesional::isColegiadoVerificado)
+                .orElse(false)
+            : null;
+    return userMapper.toResponse(user, colegiadoVerificado);
   }
 
   @Transactional(readOnly = true)

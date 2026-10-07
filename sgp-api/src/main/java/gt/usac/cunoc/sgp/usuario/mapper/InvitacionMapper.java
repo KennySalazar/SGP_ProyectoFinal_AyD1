@@ -2,7 +2,9 @@ package gt.usac.cunoc.sgp.usuario.mapper;
 
 import gt.usac.cunoc.sgp.usuario.dto.InvitacionPublicaResponse;
 import gt.usac.cunoc.sgp.usuario.dto.InvitacionResponse;
+import gt.usac.cunoc.sgp.usuario.dto.ProfesionalResponse;
 import gt.usac.cunoc.sgp.usuario.entity.InvitacionUsuario;
+import gt.usac.cunoc.sgp.usuario.entity.UsuarioProfesional;
 import gt.usac.cunoc.sgp.usuario.model.EstadoInvitacion;
 import java.time.Instant;
 import java.time.OffsetDateTime;
@@ -20,14 +22,21 @@ public interface InvitacionMapper {
   @Mapping(target = "estado", source = "estado")
   @Mapping(target = "usuarioId", source = "invitacion.usuarioCreadoId")
   @Mapping(target = "invitadoPorId", source = "invitacion.invitadoPorId")
+  @Mapping(target = "numeroColegiado", source = "numeroColegiado")
   @Mapping(target = "expiraEn", source = "invitacion.expiraEn")
   @Mapping(target = "aceptadoEn", source = "invitacion.aceptadoEn")
   @Mapping(target = "canceladoEn", source = "invitacion.canceladoEn")
   @Mapping(target = "creadoEn", source = "invitacion.creadoEn")
-  InvitacionResponse toResponse(InvitacionUsuario invitacion, EstadoInvitacion estado);
+  InvitacionResponse toResponse(
+      InvitacionUsuario invitacion, EstadoInvitacion estado, String numeroColegiado);
 
   @Mapping(target = "rol", source = "rol.name")
   InvitacionPublicaResponse toPublicaResponse(InvitacionUsuario invitacion);
+
+  @Mapping(target = "email", source = "usuario.email")
+  @Mapping(target = "colegiadoVerificado", expression = "java(profesional.isColegiadoVerificado())")
+  @Mapping(target = "cuentaActivada", source = "usuario.activated")
+  ProfesionalResponse toProfesionalResponse(UsuarioProfesional profesional);
 
   default OffsetDateTime aHoraGuatemala(Instant instante) {
     return instante == null
