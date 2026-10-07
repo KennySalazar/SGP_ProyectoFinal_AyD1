@@ -47,4 +47,57 @@ describe('SolicitudAltaPuenteApiService: HU010', () => {
     expect(peticion.request.params.get('tamanio')).toBe('10');
     peticion.flush({});
   });
+
+  it('consulta las solicitudes para revisión filtrando por estado', () => {
+    service.listarParaRevision('RECHAZADA', 1, 5).subscribe();
+
+    const peticion = http.expectOne((req) => req.url === '/api/v1/solicitudes-puente');
+    expect(peticion.request.method).toBe('GET');
+    expect(peticion.request.params.get('estado')).toBe('RECHAZADA');
+    expect(peticion.request.params.get('pagina')).toBe('1');
+    expect(peticion.request.params.get('tamanio')).toBe('5');
+    peticion.flush({});
+  });
+
+  it('usa PENDIENTE como estado de revisión por defecto', () => {
+    service.listarParaRevision().subscribe();
+
+    const peticion = http.expectOne((req) => req.url === '/api/v1/solicitudes-puente');
+    expect(peticion.request.params.get('estado')).toBe('PENDIENTE');
+    peticion.flush({});
+  });
+
+  it('consulta el detalle de una solicitud', () => {
+    service.obtenerParaRevision('abc').subscribe();
+
+    const peticion = http.expectOne('/api/v1/solicitudes-puente/abc');
+    expect(peticion.request.method).toBe('GET');
+    peticion.flush({});
+  });
+
+  it('aprueba enviando la confirmación de cercanía', () => {
+    service.aprobar('abc', true).subscribe();
+
+    const peticion = http.expectOne('/api/v1/solicitudes-puente/abc/aprobar');
+    expect(peticion.request.method).toBe('POST');
+    expect(peticion.request.body).toEqual({ confirmarCercania: true });
+    peticion.flush({});
+  });
+
+  it('rechaza enviando el motivo', () => {
+    service.rechazar('abc', 'No procede').subscribe();
+
+    const peticion = http.expectOne('/api/v1/solicitudes-puente/abc/rechazar');
+    expect(peticion.request.method).toBe('POST');
+    expect(peticion.request.body).toEqual({ motivo: 'No procede' });
+    peticion.flush({});
+  });
+
+  it('consulta el detalle de una solicitud propia', () => {
+    service.obtenerMia('abc').subscribe();
+
+    const peticion = http.expectOne('/api/v1/solicitudes-puente/mias/abc');
+    expect(peticion.request.method).toBe('GET');
+    peticion.flush({});
+  });
 });

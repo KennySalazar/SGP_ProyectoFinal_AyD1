@@ -16,6 +16,15 @@ h2 {
   color: #15803d;
 }
 
+.volver {
+  margin: 0 0 1rem;
+
+  a {
+    color: var(--sgp-blue-600);
+    font-weight: 600;
+  }
+}
+
 .note {
   margin: 0.75rem 0 1.5rem;
   color: var(--sgp-steel-500);

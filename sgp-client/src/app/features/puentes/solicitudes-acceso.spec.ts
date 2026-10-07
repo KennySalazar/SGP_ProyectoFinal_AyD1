@@ -55,9 +55,38 @@ describe('Acceso a las solicitudes de alta de puente: HU010', () => {
     );
 
     expect(bloque?.canActivate).toHaveLength(2);
+    // 'nueva' va antes que ':id' para que no se interprete como un identificador.
     expect(bloque?.children?.map((hija) => hija.path)).toEqual([
       'solicitudes',
       'solicitudes/nueva',
+      'solicitudes/:id',
     ]);
   });
+
+  it('declara las rutas de revisión protegidas para el Administrador', () => {
+    const bloque = puentesRoutes.find((ruta) =>
+      ruta.children?.some((hija) => hija.path === 'solicitudes/revision'),
+    );
+
+    expect(bloque?.canActivate).toHaveLength(2);
+    expect(bloque?.children?.map((hija) => hija.path)).toEqual(
+      expect.arrayContaining(['solicitudes/revision', 'solicitudes/revision/:id']),
+    );
+  });
+
+  it.each(['CATEDRATICO', 'ESTUDIANTE', 'PROFESIONAL_EXTERNO'])(
+    'la revisión redirige al inicio cuando el rol es %s',
+    (role) => {
+      usuario.set({ role });
+
+      const resultado = TestBed.runInInjectionContext(() =>
+        roleGuard('ADMINISTRADOR')(new ActivatedRouteSnapshot(), {
+          url: '/puentes/solicitudes/revision',
+        } as RouterStateSnapshot),
+      );
+
+      expect(resultado).toBeInstanceOf(UrlTree);
+      expect(TestBed.inject(Router).serializeUrl(resultado as UrlTree)).toBe('/');
+    },
+  );
 });

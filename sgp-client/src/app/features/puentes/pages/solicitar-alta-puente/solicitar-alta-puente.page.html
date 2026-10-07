@@ -4,6 +4,13 @@
   <p class="page-description">{{ 'puentes.solicitud.description' | transloco }}</p>
 </header>
 
+<p class="volver">
+  <a routerLink="/puentes/solicitudes">
+    <i class="pi pi-arrow-left" aria-hidden="true"></i>
+    {{ 'puentes.solicitud.backToMine' | transloco }}
+  </a>
+</p>
+
 @if (solicitudCreada(); as solicitud) {
 <section class="surface-card solicitud-card">
   <h2 class="success" role="status">
@@ -52,6 +59,7 @@
 } @else {
 <app-puente-form
   etiquetaEnviar="puentes.solicitud.submit"
+  [mostrarExistentes]="true"
   [guardando]="guardando()"
   [erroresServidor]="erroresCampos()"
   [errorTerritorioServidor]="errorTerritorio()"
@@ -75,5 +83,17 @@
   @if (errorSolicitud(); as mensaje) {
   <p class="feedback error" role="alert">{{ mensaje }}</p>
   }
+
+  <a
+    formAcciones
+    pButton
+    severity="secondary"
+    [outlined]="true"
+    routerLink="/puentes/solicitudes"
+    [attr.aria-disabled]="guardando() ? 'true' : null"
+    [class.p-disabled]="guardando()"
+  >
+    {{ 'puentes.solicitud.cancel' | transloco }}
+  </a>
 </app-puente-form>
 }

@@ -73,6 +73,21 @@ describe('SolicitarAltaPuentePage: HU010', () => {
     };
   }
 
+  function cargarPuentesExistentes(puentes: object[] = []): void {
+    http
+      .expectOne((req) => req.url === '/api/v1/puentes')
+      .flush({
+        content: puentes,
+        totalElements: puentes.length,
+        totalPages: 1,
+        number: 0,
+        size: 100,
+        first: true,
+        last: true,
+        empty: puentes.length === 0,
+      });
+  }
+
   beforeEach(() => {
     vi.useFakeTimers();
 
@@ -98,6 +113,7 @@ describe('SolicitarAltaPuentePage: HU010', () => {
     fixture = TestBed.createComponent(SolicitarAltaPuentePage);
     page = fixture.componentInstance;
     fixture.detectChanges();
+    cargarPuentesExistentes();
   });
 
   afterEach(() => {
@@ -181,6 +197,8 @@ describe('SolicitarAltaPuentePage: HU010', () => {
 
     page.solicitarOtra();
     fixture.detectChanges();
+    // El formulario nuevo vuelve a cargar los puentes existentes.
+    cargarPuentesExistentes([]);
 
     expect(page.solicitudCreada()).toBeNull();
     expect(formulario().form.getRawValue().nombre).toBe('');
@@ -252,5 +270,20 @@ describe('SolicitarAltaPuentePage: HU010', () => {
 
     expect(page.errorSolicitud()).toBeNull();
     expect(page.erroresCampos()).toEqual({});
+  });
+
+  it('ofrece volver a mis solicitudes y cancelar sin enviar nada', () => {
+    const enlaces = [...fixture.nativeElement.querySelectorAll('a')] as HTMLAnchorElement[];
+
+    expect(enlaces.filter((a) => a.getAttribute('href') === '/puentes/solicitudes')).toHaveLength(
+      2,
+    );
+    expect(fixture.nativeElement.textContent).toContain('puentes.solicitud.cancel');
+    expect(fixture.nativeElement.textContent).toContain('puentes.solicitud.backToMine');
+    http.expectNone('/api/v1/solicitudes-puente');
+  });
+
+  it('carga los puentes existentes en el mapa al abrir el formulario', () => {
+    expect(formulario().mostrarExistentes()).toBe(true);
   });
 });

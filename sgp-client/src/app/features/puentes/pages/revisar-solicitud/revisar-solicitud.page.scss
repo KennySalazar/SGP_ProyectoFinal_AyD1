@@ -1,0 +1,116 @@
+:host {
+  display: block;
+}
+
+.revision-card {
+  padding: clamp(1.25rem, 3vw, 2rem);
+}
+
+h2,
+h3 {
+  color: var(--sgp-navy-900);
+}
+
+h2 {
+  margin: 0;
+  font-size: 1.2rem;
+}
+
+h3 {
+  margin: 2rem 0 0;
+  font-size: 1.05rem;
+}
+
+.volver {
+  margin: 0 0 1rem;
+
+  a {
+    color: var(--sgp-blue-600);
+    font-weight: 600;
+  }
+}
+
+.note {
+  margin: 0.75rem 0 1.5rem;
+  color: var(--sgp-steel-500);
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+.success {
+  color: #15803d;
+}
+
+.rejected {
+  color: #b91c1c;
+}
+
+.error,
+.validation {
+  color: #b91c1c;
+}
+
+.feedback {
+  margin-top: 1rem;
+}
+
+.proximity {
+  margin-top: 1.5rem;
+  padding: 1.25rem;
+  border: 1px solid #fcd34d;
+  border-radius: 16px;
+  background: #fffbeb;
+  color: #78350f;
+}
+
+.proximity h3 {
+  margin: 0;
+  color: inherit;
+}
+
+.proximity p {
+  line-height: 1.6;
+}
+
+.proximity ul {
+  padding-left: 1.25rem;
+}
+
+.proximity li {
+  margin: 0.75rem 0;
+  overflow-wrap: anywhere;
+}
+
+.proximity li span {
+  display: block;
+  margin-top: 0.35rem;
+}
+
+.reject-panel {
+  margin-top: 1.5rem;
+}
+
+.field {
+  display: grid;
+  gap: 0.5rem;
+  color: var(--sgp-navy-900);
+  font-weight: 700;
+
+  textarea {
+    width: 100%;
+    resize: vertical;
+  }
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 1.5rem;
+}
+
+@media (max-width: 700px) {
+  .actions {
+    flex-direction: column;
+  }
+}

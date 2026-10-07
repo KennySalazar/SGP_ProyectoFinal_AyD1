@@ -36,6 +36,8 @@ describe('MisSolicitudesPage: HU010', () => {
       estado,
       motivoDecision,
       revisadoEn: null,
+      puenteCreadoId: null,
+      puenteCreadoCodigo: estado === 'APROBADA' ? 'GT-01-0114-0001' : null,
       creadoEn: '2026-10-06T12:00:00Z',
     };
   }
@@ -98,8 +100,9 @@ describe('MisSolicitudesPage: HU010', () => {
     expect(texto).toContain('puentes.solicitud.estado.PENDIENTE');
     expect(texto).toContain('puentes.solicitud.estado.RECHAZADA');
     expect(texto).toContain('puentes.solicitud.estado.APROBADA');
-    expect(texto).toContain('Ya existe en el catálogo');
     expect(texto).toContain('Amatitlán, Guatemala');
+    // El motivo y el código del puente se consultan en el detalle, no en la tabla.
+    expect(texto).not.toContain('Ya existe en el catálogo');
     expect(page.cargando()).toBe(false);
   });
 
@@ -134,5 +137,18 @@ describe('MisSolicitudesPage: HU010', () => {
     const peticion = http.expectOne((req) => req.url === '/api/v1/solicitudes-puente/mias');
     expect(peticion.request.params.get('pagina')).toBe('2');
     peticion.flush(pagina([], { number: 2, totalElements: 25, totalPages: 3 }));
+  });
+
+  it('ofrece un botón para ver el detalle de cada solicitud', () => {
+    responder(pagina([solicitud('Puente A', 'PENDIENTE'), solicitud('Puente B', 'APROBADA')]));
+
+    const enlaces = [...fixture.nativeElement.querySelectorAll('tbody a')] as HTMLAnchorElement[];
+
+    expect(enlaces.map((a) => a.getAttribute('href'))).toEqual([
+      '/puentes/solicitudes/Puente%20A',
+      '/puentes/solicitudes/Puente%20B',
+    ]);
+    expect(enlaces[0].textContent).toContain('puentes.solicitud.viewDetail');
+    expect(fixture.nativeElement.textContent).not.toContain('puentes.solicitud.result');
   });
 });

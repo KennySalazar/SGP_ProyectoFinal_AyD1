@@ -62,7 +62,20 @@ export interface SolicitudAltaPuenteResponse {
   estado: EstadoSolicitudAltaPuente;
   motivoDecision: string | null;
   revisadoEn: string | null;
+  puenteCreadoId: string | null;
+  puenteCreadoCodigo: string | null;
   creadoEn: string;
+}
+
+export interface SolicitudRevisionResponse {
+  solicitud: SolicitudAltaPuenteResponse;
+  solicitanteEmail: string | null;
+  revisadoPorEmail: string | null;
+}
+
+export interface SolicitudRevisionDetalleResponse extends SolicitudRevisionResponse {
+  puentesCercanos: PuenteCercanoResponse[];
+  totalPuentesCercanos: number;
 }
 
 export interface UtmResponse {

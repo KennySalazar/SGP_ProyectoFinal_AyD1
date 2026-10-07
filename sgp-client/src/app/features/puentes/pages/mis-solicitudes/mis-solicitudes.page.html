@@ -38,7 +38,9 @@
           <th scope="col" class="no-cortar">{{ 'puentes.route' | transloco }}</th>
           <th scope="col">{{ 'puentes.solicitud.requestedAt' | transloco }}</th>
           <th scope="col" class="no-cortar">{{ 'puentes.state' | transloco }}</th>
-          <th scope="col">{{ 'puentes.solicitud.decisionReason' | transloco }}</th>
+          <th scope="col">
+            <span class="sr-only">{{ 'puentes.catalogo.actions' | transloco }}</span>
+          </th>
         </tr>
       </ng-template>
       <ng-template #body let-solicitud>
@@ -54,7 +56,17 @@
               [severity]="severidad(solicitud.estado)"
             />
           </td>
-          <td class="motivo">{{ solicitud.motivoDecision ?? '—' }}</td>
+          <td class="no-cortar">
+            <a
+              pButton
+              size="small"
+              [routerLink]="['/puentes/solicitudes', solicitud.id]"
+              [attr.aria-label]="('puentes.solicitud.viewDetail' | transloco) + ': ' + solicitud.nombre"
+            >
+              <i class="pi pi-eye" aria-hidden="true"></i>
+              {{ 'puentes.solicitud.viewDetail' | transloco }}
+            </a>
+          </td>
         </tr>
       </ng-template>
     </p-table>

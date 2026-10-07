@@ -2,15 +2,7 @@
   display: block;
 }
 
-.page-heading {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 1rem;
-}
-
-.solicitudes-panel {
+.revision-panel {
   padding: clamp(1.25rem, 3vw, 2rem);
 }
 
@@ -58,15 +50,6 @@ h2 {
   white-space: nowrap;
 }
 
-.sr-only {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
-}
-
 .sin-resultados {
   display: grid;
   justify-items: center;
@@ -92,4 +75,26 @@ h2 {
 .reporte-pagina {
   margin: 0;
   color: var(--sgp-steel-500);
+}
+
+.selector {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 1.25rem;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+}
+
+@media (max-width: 650px) {
+  .selector {
+    flex-direction: column;
+  }
 }

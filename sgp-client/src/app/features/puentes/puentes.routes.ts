@@ -22,6 +22,20 @@ export const puentesRoutes: Routes = [
             (m) => m.RegistrarPuentePage,
           ),
       },
+      {
+        path: 'solicitudes/revision',
+        loadComponent: () =>
+          import('./pages/revision-solicitudes/revision-solicitudes.page').then(
+            (m) => m.RevisionSolicitudesPage,
+          ),
+      },
+      {
+        path: 'solicitudes/revision/:id',
+        loadComponent: () =>
+          import('./pages/revisar-solicitud/revisar-solicitud.page').then(
+            (m) => m.RevisarSolicitudPage,
+          ),
+      },
     ],
   },
   {
@@ -40,6 +54,13 @@ export const puentesRoutes: Routes = [
         loadComponent: () =>
           import('./pages/solicitar-alta-puente/solicitar-alta-puente.page').then(
             (m) => m.SolicitarAltaPuentePage,
+          ),
+      },
+      {
+        path: 'solicitudes/:id',
+        loadComponent: () =>
+          import('./pages/detalle-solicitud/detalle-solicitud.page').then(
+            (m) => m.DetalleSolicitudPage,
           ),
       },
     ],
