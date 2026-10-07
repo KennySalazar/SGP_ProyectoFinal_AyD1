@@ -82,9 +82,10 @@ class AsignacionPuenteServiceTest {
   void rechazaAsignacionEnCursoFinalizado() {
     UserAccount catedratico = catedratico();
     UUID inscripcionId = UUID.randomUUID();
+    var inscripcion = inscripcion(false, "ACTIVO", true, true);
     when(usuarios.findByEmail("catedratico@ejemplo.com")).thenReturn(Optional.of(catedratico));
     when(asignaciones.findInscripcionParaAsignacion(inscripcionId, catedratico.getId()))
-        .thenReturn(Optional.of(inscripcion(false, "ACTIVO", true, true)));
+        .thenReturn(Optional.of(inscripcion));
 
     assertThatThrownBy(
             () ->
@@ -105,9 +106,10 @@ class AsignacionPuenteServiceTest {
     UUID inscripcionId = UUID.randomUUID();
     UUID puenteId = UUID.randomUUID();
     Puente puente = mock(Puente.class);
+    var inscripcion = inscripcion(true, "ACTIVO", true, true);
     when(usuarios.findByEmail("catedratico@ejemplo.com")).thenReturn(Optional.of(catedratico));
     when(asignaciones.findInscripcionParaAsignacion(inscripcionId, catedratico.getId()))
-        .thenReturn(Optional.of(inscripcion(true, "ACTIVO", true, true)));
+        .thenReturn(Optional.of(inscripcion));
     when(puentes.findById(puenteId)).thenReturn(Optional.of(puente));
     when(puente.isActivo()).thenReturn(false);
 
