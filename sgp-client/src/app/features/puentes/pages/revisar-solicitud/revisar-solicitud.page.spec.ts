@@ -5,6 +5,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { AvisoCercaniaComponent } from '../../components/aviso-cercania/aviso-cercania.component';
 import { SolicitudFichaComponent } from '../../components/solicitud-ficha/solicitud-ficha.component';
 import { SelectorUbicacionComponent } from '../../../../shared/components/selector-ubicacion/selector-ubicacion.component';
 import { SelectorUbicacionStubComponent } from '../../../../shared/components/selector-ubicacion/selector-ubicacion.testing';
@@ -88,6 +89,10 @@ describe('RevisarSolicitudPage: HU011', () => {
       remove: { imports: [TranslocoPipe] },
       add: { imports: [TraduccionTestPipe] },
     });
+    TestBed.overrideComponent(AvisoCercaniaComponent, {
+      remove: { imports: [TranslocoPipe] },
+      add: { imports: [TraduccionTestPipe] },
+    });
     TestBed.overrideComponent(SolicitudFichaComponent, {
       remove: { imports: [TranslocoPipe, SelectorUbicacionComponent] },
       add: { imports: [TraduccionTestPipe, SelectorUbicacionStubComponent] },
@@ -156,6 +161,7 @@ describe('RevisarSolicitudPage: HU011', () => {
         titulo: 'GT-01-0114-0001 — Puente existente',
         latitud: 14.4811,
         longitud: -90.615,
+        inactivo: false,
       },
     ]);
     expect(boton('puentes.revision.approveAnyway')).toBeTruthy();
@@ -295,5 +301,38 @@ describe('RevisarSolicitudPage: HU011', () => {
     expect(page.hayCercanos()).toBe(false);
     expect(fixture.nativeElement.textContent).toContain('GT-09-0901-0001');
     expect(fixture.nativeElement.textContent).toContain('admin@sgp.local');
+  });
+
+  describe('cercanos inactivos', () => {
+    const inactivo = { ...cercano, id: 'puente-2', codigo: 'GT-01-0114-0002', activo: false };
+
+    it('con solo inactivos explica que conviene reactivar en lugar de aprobar', () => {
+      cargar(detalle({}, [inactivo]));
+
+      const texto = (fixture.nativeElement.querySelector('.proximity') as HTMLElement)
+        .textContent as string;
+      expect(texto).toContain('puentes.revision.proximityOnlyInactiveNote');
+      expect(texto).not.toContain('puentes.revision.proximityNote');
+      expect(page.puntosCercanos()[0].inactivo).toBe(true);
+    });
+
+    it('con activos e inactivos agrega la nota sobre los inactivos', () => {
+      cargar(detalle({}, [cercano, inactivo]));
+
+      const texto = (fixture.nativeElement.querySelector('.proximity') as HTMLElement)
+        .textContent as string;
+      expect(texto).toContain('puentes.revision.proximityNote');
+      expect(texto).toContain('puentes.revision.proximityInactiveNote');
+      expect(page.puntosCercanos().map((p) => p.inactivo)).toEqual([false, true]);
+    });
+
+    it('con solo activos no muestra notas de inactivos', () => {
+      cargar(detalle({}, [cercano]));
+
+      const texto = (fixture.nativeElement.querySelector('.proximity') as HTMLElement)
+        .textContent as string;
+      expect(texto).not.toContain('InactiveNote');
+      expect(texto).not.toContain('OnlyInactive');
+    });
   });
 });

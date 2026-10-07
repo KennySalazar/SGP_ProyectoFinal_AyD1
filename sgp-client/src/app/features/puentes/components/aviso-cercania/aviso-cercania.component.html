@@ -1,0 +1,26 @@
+<section class="proximity" role="alert">
+  <h3>{{ 'puentes.proximityTitle' | transloco }}</h3>
+  <p>{{ claveNota() | transloco }}</p>
+  @if (hayInactivos() && !soloInactivos()) {
+    <p class="aviso-inactivos">{{ claveNotaInactivos() | transloco }}</p>
+  }
+  <p>{{ 'puentes.proximityTotal' | transloco: { total: total() } }}</p>
+
+  <ul>
+    @for (cercano of cercanos(); track cercano.id) {
+      <li>
+        <strong>{{ cercano.codigo }} — {{ cercano.nombre }}</strong>
+        <span>
+          {{ 'puentes.distance' | transloco }}: {{ cercano.distanciaMetros | number: '1.1-1' }} m ·
+          {{ (cercano.activo ? 'puentes.active' : 'puentes.inactive') | transloco }}
+        </span>
+      </li>
+    }
+  </ul>
+
+  @if (total() > cercanos().length) {
+    <p>{{ 'puentes.proximityLimit' | transloco: { cantidad: cercanos().length } }}</p>
+  }
+
+  <ng-content />
+</section>

@@ -9,6 +9,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiErrorService } from '../../../../core/services/api-error.service';
 import { SelectorUbicacionComponent } from '../../../../shared/components/selector-ubicacion/selector-ubicacion.component';
 import { SelectorUbicacionStubComponent } from '../../../../shared/components/selector-ubicacion/selector-ubicacion.testing';
+import { AvisoCercaniaComponent } from '../../components/aviso-cercania/aviso-cercania.component';
 import { PuenteFormComponent } from '../../components/puente-form/puente-form.component';
 import { UbicacionTerritorialResponse } from '../../models/puente.models';
 import { SolicitarAltaPuentePage } from './solicitar-alta-puente.page';
@@ -104,6 +105,10 @@ describe('SolicitarAltaPuentePage: HU010', () => {
       remove: { imports: [TranslocoPipe] },
       add: { imports: [TraduccionTestPipe] },
     });
+    TestBed.overrideComponent(AvisoCercaniaComponent, {
+      remove: { imports: [TranslocoPipe] },
+      add: { imports: [TraduccionTestPipe] },
+    });
     TestBed.overrideComponent(PuenteFormComponent, {
       remove: { imports: [TranslocoPipe, SelectorUbicacionComponent] },
       add: { imports: [TraduccionTestPipe, SelectorUbicacionStubComponent] },
@@ -150,8 +155,8 @@ describe('SolicitarAltaPuentePage: HU010', () => {
       latitud: 14.481,
       longitud: -90.615,
       justificacion: 'No aparece en el catálogo',
+      confirmarCercania: false,
     });
-    expect(request.request.body).not.toHaveProperty('confirmarCercania');
   });
 
   it('envía justificacion nula cuando está vacía y evita duplicados', () => {
@@ -285,5 +290,152 @@ describe('SolicitarAltaPuentePage: HU010', () => {
 
   it('carga los puentes existentes en el mapa al abrir el formulario', () => {
     expect(formulario().mostrarExistentes()).toBe(true);
+  });
+
+  describe('advertencia de cercanía (RN-INV-06)', () => {
+    const cercano = {
+      id: 'puente-1',
+      codigo: 'GT-01-0114-0001',
+      nombre: 'Puente existente',
+      activo: true,
+      distanciaMetros: 11.1,
+      latitud: 14.4811,
+      longitud: -90.615,
+    };
+
+    const inactivo = {
+      ...cercano,
+      id: 'puente-2',
+      codigo: 'GT-01-0114-0002',
+      nombre: 'Puente dado de baja',
+      activo: false,
+    };
+
+    function responderConAdvertencia(cercanos: object[] = [cercano]): void {
+      http.expectOne('/api/v1/solicitudes-puente').flush(
+        {
+          code: 'puente_cercano',
+          detail: 'Existen puentes a menos de 100 metros.',
+          requiereConfirmacion: true,
+          puentesCercanos: cercanos,
+          totalPuentesCercanos: cercanos.length,
+        },
+        { status: 409, statusText: 'Conflict' },
+      );
+      fixture.detectChanges();
+    }
+
+    it('muestra el aviso con los puentes cercanos, los pasa al mapa y no crea la solicitud', () => {
+      formularioValido();
+      formulario().enviarFormulario();
+      responderConAdvertencia([cercano, inactivo]);
+
+      expect(page.advertencia()?.requiereConfirmacion).toBe(true);
+      expect(page.solicitudCreada()).toBeNull();
+      expect(page.errorSolicitud()).toBeNull();
+      expect(page.puntosCercanos().map((p) => [p.id, p.inactivo])).toEqual([
+        ['puente-1', false],
+        ['puente-2', true],
+      ]);
+      expect(fixture.nativeElement.querySelector('app-aviso-cercania')).not.toBeNull();
+      expect(fixture.nativeElement.textContent).toContain('GT-01-0114-0002');
+      expect(fixture.nativeElement.textContent).toContain('puentes.solicitud.proximityNote');
+      // El botón de envío del formulario se oculta mientras se decide.
+      expect(fixture.nativeElement.querySelector('app-puente-form button[type=submit]')).toBeNull();
+      http.expectNone('/api/v1/solicitudes-puente');
+    });
+
+    it('confirmar reenvía la misma solicitud con confirmarCercania en true', () => {
+      formularioValido();
+      page.justificacion.setValue('Falta en el catálogo');
+      formulario().enviarFormulario();
+      responderConAdvertencia();
+
+      page.confirmarSolicitud();
+
+      const peticion = http.expectOne('/api/v1/solicitudes-puente');
+      expect(peticion.request.body).toEqual({
+        nombre: 'Puente nuevo',
+        departamentoId: departamento.id,
+        municipioId: municipio.id,
+        ruta: 'CA-9',
+        kilometraje: null,
+        latitud: 14.481,
+        longitud: -90.615,
+        justificacion: 'Falta en el catálogo',
+        confirmarCercania: true,
+      });
+      expect(page.advertencia()).toBeNull();
+
+      peticion.flush(solicitudCreada(), { status: 201, statusText: 'Created' });
+      expect(page.solicitudCreada()?.estado).toBe('PENDIENTE');
+    });
+
+    it('al confirmar usa la justificación vigente, aunque se editó con el aviso abierto', () => {
+      formularioValido();
+      page.justificacion.setValue('Primera versión');
+      formulario().enviarFormulario();
+      responderConAdvertencia();
+
+      page.justificacion.setValue('Versión corregida');
+      page.confirmarSolicitud();
+
+      const peticion = http.expectOne('/api/v1/solicitudes-puente');
+      expect(peticion.request.body.justificacion).toBe('Versión corregida');
+      peticion.flush(solicitudCreada(), { status: 201, statusText: 'Created' });
+    });
+
+    it('volver al formulario conserva los datos y no envía nada', () => {
+      formularioValido();
+      const datos = formulario().form.getRawValue();
+      formulario().enviarFormulario();
+      responderConAdvertencia();
+
+      page.cancelarConfirmacion();
+      page.confirmarSolicitud();
+      fixture.detectChanges();
+
+      expect(page.advertencia()).toBeNull();
+      expect(formulario().form.getRawValue()).toEqual(datos);
+      expect(fixture.nativeElement.querySelector('app-aviso-cercania')).toBeNull();
+      http.expectNone('/api/v1/solicitudes-puente');
+    });
+
+    it('editar el formulario invalida una confirmación pendiente', () => {
+      formularioValido();
+      formulario().enviarFormulario();
+      responderConAdvertencia();
+
+      formulario().form.controls.nombre.setValue('Otro nombre');
+      page.confirmarSolicitud();
+
+      expect(page.advertencia()).toBeNull();
+      http.expectNone('/api/v1/solicitudes-puente');
+    });
+
+    it('con solo inactivos explica que el Administrador puede reactivarlo', () => {
+      formularioValido();
+      formulario().enviarFormulario();
+      responderConAdvertencia([inactivo]);
+
+      expect(fixture.nativeElement.textContent).toContain(
+        'puentes.solicitud.proximityOnlyInactiveNote',
+      );
+    });
+
+    it('un 409 que no es de cercanía se muestra como error normal', () => {
+      formularioValido();
+      formulario().enviarFormulario();
+
+      http
+        .expectOne('/api/v1/solicitudes-puente')
+        .flush(
+          { code: 'otro', detail: 'Conflicto distinto' },
+          { status: 409, statusText: 'Conflict' },
+        );
+
+      expect(page.advertencia()).toBeNull();
+      expect(page.errorSolicitud()).toBe('Conflicto distinto');
+    });
   });
 });

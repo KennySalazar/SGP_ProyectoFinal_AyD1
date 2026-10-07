@@ -95,29 +95,11 @@
   @if (errorRegistro(); as mensaje) {
   <p class="feedback error" role="alert">{{ mensaje }}</p>
   } @if (advertencia(); as aviso) {
-  <section class="proximity" role="alert">
-    <h3>{{ 'puentes.proximityTitle' | transloco }}</h3>
-    <p>{{ 'puentes.proximityNote' | transloco }}</p>
-    <p>{{ 'puentes.proximityTotal' | transloco: { total: aviso.totalPuentesCercanos ?? 0 } }}</p>
-
-    <ul>
-      @for (cercano of aviso.puentesCercanos ?? []; track cercano.id) {
-      <li>
-        <strong>{{ cercano.codigo }} — {{ cercano.nombre }}</strong>
-        <span>
-          {{ 'puentes.distance' | transloco }}: {{ cercano.distanciaMetros | number: '1.1-1' }} m ·
-          {{ (cercano.activo ? 'puentes.active' : 'puentes.inactive') | transloco }}
-        </span>
-      </li>
-      }
-    </ul>
-
-    @if ( (aviso.totalPuentesCercanos ?? 0) > (aviso.puentesCercanos?.length ?? 0) ) {
-    <p>
-      {{ 'puentes.proximityLimit' | transloco: { cantidad: aviso.puentesCercanos?.length ?? 0 } }}
-    </p>
-    }
-
+  <app-aviso-cercania
+    [cercanos]="aviso.puentesCercanos ?? []"
+    [total]="aviso.totalPuentesCercanos ?? 0"
+    modo="registro"
+  >
     <div class="actions">
       <button pButton type="button" [disabled]="guardando()" (click)="confirmarRegistro()">
         {{ 'puentes.confirm' | transloco }}
@@ -133,7 +115,7 @@
         {{ 'puentes.cancelConfirmation' | transloco }}
       </button>
     </div>
-  </section>
+  </app-aviso-cercania>
   }
 </app-puente-form>
 }

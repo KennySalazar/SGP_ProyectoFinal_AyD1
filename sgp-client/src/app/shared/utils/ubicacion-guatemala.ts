@@ -6,6 +6,8 @@ export interface CoordenadaGeografica {
 export interface PuntoMapa extends CoordenadaGeografica {
   id: string;
   titulo: string;
+  /** Puente dado de baja: se dibuja atenuado y se rotula como inactivo. */
+  inactivo?: boolean;
 }
 
 type Posicion = number[];

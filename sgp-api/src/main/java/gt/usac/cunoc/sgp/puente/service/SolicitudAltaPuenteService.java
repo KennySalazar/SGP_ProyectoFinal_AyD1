@@ -15,6 +15,7 @@ import gt.usac.cunoc.sgp.puente.dto.SolicitudRevisionDetalleResponse;
 import gt.usac.cunoc.sgp.puente.dto.SolicitudRevisionResponse;
 import gt.usac.cunoc.sgp.puente.entity.Municipio;
 import gt.usac.cunoc.sgp.puente.entity.SolicitudAltaPuente;
+import gt.usac.cunoc.sgp.puente.exception.CercaniaPuenteException;
 import gt.usac.cunoc.sgp.puente.mapper.PuenteMapper;
 import gt.usac.cunoc.sgp.puente.model.EstadoSolicitudAltaPuente;
 import gt.usac.cunoc.sgp.puente.repository.DepartamentoRepository;
@@ -125,6 +126,13 @@ public class SolicitudAltaPuenteService {
     }
 
     puenteService.validarUbicacionEnMunicipio(municipio.getId(), latitud, longitud);
+
+    // RN-INV-06: la misma advertencia (no bloqueante) que el alta directa, para que el Catedrático
+    // sepa de un posible duplicado antes de enviar la solicitud.
+    var cercanos = puentes.findCercanos(latitud, longitud, PageRequest.of(0, 100));
+    if (cercanos.hasContent() && !request.confirmarCercania()) {
+      throw new CercaniaPuenteException(cercanos.map(mapper::toPuenteCercanoResponse));
+    }
 
     String justificacion =
         request.justificacion() == null || request.justificacion().isBlank()

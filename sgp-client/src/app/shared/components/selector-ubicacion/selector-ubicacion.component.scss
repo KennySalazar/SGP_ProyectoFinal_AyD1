@@ -17,6 +17,50 @@
   line-height: 1.6;
 }
 
+.leyenda {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1.25rem;
+  margin: 0.75rem 0 0;
+  padding: 0;
+  color: var(--sgp-navy-900);
+  font-size: 0.9rem;
+  list-style: none;
+
+  li {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+}
+
+.muestra {
+  display: inline-block;
+  width: 0.9rem;
+  height: 0.9rem;
+  border: 2px solid transparent;
+  border-radius: 50%;
+}
+
+.muestra--azul {
+  background: #2563eb;
+}
+
+.muestra--gris {
+  background: #64748b;
+}
+
+.muestra--naranja {
+  background: #d97706;
+}
+
+.muestra--inactivo {
+  background: #d97706;
+  border-style: dashed;
+  border-color: #78350f;
+  opacity: 0.6;
+}
+
 .error {
   color: #b91c1c;
 }

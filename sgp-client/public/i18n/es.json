@@ -286,7 +286,9 @@
       "approvedNote": "El puente fue creado con el código {{codigo}} y se notificó al Catedrático.",
       "rejected": "Solicitud rechazada",
       "rejectedNote": "Se notificó el motivo al Catedrático y no se creó ningún puente.",
-      "decisionFailed": "No se pudo registrar la decisión. Inténtalo de nuevo."
+      "decisionFailed": "No se pudo registrar la decisión. Inténtalo de nuevo.",
+      "proximityOnlyInactiveNote": "Solo hay puentes inactivos a menos de 100 metros de esta solicitud. Si es el mismo puente, reactívalo desde el catálogo en lugar de aprobarla; si es otro (por ejemplo, uno reconstruido), puedes aprobarla.",
+      "proximityInactiveNote": "Entre los resultados hay puentes inactivos. Si alguno es el mismo puente, reactívalo desde el catálogo en lugar de aprobar esta solicitud."
     },
     "solicitud": {
       "title": "Solicitar alta de puente",
@@ -323,7 +325,11 @@
         "APROBADA": "Aprobada",
         "RECHAZADA": "Rechazada",
         "CANCELADA": "Cancelada"
-      }
+      },
+      "confirm": "Confirmar y enviar solicitud",
+      "proximityNote": "Se encontraron puentes a menos de 100 metros. Revisa los resultados y confirma si deseas enviar la solicitud de todos modos.",
+      "proximityInactiveNote": "Entre los resultados hay puentes inactivos. Si alguno es el mismo puente, no hace falta solicitar un alta: pide al Administrador que lo reactive.",
+      "proximityOnlyInactiveNote": "Solo hay puentes inactivos a menos de 100 metros. Si es el mismo puente, pide al Administrador que lo reactive en lugar de solicitar un alta nueva; si es otro (por ejemplo, uno reconstruido), puedes enviar la solicitud."
     },
     "catalogo": {
       "explore": "Explorar catálogo de puentes",
@@ -483,7 +489,9 @@
       "restrictedLogin": "Iniciar sesion para acceder",
       "noDocumentation": "No hay fotografias ni informes tecnicos publicados para este puente.",
       "back": "Volver al catalogo"
-    }
+    },
+    "proximityOnlyInactiveNote": "Solo hay puentes inactivos a menos de 100 metros. Si es el mismo puente, reactívalo desde el catálogo en lugar de registrar uno nuevo; si es otro (por ejemplo, uno reconstruido), puedes confirmar el registro.",
+    "proximityInactiveNote": "Entre los resultados hay puentes inactivos. Si alguno es el mismo puente, reactívalo desde el catálogo en lugar de registrar uno nuevo."
   },
   "auditoria": {
     "title": "Bitácora de auditoría",
