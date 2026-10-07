@@ -1,0 +1,173 @@
+<form [formGroup]="form" (ngSubmit)="enviarFormulario()" novalidate>
+  <section class="surface-card bridge-card">
+    <h2>{{ 'puentes.data' | transloco }}</h2>
+    <p class="note">{{ 'puentes.requiredNote' | transloco }}</p>
+
+    <div class="form-grid">
+      <label class="field">
+        <span>{{ 'puentes.name' | transloco }}</span>
+        <input pInputText formControlName="nombre" maxlength="200" autocomplete="off" />
+        @if (mensajeCampo('nombre'); as mensaje) {
+          <small class="validation">{{ mensaje }}</small>
+        }
+      </label>
+
+      <label class="field">
+        <span>{{ 'puentes.route' | transloco }}</span>
+        <input pInputText formControlName="ruta" maxlength="100" autocomplete="off" />
+        @if (mensajeCampo('ruta'); as mensaje) {
+          <small class="validation">{{ mensaje }}</small>
+        }
+      </label>
+
+      <label class="field">
+        <span>{{ 'puentes.kilometer' | transloco }}</span>
+        <input
+          pInputText
+          type="number"
+          formControlName="kilometraje"
+          min="0"
+          max="9999999.999"
+          step="0.001"
+          inputmode="decimal"
+        />
+        @if (mensajeCampo('kilometraje'); as mensaje) {
+          <small class="validation">{{ mensaje }}</small>
+        }
+      </label>
+    </div>
+
+    <h3>{{ 'puentes.territory' | transloco }}</h3>
+    <p class="note">{{ 'puentes.territoryFromPoint' | transloco }}</p>
+
+    @if (resolviendoUbicacion()) {
+      <p role="status">{{ 'puentes.resolvingLocation' | transloco }}</p>
+    }
+    @if (territorio()?.requiereSeleccion) {
+      <p class="feedback" role="status">{{ 'puentes.locationMultipleCandidates' | transloco }}</p>
+    }
+
+    <div class="form-grid">
+      <div class="field">
+        <label for="departamentoId"> {{ 'puentes.department' | transloco }} </label>
+        <p-select
+          inputId="departamentoId"
+          formControlName="departamentoId"
+          [options]="departamentos()"
+          optionLabel="nombre"
+          optionValue="id"
+          [placeholder]="'puentes.selectDepartment' | transloco"
+          [filter]="true"
+          filterBy="nombre"
+          [showClear]="false"
+          [loading]="resolviendoUbicacion()"
+        />
+        @if (mensajeCampo('departamentoId'); as mensaje) {
+          <small class="validation">{{ mensaje }}</small>
+        }
+      </div>
+
+      <div class="field">
+        <label for="municipioId"> {{ 'puentes.municipality' | transloco }} </label>
+        <p-select
+          inputId="municipioId"
+          formControlName="municipioId"
+          [options]="municipios()"
+          optionLabel="nombre"
+          optionValue="id"
+          [placeholder]="'puentes.selectMunicipality' | transloco"
+          [filter]="true"
+          filterBy="nombre"
+          [showClear]="false"
+          [loading]="resolviendoUbicacion()"
+        />
+        @if (mensajeCampo('municipioId'); as mensaje) {
+          <small class="validation">{{ mensaje }}</small>
+        }
+      </div>
+    </div>
+
+    <h3>{{ 'puentes.coordinates' | transloco }}</h3>
+    <p class="note">{{ 'puentes.mapCoordinatesNote' | transloco }}</p>
+
+    <app-selector-ubicacion
+      [latitud]="form.controls.latitud.value"
+      [longitud]="form.controls.longitud.value"
+      [deshabilitado]="guardando()"
+      [cercanos]="cercanos()"
+      [existentes]="existentes()"
+      (coordenadaSeleccionada)="seleccionarCoordenada($event)"
+    />
+
+    @if (form.controls.latitud.value !== null || form.controls.longitud.value !== null) {
+      <div class="actions">
+        <button
+          pButton
+          type="button"
+          severity="secondary"
+          [disabled]="guardando()"
+          (click)="quitarUbicacion()"
+        >
+          <i class="pi pi-times" aria-hidden="true"></i>
+          {{ 'puentes.clearLocation' | transloco }}
+        </button>
+      </div>
+    }
+    @if (zonaUtm(); as zona) {
+      <p role="status">
+        {{ 'puentes.zone' | transloco }} UTM:
+        <strong>{{ zona }}</strong>
+      </p>
+    }
+
+    <div class="form-grid">
+      <label class="field">
+        <span>{{ 'puentes.latitude' | transloco }}</span>
+        <input
+          pInputText
+          type="number"
+          formControlName="latitud"
+          min="-90"
+          max="90"
+          step="any"
+          inputmode="decimal"
+        />
+        @if (mensajeCampo('latitud'); as mensaje) {
+          <small class="validation">{{ mensaje }}</small>
+        }
+      </label>
+
+      <label class="field">
+        <span>{{ 'puentes.longitude' | transloco }}</span>
+        <input
+          pInputText
+          type="number"
+          formControlName="longitud"
+          min="-180"
+          max="180"
+          step="any"
+          inputmode="decimal"
+        />
+        @if (mensajeCampo('longitud'); as mensaje) {
+          <small class="validation">{{ mensaje }}</small>
+        }
+      </label>
+    </div>
+
+    <ng-content />
+
+    @if (!ocultarAcciones()) {
+      <div class="actions">
+        <button
+          pButton
+          type="submit"
+          [disabled]="guardando() || form.invalid || !ubicacionValidada()"
+        >
+          <i class="pi pi-save" aria-hidden="true"></i>
+          {{ (guardando() ? etiquetaEnviando() : etiquetaEnviar()) | transloco }}
+        </button>
+        <ng-content select="[formAcciones]" />
+      </div>
+    }
+  </section>
+</form>

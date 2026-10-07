@@ -1,0 +1,97 @@
+@if (cargandoPuente()) {
+<section class="surface-card estado-carga" role="status">
+  <i class="pi pi-spin pi-spinner" aria-hidden="true"></i>
+  <p>{{ 'puentes.loadingBridge' | transloco }}</p>
+</section>
+} @else if (errorCargaPuente() || !puente()) {
+<section class="surface-card estado-error" role="alert">
+  <i class="pi pi-exclamation-triangle" aria-hidden="true"></i>
+  <p>{{ 'puentes.bridgeNotFound' | transloco }}</p>
+  <a pButton routerLink="/puentes" class="accion-primaria">
+    {{ 'puentes.catalogo.backToCatalog' | transloco }}
+  </a>
+</section>
+} @else {
+<header class="page-heading">
+  <p class="page-kicker">{{ 'puentes.editKicker' | transloco }}</p>
+  <h1 class="page-title">{{ 'puentes.editTitle' | transloco }}</h1>
+  <p class="page-description">{{ 'puentes.editDescription' | transloco }}</p>
+</header>
+
+<section class="surface-card readonly-card">
+  <div class="card-header">
+    <div>
+      <h2 class="section-title">{{ 'puentes.calculatedData' | transloco }}</h2>
+      <p class="section-note">{{ 'puentes.calculatedNote' | transloco }}</p>
+    </div>
+    @if (puente(); as p) {
+    <p-tag
+      class="estado-puente"
+      [attr.data-estado]="p.activo ? p.estadoActual : 'Inactivo'"
+      [value]="p.activo ? p.estadoActual : ('puentes.catalogo.inactiveStatus' | transloco)"
+      [severity]="p.activo ? severidad(p.estadoActual) : 'danger'"
+    />
+    }
+  </div>
+
+  <dl class="readonly-grid">
+    <div class="readonly-item">
+      <dt>{{ 'puentes.code' | transloco }}</dt>
+      <dd class="code-value">{{ puente()?.codigo }}</dd>
+      <small class="readonly-hint">{{ 'puentes.codeReadonlyNote' | transloco }}</small>
+    </div>
+    <div class="readonly-item">
+      <dt>{{ 'puentes.conditionIndex' | transloco }}</dt>
+      <dd>{{ puente()?.indiceCondicionActual ?? '—' }}</dd>
+    </div>
+    <div class="readonly-item">
+      <dt>{{ 'puentes.lastInspection' | transloco }}</dt>
+      <dd>{{ puente()?.fechaUltimaInspeccion ?? '—' }}</dd>
+    </div>
+  </dl>
+</section>
+
+@if (puenteActualizado()) {
+<div class="surface-card feedback success" role="status">
+  <i class="pi pi-check-circle" aria-hidden="true"></i>
+  <p>{{ 'puentes.editSuccess' | transloco }}</p>
+</div>
+}
+
+<app-puente-form
+  [guardando]="guardando()"
+  [erroresServidor]="erroresCampos()"
+  [errorTerritorioServidor]="errorTerritorio()"
+  [cercanos]="puntosCercanos()"
+  [valoresIniciales]="valoresIniciales()"
+  [ocultarAcciones]="advertencia() !== null"
+  [etiquetaEnviar]="'puentes.saveChanges'"
+  [etiquetaEnviando]="'puentes.savingChanges'"
+  (enviar)="actualizar($event)"
+  (cambio)="alCambiarFormulario()"
+>
+  @if (errorRegistro(); as mensaje) {
+  <p class="feedback error" role="alert">{{ mensaje }}</p>
+  } @if (advertencia(); as aviso) {
+  <section class="proximity" role="alert">
+    <h3>{{ 'puentes.proximityTitle' | transloco }}</h3>
+    <p>{{ 'puentes.proximityEditNote' | transloco }}</p>
+    <p>{{ 'puentes.proximityTotal' | transloco: { total: aviso.totalPuentesCercanos ?? 0 } }}</p>
+    <div class="actions">
+      <button pButton type="button" (click)="confirmarActualizacion()">
+        {{ 'puentes.confirmUpdate' | transloco }}
+      </button>
+      <button
+        pButton
+        type="button"
+        severity="secondary"
+        [outlined]="true"
+        (click)="cancelarConfirmacion()"
+      >
+        {{ 'puentes.backToForm' | transloco }}
+      </button>
+    </div>
+  </section>
+  }
+</app-puente-form>
+}

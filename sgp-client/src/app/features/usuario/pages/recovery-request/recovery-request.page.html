@@ -1,0 +1,27 @@
+<app-auth-card
+  [title]="'auth.recovery.title' | transloco"
+  [subtitle]="'auth.recovery.subtitle' | transloco"
+>
+  <form [formGroup]="form" (ngSubmit)="submit()">
+    <label
+      >{{ 'common.email' | transloco }}<input
+        pInputText
+        type="email"
+        formControlName="email"
+        autocomplete="email"
+        [placeholder]="'common.emailPlaceholder' | transloco"
+    /></label>
+    <button pButton class="primary" type="submit" [disabled]="form.invalid">
+      <i class="pi pi-send"></i><span>{{ 'auth.recovery.send' | transloco }}</span>
+    </button>
+  </form>
+  @if(sent()){
+  <p class="note"><i class="pi pi-envelope"></i> {{ 'auth.recovery.sent' | transloco }}</p>
+  <div class="links">
+    <a routerLink="/recuperar/restablecer" [queryParams]="{email: form.controls.email.value}"
+      >{{ 'auth.recovery.haveCode' | transloco }}</a
+    >
+  </div>
+  }
+  <div class="links"><a routerLink="/login">{{ 'auth.recovery.back' | transloco }}</a></div>
+</app-auth-card>

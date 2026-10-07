@@ -1,0 +1,124 @@
+<header class="page-heading">
+  <p class="page-kicker">{{ 'admin.courses.kicker' | transloco }}</p>
+  <h1 class="page-title">{{ 'admin.courses.title' | transloco }}</h1>
+  <p class="page-description">{{ 'admin.courses.description' | transloco }}</p>
+</header>
+
+@if (exito(); as mensaje) {
+<p class="feedback success" role="status">
+  <i class="pi pi-check-circle"></i>{{ mensaje | transloco }}
+</p>
+}
+
+<section class="surface-card course-form">
+  <h2>{{ (cursoEnEdicion() ? 'admin.courses.edit' : 'admin.courses.create') | transloco }}</h2>
+  <p>{{ 'admin.courses.requiredNote' | transloco }}</p>
+  <form [formGroup]="form" (ngSubmit)="guardar()" novalidate>
+    <label
+      ><span>{{ 'admin.courses.name' | transloco }}</span
+      ><input pInputText formControlName="nombre" maxlength="150"
+    /></label>
+    <label
+      ><span>{{ 'admin.courses.period' | transloco }}</span
+      ><input pInputText formControlName="periodo" maxlength="50"
+    /></label>
+    <div class="field">
+      <label for="catedraticoId">{{ 'admin.courses.professor' | transloco }}</label
+      ><p-select
+        inputId="catedraticoId"
+        formControlName="catedraticoId"
+        [options]="catedraticos()"
+        optionLabel="email"
+        optionValue="id"
+        [placeholder]="'admin.courses.selectProfessor' | transloco"
+      />
+    </div>
+    <label
+      ><span>{{ 'admin.courses.startDate' | transloco }}</span
+      ><input pInputText type="date" formControlName="fechaInicio"
+    /></label>
+    <label
+      ><span>{{ 'admin.courses.endDate' | transloco }}</span
+      ><input pInputText type="date" formControlName="fechaFin"
+    /></label>
+    <button pButton type="submit" [disabled]="form.invalid || guardando()">
+      {{ (guardando() ? 'admin.courses.saving' : (cursoEnEdicion() ? 'admin.courses.save' :
+      'admin.courses.create')) | transloco }}
+    </button>
+    @if (cursoEnEdicion()) {
+    <button
+      pButton
+      type="button"
+      severity="secondary"
+      [outlined]="true"
+      (click)="cancelarEdicion()"
+    >
+      {{ 'admin.courses.cancel' | transloco }}
+    </button>
+    }
+  </form>
+</section>
+
+<section class="surface-card course-list">
+  <div>
+    <h2>{{ 'admin.courses.list' | transloco }}</h2>
+    <button pButton type="button" severity="secondary" [outlined]="true" (click)="cargar()">
+      {{ 'admin.courses.refresh' | transloco }}
+    </button>
+  </div>
+  @if (cargando()) {
+  <p role="status">{{ 'admin.courses.loading' | transloco }}</p>
+  } @else if (cursos().length === 0) {
+  <p role="status">{{ 'admin.courses.empty' | transloco }}</p>
+  } @else {
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>{{ 'admin.courses.name' | transloco }}</th>
+          <th>{{ 'admin.courses.period' | transloco }}</th>
+          <th>{{ 'admin.courses.professor' | transloco }}</th>
+          <th>{{ 'admin.courses.status' | transloco }}</th>
+          <th>{{ 'admin.courses.actions' | transloco }}</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (curso of cursos(); track curso.id) {
+        <tr>
+          <th scope="row">{{ curso.nombre }}</th>
+          <td>{{ curso.periodo }}</td>
+          <td>{{ curso.catedratico.email }}</td>
+          <td>
+            <p-tag
+              [value]="curso.estado"
+              [severity]="curso.estado === 'VIGENTE' ? 'success' : 'secondary'"
+            />
+          </td>
+          <td>
+            <button
+              pButton
+              type="button"
+              severity="secondary"
+              [outlined]="true"
+              (click)="editar(curso)"
+            >
+              {{ 'admin.courses.edit' | transloco }}
+            </button>
+            <button
+              pButton
+              type="button"
+              severity="secondary"
+              [outlined]="true"
+              [disabled]="curso.estado !== 'VIGENTE' || finalizandoId() === curso.id"
+              (click)="finalizar(curso)"
+            >
+              {{ 'admin.courses.finalize' | transloco }}
+            </button>
+          </td>
+        </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+  }
+</section>

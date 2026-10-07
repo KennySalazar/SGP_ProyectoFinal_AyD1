@@ -1,0 +1,214 @@
+<header class="page-heading">
+  <p class="page-kicker">{{ 'admin.kicker' | transloco }}</p>
+  <h1 class="page-title">{{ 'auditoria.title' | transloco }}</h1>
+  <p class="page-description">{{ 'auditoria.description' | transloco }}</p>
+</header>
+
+<section class="surface-card bitacora" [attr.aria-label]="'auditoria.title' | transloco">
+  <form class="filtros" [formGroup]="filtros" (ngSubmit)="aplicarFiltros()">
+    <label>
+      <span>{{ 'auditoria.userFilter' | transloco }}</span>
+      <input
+        pInputText
+        type="email"
+        formControlName="usuarioEmail"
+        maxlength="320"
+        [placeholder]="'common.emailPlaceholder' | transloco"
+      />
+    </label>
+    <label>
+      <span>{{ 'auditoria.from' | transloco }}</span>
+      <input pInputText type="date" formControlName="desde" />
+    </label>
+    <label>
+      <span>{{ 'auditoria.to' | transloco }}</span>
+      <input pInputText type="date" formControlName="hasta" />
+    </label>
+    <div class="acciones-filtro">
+      <button pButton type="submit" [disabled]="filtros.invalid || cargando()">
+        {{ 'auditoria.apply' | transloco }}
+      </button>
+      <button
+        pButton
+        type="button"
+        severity="secondary"
+        [disabled]="cargando()"
+        (click)="limpiarFiltros()"
+      >
+        {{ 'auditoria.clear' | transloco }}
+      </button>
+    </div>
+    @if (filtros.controls.usuarioEmail.touched && filtros.controls.usuarioEmail.invalid) {
+    <p class="validation" role="alert">{{ 'auditoria.invalidEmail' | transloco }}</p>
+    } @if (filtros.hasError('rangoFechas')) {
+    <p class="validation" role="alert">{{ 'auditoria.invalidRange' | transloco }}</p>
+    }
+  </form>
+  <p class="nota">{{ 'auditoria.timezone' | transloco }}</p>
+
+  @if (cargando()) {
+  <p role="status">{{ 'auditoria.loading' | transloco }}</p>
+  } @else if (errorConsulta(); as error) {
+  <div role="alert" class="error">
+    <p>
+      {{ (error === 'prohibido' ? 'auditoria.forbidden' : 'auditoria.loadFailed') | transloco }}
+    </p>
+    @if (error !== 'prohibido') {
+    <button pButton type="button" severity="secondary" (click)="cargarPagina()">
+      {{ 'auditoria.retry' | transloco }}
+    </button>
+    }
+  </div>
+  } @else if (pagina(); as paginaActual) {
+  <div class="resumen">
+    <p>{{ 'auditoria.total' | transloco: { total: paginaActual.totalElements } }}</p>
+    <label for="bitacora-tamanio">
+      <span>{{ 'auditoria.pageSize' | transloco }}</span>
+      <p-select
+        inputId="bitacora-tamanio"
+        [options]="tamanios"
+        [formControl]="tamanio"
+        (onChange)="cambiarTamanio()"
+        [ariaLabel]="'auditoria.pageSize' | transloco"
+      />
+    </label>
+  </div>
+  <div class="tabla-contenedor">
+    <p-table [value]="paginaActual.content" dataKey="id">
+      <ng-template #header>
+        <tr>
+          <th scope="col">{{ 'auditoria.date' | transloco }}</th>
+          <th scope="col">{{ 'auditoria.user' | transloco }}</th>
+          <th scope="col">{{ 'auditoria.action' | transloco }}</th>
+          <th scope="col">{{ 'auditoria.entity' | transloco }}</th>
+          <th scope="col">{{ 'auditoria.detail' | transloco }}</th>
+        </tr>
+      </ng-template>
+      <ng-template #body let-registro>
+        <tr>
+          <td>{{ fechaLegible(registro.creadoEn) }}</td>
+          <td>
+            @if (registro.usuarioEmail) { {{ registro.usuarioEmail }} } @else if
+            (registro.procesoAutomatico) { {{ 'auditoria.automatic' | transloco }}: {{
+            registro.procesoAutomatico }} } @else { {{ registro.usuarioId || ('auditoria.system' |
+            transloco) }} }
+          </td>
+          <td>{{ ('auditoria.acciones.' + registro.accion) | transloco }}</td>
+          <td>{{ registro.entidad }}</td>
+          <td>
+            <button
+              pButton
+              type="button"
+              severity="secondary"
+              [disabled]="cargandoDetalle()"
+              (click)="abrirDetalle(registro)"
+              [attr.aria-label]="('auditoria.openDetail' | transloco) + ' ' + registro.id"
+            >
+              {{ 'auditoria.openDetail' | transloco }}
+            </button>
+          </td>
+        </tr>
+      </ng-template>
+      <ng-template #emptymessage>
+        <tr>
+          <td colspan="5">{{ 'auditoria.empty' | transloco }}</td>
+        </tr>
+      </ng-template>
+    </p-table>
+  </div>
+  <p-paginator
+    [first]="paginaActual.number * paginaActual.size"
+    [rows]="paginaActual.size"
+    [totalRecords]="paginaActual.totalElements"
+    (onPageChange)="cambiarPagina($event)"
+  />
+  }
+</section>
+
+<p-dialog
+  [header]="'auditoria.detailTitle' | transloco"
+  [visible]="mostrarDetalle()"
+  (visibleChange)="!$event && cerrarDetalle()"
+  [modal]="true"
+  [style]="{ width: 'min(920px, 95vw)' }"
+  [draggable]="false"
+  [resizable]="false"
+>
+  @if (cargandoDetalle()) {
+  <p role="status">{{ 'auditoria.loading' | transloco }}</p>
+  } @else if (errorDetalle(); as error) {
+  <div role="alert">
+    <p>
+      {{ (error === 'prohibido' ? 'auditoria.forbidden' : 'auditoria.detailFailed') | transloco }}
+    </p>
+    @if (error !== 'prohibido') {
+    <button pButton type="button" (click)="cargarDetalle()">
+      {{ 'auditoria.retry' | transloco }}
+    </button>
+    }
+  </div>
+  } @else if (detalle(); as registro) {
+  <dl class="metadatos">
+    <div>
+      <dt>{{ 'auditoria.date' | transloco }}</dt>
+      <dd>{{ fechaLegible(registro.creadoEn) }}</dd>
+    </div>
+    <div>
+      <dt>{{ 'auditoria.user' | transloco }}</dt>
+      <dd>{{ registro.usuarioEmail || registro.usuarioId || ('auditoria.system' | transloco) }}</dd>
+    </div>
+    <div>
+      <dt>{{ 'auditoria.action' | transloco }}</dt>
+      <dd>{{ ('auditoria.acciones.' + registro.accion) | transloco }}</dd>
+    </div>
+    <div>
+      <dt>{{ 'auditoria.entity' | transloco }}</dt>
+      <dd>
+        {{ registro.entidad }} — {{ registro.entidadId || ('auditoria.noValue' | transloco) }}
+      </dd>
+    </div>
+    @if (registro.procesoAutomatico) {
+    <div>
+      <dt>{{ 'auditoria.automatic' | transloco }}</dt>
+      <dd>{{ registro.procesoAutomatico }}</dd>
+    </div>
+    }
+  </dl>
+  <p class="nota">{{ 'auditoria.detailNote' | transloco }}</p>
+  @for (grupo of gruposDetalle(); track grupo.id) {
+  <details class="grupo-detalle" [attr.data-grupo]="grupo.id" [open]="grupo.id !== 'tecnicos'">
+    <summary>
+      {{ ('auditoria.grupos.' + grupo.id) | transloco }} ({{ grupo.cambios.length }})
+    </summary>
+    <div class="tabla-contenedor">
+      <table class="cambios">
+        <caption>
+          {{ 'auditoria.changes' | transloco }}
+        </caption>
+        <thead>
+          <tr>
+            <th scope="col">{{ 'auditoria.field' | transloco }}</th>
+            <th scope="col">{{ 'auditoria.before' | transloco }}</th>
+            <th scope="col">{{ 'auditoria.after' | transloco }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (cambio of grupo.cambios; track cambio.campo) {
+          <tr>
+            <th scope="row">{{ nombreCampo(cambio.campo) }}</th>
+            <td>{{ cambio.anterior ?? ('auditoria.noValue' | transloco) }}</td>
+            <td>{{ cambio.posterior ?? ('auditoria.noValue' | transloco) }}</td>
+          </tr>
+          } @empty {
+          <tr>
+            <td colspan="3">{{ 'auditoria.noChanges' | transloco }}</td>
+          </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  </details>
+  } @empty {
+  <p>{{ 'auditoria.noChanges' | transloco }}</p>
+  } }
+</p-dialog>

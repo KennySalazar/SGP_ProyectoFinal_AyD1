@@ -1,0 +1,111 @@
+<div class="shell">
+  <main class="workspace">
+    <header class="workspace-bar">
+      <div>
+        <p class="workspace-kicker">{{ 'app.technicalPlatform' | transloco }}</p>
+        <strong>{{ 'app.title' | transloco }}</strong>
+      </div>
+      <div class="workspace-meta">
+        <span class="environment">{{ 'app.development' | transloco }}</span>
+        <span class="connectivity" [class.offline]="!connectivity.online()">
+          <span class="dot"></span>
+          {{ (connectivity.online() ? 'connectivity.online' : 'connectivity.offline') | transloco }}
+        </span>
+      </div>
+    </header>
+
+    <section class="route-content">
+      <ng-content />
+      <router-outlet />
+    </section>
+  </main>
+
+  <aside class="sidebar" [attr.aria-label]="'nav.main' | transloco">
+    <a class="brand" routerLink="/" [attr.aria-label]="'nav.goHome' | transloco">
+      <span class="brand-mark">SGP</span>
+      <span class="brand-copy">
+        <strong>{{ 'app.shortTitle' | transloco }}</strong>
+        <small>{{ 'app.technicalEvaluation' | transloco }}</small>
+      </span>
+    </a>
+
+    <div class="sidebar-section">
+      <span class="section-label">{{ 'nav.operation' | transloco }}</span>
+      <nav>
+        <a routerLink="/" [routerLinkActiveOptions]="{ exact: true }" routerLinkActive="active">
+          <i class="pi pi-home"></i><span>{{ 'nav.home' | transloco }}</span>
+        </a>
+        <a
+          routerLink="/puentes"
+          [routerLinkActiveOptions]="{ exact: true }"
+          routerLinkActive="active"
+          ariaCurrentWhenActive="page"
+        >
+          <i class="pi pi-list" aria-hidden="true"></i
+          ><span>{{ 'nav.bridgeCatalog' | transloco }}</span>
+        </a>
+        <a routerLink="/offline" routerLinkActive="active">
+          <i class="pi pi-cloud"></i><span>{{ 'nav.offline' | transloco }}</span>
+        </a>
+        <a routerLink="/seguridad" routerLinkActive="active">
+          <i class="pi pi-shield"></i><span>{{ 'nav.security' | transloco }}</span>
+        </a>
+        @if (auth.user()?.role === 'ADMINISTRADOR') {
+          <a routerLink="/admin" routerLinkActive="active">
+            <i class="pi pi-users"></i><span>{{ 'nav.users' | transloco }}</span>
+          </a>
+
+          <a routerLink="/puentes/nuevo" routerLinkActive="active">
+            <i class="pi pi-map"></i>
+            <span>{{ 'nav.registerBridge' | transloco }}</span>
+          </a>
+          <a routerLink="/puentes/solicitudes/revision" routerLinkActive="active">
+            <i class="pi pi-inbox" aria-hidden="true"></i>
+            <span>{{ 'nav.reviewBridgeRequests' | transloco }}</span>
+          </a>
+        }
+        @if (auth.user()?.role === 'CATEDRATICO') {
+          <a routerLink="/puentes/solicitudes" routerLinkActive="active">
+            <i class="pi pi-send" aria-hidden="true"></i>
+            <span>{{ 'nav.myBridgeRequests' | transloco }}</span>
+          </a>
+        }
+        @if (auth.user()?.role === 'CATEDRATICO') {
+          <a routerLink="/estudiantes/pendientes" routerLinkActive="active">
+            <i class="pi pi-users"></i><span>{{ 'nav.pendingStudents' | transloco }}</span>
+          </a>
+          <a routerLink="/puentes/asignaciones" routerLinkActive="active">
+            <i class="pi pi-link"></i><span>{{ 'nav.bridgeAssignments' | transloco }}</span>
+          </a>
+        }
+        @if (auth.user()?.role === 'ESTUDIANTE') {
+          <a routerLink="/puentes/mis-asignaciones" routerLinkActive="active">
+            <i class="pi pi-map-marker"></i><span>{{ 'nav.myAssignedBridges' | transloco }}</span>
+          </a>
+        }
+      </nav>
+    </div>
+
+    <div class="sidebar-spacer"></div>
+
+    <div class="user-panel">
+      <div class="user-avatar">{{ auth.user()?.email?.charAt(0)?.toUpperCase() || 'U' }}</div>
+      <div class="user-data">
+        <strong>{{ auth.user()?.email }}</strong>
+        <span>{{ auth.user()?.role }}</span>
+      </div>
+    </div>
+
+    <button
+      class="logout"
+      type="button"
+      [attr.aria-label]="'nav.logout' | transloco"
+      (click)="logout()"
+    >
+      <i class="pi pi-sign-out"></i>
+      <span>{{ 'nav.logout' | transloco }}</span>
+    </button>
+
+    <p class="sidebar-foot">{{ 'app.footer' | transloco }}</p>
+  </aside>
+</div>

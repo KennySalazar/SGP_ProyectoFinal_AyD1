@@ -1,0 +1,17 @@
+.env
+.env.*
+!.env.example
+**/.env
+**/.env.*
+!**/.env.example
+**/target/
+**/build/
+**/.gradle/
+**/.idea/
+**/.angular/
+**/node_modules/
+**/dist/
+.DS_Store
+*.log
+enunciado_ayd1.md
+manual_centro_americano.md

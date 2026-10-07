@@ -1,0 +1,139 @@
+<header class="page-heading">
+  <p class="page-kicker">{{ 'puentes.kicker' | transloco }}</p>
+  <h1 class="page-title">{{ 'puentes.title' | transloco }}</h1>
+  <p class="page-description">{{ 'puentes.description' | transloco }}</p>
+</header>
+
+@if (puenteRegistrado(); as puente) {
+<section class="surface-card bridge-card">
+  <h2 class="success" role="status">
+    <i class="pi pi-check-circle" aria-hidden="true"></i>
+    {{ 'puentes.success' | transloco }}
+  </h2>
+
+  <dl class="result-grid">
+    <div>
+      <dt>{{ 'puentes.code' | transloco }}</dt>
+      <dd>{{ puente.codigo }}</dd>
+    </div>
+    <div>
+      <dt>{{ 'puentes.name' | transloco }}</dt>
+      <dd>{{ puente.nombre }}</dd>
+    </div>
+    <div>
+      <dt>{{ 'puentes.department' | transloco }}</dt>
+      <dd>{{ puente.departamento.nombre }}</dd>
+    </div>
+    <div>
+      <dt>{{ 'puentes.municipality' | transloco }}</dt>
+      <dd>{{ puente.municipio.nombre }}</dd>
+    </div>
+    <div>
+      <dt>{{ 'puentes.route' | transloco }}</dt>
+      <dd>{{ puente.ruta }}</dd>
+    </div>
+    <div>
+      <dt>{{ 'puentes.state' | transloco }}</dt>
+      <dd>{{ puente.estadoActual }}</dd>
+    </div>
+    <div>
+      <dt>{{ 'puentes.active' | transloco }}</dt>
+      <dd>{{ (puente.activo ? 'common.yes' : 'common.no') | transloco }}</dd>
+    </div>
+    <div>
+      <dt>{{ 'puentes.createdAt' | transloco }}</dt>
+      <dd>{{ fechaGuatemala(puente.creadoEn) }}</dd>
+    </div>
+    <div>
+      <dt>{{ 'puentes.latitude' | transloco }}</dt>
+      <dd>{{ puente.latitud }}</dd>
+    </div>
+    <div>
+      <dt>{{ 'puentes.longitude' | transloco }}</dt>
+      <dd>{{ puente.longitud }}</dd>
+    </div>
+  </dl>
+
+  <h3>{{ 'puentes.utm' | transloco }}</h3>
+
+  <dl class="result-grid">
+    <div>
+      <dt>{{ 'puentes.zone' | transloco }}</dt>
+      <dd>{{ puente.utm.zona }}{{ puente.utm.hemisferio }}</dd>
+    </div>
+    <div>
+      <dt>EPSG</dt>
+      <dd>{{ puente.utm.epsg }}</dd>
+    </div>
+    <div>
+      <dt>{{ 'puentes.east' | transloco }}</dt>
+      <dd>{{ puente.utm.este | number: '1.2-2' }}</dd>
+    </div>
+    <div>
+      <dt>{{ 'puentes.north' | transloco }}</dt>
+      <dd>{{ puente.utm.norte | number: '1.2-2' }}</dd>
+    </div>
+  </dl>
+
+  <p class="note">{{ 'puentes.noInspections' | transloco }}</p>
+
+  <button pButton type="button" (click)="registrarOtro()">
+    {{ 'puentes.another' | transloco }}
+  </button>
+</section>
+} @else {
+<app-puente-form
+  [mostrarExistentes]="true"
+  [guardando]="guardando()"
+  [erroresServidor]="erroresCampos()"
+  [errorTerritorioServidor]="errorTerritorio()"
+  [cercanos]="puntosCercanos()"
+  [ocultarAcciones]="advertencia() !== null"
+  (enviar)="registrar($event)"
+  (cambio)="alCambiarFormulario()"
+>
+  @if (errorRegistro(); as mensaje) {
+  <p class="feedback error" role="alert">{{ mensaje }}</p>
+  } @if (advertencia(); as aviso) {
+  <section class="proximity" role="alert">
+    <h3>{{ 'puentes.proximityTitle' | transloco }}</h3>
+    <p>{{ 'puentes.proximityNote' | transloco }}</p>
+    <p>{{ 'puentes.proximityTotal' | transloco: { total: aviso.totalPuentesCercanos ?? 0 } }}</p>
+
+    <ul>
+      @for (cercano of aviso.puentesCercanos ?? []; track cercano.id) {
+      <li>
+        <strong>{{ cercano.codigo }} — {{ cercano.nombre }}</strong>
+        <span>
+          {{ 'puentes.distance' | transloco }}: {{ cercano.distanciaMetros | number: '1.1-1' }} m ·
+          {{ (cercano.activo ? 'puentes.active' : 'puentes.inactive') | transloco }}
+        </span>
+      </li>
+      }
+    </ul>
+
+    @if ( (aviso.totalPuentesCercanos ?? 0) > (aviso.puentesCercanos?.length ?? 0) ) {
+    <p>
+      {{ 'puentes.proximityLimit' | transloco: { cantidad: aviso.puentesCercanos?.length ?? 0 } }}
+    </p>
+    }
+
+    <div class="actions">
+      <button pButton type="button" [disabled]="guardando()" (click)="confirmarRegistro()">
+        {{ 'puentes.confirm' | transloco }}
+      </button>
+
+      <button
+        pButton
+        type="button"
+        severity="secondary"
+        [disabled]="guardando()"
+        (click)="cancelarConfirmacion()"
+      >
+        {{ 'puentes.cancelConfirmation' | transloco }}
+      </button>
+    </div>
+  </section>
+  }
+</app-puente-form>
+}
