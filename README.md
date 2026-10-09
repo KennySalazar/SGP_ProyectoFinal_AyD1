@@ -11,7 +11,8 @@ SGP_ProyectoFinal_AyD1/
 ├── sgp-api/                  # Backend Spring Boot
 ├── sgp-client/               # Frontend Angular PWA
 ├── infra/                    # Inicialización de infraestructura
-│   └── postgres/
+│   ├── postgres/
+│   └── staging/              # Compose y operación de staging
 ├── docs/                     # Documentación técnica
 ├── docker-compose.yml
 ├── .gitignore
@@ -110,6 +111,8 @@ Antes de desarrollar una funcionalidad, revisar la documentación correspondient
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — organización del backend y frontend, capas, servicios y rutas.
 - [`docs/UI_GUIDELINES.md`](docs/UI_GUIDELINES.md) — reglas visuales y de experiencia de usuario.
 - [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md) — preparación y ejecución del entorno local.
+- [`docs/deployment/STAGING_AWS.md`](docs/deployment/STAGING_AWS.md) — arquitectura, configuración y operación de staging en AWS.
+- [`docs/deployment/GUIA_IMPLEMENTACION_PRODUCCION.md`](docs/deployment/GUIA_IMPLEMENTACION_PRODUCCION.md) — contratos y decisiones para el responsable de producción.
 - [`docs/adr/`](docs/adr/) — decisiones de arquitectura relevantes.
 
 ## Reglas principales
