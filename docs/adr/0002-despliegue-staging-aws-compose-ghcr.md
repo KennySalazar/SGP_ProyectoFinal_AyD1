@@ -91,6 +91,10 @@ puertos administrativos públicos ni credenciales AWS permanentes en GitHub.
 13. Serializar despliegues con concurrencia de GitHub y `flock` en la instancia.
 14. Mantener los secretos solo en `/etc/sgp/staging/staging.env` con permisos
     `0600`; la EC2 no clona el repositorio.
+15. Mantener por ahora los paquetes GHCR privados. La EC2 de staging se
+    autentica como `root` con un Personal Access Token (classic) limitado a
+    `read:packages`, almacenado por Docker fuera del repositorio. Producción no
+    debe reutilizar esa credencial.
 
 No se decide todavía si producción compartirá la EC2. Si lo hace, deberá usar
 recursos completamente independientes. Producción no se desplegará
@@ -109,6 +113,12 @@ claves SSH. Las redes internas y el bind a loopback impiden exposición directa 
 servicios. La configuración externa permite promover las mismas imágenes entre
 ambientes.
 
+La cuenta que opera staging puede leer los paquetes, pero no administrar su
+visibilidad dentro de la cuenta propietaria. Mantenerlos privados y autenticar la
+EC2 permite continuar sin ampliar permisos ni introducir el token en GitHub
+Actions. La publicación sigue usando `GITHUB_TOKEN`; el PAT se limita a la
+descarga en el servidor.
+
 Silo se adopta como respuesta limitada a la retirada de las imágenes oficiales;
 evita mantener una compilación propia y conserva compatibilidad para la
 integración futura. La elección deberá revisarse cuando el backend empiece a
@@ -125,6 +135,7 @@ almacenar objetos o si cambia su mantenimiento.
 - Producción puede seleccionar manualmente una versión validada sin cambiar las
   imágenes.
 - El despliegue puede revertir Compose y digests sin eliminar volúmenes.
+- Las imágenes no quedan disponibles para descarga anónima.
 
 ### Negativas y riesgos
 
@@ -133,8 +144,12 @@ almacenar objetos o si cambia su mantenimiento.
 - Silo es un fork comunitario y requiere seguimiento de seguridad y continuidad.
 - Un único host sigue siendo un punto de fallo.
 - El acceso depende de Systems Manager y de conectividad de salida.
-- Los paquetes públicos de GHCR facilitan la operación, pero exponen las imágenes
-  a descarga anónima; no contienen secretos.
+- La EC2 mantiene una credencial GHCR en `/root/.docker/config.json`; debe
+  protegerse, expira y depende de que la cuenta conserve acceso de lectura.
+- Un PAT classic con `read:packages` no se restringe a un solo paquete: puede
+  leer otros paquetes privados accesibles para la misma cuenta.
+- La rotación del PAT es una tarea operativa manual y un token vencido impide
+  nuevos pulls, aunque no detiene contenedores en ejecución.
 
 ## Limitaciones
 
@@ -143,8 +158,9 @@ almacenar objetos o si cambia su mantenimiento.
 - MinIO/Silo todavía no está integrado con el backend.
 - Se usa gzip; Brotli queda pendiente para evitar módulos o imágenes adicionales.
 - La rotación local de Docker no satisface retención centralizada por 90 días.
-- El workflow está implementado, pero todavía no se ha ejecutado; OIDC, IAM y la
-  EC2 no se han configurado en el momento de aceptar esta versión del ADR.
+- Las validaciones y publicaciones del workflow ya se ejecutaron; OIDC, IAM, la
+  autenticación GHCR desde EC2 y la instancia no se han validado al actualizar
+  esta versión del ADR.
 
 ## Relación con el enunciado
 
@@ -167,4 +183,5 @@ pendiente en lugar de declararse implementados.
 - [Repositorio del fork Silo y su contrato de compatibilidad](https://github.com/pgsty/silo).
 - [Release de Silo seleccionada](https://github.com/pgsty/silo/releases/tag/RELEASE.2026-09-16T00-00-00Z).
 - [Docker Compose v2.40.3](https://github.com/docker/compose/releases/tag/v2.40.3).
+- [Autenticación en GitHub Container Registry](https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-container-registry).
 

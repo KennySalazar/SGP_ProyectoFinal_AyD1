@@ -10,8 +10,8 @@ se actualiza de forma incremental durante la historia de usuario.
 | Imágenes reutilizables de backend y frontend | Implementada y validada localmente. |
 | Compose aislado de staging | Implementado y validado localmente. |
 | Preparación de Amazon Linux 2023 | Script implementado; no ejecutado en AWS. |
-| Workflow de validación, publicación y despliegue | Implementado; pendiente de ejecución en GitHub. |
-| Publicación en GHCR | Implementada en el workflow; pendiente de primera ejecución. |
+| Workflow de validación, publicación y despliegue | Ejecutado correctamente en GitHub para `develop`. |
+| Publicación en GHCR | Backend y frontend publicados como paquetes privados. |
 | Despliegue automático desde `develop` | Implementado y deshabilitado hasta disponer de AWS. |
 | Instancia EC2, IAM y Systems Manager | Pendiente de autorización y creación. |
 | Despliegue real en AWS | No ejecutado. |
@@ -134,9 +134,52 @@ El workflow `.github/workflows/ci.yml` publicará solamente desde `develop`:
 - `develop` como referencia móvil informativa.
 
 El despliegue no utilizará `latest`: recibirá referencias con digest, por
-ejemplo `ghcr.io/kennysalazar/sgp-api@sha256:...`. Los paquetes todavía no han
-sido publicados y su visibilidad pública deberá configurarse después de la
-primera publicación.
+ejemplo `ghcr.io/kennysalazar/sgp-api@sha256:...`. La primera publicación desde
+`develop` se completó correctamente. Los paquetes pertenecen a la cuenta
+`KennySalazar` y permanecen privados: el integrante que opera staging puede
+leerlos, pero no posee permisos administrativos para cambiar su visibilidad.
+
+## Autenticación de la EC2 en GHCR
+
+La EC2 utilizará un Personal Access Token (classic) de una cuenta con acceso a
+los paquetes. Debe conceder únicamente `read:packages`, tener fecha de expiración
+y no incluir `write:packages` ni `delete:packages`. El token es una credencial de
+operación del servidor: no debe guardarse en el repositorio, `staging.env`, User
+Data, GitHub Actions, logs ni documentación.
+
+Después de preparar la instancia, abra una sesión interactiva de Systems Manager
+y autentique al usuario `root`, que es el usuario con el que Run Command ejecuta
+el despliegue:
+
+```bash
+sudo -i
+install -d -m 0700 /root/.docker
+read -rsp "GHCR token: " GHCR_TOKEN; printf '\n'
+printf '%s' "${GHCR_TOKEN}" | docker login ghcr.io \
+  --username <USUARIO_GITHUB_DEL_TOKEN> \
+  --password-stdin
+unset GHCR_TOKEN
+chmod 0600 /root/.docker/config.json
+exit
+```
+
+El valor escrito con `read -s` no se muestra ni se incorpora al historial. Docker
+guarda la credencial en `/root/.docker/config.json`; el archivo debe permanecer
+propiedad de `root` y con modo `0600`. Esta configuración no se transfiere mediante
+el workflow.
+
+Compruebe el acceso usando un digest publicado, no la etiqueta móvil:
+
+```bash
+sudo docker pull \
+  ghcr.io/kennysalazar/sgp-api@sha256:<digest-publicado>
+```
+
+Para rotar el token, cree otro con el mismo permiso, repita `docker login`, pruebe
+un `docker pull` por digest y solo entonces revoque el anterior. La expiración no
+detiene contenedores en ejecución, pero impide descargar imágenes en el siguiente
+despliegue. Debe registrarse externamente una fecha de renovación sin registrar el
+valor del token.
 
 ## GitHub Actions y GHCR
 
@@ -171,11 +214,13 @@ Configure un GitHub Environment llamado `staging`, restringido a la rama
 | `AWS_ROLE_ARN` | Environment `staging` | Pendiente | Rol asumido mediante OIDC. |
 | `STAGING_INSTANCE_ID` | Environment `staging` | Pendiente | Instancia administrada por SSM. |
 
-No se requieren GitHub Secrets para GHCR ni AWS: GHCR usa el `GITHUB_TOKEN`
-efímero y AWS usa OIDC. La relación de confianza del rol debe limitar el sujeto a
-`repo:KennySalazar/SGP_ProyectoFinal_AyD1:environment:staging`. Su política debe
-permitir únicamente enviar `AWS-RunShellScript` a la instancia de staging,
-consultar el resultado y cancelar el comando en caso de timeout.
+La publicación en GHCR no requiere GitHub Secrets: utiliza el `GITHUB_TOKEN`
+efímero. La descarga desde la EC2 es una operación diferente y utiliza el PAT de
+solo lectura instalado manualmente en Docker. AWS usa OIDC y tampoco requiere
+claves permanentes en GitHub. La relación de confianza del rol debe limitar el
+sujeto a `repo:KennySalazar/SGP_ProyectoFinal_AyD1:environment:staging`. Su
+política debe permitir únicamente enviar `AWS-RunShellScript` a la instancia de
+staging, consultar el resultado y cancelar el comando en caso de timeout.
 
 Cada job vuelve a consultar el SHA actual de `develop` antes de publicar o
 desplegar. La publicación por imagen está serializada, el despliegue tiene una
@@ -266,7 +311,8 @@ El script:
 2. Usa `flock` para impedir despliegues simultáneos.
 3. Valida Compose antes de reemplazar la configuración activa.
 4. Conserva la configuración anterior para rollback.
-5. Descarga las imágenes y ejecuta `docker compose up --wait`.
+5. Descarga las imágenes usando la autenticación GHCR de `root` y ejecuta
+   `docker compose up --wait`.
 6. Comprueba Nginx, la API pública y al menos las 16 migraciones existentes.
 7. Registra el SHA desplegado en `/opt/sgp/staging/REVISION`.
 
@@ -320,7 +366,7 @@ No utilizar `docker compose down -v`: eliminaría datos persistentes.
 | Síntoma | Revisión |
 |---|---|
 | Backend no saludable | Revisar PostgreSQL, variables obligatorias, política de contraseña inicial y logs de Flyway. |
-| Error al descargar GHCR | Confirmar que el paquete sea público o configurar autenticación de solo lectura fuera del repositorio. |
+| `unauthorized` al descargar GHCR | Confirmar `/root/.docker/config.json`, acceso de la cuenta a ambos paquetes, permiso `read:packages` y vigencia del PAT. Repetir `docker login` sin mostrar el token. |
 | Puerto 8088 inaccesible | Confirmar que el túnel SSM siga abierto; el puerto no se publica a Internet. |
 | Despliegue con código 75 | Ya existe otro despliegue usando el bloqueo `flock`. |
 | Migraciones menores que 16 | No continuar: revisar logs del backend y `flyway_schema_history`. |
@@ -340,14 +386,21 @@ El 9 de octubre de 2026 se validó localmente:
   volúmenes.
 - Aislamiento de puertos, redes y volúmenes.
 
-El workflow fue revisado y formateado localmente, pero todavía no se ha ejecutado
-en GitHub. Tampoco se han validado GHCR, OIDC, SSM ni una EC2 real.
+El workflow también se ejecutó en GitHub después de integrar los cambios en
+`develop`: las validaciones de backend y frontend finalizaron correctamente y se
+publicaron ambas imágenes en GHCR. El job `Deploy staging` permaneció omitido,
+como se esperaba, porque `STAGING_ENABLED` no está activo. Aún no se han validado
+el acceso desde EC2 a los paquetes privados, OIDC, SSM ni una instancia real. La
+URL o el identificador de la ejecución deben agregarse cuando se recopile la
+evidencia final.
 
 ## Limitaciones y trabajo pendiente
 
-- Ejecutar el workflow en GitHub y registrar su evidencia.
+- Registrar la URL o el identificador de la ejecución exitosa de GitHub Actions.
 - Crear y autorizar los recursos mínimos de AWS.
-- Configurar la visibilidad de los paquetes GHCR.
+- Crear, instalar y probar en EC2 el PAT classic de solo lectura para GHCR.
+- Definir responsable y recordatorio de rotación del PAT; su disponibilidad
+  depende de que la cuenta conserve acceso a los paquetes privados.
 - Confirmar el tamaño definitivo de EC2 y disco mediante medición.
 - El backend todavía no usa MinIO/Silo; el dominio `archivo` está preparado pero
   no integra almacenamiento de objetos.

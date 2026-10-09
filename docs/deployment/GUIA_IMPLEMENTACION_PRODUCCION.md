@@ -19,9 +19,9 @@ responsable de producción debe conservar o coordinar antes de modificarlos.
 |---|---|
 | Dockerfiles reutilizables | Implementados y construidos localmente. |
 | Compose de staging | Implementado y probado localmente. |
-| Workflow CI, publicación y staging | Implementado; pendiente de primera ejecución. |
-| Imágenes en GHCR | Pendientes de primera publicación desde `develop`. |
-| Convención de versiones | Definida, todavía no publicada. |
+| Workflow CI, publicación y staging | Validaciones y publicación ejecutadas correctamente; despliegue AWS deshabilitado. |
+| Imágenes en GHCR | Backend y frontend publicados como paquetes privados. |
+| Convención de versiones | Definida y utilizada en la primera publicación. |
 | Infraestructura AWS de staging | Pendiente. |
 | Infraestructura y Compose de producción | Responsabilidad del segundo integrante. |
 
@@ -74,10 +74,17 @@ Convención definida:
 - `develop`: etiqueta móvil para identificar la última integración exitosa.
 - `<imagen>@sha256:<digest>`: referencia que debe usarse en un despliegue.
 
-Los paquetes todavía no existen en GHCR. Después de la primera publicación debe
-configurarse y comprobarse su visibilidad pública. Si se decide mantenerlos
-privados, la EC2 necesitará una credencial de solo lectura administrada fuera del
-repositorio; ese cambio debe coordinarse.
+Los paquetes ya existen en GHCR y permanecen privados. El responsable de staging
+tiene acceso de lectura, pero no permisos administrativos sobre los paquetes de
+la cuenta `KennySalazar`; por ello la EC2 de staging se autenticará con un
+Personal Access Token (classic) limitado a `read:packages`.
+
+Producción no debe reutilizar el token de staging. Su responsable deberá obtener
+una credencial independiente de una cuenta con lectura sobre ambos paquetes,
+definir su vigencia y mantenerla fuera del repositorio, Compose, archivos de
+entorno, User Data y logs. Si posteriormente el propietario vuelve públicos los
+paquetes o adopta una identidad compartida, el cambio debe coordinarse y
+documentarse; no es una decisión tomada por staging.
 
 Producción no debe reconstruir una versión. Debe usar exactamente los digests
 aprobados en staging, de modo que el binario validado y el desplegado sean el
@@ -127,7 +134,25 @@ en producción sigue pendiente de decisión.
 
 ## 8. Descarga manual desde GHCR
 
-Con paquetes públicos:
+Mientras los paquetes sean privados, cree un Personal Access Token (classic) con
+solo `read:packages` y una fecha de expiración. En una sesión interactiva de la
+instancia, autentique al mismo usuario que ejecutará el despliegue:
+
+```bash
+sudo -i
+install -d -m 0700 /root/.docker
+read -rsp "GHCR token: " GHCR_TOKEN; printf '\n'
+printf '%s' "${GHCR_TOKEN}" | docker login ghcr.io \
+  --username <USUARIO_GITHUB_DEL_TOKEN> \
+  --password-stdin
+unset GHCR_TOKEN
+chmod 0600 /root/.docker/config.json
+exit
+```
+
+No escriba el token directamente en el comando porque quedaría en el historial.
+Docker lo conserva en `/root/.docker/config.json`; proteja ese archivo como una
+credencial. Descargue luego los artefactos aprobados:
 
 ```bash
 docker pull ghcr.io/kennysalazar/sgp-api@sha256:<digest-aprobado>
@@ -142,7 +167,10 @@ docker image inspect ghcr.io/kennysalazar/sgp-client@sha256:<digest-aprobado>
 ```
 
 No usar `docker build` en la EC2 ni sustituir el digest por `develop` durante el
-despliegue manual.
+despliegue manual. Antes de que expire el token, reemplácelo mediante otro
+`docker login`, verifique una descarga y revoque el anterior. La expiración no
+detiene los contenedores activos, pero bloqueará actualizaciones y rollback que
+requieran descargar una imagen ausente del host.
 
 ## 9. Recomendaciones para Compose de producción
 
@@ -231,8 +259,10 @@ crear el Compose real de producción.
 - No existe retención centralizada de logs por 90 días.
 - No se han implementado respaldos ni restauraciones.
 - No se ha medido aún el consumo real en EC2.
-- El workflow está implementado, pero todavía no se ha ejecutado en GitHub ni ha
-  publicado paquetes GHCR.
+- Los paquetes GHCR son privados. Cada ambiente necesita una credencial de
+  lectura cuya vigencia y dependencia de una cuenta personal deben operarse.
+- El PAT classic con `read:packages` puede leer los paquetes a los que tenga
+  acceso su cuenta; no es una credencial limitada exclusivamente a este proyecto.
 
 ## 14. Decisiones pendientes
 
@@ -240,6 +270,7 @@ crear el Compose real de producción.
 - Región, VPC, tipo y capacidad definitiva de la instancia de producción.
 - Solución de certificado HTTPS válido para IP pública.
 - Mecanismo de secretos de producción.
+- Cuenta responsable, vigencia y rotación de la credencial GHCR de producción.
 - Nombres y rutas del Compose de producción.
 - Retención y centralización de logs.
 - Estrategia futura de respaldos y restauración.
