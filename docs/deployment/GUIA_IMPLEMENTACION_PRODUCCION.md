@@ -18,7 +18,7 @@ responsable de producción debe conservar o coordinar antes de modificarlos.
 | Componente | Estado |
 |---|---|
 | Dockerfiles reutilizables | Preparados para AMD64/ARM64; nueva publicación pendiente. |
-| Compose de staging | Versión anterior probada; adaptación a RDS y S3 pendiente. |
+| Compose de staging | Adaptado para RDS y S3 externos; validación real en AWS pendiente. |
 | Workflow CI, publicación y staging | Validaciones y publicación ejecutadas correctamente; despliegue AWS deshabilitado. |
 | Imágenes en GHCR | Paquetes privados existentes en AMD64; manifiestos multi-arquitectura pendientes. |
 | Convención de versiones | Definida y utilizada en la primera publicación. |
@@ -36,7 +36,8 @@ responsable de producción debe conservar o coordinar antes de modificarlos.
 7. No se depende exclusivamente de la etiqueta `latest`.
 8. Nginx es el punto de entrada y proxy de `/api/`.
 9. Backend, PostgreSQL y almacenamiento S3 no deben publicarse directamente.
-10. Bases, redes, volúmenes y secretos deben ser independientes por ambiente.
+10. Bases RDS, buckets S3, redes, roles IAM y secretos deben ser independientes
+    por ambiente.
 11. No se usan datos reales de producción en staging.
 12. No deben modificarse migraciones Flyway ya aplicadas.
 13. Las imágenes deben publicarse para `linux/amd64` y `linux/arm64`; las EC2
@@ -56,10 +57,10 @@ de la historia de usuario.
 - Perfil `application-staging.properties`.
 - Perfil `application-prod.properties` ya existente, que desactiva OpenAPI y
   exige cookie segura.
-- Compose de staging con redes y volúmenes explícitos.
+- Compose de staging con una red explícita y sin volúmenes de datos locales.
 - Plantilla de variables sin secretos.
 - Preparación de Amazon Linux y despliegue con rollback.
-- Inicialización segura de PostgreSQL con usuarios separados.
+- Preparación parametrizada de RDS con extensiones y usuarios separados.
 
 Estos elementos sirven de referencia; `infra/staging/compose.yml` no debe
 utilizarse directamente como Compose de producción.
@@ -107,14 +108,15 @@ mismo.
 | `sgp-api/Dockerfile` | Compartido sin cambios específicos por ambiente. |
 | `sgp-client/Dockerfile` | Compartido sin cambios específicos por ambiente. |
 | `sgp-client/nginx.conf` | Compartido; el TLS puede terminar en una capa Nginx separada o en una adaptación coordinada. |
-| `infra/postgres/init/00-create-app-user.sh` | Reutilizable en una base nueva. Solo se ejecuta al inicializar el volumen. |
+| `infra/rds/prepare-database.sql` | Reutilizable para preparar la base RDS de producción con nombres y secretos propios; se ejecuta una vez como administrador. |
+| `infra/postgres/init/00-create-app-user.sh` | Exclusivo del PostgreSQL contenedorizado de desarrollo local. |
 | `sgp-api/src/main/resources/application-prod.properties` | Perfil obligatorio de producción. |
 | `infra/staging/compose.yml` | Referencia de diseño; no es la configuración de producción. |
 | `infra/staging/deploy.sh` | Referencia para comprobaciones; producción será manual. |
 
 El responsable deberá crear la configuración de producción en una ubicación
-independiente. Su ruta y nombres de red/volumen aún no están definidos; deben
-elegirse explícitamente sin reutilizar ningún nombre `sgp_staging_*`.
+independiente. Su ruta y nombre de red aún no están definidos; debe elegirse
+explícitamente sin reutilizar `sgp_staging_proxy`.
 
 ## 7. Variables requeridas en producción
 
@@ -124,10 +126,10 @@ controles independientes:
 | Variable o grupo | Requisito de producción |
 |---|---|
 | Imágenes backend/frontend | Digests aprobados, no `latest`. |
-| `POSTGRES_DB` | Base exclusiva de producción. |
-| `POSTGRES_MIGRATOR_USER/PASSWORD` | Credencial exclusiva para Flyway. |
-| `POSTGRES_APP_USER/PASSWORD` | Usuario de aplicación distinto y con menor privilegio. |
-| `MINIO_ROOT_USER/PASSWORD` | Credenciales exclusivas; confirmar primero la integración real. |
+| `DATABASE_URL` | JDBC hacia el endpoint RDS privado y la base exclusiva de producción; debe exigir TLS. |
+| `MIGRATION_DATABASE_USERNAME/PASSWORD` | Credencial exclusiva para Flyway. |
+| `DATABASE_USERNAME/PASSWORD` | Usuario de aplicación distinto y con menor privilegio. |
+| S3 | El backend aún no define variables de bucket. Cuando exista la integración, usar el bucket de producción y el rol IAM de su EC2, nunca claves estáticas. |
 | `SECRET_KEY_JWT` | Secreto aleatorio de al menos 32 caracteres, distinto de staging. |
 | Expiraciones JWT/OTP | Revisar y aprobar valores antes del despliegue. |
 | `INITIAL_ADMIN_EMAIL/PASSWORD` | Identidad controlada; contraseña de 10–72 caracteres con letras y números. |
@@ -141,6 +143,20 @@ controles independientes:
 Los secretos no deben incluirse en Compose, AMI, User Data, logs, GitHub Actions
 ni archivos versionados. El mecanismo definitivo de almacenamiento de secretos
 en producción sigue pendiente de decisión.
+
+Antes del primer despliegue, el responsable de producción deberá ejecutar
+`infra/rds/prepare-database.sql` como administrador de RDS, usando nombres y
+contraseñas exclusivos de producción mediante las variables
+`SGP_DATABASE_NAME`, `SGP_MIGRATOR_USER`, `SGP_MIGRATOR_PASSWORD`,
+`SGP_APP_USER` y `SGP_APP_PASSWORD`. El procedimiento detallado está en la guía
+de staging; no debe reutilizar sus valores. El archivo crea las extensiones con
+el administrador y deja a Flyway con permisos DDL sin concederle
+`rds_superuser`.
+
+La EC2 de producción debe recibir un rol de instancia que solo permita las
+operaciones necesarias sobre su bucket. Debe exigir IMDSv2 y usar hop limit `2`
+para cargas dentro de Docker. No se deben crear `AWS_ACCESS_KEY_ID` ni
+`AWS_SECRET_ACCESS_KEY` para la aplicación.
 
 ## 8. Descarga manual desde GHCR
 
@@ -185,17 +201,19 @@ requieran descargar una imagen ausente del host.
 ## 9. Recomendaciones para Compose de producción
 
 - Definir un nombre de proyecto diferente a `sgp-staging`.
-- Definir redes y volúmenes con nombres explícitos que no empiecen por
-  `sgp_staging_`.
+- Definir una red con nombre explícito que no empiece por `sgp_staging_`.
 - Publicar únicamente el punto de entrada HTTPS.
-- Mantener backend, PostgreSQL y almacenamiento en redes privadas.
+- Mantener el backend sin puertos publicados, RDS en subredes privadas y S3 sin
+  acceso público.
 - Usar las imágenes por digest.
 - Inyectar todas las variables desde un archivo protegido o un gestor aprobado.
-- Incluir healthchecks y `depends_on` por salud.
+- Incluir healthchecks para frontend y backend. RDS y S3 no son servicios del
+  Compose y no deben agregarse a `depends_on`.
 - Mantener `restart: unless-stopped`, límites de recursos y rotación de logs.
 - No montar el código fuente ni usar `build:`.
 - Ejecutar Flyway con su usuario separado antes de aceptar tráfico.
-- No compartir volúmenes, redes ni archivos de entorno con staging.
+- No compartir redes, bases, buckets, roles IAM ni archivos de entorno con
+  staging.
 
 Los nombres y rutas definitivos pertenecen a la implementación de producción y
 no se fijan en esta guía antes de que exista su diseño.
@@ -215,6 +233,8 @@ Requisitos mínimos:
 - Configurar `INVITACION_URL_ACTIVACION` y CORS con la URL HTTPS exacta.
 - Conservar cookies `Secure`, `HttpOnly` y `SameSite=Strict`.
 - No exponer Actuator, OpenAPI, PostgreSQL ni el almacenamiento.
+- Exigir IMDSv2 con hop limit `2` para que el SDK ejecutado dentro de Docker
+  pueda obtener las credenciales temporales del rol de instancia.
 - Probar renovación del certificado y documentar su operación.
 
 La solución de certificados no ha sido elegida y no debe considerarse cerrada.
@@ -234,7 +254,7 @@ La solución de certificados no ha sido elegida y no debe considerarse cerrada.
 9. Ejecutar pruebas funcionales mínimas mediante HTTPS.
 10. Registrar commit, digests, fecha, operador y resultado.
 11. Ante un fallo, restaurar el Compose y los digests anteriores sin eliminar
-    volúmenes.
+    ni modificar datos en RDS o S3.
 
 Este procedimiento es una propuesta de interfaz; debe adaptarse y probarse al
 crear el Compose real de producción.
@@ -246,25 +266,26 @@ crear el Compose real de producción.
 - HTTPS válido accediendo por IP pública.
 - Renovación del certificado comprobada.
 - Solo Nginx accesible desde Internet.
-- PostgreSQL/PostGIS saludable y persistente.
+- RDS PostgreSQL/PostGIS accesible solo desde las EC2 autorizadas y con base y
+  credenciales exclusivas de producción.
 - Todas las migraciones Flyway aplicadas una sola vez y sin errores.
 - Backend saludable y OpenAPI no público.
 - Frontend y `/api/v1` accesibles mediante Nginx.
 - CORS restringido al origen de producción.
 - Cookies seguras y flujo de renovación funcional.
 - SMTP e invitaciones utilizando la URL de producción.
-- Redes, volúmenes, credenciales y datos separados de staging.
+- Redes, base RDS, bucket S3, rol IAM, credenciales y datos separados de staging.
 - Reinicio de instancia y recuperación automática de servicios.
 - Logs rotados sin secretos.
 - Procedimiento de rollback probado sin eliminar datos.
 
 ## 13. Errores y limitaciones conocidos
 
-- Las imágenes oficiales comunitarias de MinIO fueron retiradas. Staging usa
-  `docker.io/pgsty/silo:RELEASE.2026-09-16T00-00-00Z` fijada por digest. Silo
-  conserva compatibilidad S3 y formato de datos, pero es un
-  [fork comunitario independiente](https://github.com/pgsty/silo).
-- El backend todavía no consume MinIO/Silo.
+- El backend todavía no implementa la interfaz de almacenamiento de objetos ni
+  consume S3. No deben inventarse variables ni declararse validado hasta que esa
+  funcionalidad exista.
+- La verificación completa del certificado RDS con `sslmode=verify-full` y el
+  bundle CA debe incorporarse y probarse al preparar la infraestructura.
 - Brotli no está configurado; Nginx usa gzip.
 - No existe retención centralizada de logs por 90 días.
 - No se han implementado respaldos ni restauraciones.
@@ -285,7 +306,8 @@ crear el Compose real de producción.
 - Nombres y rutas del Compose de producción.
 - Retención y centralización de logs.
 - Estrategia futura de respaldos y restauración.
-- Permanencia de Silo cuando se implemente el almacenamiento de archivos.
+- Nombres de las variables S3 que expondrá el backend cuando se implemente
+  `AlmacenamientoArchivos`.
 
 Estas decisiones no deben cerrarse unilateralmente si cambian contratos
 compartidos con staging.
@@ -299,7 +321,7 @@ La parte de producción se considera completa cuando:
 3. El despliegue manual por digest es reproducible y tiene rollback.
 4. La aplicación es accesible mediante HTTPS válido sobre IP pública.
 5. Solo el proxy está expuesto y los servicios internos permanecen aislados.
-6. La persistencia, Flyway, salud, reinicio y separación de ambientes están
+6. La persistencia en RDS/S3, Flyway, salud, reinicio y separación de ambientes están
    demostrados.
 7. Variables y secretos están documentados sin publicar valores reales.
 8. Las limitaciones y tareas pendientes, incluidos respaldos, están registradas.
@@ -307,7 +329,8 @@ La parte de producción se considera completa cuando:
 
 ## Referencias compartidas
 
-- [Retirada de la imagen de MinIO en Quay](https://access.redhat.com/solutions/7148629).
-- [Repositorio y contrato de compatibilidad de Silo](https://github.com/pgsty/silo).
-- [Release de Silo fijada por staging](https://github.com/pgsty/silo/releases/tag/RELEASE.2026-09-16T00-00-00Z).
+- [Extensiones de PostgreSQL en Amazon RDS](https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/Appendix.PostgreSQL.CommonDBATasks.Extensions.html).
+- [Configuración de PostGIS en RDS](https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/Appendix.PostgreSQL.CommonDBATasks.PostGIS.html).
+- [Uso de TLS con RDS PostgreSQL](https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/PostgreSQL.Concepts.General.SSL.html).
+- [Roles IAM para aplicaciones en EC2](https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_use_switch-role-ec2.html).
 

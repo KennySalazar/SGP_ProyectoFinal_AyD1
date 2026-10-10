@@ -12,6 +12,7 @@ SGP_ProyectoFinal_AyD1/
 ├── sgp-client/               # Frontend Angular PWA
 ├── infra/                    # Inicialización de infraestructura
 │   ├── postgres/
+│   ├── rds/                  # Preparación parametrizada de PostgreSQL en RDS
 │   └── staging/              # Compose y operación de staging
 ├── docs/                     # Documentación técnica
 ├── docker-compose.yml

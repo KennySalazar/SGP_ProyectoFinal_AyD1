@@ -23,7 +23,7 @@ case "$(uname -m)" in
     ;;
 esac
 
-dnf install --assumeyes docker curl
+dnf install --assumeyes docker curl postgresql16
 systemctl enable --now docker
 systemctl enable --now chronyd
 
@@ -51,7 +51,7 @@ if [[ -z "${expected_checksum}" || "${actual_checksum}" != "${expected_checksum}
 fi
 install -m 0755 "${temporary_compose}" "${COMPOSE_PATH}"
 
-install -d -m 0755 /opt/sgp/staging /opt/sgp/postgres/init
+install -d -m 0755 /opt/sgp/staging
 install -d -m 0700 /etc/sgp/staging
 
 if [[ ! -f /swapfile ]]; then

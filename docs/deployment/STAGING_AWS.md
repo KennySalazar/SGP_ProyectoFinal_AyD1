@@ -8,9 +8,9 @@ se actualiza de forma incremental durante la historia de usuario.
 | Área | Estado |
 |---|---|
 | Imágenes reutilizables de backend y frontend | Build multi-arquitectura implementado; pendiente de publicación desde `develop`. |
-| Compose aislado de staging | La versión con PostgreSQL y MinIO fue validada; su adaptación a RDS y S3 está pendiente. |
+| Compose aislado de staging | Adaptado para ejecutar solo Nginx/Angular y Spring Boot; RDS y S3 son externos a la EC2. |
 | Preparación de Amazon Linux 2023 | Script compatible con ARM64 y x86_64; no ejecutado en AWS. |
-| Workflow de validación, publicación y despliegue | Ejecutado correctamente en GitHub para `develop`. |
+| Workflow de validación, publicación y despliegue | Versión anterior ejecutada correctamente; cambio actual pendiente de CI. |
 | Publicación en GHCR | Paquetes privados publicados inicialmente para AMD64; manifiestos AMD64/ARM64 pendientes de este cambio. |
 | Despliegue automático desde `develop` | Implementado y deshabilitado hasta disponer de AWS. |
 | Instancia EC2, IAM y Systems Manager | Pendiente de autorización y creación. |
@@ -21,17 +21,17 @@ No se han creado recursos ni credenciales en AWS.
 ### Transición de arquitectura
 
 La aclaración recibida el 10 de octubre de 2026 exige almacenar los archivos
-fuera del servidor de aplicación. La arquitectura objetivo pasa a usar dos EC2
-ARM64 separadas, una RDS PostgreSQL/PostGIS compartida por ambientes y buckets S3
-independientes. Este incremento prepara las imágenes y el servidor ARM64; el
-Compose, RDS, S3, HTTPS y logs se adaptarán en los siguientes incrementos. No se
-debe aprovisionar AWS usando todavía el Compose descrito a continuación.
+fuera del servidor de aplicación. La arquitectura objetivo usa dos EC2 ARM64
+separadas, una RDS PostgreSQL/PostGIS compartida por ambientes y buckets S3
+independientes. El Compose de staging ya refleja esta separación: PostgreSQL y
+MinIO permanecen únicamente en el Compose de desarrollo local.
 
-## Arquitectura de staging actualmente implementada
+## Arquitectura de staging
 
 El punto de entrada es Nginx. El puerto se publica únicamente en la interfaz de
 loopback de la instancia para acceder mediante un túnel de AWS Systems Manager.
-El backend, PostgreSQL y el almacenamiento S3 no publican puertos en el host.
+El backend no publica puertos en el host. RDS debe permanecer en subredes
+privadas y el bucket S3 debe bloquear todo acceso público.
 
 ```text
 Equipo del proyecto
@@ -41,22 +41,19 @@ Equipo del proyecto
 127.0.0.1:8088 en EC2
         |
         v
-Nginx + Angular ---- red proxy ---- Spring Boot
-                                      |
-                                      | red data (internal)
-                         +------------+------------+
-                         |                         |
-                  PostgreSQL/PostGIS          Silo/MinIO
+Nginx + Angular ---- red sgp_staging_proxy ---- Spring Boot
+                                                   |
+                               +-------------------+-------------------+
+                               |                                       |
+                               v                                       v
+                  RDS PostgreSQL/PostGIS privado          S3 privado mediante
+                  base y usuarios de staging              rol IAM de la EC2 (*)
 ```
 
-El backend pertenece a ambas redes: necesita comunicarse con la base y disponer
-de salida para SMTP. La red `data` es interna. El servicio de almacenamiento se
-mantiene con el nombre `minio` por compatibilidad conceptual, pero utiliza Silo,
-un fork compatible con MinIO, porque las imágenes comunitarias oficiales dejaron
-de estar disponibles para descargas anónimas. La decisión se apoya en el
-[incidente documentado por Red Hat](https://access.redhat.com/solutions/7148629)
-y en la
-[release verificable de Silo](https://github.com/pgsty/silo/releases/tag/RELEASE.2026-09-16T00-00-00Z).
+`(*)` El backend todavía no implementa la interfaz de almacenamiento de objetos.
+Por ello el Compose no recibe variables S3 ni credenciales estáticas. Cuando se
+implemente el módulo, el SDK deberá obtener credenciales temporales desde el rol
+de instancia y limitarse al bucket de staging.
 
 ## Archivos implementados
 
@@ -70,7 +67,8 @@ y en la
 | `infra/staging/.env.example` | Plantilla sin credenciales reales. |
 | `infra/staging/bootstrap-amazon-linux-2023.sh` | Prepara Amazon Linux 2023 ARM64 o x86_64 con Docker, Compose, SSM y swap. |
 | `infra/staging/deploy.sh` | Valida, actualiza y comprueba el stack con bloqueo y rollback. |
-| `infra/postgres/init/00-create-app-user.sh` | Crea de forma segura el usuario de aplicación. |
+| `infra/rds/prepare-database.sql` | Prepara una base RDS con extensiones y roles separados, sin incluir nombres ni secretos reales. |
+| `infra/postgres/init/00-create-app-user.sh` | Inicializa PostgreSQL únicamente en desarrollo local. |
 
 El `docker-compose.yml` de la raíz continúa siendo el entorno de desarrollo y no
 ha sido sustituido por la configuración de staging.
@@ -87,11 +85,19 @@ La infraestructura objetivo asigna una EC2 independiente a staging:
   autorización.
 - 2 GiB de swap creados por el script de preparación.
 - Rol de instancia con `AmazonSSMManagedInstanceCore` o una política equivalente
-  de permisos mínimos.
+  de permisos mínimos y, cuando exista la integración, acceso exclusivo al
+  bucket S3 de staging.
 - Salida HTTPS hacia AWS, GHCR/Docker Hub y el proveedor SMTP.
 - Administración mediante Systems Manager, sin publicar SSH.
-- Las reglas públicas 80/443, RDS privada y S3 se definirán en el incremento de
-  infraestructura; no se usarán ALB, NAT Gateway, ECS ni EKS.
+- RDS PostgreSQL 16 no pública, en la misma VPC, cuyo Security Group acepte el
+  puerto 5432 únicamente desde el Security Group de la EC2 de staging.
+- Una base `sgp_staging`, un usuario migrador y un usuario de aplicación que no
+  se reutilicen en producción.
+- Bucket S3 de staging privado e independiente del bucket de producción.
+- IMDSv2 obligatorio y salto de respuesta igual a `2`, necesario para que un SDK
+  dentro de Docker pueda obtener credenciales temporales del rol de instancia.
+- Las reglas públicas 80/443 se definirán junto con HTTPS; no se usarán ALB, NAT
+  Gateway, ECS ni EKS.
 
 El disco, región, VPC y recursos administrados no deben aprovisionarse sin
 autorización y verificación previa de costos.
@@ -108,11 +114,10 @@ sudo bash /tmp/bootstrap-amazon-linux-2023.sh
 
 Realiza las siguientes operaciones:
 
-1. Instala y habilita Docker.
+1. Instala Docker, el cliente PostgreSQL 16 y `curl`.
 2. Verifica y habilita `amazon-ssm-agent` y `chronyd`.
 3. Instala Docker Compose `v2.40.3` y verifica su SHA-256.
-4. Crea `/opt/sgp/staging`, `/opt/sgp/postgres/init` y
-   `/etc/sgp/staging`.
+4. Crea `/opt/sgp/staging` y `/etc/sgp/staging`.
 5. Configura `/swapfile` de 2 GiB si no existe.
 6. Agrega `ssm-user` al grupo `docker`, si el usuario existe.
 
@@ -124,7 +129,6 @@ documentará cuando exista la instancia.
 | Ruta | Contenido | Permisos esperados |
 |---|---|---|
 | `/opt/sgp/staging` | Compose activo, imágenes seleccionadas, revisión y script de despliegue. | Administrado por `root`. |
-| `/opt/sgp/postgres/init` | Script de inicialización de PostgreSQL. | Lectura para Docker. |
 | `/etc/sgp/staging/staging.env` | Secretos y configuración de staging. | `0600`, propietario `root`. |
 
 La EC2 no necesita clonar el repositorio ni compilar Java o Angular.
@@ -250,13 +254,11 @@ en `/etc/sgp/staging/staging.env` y nunca debe registrarse en Git.
 | `BACKEND_IMAGE` | Compose | Sí, inyectada | Digest de `ghcr.io/kennysalazar/sgp-api`; el despliegue la escribe en `images.env`. |
 | `FRONTEND_IMAGE` | Compose | Sí, inyectada | Digest de `ghcr.io/kennysalazar/sgp-client`. |
 | `STAGING_HTTP_PORT` | Nginx | No | Puerto loopback; `8088`. |
-| `POSTGRES_DB` | PostgreSQL/backend | Sí | Base aislada; `sgp_staging`. |
-| `POSTGRES_MIGRATOR_USER` | PostgreSQL/Flyway | Sí | Propietario de migraciones; `sgp_staging_migrator`. |
-| `POSTGRES_MIGRATOR_PASSWORD` | PostgreSQL/Flyway | Sí | Secreto hexadecimal aleatorio. |
-| `POSTGRES_APP_USER` | PostgreSQL/backend | Sí | Usuario de mínimo privilegio; `sgp_staging_app`. |
-| `POSTGRES_APP_PASSWORD` | PostgreSQL/backend | Sí | Secreto distinto al del migrador. |
-| `MINIO_ROOT_USER` | Silo/MinIO | Sí | Administrador del almacenamiento; `sgp_staging_minio`. |
-| `MINIO_ROOT_PASSWORD` | Silo/MinIO | Sí | Secreto aleatorio de al menos 8 caracteres. |
+| `DATABASE_URL` | Backend/Flyway | Sí | JDBC hacia el endpoint privado y base de staging, terminada en `?sslmode=require`. |
+| `DATABASE_USERNAME` | Backend | Sí | Usuario de mínimo privilegio; `sgp_staging_app`. |
+| `DATABASE_PASSWORD` | Backend | Sí | Secreto hexadecimal aleatorio del usuario de aplicación. |
+| `MIGRATION_DATABASE_USERNAME` | Flyway | Sí | Propietario de migraciones; `sgp_staging_migrator`. |
+| `MIGRATION_DATABASE_PASSWORD` | Flyway | Sí | Secreto distinto al del usuario de aplicación. |
 | `SECRET_KEY_JWT` | Backend | Sí | Clave JWT de al menos 32 caracteres. |
 | `ACCESS_EXPIRATION_TIME_JWT` | Backend | No | Vigencia de acceso en ms; `900000`. |
 | `REFRESH_EXPIRATION_TIME_JWT` | Backend | No | Vigencia de renovación en ms; `604800000`. |
@@ -289,17 +291,56 @@ archivo de entorno puede utilizarse:
 openssl rand -hex 32
 ```
 
+No se definen `AWS_ACCESS_KEY_ID` ni `AWS_SECRET_ACCESS_KEY`. El acceso futuro a
+S3 utilizará credenciales temporales del rol IAM de la EC2. Tampoco se inventan
+variables de bucket mientras el backend no tenga una configuración que las
+consuma.
+
+## Preparación de la base RDS
+
+Después de crear RDS y antes del primer despliegue, copie temporalmente
+`infra/rds/prepare-database.sql` a un equipo con acceso de red a la instancia,
+por ejemplo la EC2 de staging administrada mediante SSM. Ejecútelo como el
+usuario administrador de RDS:
+
+```bash
+read -rp "Base: " SGP_DATABASE_NAME
+read -rp "Usuario migrador: " SGP_MIGRATOR_USER
+read -rsp "Clave del migrador: " SGP_MIGRATOR_PASSWORD; printf '\n'
+read -rp "Usuario de aplicacion: " SGP_APP_USER
+read -rsp "Clave de aplicacion: " SGP_APP_PASSWORD; printf '\n'
+export SGP_DATABASE_NAME SGP_MIGRATOR_USER SGP_MIGRATOR_PASSWORD
+export SGP_APP_USER SGP_APP_PASSWORD
+
+psql \
+  "host=<RDS_ENDPOINT> port=5432 dbname=postgres user=<RDS_ADMIN> sslmode=require" \
+  --file prepare-database.sql
+
+unset SGP_DATABASE_NAME SGP_MIGRATOR_USER SGP_MIGRATOR_PASSWORD
+unset SGP_APP_USER SGP_APP_PASSWORD
+```
+
+El archivo crea la base y los dos roles si no existen, habilita `postgis`,
+`pg_trgm` y `uuid-ossp` con el administrador y configura privilegios actuales y
+predeterminados. No concede `rds_superuser` al usuario de Flyway. Debe ejecutarse
+por separado para la base de producción usando otros nombres y secretos.
+
+La primera migración también contiene `CREATE EXTENSION IF NOT EXISTS`; al estar
+las extensiones ya instaladas, Flyway puede ejecutarla sin elevar privilegios.
+RDS debe configurarse para exigir TLS. `sslmode=require` evita conexiones sin
+cifrado; la validación completa del certificado con `verify-full` y el bundle CA
+de RDS queda pendiente del incremento de infraestructura.
+
 ## Docker Compose
 
 | Servicio | Exposición | Persistencia | Salud |
 |---|---|---|---|
 | `nginx` | `127.0.0.1:8088` | Imagen inmutable | `GET /healthz`. |
-| `backend` | Solo red `proxy` | Sin datos locales | Actuator interno. |
-| `postgres` | Solo red `data` | `sgp_staging_postgres_data` | `pg_isready`. |
-| `minio` | Solo red `data` | `sgp_staging_minio_data` | `/minio/health/live`. |
+| `backend` | Solo red `sgp_staging_proxy` | Sin datos locales | Actuator interno; incluye conectividad de base. |
 
-Las redes son `sgp_staging_proxy` y `sgp_staging_data`. Estos nombres y los
-volúmenes son exclusivos de staging para evitar colisiones con producción.
+La única red de Compose es `sgp_staging_proxy`. Staging no crea volúmenes: la
+persistencia reside en RDS y S3, fuera del ciclo de vida de los contenedores.
+Eliminar o recrear los contenedores no elimina datos persistentes.
 
 Los servicios utilizan `restart: unless-stopped`, límites de memoria/procesos y
 el driver `json-file` con cinco archivos de 10 MiB. Esta rotación protege el
@@ -326,7 +367,8 @@ El script:
 4. Conserva la configuración anterior para rollback.
 5. Descarga las imágenes usando la autenticación GHCR de `root` y ejecuta
    `docker compose up --wait`.
-6. Comprueba Nginx, la API pública y al menos las 16 migraciones existentes.
+6. Comprueba Nginx, la API y Actuator. Spring Boot solo queda saludable después
+   de conectarse a RDS, ejecutar Flyway y validar el esquema con Hibernate.
 7. Registra el SHA desplegado en `/opt/sgp/staging/REVISION`.
 
 La publicación de imágenes y el despliegue serán jobs independientes para que
@@ -372,19 +414,20 @@ sudo docker compose \
   -f /opt/sgp/staging/compose.yml logs --tail=200 backend
 ```
 
-No utilizar `docker compose down -v`: eliminaría datos persistentes.
+No utilizar opciones destructivas contra RDS o S3 durante una actualización. El
+Compose de staging no administra esos recursos.
 
 ## Problemas frecuentes
 
 | Síntoma | Revisión |
 |---|---|
-| Backend no saludable | Revisar PostgreSQL, variables obligatorias, política de contraseña inicial y logs de Flyway. |
+| Backend no saludable | Revisar el Security Group de RDS, endpoint, TLS, variables obligatorias, credenciales y logs de Flyway. |
 | `unauthorized` al descargar GHCR | Confirmar `/root/.docker/config.json`, acceso de la cuenta a ambos paquetes, permiso `read:packages` y vigencia del PAT. Repetir `docker login` sin mostrar el token. |
 | Puerto 8088 inaccesible | Confirmar que el túnel SSM siga abierto; el puerto no se publica a Internet. |
 | Despliegue con código 75 | Ya existe otro despliegue usando el bloqueo `flock`. |
-| Migraciones menores que 16 | No continuar: revisar logs del backend y `flyway_schema_history`. |
-| Servicio `minio` no inicia | Confirmar acceso a Docker Hub y el digest de Silo fijado en Compose. |
-| Memoria insuficiente | Revisar consumo y swap; evaluar `t3.small` con autorización. |
+| Migración o validación de esquema falla | No continuar: revisar logs del backend y consultar `flyway_schema_history` con el usuario migrador. |
+| Acceso S3 falla en el futuro | Confirmar rol de instancia, política del bucket, región e IMDSv2 con hop limit `2`; no agregar claves estáticas. |
+| Memoria insuficiente | Revisar consumo y swap; evaluar un tamaño ARM64 superior con autorización. |
 
 ## Validación realizada
 
@@ -399,6 +442,15 @@ El 9 de octubre de 2026 se validó localmente:
   volúmenes.
 - Aislamiento de puertos, redes y volúmenes.
 
+Esas pruebas corresponden al Compose anterior con PostgreSQL y MinIO locales. En
+este incremento se validaron estáticamente el nuevo Compose y los scripts. El
+SQL de preparación se ejecutó dos veces sobre un contenedor local
+PostgreSQL/PostGIS 16: se comprobaron las extensiones, los privilegios DML y de
+secuencias del usuario de aplicación, y la prohibición de crear tablas con ese
+usuario. Luego la imagen local del backend inició saludablemente con esos roles
+y Flyway registró 16 migraciones exitosas y ninguna fallida. Aún no se ha
+probado contra una RDS ni un bucket S3 reales.
+
 El workflow también se ejecutó en GitHub después de integrar los cambios en
 `develop`: las validaciones de backend y frontend finalizaron correctamente y se
 publicaron ambas imágenes en GHCR. El job `Deploy staging` permaneció omitido,
@@ -412,18 +464,28 @@ ejecución debe agregarse cuando se recopile la evidencia final.
 - Registrar la URL o el identificador de la ejecución exitosa de GitHub Actions.
 - Publicar y verificar los manifiestos AMD64/ARM64 después de integrar este
   cambio en `develop`.
-- Sustituir PostgreSQL y MinIO del Compose de staging por RDS y S3.
 - Crear y autorizar los recursos mínimos de AWS.
+- Ejecutar y validar `infra/rds/prepare-database.sql` contra RDS PostgreSQL 16.
+- Confirmar en la versión elegida de RDS la disponibilidad de PostGIS antes de
+  crear datos.
 - Crear, instalar y probar en EC2 el PAT classic de solo lectura para GHCR.
 - Definir responsable y recordatorio de rotación del PAT; su disponibilidad
   depende de que la cuenta conserve acceso a los paquetes privados.
 - Confirmar el tamaño definitivo de EC2 y disco mediante medición.
-- El backend todavía no usa MinIO/Silo; el dominio `archivo` está preparado pero
-  no integra almacenamiento de objetos.
+- El backend todavía no integra almacenamiento de objetos; S3 no puede validarse
+  funcionalmente hasta que exista la interfaz requerida por DT-ALM-03.
 - Brotli no está habilitado; Nginx utiliza gzip para evitar una imagen con módulos
   adicionales no justificados.
 - La retención centralizada de logs por 90 días no está implementada.
-- Los respaldos y restauraciones de PostgreSQL y MinIO/Silo están fuera del
+- Los respaldos y restauraciones de RDS y S3 están fuera del
   alcance de esta historia y permanecen pendientes.
 - Configurar HTTPS público también para staging según la nueva arquitectura.
+
+## Referencias de AWS
+
+- [Extensiones de PostgreSQL en Amazon RDS](https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/Appendix.PostgreSQL.CommonDBATasks.Extensions.html).
+- [Configuración de PostGIS en RDS](https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/Appendix.PostgreSQL.CommonDBATasks.PostGIS.html).
+- [Uso de TLS con RDS PostgreSQL](https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/PostgreSQL.Concepts.General.SSL.html).
+- [Roles IAM para aplicaciones en EC2](https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_use_switch-role-ec2.html).
+- [IMDSv2 en entornos con contenedores](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/configuring-IMDS-new-instances.html).
 

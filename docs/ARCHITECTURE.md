@@ -11,7 +11,9 @@ sgp-proyecto-final-ayd1/
 ├── sgp-api/                  Backend Spring Boot
 ├── sgp-client/               Frontend Angular PWA
 ├── infra/                    Inicialización de infraestructura
-│   └── postgres/
+│   ├── postgres/             PostgreSQL contenedorizado para desarrollo local
+│   ├── rds/                  Preparación de PostgreSQL administrado en AWS
+│   └── staging/              Compose y operación del ambiente de pruebas
 ├── docs/                     Documentación y ADR
 ├── docker-compose.yml
 ├── .gitignore

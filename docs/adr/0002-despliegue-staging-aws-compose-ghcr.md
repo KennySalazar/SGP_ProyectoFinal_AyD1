@@ -1,204 +1,192 @@
-# ADR-0002: Despliegue de staging con AWS, Docker Compose y GHCR
+# ADR-0002: Despliegue en AWS con EC2, RDS, S3, Compose y GHCR
 
 ## Estado
 
-En revisión desde el 10 de octubre de 2026 por la adopción de RDS y S3. La
-plataforma ARM64 y la publicación multi-arquitectura descritas en esta revisión
-están aceptadas. Las secciones sobre PostgreSQL y MinIO en la EC2 se actualizarán
-en el siguiente incremento y no deben usarse para aprovisionar AWS.
+Aceptada para staging el 10 de octubre de 2026. La infraestructura AWS todavía
+no ha sido creada ni validada. La configuración y el despliegue de producción
+permanecen fuera del alcance de esta historia.
 
 ## Contexto
 
-El SGP debe contar con ambientes separados de staging y producción, imágenes
-contenedorizadas, proxy Nginx, PostgreSQL/PostGIS, almacenamiento de objetos,
-persistencia, variables externas, healthchecks y automatización de integración.
+El SGP debe contar con desarrollo, staging y producción separados, imágenes
+contenedorizadas, Nginx como único punto de entrada, PostgreSQL/PostGIS,
+almacenamiento de objetos, configuración externa y trazabilidad entre commit,
+imagen y despliegue.
 
-El equipo necesita una solución económica, comprensible y operable dentro de los
-créditos disponibles de AWS. El proyecto continúa en desarrollo, por lo que la
-infraestructura no debe acoplar configuración de ambiente dentro de las imágenes
-ni impedir que staging y producción seleccionen versiones diferentes.
+El enunciado propone cuatro servicios en Docker Compose: Nginx, backend,
+PostgreSQL y MinIO. La sección 9.4 permite adaptar esos lineamientos a un
+proveedor de nube pública. Además, el auxiliar aclaró que los archivos no pueden
+residir en el mismo servidor de la aplicación. El equipo eligió AWS y dispone de
+créditos limitados, por lo que debe evitar componentes innecesarios.
 
-Durante la implementación se comprobó además que las imágenes comunitarias
-oficiales de MinIO dejaron de admitir descargas anónimas. El backend aún no
-consume el servicio de almacenamiento, pero el componente debe permanecer en el
-stack por el alcance arquitectónico del proyecto.
+El backend todavía no implementa `AlmacenamientoArchivos` ni consume MinIO o S3.
+La infraestructura debe reflejar esa limitación sin agregar credenciales o
+variables que el código aún no utiliza.
 
 ## Problema
 
 Se necesita construir y publicar imágenes fuera de AWS, actualizar staging
-automáticamente desde `develop`, mantener los servicios internos aislados y
-permitir un futuro despliegue manual de producción sin duplicar Dockerfiles ni
-reconstruir artefactos.
+automáticamente desde `develop`, conservar datos fuera del ciclo de vida de EC2
+y permitir un futuro despliegue manual de producción usando exactamente los
+mismos artefactos.
 
-La solución no debe requerir Kubernetes, servicios administrados costosos,
-puertos administrativos públicos ni credenciales AWS permanentes en GitHub.
+La solución no debe requerir Kubernetes, exponer servicios de datos, guardar
+claves AWS estáticas ni compilar Java o Angular en EC2.
 
 ## Alternativas consideradas
 
-### Orquestación
+### Ejecución
 
-- **EC2 con Docker Compose:** menor complejidad y costo operativo para el alcance.
-- **ECS/Fargate:** mejor integración administrada, pero añade servicios,
-  configuración y costos innecesarios para este proyecto.
-- **EKS/Kubernetes:** descartado por complejidad y consumo desproporcionados.
+- **EC2 con Docker Compose:** menor complejidad para dos contenedores de
+  aplicación y operación conocida por el equipo.
+- **ECS/Fargate:** integración administrada, pero añade configuración y costo.
+- **EKS/Kubernetes:** complejidad desproporcionada para el proyecto.
 
 ### Construcción de imágenes
 
-- **GitHub Actions:** libera CPU, memoria y disco de EC2 y deja trazabilidad.
+- **GitHub Actions:** descarga trabajo de CPU, memoria y disco fuera de EC2 y
+  conserva trazabilidad.
 - **Compilar en EC2:** descartado por consumo y por mezclar build con operación.
-- **Solo AMD64:** no puede ejecutarse en las instancias `t4g` seleccionadas.
-- **Solo ARM64:** reduce el trabajo de publicación, pero limita la portabilidad y
-  las validaciones en equipos x86_64.
-- **AMD64 y ARM64:** conserva portabilidad; las etapas de compilación se fijan a
-  `BUILDPLATFORM` para no repetir Maven y Angular.
+- **Solo ARM64:** suficiente para `t4g`, pero limita validaciones y portabilidad.
+- **AMD64 y ARM64:** elegida; publica un índice OCI reutilizable en ambos tipos
+  de host y compila Maven/Angular una sola vez sobre `BUILDPLATFORM`.
 
 ### Registro
 
-- **GHCR:** se integra con GitHub Actions y permite reutilizar los mismos
-  artefactos en ambos ambientes.
-- **Amazon ECR:** válido técnicamente, pero añade configuración AWS sin una
-  necesidad actual.
+- **GHCR:** integración directa con GitHub Actions y artefactos reutilizables.
+- **Amazon ECR:** técnicamente válido, pero innecesario para las imágenes que ya
+  se publican desde GitHub.
 
-### Acceso de administración
+### Base de datos
 
-- **AWS Systems Manager:** evita puertos SSH públicos y permite Run Command y
-  túneles con IAM.
-- **SSH público restringido:** simple, pero requiere puerto, claves y control de
-  origen adicionales.
-- **VPN:** no se justifica para el tamaño del equipo y el alcance actual.
+- **PostgreSQL/PostGIS en cada EC2:** menor costo de servicio, pero duplica
+  operación, respaldo, actualización y consumo de memoria.
+- **Dos instancias RDS:** mejor aislamiento, pero duplica el componente más caro.
+- **Una RDS PostgreSQL 16 con dos bases y credenciales separadas:** elegida por
+  costo. Aísla los datos lógicamente, aunque comparte capacidad y punto de fallo.
 
-### Almacenamiento compatible con MinIO
+### Archivos
 
-- **Continuar con la imagen oficial fijada:** imposible para instalaciones nuevas
-  al devolver `unauthorized` en Quay y Docker Hub.
-- **Construir MinIO desde fuente en cada proyecto:** aumenta el tiempo de CI y la
-  responsabilidad de mantenimiento de una tercera imagen.
-- **Silo:** fork comunitario mantenido que conserva API S3, variables `MINIO_*` y
-  formato de datos; publica imágenes versionadas, SBOM y procedencia.
+- **MinIO/Silo en EC2:** descartado para AWS porque incumple la aclaración de no
+  almacenar archivos en el servidor de aplicación.
+- **Un bucket S3 con prefijos:** posible, pero aumenta el riesgo de permisos y
+  reglas de ciclo de vida cruzados.
+- **Un bucket S3 privado por ambiente:** elegido por aislamiento de IAM,
+  versionado y ciclo de vida. MinIO permanece solo en desarrollo local.
+
+### Administración
+
+- **AWS Systems Manager:** elegido para operación y automatización sin publicar
+  SSH ni administrar claves permanentes.
+- **SSH público restringido:** simple, pero amplía la superficie de ataque.
+- **VPN:** no se justifica para el tamaño del equipo.
 
 ## Decisión
 
-1. Ejecutar staging en una EC2 `t4g.micro` Amazon Linux 2023 ARM64 con Docker
-   Compose.
-2. Construir backend y frontend en GitHub Actions y publicar un índice OCI con
-   variantes `linux/amd64` y `linux/arm64` en GHCR.
-3. Usar imágenes separadas:
-   `ghcr.io/kennysalazar/sgp-api` y
-   `ghcr.io/kennysalazar/sgp-client`.
-4. Publicar únicamente desde `develop` después de las validaciones existentes.
-5. Etiquetar con `sha-<SHA completo>` y `develop`, pero desplegar por digest.
-6. Mantener publicación y despliegue en jobs separados.
-7. Usar OIDC para credenciales AWS temporales y permisos mínimos. La política y
-   recursos aún deben crearse y aprobarse.
-8. Acceder a staging mediante Systems Manager; Nginx escucha solo en loopback.
-9. Mantener el `docker-compose.yml` actual para desarrollo y agregar
-   `infra/staging/compose.yml` para imágenes publicadas.
-10. Aislar staging mediante redes, volúmenes, variables y nombres explícitos.
-11. Reutilizar los mismos Dockerfiles en staging y producción.
-12. Usar Silo `RELEASE.2026-09-16T00-00-00Z` fijado por digest como componente
-    compatible con MinIO, manteniendo el servicio Compose llamado `minio`.
-13. Serializar despliegues con concurrencia de GitHub y `flock` en la instancia.
-14. Mantener los secretos solo en `/etc/sgp/staging/staging.env` con permisos
-    `0600`; la EC2 no clona el repositorio.
-15. Mantener por ahora los paquetes GHCR privados. La EC2 de staging se
-    autentica como `root` con un Personal Access Token (classic) limitado a
-    `read:packages`, almacenado por Docker fuera del repositorio. Producción no
-    debe reutilizar esa credencial.
-
-Staging y producción usarán EC2 separadas. Esta historia no crea ni despliega la
-instancia de producción. Producción no se desplegará automáticamente desde
-`develop`.
+1. Usar una EC2 Amazon Linux 2023 ARM64 independiente por ambiente:
+   `t4g.micro` como punto de partida para staging y `t4g.small` propuesto para
+   producción. Esta historia solo prepara staging.
+2. Ejecutar en cada EC2 únicamente dos servicios Compose: la imagen
+   Nginx/Angular y la imagen Spring Boot. No ejecutar PostgreSQL ni MinIO en AWS.
+3. Mantener el `docker-compose.yml` raíz con PostgreSQL/PostGIS y MinIO para
+   desarrollo local.
+4. Usar una RDS PostgreSQL 16 privada con las bases `sgp_staging` y `sgp_prod`,
+   cada una con usuario migrador y usuario de aplicación propios.
+5. Crear `postgis`, `pg_trgm` y `uuid-ossp` una vez como administrador de RDS;
+   Flyway conserva las migraciones existentes sin recibir `rds_superuser`.
+6. Usar un bucket S3 privado por ambiente. La EC2 accederá mediante un rol IAM
+   de mínimo privilegio y credenciales temporales; nunca mediante access keys en
+   `.env`. La integración se habilitará cuando exista en el backend.
+7. Exigir IMDSv2 y configurar hop limit `2` para que un SDK dentro de Docker
+   pueda obtener credenciales del rol de instancia.
+8. Construir backend y frontend en GitHub Actions para `linux/amd64` y
+   `linux/arm64`, publicarlos por separado en GHCR y desplegar por digest.
+9. Publicar solo desde `develop` después de las validaciones. La etiqueta
+   `sha-<SHA completo>` aporta trazabilidad y `develop` es solo informativa.
+10. Mantener publicación y despliegue en jobs separados; un fallo en AWS no
+    obliga a reconstruir las imágenes.
+11. Usar OIDC para que GitHub Actions asuma un rol limitado a SSM. La EC2 lee
+    GHCR privado con un PAT classic de solo `read:packages`, instalado fuera del
+    repositorio y de GitHub Actions.
+12. Guardar la configuración de staging en
+    `/etc/sgp/staging/staging.env`, modo `0600`, e impedir despliegues simultáneos
+    con concurrencia de GitHub y `flock` en el servidor.
+13. Mantener temporalmente Nginx en loopback hasta implementar y validar el
+    acceso HTTPS público definido para la arquitectura final.
 
 ## Justificación
 
-Docker Compose cubre los cuatro servicios requeridos con una operación conocida
-por el equipo. Construir fuera de EC2 permite comenzar con una instancia pequeña
-y evita instalar Maven o Node en el servidor. GHCR conserva la relación entre
-commit e imagen, mientras que el digest garantiza que una etiqueta móvil no
-cambie el artefacto aprobado.
+Docker Compose mantiene simple la operación de la EC2. GHCR y GitHub Actions
+evitan usar la instancia pequeña para compilar. Los índices OCI permiten usar
+instancias Graviton sin crear Dockerfiles por ambiente o arquitectura.
 
-La publicación multi-arquitectura permite usar las EC2 ARM64 seleccionadas sin
-perder compatibilidad con hosts x86_64. QEMU solo ejecuta las instrucciones ARM64
-de las capas finales que lo requieran; Maven y Angular se construyen en la
-arquitectura nativa del runner y sus artefactos son independientes de la CPU.
+RDS mueve persistencia, actualización y respaldo fuera del host de aplicación.
+Compartir una instancia reduce costo, mientras bases y roles separados impiden
+que staging use los datos de producción. El Security Group de RDS debe aceptar
+5432 solo desde los Security Groups de ambas EC2.
 
-Systems Manager reduce superficie de ataque y elimina la administración de
-claves SSH. Las redes internas y el bind a loopback impiden exposición directa de
-servicios. La configuración externa permite promover las mismas imágenes entre
-ambientes.
+S3 satisface la obligación de almacenar archivos fuera de EC2. Dos buckets
+permiten políticas y ciclos de vida independientes. Los roles de instancia
+evitan distribuir claves estáticas y permiten restringir cada EC2 a su bucket.
 
-La cuenta que opera staging puede leer los paquetes, pero no administrar su
-visibilidad dentro de la cuenta propietaria. Mantenerlos privados y autenticar la
-EC2 permite continuar sin ampliar permisos ni introducir el token en GitHub
-Actions. La publicación sigue usando `GITHUB_TOKEN`; el PAT se limita a la
-descarga en el servidor.
-
-Silo se adopta como respuesta limitada a la retirada de las imágenes oficiales;
-evita mantener una compilación propia y conserva compatibilidad para la
-integración futura. La elección deberá revisarse cuando el backend empiece a
-almacenar objetos o si cambia su mantenimiento.
+Systems Manager evita un puerto SSH público. La configuración externa permite
+promover los mismos digests entre ambientes sin reconstruir artefactos.
 
 ## Consecuencias
 
 ### Positivas
 
-- EC2 consume artefactos listos y necesita menos recursos de compilación.
+- La EC2 ejecuta solo frontend y backend y dispone de más memoria para la JVM.
+- Recrear contenedores o la EC2 no elimina los datos de RDS o S3.
 - Cada despliegue se relaciona con un commit y dos digests.
-- Staging permanece privado y los servicios de datos no exponen puertos.
-- Desarrollo local continúa funcionando con su Compose actual.
-- Producción puede seleccionar manualmente una versión validada sin cambiar las
-  imágenes.
-- El despliegue puede revertir Compose y digests sin eliminar volúmenes.
-- Las imágenes no quedan disponibles para descarga anónima.
+- Desarrollo local conserva su flujo actual sin depender de AWS.
+- Producción puede seleccionar manualmente lo validado en staging.
+- RDS, buckets, roles y credenciales se separan por ambiente.
 
 ### Negativas y riesgos
 
-- Una `t4g.micro` puede tener presión de memoria; se agrega swap y límites, pero
-  debe medirse antes de confirmar el tamaño.
-- Las capas finales ARM64 que ejecutan comandos durante el build dependen de
-  emulación QEMU y pueden tardar más que AMD64.
-- Silo es un fork comunitario y requiere seguimiento de seguridad y continuidad.
-- Un único host sigue siendo un punto de fallo.
-- El acceso depende de Systems Manager y de conectividad de salida.
-- La EC2 mantiene una credencial GHCR en `/root/.docker/config.json`; debe
-  protegerse, expira y depende de que la cuenta conserve acceso de lectura.
-- Un PAT classic con `read:packages` no se restringe a un solo paquete: puede
-  leer otros paquetes privados accesibles para la misma cuenta.
-- La rotación del PAT es una tarea operativa manual y un token vencido impide
-  nuevos pulls, aunque no detiene contenedores en ejecución.
+- RDS, S3, dos IPv4 públicas y dos EC2 generan costo incluso con poco tráfico;
+  deben configurarse presupuestos y revisar créditos antes de crearlos.
+- Staging y producción comparten capacidad y disponibilidad de una RDS.
+- `t4g.micro` puede sufrir presión de memoria y debe medirse.
+- El backend no puede validar todavía el flujo de archivos en S3.
+- Un PAT classic con `read:packages` puede leer otros paquetes privados a los
+  que tenga acceso la cuenta y requiere rotación manual.
+- `sslmode=require` cifra la conexión RDS, pero la verificación de identidad con
+  `verify-full` requiere distribuir y probar el bundle CA.
+- El acceso a credenciales IAM desde contenedores requiere configurar IMDSv2 de
+  forma consciente; un hop limit incorrecto impediría acceder a S3.
 
 ## Limitaciones
 
-- No incluye producción, HTTPS público, respaldos ni restauración.
-- La nueva arquitectura define dos EC2 separadas, pero esta historia solo
-  implementa staging.
-- MinIO/Silo todavía no está integrado con el backend.
-- Se usa gzip; Brotli queda pendiente para evitar módulos o imágenes adicionales.
-- La rotación local de Docker no satisface retención centralizada por 90 días.
-- La publicación inicial AMD64 ya se ejecutó. Los nuevos manifiestos
-  multi-arquitectura, OIDC, IAM, la autenticación GHCR desde EC2 y la instancia
-  no se han validado al actualizar esta versión del ADR.
+- No incluye creación de EC2, RDS, S3, IAM, DNS ni certificados.
+- No incluye Compose ni despliegue de producción.
+- No implementa respaldos, restauración ni retención centralizada de logs.
+- S3 está decidido como servicio, pero su integración de aplicación permanece
+  pendiente de la funcionalidad de archivos.
+- Brotli y HTTPS público todavía no están implementados.
+- La configuración RDS/S3 no ha sido probada contra recursos AWS reales.
+- La publicación multi-arquitectura, OIDC, SSM y GHCR desde EC2 aún requieren
+  validación real.
 
 ## Relación con el enunciado
 
-La decisión atiende las directrices de los apartados de infraestructura y CI/CD:
+La decisión conserva Docker Compose, Nginx, imágenes independientes,
+configuración externa, healthchecks, reinicio automático, Flyway y separación de
+ambientes. Se desvía de DT-DEP-01 al usar RDS y S3 administrados en vez de
+contenedores PostgreSQL/MinIO en el servidor; la sección 9.4 permite adaptar el
+despliegue a nube pública y la aclaración del auxiliar exige que los archivos no
+residan en EC2.
 
-- contenedores separados para frontend, backend, PostgreSQL/PostGIS y
-  almacenamiento de objetos;
-- Nginx como punto de entrada;
-- configuración externa y separación de ambientes;
-- persistencia, healthchecks, reinicio y ejecución sin privilegios cuando aplica;
-- compilación, pruebas y trazabilidad en CI;
-- registro de decisiones mediante ADR.
-
-Los respaldos, retención extendida de logs y producción se registran como trabajo
-pendiente en lugar de declararse implementados.
+S3 mantiene una API de almacenamiento de objetos compatible con la intención de
+DT-ALM. MinIO continúa en desarrollo local. La interfaz intercambiable de
+DT-ALM-03 sigue pendiente en el backend y no se declara implementada.
 
 ## Referencias
 
-- [Problema de acceso a la imagen oficial de MinIO](https://access.redhat.com/solutions/7148629).
-- [Repositorio del fork Silo y su contrato de compatibilidad](https://github.com/pgsty/silo).
-- [Release de Silo seleccionada](https://github.com/pgsty/silo/releases/tag/RELEASE.2026-09-16T00-00-00Z).
-- [Docker Compose v2.40.3](https://github.com/docker/compose/releases/tag/v2.40.3).
+- [Extensiones de PostgreSQL en Amazon RDS](https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/Appendix.PostgreSQL.CommonDBATasks.Extensions.html).
+- [Configuración de PostGIS en RDS](https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/Appendix.PostgreSQL.CommonDBATasks.PostGIS.html).
+- [Uso de TLS con RDS PostgreSQL](https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/PostgreSQL.Concepts.General.SSL.html).
+- [Roles IAM para aplicaciones en EC2](https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_use_switch-role-ec2.html).
+- [IMDSv2 para cargas contenedorizadas](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/configuring-IMDS-new-instances.html).
 - [Autenticación en GitHub Container Registry](https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-container-registry).
-

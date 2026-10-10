@@ -291,22 +291,19 @@ jobs:
         run: |
           compose_b64="$(base64 --wrap=0 infra/staging/compose.yml)"
           deploy_b64="$(base64 --wrap=0 infra/staging/deploy.sh)"
-          postgres_init_b64="$(base64 --wrap=0 infra/postgres/init/00-create-app-user.sh)"
 
           parameters="$(jq --null-input \
             --arg compose "${compose_b64}" \
             --arg deploy "${deploy_b64}" \
-            --arg postgres_init "${postgres_init_b64}" \
             --arg backend "${BACKEND_IMAGE}" \
             --arg frontend "${FRONTEND_IMAGE}" \
             --arg revision "${GITHUB_SHA}" \
             '{commands: [
               "set -eu",
-              "install -d -m 0755 /opt/sgp/staging /opt/sgp/postgres/init",
+              "install -d -m 0755 /opt/sgp/staging",
               ("printf %s " + ($compose | @sh) + " | base64 --decode > /opt/sgp/staging/compose.candidate.yml"),
               ("printf %s " + ($deploy | @sh) + " | base64 --decode > /opt/sgp/staging/deploy.sh"),
-              ("printf %s " + ($postgres_init | @sh) + " | base64 --decode > /opt/sgp/postgres/init/00-create-app-user.sh"),
-              "chmod 0755 /opt/sgp/staging/deploy.sh /opt/sgp/postgres/init/00-create-app-user.sh",
+              "chmod 0755 /opt/sgp/staging/deploy.sh",
               ("/opt/sgp/staging/deploy.sh /opt/sgp/staging/compose.candidate.yml " + ($backend | @sh) + " " + ($frontend | @sh) + " " + ($revision | @sh))
             ]}')"
 

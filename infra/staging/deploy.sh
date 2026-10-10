@@ -116,11 +116,8 @@ compose up --detach --remove-orphans --wait --wait-timeout 180
 
 compose exec --no-TTY nginx wget --quiet --output-document=/dev/null http://127.0.0.1:8080/healthz
 compose exec --no-TTY nginx wget --quiet --output-document=/dev/null 'http://127.0.0.1:8080/api/v1/puentes?size=1'
-compose exec --no-TTY postgres sh -ec '
-  applied="$(psql --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" --tuples-only --no-align \
-    --command "SELECT COUNT(*) FROM flyway_schema_history WHERE success = true;")"
-  test "$applied" -ge 16
-'
+compose exec --no-TTY backend curl --fail --silent --show-error \
+  http://127.0.0.1:8090/actuator/health >/dev/null
 
 printf '%s\n' "${REVISION}" >"${REVISION_FILE}"
 chmod 0644 "${REVISION_FILE}"
