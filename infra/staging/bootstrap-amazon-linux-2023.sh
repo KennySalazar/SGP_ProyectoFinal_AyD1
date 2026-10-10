@@ -2,7 +2,6 @@
 set -Eeuo pipefail
 
 readonly COMPOSE_VERSION="v2.40.3"
-readonly COMPOSE_ARCH="x86_64"
 readonly COMPOSE_DIR="/usr/local/lib/docker/cli-plugins"
 readonly COMPOSE_PATH="${COMPOSE_DIR}/docker-compose"
 
@@ -11,10 +10,18 @@ if [[ "${EUID}" -ne 0 ]]; then
   exit 1
 fi
 
-if [[ "$(uname -m)" != "x86_64" ]]; then
-  echo "Este script esta preparado para una instancia EC2 x86_64." >&2
-  exit 1
-fi
+case "$(uname -m)" in
+  aarch64 | arm64)
+    readonly COMPOSE_ARCH="aarch64"
+    ;;
+  x86_64 | amd64)
+    readonly COMPOSE_ARCH="x86_64"
+    ;;
+  *)
+    echo "Arquitectura no soportada: $(uname -m). Se requiere ARM64 o x86_64." >&2
+    exit 1
+    ;;
+esac
 
 dnf install --assumeyes docker curl
 systemctl enable --now docker

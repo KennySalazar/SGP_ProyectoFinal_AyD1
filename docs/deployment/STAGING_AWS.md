@@ -7,18 +7,27 @@ se actualiza de forma incremental durante la historia de usuario.
 
 | Área | Estado |
 |---|---|
-| Imágenes reutilizables de backend y frontend | Implementada y validada localmente. |
-| Compose aislado de staging | Implementado y validado localmente. |
-| Preparación de Amazon Linux 2023 | Script implementado; no ejecutado en AWS. |
+| Imágenes reutilizables de backend y frontend | Build multi-arquitectura implementado; pendiente de publicación desde `develop`. |
+| Compose aislado de staging | La versión con PostgreSQL y MinIO fue validada; su adaptación a RDS y S3 está pendiente. |
+| Preparación de Amazon Linux 2023 | Script compatible con ARM64 y x86_64; no ejecutado en AWS. |
 | Workflow de validación, publicación y despliegue | Ejecutado correctamente en GitHub para `develop`. |
-| Publicación en GHCR | Backend y frontend publicados como paquetes privados. |
+| Publicación en GHCR | Paquetes privados publicados inicialmente para AMD64; manifiestos AMD64/ARM64 pendientes de este cambio. |
 | Despliegue automático desde `develop` | Implementado y deshabilitado hasta disponer de AWS. |
 | Instancia EC2, IAM y Systems Manager | Pendiente de autorización y creación. |
 | Despliegue real en AWS | No ejecutado. |
 
 No se han creado recursos ni credenciales en AWS.
 
-## Arquitectura de staging
+### Transición de arquitectura
+
+La aclaración recibida el 10 de octubre de 2026 exige almacenar los archivos
+fuera del servidor de aplicación. La arquitectura objetivo pasa a usar dos EC2
+ARM64 separadas, una RDS PostgreSQL/PostGIS compartida por ambientes y buckets S3
+independientes. Este incremento prepara las imágenes y el servidor ARM64; el
+Compose, RDS, S3, HTTPS y logs se adaptarán en los siguientes incrementos. No se
+debe aprovisionar AWS usando todavía el Compose descrito a continuación.
+
+## Arquitectura de staging actualmente implementada
 
 El punto de entrada es Nginx. El puerto se publica únicamente en la interfaz de
 loopback de la instancia para acceder mediante un túnel de AWS Systems Manager.
@@ -53,13 +62,13 @@ y en la
 
 | Archivo | Responsabilidad |
 |---|---|
-| `sgp-api/Dockerfile` | Construye la API con Java 21 y la ejecuta sin privilegios. |
-| `sgp-client/Dockerfile` | Construye Angular y lo sirve con Nginx sin privilegios. |
+| `sgp-api/Dockerfile` | Construye la API con Java 21 una vez y genera runtimes AMD64/ARM64 sin privilegios. |
+| `sgp-client/Dockerfile` | Construye Angular una vez y genera runtimes Nginx AMD64/ARM64 sin privilegios. |
 | `sgp-client/nginx.conf` | Sirve la SPA, comprime con gzip y reenvía `/api/` al backend. |
 | `sgp-api/src/main/resources/application-staging.properties` | Desactiva OpenAPI público y configura el perfil de staging. |
 | `infra/staging/compose.yml` | Define el stack aislado que consume imágenes publicadas. |
 | `infra/staging/.env.example` | Plantilla sin credenciales reales. |
-| `infra/staging/bootstrap-amazon-linux-2023.sh` | Prepara una EC2 x86_64 con Docker, Compose, SSM y swap. |
+| `infra/staging/bootstrap-amazon-linux-2023.sh` | Prepara Amazon Linux 2023 ARM64 o x86_64 con Docker, Compose, SSM y swap. |
 | `infra/staging/deploy.sh` | Valida, actualiza y comprueba el stack con bloqueo y rollback. |
 | `infra/postgres/init/00-create-app-user.sh` | Crea de forma segura el usuario de aplicación. |
 
@@ -68,29 +77,30 @@ ha sido sustituido por la configuración de staging.
 
 ## Requisitos de infraestructura
 
-La propuesta de menor complejidad y costo es una única EC2 para la primera
-implementación de staging:
+La infraestructura objetivo asigna una EC2 independiente a staging:
 
-- Amazon Linux 2023, arquitectura x86_64.
-- Tipo `t3.micro` como punto de partida, sujeto a medición y disponibilidad de
-  créditos. Si la memoria no es suficiente, evaluar `t3.small` antes de cambiar
-  la arquitectura.
+- Amazon Linux 2023, arquitectura ARM64 (`aarch64`).
+- Tipo `t4g.micro` como punto de partida, con el heap de Java limitado y sujeto a
+  medición. Si la memoria no es suficiente, cualquier aumento requiere revisar
+  primero los créditos y el presupuesto.
 - Disco raíz gp3 de aproximadamente 20 GiB como valor inicial, sujeto a
   autorización.
 - 2 GiB de swap creados por el script de preparación.
 - Rol de instancia con `AmazonSSMManagedInstanceCore` o una política equivalente
   de permisos mínimos.
 - Salida HTTPS hacia AWS, GHCR/Docker Hub y el proveedor SMTP.
-- Security Group sin reglas de entrada para staging.
-- Sin ALB, RDS, NAT Gateway, ECS, EKS ni otros servicios de costo adicional.
+- Administración mediante Systems Manager, sin publicar SSH.
+- Las reglas públicas 80/443, RDS privada y S3 se definirán en el incremento de
+  infraestructura; no se usarán ALB, NAT Gateway, ECS ni EKS.
 
-El tipo, disco, región, VPC y uso compartido con producción no están aprobados de
-forma definitiva. No deben aprovisionarse sin autorización.
+El disco, región, VPC y recursos administrados no deben aprovisionarse sin
+autorización y verificación previa de costos.
 
 ## Preparación del servidor
 
 El script está diseñado para ejecutarse una sola vez como `root` en Amazon Linux
-2023 x86_64:
+2023. Detecta `aarch64` para la EC2 `t4g` objetivo y conserva compatibilidad con
+`x86_64`:
 
 ```bash
 sudo bash /tmp/bootstrap-amazon-linux-2023.sh
@@ -201,8 +211,11 @@ y reciben solamente `packages: write`. El job de despliegue recibe
 `id-token: write` para OIDC y no usa claves AWS permanentes.
 
 Las acciones de terceros están fijadas a commits inmutables. Buildx usa cachés
-separadas para cada imagen, genera SBOM y procedencia, y construye únicamente
-`linux/amd64`, que coincide con la arquitectura seleccionada para staging.
+separadas para cada imagen, genera SBOM y procedencia, y publica un único
+manifiesto con `linux/amd64` y `linux/arm64`. QEMU se registra antes de Buildx y
+su imagen `binfmt` está fijada por digest. Las etapas Maven y Angular usan
+`BUILDPLATFORM`, por lo que se ejecutan una vez en la arquitectura nativa del
+runner; las etapas finales producen los runtimes de ambas arquitecturas.
 
 Configure un GitHub Environment llamado `staging`, restringido a la rama
 `develop`, con estas variables:
@@ -390,13 +403,16 @@ El workflow también se ejecutó en GitHub después de integrar los cambios en
 `develop`: las validaciones de backend y frontend finalizaron correctamente y se
 publicaron ambas imágenes en GHCR. El job `Deploy staging` permaneció omitido,
 como se esperaba, porque `STAGING_ENABLED` no está activo. Aún no se han validado
-el acceso desde EC2 a los paquetes privados, OIDC, SSM ni una instancia real. La
-URL o el identificador de la ejecución deben agregarse cuando se recopile la
-evidencia final.
+los nuevos manifiestos multi-arquitectura, el acceso desde EC2 a los paquetes
+privados, OIDC, SSM ni una instancia real. La URL o el identificador de cada
+ejecución debe agregarse cuando se recopile la evidencia final.
 
 ## Limitaciones y trabajo pendiente
 
 - Registrar la URL o el identificador de la ejecución exitosa de GitHub Actions.
+- Publicar y verificar los manifiestos AMD64/ARM64 después de integrar este
+  cambio en `develop`.
+- Sustituir PostgreSQL y MinIO del Compose de staging por RDS y S3.
 - Crear y autorizar los recursos mínimos de AWS.
 - Crear, instalar y probar en EC2 el PAT classic de solo lectura para GHCR.
 - Definir responsable y recordatorio de rotación del PAT; su disponibilidad
@@ -409,5 +425,5 @@ evidencia final.
 - La retención centralizada de logs por 90 días no está implementada.
 - Los respaldos y restauraciones de PostgreSQL y MinIO/Silo están fuera del
   alcance de esta historia y permanecen pendientes.
-- HTTPS público corresponde a producción, no a staging.
+- Configurar HTTPS público también para staging según la nueva arquitectura.
 

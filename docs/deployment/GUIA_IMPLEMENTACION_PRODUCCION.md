@@ -17,10 +17,10 @@ responsable de producción debe conservar o coordinar antes de modificarlos.
 
 | Componente | Estado |
 |---|---|
-| Dockerfiles reutilizables | Implementados y construidos localmente. |
-| Compose de staging | Implementado y probado localmente. |
+| Dockerfiles reutilizables | Preparados para AMD64/ARM64; nueva publicación pendiente. |
+| Compose de staging | Versión anterior probada; adaptación a RDS y S3 pendiente. |
 | Workflow CI, publicación y staging | Validaciones y publicación ejecutadas correctamente; despliegue AWS deshabilitado. |
-| Imágenes en GHCR | Backend y frontend publicados como paquetes privados. |
+| Imágenes en GHCR | Paquetes privados existentes en AMD64; manifiestos multi-arquitectura pendientes. |
 | Convención de versiones | Definida y utilizada en la primera publicación. |
 | Infraestructura AWS de staging | Pendiente. |
 | Infraestructura y Compose de producción | Responsabilidad del segundo integrante. |
@@ -39,14 +39,19 @@ responsable de producción debe conservar o coordinar antes de modificarlos.
 10. Bases, redes, volúmenes y secretos deben ser independientes por ambiente.
 11. No se usan datos reales de producción en staging.
 12. No deben modificarse migraciones Flyway ya aplicadas.
+13. Las imágenes deben publicarse para `linux/amd64` y `linux/arm64`; las EC2
+    objetivo usan ARM64 (`t4g`).
 
-La decisión de usar una o dos EC2 sigue pendiente. El Compose de producción debe
-poder coexistir con staging sin compartir recursos, incluso si inicialmente se
-elige una sola instancia.
+La nueva arquitectura asigna una EC2 independiente a cada ambiente: `t4g.micro`
+para staging y `t4g.small` para producción. Ambas usarán una RDS compartida, pero
+con bases y credenciales separadas. Estos recursos no se crean desde esta parte
+de la historia de usuario.
 
 ## 4. Componentes entregados por staging
 
-- Dockerfiles multietapa con usuario sin privilegios y healthcheck.
+- Dockerfiles multietapa, multi-arquitectura, con usuario sin privilegios y
+  healthcheck. Las etapas de compilación usan la plataforma nativa del runner
+  para no repetir Maven y Angular por cada arquitectura.
 - Nginx con SPA, proxy inverso, gzip, encabezados de seguridad y caché controlada.
 - Perfil `application-staging.properties`.
 - Perfil `application-prod.properties` ya existente, que desactiva OpenAPI y
@@ -73,6 +78,11 @@ Convención definida:
 - `sha-<SHA completo>`: etiqueta inmutable asociada al commit de `develop`.
 - `develop`: etiqueta móvil para identificar la última integración exitosa.
 - `<imagen>@sha256:<digest>`: referencia que debe usarse en un despliegue.
+
+Cada etiqueta publicará un índice OCI con variantes `linux/amd64` y
+`linux/arm64`. Una EC2 `t4g` seleccionará automáticamente la variante ARM64 sin
+cambiar el nombre ni la etiqueta. El digest aprobado debe corresponder al índice
+multi-arquitectura, no a una variante aislada.
 
 Los paquetes ya existen en GHCR y permanecen privados. El responsable de staging
 tiene acceso de lectura, pero no permisos administrativos sobre los paquetes de
@@ -259,6 +269,8 @@ crear el Compose real de producción.
 - No existe retención centralizada de logs por 90 días.
 - No se han implementado respaldos ni restauraciones.
 - No se ha medido aún el consumo real en EC2.
+- La publicación multi-arquitectura está implementada en la rama de trabajo, pero
+  debe comprobarse en GHCR después de integrarla en `develop`.
 - Los paquetes GHCR son privados. Cada ambiente necesita una credencial de
   lectura cuya vigencia y dependencia de una cuenta personal deben operarse.
 - El PAT classic con `read:packages` puede leer los paquetes a los que tenga
@@ -266,8 +278,7 @@ crear el Compose real de producción.
 
 ## 14. Decisiones pendientes
 
-- Una EC2 compartida o dos instancias separadas.
-- Región, VPC, tipo y capacidad definitiva de la instancia de producción.
+- Región, VPC y capacidad definitiva de disco para las dos EC2 separadas.
 - Solución de certificado HTTPS válido para IP pública.
 - Mecanismo de secretos de producción.
 - Cuenta responsable, vigencia y rotación de la credencial GHCR de producción.

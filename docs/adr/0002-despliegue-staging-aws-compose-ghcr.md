@@ -2,8 +2,10 @@
 
 ## Estado
 
-Aceptada para staging. Las decisiones exclusivas de producción y la posible
-coexistencia de ambientes en una EC2 permanecen pendientes.
+En revisión desde el 10 de octubre de 2026 por la adopción de RDS y S3. La
+plataforma ARM64 y la publicación multi-arquitectura descritas en esta revisión
+están aceptadas. Las secciones sobre PostgreSQL y MinIO en la EC2 se actualizarán
+en el siguiente incremento y no deben usarse para aprovisionar AWS.
 
 ## Contexto
 
@@ -44,6 +46,11 @@ puertos administrativos públicos ni credenciales AWS permanentes en GitHub.
 
 - **GitHub Actions:** libera CPU, memoria y disco de EC2 y deja trazabilidad.
 - **Compilar en EC2:** descartado por consumo y por mezclar build con operación.
+- **Solo AMD64:** no puede ejecutarse en las instancias `t4g` seleccionadas.
+- **Solo ARM64:** reduce el trabajo de publicación, pero limita la portabilidad y
+  las validaciones en equipos x86_64.
+- **AMD64 y ARM64:** conserva portabilidad; las etapas de compilación se fijan a
+  `BUILDPLATFORM` para no repetir Maven y Angular.
 
 ### Registro
 
@@ -71,8 +78,10 @@ puertos administrativos públicos ni credenciales AWS permanentes en GitHub.
 
 ## Decisión
 
-1. Ejecutar staging en una EC2 Amazon Linux 2023 x86_64 con Docker Compose.
-2. Construir backend y frontend en GitHub Actions y publicar en GHCR.
+1. Ejecutar staging en una EC2 `t4g.micro` Amazon Linux 2023 ARM64 con Docker
+   Compose.
+2. Construir backend y frontend en GitHub Actions y publicar un índice OCI con
+   variantes `linux/amd64` y `linux/arm64` en GHCR.
 3. Usar imágenes separadas:
    `ghcr.io/kennysalazar/sgp-api` y
    `ghcr.io/kennysalazar/sgp-client`.
@@ -96,9 +105,9 @@ puertos administrativos públicos ni credenciales AWS permanentes en GitHub.
     `read:packages`, almacenado por Docker fuera del repositorio. Producción no
     debe reutilizar esa credencial.
 
-No se decide todavía si producción compartirá la EC2. Si lo hace, deberá usar
-recursos completamente independientes. Producción no se desplegará
-automáticamente desde `develop`.
+Staging y producción usarán EC2 separadas. Esta historia no crea ni despliega la
+instancia de producción. Producción no se desplegará automáticamente desde
+`develop`.
 
 ## Justificación
 
@@ -107,6 +116,11 @@ por el equipo. Construir fuera de EC2 permite comenzar con una instancia pequeñ
 y evita instalar Maven o Node en el servidor. GHCR conserva la relación entre
 commit e imagen, mientras que el digest garantiza que una etiqueta móvil no
 cambie el artefacto aprobado.
+
+La publicación multi-arquitectura permite usar las EC2 ARM64 seleccionadas sin
+perder compatibilidad con hosts x86_64. QEMU solo ejecuta las instrucciones ARM64
+de las capas finales que lo requieran; Maven y Angular se construyen en la
+arquitectura nativa del runner y sus artefactos son independientes de la CPU.
 
 Systems Manager reduce superficie de ataque y elimina la administración de
 claves SSH. Las redes internas y el bind a loopback impiden exposición directa de
@@ -139,8 +153,10 @@ almacenar objetos o si cambia su mantenimiento.
 
 ### Negativas y riesgos
 
-- Una `t3.micro` puede tener presión de memoria; se agrega swap y límites, pero
+- Una `t4g.micro` puede tener presión de memoria; se agrega swap y límites, pero
   debe medirse antes de confirmar el tamaño.
+- Las capas finales ARM64 que ejecutan comandos durante el build dependen de
+  emulación QEMU y pueden tardar más que AMD64.
 - Silo es un fork comunitario y requiere seguimiento de seguridad y continuidad.
 - Un único host sigue siendo un punto de fallo.
 - El acceso depende de Systems Manager y de conectividad de salida.
@@ -154,13 +170,14 @@ almacenar objetos o si cambia su mantenimiento.
 ## Limitaciones
 
 - No incluye producción, HTTPS público, respaldos ni restauración.
-- No define aún una o dos EC2.
+- La nueva arquitectura define dos EC2 separadas, pero esta historia solo
+  implementa staging.
 - MinIO/Silo todavía no está integrado con el backend.
 - Se usa gzip; Brotli queda pendiente para evitar módulos o imágenes adicionales.
 - La rotación local de Docker no satisface retención centralizada por 90 días.
-- Las validaciones y publicaciones del workflow ya se ejecutaron; OIDC, IAM, la
-  autenticación GHCR desde EC2 y la instancia no se han validado al actualizar
-  esta versión del ADR.
+- La publicación inicial AMD64 ya se ejecutó. Los nuevos manifiestos
+  multi-arquitectura, OIDC, IAM, la autenticación GHCR desde EC2 y la instancia
+  no se han validado al actualizar esta versión del ADR.
 
 ## Relación con el enunciado
 
