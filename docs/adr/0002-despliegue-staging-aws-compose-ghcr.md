@@ -6,7 +6,8 @@ Aceptada para staging el 10 de octubre de 2026. La región y VPC están
 confirmadas; se crearon los Security Groups, el bucket S3, la red privada, el DB
 Subnet Group, RDS y la EC2 de staging. Session Manager y el alcance TCP desde la
 EC2 hacia RDS están verificados, aunque todavía no se han autenticado conexiones
-PostgreSQL ni creado las bases. El rol OIDC y el despliegue real aún no existen.
+PostgreSQL ni creado las bases. El rol OIDC ya tiene un ARN asignado, pero su
+confianza limitada a `develop` y el despliegue real aún no han sido validados.
 La configuración y el despliegue de producción permanecen fuera del alcance de
 esta historia.
 
@@ -122,7 +123,12 @@ claves AWS estáticas ni compilar Java o Angular en EC2.
    `sha-<SHA completo>` aporta trazabilidad y `develop` es solo informativa.
 11. Mantener publicación y despliegue en jobs separados; un fallo en AWS no
     obliga a reconstruir las imágenes.
-12. Usar OIDC para que GitHub Actions asuma un rol limitado a SSM. La EC2 lee
+12. Usar OIDC para que GitHub Actions asuma un rol limitado a SSM. El job no
+    depende de un GitHub Environment: consume `AWS_REGION`, `AWS_ROLE_ARN`,
+    `STAGING_INSTANCE_ID` y el interruptor `STAGING_ENABLED` como variables de
+    repositorio. Solo un `push` a `develop` puede desplegar y la confianza de AWS
+    se limita al sujeto
+    `repo:KennySalazar/SGP_ProyectoFinal_AyD1:ref:refs/heads/develop`. La EC2 lee
     GHCR privado con un PAT classic de solo `read:packages`, instalado fuera del
     repositorio y de GitHub Actions.
 13. Guardar la configuración de staging en
@@ -175,9 +181,11 @@ En `us-east-1` se confirmaron los siguientes recursos de staging:
   repositorio.
 
 La prueba TCP demuestra conectividad de red entre EC2 y RDS, no un despliegue
-funcional ni autenticación PostgreSQL. El rol OIDC de GitHub Actions es distinto
-del rol de instancia y continúa pendiente. No existen todavía `sgp_staging` ni
-`sgp_prod`; no se han probado TLS, PostGIS, Flyway ni el backend contra RDS.
+funcional ni autenticación PostgreSQL. El rol OIDC de GitHub Actions
+`arn:aws:iam::416086757987:role/sgp-staging-github-actions-role` es distinto del
+rol de instancia; su política de confianza para `develop` y su asunción real
+continúan pendientes de validar. No existen todavía `sgp_staging` ni `sgp_prod`;
+no se han probado TLS, PostGIS, Flyway ni el backend contra RDS.
 
 ### Excepción operativa de respaldos
 
@@ -250,8 +258,9 @@ promover los mismos digests entre ambientes sin reconstruir artefactos.
   Subnet Group y la EC2; todavía no se ha ejecutado una carga de aplicación real.
 - RDS está disponible y responde por TCP desde EC2, pero faltan TLS,
   autenticación, bases, usuarios, extensiones y migraciones reales.
-- El host EC2 ya está preparado; todavía faltan el rol OIDC y los certificados.
-  La compra de dominio y la creación de una zona DNS pública se descartaron.
+- El host EC2 ya está preparado; todavía falta validar el rol OIDC con la
+  confianza limitada a `develop` y faltan los certificados. La compra de dominio
+  y la creación de una zona DNS pública se descartaron.
 - No incluye Compose ni despliegue de producción.
 - Solo existe una retención automática solicitada de 1 día en RDS. La política
   requerida de respaldos, restauración y la retención centralizada de logs no

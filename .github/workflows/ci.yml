@@ -231,7 +231,6 @@ jobs:
     needs: [publish-backend, publish-frontend]
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    environment: staging
     permissions:
       contents: read
       id-token: write

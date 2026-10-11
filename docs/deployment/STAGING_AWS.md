@@ -12,7 +12,7 @@ se actualiza de forma incremental durante la historia de usuario.
 | Preparación de Amazon Linux 2023 | Completada exitosamente en la EC2 ARM64 el 11 de octubre de 2026. |
 | Workflow de validación, publicación y despliegue | Versión anterior ejecutada correctamente; cambio actual pendiente de CI. |
 | Publicación en GHCR | Paquetes privados publicados inicialmente para AMD64; manifiestos AMD64/ARM64 pendientes de este cambio. |
-| Despliegue automático desde `develop` | Implementado y deshabilitado hasta completar los requisitos restantes. |
+| Despliegue automático desde `develop` | Implementado con variables de repositorio y deshabilitado hasta completar los requisitos restantes. |
 | Red AWS | VPC, tabla privada, dos subredes dedicadas y DB Subnet Group de RDS confirmados. |
 | Security Groups | Grupos de EC2 y RDS creados; la regla 5432 de RDS referencia únicamente al grupo de staging. |
 | IAM y Systems Manager | Rol asociado a la EC2 y acceso interactivo mediante Session Manager verificado. |
@@ -24,9 +24,10 @@ se actualiza de forma incremental durante la historia de usuario.
 Se crearon los dos Security Groups, el bucket S3, RDS y la EC2 de staging. El rol
 de instancia está asociado y el acceso mediante Session Manager funciona. Una
 prueba desde EC2 confirmó alcance TCP al endpoint privado de RDS en el puerto
-5432. La preparación inicial del servidor finalizó correctamente. No existe
-todavía el rol OIDC de GitHub Actions y no se han preparado la base ni el
-despliegue real.
+5432. La preparación inicial del servidor finalizó correctamente. El rol OIDC de
+GitHub Actions y sus variables de repositorio ya tienen identificadores
+asignados, pero la confianza para `develop` y la asunción del rol todavía no han
+sido validadas. Tampoco se han preparado la base ni el despliegue real.
 
 ## Inventario AWS confirmado
 
@@ -66,7 +67,7 @@ el 10 y 11 de octubre de 2026:
 | Administración EC2 | Acceso interactivo mediante AWS Systems Manager Session Manager verificado. |
 | Par de claves | `sgp-staging-key`, ED25519 y formato privado `.pem`; archivo conservado fuera del repositorio. SSH no probado y sin regla de entrada pública. |
 | Acceso S3 desde IAM | No concedido todavía; el rol confirmado solo habilita la administración mediante SSM. |
-| Rol OIDC de GitHub Actions | Pendiente; es independiente del rol de instancia EC2. |
+| Rol OIDC de GitHub Actions | `arn:aws:iam::416086757987:role/sgp-staging-github-actions-role`; es independiente del rol de instancia EC2. Su confianza para la rama `develop` y su uso real siguen pendientes de configurar o validar. |
 | Créditos disponibles | USD 120 al momento de la revisión. |
 | Alertas de presupuesto | No fue posible configurarlas; quedan a cargo del propietario de la cuenta y el consumo se revisará manualmente. |
 
@@ -461,23 +462,35 @@ su imagen `binfmt` está fijada por digest. Las etapas Maven y Angular usan
 `BUILDPLATFORM`, por lo que se ejecutan una vez en la arquitectura nativa del
 runner; las etapas finales producen los runtimes de ambas arquitecturas.
 
-Configure un GitHub Environment llamado `staging`, restringido a la rama
-`develop`, con estas variables:
+El job no depende de un GitHub Environment. Configure todas las entradas en
+**Settings → Secrets and variables → Actions → Repository variables**:
 
 | Variable | Nivel | Estado inicial | Propósito |
 |---|---|---|---|
-| `STAGING_ENABLED` | Repositorio | Ausente o `false` | Habilita el job; debe ser de repositorio porque se evalúa antes de cargar el Environment. |
-| `AWS_REGION` | Environment `staging` | Pendiente | Región de la instancia y del rol. |
-| `AWS_ROLE_ARN` | Environment `staging` | Pendiente | Rol asumido mediante OIDC. |
-| `STAGING_INSTANCE_ID` | Environment `staging` | Pendiente de configurar; valor previsto `i-0385c95df8cd7909d` | Instancia administrada por SSM. |
+| `STAGING_ENABLED` | Repositorio | Ausente o `false` | Interruptor del job. Solo debe cambiarse a `true` después de completar los requisitos y validar la confianza OIDC. |
+| `AWS_REGION` | Repositorio | Configurada: `us-east-1` | Región de la instancia y del rol. |
+| `AWS_ROLE_ARN` | Repositorio | Configurada: `arn:aws:iam::416086757987:role/sgp-staging-github-actions-role` | Rol asumido mediante OIDC. |
+| `STAGING_INSTANCE_ID` | Repositorio | Configurada: `i-0385c95df8cd7909d` | Instancia administrada por SSM. |
+
+Las variables anteriores son identificadores de infraestructura, no
+credenciales. No deben agregarse access keys, contraseñas ni tokens como
+variables de repositorio. La ausencia de `STAGING_ENABLED`, o cualquier valor
+distinto de la cadena exacta `true`, mantiene omitido el job de despliegue.
 
 La publicación en GHCR no requiere GitHub Secrets: utiliza el `GITHUB_TOKEN`
 efímero. La descarga desde la EC2 es una operación diferente y utiliza el PAT de
 solo lectura instalado manualmente en Docker. AWS usa OIDC y tampoco requiere
 claves permanentes en GitHub. La relación de confianza del rol debe limitar el
-sujeto a `repo:KennySalazar/SGP_ProyectoFinal_AyD1:environment:staging`. Su
+sujeto a
+`repo:KennySalazar/SGP_ProyectoFinal_AyD1:ref:refs/heads/develop`. Su
 política debe permitir únicamente enviar `AWS-RunShellScript` a la instancia de
 staging, consultar el resultado y cancelar el comando en caso de timeout.
+
+La protección que antes habría aportado el Environment se reemplaza de forma
+explícita por tres controles: el workflow solo recibe eventos `push` de
+`develop`, el job vuelve a comprobar `github.ref == 'refs/heads/develop'` y la
+confianza de AWS acepta únicamente el sujeto OIDC de esa misma referencia. Esta
+adaptación no agrega claves permanentes ni cambia el despliegue mediante SSM.
 
 Cada job vuelve a consultar el SHA actual de `develop` antes de publicar o
 desplegar. La publicación por imagen está serializada, el despliegue tiene una
@@ -767,7 +780,9 @@ agregarse cuando se recopile la evidencia final.
   cambio en `develop`.
 - Probar autenticación PostgreSQL desde EC2 con `sslmode=verify-full` y el bundle
   CA de RDS; la prueba TCP actual no cubre esa validación.
-- Crear el rol OIDC limitado al Environment `staging` y a la instancia EC2.
+- Configurar y verificar la confianza OIDC del rol
+  `sgp-staging-github-actions-role`, limitada a `refs/heads/develop`, y su
+  política SSM limitada a la instancia de staging.
 - Ejecutar y validar `infra/rds/prepare-database.sql` contra RDS PostgreSQL 16.
 - Confirmar en la versión elegida de RDS la disponibilidad de PostGIS antes de
   crear datos.
@@ -797,9 +812,9 @@ agregarse cuando se recopile la evidencia final.
    modificar migraciones existentes. No crear `sgp_prod`.
 3. Instalar en EC2 la autenticación de solo lectura para GHCR y configurar
    `/etc/sgp/staging/staging.env` sin versionar secretos.
-4. Crear el rol OIDC de GitHub Actions, configurar las variables del Environment
-   `staging` y probar el despliegue manteniendo `STAGING_ENABLED=false` hasta que
-   las comprobaciones manuales anteriores sean satisfactorias.
+4. Terminar la política de confianza del rol OIDC, revisar las variables de
+   repositorio y probar el flujo manteniendo `STAGING_ENABLED` ausente o en
+   `false` hasta que las comprobaciones manuales anteriores sean satisfactorias.
 5. Habilitar el despliegue automático y recopilar evidencia de SSM, descarga por
    digest, salud, Flyway, frontend y `/api/v1`.
 
