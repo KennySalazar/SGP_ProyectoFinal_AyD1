@@ -9,23 +9,24 @@ se actualiza de forma incremental durante la historia de usuario.
 |---|---|
 | Imágenes reutilizables de backend y frontend | Build multi-arquitectura implementado; pendiente de publicación desde `develop`. |
 | Compose aislado de staging | Adaptado para ejecutar solo Nginx/Angular y Spring Boot; RDS y S3 son externos a la EC2. |
-| Preparación de Amazon Linux 2023 | Script compatible con ARM64 y x86_64; no ejecutado en AWS. |
+| Preparación de Amazon Linux 2023 | Completada exitosamente en la EC2 ARM64 el 11 de octubre de 2026. |
 | Workflow de validación, publicación y despliegue | Versión anterior ejecutada correctamente; cambio actual pendiente de CI. |
 | Publicación en GHCR | Paquetes privados publicados inicialmente para AMD64; manifiestos AMD64/ARM64 pendientes de este cambio. |
-| Despliegue automático desde `develop` | Implementado y deshabilitado hasta completar la preparación inicial. |
+| Despliegue automático desde `develop` | Implementado y deshabilitado hasta completar los requisitos restantes. |
 | Red AWS | VPC, tabla privada, dos subredes dedicadas y DB Subnet Group de RDS confirmados. |
 | Security Groups | Grupos de EC2 y RDS creados; la regla 5432 de RDS referencia únicamente al grupo de staging. |
 | IAM y Systems Manager | Rol asociado a la EC2 y acceso interactivo mediante Session Manager verificado. |
 | S3 | Bucket privado de staging creado y vacío; integración de aplicación no implementada. |
 | RDS | `sgp-rds-postgres` disponible; conectividad TCP desde EC2 verificada, con autenticación, bases, extensiones y migraciones pendientes. |
-| EC2 | `sgp-staging-ec2` creada, en ejecución y con sus tres comprobaciones superadas; Docker todavía no está instalado. |
+| EC2 | `sgp-staging-ec2` creada, en ejecución y con sus tres comprobaciones superadas; preparación inicial completada. |
 | Despliegue real en AWS | No ejecutado. |
 
 Se crearon los dos Security Groups, el bucket S3, RDS y la EC2 de staging. El rol
 de instancia está asociado y el acceso mediante Session Manager funciona. Una
 prueba desde EC2 confirmó alcance TCP al endpoint privado de RDS en el puerto
-5432. No existe todavía el rol OIDC de GitHub Actions y no se han preparado la
-base, el servidor ni el despliegue real.
+5432. La preparación inicial del servidor finalizó correctamente. No existe
+todavía el rol OIDC de GitHub Actions y no se han preparado la base ni el
+despliegue real.
 
 ## Inventario AWS confirmado
 
@@ -274,7 +275,7 @@ La infraestructura objetivo asigna una EC2 independiente a staging:
   medición. Si la memoria no es suficiente, cualquier aumento requiere revisar
   primero los créditos y el presupuesto.
 - Disco raíz de 20 GiB gp3, cifrado con `aws/ebs`.
-- 2 GiB de swap pendientes de crear mediante el script de preparación.
+- 2 GiB de swap configurados mediante el script de preparación.
 - Rol de instancia `sgp-staging-ec2-role`, asociado y probado para acceso
   interactivo con `AmazonSSMManagedInstanceCore`.
 - Cuando exista la integración de archivos, una política adicional de mínimo
@@ -346,16 +347,20 @@ sudo bash /tmp/bootstrap-amazon-linux-2023.sh
 
 Realiza las siguientes operaciones:
 
-1. Instala Docker, el cliente PostgreSQL 16 y `curl`.
+1. Instala Docker y el cliente PostgreSQL 16. Utiliza el comando `curl` ya
+   provisto por `curl-minimal` en Amazon Linux 2023.
 2. Verifica y habilita `amazon-ssm-agent` y `chronyd`.
 3. Instala Docker Compose `v2.40.3` y verifica su SHA-256.
 4. Crea `/opt/sgp/staging` y `/etc/sgp/staging`.
 5. Configura `/swapfile` de 2 GiB si no existe.
 6. Agrega `ssm-user` al grupo `docker`, si el usuario existe.
 
-La instancia ya admite sesiones de SSM, pero el script todavía no ha sido
-transferido ni ejecutado. Ese resultado deberá registrarse durante la preparación
-inicial, sin incorporar secretos en el comando ni en sus salidas.
+La preparación se ejecutó exitosamente en `sgp-staging-ec2` el 11 de octubre de
+2026. El primer intento solicitaba el paquete `curl` y falló porque Amazon Linux
+2023 ya incluía `curl-minimal`; ambos paquetes entran en conflicto. Se eliminó
+`curl` de la instalación de DNF, conservando el comando proporcionado por
+`curl-minimal`, y la ejecución posterior completó Docker, Docker Compose,
+PostgreSQL 16, SSM, swap y los directorios de staging.
 
 ## Directorios del servidor
 
@@ -690,6 +695,11 @@ prueba TCP desde esa instancia. Todavía no se han probado TLS, autenticación,
 PostGIS, Flyway ni la conexión del backend contra RDS. El bucket S3 tampoco tiene
 una integración funcional que probar.
 
+El script de preparación de Amazon Linux 2023 se ejecutó correctamente en la EC2
+el 11 de octubre de 2026 después de eliminar de DNF la solicitud del paquete
+`curl`, incompatible con `curl-minimal`. Esto valida la preparación del host, no
+el acceso a GHCR ni la ejecución de los contenedores de la aplicación.
+
 El workflow también se ejecutó en GitHub después de integrar los cambios en
 `develop`: las validaciones de backend y frontend finalizaron correctamente y se
 publicaron ambas imágenes en GHCR. El job `Deploy staging` permaneció omitido,
@@ -706,7 +716,6 @@ agregarse cuando se recopile la evidencia final.
   cambio en `develop`.
 - Probar autenticación PostgreSQL desde EC2 con `sslmode=verify-full` y el bundle
   CA de RDS; la prueba TCP actual no cubre esa validación.
-- Ejecutar y validar el script de preparación de Amazon Linux en la EC2.
 - Crear el rol OIDC limitado al Environment `staging` y a la instancia EC2.
 - Ejecutar y validar `infra/rds/prepare-database.sql` contra RDS PostgreSQL 16.
 - Confirmar en la versión elegida de RDS la disponibilidad de PostGIS antes de
@@ -730,19 +739,17 @@ agregarse cuando se recopile la evidencia final.
 
 ## Secuencia de implementación pendiente
 
-1. Transferir por SSM y ejecutar el script de preparación; validar Docker,
-   Compose, swap y el agente SSM sin abrir puertos de entrada.
-2. Descargar el bundle CA desde su origen oficial y probar PostgreSQL con
+1. Descargar el bundle CA desde su origen oficial y probar PostgreSQL con
    `sslmode=verify-full`. Registrar el resultado sin exponer la contraseña.
-3. Preparar `sgp_staging` y sus usuarios
+2. Preparar `sgp_staging` y sus usuarios
    mediante `infra/rds/prepare-database.sql`; comprobar extensiones y Flyway sin
    modificar migraciones existentes. No crear `sgp_prod`.
-4. Instalar en EC2 la autenticación de solo lectura para GHCR y configurar
+3. Instalar en EC2 la autenticación de solo lectura para GHCR y configurar
    `/etc/sgp/staging/staging.env` sin versionar secretos.
-5. Crear el rol OIDC de GitHub Actions, configurar las variables del Environment
+4. Crear el rol OIDC de GitHub Actions, configurar las variables del Environment
    `staging` y probar el despliegue manteniendo `STAGING_ENABLED=false` hasta que
    las comprobaciones manuales anteriores sean satisfactorias.
-6. Habilitar el despliegue automático y recopilar evidencia de SSM, descarga por
+5. Habilitar el despliegue automático y recopilar evidencia de SSM, descarga por
    digest, salud, Flyway, frontend y `/api/v1`.
 
 ## Referencias de AWS

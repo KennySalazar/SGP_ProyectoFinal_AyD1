@@ -23,7 +23,7 @@ case "$(uname -m)" in
     ;;
 esac
 
-dnf install --assumeyes docker curl postgresql16
+dnf install --assumeyes docker postgresql16
 systemctl enable --now docker
 systemctl enable --now chronyd
 

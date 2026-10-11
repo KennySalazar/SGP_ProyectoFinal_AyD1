@@ -135,9 +135,11 @@ La instancia `sgp-staging-ec2` (`i-0385c95df8cd7909d`) ejecuta Amazon Linux
 2023 ARM64 sobre `t4g.micro`, con 20 GiB gp3 cifrados. Está en `us-east-1f`, usa
 `sgp-staging-ec2-sg`, obtuvo automáticamente la IPv4 pública dinámica
 `3.235.197.36` y no tiene Elastic IP. Sus comprobaciones `3/3` y Session Manager
-fueron satisfactorios. Docker, Compose y la aplicación aún no se han instalado.
-RDS reside en `us-east-1b`; la diferencia de zona no impide la conectividad, pero
-debe considerarse al evaluar costo de transferencia y latencia para producción.
+fueron satisfactorios. La preparación inicial instaló Docker, Docker Compose y
+el cliente PostgreSQL 16, configuró swap y creó los directorios operativos; la
+aplicación aún no se ha desplegado. RDS reside en `us-east-1b`; la diferencia de
+zona no impide la conectividad, pero debe considerarse al evaluar costo de
+transferencia y latencia para producción.
 
 Existe el par ED25519 `sgp-staging-key`, cuya clave privada permanece fuera del
 repositorio. No se ha probado SSH ni se abrió una regla de entrada para utilizarlo;
@@ -161,6 +163,11 @@ y no debe considerarse una garantía de capacidad futura.
 - Plantilla de variables sin secretos.
 - Preparación de Amazon Linux y despliegue con rollback.
 - Preparación parametrizada de RDS con extensiones y usuarios separados.
+
+El bootstrap se ejecutó exitosamente en staging el 11 de octubre de 2026. En
+Amazon Linux 2023 no debe instalarse el paquete `curl` encima de `curl-minimal`:
+la AMI ya proporciona el comando requerido y ambos paquetes entran en conflicto.
+Esta corrección debe conservarse al reutilizar el script para producción.
 
 Estos elementos sirven de referencia; `infra/staging/compose.yml` no debe
 utilizarse directamente como Compose de producción.

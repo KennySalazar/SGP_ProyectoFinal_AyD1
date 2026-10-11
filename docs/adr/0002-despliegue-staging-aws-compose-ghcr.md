@@ -160,6 +160,10 @@ En `us-east-1` se confirmaron los siguientes recursos de staging:
 - La EC2 usa `sgp-staging-ec2-sg` y `sgp-staging-ec2-role`. El acceso mediante
   Session Manager fue exitoso y una prueba desde la sesión abrió TCP 5432 hacia
   el endpoint de RDS.
+- La preparación inicial de Amazon Linux 2023 finalizó exitosamente el 11 de
+  octubre de 2026. El bootstrap instala Docker y PostgreSQL 16 sin solicitar el
+  paquete `curl`, porque la AMI ya proporciona el comando mediante
+  `curl-minimal` y ambos paquetes entran en conflicto.
 - Se creó `sgp-staging-key`, ED25519, pero SSH no se ha probado y el Security
   Group continúa sin reglas de entrada. La clave privada permanece fuera del
   repositorio.
@@ -240,8 +244,8 @@ promover los mismos digests entre ambientes sin reconstruir artefactos.
   Subnet Group y la EC2; todavía no se ha ejecutado una carga de aplicación real.
 - RDS está disponible y responde por TCP desde EC2, pero faltan TLS,
   autenticación, bases, usuarios, extensiones y migraciones reales.
-- No incluye todavía preparación de EC2, rol OIDC ni certificados. La compra de
-  dominio y la creación de una zona DNS pública se descartaron.
+- El host EC2 ya está preparado; todavía faltan el rol OIDC y los certificados.
+  La compra de dominio y la creación de una zona DNS pública se descartaron.
 - No incluye Compose ni despliegue de producción.
 - Solo existe una retención automática solicitada de 1 día en RDS. La política
   requerida de respaldos, restauración y la retención centralizada de logs no
