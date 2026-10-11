@@ -22,7 +22,8 @@ responsable de producción debe conservar o coordinar antes de modificarlos.
 | Workflow CI, publicación y staging | Validaciones y publicación ejecutadas correctamente; despliegue AWS deshabilitado. |
 | Imágenes en GHCR | Paquetes privados existentes en AMD64; manifiestos multi-arquitectura pendientes. |
 | Convención de versiones | Definida y utilizada en la primera publicación. |
-| Infraestructura AWS de staging | Pendiente. |
+| Infraestructura AWS compartida | Red privada y DB Subnet Group confirmados; `sgp-rds-postgres` disponible y alcanzable por TCP desde staging, todavía sin bases ni autenticación validada. |
+| Infraestructura exclusiva de staging | Security Group, bucket, rol IAM y EC2 creados; Session Manager verificado y OIDC pendiente. |
 | Infraestructura y Compose de producción | Responsabilidad del segundo integrante. |
 
 ## 3. Decisiones que deben conservarse
@@ -36,17 +37,116 @@ responsable de producción debe conservar o coordinar antes de modificarlos.
 7. No se depende exclusivamente de la etiqueta `latest`.
 8. Nginx es el punto de entrada y proxy de `/api/`.
 9. Backend, PostgreSQL y almacenamiento S3 no deben publicarse directamente.
-10. Bases RDS, buckets S3, redes, roles IAM y secretos deben ser independientes
-    por ambiente.
+10. Bases RDS, buckets S3, Security Groups, redes Compose, roles IAM y secretos
+    deben ser independientes por ambiente. La VPC seleccionada sí puede ser
+    compartida.
 11. No se usan datos reales de producción en staging.
 12. No deben modificarse migraciones Flyway ya aplicadas.
 13. Las imágenes deben publicarse para `linux/amd64` y `linux/arm64`; las EC2
     objetivo usan ARM64 (`t4g`).
+14. La RDS compartida será PostgreSQL 16 Single-AZ para reducir costos; esta
+    decisión acepta explícitamente no disponer de conmutación automática de AZ.
+15. No se comprará un dominio ni se creará una zona DNS pública. Producción debe
+    exponer HTTPS válido directamente sobre una IPv4 pública estable.
 
 La nueva arquitectura asigna una EC2 independiente a cada ambiente: `t4g.micro`
 para staging y `t4g.small` para producción. Ambas usarán una RDS compartida, pero
-con bases y credenciales separadas. Estos recursos no se crean desde esta parte
-de la historia de usuario.
+con bases y credenciales separadas. La EC2, los Security Groups y el Compose de
+producción no se crean desde esta parte de la historia de usuario.
+
+### Infraestructura compartida ya seleccionada
+
+Staging comenzó la preparación en `us-east-1` sobre la VPC predeterminada
+`vpc-04c3c96ee06abd1bc`, CIDR `172.31.0.0/16`, con resolución DNS y nombres de
+host DNS habilitados. Existen seis subredes, una en cada zona desde
+`us-east-1a` hasta `us-east-1f`; esas subredes predeterminadas no se modificaron.
+Staging utiliza la subred pública `subnet-0745affbda7ec4bb1`, CIDR
+`172.31.64.0/20`, en `us-east-1f`.
+
+Para RDS se creó una red dedicada dentro de la VPC: la tabla
+`sgp-rds-private-rt` (`rtb-0bd589b3134333454`) solo contiene
+`172.31.0.0/16 → local`, sin Internet Gateway ni NAT. Sus subredes son
+`sgp-rds-private-1a` (`subnet-0e261924496a742c8`, `172.31.96.0/24`,
+`us-east-1a`) y `sgp-rds-private-1b` (`subnet-0e6f2f94648deb3f9`,
+`172.31.97.0/24`, `us-east-1b`). Ambas están asociadas con la tabla privada. El
+DB Subnet Group `sgp-rds-subnet-group` contiene las dos subredes.
+
+La presencia de dos zonas en el DB Subnet Group es un requisito de cobertura de
+red y no implica Multi-AZ. La RDS compartida se desplegó como Single-AZ; el
+responsable de producción debe considerar la falta de failover automático y no
+cambiar esta decisión sin revisar costos y coordinar con staging.
+
+AWS aceptó la creación de `sgp-rds-postgres` con PostgreSQL 16,
+`db.t4g.micro`, 20 GiB gp3, cifrado `aws/rds`, Single-AZ, IPv4, puerto 5432 y
+acceso público deshabilitado. Usa `sgp-rds-subnet-group` y `sgp-rds-sg`, tiene
+protección contra eliminación, actualizaciones secundarias automáticas, la CA
+`rds-ca-rsa2048-g1` y las etiquetas `Project=SGP` y `Environment=shared`. Se
+observó `Disponible` en `us-east-1b`, con el endpoint privado
+`sgp-rds-postgres.c8hwo202k9fb.us-east-1.rds.amazonaws.com:5432`. Una prueba
+desde la EC2 de staging confirmó conectividad TCP al puerto 5432; no se han
+confirmado TLS, autenticación, extensiones ni migraciones.
+
+No se indicó una base inicial. Staging preparará únicamente `sgp_staging`; no
+debe crear `sgp_prod`. El responsable de producción deberá preparar después
+`sgp_prod` y sus usuarios independientes mediante el procedimiento compartido.
+Las credenciales administrativas son autoadministradas y deben transferirse por
+un medio seguro, nunca mediante Git, esta guía o logs.
+
+La conexión deberá verificar la identidad de RDS mediante `sslmode=verify-full`
+y el bundle oficial de CA. El usuario maestro real debe confirmarse; no debe
+asumirse que sea `postgres`. Session Manager interactivo y el alcance TCP desde
+EC2 ya se probaron; la conexión autenticada con `verify-full` y el túnel de
+puertos para clientes locales siguen pendientes.
+
+### Excepción compartida de respaldos
+
+La retención original de 30 días fue rechazada por la limitación del plan
+gratuito de la cuenta. Para aceptar la solicitud, RDS quedó temporalmente con
+respaldos automáticos de 1 día, copia de etiquetas habilitada y sin replicación
+a otra región. El equipo decidió no migrar la cuenta al plan de pago.
+
+Esta excepción no elimina el requisito de 30 días. Tampoco están implementados
+los 12 respaldos mensuales mediante AWS Backup ni la prueba de restauración. El
+responsable de producción debe tratar los tres puntos como incumplimientos
+pendientes y coordinarlos con el propietario de la cuenta.
+
+Se creó `sgp-staging-ec2-sg` (`sg-0e617972b3eedeb73`) sin reglas de entrada y
+con salida general. También se creó `sgp-rds-sg`
+(`sg-0ab8d04a2ef4d3db8`), que acepta TCP 5432 desde el Security Group de EC2 de
+staging, no desde un CIDR público. Producción debe usar un Security Group de EC2
+propio y agregarlo como un origen independiente; no debe reutilizar
+`sgp-staging-ec2-sg`.
+
+El bucket privado de staging es `sgp-staging-archivos-ayd1-2026-gt01`. Tiene
+ACL deshabilitadas, bloqueo completo de acceso público y SSE-S3; permanece vacío,
+sin política personalizada, CORS, versionado ni Object Lock. Producción deberá
+crear otro bucket con nombre, etiquetas, política IAM y configuración propias;
+no debe reutilizar este bucket ni asumir que deshabilitar el versionado será la
+decisión definitiva para producción.
+
+El rol `sgp-staging-ec2-role` confía en EC2 y actualmente solo tiene
+`AmazonSSMManagedInstanceCore`; ya está asociado y permitió administrar staging
+mediante Session Manager. El acceso S3 futuro requerirá una política
+adicional limitada al bucket de staging. Producción debe crear su propio rol de
+instancia, limitado a su bucket. El rol OIDC usado por GitHub Actions es una
+identidad diferente y todavía no se ha creado.
+
+La instancia `sgp-staging-ec2` (`i-0385c95df8cd7909d`) ejecuta Amazon Linux
+2023 ARM64 sobre `t4g.micro`, con 20 GiB gp3 cifrados. Está en `us-east-1f`, usa
+`sgp-staging-ec2-sg`, obtuvo automáticamente la IPv4 pública dinámica
+`3.235.197.36` y no tiene Elastic IP. Sus comprobaciones `3/3` y Session Manager
+fueron satisfactorios. Docker, Compose y la aplicación aún no se han instalado.
+RDS reside en `us-east-1b`; la diferencia de zona no impide la conectividad, pero
+debe considerarse al evaluar costo de transferencia y latencia para producción.
+
+Existe el par ED25519 `sgp-staging-key`, cuya clave privada permanece fuera del
+repositorio. No se ha probado SSH ni se abrió una regla de entrada para utilizarlo;
+SSM continúa siendo el mecanismo administrativo elegido.
+
+Al momento de esta actualización la cuenta reportó USD 120 en créditos. No fue
+posible crear alertas de presupuesto: el propietario de la cuenta asumió esa
+responsabilidad y el consumo debe revisarse manualmente. Este saldo puede cambiar
+y no debe considerarse una garantía de capacidad futura.
 
 ## 4. Componentes entregados por staging
 
@@ -134,8 +234,8 @@ controles independientes:
 | Expiraciones JWT/OTP | Revisar y aprobar valores antes del despliegue. |
 | `INITIAL_ADMIN_EMAIL/PASSWORD` | Identidad controlada; contraseña de 10–72 caracteres con letras y números. |
 | `MAIL_*` | Cuenta SMTP de producción y remitente autorizado. |
-| `INVITACION_URL_ACTIVACION` | URL pública HTTPS definitiva. |
-| `CORS_ALLOWED_ORIGINS` | Únicamente el origen HTTPS público de producción. |
+| `INVITACION_URL_ACTIVACION` | URL HTTPS con la IP pública definitiva; por ejemplo, `https://<IP_PUBLICA>/activar-cuenta`. |
+| `CORS_ALLOWED_ORIGINS` | Únicamente el origen `https://<IP_PUBLICA>` de producción. |
 | `SPRING_PROFILES_ACTIVE` | `prod`. |
 | `REFRESH_COOKIE_SECURE` | `true`; el perfil `prod` ya lo establece. |
 | `OPENAPI_PUBLIC` | `false`; el perfil `prod` ya lo establece. |
@@ -212,18 +312,24 @@ requieran descargar una imagen ausente del host.
 - Mantener `restart: unless-stopped`, límites de recursos y rotación de logs.
 - No montar el código fuente ni usar `build:`.
 - Ejecutar Flyway con su usuario separado antes de aceptar tráfico.
-- No compartir redes, bases, buckets, roles IAM ni archivos de entorno con
-  staging.
+- No compartir redes Compose, Security Groups de EC2, bases, buckets, roles IAM
+  ni archivos de entorno con staging. La VPC y la instancia RDS sí pueden ser
+  compartidas según la decisión vigente.
 
 Los nombres y rutas definitivos pertenecen a la implementación de producción y
 no se fijan en esta guía antes de que exista su diseño.
 
 ## 10. Nginx, HTTPS y seguridad
 
-Producción debe exponer HTTPS sobre una IP pública sin comprar dominio. El
-responsable debe confirmar una autoridad certificadora que emita certificados
+Producción debe exponer HTTPS sobre una IPv4 pública estable. La decisión de no
+comprar dominio es definitiva para este proyecto: no debe presupuestarse un
+registro de dominio ni una zona hospedada de DNS público. La resolución DNS
+interna habilitada en la VPC no contradice esta decisión.
+
+El responsable debe confirmar una autoridad certificadora que emita certificados
 válidos con la IP como Subject Alternative Name, su método de validación y la
-renovación automática.
+renovación automática. Un certificado autofirmado no cumple el criterio de
+HTTPS válido para usuarios finales.
 
 Requisitos mínimos:
 
@@ -237,7 +343,9 @@ Requisitos mínimos:
   pueda obtener las credenciales temporales del rol de instancia.
 - Probar renovación del certificado y documentar su operación.
 
-La solución de certificados no ha sido elegida y no debe considerarse cerrada.
+La solución de certificados y la asignación de la IPv4 pública estable no han
+sido elegidas y no deben considerarse cerradas. La compra de dominio sí está
+fuera de consideración.
 
 ## 11. Procedimiento manual propuesto
 
@@ -288,8 +396,12 @@ crear el Compose real de producción.
   bundle CA debe incorporarse y probarse al preparar la infraestructura.
 - Brotli no está configurado; Nginx usa gzip.
 - No existe retención centralizada de logs por 90 días.
-- No se han implementado respaldos ni restauraciones.
+- RDS tiene únicamente 1 día de retención automática por la limitación del plan
+  gratuito. No se cumplen todavía los 30 días, los 12 respaldos mensuales ni la
+  prueba de restauración.
 - No se ha medido aún el consumo real en EC2.
+- La EC2 de staging y RDS están en zonas distintas; debe medirse el impacto de
+  transferencia inter-AZ antes de repetir esa distribución en producción.
 - La publicación multi-arquitectura está implementada en la rama de trabajo, pero
   debe comprobarse en GHCR después de integrarla en `develop`.
 - Los paquetes GHCR son privados. Cada ambiente necesita una credencial de
@@ -299,8 +411,11 @@ crear el Compose real de producción.
 
 ## 14. Decisiones pendientes
 
-- Región, VPC y capacidad definitiva de disco para las dos EC2 separadas.
-- Solución de certificado HTTPS válido para IP pública.
+- Validación de conectividad TLS, extensiones y migraciones sobre
+  `sgp-rds-postgres`.
+- Capacidad definitiva de disco para las dos EC2 separadas.
+- Asignación de IPv4 pública estable y solución de certificado HTTPS válido para
+  esa IP, sin comprar dominio.
 - Mecanismo de secretos de producción.
 - Cuenta responsable, vigencia y rotación de la credencial GHCR de producción.
 - Nombres y rutas del Compose de producción.

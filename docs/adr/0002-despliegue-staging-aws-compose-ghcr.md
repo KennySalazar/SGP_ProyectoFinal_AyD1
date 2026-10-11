@@ -2,9 +2,13 @@
 
 ## Estado
 
-Aceptada para staging el 10 de octubre de 2026. La infraestructura AWS todavía
-no ha sido creada ni validada. La configuración y el despliegue de producción
-permanecen fuera del alcance de esta historia.
+Aceptada para staging el 10 de octubre de 2026. La región y VPC están
+confirmadas; se crearon los Security Groups, el bucket S3, la red privada, el DB
+Subnet Group, RDS y la EC2 de staging. Session Manager y el alcance TCP desde la
+EC2 hacia RDS están verificados, aunque todavía no se han autenticado conexiones
+PostgreSQL ni creado las bases. El rol OIDC y el despliegue real aún no existen.
+La configuración y el despliegue de producción permanecen fuera del alcance de
+esta historia.
 
 ## Contexto
 
@@ -71,8 +75,9 @@ claves AWS estáticas ni compilar Java o Angular en EC2.
   almacenar archivos en el servidor de aplicación.
 - **Un bucket S3 con prefijos:** posible, pero aumenta el riesgo de permisos y
   reglas de ciclo de vida cruzados.
-- **Un bucket S3 privado por ambiente:** elegido por aislamiento de IAM,
-  versionado y ciclo de vida. MinIO permanece solo en desarrollo local.
+- **Un bucket S3 privado por ambiente:** elegido porque permite aislar IAM,
+  versionado y ciclo de vida por ambiente. MinIO permanece solo en desarrollo
+  local.
 
 ### Administración
 
@@ -86,33 +91,95 @@ claves AWS estáticas ni compilar Java o Angular en EC2.
 1. Usar una EC2 Amazon Linux 2023 ARM64 independiente por ambiente:
    `t4g.micro` como punto de partida para staging y `t4g.small` propuesto para
    producción. Esta historia solo prepara staging.
-2. Ejecutar en cada EC2 únicamente dos servicios Compose: la imagen
+2. Usar `us-east-1` y la VPC predeterminada existente para evitar crear una red
+   adicional. La VPC dispone de DNS y seis subredes predeterminadas distribuidas
+   en seis zonas. RDS utilizará dos subredes adicionales y dedicadas sin rutas a
+   Internet Gateway o NAT y no tendrá acceso público.
+3. Ejecutar en cada EC2 únicamente dos servicios Compose: la imagen
    Nginx/Angular y la imagen Spring Boot. No ejecutar PostgreSQL ni MinIO en AWS.
-3. Mantener el `docker-compose.yml` raíz con PostgreSQL/PostGIS y MinIO para
+4. Mantener el `docker-compose.yml` raíz con PostgreSQL/PostGIS y MinIO para
    desarrollo local.
-4. Usar una RDS PostgreSQL 16 privada con las bases `sgp_staging` y `sgp_prod`,
-   cada una con usuario migrador y usuario de aplicación propios.
-5. Crear `postgis`, `pg_trgm` y `uuid-ossp` una vez como administrador de RDS;
+5. Usar una RDS PostgreSQL 16 privada y Single-AZ con las bases `sgp_staging` y
+   `sgp_prod`, cada una con usuario migrador y usuario de aplicación propios. Se
+   acepta la ausencia de conmutación automática para reducir costos en el
+   contexto académico y con los créditos disponibles.
+6. Crear `postgis`, `pg_trgm` y `uuid-ossp` una vez como administrador de RDS;
    Flyway conserva las migraciones existentes sin recibir `rds_superuser`.
-6. Usar un bucket S3 privado por ambiente. La EC2 accederá mediante un rol IAM
+7. Usar un bucket S3 privado por ambiente. La EC2 accederá mediante un rol IAM
    de mínimo privilegio y credenciales temporales; nunca mediante access keys en
    `.env`. La integración se habilitará cuando exista en el backend.
-7. Exigir IMDSv2 y configurar hop limit `2` para que un SDK dentro de Docker
+8. Exigir IMDSv2 y configurar hop limit `2` para que un SDK dentro de Docker
    pueda obtener credenciales del rol de instancia.
-8. Construir backend y frontend en GitHub Actions para `linux/amd64` y
+9. Construir backend y frontend en GitHub Actions para `linux/amd64` y
    `linux/arm64`, publicarlos por separado en GHCR y desplegar por digest.
-9. Publicar solo desde `develop` después de las validaciones. La etiqueta
+10. Publicar solo desde `develop` después de las validaciones. La etiqueta
    `sha-<SHA completo>` aporta trazabilidad y `develop` es solo informativa.
-10. Mantener publicación y despliegue en jobs separados; un fallo en AWS no
+11. Mantener publicación y despliegue en jobs separados; un fallo en AWS no
     obliga a reconstruir las imágenes.
-11. Usar OIDC para que GitHub Actions asuma un rol limitado a SSM. La EC2 lee
+12. Usar OIDC para que GitHub Actions asuma un rol limitado a SSM. La EC2 lee
     GHCR privado con un PAT classic de solo `read:packages`, instalado fuera del
     repositorio y de GitHub Actions.
-12. Guardar la configuración de staging en
+13. Guardar la configuración de staging en
     `/etc/sgp/staging/staging.env`, modo `0600`, e impedir despliegues simultáneos
     con concurrencia de GitHub y `flock` en el servidor.
-13. Mantener temporalmente Nginx en loopback hasta implementar y validar el
+14. Mantener temporalmente Nginx en loopback hasta implementar y validar el
     acceso HTTPS público definido para la arquitectura final.
+15. No comprar un dominio ni crear una zona DNS pública. Staging se administrará
+    inicialmente mediante túnel SSM; producción deberá ofrecer HTTPS válido
+    sobre una IPv4 pública. El mecanismo de emisión y renovación del certificado
+    para IP continúa pendiente de validación.
+
+### Estado de implementación en AWS
+
+En `us-east-1` se confirmaron los siguientes recursos de staging:
+
+- `sgp-staging-ec2-sg` (`sg-0e617972b3eedeb73`), sin entrada pública.
+- `sgp-rds-sg` (`sg-0ab8d04a2ef4d3db8`), con PostgreSQL TCP 5432 permitido solo
+  desde el Security Group anterior.
+- `sgp-staging-archivos-ayd1-2026-gt01`, bucket con bloqueo de acceso público,
+  ACL deshabilitadas y SSE-S3. Está vacío; versionado y Object Lock están
+  deshabilitados y no tiene política personalizada ni CORS.
+- `sgp-staging-ec2-role`, confiado a EC2 y con
+  `AmazonSSMManagedInstanceCore`. Todavía no concede acceso a S3.
+- `sgp-rds-private-rt` (`rtb-0bd589b3134333454`), tabla no principal con solo
+  la ruta local `172.31.0.0/16` y sin salida mediante Internet Gateway o NAT.
+- `sgp-rds-private-1a` (`subnet-0e261924496a742c8`, `172.31.96.0/24`,
+  `us-east-1a`) y `sgp-rds-private-1b` (`subnet-0e6f2f94648deb3f9`,
+  `172.31.97.0/24`, `us-east-1b`), asociadas con la tabla privada.
+- `sgp-rds-subnet-group`, compuesto por las dos subredes anteriores.
+- `sgp-rds-postgres`, solicitado como PostgreSQL 16 Single-AZ,
+  `db.t4g.micro`, 20 GiB gp3 cifrados con `aws/rds`, IPv4, sin acceso público,
+  protegido contra eliminación y con `sgp-rds-sg`. Está `Disponible` en
+  `us-east-1b` y publica el endpoint privado
+  `sgp-rds-postgres.c8hwo202k9fb.us-east-1.rds.amazonaws.com:5432`.
+- `sgp-staging-ec2` (`i-0385c95df8cd7909d`), Amazon Linux 2023 ARM64,
+  `t4g.micro`, 20 GiB gp3 cifrados con `aws/ebs`, en la subred pública
+  `subnet-0745affbda7ec4bb1` (`172.31.64.0/20`) de `us-east-1f`. Se observó en
+  ejecución, con las comprobaciones `3/3` superadas y la IPv4 pública dinámica
+  `3.235.197.36`; no tiene Elastic IP.
+- La EC2 usa `sgp-staging-ec2-sg` y `sgp-staging-ec2-role`. El acceso mediante
+  Session Manager fue exitoso y una prueba desde la sesión abrió TCP 5432 hacia
+  el endpoint de RDS.
+- Se creó `sgp-staging-key`, ED25519, pero SSH no se ha probado y el Security
+  Group continúa sin reglas de entrada. La clave privada permanece fuera del
+  repositorio.
+
+La prueba TCP demuestra conectividad de red entre EC2 y RDS, no un despliegue
+funcional ni autenticación PostgreSQL. El rol OIDC de GitHub Actions es distinto
+del rol de instancia y continúa pendiente. No existen todavía `sgp_staging` ni
+`sgp_prod`; no se han probado TLS, PostGIS, Flyway ni el backend contra RDS.
+
+### Excepción operativa de respaldos
+
+El diseño conserva el requisito de 30 días de respaldos automáticos. La cuenta
+rechazó ese valor porque supera el máximo disponible en su plan gratuito y no se
+autorizó migrar a un plan de pago. Para que AWS aceptara la creación, se redujo
+temporalmente la retención a 1 día, con copia de etiquetas habilitada y sin
+replicación entre regiones.
+
+Esta excepción no modifica el requisito original: la retención de 30 días, los
+12 respaldos mensuales mediante AWS Backup y la prueba de restauración siguen
+pendientes.
 
 ## Justificación
 
@@ -141,15 +208,25 @@ promover los mismos digests entre ambientes sin reconstruir artefactos.
 - Cada despliegue se relaciona con un commit y dos digests.
 - Desarrollo local conserva su flujo actual sin depender de AWS.
 - Producción puede seleccionar manualmente lo validado en staging.
-- RDS, buckets, roles y credenciales se separan por ambiente.
+- Las bases dentro de RDS, los buckets, roles y credenciales se separan por
+  ambiente.
 
 ### Negativas y riesgos
 
 - RDS, S3, dos IPv4 públicas y dos EC2 generan costo incluso con poco tráfico;
   deben configurarse presupuestos y revisar créditos antes de crearlos.
+- La cuenta informó USD 120 en créditos, pero no se pudieron configurar alertas
+  automáticas; el propietario debe controlar manualmente el consumo.
 - Staging y producción comparten capacidad y disponibilidad de una RDS.
+- Single-AZ reduce el costo, pero no ofrece conmutación automática ante la falla
+  de la zona que aloje la instancia.
+- El plan gratuito limita la retención automática aplicada a 1 día. Este valor
+  no satisface los 30 días del diseño ni sustituye los respaldos mensuales o la
+  prueba de restauración.
 - `t4g.micro` puede sufrir presión de memoria y debe medirse.
 - El backend no puede validar todavía el flujo de archivos en S3.
+- El bucket de staging no tiene versionado ni Object Lock; la recuperación ante
+  borrados y los respaldos permanecen fuera de esta historia.
 - Un PAT classic con `read:packages` puede leer otros paquetes privados a los
   que tenga acceso la cuenta y requiere rotación manual.
 - `sslmode=require` cifra la conexión RDS, pero la verificación de identidad con
@@ -159,15 +236,23 @@ promover los mismos digests entre ambientes sin reconstruir artefactos.
 
 ## Limitaciones
 
-- No incluye creación de EC2, RDS, S3, IAM, DNS ni certificados.
+- Se crearon ambos Security Groups, el bucket, el rol IAM, la red privada, el DB
+  Subnet Group y la EC2; todavía no se ha ejecutado una carga de aplicación real.
+- RDS está disponible y responde por TCP desde EC2, pero faltan TLS,
+  autenticación, bases, usuarios, extensiones y migraciones reales.
+- No incluye todavía preparación de EC2, rol OIDC ni certificados. La compra de
+  dominio y la creación de una zona DNS pública se descartaron.
 - No incluye Compose ni despliegue de producción.
-- No implementa respaldos, restauración ni retención centralizada de logs.
+- Solo existe una retención automática solicitada de 1 día en RDS. La política
+  requerida de respaldos, restauración y la retención centralizada de logs no
+  están implementadas.
 - S3 está decidido como servicio, pero su integración de aplicación permanece
   pendiente de la funcionalidad de archivos.
-- Brotli y HTTPS público todavía no están implementados.
-- La configuración RDS/S3 no ha sido probada contra recursos AWS reales.
-- La publicación multi-arquitectura, OIDC, SSM y GHCR desde EC2 aún requieren
-  validación real.
+- Brotli y HTTPS público sobre IP todavía no están implementados.
+- El bucket S3 existe, pero la aplicación no lo consume; RDS está disponible,
+  pero todavía no tiene autenticación o esquema validados.
+- La publicación multi-arquitectura, OIDC y GHCR desde EC2 aún requieren
+  validación real. Session Manager sí fue verificado.
 
 ## Relación con el enunciado
 

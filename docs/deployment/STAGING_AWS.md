@@ -12,11 +12,200 @@ se actualiza de forma incremental durante la historia de usuario.
 | Preparación de Amazon Linux 2023 | Script compatible con ARM64 y x86_64; no ejecutado en AWS. |
 | Workflow de validación, publicación y despliegue | Versión anterior ejecutada correctamente; cambio actual pendiente de CI. |
 | Publicación en GHCR | Paquetes privados publicados inicialmente para AMD64; manifiestos AMD64/ARM64 pendientes de este cambio. |
-| Despliegue automático desde `develop` | Implementado y deshabilitado hasta disponer de AWS. |
-| Instancia EC2, IAM y Systems Manager | Pendiente de autorización y creación. |
+| Despliegue automático desde `develop` | Implementado y deshabilitado hasta completar la preparación inicial. |
+| Red AWS | VPC, tabla privada, dos subredes dedicadas y DB Subnet Group de RDS confirmados. |
+| Security Groups | Grupos de EC2 y RDS creados; la regla 5432 de RDS referencia únicamente al grupo de staging. |
+| IAM y Systems Manager | Rol asociado a la EC2 y acceso interactivo mediante Session Manager verificado. |
+| S3 | Bucket privado de staging creado y vacío; integración de aplicación no implementada. |
+| RDS | `sgp-rds-postgres` disponible; conectividad TCP desde EC2 verificada, con autenticación, bases, extensiones y migraciones pendientes. |
+| EC2 | `sgp-staging-ec2` creada, en ejecución y con sus tres comprobaciones superadas; Docker todavía no está instalado. |
 | Despliegue real en AWS | No ejecutado. |
 
-No se han creado recursos ni credenciales en AWS.
+Se crearon los dos Security Groups, el bucket S3, RDS y la EC2 de staging. El rol
+de instancia está asociado y el acceso mediante Session Manager funciona. Una
+prueba desde EC2 confirmó alcance TCP al endpoint privado de RDS en el puerto
+5432. No existe todavía el rol OIDC de GitHub Actions y no se han preparado la
+base, el servidor ni el despliegue real.
+
+## Inventario AWS confirmado
+
+Estado actualizado mediante las comprobaciones manuales realizadas en la consola
+el 10 y 11 de octubre de 2026:
+
+| Elemento | Valor o estado |
+|---|---|
+| Región | `us-east-1` (Norte de Virginia). |
+| VPC | Predeterminada, `vpc-04c3c96ee06abd1bc`. |
+| CIDR de la VPC | `172.31.0.0/16`. |
+| DNS de la VPC | Resolución DNS y nombres de host DNS habilitados. |
+| Subredes predeterminadas | Seis existentes, distribuidas entre `us-east-1a` y `us-east-1f`; no fueron modificadas. |
+| Tabla de rutas privada | `sgp-rds-private-rt` (`rtb-0bd589b3134333454`), no principal y asociada a la VPC seleccionada. |
+| Rutas de la tabla privada | Únicamente `172.31.0.0/16 → local`; sin Internet Gateway ni NAT Gateway. |
+| Subred privada RDS 1 | `sgp-rds-private-1a` (`subnet-0e261924496a742c8`), `172.31.96.0/24`, en `us-east-1a`. |
+| Subred privada RDS 2 | `sgp-rds-private-1b` (`subnet-0e6f2f94648deb3f9`), `172.31.97.0/24`, en `us-east-1b`. |
+| Asociación de subredes | Ambas asociadas con `rtb-0bd589b3134333454`. |
+| DB Subnet Group | `sgp-rds-subnet-group`, compuesto por ambas subredes y zonas. |
+| Instancia RDS | `sgp-rds-postgres`, estado observado `Disponible` en `us-east-1b`. |
+| Endpoint RDS | `sgp-rds-postgres.c8hwo202k9fb.us-east-1.rds.amazonaws.com:5432`. |
+| Instancia EC2 | `sgp-staging-ec2` (`i-0385c95df8cd7909d`), Amazon Linux 2023 ARM64, `t4g.micro`, en ejecución y con comprobaciones `3/3`. |
+| Ubicación EC2 | Subred pública `subnet-0745affbda7ec4bb1`, CIDR `172.31.64.0/20`, en `us-east-1f`. |
+| Almacenamiento EC2 | 20 GiB gp3 cifrados con `aws/ebs`. |
+| IPv4 pública observada | `3.235.197.36`, asignada automáticamente y dinámica; no existe Elastic IP. |
+| Security Group de EC2 | `sgp-staging-ec2-sg` (`sg-0e617972b3eedeb73`), sin reglas de entrada y con salida hacia `0.0.0.0/0`. |
+| Security Group de RDS | `sgp-rds-sg` (`sg-0ab8d04a2ef4d3db8`), con salida predeterminada. |
+| Regla de entrada de RDS | PostgreSQL TCP 5432 desde `sg-0e617972b3eedeb73` (`sgp-staging-ec2-sg`); no usa un CIDR público. |
+| Bucket S3 | `sgp-staging-archivos-ayd1-2026-gt01`, propósito general, creado vacío en `us-east-1`. |
+| Seguridad del bucket | Bucket owner enforced, ACL deshabilitadas y todas las opciones de bloqueo de acceso público habilitadas. |
+| Protección de objetos | SSE-S3 habilitado; versionado, S3 Bucket Key y Object Lock deshabilitados. |
+| Etiquetas del bucket | `Project=SGP` y `Environment=staging`. |
+| Configuración adicional de S3 | Sin política personalizada, CORS ni objetos. |
+| Rol IAM de EC2 | `sgp-staging-ec2-role`, asociado a la instancia, con confianza en `ec2.amazonaws.com` y política `AmazonSSMManagedInstanceCore`. |
+| Administración EC2 | Acceso interactivo mediante AWS Systems Manager Session Manager verificado. |
+| Par de claves | `sgp-staging-key`, ED25519 y formato privado `.pem`; archivo conservado fuera del repositorio. SSH no probado y sin regla de entrada pública. |
+| Acceso S3 desde IAM | No concedido todavía; el rol confirmado solo habilita la administración mediante SSM. |
+| Rol OIDC de GitHub Actions | Pendiente; es independiente del rol de instancia EC2. |
+| Créditos disponibles | USD 120 al momento de la revisión. |
+| Alertas de presupuesto | No fue posible configurarlas; quedan a cargo del propietario de la cuenta y el consumo se revisará manualmente. |
+
+Los USD 120 son una fotografía temporal, no un presupuesto garantizado. Antes
+de crear cada recurso con cobro continuo debe volver a revisarse el saldo y
+registrarse la fecha de la comprobación.
+
+La EC2 usa la subred pública predeterminada `subnet-0745affbda7ec4bb1` en
+`us-east-1f`, con asignación automática de IPv4 pública. Las dos nuevas subredes
+de RDS usan CIDR independientes que no se superponen con las seis subredes
+predeterminadas. Su aislamiento se basa en la tabla que solo contiene la ruta
+local.
+
+El nombre del bucket queda registrado como identificador de infraestructura, no
+como variable del backend. No debe agregarse a Compose ni al archivo de entorno
+hasta que el código implemente y defina el contrato de almacenamiento S3.
+
+### Red privada para RDS
+
+Se creó `sgp-rds-private-rt` (`rtb-0bd589b3134333454`) dentro de
+`vpc-04c3c96ee06abd1bc`. No es la tabla principal y solo contiene la ruta local
+de la VPC:
+
+```text
+172.31.0.0/16 -> local
+```
+
+La tabla de rutas pública existente también fue revisada, sin modificarla. La
+EC2 utiliza `subnet-0745affbda7ec4bb1` (`172.31.64.0/20`) en `us-east-1f`.
+
+La tabla privada no incluye rutas hacia Internet Gateway ni NAT Gateway. Se
+crearon dos subredes dedicadas a RDS:
+
+| Nombre | ID | Zona | CIDR |
+|---|---|---|---|
+| `sgp-rds-private-1a` | `subnet-0e261924496a742c8` | `us-east-1a` | `172.31.96.0/24` |
+| `sgp-rds-private-1b` | `subnet-0e6f2f94648deb3f9` | `us-east-1b` | `172.31.97.0/24` |
+
+Ambas subredes están asociadas con `sgp-rds-private-rt`.
+
+El DB Subnet Group `sgp-rds-subnet-group` contiene las dos subredes. El primer
+intento falló porque solo se había seleccionado una zona de disponibilidad; la
+selección se corrigió agregando `us-east-1a` y `us-east-1b`. Posteriormente se
+usó este grupo en la solicitud de creación de RDS aceptada por AWS.
+
+La instancia será PostgreSQL 16 Single-AZ. Las dos zonas del DB Subnet Group
+cumplen la cobertura de red exigida por RDS, pero no convierten la instancia en
+Multi-AZ ni proporcionan conmutación automática ante la falla de una zona.
+
+### Instancia RDS compartida
+
+AWS completó la creación de la instancia compartida y se observó el estado
+`Disponible`. La conectividad TCP desde EC2 está confirmada, pero no la
+autenticación PostgreSQL ni la preparación de las bases.
+
+| Propiedad | Configuración solicitada |
+|---|---|
+| Identificador | `sgp-rds-postgres` |
+| Endpoint | `sgp-rds-postgres.c8hwo202k9fb.us-east-1.rds.amazonaws.com` |
+| Región y red | `us-east-1`, IPv4, `vpc-04c3c96ee06abd1bc` |
+| Zona de disponibilidad | `us-east-1b` |
+| Motor | PostgreSQL 16 |
+| Disponibilidad | Single-AZ |
+| Clase | `db.t4g.micro`, 2 vCPU y 1 GiB de RAM |
+| Almacenamiento | 20 GiB gp3, cifrado con la clave administrada `aws/rds` |
+| DB Subnet Group | `sgp-rds-subnet-group` |
+| Security Group | `sg-0ab8d04a2ef4d3db8` (`sgp-rds-sg`) |
+| Acceso y puerto | Sin acceso público; PostgreSQL TCP 5432 |
+| Base inicial | Sin nombre de base inicial; `sgp_staging` aún no existe |
+| Credenciales | Autoadministradas, autenticación mediante contraseña |
+| Entidad certificadora | `rds-ca-rsa2048-g1` |
+| RDS Proxy | Deshabilitado |
+| Supervisión | Database Insights estándar; métricas detalladas habilitadas con retención de siete días; monitorización mejorada deshabilitada |
+| Mantenimiento | Actualizaciones secundarias automáticas; ventana sin preferencia |
+| Protección | Protección contra eliminación habilitada |
+| Etiquetas | `Project=SGP`, `Environment=shared` |
+
+El valor `shared` identifica que la instancia será compartida por staging y
+producción. Esta historia solo preparará `sgp_staging`; no debe crear
+`sgp_prod`, sus usuarios ni ejecutar migraciones de producción.
+
+Desde la EC2 se abrió correctamente una conexión TCP al endpoint en el puerto
+5432 mediante `/dev/tcp`. Esta prueba confirma resolución DNS, enrutamiento y
+reglas de red; no valida TLS, autenticación PostgreSQL, el usuario administrador,
+PostGIS, Flyway ni el backend.
+
+#### Excepción de retención de respaldos
+
+El diseño de referencia mantiene el requisito de 30 días de respaldos
+automáticos de RDS. AWS rechazó esa retención porque supera el máximo permitido
+por el plan gratuito de la cuenta. No se autorizó actualizar el plan de
+facturación, por lo que la solicitud aceptada usa temporalmente:
+
+```text
+The specified backup retention period exceeds the maximum available to free
+tier customers. To remove all limitations, upgrade your account plan.
+```
+
+- respaldos automáticos habilitados;
+- retención de 1 día;
+- ventana de respaldos sin preferencia;
+- copia de etiquetas a respaldos automáticos e instantáneas habilitada;
+- replicación a otra región deshabilitada.
+
+Esta excepción no satisface el requisito original de 30 días. Los 12 respaldos
+mensuales mediante AWS Backup y la prueba de restauración tampoco están
+implementados y permanecen como trabajo pendiente fuera de esta historia.
+
+### Verificación TLS pendiente
+
+La conexión administrativa deberá realizarse desde un equipo con alcance de red
+a RDS. La EC2 administrada mediante SSM ya demostró alcance TCP y se utilizará
+para la siguiente prueba. AWS proporciona el bundle global de CA para verificar
+el endpoint:
+
+```bash
+curl --fail --show-error --location \
+  --output global-bundle.pem \
+  https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem
+
+export RDSHOST="sgp-rds-postgres.c8hwo202k9fb.us-east-1.rds.amazonaws.com"
+
+psql \
+  "host=${RDSHOST} port=5432 dbname=postgres user=<RDS_ADMIN> sslmode=verify-full sslrootcert=./global-bundle.pem"
+
+unset RDSHOST
+```
+
+`<RDS_ADMIN>` debe sustituirse por el usuario maestro configurado realmente; no
+se debe asumir que sea `postgres` ni escribir su contraseña en comandos,
+documentación o logs. Este procedimiento todavía no se ha ejecutado y no se
+declara exitoso.
+
+Esta prueba cubre al cliente `psql`, no al backend. La plantilla actual del
+backend usa `sslmode=require`; pasarla a `verify-full` también requiere hacer
+disponible el bundle CA dentro del contenedor y validar el driver JDBC. Esa
+integración sigue pendiente y no debe declararse implementada solo porque la
+prueba administrativa funcione.
+
+También se prevé un túnel de Systems Manager hacia el endpoint para usar un
+cliente local como DBeaver. Session Manager interactivo ya funciona, pero el
+túnel de puertos y una conexión PostgreSQL autenticada todavía no se han probado.
 
 ### Transición de arquitectura
 
@@ -36,7 +225,7 @@ privadas y el bucket S3 debe bloquear todo acceso público.
 ```text
 Equipo del proyecto
         |
-        | túnel SSM (pendiente de AWS)
+        | túnel SSM a la aplicación (pendiente de probar)
         v
 127.0.0.1:8088 en EC2
         |
@@ -77,30 +266,73 @@ ha sido sustituido por la configuración de staging.
 
 La infraestructura objetivo asigna una EC2 independiente a staging:
 
+- Región confirmada: `us-east-1`.
+- VPC confirmada: VPC predeterminada `vpc-04c3c96ee06abd1bc`, con CIDR
+  `172.31.0.0/16` y DNS habilitado.
 - Amazon Linux 2023, arquitectura ARM64 (`aarch64`).
 - Tipo `t4g.micro` como punto de partida, con el heap de Java limitado y sujeto a
   medición. Si la memoria no es suficiente, cualquier aumento requiere revisar
   primero los créditos y el presupuesto.
-- Disco raíz gp3 de aproximadamente 20 GiB como valor inicial, sujeto a
-  autorización.
-- 2 GiB de swap creados por el script de preparación.
-- Rol de instancia con `AmazonSSMManagedInstanceCore` o una política equivalente
-  de permisos mínimos y, cuando exista la integración, acceso exclusivo al
-  bucket S3 de staging.
+- Disco raíz de 20 GiB gp3, cifrado con `aws/ebs`.
+- 2 GiB de swap pendientes de crear mediante el script de preparación.
+- Rol de instancia `sgp-staging-ec2-role`, asociado y probado para acceso
+  interactivo con `AmazonSSMManagedInstanceCore`.
+- Cuando exista la integración de archivos, una política adicional de mínimo
+  privilegio deberá limitar el rol al bucket
+  `sgp-staging-archivos-ayd1-2026-gt01`; el rol actual no concede acceso S3.
 - Salida HTTPS hacia AWS, GHCR/Docker Hub y el proveedor SMTP.
 - Administración mediante Systems Manager, sin publicar SSH.
 - RDS PostgreSQL 16 no pública, en la misma VPC, cuyo Security Group acepte el
   puerto 5432 únicamente desde el Security Group de la EC2 de staging.
+- Modalidad Single-AZ, aceptando que no habrá conmutación automática entre zonas.
 - Una base `sgp_staging`, un usuario migrador y un usuario de aplicación que no
   se reutilicen en producción.
-- Bucket S3 de staging privado e independiente del bucket de producción.
+- Bucket S3 `sgp-staging-archivos-ayd1-2026-gt01`, privado e independiente del
+  futuro bucket de producción. Actualmente está vacío y sin CORS ni políticas
+  personalizadas.
 - IMDSv2 obligatorio y salto de respuesta igual a `2`, necesario para que un SDK
   dentro de Docker pueda obtener credenciales temporales del rol de instancia.
-- Las reglas públicas 80/443 se definirán junto con HTTPS; no se usarán ALB, NAT
-  Gateway, ECS ni EKS.
+- No se comprará un dominio ni se creará una zona DNS pública para el proyecto.
+  El acceso inicial de staging continuará mediante túnel SSM, sin publicar
+  puertos.
+- Si posteriormente se exige acceso público a staging, HTTPS deberá resolverse
+  sobre una IPv4 pública estable con un certificado válido para esa IP. No se
+  abrirán 80/443 hasta aprobar y validar ese mecanismo.
+- No se usarán ALB, NAT Gateway, ECS ni EKS.
 
-El disco, región, VPC y recursos administrados no deben aprovisionarse sin
-autorización y verificación previa de costos.
+La EC2 y su disco están aprovisionados. RDS está `Disponible` y su puerto 5432 es
+alcanzable desde la instancia, pero quedan pendientes TLS, autenticación y la
+preparación de PostgreSQL. La imposibilidad de configurar alertas automáticas
+obliga a mantener un control manual del saldo.
+
+### EC2 de staging creada
+
+La instancia confirmada tiene la siguiente configuración:
+
+| Propiedad | Valor confirmado |
+|---|---|
+| Nombre | `sgp-staging-ec2` |
+| ID | `i-0385c95df8cd7909d` |
+| Sistema y arquitectura | Amazon Linux 2023 ARM64 |
+| Tipo | `t4g.micro`, 2 vCPU y 1 GiB de RAM |
+| Disco | 20 GiB gp3 cifrados con `aws/ebs` |
+| VPC | `vpc-04c3c96ee06abd1bc` |
+| Subred | `subnet-0745affbda7ec4bb1`, `172.31.64.0/20`, `us-east-1f` |
+| IPv4 pública | Asignación automática; se observó `3.235.197.36`, sin Elastic IP |
+| Security Group | `sgp-staging-ec2-sg` (`sg-0e617972b3eedeb73`) |
+| Rol IAM | `sgp-staging-ec2-role` |
+| Administración | Session Manager verificado; SSH no probado y sin entrada pública |
+| Estado | En ejecución; comprobaciones `3/3` superadas |
+
+La IPv4 pública dinámica proporciona la salida necesaria sin usar NAT Gateway,
+pero no autoriza tráfico entrante: el Security Group sigue sin ingress y Nginx
+permanecerá ligado a loopback. La dirección puede cambiar al detener e iniciar
+la instancia y no se considera una interfaz pública estable.
+
+EC2 está en `us-east-1f` y RDS en `us-east-1b`. La comunicación privada funciona,
+pero cruza zonas de disponibilidad y puede implicar costo de transferencia y
+latencia adicionales. No se trasladará ningún recurso sin una evaluación de
+costo e impacto.
 
 ## Preparación del servidor
 
@@ -121,8 +353,9 @@ Realiza las siguientes operaciones:
 5. Configura `/swapfile` de 2 GiB si no existe.
 6. Agrega `ssm-user` al grupo `docker`, si el usuario existe.
 
-La forma definitiva de transferir y ejecutar este script mediante SSM se
-documentará cuando exista la instancia.
+La instancia ya admite sesiones de SSM, pero el script todavía no ha sido
+transferido ni ejecutado. Ese resultado deberá registrarse durante la preparación
+inicial, sin incorporar secretos en el comando ni en sus salidas.
 
 ## Directorios del servidor
 
@@ -229,7 +462,7 @@ Configure un GitHub Environment llamado `staging`, restringido a la rama
 | `STAGING_ENABLED` | Repositorio | Ausente o `false` | Habilita el job; debe ser de repositorio porque se evalúa antes de cargar el Environment. |
 | `AWS_REGION` | Environment `staging` | Pendiente | Región de la instancia y del rol. |
 | `AWS_ROLE_ARN` | Environment `staging` | Pendiente | Rol asumido mediante OIDC. |
-| `STAGING_INSTANCE_ID` | Environment `staging` | Pendiente | Instancia administrada por SSM. |
+| `STAGING_INSTANCE_ID` | Environment `staging` | Pendiente de configurar; valor previsto `i-0385c95df8cd7909d` | Instancia administrada por SSM. |
 
 La publicación en GHCR no requiere GitHub Secrets: utiliza el `GITHUB_TOKEN`
 efímero. La descarga desde la EC2 es una operación diferente y utiliza el PAT de
@@ -298,10 +531,10 @@ consuma.
 
 ## Preparación de la base RDS
 
-Después de crear RDS y antes del primer despliegue, copie temporalmente
-`infra/rds/prepare-database.sql` a un equipo con acceso de red a la instancia,
-por ejemplo la EC2 de staging administrada mediante SSM. Ejecútelo como el
-usuario administrador de RDS:
+Con RDS ya observada `Disponible`, y antes del primer despliegue, copie
+temporalmente `infra/rds/prepare-database.sql` a un equipo con acceso de red a
+la instancia, por ejemplo la EC2 de staging administrada mediante SSM.
+Ejecútelo como el usuario administrador de RDS solo después de validar TLS:
 
 ```bash
 read -rp "Base: " SGP_DATABASE_NAME
@@ -322,8 +555,9 @@ unset SGP_APP_USER SGP_APP_PASSWORD
 
 El archivo crea la base y los dos roles si no existen, habilita `postgis`,
 `pg_trgm` y `uuid-ossp` con el administrador y configura privilegios actuales y
-predeterminados. No concede `rds_superuser` al usuario de Flyway. Debe ejecutarse
-por separado para la base de producción usando otros nombres y secretos.
+predeterminados. No concede `rds_superuser` al usuario de Flyway. El responsable
+de producción deberá ejecutarlo posteriormente y por separado para `sgp_prod`,
+usando otros nombres y secretos. Staging no debe preparar esa base.
 
 La primera migración también contiene `CREATE EXTENSION IF NOT EXISTS`; al estar
 las extensiones ya instaladas, Flyway puede ejecutarla sin elevar privilegios.
@@ -380,14 +614,16 @@ Con Session Manager Plugin instalado en el equipo del integrante:
 
 ```bash
 aws ssm start-session \
-  --target <STAGING_INSTANCE_ID> \
+  --target i-0385c95df8cd7909d \
   --document-name AWS-StartPortForwardingSession \
   --parameters '{"portNumber":["8088"],"localPortNumber":["8088"]}'
 ```
 
 Mientras la sesión esté abierta, la aplicación se accederá en
-`http://localhost:8088`. El identificador, región y permisos reales están
-pendientes.
+`http://localhost:8088`. El identificador y la región ya están confirmados; la
+ejecución desde un equipo local, sus permisos y el Session Manager Plugin siguen
+pendientes. El acceso interactivo desde la consola sí fue verificado, pero el
+comando de port forwarding anterior aún no se ha ejecutado.
 
 ## Verificación y operación
 
@@ -448,23 +684,30 @@ SQL de preparación se ejecutó dos veces sobre un contenedor local
 PostgreSQL/PostGIS 16: se comprobaron las extensiones, los privilegios DML y de
 secuencias del usuario de aplicación, y la prohibición de crear tablas con ese
 usuario. Luego la imagen local del backend inició saludablemente con esos roles
-y Flyway registró 16 migraciones exitosas y ninguna fallida. Aún no se ha
-probado contra una RDS ni un bucket S3 reales.
+y Flyway registró 16 migraciones exitosas y ninguna fallida. En AWS, la EC2 está
+en ejecución, Session Manager funciona y el endpoint de RDS respondió a una
+prueba TCP desde esa instancia. Todavía no se han probado TLS, autenticación,
+PostGIS, Flyway ni la conexión del backend contra RDS. El bucket S3 tampoco tiene
+una integración funcional que probar.
 
 El workflow también se ejecutó en GitHub después de integrar los cambios en
 `develop`: las validaciones de backend y frontend finalizaron correctamente y se
 publicaron ambas imágenes en GHCR. El job `Deploy staging` permaneció omitido,
 como se esperaba, porque `STAGING_ENABLED` no está activo. Aún no se han validado
 los nuevos manifiestos multi-arquitectura, el acceso desde EC2 a los paquetes
-privados, OIDC, SSM ni una instancia real. La URL o el identificador de cada
-ejecución debe agregarse cuando se recopile la evidencia final.
+privados, OIDC ni el despliegue real. Session Manager sí quedó validado en la
+instancia `i-0385c95df8cd7909d`. La URL o el identificador de cada ejecución debe
+agregarse cuando se recopile la evidencia final.
 
 ## Limitaciones y trabajo pendiente
 
 - Registrar la URL o el identificador de la ejecución exitosa de GitHub Actions.
 - Publicar y verificar los manifiestos AMD64/ARM64 después de integrar este
   cambio en `develop`.
-- Crear y autorizar los recursos mínimos de AWS.
+- Probar autenticación PostgreSQL desde EC2 con `sslmode=verify-full` y el bundle
+  CA de RDS; la prueba TCP actual no cubre esa validación.
+- Ejecutar y validar el script de preparación de Amazon Linux en la EC2.
+- Crear el rol OIDC limitado al Environment `staging` y a la instancia EC2.
 - Ejecutar y validar `infra/rds/prepare-database.sql` contra RDS PostgreSQL 16.
 - Confirmar en la versión elegida de RDS la disponibilidad de PostGIS antes de
   crear datos.
@@ -477,9 +720,30 @@ ejecución debe agregarse cuando se recopile la evidencia final.
 - Brotli no está habilitado; Nginx utiliza gzip para evitar una imagen con módulos
   adicionales no justificados.
 - La retención centralizada de logs por 90 días no está implementada.
-- Los respaldos y restauraciones de RDS y S3 están fuera del
-  alcance de esta historia y permanecen pendientes.
-- Configurar HTTPS público también para staging según la nueva arquitectura.
+- RDS conserva temporalmente solo 1 día de respaldos automáticos por la
+  restricción del plan gratuito. La retención requerida de 30 días, los 12
+  respaldos mensuales y la prueba de restauración permanecen pendientes.
+- Los respaldos y restauraciones de S3 están fuera del alcance de esta historia.
+- Definir y validar, solo si staging debe hacerse público, HTTPS válido sobre IP
+  pública sin comprar dominio. Un certificado autofirmado no satisface este
+  requisito.
+
+## Secuencia de implementación pendiente
+
+1. Transferir por SSM y ejecutar el script de preparación; validar Docker,
+   Compose, swap y el agente SSM sin abrir puertos de entrada.
+2. Descargar el bundle CA desde su origen oficial y probar PostgreSQL con
+   `sslmode=verify-full`. Registrar el resultado sin exponer la contraseña.
+3. Preparar `sgp_staging` y sus usuarios
+   mediante `infra/rds/prepare-database.sql`; comprobar extensiones y Flyway sin
+   modificar migraciones existentes. No crear `sgp_prod`.
+4. Instalar en EC2 la autenticación de solo lectura para GHCR y configurar
+   `/etc/sgp/staging/staging.env` sin versionar secretos.
+5. Crear el rol OIDC de GitHub Actions, configurar las variables del Environment
+   `staging` y probar el despliegue manteniendo `STAGING_ENABLED=false` hasta que
+   las comprobaciones manuales anteriores sean satisfactorias.
+6. Habilitar el despliegue automático y recopilar evidencia de SSM, descarga por
+   digest, salud, Flyway, frontend y `/api/v1`.
 
 ## Referencias de AWS
 
