@@ -103,8 +103,14 @@ claves AWS estáticas ni compilar Java o Angular en EC2.
    `sgp_prod`, cada una con usuario migrador y usuario de aplicación propios. Se
    acepta la ausencia de conmutación automática para reducir costos en el
    contexto académico y con los créditos disponibles.
-6. Crear `postgis`, `pg_trgm` y `uuid-ossp` una vez como administrador de RDS;
-   Flyway conserva las migraciones existentes sin recibir `rds_superuser`.
+6. Crear `postgis`, `pg_trgm` y `uuid-ossp` una vez como administrador de RDS.
+   Para crear la base con el migrador como propietario y configurar sus
+   privilegios predeterminados, el administrador recibe membresía temporal,
+   ejecuta las operaciones de propietario mediante `SET ROLE` y pierde las
+   opciones `SET` e `INHERIT` al finalizar. Puede conservar el `ADMIN OPTION`
+   que PostgreSQL 16 concede automáticamente al creador del rol, sin obtener por
+   ello acceso como migrador. Flyway conserva las migraciones existentes sin
+   recibir `rds_superuser`.
 7. Usar un bucket S3 privado por ambiente. La EC2 accederá mediante un rol IAM
    de mínimo privilegio y credenciales temporales; nunca mediante access keys en
    `.env`. La integración se habilitará cuando exista en el backend.
@@ -276,6 +282,9 @@ DT-ALM-03 sigue pendiente en el backend y no se declara implementada.
 - [Extensiones de PostgreSQL en Amazon RDS](https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/Appendix.PostgreSQL.CommonDBATasks.Extensions.html).
 - [Configuración de PostGIS en RDS](https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/Appendix.PostgreSQL.CommonDBATasks.PostGIS.html).
 - [Uso de TLS con RDS PostgreSQL](https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/PostgreSQL.Concepts.General.SSL.html).
+- [Creación de bases de datos en PostgreSQL 16](https://www.postgresql.org/docs/16/sql-createdatabase.html).
+- [Privilegios predeterminados en PostgreSQL 16](https://www.postgresql.org/docs/16/sql-alterdefaultprivileges.html).
+- [Membresía de roles en PostgreSQL 16](https://www.postgresql.org/docs/16/role-membership.html).
 - [Roles IAM para aplicaciones en EC2](https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_use_switch-role-ec2.html).
 - [IMDSv2 para cargas contenedorizadas](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/configuring-IMDS-new-instances.html).
 - [Autenticación en GitHub Container Registry](https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-container-registry).

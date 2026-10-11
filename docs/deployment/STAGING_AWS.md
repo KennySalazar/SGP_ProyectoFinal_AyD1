@@ -48,6 +48,8 @@ el 10 y 11 de octubre de 2026:
 | DB Subnet Group | `sgp-rds-subnet-group`, compuesto por ambas subredes y zonas. |
 | Instancia RDS | `sgp-rds-postgres`, estado observado `Disponible` en `us-east-1b`. |
 | Endpoint RDS | `sgp-rds-postgres.c8hwo202k9fb.us-east-1.rds.amazonaws.com:5432`. |
+| Administrador RDS | `postgres`; `rolsuper=false` y `rolcreaterole=true`. El script comprueba además `rolcreatedb` antes de crear la base. |
+| Extensiones disponibles | PostGIS 3.4.6, `pg_trgm` 1.6 y `uuid-ossp` 1.1 confirmadas como disponibles; todavía no instaladas en `sgp_staging`. |
 | Instancia EC2 | `sgp-staging-ec2` (`i-0385c95df8cd7909d`), Amazon Linux 2023 ARM64, `t4g.micro`, en ejecución y con comprobaciones `3/3`. |
 | Ubicación EC2 | Subred pública `subnet-0745affbda7ec4bb1`, CIDR `172.31.64.0/20`, en `us-east-1f`. |
 | Almacenamiento EC2 | 20 GiB gp3 cifrados con `aws/ebs`. |
@@ -539,36 +541,68 @@ consuma.
 Con RDS ya observada `Disponible`, y antes del primer despliegue, copie
 temporalmente `infra/rds/prepare-database.sql` a un equipo con acceso de red a
 la instancia, por ejemplo la EC2 de staging administrada mediante SSM.
-Ejecútelo como el usuario administrador de RDS solo después de validar TLS:
+La base `sgp_staging` todavía no existe. Ejecute la versión corregida como
+`postgres` solo después de descargar el bundle oficial y validar TLS:
 
 ```bash
-read -rp "Base: " SGP_DATABASE_NAME
-read -rp "Usuario migrador: " SGP_MIGRATOR_USER
+export SGP_DATABASE_NAME=sgp_staging
+export SGP_MIGRATOR_USER=sgp_staging_migrator
 read -rsp "Clave del migrador: " SGP_MIGRATOR_PASSWORD; printf '\n'
-read -rp "Usuario de aplicacion: " SGP_APP_USER
+export SGP_APP_USER=sgp_staging_app
 read -rsp "Clave de aplicacion: " SGP_APP_PASSWORD; printf '\n'
+read -rsp "Clave del administrador RDS: " PGPASSWORD; printf '\n'
 export SGP_DATABASE_NAME SGP_MIGRATOR_USER SGP_MIGRATOR_PASSWORD
 export SGP_APP_USER SGP_APP_PASSWORD
+export PGPASSWORD
 
 psql \
-  "host=<RDS_ENDPOINT> port=5432 dbname=postgres user=<RDS_ADMIN> sslmode=require" \
+  "host=sgp-rds-postgres.c8hwo202k9fb.us-east-1.rds.amazonaws.com port=5432 dbname=postgres user=postgres sslmode=verify-full sslrootcert=<RUTA_BUNDLE_CA>" \
   --file prepare-database.sql
 
 unset SGP_DATABASE_NAME SGP_MIGRATOR_USER SGP_MIGRATOR_PASSWORD
-unset SGP_APP_USER SGP_APP_PASSWORD
+unset SGP_APP_USER SGP_APP_PASSWORD PGPASSWORD
 ```
 
-El archivo crea la base y los dos roles si no existen, habilita `postgis`,
-`pg_trgm` y `uuid-ossp` con el administrador y configura privilegios actuales y
-predeterminados. No concede `rds_superuser` al usuario de Flyway. El responsable
-de producción deberá ejecutarlo posteriormente y por separado para `sgp_prod`,
-usando otros nombres y secretos. Staging no debe preparar esa base.
+Sustituya `<RUTA_BUNDLE_CA>` por la ruta absoluta del bundle descargado desde el
+trust store oficial de RDS. Las claves se leen sin mostrarse y no deben incluirse
+en el historial, el repositorio o la salida de Session Manager.
+
+El archivo valida identificadores, roles separados y los atributos `CREATEROLE`
+y `CREATEDB` del administrador. PostgreSQL 16 exige que quien ejecuta
+`CREATE DATABASE ... OWNER` pueda hacer `SET ROLE` al propietario. Por ello el
+script concede temporalmente `sgp_staging_migrator` a `postgres`, crea la base y
+revoca inmediatamente las capacidades temporales para asumir o heredar el rol.
+
+Después se conecta a la base, abre una transacción, vuelve a conceder la
+membresía temporal y crea `postgis`, `pg_trgm` y `uuid-ossp` con el administrador.
+Las concesiones de esquema y `ALTER DEFAULT PRIVILEGES` se ejecutan mediante
+`SET ROLE sgp_staging_migrator`; así los privilegios predeterminados se aplican a
+los objetos que Flyway creará realmente. Al finalizar se ejecutan `RESET ROLE` y
+`REVOKE`, por lo que `postgres` deja de poder ejecutar `SET ROLE` o heredar sus
+privilegios. PostgreSQL 16 puede conservar para el creador del rol una membresía
+administrativa con `ADMIN OPTION`, `SET=false` e `INHERIT=false`; esta capacidad
+permite administrar el rol, pero no asumirlo ni acceder como migrador.
+
+El migrador conserva DDL sobre `public` sin recibir `rds_superuser`; la cuenta de
+aplicación recibe `CONNECT`, `USAGE` de esquema y DML sobre tablas y secuencias
+creadas por el migrador. En una reejecución solo se actualizan objetos existentes
+que pertenezcan al migrador, evitando conceder DML sobre tablas internas de
+PostGIS. El responsable de producción deberá ejecutar el archivo posteriormente
+y por separado para `sgp_prod`, usando otros nombres y secretos. Staging no debe
+preparar esa base.
+
+Si la ejecución se interrumpe específicamente entre el primer `GRANT` temporal y
+su `REVOKE`, revise la membresía y elimínela antes de reintentar:
+
+```sql
+SELECT pg_has_role('postgres', 'sgp_staging_migrator', 'SET');
+REVOKE sgp_staging_migrator FROM postgres;
+```
 
 La primera migración también contiene `CREATE EXTENSION IF NOT EXISTS`; al estar
 las extensiones ya instaladas, Flyway puede ejecutarla sin elevar privilegios.
-RDS debe configurarse para exigir TLS. `sslmode=require` evita conexiones sin
-cifrado; la validación completa del certificado con `verify-full` y el bundle CA
-de RDS queda pendiente del incremento de infraestructura.
+La ejecución contra RDS y la validación completa con `verify-full` siguen
+pendientes; no deben declararse exitosas hasta realizar la prueba real.
 
 ## Docker Compose
 
@@ -700,6 +734,23 @@ el 11 de octubre de 2026 después de eliminar de DNF la solicitud del paquete
 `curl`, incompatible con `curl-minimal`. Esto valida la preparación del host, no
 el acceso a GHCR ni la ejecución de los contenedores de la aplicación.
 
+La corrección de `infra/rds/prepare-database.sql` se validó localmente en un
+contenedor PostgreSQL 16 con PostGIS 3.5.2. Se utilizó un administrador ficticio
+con `rolsuper=false`, `rolcreaterole=true` y `rolcreatedb=true`; PostGIS se marcó
+como extensión confiable únicamente dentro del contenedor desechable para
+simular la capacidad delegada al administrador de RDS. El archivo exacto se
+ejecutó dos veces, conservó al migrador como propietario, retiró al administrador
+las capacidades `SET` e `INHERIT` y dejó al usuario de aplicación sin permiso
+`CREATE` sobre `public`.
+
+Las 16 migraciones existentes se ejecutaron en orden con el rol migrador. V14 se
+ejecutó en una sola transacción, como lo hace Flyway, debido a su tabla temporal
+`ON COMMIT DROP`. Una tabla de prueba creada posteriormente por el migrador
+heredó los privilegios predeterminados: la aplicación pudo realizar
+`INSERT`, `SELECT`, `UPDATE` y `DELETE`, pero su intento de `CREATE TABLE` fue
+rechazado. Esta prueba es local; el SQL corregido todavía no se ha ejecutado en
+la RDS real.
+
 El workflow también se ejecutó en GitHub después de integrar los cambios en
 `develop`: las validaciones de backend y frontend finalizaron correctamente y se
 publicaron ambas imágenes en GHCR. El job `Deploy staging` permaneció omitido,
@@ -757,6 +808,9 @@ agregarse cuando se recopile la evidencia final.
 - [Extensiones de PostgreSQL en Amazon RDS](https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/Appendix.PostgreSQL.CommonDBATasks.Extensions.html).
 - [Configuración de PostGIS en RDS](https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/Appendix.PostgreSQL.CommonDBATasks.PostGIS.html).
 - [Uso de TLS con RDS PostgreSQL](https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/PostgreSQL.Concepts.General.SSL.html).
+- [Creación de bases de datos en PostgreSQL 16](https://www.postgresql.org/docs/16/sql-createdatabase.html).
+- [Privilegios predeterminados en PostgreSQL 16](https://www.postgresql.org/docs/16/sql-alterdefaultprivileges.html).
+- [Membresía de roles en PostgreSQL 16](https://www.postgresql.org/docs/16/role-membership.html).
 - [Roles IAM para aplicaciones en EC2](https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_use_switch-role-ec2.html).
 - [IMDSv2 en entornos con contenedores](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/configuring-IMDS-new-instances.html).
 

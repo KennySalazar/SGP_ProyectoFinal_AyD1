@@ -260,6 +260,16 @@ de staging; no debe reutilizar sus valores. El archivo crea las extensiones con
 el administrador y deja a Flyway con permisos DDL sin concederle
 `rds_superuser`.
 
+En PostgreSQL 16 el administrador debe poder hacer `SET ROLE` al propietario
+indicado en `CREATE DATABASE ... OWNER` y al rol indicado por los privilegios
+predeterminados. El script resuelve este requisito con una membresía temporal al
+migrador, ejecuta como migrador las concesiones de esquema y
+`ALTER DEFAULT PRIVILEGES`, y revoca las capacidades `SET` e `INHERIT` al
+finalizar. PostgreSQL 16 puede conservar el `ADMIN OPTION` entregado
+automáticamente a quien creó el rol; esto no permite asumirlo. Producción debe
+conservar este mecanismo y comprobar que su administrador tenga `CREATEROLE` y
+`CREATEDB`; no debe conceder esos atributos al migrador ni a la aplicación.
+
 La EC2 de producción debe recibir un rol de instancia que solo permita las
 operaciones necesarias sobre su bucket. Debe exigir IMDSv2 y usar hop limit `2`
 para cargas dentro de Docker. No se deben crear `AWS_ACCESS_KEY_ID` ni
