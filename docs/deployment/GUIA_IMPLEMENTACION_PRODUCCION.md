@@ -17,13 +17,13 @@ responsable de producción debe conservar o coordinar antes de modificarlos.
 
 | Componente | Estado |
 |---|---|
-| Dockerfiles reutilizables | Preparados para AMD64/ARM64; nueva publicación pendiente. |
+| Dockerfiles reutilizables | Preparados para AMD64/ARM64; la publicación multi-arquitectura sigue pendiente del PR hacia `develop`. |
 | Compose de staging | Adaptado para RDS y S3 externos; validación real en AWS pendiente. |
 | Workflow CI, publicación y staging | Validaciones y publicación ejecutadas correctamente; despliegue AWS deshabilitado. |
-| Imágenes en GHCR | Paquetes privados existentes en AMD64; manifiestos multi-arquitectura pendientes. |
+| Imágenes en GHCR | Referencias `develop` existentes y accesibles desde EC2, pero sin variante ARM64 en la última comprobación. |
 | Convención de versiones | Definida y utilizada en la primera publicación. |
 | Infraestructura AWS compartida | Red privada y DB Subnet Group confirmados; `sgp-rds-postgres` disponible y alcanzable por TCP desde staging, todavía sin bases ni autenticación validada. |
-| Infraestructura exclusiva de staging | Security Group, bucket, rol IAM y EC2 creados; Session Manager verificado y OIDC pendiente. |
+| Infraestructura exclusiva de staging | Security Group, bucket, rol IAM y EC2 creados; Session Manager y autenticación GHCR verificados; OIDC sin validar. |
 | Infraestructura y Compose de producción | Responsabilidad del segundo integrante. |
 
 ## 3. Decisiones que deben conservarse
@@ -129,7 +129,7 @@ El rol `sgp-staging-ec2-role` confía en EC2 y actualmente solo tiene
 mediante Session Manager. El acceso S3 futuro requerirá una política
 adicional limitada al bucket de staging. Producción debe crear su propio rol de
 instancia, limitado a su bucket. El rol OIDC usado por GitHub Actions es una
-identidad diferente y todavía no se ha creado.
+identidad diferente, ya tiene un ARN asignado y todavía no ha sido validado.
 
 La instancia `sgp-staging-ec2` (`i-0385c95df8cd7909d`) ejecuta Amazon Linux
 2023 ARM64 sobre `t4g.micro`, con 20 GiB gp3 cifrados. Está en `us-east-1f`, usa
@@ -187,14 +187,24 @@ Convención definida:
 - `develop`: etiqueta móvil para identificar la última integración exitosa.
 - `<imagen>@sha256:<digest>`: referencia que debe usarse en un despliegue.
 
-Cada etiqueta publicará un índice OCI con variantes `linux/amd64` y
-`linux/arm64`. Una EC2 `t4g` seleccionará automáticamente la variante ARM64 sin
-cambiar el nombre ni la etiqueta. El digest aprobado debe corresponder al índice
-multi-arquitectura, no a una variante aislada.
+Después de integrar el cambio pendiente, cada etiqueta deberá publicar un índice
+OCI con variantes `linux/amd64` y `linux/arm64`. Una EC2 `t4g` seleccionará
+automáticamente la variante ARM64 sin cambiar el nombre ni la etiqueta. El digest
+aprobado debe corresponder al índice multi-arquitectura, no a una variante
+aislada.
+
+En staging, `docker manifest inspect` confirmó que las referencias `develop`
+existían y eran accesibles. Sin embargo, las descargas con
+`--platform linux/arm64` fallaron para backend y frontend con
+`no matching manifest for linux/arm64 in the manifest list entries`. La versión
+del workflow integrada en `develop` solo publicaba AMD64; la rama
+`feature/staging-aws-rds-s3` ya contiene la configuración AMD64/ARM64, pero su
+PR, merge y nueva publicación todavía no están confirmados. Producción no debe
+aprobar un digest hasta verificar ambas arquitecturas en el índice OCI.
 
 Los paquetes ya existen en GHCR y permanecen privados. El responsable de staging
 tiene acceso de lectura, pero no permisos administrativos sobre los paquetes de
-la cuenta `KennySalazar`; por ello la EC2 de staging se autenticará con un
+la cuenta `KennySalazar`; por ello la EC2 de staging se autenticó con un
 Personal Access Token (classic) limitado a `read:packages`.
 
 Producción no debe reutilizar el token de staging. Su responsable deberá obtener
@@ -250,6 +260,12 @@ controles independientes:
 Los secretos no deben incluirse en Compose, AMI, User Data, logs, GitHub Actions
 ni archivos versionados. El mecanismo definitivo de almacenamiento de secretos
 en producción sigue pendiente de decisión.
+
+Staging usa temporalmente un destino SMTP ficticio en `127.0.0.1:2525`; no hay
+un servidor de correo operativo y los flujos de OTP, invitación, activación y
+recuperación de contraseña no están validados. Producción no debe copiar esos
+valores: necesita un proveedor SMTP real, credenciales propias, un remitente
+autorizado y pruebas completas de los flujos dependientes del correo.
 
 Antes del primer despliegue, el responsable de producción deberá ejecutar
 `infra/rds/prepare-database.sql` como administrador de RDS, usando nombres y
@@ -420,11 +436,14 @@ crear el Compose real de producción.
 - La EC2 de staging y RDS están en zonas distintas; debe medirse el impacto de
   transferencia inter-AZ antes de repetir esa distribución en producción.
 - La publicación multi-arquitectura está implementada en la rama de trabajo, pero
-  debe comprobarse en GHCR después de integrarla en `develop`.
+  el PR hacia `develop` no está confirmado. Las referencias actuales fallaron al
+  descargarse explícitamente para ARM64 y deben volver a publicarse y comprobarse.
 - Los paquetes GHCR son privados. Cada ambiente necesita una credencial de
   lectura cuya vigencia y dependencia de una cuenta personal deben operarse.
 - El PAT classic con `read:packages` puede leer los paquetes a los que tenga
   acceso su cuenta; no es una credencial limitada exclusivamente a este proyecto.
+- El SMTP de staging es ficticio; no existe evidencia de envío de correos ni de
+  los flujos de autenticación que dependen de ellos.
 
 ## 14. Decisiones pendientes
 

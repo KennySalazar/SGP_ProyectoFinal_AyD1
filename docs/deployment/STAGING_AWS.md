@@ -7,18 +7,18 @@ se actualiza de forma incremental durante la historia de usuario.
 
 | Área | Estado |
 |---|---|
-| Imágenes reutilizables de backend y frontend | Build multi-arquitectura implementado; pendiente de publicación desde `develop`. |
+| Imágenes reutilizables de backend y frontend | Build multi-arquitectura implementado en la rama feature; las imágenes actuales de `develop` no ofrecen ARM64. |
 | Compose aislado de staging | Adaptado para ejecutar solo Nginx/Angular y Spring Boot; RDS y S3 son externos a la EC2. |
 | Preparación de Amazon Linux 2023 | Completada exitosamente en la EC2 ARM64 el 11 de octubre de 2026. |
-| Workflow de validación, publicación y despliegue | Versión anterior ejecutada correctamente; cambio actual pendiente de CI. |
-| Publicación en GHCR | Paquetes privados publicados inicialmente para AMD64; manifiestos AMD64/ARM64 pendientes de este cambio. |
+| Workflow de validación, publicación y despliegue | Cambio implementado en la rama feature; PR, integración y ejecución actualizada pendientes. |
+| Publicación en GHCR | Las referencias `develop` existen y son accesibles, pero no incluyen ARM64; republicación multi-arquitectura pendiente del PR. |
 | Despliegue automático desde `develop` | Implementado con variables de repositorio y deshabilitado hasta completar los requisitos restantes. |
 | Red AWS | VPC, tabla privada, dos subredes dedicadas y DB Subnet Group de RDS confirmados. |
 | Security Groups | Grupos de EC2 y RDS creados; la regla 5432 de RDS referencia únicamente al grupo de staging. |
 | IAM y Systems Manager | Rol asociado a la EC2 y acceso interactivo mediante Session Manager verificado. |
 | S3 | Bucket privado de staging creado y vacío; integración de aplicación no implementada. |
 | RDS | `sgp-rds-postgres` disponible; conectividad TCP desde EC2 verificada, con autenticación, bases, extensiones y migraciones pendientes. |
-| EC2 | `sgp-staging-ec2` creada, en ejecución y con sus tres comprobaciones superadas; preparación inicial completada. |
+| EC2 | `sgp-staging-ec2` creada, en ejecución y con sus tres comprobaciones superadas; preparación inicial y autenticación en GHCR completadas. |
 | Despliegue real en AWS | No ejecutado. |
 
 Se crearon los dos Security Groups, el bucket S3, RDS y la EC2 de staging. El rol
@@ -29,10 +29,18 @@ GitHub Actions y sus variables de repositorio ya tienen identificadores
 asignados, pero la confianza para `develop` y la asunción del rol todavía no han
 sido validadas. Tampoco se han preparado la base ni el despliegue real.
 
+En la EC2 se creó `/etc/sgp/staging/staging.env` con propietario `root` y modo
+`0600`. Se verificaron las cinco variables de PostgreSQL y `SECRET_KEY_JWT`. La
+configuración de las dos variables del administrador inicial y las cinco
+variables `MAIL_*` fue reportada como completada posteriormente, pero no se
+conserva una nueva salida
+que demuestre la validación conjunta de todas las variables obligatorias. No se
+registran sus valores en esta guía.
+
 ## Inventario AWS confirmado
 
-Estado actualizado mediante las comprobaciones manuales realizadas en la consola
-el 10 y 11 de octubre de 2026:
+Estado consolidado al 14 de octubre de 2026 a partir de las comprobaciones
+manuales realizadas en AWS y GitHub:
 
 | Elemento | Valor o estado |
 |---|---|
@@ -396,11 +404,14 @@ leerlos, pero no posee permisos administrativos para cambiar su visibilidad.
 
 ## Autenticación de la EC2 en GHCR
 
-La EC2 utilizará un Personal Access Token (classic) de una cuenta con acceso a
-los paquetes. Debe conceder únicamente `read:packages`, tener fecha de expiración
-y no incluir `write:packages` ni `delete:packages`. El token es una credencial de
-operación del servidor: no debe guardarse en el repositorio, `staging.env`, User
-Data, GitHub Actions, logs ni documentación.
+La EC2 utiliza un Personal Access Token (classic) de una cuenta con acceso a los
+paquetes. La autenticación se realizó como `root` desde Session Manager mediante
+`docker login ghcr.io` y devolvió `Login Succeeded`. El token no se
+incorporó al repositorio, la documentación, `staging.env` ni GitHub Actions.
+
+El token debe conceder únicamente `read:packages`, tener fecha de expiración y
+no incluir `write:packages` ni `delete:packages`. Es una credencial de operación
+del servidor: tampoco debe guardarse en User Data o logs.
 
 Después de preparar la instancia, abra una sesión interactiva de Systems Manager
 y autentique al usuario `root`, que es el usuario con el que Run Command ejecuta
@@ -435,6 +446,53 @@ un `docker pull` por digest y solo entonces revoque el anterior. La expiración 
 detiene contenedores en ejecución, pero impide descargar imágenes en el siguiente
 despliegue. Debe registrarse externamente una fecha de renovación sin registrar el
 valor del token.
+
+### Diagnóstico de las imágenes ARM64
+
+Desde la EC2 se confirmó mediante `docker manifest inspect` que existen y son
+accesibles estas referencias:
+
+```text
+ghcr.io/kennysalazar/sgp-api:develop
+ghcr.io/kennysalazar/sgp-client:develop
+```
+
+Esta comprobación solo demostró existencia y acceso. Al solicitar explícitamente
+la variante de la instancia Graviton:
+
+```bash
+sudo docker pull --platform linux/arm64 ghcr.io/kennysalazar/sgp-api:develop
+sudo docker pull --platform linux/arm64 ghcr.io/kennysalazar/sgp-client:develop
+```
+
+ambas descargas fallaron con:
+
+```text
+no matching manifest for linux/arm64 in the manifest list entries
+```
+
+Por ello ninguna imagen quedó descargada y `docker image inspect` respondió
+`No such image`. La causa es que el workflow actualmente integrado en `develop`
+publica solo `linux/amd64`; la rama `feature/staging-aws-rds-s3` ya configura
+`linux/amd64,linux/arm64`. No se requiere cambiar la EC2 ARM64: debe integrarse
+el cambio mediante PR y permitir que `develop` vuelva a publicar ambas imágenes.
+
+Después del merge, y antes de habilitar el despliegue, compruebe ambas
+arquitecturas y repita las descargas:
+
+```bash
+sudo docker manifest inspect ghcr.io/kennysalazar/sgp-api:develop \
+  | grep -E '"architecture"|"os"'
+sudo docker manifest inspect ghcr.io/kennysalazar/sgp-client:develop \
+  | grep -E '"architecture"|"os"'
+
+sudo docker pull --platform linux/arm64 ghcr.io/kennysalazar/sgp-api:develop
+sudo docker pull --platform linux/arm64 ghcr.io/kennysalazar/sgp-client:develop
+```
+
+El resultado debe enumerar `linux/amd64` y `linux/arm64`. Para el despliegue se
+mantiene la regla de consumir los digests producidos por el workflow, no la
+etiqueta móvil `develop`.
 
 ## GitHub Actions y GHCR
 
@@ -502,6 +560,15 @@ se evitan despliegues simultáneos y revisiones antiguas fuera de orden.
 La plantilla es `infra/staging/.env.example`. El archivo real debe existir solo
 en `/etc/sgp/staging/staging.env` y nunca debe registrarse en Git.
 
+El archivo ya existe en la EC2 con propietario `root` y modo `0600`. Las
+variables `DATABASE_URL`, `DATABASE_USERNAME`, `DATABASE_PASSWORD`,
+`MIGRATION_DATABASE_USERNAME`, `MIGRATION_DATABASE_PASSWORD` y
+`SECRET_KEY_JWT` fueron verificadas. Se reportó la configuración posterior de
+`INITIAL_ADMIN_EMAIL`, `INITIAL_ADMIN_PASSWORD`, `MAIL_HOST`, `MAIL_PORT`,
+`MAIL_USERNAME`, `MAIL_PASSWORD` y `MAIL_FROM`, sin una nueva evidencia completa
+que permita marcarlas como verificadas. Los valores reales permanecen fuera de
+Git y de esta documentación.
+
 | Variable | Servicio | Obligatoria | Propósito / ejemplo seguro |
 |---|---|---:|---|
 | `BACKEND_IMAGE` | Compose | Sí, inyectada | Digest de `ghcr.io/kennysalazar/sgp-api`; el despliegue la escribe en `images.env`. |
@@ -531,6 +598,26 @@ en `/etc/sgp/staging/staging.env` y nunca debe registrarse en Git.
 | `INVITACION_URL_ACTIVACION` | Backend | No | `http://localhost:8088/activar-cuenta` mientras se use el túnel. |
 | `CORS_ALLOWED_ORIGINS` | Backend | No | `http://localhost:8088` para el acceso privado. |
 | `JAVA_TOOL_OPTIONS` | Backend | No | Límites de JVM definidos en la plantilla. |
+
+### SMTP temporal sin servicio de correo
+
+Para las primeras pruebas de infraestructura se configuró temporalmente un
+destino SMTP ficticio:
+
+```dotenv
+MAIL_HOST=127.0.0.1
+MAIL_PORT=2525
+MAIL_USERNAME=no-reply@example.invalid
+MAIL_PASSWORD=SMTP_NO_CONFIGURADO
+MAIL_FROM=no-reply@example.invalid
+```
+
+No hay un servidor SMTP escuchando en esa dirección y no se espera que los
+correos se envíen. Esta configuración permite completar el contrato de variables,
+pero no valida correo, OTP, invitaciones, activación de cuentas, recuperación de
+contraseñas ni ningún flujo de autenticación dependiente del correo. Antes de
+declarar staging funcional debe configurarse un servicio SMTP real y probar esos
+flujos. El marcador `SMTP_NO_CONFIGURADO` no debe reutilizarse en producción.
 
 En staging, `SPRING_PROFILES_ACTIVE=staging`, `OPENAPI_PUBLIC=false` y
 `REFRESH_COOKIE_SECURE=false` están fijados por Compose. La cookie no se marca
@@ -745,7 +832,7 @@ una integración funcional que probar.
 El script de preparación de Amazon Linux 2023 se ejecutó correctamente en la EC2
 el 11 de octubre de 2026 después de eliminar de DNF la solicitud del paquete
 `curl`, incompatible con `curl-minimal`. Esto valida la preparación del host, no
-el acceso a GHCR ni la ejecución de los contenedores de la aplicación.
+la ejecución de los contenedores de la aplicación.
 
 La corrección de `infra/rds/prepare-database.sql` se validó localmente en un
 contenedor PostgreSQL 16 con PostGIS 3.5.2. Se utilizó un administrador ficticio
@@ -767,17 +854,22 @@ la RDS real.
 El workflow también se ejecutó en GitHub después de integrar los cambios en
 `develop`: las validaciones de backend y frontend finalizaron correctamente y se
 publicaron ambas imágenes en GHCR. El job `Deploy staging` permaneció omitido,
-como se esperaba, porque `STAGING_ENABLED` no está activo. Aún no se han validado
-los nuevos manifiestos multi-arquitectura, el acceso desde EC2 a los paquetes
-privados, OIDC ni el despliegue real. Session Manager sí quedó validado en la
-instancia `i-0385c95df8cd7909d`. La URL o el identificador de cada ejecución debe
-agregarse cuando se recopile la evidencia final.
+como se esperaba, porque `STAGING_ENABLED` no está activo. Desde EC2 se validó
+posteriormente `docker login` y el acceso a las referencias privadas. Las
+descargas explícitas para ARM64 fallaron porque los manifiestos publicados por
+la versión actual de `develop` no contienen esa arquitectura. La corrección está
+en la rama feature, cuyo PR, revisión e integración aún no se han confirmado.
+OIDC y el despliegue real tampoco se han validado. Session Manager sí quedó
+validado en `i-0385c95df8cd7909d`. La URL o el identificador de cada ejecución
+debe agregarse cuando se recopile la evidencia final.
 
 ## Limitaciones y trabajo pendiente
 
 - Registrar la URL o el identificador de la ejecución exitosa de GitHub Actions.
 - Publicar y verificar los manifiestos AMD64/ARM64 después de integrar este
   cambio en `develop`.
+- Crear, revisar y fusionar el PR de `feature/staging-aws-rds-s3` hacia
+  `develop`; todavía no se ha confirmado ninguna de estas acciones.
 - Probar autenticación PostgreSQL desde EC2 con `sslmode=verify-full` y el bundle
   CA de RDS; la prueba TCP actual no cubre esa validación.
 - Configurar y verificar la confianza OIDC del rol
@@ -786,9 +878,10 @@ agregarse cuando se recopile la evidencia final.
 - Ejecutar y validar `infra/rds/prepare-database.sql` contra RDS PostgreSQL 16.
 - Confirmar en la versión elegida de RDS la disponibilidad de PostGIS antes de
   crear datos.
-- Crear, instalar y probar en EC2 el PAT classic de solo lectura para GHCR.
 - Definir responsable y recordatorio de rotación del PAT; su disponibilidad
   depende de que la cuenta conserve acceso a los paquetes privados.
+- Sustituir el SMTP ficticio por un servicio real y validar OTP, invitaciones,
+  activación y recuperación de contraseña.
 - Confirmar el tamaño definitivo de EC2 y disco mediante medición.
 - El backend todavía no integra almacenamiento de objetos; S3 no puede validarse
   funcionalmente hasta que exista la interfaz requerida por DT-ALM-03.
@@ -805,17 +898,22 @@ agregarse cuando se recopile la evidencia final.
 
 ## Secuencia de implementación pendiente
 
-1. Descargar el bundle CA desde su origen oficial y probar PostgreSQL con
+1. Crear y revisar el PR de `feature/staging-aws-rds-s3` hacia `develop`, sin
+   activar `STAGING_ENABLED`; después del merge, esperar las validaciones y la
+   publicación de ambas imágenes.
+2. Confirmar que los manifiestos publicados enumeren `linux/amd64` y
+   `linux/arm64`, y repetir desde EC2 los `docker pull --platform linux/arm64`.
+3. Descargar el bundle CA desde su origen oficial y probar PostgreSQL con
    `sslmode=verify-full`. Registrar el resultado sin exponer la contraseña.
-2. Preparar `sgp_staging` y sus usuarios
+4. Preparar `sgp_staging` y sus usuarios
    mediante `infra/rds/prepare-database.sql`; comprobar extensiones y Flyway sin
    modificar migraciones existentes. No crear `sgp_prod`.
-3. Instalar en EC2 la autenticación de solo lectura para GHCR y configurar
-   `/etc/sgp/staging/staging.env` sin versionar secretos.
-4. Terminar la política de confianza del rol OIDC, revisar las variables de
+5. Verificar de forma completa `/etc/sgp/staging/staging.env`, conservar sus
+   permisos `0600` y reemplazar el SMTP ficticio antes de probar flujos de correo.
+6. Terminar la política de confianza del rol OIDC, revisar las variables de
    repositorio y probar el flujo manteniendo `STAGING_ENABLED` ausente o en
    `false` hasta que las comprobaciones manuales anteriores sean satisfactorias.
-5. Habilitar el despliegue automático y recopilar evidencia de SSM, descarga por
+7. Habilitar el despliegue automático y recopilar evidencia de SSM, descarga por
    digest, salud, Flyway, frontend y `/api/v1`.
 
 ## Referencias de AWS
