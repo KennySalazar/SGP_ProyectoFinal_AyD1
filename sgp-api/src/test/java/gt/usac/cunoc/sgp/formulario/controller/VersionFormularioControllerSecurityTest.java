@@ -9,6 +9,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -198,6 +199,118 @@ class VersionFormularioControllerSecurityTest {
 
     mockMvc
         .perform(post("/api/v1/formularios/" + id + "/publicar").principal(auth))
+        .andExpect(status().isForbidden())
+        .andExpect(jsonPath("$.code").value("access_denied"));
+
+    verifyNoInteractions(service);
+  }
+
+  @Test
+  void permiteAdministradorConfigurarPesos() throws Exception {
+    var auth = autenticar(RoleName.ADMINISTRADOR);
+    UUID id = UUID.randomUUID();
+
+    when(service.calibrarPesos(eq(id), any(), eq(USUARIO_ID))).thenReturn(Collections.emptyList());
+
+    mockMvc
+        .perform(
+            put("/api/v1/formularios/" + id + "/pesos")
+                .principal(auth)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                                    [
+                                      {
+                                        "elementoRef": "/vigas",
+                                        "peso": 1,
+                                        "descripcion": "Vigas"
+                                      }
+                                    ]
+                                    """))
+        .andExpect(status().isOk());
+
+    verify(service).calibrarPesos(eq(id), any(), eq(USUARIO_ID));
+  }
+
+  @ParameterizedTest
+  @EnumSource(
+      value = RoleName.class,
+      names = {"CATEDRATICO", "ESTUDIANTE", "PROFESIONAL_EXTERNO"})
+  void rechazaNoAdministradoresConfigurarPesos(RoleName rol) throws Exception {
+    var auth = autenticar(rol);
+    UUID id = UUID.randomUUID();
+
+    mockMvc
+        .perform(
+            put("/api/v1/formularios/" + id + "/pesos")
+                .principal(auth)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                                    [
+                                      {
+                                        "elementoRef": "/vigas",
+                                        "peso": 1,
+                                        "descripcion": "Vigas"
+                                      }
+                                    ]
+                                    """))
+        .andExpect(status().isForbidden())
+        .andExpect(jsonPath("$.code").value("access_denied"));
+
+    verifyNoInteractions(service);
+  }
+
+  @Test
+  void permiteAdministradorConfigurarEscala() throws Exception {
+    var auth = autenticar(RoleName.ADMINISTRADOR);
+    UUID id = UUID.randomUUID();
+
+    mockMvc
+        .perform(
+            put("/api/v1/formularios/" + id + "/escala")
+                .principal(auth)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                                    {
+                                      "valores": {
+                                        "NO_PRESENTA": 0,
+                                        "LEVE": 1,
+                                        "MODERADO": 2,
+                                        "SEVERO": 4
+                                      }
+                                    }
+                                    """))
+        .andExpect(status().isOk());
+
+    verify(service).configurarEscala(eq(id), any(), eq(USUARIO_ID));
+  }
+
+  @ParameterizedTest
+  @EnumSource(
+      value = RoleName.class,
+      names = {"CATEDRATICO", "ESTUDIANTE", "PROFESIONAL_EXTERNO"})
+  void rechazaNoAdministradoresConfigurarEscala(RoleName rol) throws Exception {
+    var auth = autenticar(rol);
+    UUID id = UUID.randomUUID();
+
+    mockMvc
+        .perform(
+            put("/api/v1/formularios/" + id + "/escala")
+                .principal(auth)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                                    {
+                                      "valores": {
+                                        "NO_PRESENTA": 0,
+                                        "LEVE": 1,
+                                        "MODERADO": 2,
+                                        "SEVERO": 4
+                                      }
+                                    }
+                                    """))
         .andExpect(status().isForbidden())
         .andExpect(jsonPath("$.code").value("access_denied"));
 

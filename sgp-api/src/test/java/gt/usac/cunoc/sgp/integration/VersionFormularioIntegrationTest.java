@@ -28,9 +28,11 @@ import gt.usac.cunoc.sgp.formulario.service.VersionFormularioService;
 import gt.usac.cunoc.sgp.formulario.validation.CampoSchemaExtractor;
 import gt.usac.cunoc.sgp.formulario.validation.JsonSchemaValidatorService;
 import gt.usac.cunoc.sgp.usuario.model.RoleName;
+import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
@@ -125,16 +127,16 @@ class VersionFormularioIntegrationTest {
 
     jdbc.update(
         """
-        INSERT INTO usuario (
-          id, email, password_hash, rol_id,
-          verificado, activado, activo, nombre_completo
-        )
-        SELECT ?, 'admin@cunoc.edu.gt', 'hash-de-prueba', id,
-               true, true, true, 'Administrador de prueba'
-        FROM rol
-        WHERE nombre = 'ADMINISTRADOR'
-        ON CONFLICT (id) DO NOTHING
-        """,
+            INSERT INTO usuario (
+              id, email, password_hash, rol_id,
+              verificado, activado, activo, nombre_completo
+            )
+            SELECT ?, 'admin@cunoc.edu.gt', 'hash-de-prueba', id,
+                   true, true, true, 'Administrador de prueba'
+            FROM rol
+            WHERE nombre = 'ADMINISTRADOR'
+            ON CONFLICT (id) DO NOTHING
+            """,
         ADMINISTRADOR_ID);
   }
 
@@ -145,23 +147,31 @@ class VersionFormularioIntegrationTest {
 
   @Test
   void cicloDeVidaCompletoVersionesYPublicacionExclusiva() throws Exception {
-    // 1. Cargar plantilla SIECA-v1 inicial
     VersionFormularioResponse v1 =
         service.cargarPlantillaSiecaInicial("SIECA-v1", ADMINISTRADOR_ID);
 
     assertThat(v1.codigo()).isEqualTo("SIECA-v1");
     assertThat(v1.estado()).isEqualTo(EstadoVersionFormulario.BORRADOR);
     assertThat(v1.activa()).isFalse();
-    assertThat(v1.pesos()).hasSizeGreaterThanOrEqualTo(40);
+    assertThat(v1.pesos()).isEmpty();
 
-    // 2. Publicar SIECA-v1
+    ApiException sinPesos =
+        assertThrows(ApiException.class, () -> service.publicar(v1.id(), null, ADMINISTRADOR_ID));
+    assertThat(sinPesos.getCode()).isEqualTo("pesos_incompletos");
+
+    configurarPesosDePrueba(v1.id(), BigDecimal.ONE);
+    ApiException sinEscala =
+        assertThrows(ApiException.class, () -> service.publicar(v1.id(), null, ADMINISTRADOR_ID));
+    assertThat(sinEscala.getCode()).isEqualTo("escala_incompleta");
+    service.configurarEscala(v1.id(), escalaDePrueba(4), ADMINISTRADOR_ID);
+    assertThat(service.obtenerPorId(v1.id()).pesos()).hasSize(45);
+
     VersionFormularioResponse v1Publicada = service.publicar(v1.id(), null, ADMINISTRADOR_ID);
 
     assertThat(v1Publicada.estado()).isEqualTo(EstadoVersionFormulario.PUBLICADA);
     assertThat(v1Publicada.activa()).isTrue();
     assertThat(v1Publicada.hashContenido()).isNotBlank();
 
-    // 3. RN-FRM-03: Inmutabilidad de versión publicada
     ApiException errorInmutable =
         assertThrows(
             ApiException.class,
@@ -175,23 +185,22 @@ class VersionFormularioIntegrationTest {
                     ADMINISTRADOR_ID));
     assertThat(errorInmutable.getStatus()).isEqualTo(HttpStatus.CONFLICT);
 
-    // 4. Crear versión base SIECA-v2 a partir de SIECA-v1
     JsonNode esquemaV2 =
         objectMapper.readTree(
             """
-            {
-              "$schema": "https://json-schema.org/draft/2020-12/schema",
-              "type": "object",
-              "properties": {
-                "datos_generales": {
-                  "type": "object",
-                  "properties": {
-                    "nombre": { "type": "string" }
-                  }
-                }
-              }
-            }
-            """);
+                    {
+                      "$schema": "https://json-schema.org/draft/2020-12/schema",
+                      "type": "object",
+                      "properties": {
+                        "datos_generales": {
+                          "type": "object",
+                          "properties": {
+                            "nombre": { "type": "string" }
+                          }
+                        }
+                      }
+                    }
+                    """);
 
     CrearVersionRequest crearV2Req =
         new CrearVersionRequest("SIECA-v2", v1.id(), false, esquemaV2, null, null);
@@ -200,14 +209,30 @@ class VersionFormularioIntegrationTest {
     assertThat(v2.codigo()).isEqualTo("SIECA-v2");
     assertThat(v2.estado()).isEqualTo(EstadoVersionFormulario.BORRADOR);
     assertThat(v2.versionAnteriorId()).isEqualTo(v1.id());
+    assertThat(v2.pesos()).hasSize(45);
 
-    // 5. RN-FRM-06: Intentar publicar v2 sin mapear todos los campos de v1 debe fallar
+    configurarPesosDePrueba(v2.id(), BigDecimal.valueOf(2));
+    service.configurarEscala(v2.id(), escalaDePrueba(3), ADMINISTRADOR_ID);
+
+    assertThat(configuracionesIc.findAllByVersionFormularioId(v1.id()))
+        .allSatisfy(peso -> assertThat(peso.getPeso()).isEqualByComparingTo("1"));
+    assertThat(configuracionesIc.findAllByVersionFormularioId(v2.id()))
+        .hasSize(45)
+        .allSatisfy(peso -> assertThat(peso.getPeso()).isEqualByComparingTo("2"));
+    assertThat(
+            versiones
+                .findById(v1.id())
+                .orElseThrow()
+                .getReglasEvaluacionIc()
+                .at("/reglas_evaluacion_ic/escala_severidad/SEVERO")
+                .asInt())
+        .isEqualTo(4);
+
     ApiException errorMapeo =
         assertThrows(ApiException.class, () -> service.publicar(v2.id(), null, ADMINISTRADOR_ID));
     assertThat(errorMapeo.getStatus()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
     assertThat(errorMapeo.getCode()).isEqualTo("mapeo_incompleto");
 
-    // 6. Declarar mapeo de los campos origen
     var analisis = service.analizarMapeo(v2.id());
     List<DeclaracionMapeoRequest> declaraciones =
         analisis.camposOrigen().stream()
@@ -223,16 +248,41 @@ class VersionFormularioIntegrationTest {
     assertThat(v2Publicada.estado()).isEqualTo(EstadoVersionFormulario.PUBLICADA);
     assertThat(v2Publicada.activa()).isTrue();
 
-    // 7. RN-FRM-04: Verificar que v1 dejó de ser activa y solo v2 es activa
     var v1EnDb = versiones.findById(v1.id()).orElseThrow();
     assertThat(v1EnDb.isActiva()).isFalse();
 
     var activaDb = versiones.findByActivaTrue().orElseThrow();
     assertThat(activaDb.getId()).isEqualTo(v2.id());
 
-    // 8. Verificar que el formulario activo consultado es v2
     var activoResp = service.obtenerActiva();
     assertThat(activoResp.codigo()).isEqualTo("SIECA-v2");
+  }
+
+  private void configurarPesosDePrueba(UUID versionId, BigDecimal peso) {
+    JsonNode catalogo = versiones.findById(versionId).orElseThrow().getReglasEvaluacionIc();
+    List<gt.usac.cunoc.sgp.formulario.dto.ConfiguracionIcElementoRequest> configuraciones =
+        new ArrayList<>();
+    for (JsonNode elemento : catalogo.get("elementos")) {
+      configuraciones.add(
+          new gt.usac.cunoc.sgp.formulario.dto.ConfiguracionIcElementoRequest(
+              elemento.get("elemento_ref").asText(),
+              peso,
+              elemento.path("nombre").asText(elemento.get("elemento_ref").asText())));
+    }
+    service.calibrarPesos(versionId, configuraciones, ADMINISTRADOR_ID);
+  }
+
+  private gt.usac.cunoc.sgp.formulario.dto.ConfigurarEscalaIcRequest escalaDePrueba(int severo) {
+    return new gt.usac.cunoc.sgp.formulario.dto.ConfigurarEscalaIcRequest(
+        java.util.Map.of(
+            "NO_PRESENTA",
+            BigDecimal.ZERO,
+            "LEVE",
+            BigDecimal.ONE,
+            "MODERADO",
+            BigDecimal.valueOf(2),
+            "SEVERO",
+            BigDecimal.valueOf(severo)));
   }
 
   private void autenticarAdministrador() {

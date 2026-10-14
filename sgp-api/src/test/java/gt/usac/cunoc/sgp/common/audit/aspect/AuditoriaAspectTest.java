@@ -149,8 +149,8 @@ class AuditoriaAspectTest {
     SecurityContextHolder.getContext().setAuthentication(authentication);
   }
 
-  private Auditable anotacion(String metodo) throws NoSuchMethodException {
-    Method metodoReal = ServicioAuditable.class.getMethod(metodo);
+  private Auditable anotacion(String metodo, Class<?>... parametros) throws NoSuchMethodException {
+    Method metodoReal = ServicioAuditable.class.getMethod(metodo, parametros);
     return metodoReal.getAnnotation(Auditable.class);
   }
 
@@ -164,5 +164,105 @@ class AuditoriaAspectTest {
     @Auditable(accion = AccionAuditoria.CREAR, entidad = "usuario", proceso = "provision-admin")
     @Scheduled(fixedDelay = 3600000)
     public void provisionar() {}
+
+    @Auditable(
+        accion = AccionAuditoria.MODIFICAR,
+        entidad = "version_formulario",
+        idArg = "id",
+        tipo = gt.usac.cunoc.sgp.formulario.entity.VersionFormulario.class,
+        recargarPosteriores = true)
+    public void modificarConfiguracion(UUID id) {}
+  }
+
+  @Test
+  void recargaLaConfiguracionAnteriorYPosteriorConElUsuarioAutenticado() throws Throwable {
+    autenticar();
+
+    UUID versionId = UUID.randomUUID();
+    ObjectMapper json = new ObjectMapper();
+
+    var anteriores =
+        json.readTree(
+            """
+                    {
+                      "pesos": [{"elementoRef": "/vigas", "peso": 1}],
+                      "reglasEvaluacionIc": {
+                        "reglas_evaluacion_ic": {
+                          "escala_severidad": {"SEVERO": 3}
+                        }
+                      }
+                    }
+                    """);
+
+    var posteriores =
+        json.readTree(
+            """
+                    {
+                      "pesos": [{"elementoRef": "/vigas", "peso": 2}],
+                      "reglasEvaluacionIc": {
+                        "reglas_evaluacion_ic": {
+                          "escala_severidad": {"SEVERO": 4}
+                        }
+                      }
+                    }
+                    """);
+
+    when(firma.getParameterNames()).thenReturn(new String[] {"id"});
+    when(punto.getArgs()).thenReturn(new Object[] {versionId});
+    when(punto.proceed()).thenReturn(List.of("respuesta"));
+    when(snapshots.cargar(gt.usac.cunoc.sgp.formulario.entity.VersionFormulario.class, versionId))
+        .thenReturn(anteriores, posteriores);
+
+    Object resultado = aspect.auditar(punto, anotacion("modificarConfiguracion", UUID.class));
+
+    assertEquals(List.of("respuesta"), resultado);
+
+    verify(escritor)
+        .registrar(
+            eq(USUARIO_ID),
+            eq(AccionAuditoria.MODIFICAR),
+            eq("version_formulario"),
+            eq(versionId),
+            eq(anteriores),
+            eq(posteriores),
+            eq(""));
+
+    verify(snapshots, org.mockito.Mockito.times(2))
+        .cargar(gt.usac.cunoc.sgp.formulario.entity.VersionFormulario.class, versionId);
+
+    verify(snapshots, org.mockito.Mockito.never()).serializar(org.mockito.ArgumentMatchers.any());
+  }
+
+  @Test
+  void configuracionRechazadaNoRecargaElEstadoPosteriorNiEscribeAuditoria() throws Throwable {
+    autenticar();
+
+    UUID versionId = UUID.randomUUID();
+    var anteriores = new ObjectMapper().readTree("{\"pesos\":[]}");
+
+    when(firma.getParameterNames()).thenReturn(new String[] {"id"});
+    when(punto.getArgs()).thenReturn(new Object[] {versionId});
+    when(snapshots.cargar(gt.usac.cunoc.sgp.formulario.entity.VersionFormulario.class, versionId))
+        .thenReturn(anteriores);
+
+    when(punto.proceed())
+        .thenThrow(
+            new ApiException(
+                HttpStatus.CONFLICT,
+                "version_inmutable",
+                "Version inmutable",
+                "La version publicada no puede modificarse."));
+
+    ApiException error =
+        assertThrows(
+            ApiException.class,
+            () -> aspect.auditar(punto, anotacion("modificarConfiguracion", UUID.class)));
+
+    assertEquals("version_inmutable", error.getCode());
+
+    verify(snapshots)
+        .cargar(gt.usac.cunoc.sgp.formulario.entity.VersionFormulario.class, versionId);
+
+    verifyNoInteractions(escritor);
   }
 }

@@ -184,4 +184,16 @@ public class VersionFormularioController {
     }
     return jwtData.userId();
   }
+
+  @PutMapping("/{id}/escala")
+  @PreAuthorize("hasRole('ADMINISTRADOR')")
+  @Operation(
+      summary = "Configurar escala de severidad del IC",
+      description = "Configura los valores de severidad de una version en BORRADOR.")
+  public ResponseEntity<VersionFormularioResponse> configurarEscala(
+      @PathVariable UUID id,
+      @Valid @RequestBody gt.usac.cunoc.sgp.formulario.dto.ConfigurarEscalaIcRequest request,
+      Authentication authentication) {
+    return ResponseEntity.ok(service.configurarEscala(id, request, usuarioId(authentication)));
+  }
 }
