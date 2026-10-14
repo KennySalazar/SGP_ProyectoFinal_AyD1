@@ -204,6 +204,47 @@
                             <goal>report</goal>
                         </goals>
                     </execution>
+                    <execution>
+                        <id>hu018-coverage-check</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>check</goal>
+                        </goals>
+                        <configuration>
+                            <rules>
+                                <rule>
+                                    <element>CLASS</element>
+                                    <includes>
+                                        <include>gt.usac.cunoc.sgp.inspeccion.service.CalculoIndiceCondicionService</include>
+                                        <include>gt.usac.cunoc.sgp.inspeccion.service.MotorPonderacionIc</include>
+                                        <include>gt.usac.cunoc.sgp.inspeccion.service.AgregadorCalificacionesIc</include>
+                                        <include>gt.usac.cunoc.sgp.inspeccion.service.ResolverElementosIc</include>
+                                        <include>gt.usac.cunoc.sgp.inspeccion.service.ConversorIndicadoresIc</include>
+                                        <include>gt.usac.cunoc.sgp.inspeccion.service.ConversorMedicionesIc</include>
+                                        <include>gt.usac.cunoc.sgp.inspeccion.service.EvaluadorCondicionesCriticasIc</include>
+                                        <include>gt.usac.cunoc.sgp.inspeccion.service.HuellaEntradaIc</include>
+                                    </includes>
+                                    <limits>
+                                        <limit>
+                                            <counter>LINE</counter>
+                                            <value>COVEREDRATIO</value>
+                                            <minimum>1.00</minimum>
+                                        </limit>
+                                        <limit>
+                                            <counter>BRANCH</counter>
+                                            <value>COVEREDRATIO</value>
+                                            <minimum>1.00</minimum>
+                                        </limit>
+                                        <limit>
+                                            <counter>INSTRUCTION</counter>
+                                            <value>COVEREDRATIO</value>
+                                            <minimum>1.00</minimum>
+                                        </limit>
+                                    </limits>
+                                </rule>
+                            </rules>
+                        </configuration>
+                    </execution>
                 </executions>
             </plugin>
         </plugins>
