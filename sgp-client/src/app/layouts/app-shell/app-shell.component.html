@@ -51,7 +51,11 @@
           <i class="pi pi-shield"></i><span>{{ 'nav.security' | transloco }}</span>
         </a>
         @if (auth.user()?.role === 'ADMINISTRADOR') {
-          <a routerLink="/admin" routerLinkActive="active">
+          <a
+            routerLink="/admin"
+            [routerLinkActiveOptions]="{ exact: true }"
+            routerLinkActive="active"
+          >
             <i class="pi pi-users"></i><span>{{ 'nav.users' | transloco }}</span>
           </a>
           <a routerLink="/admin/formularios" routerLinkActive="active">
