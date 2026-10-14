@@ -21,6 +21,10 @@ export const adminRoutes: Routes = [
       import('./pages/catalogo-cursos/catalogo-cursos.page').then((m) => m.CatalogoCursosPage),
   },
   {
+    path: 'formularios',
+    loadChildren: () => import('../formulario/formulario.routes').then((m) => m.formularioRoutes),
+  },
+  {
     path: '',
     pathMatch: 'full',
     loadComponent: () => import('./pages/usuarios/usuarios.page').then((m) => m.UsuariosPage),
