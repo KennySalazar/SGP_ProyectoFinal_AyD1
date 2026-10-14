@@ -176,6 +176,8 @@ y no debe considerarse una garantía de capacidad futura.
 - Plantilla de variables sin secretos.
 - Preparación de Amazon Linux y despliegue con rollback.
 - Preparación parametrizada de RDS con extensiones y usuarios separados.
+- Plantillas y scripts para Nginx del host, certificado IP de corta duración y
+  renovación con systemd. Su instalación real en staging continúa pendiente.
 
 El bootstrap se ejecutó exitosamente en staging el 11 de octubre de 2026. En
 Amazon Linux 2023 no debe instalarse el paquete `curl` encima de `curl-minimal`:
@@ -370,10 +372,18 @@ comprar dominio es definitiva para este proyecto: no debe presupuestarse un
 registro de dominio ni una zona hospedada de DNS público. La resolución DNS
 interna habilitada en la VPC no contradice esta decisión.
 
-El responsable debe confirmar una autoridad certificadora que emita certificados
-válidos con la IP como Subject Alternative Name, su método de validación y la
-renovación automática. Un certificado autofirmado no cumple el criterio de
-HTTPS válido para usuarios finales.
+Staging preparó como referencia un Nginx en el host y certificados IP de Let's
+Encrypt con perfil `shortlived`. Usa Certbot 5.8.0 mediante su imagen oficial,
+ACME `webroot` y un temporizador systemd dos veces al día. El Nginx del
+contenedor permanece en loopback. Esta solución todavía debe probarse en AWS;
+producción no debe declararla validada ni reutilizar certificados, rutas o
+archivos de staging.
+
+El responsable de producción debe confirmar primero su IPv4 pública estable y
+adaptar una copia independiente de la configuración. Los certificados IP tienen
+vigencia de 160 horas, por lo que la renovación automática y su monitoreo son
+obligatorios. Un certificado autofirmado no cumple el criterio de HTTPS válido
+para usuarios finales.
 
 Requisitos mínimos:
 
@@ -387,9 +397,9 @@ Requisitos mínimos:
   pueda obtener las credenciales temporales del rol de instancia.
 - Probar renovación del certificado y documentar su operación.
 
-La solución de certificados y la asignación de la IPv4 pública estable no han
-sido elegidas y no deben considerarse cerradas. La compra de dominio sí está
-fuera de consideración.
+La referencia técnica de certificado ya existe en staging, pero la asignación
+de una IPv4 pública estable y su adaptación independiente a producción no han
+sido cerradas. La compra de dominio sí está fuera de consideración.
 
 ## 11. Procedimiento manual propuesto
 
@@ -454,6 +464,8 @@ crear el Compose real de producción.
   acceso su cuenta; no es una credencial limitada exclusivamente a este proyecto.
 - El SMTP de staging es ficticio; no existe evidencia de envío de correos ni de
   los flujos de autenticación que dependen de ellos.
+- HTTPS para staging está preparado en el repositorio, pero todavía no se ha
+  instalado, emitido ni probado en EC2.
 
 ## 14. Decisiones pendientes
 

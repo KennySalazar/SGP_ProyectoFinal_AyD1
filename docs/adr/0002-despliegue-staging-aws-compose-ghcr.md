@@ -10,6 +10,8 @@ saludable durante el primer despliegue automático. La publicación
 multi-arquitectura, la descarga ARM64, la asunción OIDC y Systems Manager también
 fueron validados para la revisión
 `488dae1ea7278eefc5f39e557eaadde4c07d00f9`.
+La terminación HTTPS sobre IP quedó preparada en el repositorio, pero aún no se
+ha instalado ni probado en EC2.
 La configuración y el despliegue de producción permanecen fuera del alcance de
 esta historia.
 
@@ -89,6 +91,19 @@ claves AWS estáticas ni compilar Java o Angular en EC2.
 - **SSH público restringido:** simple, pero amplía la superficie de ataque.
 - **VPN:** no se justifica para el tamaño del equipo.
 
+### HTTPS sin dominio
+
+- **Certificado autofirmado:** descartado porque los clientes no lo consideran
+  una identidad pública válida.
+- **ALB o un servicio adicional:** descartado por costo y complejidad para este
+  staging académico.
+- **Nginx del host y certificado IP de Let's Encrypt:** elegido. Mantiene el
+  contenedor en loopback, permite ACME `webroot` y no requiere dominio.
+- **Certbot de DNF:** descartado porque la versión disponible en Amazon Linux
+  2023 no soporta el flujo actual de certificados IP.
+- **Imagen oficial Certbot 5.8.0:** elegida por compatibilidad ARM64, versión y
+  digest explícitos, y ausencia de instalación Python adicional en el host.
+
 ## Decisión
 
 1. Usar una EC2 Amazon Linux 2023 ARM64 independiente por ambiente:
@@ -137,12 +152,14 @@ claves AWS estáticas ni compilar Java o Angular en EC2.
 13. Guardar la configuración de staging en
     `/etc/sgp/staging/staging.env`, modo `0600`, e impedir despliegues simultáneos
     con concurrencia de GitHub y `flock` en el servidor.
-14. Mantener temporalmente Nginx en loopback hasta implementar y validar el
-    acceso HTTPS público definido para la arquitectura final.
+14. Mantener el Nginx/Angular del contenedor en loopback y agregar un Nginx del
+    host como único punto público. El host redirige 80 a 443, conserva el
+    directorio ACME y reenvía a `127.0.0.1:8088` con `X-Forwarded-*`.
 15. No comprar un dominio ni crear una zona DNS pública. Staging se administrará
-    inicialmente mediante túnel SSM; producción deberá ofrecer HTTPS válido
-    sobre una IPv4 pública. El mecanismo de emisión y renovación del certificado
-    para IP continúa pendiente de validación.
+    mediante SSM y ofrecerá HTTPS válido directamente sobre su IPv4. Se usará el
+    perfil `shortlived` de Let's Encrypt con Certbot 5.8.0 en Docker y un
+    temporizador systemd de comprobación dos veces al día. Su instalación real
+    continúa pendiente de autorización y validación.
 16. Conservar para staging la IPv4 pública dinámica observada y no asignar una
     Elastic IP, dado el plazo académico hasta el 28 de octubre de 2026. Se acepta
     que detener e iniciar EC2 puede cambiar la IP y obligar a actualizar URLs y
@@ -270,15 +287,17 @@ promover los mismos digests entre ambientes sin reconstruir artefactos.
 - RDS está operativa para el backend y Flyway; falta una prueba administrativa
   de `verify-full` y una consulta directa de extensiones.
 - El host EC2, OIDC y Systems Manager están validados; todavía falta HTTPS
-  público. La compra de dominio, una zona DNS pública y Elastic IP se descartaron
-  para staging.
+  público real. Los scripts y plantillas están preparados, pero no se han
+  aplicado. La compra de dominio, una zona DNS pública y Elastic IP se
+  descartaron para staging.
 - No incluye Compose ni despliegue de producción.
 - Solo existe una retención automática solicitada de 1 día en RDS. La política
   requerida de respaldos, restauración y la retención centralizada de logs no
   están implementadas.
 - S3 está decidido como servicio, pero su integración de aplicación permanece
   pendiente de la funcionalidad de archivos.
-- Brotli y HTTPS público sobre IP todavía no están implementados.
+- Brotli no está implementado. HTTPS sobre IP está implementado en el
+  repositorio, pero sigue pendiente de instalación y prueba en AWS.
 - El bucket S3 existe, pero la aplicación todavía no lo consume.
 - La publicación multi-arquitectura, descarga ARM64, GHCR, OIDC, SSM y el primer
   despliegue ya cuentan con validación real.

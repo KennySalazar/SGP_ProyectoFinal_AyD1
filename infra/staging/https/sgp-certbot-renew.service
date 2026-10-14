@@ -1,0 +1,13 @@
+[Unit]
+Description=Renew the SGP staging short-lived IP certificate
+Wants=network-online.target
+After=network-online.target docker.service nginx.service
+ConditionPathExists=/etc/sgp/staging/https-public-ip
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/bash /opt/sgp/staging/https/renew-certificate.sh
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=full
+ReadWritePaths=/etc/letsencrypt /var/lib/letsencrypt /var/www/letsencrypt
