@@ -25,4 +25,6 @@ public @interface Auditable {
 
   /** En auto-registro, el usuario creado es quien inició la acción anónima. */
   boolean actorEsEntidad() default false;
+
+  boolean recargarPosteriores() default false;
 }

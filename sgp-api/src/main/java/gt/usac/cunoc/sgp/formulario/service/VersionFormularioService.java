@@ -27,7 +27,6 @@ import gt.usac.cunoc.sgp.formulario.repository.VersionFormularioRepository;
 import gt.usac.cunoc.sgp.formulario.validation.CampoSchemaExtractor;
 import gt.usac.cunoc.sgp.formulario.validation.JsonSchemaValidatorService;
 import java.io.InputStream;
-import java.math.BigDecimal;
 import java.security.MessageDigest;
 import java.time.Clock;
 import java.time.Instant;
@@ -276,18 +275,42 @@ public class VersionFormularioService {
     // Precargar configuración de pesos a partir del catálogo elementos-ic.json
     if (elementosIcNode.has("elementos") && elementosIcNode.get("elementos").isArray()) {
       for (JsonNode elem : elementosIcNode.get("elementos")) {
-        if (elem.hasNonNull("elemento_ref")) {
-          String ref = elem.get("elemento_ref").asText();
-          String nombre = elem.hasNonNull("nombre") ? elem.get("nombre").asText() : ref;
-          BigDecimal peso =
-              (elem.hasNonNull("peso") && elem.get("peso").isNumber())
-                  ? BigDecimal.valueOf(elem.get("peso").asDouble())
-                  : BigDecimal.ONE;
+        JsonNode pesoConfigurado = elem.get("peso");
 
-          ConfiguracionIcElemento cfg =
-              new ConfiguracionIcElemento(UUID.randomUUID(), guardada, ref, peso, nombre, ahora);
-          configuracionesIc.save(cfg);
+        if (pesoConfigurado == null || pesoConfigurado.isNull()) {
+          continue;
         }
+
+        if (!pesoConfigurado.isNumber() || pesoConfigurado.decimalValue().signum() <= 0) {
+          throw new ApiException(
+              HttpStatus.UNPROCESSABLE_ENTITY,
+              "peso_invalido",
+              "Peso invalido",
+              "La plantilla contiene un peso invalido para " + elem.path("elemento_ref").asText());
+        }
+
+        String referencia = elem.path("elemento_ref").asText();
+
+        if (referencia.isBlank()) {
+          throw new ApiException(
+              HttpStatus.UNPROCESSABLE_ENTITY,
+              "referencia_elemento_invalida",
+              "Referencia invalida",
+              "La plantilla contiene un peso sin referencia de elemento.");
+        }
+
+        String nombre = elem.hasNonNull("nombre") ? elem.get("nombre").asText() : referencia;
+
+        ConfiguracionIcElemento configuracion =
+            new ConfiguracionIcElemento(
+                UUID.randomUUID(),
+                guardada,
+                referencia,
+                pesoConfigurado.decimalValue(),
+                nombre,
+                ahora);
+
+        configuracionesIc.save(configuracion);
       }
     }
 
@@ -296,7 +319,12 @@ public class VersionFormularioService {
 
   @Transactional
   @PreAuthorize("hasRole('ADMINISTRADOR')")
-  @Auditable(accion = AccionAuditoria.MODIFICAR, entidad = "version_formulario")
+  @Auditable(
+      accion = AccionAuditoria.MODIFICAR,
+      entidad = "version_formulario",
+      idArg = "id",
+      tipo = VersionFormulario.class,
+      recargarPosteriores = true)
   public VersionFormularioResponse actualizarBorrador(
       UUID id,
       JsonNode esquema,
@@ -351,8 +379,15 @@ public class VersionFormularioService {
 
   @Transactional
   @PreAuthorize("hasRole('ADMINISTRADOR')")
+  @Auditable(
+      accion = AccionAuditoria.MODIFICAR,
+      entidad = "version_formulario",
+      idArg = "id",
+      tipo = VersionFormulario.class,
+      recargarPosteriores = true)
   public List<ConfiguracionIcElementoResponse> calibrarPesos(
       UUID id, List<ConfiguracionIcElementoRequest> nuevosPesos, UUID usuarioId) {
+
     VersionFormulario version =
         versiones
             .findById(id)
@@ -361,34 +396,99 @@ public class VersionFormularioService {
                     new ApiException(
                         HttpStatus.NOT_FOUND,
                         "version_no_encontrada",
-                        "Versión no encontrada",
-                        "No existe una versión con identificador " + id));
+                        "Version no encontrada",
+                        "No existe una version con identificador " + id));
 
     if (version.getEstado() == EstadoVersionFormulario.PUBLICADA) {
       throw new ApiException(
           HttpStatus.CONFLICT,
           "version_inmutable",
-          "Versión inmutable",
-          "Los pesos de una versión publicada están congelados y no pueden alterarse.");
+          "Version inmutable",
+          "Los pesos de una version publicada estan congelados. Cree una nueva version.");
     }
 
-    Instant ahora = clock.instant();
-    configuracionesIc.deleteAllByVersionFormularioId(id);
+    if (nuevosPesos == null || nuevosPesos.isEmpty()) {
+      throw new ApiException(
+          HttpStatus.UNPROCESSABLE_ENTITY,
+          "pesos_incompletos",
+          "Pesos incompletos",
+          "Debe indicar al menos un elemento con su peso.");
+    }
 
+    Set<String> referencias = new HashSet<>();
     List<ConfiguracionIcElemento> lista = new ArrayList<>();
+    Instant ahora = clock.instant();
+
     for (ConfiguracionIcElementoRequest req : nuevosPesos) {
-      if (req.peso() == null || req.peso().compareTo(BigDecimal.ZERO) <= 0) {
+      if (req == null) {
+        throw new ApiException(
+            HttpStatus.UNPROCESSABLE_ENTITY,
+            "configuracion_ic_invalida",
+            "Configuracion invalida",
+            "La lista de pesos no puede contener elementos nulos.");
+      }
+
+      if (req.peso() == null || req.peso().signum() <= 0) {
         throw new ApiException(
             HttpStatus.UNPROCESSABLE_ENTITY,
             "peso_invalido",
-            "Peso inválido",
-            "El peso para '" + req.elementoRef() + "' debe ser mayor a cero");
+            "Peso invalido",
+            "El peso para '" + req.elementoRef() + "' debe ser mayor a cero.");
       }
+
+      if (req.peso().scale() > 6 || req.peso().precision() - req.peso().scale() > 6) {
+        throw new ApiException(
+            HttpStatus.UNPROCESSABLE_ENTITY,
+            "peso_invalido",
+            "Peso invalido",
+            "El peso para '"
+                + req.elementoRef()
+                + "' admite hasta 6 digitos enteros y 6 decimales.");
+      }
+
+      if (req.elementoRef() == null
+          || req.elementoRef().isBlank()
+          || req.elementoRef().length() > 300
+          || !req.elementoRef().startsWith("/")
+          || req.elementoRef().length() == 1) {
+        throw new ApiException(
+            HttpStatus.UNPROCESSABLE_ENTITY,
+            "referencia_elemento_invalida",
+            "Referencia invalida",
+            "Cada elemento requiere una referencia que comience con / y no supere 300 caracteres.");
+      }
+
+      String referencia = req.elementoRef().strip();
+
+      if (!referencias.add(referencia)) {
+        throw new ApiException(
+            HttpStatus.UNPROCESSABLE_ENTITY,
+            "elemento_ic_duplicado",
+            "Elemento duplicado",
+            "La referencia aparece mas de una vez: " + referencia);
+      }
+
+      if (req.descripcion() == null
+          || req.descripcion().isBlank()
+          || req.descripcion().length() > 500) {
+        throw new ApiException(
+            HttpStatus.UNPROCESSABLE_ENTITY,
+            "descripcion_elemento_invalida",
+            "Descripcion invalida",
+            "El elemento " + referencia + " requiere una descripcion de hasta 500 caracteres.");
+      }
+
       lista.add(
           new ConfiguracionIcElemento(
-              UUID.randomUUID(), version, req.elementoRef(), req.peso(), req.descripcion(), ahora));
+              UUID.randomUUID(),
+              version,
+              referencia,
+              req.peso(),
+              req.descripcion().strip(),
+              ahora));
     }
 
+    configuracionesIc.deleteAllByVersionFormularioId(id);
     configuracionesIc.saveAll(lista);
 
     version.setCalibradoPorId(usuarioId);
@@ -549,15 +649,9 @@ public class VersionFormularioService {
     }
 
     // 4. Validar pesos completos
-    List<ConfiguracionIcElemento> pesos =
-        configuracionesIc.findAllByVersionFormularioId(version.getId());
-    if (pesos.isEmpty()) {
-      throw new ApiException(
-          HttpStatus.UNPROCESSABLE_ENTITY,
-          "pesos_incompletos",
-          "Pesos de evaluación incompletos",
-          "No se puede publicar la versión sin configurar los pesos de los elementos evaluables.");
-    }
+    validarPesosParaPublicacion(version);
+    validarPesosParaPublicacion(version);
+    validarEscalaParaPublicacion(version);
 
     Instant ahora = clock.instant();
 
@@ -577,6 +671,97 @@ public class VersionFormularioService {
 
     VersionFormulario publicada = versiones.saveAndFlush(version);
     return construirRespuestaDetallada(publicada);
+  }
+
+  private void validarPesosParaPublicacion(VersionFormulario version) {
+    JsonNode catalogo = version.getReglasEvaluacionIc();
+    JsonNode elementos = catalogo == null ? null : catalogo.get("elementos");
+
+    if (elementos == null || !elementos.isArray() || elementos.isEmpty()) {
+      throw new ApiException(
+          HttpStatus.UNPROCESSABLE_ENTITY,
+          "catalogo_ic_incompleto",
+          "Catalogo IC incompleto",
+          "La version requiere un catalogo de elementos evaluables para verificar sus pesos.");
+    }
+
+    Set<String> esperados = new java.util.TreeSet<>();
+
+    for (JsonNode elemento : elementos) {
+      JsonNode referenciaNode = elemento.get("elemento_ref");
+
+      if (referenciaNode == null
+          || !referenciaNode.isTextual()
+          || referenciaNode.asText().isBlank()
+          || !referenciaNode.asText().startsWith("/")
+          || referenciaNode.asText().length() == 1
+          || referenciaNode.asText().length() > 300) {
+        throw new ApiException(
+            HttpStatus.UNPROCESSABLE_ENTITY,
+            "referencia_elemento_invalida",
+            "Referencia invalida",
+            "El catalogo contiene un elemento sin una referencia valida.");
+      }
+
+      String referencia = referenciaNode.asText();
+
+      if (!referencia.equals(referencia.strip()) || !esperados.add(referencia)) {
+        throw new ApiException(
+            HttpStatus.UNPROCESSABLE_ENTITY,
+            "catalogo_ic_invalido",
+            "Catalogo IC invalido",
+            "La referencia esta duplicada o contiene espacios externos: " + referencia);
+      }
+    }
+
+    List<ConfiguracionIcElemento> pesos =
+        configuracionesIc.findAllByVersionFormularioId(version.getId());
+
+    Set<String> configurados = new HashSet<>();
+
+    for (ConfiguracionIcElemento configuracion : pesos) {
+      String referencia = configuracion.getElementoRef();
+
+      if (referencia == null || !esperados.contains(referencia)) {
+        throw new ApiException(
+            HttpStatus.UNPROCESSABLE_ENTITY,
+            "elemento_ic_desconocido",
+            "Elemento IC desconocido",
+            "El peso corresponde a un elemento que no pertenece al catalogo: " + referencia);
+      }
+
+      if (!configurados.add(referencia)) {
+        throw new ApiException(
+            HttpStatus.UNPROCESSABLE_ENTITY,
+            "elemento_ic_duplicado",
+            "Elemento duplicado",
+            "Existe mas de un peso para el elemento " + referencia);
+      }
+
+      if (configuracion.getPeso() == null
+          || configuracion.getPeso().signum() <= 0
+          || configuracion.getPeso().scale() > 6
+          || configuracion.getPeso().precision() - configuracion.getPeso().scale() > 6) {
+        throw new ApiException(
+            HttpStatus.UNPROCESSABLE_ENTITY,
+            "peso_invalido",
+            "Peso invalido",
+            "El elemento "
+                + referencia
+                + " requiere un peso positivo con hasta 6 digitos enteros y 6 decimales.");
+      }
+    }
+
+    Set<String> pendientes = new java.util.TreeSet<>(esperados);
+    pendientes.removeAll(configurados);
+
+    if (!pendientes.isEmpty()) {
+      throw new ApiException(
+          HttpStatus.UNPROCESSABLE_ENTITY,
+          "pesos_incompletos",
+          "Pesos incompletos",
+          "Falta configurar el peso de los siguientes elementos: " + String.join(", ", pendientes));
+    }
   }
 
   private void validarCoherenciaMapeo(DeclaracionMapeoRequest d) {
@@ -641,5 +826,157 @@ public class VersionFormularioService {
             : Collections.emptyList();
 
     return mapper.toResponse(version, listaPesos, listaMapeos);
+  }
+
+  @Transactional
+  @PreAuthorize("hasRole('ADMINISTRADOR')")
+  @Auditable(
+      accion = AccionAuditoria.MODIFICAR,
+      entidad = "version_formulario",
+      idArg = "id",
+      tipo = VersionFormulario.class,
+      recargarPosteriores = true)
+  public VersionFormularioResponse configurarEscala(
+      UUID id, gt.usac.cunoc.sgp.formulario.dto.ConfigurarEscalaIcRequest request, UUID usuarioId) {
+    VersionFormulario version =
+        versiones
+            .findById(id)
+            .orElseThrow(
+                () ->
+                    new ApiException(
+                        HttpStatus.NOT_FOUND,
+                        "version_no_encontrada",
+                        "Version no encontrada",
+                        "No existe una version con identificador " + id));
+
+    if (version.getEstado() == EstadoVersionFormulario.PUBLICADA) {
+      throw new ApiException(
+          HttpStatus.CONFLICT,
+          "version_inmutable",
+          "Version inmutable",
+          "La escala de una version publicada no puede modificarse. Cree una nueva version.");
+    }
+
+    Set<String> niveles = Set.of("NO_PRESENTA", "LEVE", "MODERADO", "SEVERO");
+
+    if (request == null
+        || request.valores() == null
+        || !request.valores().keySet().equals(niveles)) {
+      throw new ApiException(
+          HttpStatus.UNPROCESSABLE_ENTITY,
+          "escala_incompleta",
+          "Escala incompleta",
+          "Debe configurar exactamente los niveles NO_PRESENTA, LEVE, MODERADO y SEVERO.");
+    }
+
+    for (String nivel : niveles) {
+      java.math.BigDecimal valor = request.valores().get(nivel);
+
+      if (valor == null
+          || valor.signum() < 0
+          || valor.compareTo(java.math.BigDecimal.valueOf(4)) > 0) {
+        throw new ApiException(
+            HttpStatus.UNPROCESSABLE_ENTITY,
+            "severidad_invalida",
+            "Severidad invalida",
+            "El nivel " + nivel + " requiere un valor entre 0 y 4.");
+      }
+    }
+
+    if (request.valores().get("NO_PRESENTA").signum() != 0) {
+      throw new ApiException(
+          HttpStatus.UNPROCESSABLE_ENTITY,
+          "severidad_invalida",
+          "Severidad invalida",
+          "El nivel NO_PRESENTA debe tener valor 0.");
+    }
+
+    JsonNode configuracionActual = version.getReglasEvaluacionIc();
+
+    if (configuracionActual == null || !configuracionActual.isObject()) {
+      throw new ApiException(
+          HttpStatus.UNPROCESSABLE_ENTITY,
+          "configuracion_ic_invalida",
+          "Configuracion IC invalida",
+          "La version requiere una configuracion IC de tipo objeto.");
+    }
+
+    com.fasterxml.jackson.databind.node.ObjectNode configuracion = configuracionActual.deepCopy();
+
+    JsonNode reglasActuales = configuracion.get("reglas_evaluacion_ic");
+
+    if (reglasActuales != null && !reglasActuales.isObject()) {
+      throw new ApiException(
+          HttpStatus.UNPROCESSABLE_ENTITY,
+          "configuracion_ic_invalida",
+          "Configuracion IC invalida",
+          "Las reglas de evaluacion IC deben ser un objeto.");
+    }
+
+    com.fasterxml.jackson.databind.node.ObjectNode reglas =
+        reglasActuales == null
+            ? objectMapper.createObjectNode()
+            : (com.fasterxml.jackson.databind.node.ObjectNode) reglasActuales;
+
+    com.fasterxml.jackson.databind.node.ObjectNode escala = objectMapper.createObjectNode();
+
+    for (String nivel : niveles.stream().sorted().toList()) {
+      escala.put(nivel, request.valores().get(nivel));
+    }
+
+    reglas.set("escala_severidad", escala);
+    configuracion.set("reglas_evaluacion_ic", reglas);
+
+    Instant ahora = clock.instant();
+    version.setReglasEvaluacionIc(configuracion);
+    version.setCalibradoPorId(usuarioId);
+    version.setCalibradoEn(ahora);
+    version.setActualizadoEn(ahora);
+
+    return construirRespuestaDetallada(versiones.save(version));
+  }
+
+  private void validarEscalaParaPublicacion(VersionFormulario version) {
+    JsonNode configuracion = version.getReglasEvaluacionIc();
+    JsonNode escala =
+        configuracion == null ? null : configuracion.at("/reglas_evaluacion_ic/escala_severidad");
+
+    List<String> niveles = List.of("NO_PRESENTA", "LEVE", "MODERADO", "SEVERO");
+    List<String> pendientes = new ArrayList<>();
+
+    for (String nivel : niveles) {
+      JsonNode valor = escala == null ? null : escala.get(nivel);
+
+      if (valor == null || valor.isNull()) {
+        pendientes.add(nivel);
+        continue;
+      }
+
+      if (!valor.isNumber()
+          || valor.decimalValue().signum() < 0
+          || valor.decimalValue().compareTo(java.math.BigDecimal.valueOf(4)) > 0) {
+        throw new ApiException(
+            HttpStatus.UNPROCESSABLE_ENTITY,
+            "severidad_invalida",
+            "Severidad invalida",
+            "El nivel " + nivel + " requiere un valor numerico entre 0 y 4.");
+      }
+
+      if ("NO_PRESENTA".equals(nivel) && valor.decimalValue().signum() != 0) {
+        throw new ApiException(
+            HttpStatus.UNPROCESSABLE_ENTITY,
+            "severidad_invalida",
+            "Severidad invalida",
+            "El nivel NO_PRESENTA debe tener valor 0.");
+      }
+    }
+
+    if (!pendientes.isEmpty()) {
+      throw new ApiException(
+          HttpStatus.UNPROCESSABLE_ENTITY,
+          "escala_incompleta",
+          "Escala incompleta",
+          "Falta configurar los siguientes niveles: " + String.join(", ", pendientes));
+    }
   }
 }
