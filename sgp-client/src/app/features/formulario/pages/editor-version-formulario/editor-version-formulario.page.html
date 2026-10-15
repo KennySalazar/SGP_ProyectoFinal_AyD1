@@ -12,9 +12,14 @@
       <p class="page-kicker">{{ 'admin.kicker' | transloco }}</p>
       <h1 class="page-title">{{ ver.codigo }}</h1>
       <p class="page-description">
-        {{ 'formulario.algorithm' | transloco }}: {{ ver.versionAlgoritmoIc }} @if
-        (ver.versionAnteriorCodigo) { · Base: {{ ver.versionAnteriorCodigo }} } @if
-        (ver.hashContenido) { · SHA-256: <code>{{ ver.hashContenido.substring(0, 16) }}...</code>
+        @if (ver.estado === 'PUBLICADA') {
+        <span>Versión publicada y activa del formulario SIECA.</span>
+        } @else {
+        <span>Borrador en edición del formulario SIECA.</span>
+        } @if (ver.versionAnteriorCodigo) {
+        <span> · Basado en: <strong>{{ ver.versionAnteriorCodigo }}</strong></span>
+        } @if (ver.versionAlgoritmoIc) {
+        <span> · Algoritmo IC: {{ ver.versionAlgoritmoIc }}</span>
         }
       </p>
     </div>
@@ -196,7 +201,7 @@
         (click)="seleccionarSeccionVisual(sec.clave)"
       >
         <span class="tab-badge-num">{{ $index + 1 }}</span>
-        <span class="tab-nombre">{{ sec.titulo }}</span>
+        <span class="tab-nombre">{{ limpiarTituloSeccion(sec.titulo) || sec.titulo }}</span>
         <span class="tab-preguntas-count">({{ sec.preguntas.length }})</span>
         @if (sec.esRepetible) {
         <span class="tab-repetible-pill">R</span>
@@ -1002,7 +1007,8 @@
       </button>
       <button pButton type="submit" [disabled]="seccionForm.invalid">
         <span
-          >{{ (modoSeccion() === 'crear' ? 'formulario.create' : 'common.save') | transloco }}</span
+          >{{ (modoSeccion() === 'crear' ? 'formulario.create' : 'formulario.save') | transloco
+          }}</span
         >
       </button>
     </div>
@@ -1223,7 +1229,7 @@
         [disabled]="preguntaForm.invalid || (preguntaForm.controls.tipo.value === 'select' && opcionesSeleccion().length === 0)"
       >
         <span
-          >{{ (modoPregunta() === 'crear' ? 'formulario.create' : 'common.save') | transloco
+          >{{ (modoPregunta() === 'crear' ? 'formulario.create' : 'formulario.save') | transloco
           }}</span
         >
       </button>
@@ -1320,7 +1326,8 @@
       </button>
       <button pButton type="submit" [disabled]="vinculoForm.invalid">
         <span
-          >{{ (modoVinculo() === 'crear' ? 'formulario.create' : 'common.save') | transloco }}</span
+          >{{ (modoVinculo() === 'crear' ? 'formulario.create' : 'formulario.save') | transloco
+          }}</span
         >
       </button>
     </div>

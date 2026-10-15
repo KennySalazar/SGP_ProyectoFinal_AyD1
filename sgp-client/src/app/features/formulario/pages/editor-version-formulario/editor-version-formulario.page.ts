@@ -444,6 +444,11 @@ export class EditorVersionFormularioPage implements OnInit {
     this.seccionVisualActiva.set(clave);
   }
 
+  limpiarTituloSeccion(titulo: string): string {
+    if (!titulo) return '';
+    return titulo.replace(/^\d+[.\-\s:]+\s*/, '').trim();
+  }
+
   eliminarSeccion(secClave: string): void {
     const lista = this.seccionesVisuales().filter((s) => s.clave !== secClave);
     this.seccionesVisuales.set(lista);

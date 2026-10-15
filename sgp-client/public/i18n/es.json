@@ -56,7 +56,9 @@
     "no": "No",
     "notRequested": "Sin solicitar",
     "closeMessage": "Cerrar mensaje",
-    "operationFailed": "No fue posible completar la operacion."
+    "operationFailed": "No fue posible completar la operacion.",
+    "save": "Guardar",
+    "saveChanges": "Guardar cambios"
   },
   "auth": {
     "login": {
@@ -778,7 +780,7 @@
     "detailTitle": "Ficha de versión",
     "detailDescription": "Consulta y edita la estructura JSON Schema, pesos de evaluación y correspondencia de campos.",
     "backToList": "Volver a versiones",
-    "immutableAlert": "Esta versión está PUBLICADA y es inmutable (RN-FRM-03). Para modificar la estructura cree una nueva versión basada en esta.",
+    "immutableAlert": "Esta versión está PUBLICADA y su estructura no puede modificarse. Para realizar cambios, cree una nueva versión basada en esta.",
     "activeNotice": "Esta versión es la versión ACTIVA actualmente utilizada para las inspecciones técnicas del sistema.",
     "schemaTab": "Esquema JSON",
     "linksTab": "Vínculos de almacenamiento",
@@ -787,6 +789,7 @@
     "publishTab": "Publicación y activación",
     "schemaFormatError": "El contenido no es un JSON válido.",
     "schemaValidationError": "Error de validación del JSON Schema:",
+    "save": "Guardar",
     "saveSchema": "Guardar esquema",
     "savingSchema": "Guardando...",
     "schemaSaved": "Esquema y reglas actualizados correctamente.",
@@ -808,7 +811,7 @@
     "savingMappings": "Guardando...",
     "mappingsSaved": "Mapeos guardados correctamente.",
     "publishTitle": "Publicar y activar versión",
-    "publishDescription": "Al publicar, la versión pasará a estado PUBLICADA y activa, desactivando la versión activa anterior (RN-FRM-04). Su estructura quedará congelada e inmutable (RN-FRM-03).",
+    "publishDescription": "Al publicar, esta versión pasará a estado PUBLICADA y quedará activa para nuevas inspecciones, desactivando la versión previa. Su estructura quedará fija de forma definitiva.",
     "publishChecklist": "Requisitos para publicación:",
     "checkValidSchema": "Esquema JSON Schema sintácticamente válido",
     "checkWeights": "Pesos de evaluación configurados ({{total}} elementos)",

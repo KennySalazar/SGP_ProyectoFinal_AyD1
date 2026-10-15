@@ -52,12 +52,54 @@ export function esquemaASeccionesVisuales(
   vinculos: Record<string, unknown> | null | undefined = {},
 ): SeccionVisual[] {
   if (!esquema || typeof esquema !== 'object') return [];
-  const properties = esquema['properties'];
+  const properties = esquema['properties'] as Record<string, unknown> | undefined;
   if (!properties || typeof properties !== 'object') return [];
+
+  // Determinar orden de claves de secciones
+  let ordenClaves: string[] = [];
+  if (Array.isArray(esquema['x-sgp-orden'])) {
+    ordenClaves = (esquema['x-sgp-orden'] as unknown[]).filter(
+      (k): k is string => typeof k === 'string',
+    );
+  }
+
+  const todasClaves = Object.keys(properties);
+
+  // Ordenar secciones:
+  // 1. Si los títulos contienen número ("1. Identificación", "8. Otros"), ordenar numéricamente por ese número.
+  // 2. Si no, respetar 'x-sgp-orden' si existe.
+  // 3. De lo contrario, mantener orden natural.
+  todasClaves.sort((a, b) => {
+    const defA = properties[a] as Record<string, unknown> | undefined;
+    const defB = properties[b] as Record<string, unknown> | undefined;
+    const titA = (defA?.['title'] as string) || a;
+    const titB = (defB?.['title'] as string) || b;
+    const matchA = titA.match(/^(\d+)/);
+    const matchB = titB.match(/^(\d+)/);
+    if (matchA && matchB) {
+      const diff = parseInt(matchA[1], 10) - parseInt(matchB[1], 10);
+      if (diff !== 0) return diff;
+    } else if (matchA) {
+      return -1;
+    } else if (matchB) {
+      return 1;
+    }
+
+    if (ordenClaves.length > 0) {
+      const idxA = ordenClaves.indexOf(a);
+      const idxB = ordenClaves.indexOf(b);
+      if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+      if (idxA !== -1) return -1;
+      if (idxB !== -1) return 1;
+    }
+
+    return 0;
+  });
 
   const secciones: SeccionVisual[] = [];
 
-  for (const [secClave, secDefRaw] of Object.entries(properties)) {
+  for (const secClave of todasClaves) {
+    const secDefRaw = properties[secClave];
     if (!secDefRaw || typeof secDefRaw !== 'object') continue;
     const secDef = secDefRaw as Record<string, unknown>;
 
@@ -67,6 +109,11 @@ export function esquemaASeccionesVisuales(
 
     let propsObj: Record<string, unknown> = {};
     let requiredFields: string[] = [];
+
+    const sourceObj =
+      esRepetible && secDef['items'] && typeof secDef['items'] === 'object'
+        ? (secDef['items'] as Record<string, unknown>)
+        : secDef;
 
     if (esRepetible && secDef['items'] && typeof secDef['items'] === 'object') {
       const items = secDef['items'] as Record<string, unknown>;
@@ -83,8 +130,28 @@ export function esquemaASeccionesVisuales(
       }
     }
 
+    let ordenPreguntas: string[] = [];
+    if (Array.isArray(sourceObj['x-sgp-orden'])) {
+      ordenPreguntas = (sourceObj['x-sgp-orden'] as unknown[]).filter(
+        (k): k is string => typeof k === 'string',
+      );
+    }
+
+    const todasPregClaves = Object.keys(propsObj);
+    if (ordenPreguntas.length > 0) {
+      todasPregClaves.sort((a, b) => {
+        const idxA = ordenPreguntas.indexOf(a);
+        const idxB = ordenPreguntas.indexOf(b);
+        if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+        if (idxA !== -1) return -1;
+        if (idxB !== -1) return 1;
+        return 0;
+      });
+    }
+
     const preguntas: PreguntaVisual[] = [];
-    for (const [pregClave, pregDefRaw] of Object.entries(propsObj)) {
+    for (const pregClave of todasPregClaves) {
+      const pregDefRaw = propsObj[pregClave];
       if (!pregDefRaw || typeof pregDefRaw !== 'object') continue;
       const p = pregDefRaw as Record<string, unknown>;
 
@@ -337,6 +404,7 @@ export function seccionesVisualesAEsquema(
           type: 'object',
           additionalProperties: false,
           required: reqList,
+          'x-sgp-orden': sec.preguntas.map((p) => p.clave),
           properties: propsObj,
         },
       };
@@ -348,6 +416,7 @@ export function seccionesVisualesAEsquema(
         type: 'object',
         additionalProperties: false,
         required: reqList,
+        'x-sgp-orden': sec.preguntas.map((p) => p.clave),
         properties: propsObj,
       };
     }
@@ -355,6 +424,7 @@ export function seccionesVisualesAEsquema(
 
   esquema['properties'] = nuevasPropiedades;
   esquema['required'] = nuevasRequeridas;
+  esquema['x-sgp-orden'] = secciones.map((s) => s.clave);
 
   return { esquema, vinculos };
 }

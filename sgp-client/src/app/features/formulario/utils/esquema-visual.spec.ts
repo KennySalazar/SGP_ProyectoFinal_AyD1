@@ -129,6 +129,26 @@ describe('esquema-visual utility', () => {
     expect(sec2.preguntas[0].obligatorio).toBe(true);
   });
 
+  it('ordena las secciones numéricamente por título y respeta x-sgp-orden', () => {
+    const esquemaDesordenado = {
+      type: 'object',
+      properties: {
+        otros: { title: '8. Otros', properties: {} },
+        tramos: { title: '3. Tramos', properties: {} },
+        identificacion: { title: '1. Identificación del puente', properties: {} },
+        datos_generales: { title: '2. Datos generales', properties: {} },
+      },
+    };
+
+    const secciones = esquemaASeccionesVisuales(esquemaDesordenado);
+    expect(secciones.map((s) => s.clave)).toEqual([
+      'identificacion',
+      'datos_generales',
+      'tramos',
+      'otros',
+    ]);
+  });
+
   it('genera esquema y vínculos a partir de secciones visuales modificadas', () => {
     const seccionesVisuales: SeccionVisual[] = [
       {

@@ -222,6 +222,12 @@ describe('EditorVersionFormularioPage', () => {
     expect(component.seccionVisualActiva()).toBe('sec_2');
     expect(component.seccionVisualActual()?.clave).toBe('sec_2');
     expect(component.seccionVisualActual()?.titulo).toBe('Sección 2');
+
+    expect(component.limpiarTituloSeccion('1. Identificación del puente')).toBe(
+      'Identificación del puente',
+    );
+    expect(component.limpiarTituloSeccion('8. Otros')).toBe('Otros');
+    expect(component.limpiarTituloSeccion('Sin número')).toBe('Sin número');
   });
 
   it('debe gestionar vínculos de almacenamiento de forma visual', () => {
