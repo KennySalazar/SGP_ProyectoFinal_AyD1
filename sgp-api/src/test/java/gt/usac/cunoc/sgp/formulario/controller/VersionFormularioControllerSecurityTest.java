@@ -118,6 +118,62 @@ class VersionFormularioControllerSecurityTest {
     verify(service).obtenerActiva();
   }
 
+  @ParameterizedTest
+  @EnumSource(RoleName.class)
+  void permiteCualquierUsuarioAutenticadoObtenerElEsquemaDeUnaVersionPublicada(RoleName rol)
+      throws Exception {
+    var auth = autenticar(rol);
+    UUID id = UUID.randomUUID();
+    when(service.obtenerPublicadaPorId(id))
+        .thenReturn(
+            new FormularioActivoResponse(
+                id,
+                "SIECA-v1",
+                1L,
+                OBJECT_MAPPER.readTree("{\"type\":\"object\"}"),
+                "hash123",
+                Instant.now()));
+
+    mockMvc
+        .perform(get("/api/v1/formularios/" + id + "/esquema").principal(auth))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.codigo").value("SIECA-v1"))
+        .andExpect(jsonPath("$.esquema.type").value("object"));
+
+    verify(service).obtenerPublicadaPorId(id);
+  }
+
+  @Test
+  void unIdentificadorMalFormadoResponde400EnVezDeError500() throws Exception {
+    var auth = autenticar(RoleName.CATEDRATICO);
+
+    mockMvc
+        .perform(get("/api/v1/formularios/no-es-uuid/esquema").principal(auth))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("validation_error"))
+        .andExpect(jsonPath("$.errores[0].campo").value("id"));
+
+    verifyNoInteractions(service);
+  }
+
+  @Test
+  void respondeNoEncontradoParaUnaVersionNoPublicadaOInexistente() throws Exception {
+    var auth = autenticar(RoleName.CATEDRATICO);
+    UUID id = UUID.randomUUID();
+    when(service.obtenerPublicadaPorId(id))
+        .thenThrow(
+            new gt.usac.cunoc.sgp.common.exception.ApiException(
+                org.springframework.http.HttpStatus.NOT_FOUND,
+                "version_no_encontrada",
+                "Versión no encontrada",
+                "No existe una versión publicada"));
+
+    mockMvc
+        .perform(get("/api/v1/formularios/" + id + "/esquema").principal(auth))
+        .andExpect(status().isNotFound())
+        .andExpect(jsonPath("$.code").value("version_no_encontrada"));
+  }
+
   @Test
   void permiteAdministradorCrearVersion() throws Exception {
     var auth = autenticar(RoleName.ADMINISTRADOR);

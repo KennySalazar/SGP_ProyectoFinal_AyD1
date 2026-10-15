@@ -66,6 +66,17 @@ public class VersionFormularioController {
     return ResponseEntity.ok(service.obtenerActiva());
   }
 
+  @GetMapping("/{id}/esquema")
+  @PreAuthorize("isAuthenticated()")
+  @Operation(
+      summary = "Consultar el esquema de una versión publicada",
+      description =
+          "Retorna el esquema de una versión publicada, activa o anterior, para mostrar una "
+              + "inspección con la estructura de su versión original. Los borradores responden 404.")
+  public ResponseEntity<FormularioActivoResponse> obtenerEsquemaPublicado(@PathVariable UUID id) {
+    return ResponseEntity.ok(service.obtenerPublicadaPorId(id));
+  }
+
   @GetMapping("/{id}")
   @PreAuthorize("hasRole('ADMINISTRADOR')")
   @Operation(

@@ -31,6 +31,11 @@ export class FormularioApiService {
     return this.http.get<FormularioActivo>('/api/v1/formularios/activo');
   }
 
+  /** Esquema de una versión ya publicada, para mostrar inspecciones hechas con versiones anteriores. */
+  obtenerEsquemaPublicado(id: string): Observable<FormularioActivo> {
+    return this.http.get<FormularioActivo>(`/api/v1/formularios/${encodeURIComponent(id)}/esquema`);
+  }
+
   crear(request: CrearVersionRequest): Observable<VersionFormulario> {
     return this.http.post<VersionFormulario>('/api/v1/formularios', request);
   }

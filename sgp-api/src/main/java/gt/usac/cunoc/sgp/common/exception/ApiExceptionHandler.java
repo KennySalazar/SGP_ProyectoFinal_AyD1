@@ -13,6 +13,7 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 @RestControllerAdvice
 public class ApiExceptionHandler {
@@ -53,6 +54,23 @@ public class ApiExceptionHandler {
             .map(value -> (Object) value)
             .toList();
     problem.setProperty("errores", errores);
+    return response(problem, HttpStatus.BAD_REQUEST);
+  }
+
+  /** Un parámetro de ruta o consulta con formato inválido (por ejemplo un UUID mal formado). */
+  @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+  ResponseEntity<ProblemDetail> handleTipoInvalido(
+      MethodArgumentTypeMismatchException exception, HttpServletRequest request) {
+    ProblemDetail problem =
+        ProblemDetails.create(
+            400,
+            "Solicitud invalida",
+            "La solicitud contiene datos invalidos",
+            "validation_error",
+            request);
+    problem.setProperty(
+        "errores",
+        List.of(java.util.Map.of("campo", exception.getName(), "mensaje", "Valor invalido")));
     return response(problem, HttpStatus.BAD_REQUEST);
   }
 

@@ -49,6 +49,23 @@ describe('FormularioApiService', () => {
     });
   });
 
+  it('obtiene el esquema de una versión publicada por su id', () => {
+    service.obtenerEsquemaPublicado('a b').subscribe((version) => {
+      expect(version.codigo).toBe('SIECA-v0');
+    });
+
+    const req = httpTesting.expectOne('/api/v1/formularios/a%20b/esquema');
+    expect(req.request.method).toBe('GET');
+    req.flush({
+      id: 'a b',
+      codigo: 'SIECA-v0',
+      version: 0,
+      esquema: {},
+      hashContenido: 'abc',
+      publicadoEn: '2026-10-01T00:00:00Z',
+    });
+  });
+
   it('carga la plantilla inicial sieca', () => {
     service.cargarPlantillaSieca('SIECA-v1').subscribe((version) => {
       expect(version.codigo).toBe('SIECA-v1');

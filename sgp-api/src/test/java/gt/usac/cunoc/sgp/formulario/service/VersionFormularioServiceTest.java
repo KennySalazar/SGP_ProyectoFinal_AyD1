@@ -125,6 +125,46 @@ class VersionFormularioServiceTest {
   }
 
   @Test
+  void obtenerPublicadaPorIdRetornaLaVersionAnteriorNoActiva() throws Exception {
+    UUID id = UUID.randomUUID();
+    VersionFormulario anterior =
+        crearEntidad(id, "SIECA-v1", EstadoVersionFormulario.PUBLICADA, false);
+    when(versiones.findById(id)).thenReturn(Optional.of(anterior));
+
+    FormularioActivoResponse res = service.obtenerPublicadaPorId(id);
+
+    assertThat(res.id()).isEqualTo(id);
+    assertThat(res.codigo()).isEqualTo("SIECA-v1");
+    assertThat(res.esquema()).isNotNull();
+  }
+
+  @Test
+  void obtenerPublicadaPorIdNoExponeBorradores() throws Exception {
+    UUID id = UUID.randomUUID();
+    VersionFormulario borrador =
+        crearEntidad(id, "SIECA-v2", EstadoVersionFormulario.BORRADOR, false);
+    when(versiones.findById(id)).thenReturn(Optional.of(borrador));
+
+    assertThatThrownBy(() -> service.obtenerPublicadaPorId(id))
+        .isInstanceOfSatisfying(
+            ApiException.class,
+            ex -> {
+              assertThat(ex.getStatus()).isEqualTo(HttpStatus.NOT_FOUND);
+              assertThat(ex.getCode()).isEqualTo("version_no_encontrada");
+            });
+  }
+
+  @Test
+  void obtenerPublicadaPorIdFallaCuandoNoExiste() {
+    UUID id = UUID.randomUUID();
+    when(versiones.findById(id)).thenReturn(Optional.empty());
+
+    assertThatThrownBy(() -> service.obtenerPublicadaPorId(id))
+        .isInstanceOfSatisfying(
+            ApiException.class, ex -> assertThat(ex.getStatus()).isEqualTo(HttpStatus.NOT_FOUND));
+  }
+
+  @Test
   void cargarPlantillaSiecaInicialDejaLosPesosPendientesDeCalibracion() {
     when(versiones.existsByCodigo("SIECA-v1")).thenReturn(false);
     when(versiones.save(any(VersionFormulario.class)))
