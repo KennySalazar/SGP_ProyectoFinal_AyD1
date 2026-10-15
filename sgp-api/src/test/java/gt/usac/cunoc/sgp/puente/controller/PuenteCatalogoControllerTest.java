@@ -24,12 +24,15 @@ import gt.usac.cunoc.sgp.puente.service.CatalogoTerritorialService;
 import gt.usac.cunoc.sgp.puente.service.PuenteService;
 import gt.usac.cunoc.sgp.puente.service.UbicacionTerritorialService;
 import gt.usac.cunoc.sgp.usuario.repository.UserAccountRepository;
+import java.math.BigDecimal;
 import java.time.Clock;
+import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -77,7 +80,9 @@ class PuenteCatalogoControllerTest {
             14.481,
             -90.615,
             true,
-            "Sin evaluar");
+            "Sin evaluar",
+            null,
+            null);
     when(service.listarCatalogo(null, null, 0, 20))
         .thenReturn(new PageImpl<>(List.of(puente), PageRequest.of(0, 20), 1));
 
@@ -268,6 +273,77 @@ class PuenteCatalogoControllerTest {
         .andExpect(jsonPath("$.fotografias").doesNotExist())
         .andExpect(jsonPath("$.danos").doesNotExist())
         .andExpect(jsonPath("$.creadoPorId").doesNotExist());
+  }
+
+  @ParameterizedTest
+  @CsvSource({"Bueno,80", "Regular,60", "Malo,20", "Malo,80"})
+  void visitanteConsultaEstadoEIcVigentesEnCatalogo(String estado, String indice) throws Exception {
+    UUID id = UUID.randomUUID();
+    LocalDate fecha = LocalDate.of(2026, 10, 15);
+    var puente =
+        new PuenteCatalogoResponse(
+            id,
+            "GT-01-0114-0001",
+            "Puente publico",
+            null,
+            null,
+            14.481,
+            -90.615,
+            true,
+            estado,
+            new BigDecimal(indice),
+            fecha);
+    when(service.listarCatalogo(null, null, 0, 20))
+        .thenReturn(new PageImpl<>(List.of(puente), PageRequest.of(0, 20), 1));
+
+    mvc.perform(get("/api/v1/puentes"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.content[0].id").value(id.toString()))
+        .andExpect(jsonPath("$.content[0].estadoActual").value(estado))
+        .andExpect(jsonPath("$.content[0].indiceCondicionActual").value(Integer.parseInt(indice)))
+        .andExpect(jsonPath("$.content[0].fechaUltimaInspeccion").value("2026-10-15"))
+        .andExpect(jsonPath("$.content[0].latitud").value(14.481))
+        .andExpect(jsonPath("$.content[0].longitud").value(-90.615))
+        .andExpect(jsonPath("$.content[0].danos").doesNotExist())
+        .andExpect(jsonPath("$.content[0].fotografias").doesNotExist())
+        .andExpect(jsonPath("$.content[0].informes").doesNotExist())
+        .andExpect(jsonPath("$.content[0].desglose").doesNotExist())
+        .andExpect(jsonPath("$.content[0].condicionesAnulacion").doesNotExist());
+  }
+
+  @ParameterizedTest
+  @CsvSource({"Bueno,80", "Regular,60", "Malo,20", "Malo,80"})
+  void visitanteConsultaEstadoEIcVigentesEnFicha(String estado, String indice) throws Exception {
+    UUID id = UUID.randomUUID();
+    var puente =
+        new PuenteResponse(
+            id,
+            "GT-01-0114-0001",
+            "Puente publico",
+            null,
+            null,
+            "CA-9",
+            null,
+            14.481,
+            -90.615,
+            null,
+            true,
+            estado,
+            new BigDecimal(indice),
+            LocalDate.of(2026, 10, 15),
+            OffsetDateTime.parse("2026-10-01T08:00:00-06:00"));
+    when(service.obtenerPorId(id)).thenReturn(puente);
+
+    mvc.perform(get("/api/v1/puentes/{id}", id))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.estadoActual").value(estado))
+        .andExpect(jsonPath("$.indiceCondicionActual").value(Integer.parseInt(indice)))
+        .andExpect(jsonPath("$.fechaUltimaInspeccion").value("2026-10-15"))
+        .andExpect(jsonPath("$.danos").doesNotExist())
+        .andExpect(jsonPath("$.fotografias").doesNotExist())
+        .andExpect(jsonPath("$.informes").doesNotExist())
+        .andExpect(jsonPath("$.desglose").doesNotExist())
+        .andExpect(jsonPath("$.condicionesAnulacion").doesNotExist());
   }
 
   @Test
