@@ -235,7 +235,7 @@
           "x-sgp-orden": ["existencia", "estado"],
           "properties": {
             "existencia": { "$ref": "#/$defs/existencia" },
-            "estado": { "title": "Estado", "type": "string", "enum": ["LIMPIOS", "OBSTRUIDOS"] }
+            "estado": { "title": "Estado", "type": "string", "enum": ["LIMPIOS", "OBSTRUIDOS"], "x-sgp-sin-danos": "LIMPIOS" }
           },
           "if": { "$ref": "#/$defs/siPresente" },
           "then": { "required": ["estado"] },
@@ -295,7 +295,7 @@
             "material": { "$ref": "#/$defs/material" },
             "ausencia_seccion": { "title": "Ausencia de sección", "$ref": "#/$defs/severidad" },
             "deformacion_elemento": { "title": "Deformación de elemento", "$ref": "#/$defs/severidad" },
-            "golpeado_longitud_m": { "title": "Golpeado (longitud, m)", "description": "0 si no hay tramos golpeados.", "type": "number", "minimum": 0, "maximum": 5000 },
+            "golpeado_longitud_m": { "title": "Golpeado (longitud, m)", "description": "0 si no hay tramos golpeados.", "type": "number", "minimum": 0, "maximum": 5000, "x-sgp-sin-danos": 0 },
             "pintura": { "title": "Pintura", "$ref": "#/$defs/severidad" },
             "otros": { "$ref": "#/$defs/otroDano" }
           },
@@ -325,7 +325,7 @@
             "material": { "$ref": "#/$defs/material" },
             "ausencia_seccion": { "title": "Ausencia de sección", "$ref": "#/$defs/severidad" },
             "deformacion_elemento": { "title": "Deformación de elemento", "$ref": "#/$defs/severidad" },
-            "golpeados_cantidad": { "title": "Golpeados (cuántos)", "type": "integer", "minimum": 0, "maximum": 10000 },
+            "golpeados_cantidad": { "title": "Golpeados (cuántos)", "type": "integer", "minimum": 0, "maximum": 10000, "x-sgp-sin-danos": 0 },
             "pintura": { "title": "Pintura", "$ref": "#/$defs/severidad" },
             "otros": { "$ref": "#/$defs/otroDano" }
           },
@@ -353,7 +353,7 @@
             "material": { "$ref": "#/$defs/material" },
             "grietas_una_direccion": { "title": "Grietas en una dirección", "$ref": "#/$defs/severidad" },
             "grietas_dos_direcciones": { "title": "Grietas en dos direcciones", "$ref": "#/$defs/severidad" },
-            "golpeado_longitud_m": { "title": "Golpeado (longitud, m)", "type": "number", "minimum": 0, "maximum": 5000 },
+            "golpeado_longitud_m": { "title": "Golpeado (longitud, m)", "type": "number", "minimum": 0, "maximum": 5000, "x-sgp-sin-danos": 0 },
             "pintura": { "title": "Pintura", "$ref": "#/$defs/severidad" },
             "otros": { "$ref": "#/$defs/otroDano" }
           },
@@ -501,7 +501,7 @@
           "x-sgp-orden": ["existe", "estado"],
           "properties": {
             "existe": { "title": "Existe", "type": "boolean" },
-            "estado": { "title": "Estado", "type": "string", "enum": ["BUENO", "MALO"] }
+            "estado": { "title": "Estado", "type": "string", "enum": ["BUENO", "MALO"], "x-sgp-sin-danos": "BUENO" }
           },
           "if": { "properties": { "existe": { "const": true } } },
           "then": { "required": ["estado"] },
@@ -544,7 +544,8 @@
       "title": "Severidad del daño",
       "description": "Escala PROPUESTA por el equipo (el manual solo deja la celda en blanco). Pendiente de validación en el acta de calibración HU-017.",
       "type": "string",
-      "enum": ["NO_PRESENTA", "LEVE", "MODERADO", "SEVERO"]
+      "enum": ["NO_PRESENTA", "LEVE", "MODERADO", "SEVERO"],
+      "x-sgp-sin-danos": "NO_PRESENTA"
     },
     "otroDano": {
       "title": "Otros (especificar)",
@@ -593,7 +594,8 @@
     },
     "nivelSocavacion": {
       "type": "string",
-      "enum": ["NO_HAY", "SIN_EXPOSICION", "CON_EXPOSICION", "ASENTAMIENTO_ESTRUCTURA"]
+      "enum": ["NO_HAY", "SIN_EXPOSICION", "CON_EXPOSICION", "ASENTAMIENTO_ESTRUCTURA"],
+      "x-sgp-sin-danos": "NO_HAY"
     },
     "elementoConcreto": {
       "title": "Elemento de sub-estructura",
@@ -901,8 +903,8 @@
       "properties": {
         "existencia": { "$ref": "#/$defs/existencia" },
         "material": { "$ref": "#/$defs/material" },
-        "falta_elemento": { "title": "Falta elemento", "type": "boolean" },
-        "junta_limpia": { "title": "Junta limpia", "type": "boolean" },
+        "falta_elemento": { "title": "Falta elemento", "type": "boolean", "x-sgp-sin-danos": false },
+        "junta_limpia": { "title": "Junta limpia", "type": "boolean", "x-sgp-sin-danos": true },
         "danos": { "title": "Daños", "$ref": "#/$defs/otroDano" }
       },
       "if": { "$ref": "#/$defs/siPresente" },
@@ -927,7 +929,7 @@
       "properties": {
         "existencia": { "$ref": "#/$defs/existencia" },
         "material": { "$ref": "#/$defs/material" },
-        "buen_estado": { "title": "Buen estado", "type": "boolean" },
+        "buen_estado": { "title": "Buen estado", "type": "boolean", "x-sgp-sin-danos": true },
         "asentado": { "title": "Daño: asentado", "$ref": "#/$defs/severidad" },
         "fisurado": { "title": "Daño: fisurado", "$ref": "#/$defs/severidad" },
         "bache": { "title": "Daño: bache", "$ref": "#/$defs/severidad" }
@@ -977,6 +979,7 @@
       "minItems": 1,
       "uniqueItems": true,
       "items": { "type": "string", "enum": ["LIMPIO", "ASOLVADO_SEDIMENTADO", "EROSIONADO", "OTRO"] },
+      "x-sgp-sin-danos": ["LIMPIO"],
       "if": { "contains": { "const": "LIMPIO" } },
       "then": { "maxItems": 1 }
     },
@@ -990,7 +993,7 @@
       "x-sgp-orden": ["existe", "estado"],
       "properties": {
         "existe": { "title": "Hay", "type": "boolean" },
-        "estado": { "title": "Estado", "type": "string", "enum": ["BUENO", "MALO"] }
+        "estado": { "title": "Estado", "type": "string", "enum": ["BUENO", "MALO"], "x-sgp-sin-danos": "BUENO" }
       },
       "if": { "properties": { "existe": { "const": true } } },
       "then": { "required": ["estado"] },

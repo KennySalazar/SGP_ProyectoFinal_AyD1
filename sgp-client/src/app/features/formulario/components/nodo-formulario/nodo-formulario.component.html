@@ -7,7 +7,12 @@
 } @else {
   @switch (nodo().clase) {
     @case ('campo') {
-      <app-campo-formulario [nodo]="campo()" [control]="control()" [construido]="construido()" />
+      <app-campo-formulario
+        [nodo]="campo()"
+        [control]="control()"
+        [construido]="construido()"
+        [modoGrilla]="modoGrilla()"
+      />
     }
     @case ('objeto') {
       @if (esOpcional()) {
@@ -23,6 +28,7 @@
                 [control]="controlDe(hijo)"
                 [construido]="construido()"
                 [nivel]="nivel() + 1"
+                [modoGrilla]="modoGrilla()"
               />
             }
           </div>
@@ -52,6 +58,7 @@
                 [control]="controlDe(hijo)"
                 [construido]="construido()"
                 [nivel]="nivel() + 1"
+                [modoGrilla]="modoGrilla()"
               />
             }
           </div>
@@ -99,6 +106,7 @@
               [control]="instancia"
               [construido]="construido()"
               [nivel]="nivel() + 1"
+              [modoGrilla]="modoGrilla()"
               [mostrarLeyenda]="false"
             />
           </div>

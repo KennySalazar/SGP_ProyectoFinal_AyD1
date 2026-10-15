@@ -2,6 +2,8 @@
 @if (n.tipo !== 'uuid') {
   <div
     class="campo"
+    [class.en-grilla]="modoGrilla()"
+    [class.en-celdas]="modoCeldas()"
     [class.invalido]="mensaje() !== null"
     [class.precargado]="n.soloLectura"
     [attr.data-ruta]="n.ruta"
@@ -31,6 +33,17 @@
               <i class="pi pi-question-circle" aria-hidden="true"></i>
             </button>
           }
+          @if (puedeQuitarSeleccion() && modoGrilla()) {
+            <button
+              type="button"
+              class="quitar"
+              [attr.title]="'formulario.dinamico.clear' | transloco"
+              (click)="quitarSeleccion()"
+            >
+              <i class="pi pi-times" aria-hidden="true"></i>
+              <span class="texto-quitar">{{ 'formulario.dinamico.clear' | transloco }}</span>
+            </button>
+          }
         </legend>
 
         @if (ayudas().length > 0) {
@@ -49,13 +62,18 @@
             class="segmentos"
             [class.amplios]="n.tipo === 'enumerado'"
             [class.cuatro]="opcionesRadio().length === 4"
+            [class.largas]="etiquetasLargas()"
+            [class.celdas]="modoCeldas()"
+            [style.--columnas]="opcionesRadio().length"
             role="radiogroup"
           >
-            @for (opcion of opcionesRadio(); track opcion.etiqueta) {
+            @for (opcion of opcionesConGravedad(); track opcion.etiqueta) {
               <label
                 class="segmento"
                 [class.marcado]="valorActual() === opcion.valor"
                 [class.deshabilitado]="deshabilitado()"
+                [attr.data-gravedad]="opcion.gravedad"
+                [attr.data-valor]="opcion.valor"
               >
                 <input
                   type="radio"
@@ -63,8 +81,14 @@
                   [checked]="valorActual() === opcion.valor"
                   [disabled]="deshabilitado()"
                   (click)="elegir(opcion.valor)"
+                  (keydown)="alTeclear($event, opcion.valor)"
                 />
-                <span>{{ opcion.etiqueta }}</span>
+                @if (opcion.gravedad && valorActual() === opcion.valor) {
+                  <i class="pi pi-check marca-eleccion" aria-hidden="true"></i>
+                } @else if (modoCeldas()) {
+                  <i class="pi pi-circle celda-vacia" aria-hidden="true"></i>
+                }
+                <span [class.solo-lectores]="modoCeldas()">{{ opcion.etiqueta }}</span>
               </label>
             }
           </div>
@@ -84,10 +108,15 @@
             }
           </div>
         }
-        @if (puedeQuitarSeleccion()) {
-          <button type="button" class="quitar" (click)="quitarSeleccion()">
+        @if (puedeQuitarSeleccion() && !modoGrilla()) {
+          <button
+            type="button"
+            class="quitar"
+            [attr.title]="'formulario.dinamico.clear' | transloco"
+            (click)="quitarSeleccion()"
+          >
             <i class="pi pi-times" aria-hidden="true"></i>
-            {{ 'formulario.dinamico.clear' | transloco }}
+            <span class="texto-quitar">{{ 'formulario.dinamico.clear' | transloco }}</span>
           </button>
         }
       </fieldset>

@@ -10,8 +10,9 @@ import {
   NodoFormulario,
   NodoObjeto,
 } from '../esquema/modelos';
+import { activacionDe, indicadoresDe } from './danos';
 import { ConjuntoOcultos, esOpcional, valorDelNodo } from './valor';
-import { validadoresDeArreglo, validadoresDeCampo } from './validadores';
+import { vacio, validadoresDeArreglo, validadoresDeCampo } from './validadores';
 
 type Datos = Record<string, unknown>;
 
@@ -41,6 +42,8 @@ export class FormularioConstruido {
    * componentes la leen para refrescar lo que depende de controles que no son señales.
    */
   readonly revision = signal(0);
+  /** Pasa a `true` cuando se pide la revisión: lo pendiente se destaca en lugar de esperar. */
+  readonly revisado = signal(false);
 
   private readonly suscripciones = new Subscription();
   private readonly ambitos: AmbitoOpcional[] = [];
@@ -61,6 +64,7 @@ export class FormularioConstruido {
 
   /** Marca todos los campos como tocados para que se muestren sus errores. */
   revisar(): void {
+    this.revisado.set(true);
     this.form.markAllAsTouched();
     this.notificarCambio();
   }
@@ -80,6 +84,49 @@ export class FormularioConstruido {
       this.restaurarSubarbol(this.esquema.raiz, this.form);
     }
     this.form.updateValueAndValidity({ emitEvent: false });
+    this.notificarCambio();
+  }
+
+  /**
+   * «Sin daños en este elemento» (RN-INS-11): en una sola operación declara que el elemento existe
+   * y marca como sano cada uno de sus indicadores, con el valor que el esquema declara sano. Un
+   * indicador que ya tenía un daño se sobrescribe: la acción afirma que el elemento está sano.
+   */
+  marcarSinDanos(nodo: NodoObjeto, grupo: FormGroup): void {
+    const activacion = activacionDe(nodo);
+    const decisor = activacion ? grupo.controls[activacion.clave] : undefined;
+    if (activacion && decisor?.enabled) decisor.setValue(activacion.valor);
+
+    // Declarar la existencia puede mostrar indicadores; un indicador puede mostrar otros.
+    for (let pasada = 0; pasada < 3; pasada++) {
+      let cambios = 0;
+      for (const indicador of indicadoresDe(nodo)) {
+        const control = grupo.controls[indicador.clave];
+        if (!control || control.disabled || this.ocultos.has(control)) continue;
+
+        const sano = Array.isArray(indicador.sinDanos)
+          ? [...indicador.sinDanos]
+          : indicador.sinDanos;
+        if (JSON.stringify(control.value) === JSON.stringify(sano)) continue;
+        control.setValue(sano);
+        control.markAsDirty();
+        cambios++;
+      }
+      if (cambios === 0) break;
+    }
+    this.notificarCambio();
+  }
+
+  /** Deshace «Sin daños» (o cualquier marca): deja los indicadores del elemento sin responder. */
+  limpiarDanos(nodo: NodoObjeto, grupo: FormGroup): void {
+    for (const indicador of indicadoresDe(nodo)) {
+      const control = grupo.controls[indicador.clave];
+      if (!control || control.disabled || vacio(control.value)) continue;
+
+      control.setValue(indicador.tipo === 'seleccionMultiple' ? [] : null);
+      control.markAsPristine();
+      control.markAsUntouched();
+    }
     this.notificarCambio();
   }
 

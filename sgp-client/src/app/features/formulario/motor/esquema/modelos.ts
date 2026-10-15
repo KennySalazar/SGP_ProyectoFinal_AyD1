@@ -77,6 +77,12 @@ export interface NodoCampo extends NodoBase {
   maximoElementos?: number;
   reglasLista: ReglaLista[];
   sugerencias: string[];
+  /**
+   * Valor que significa «sin daño» en un indicador de daño (`x-sgp-sin-danos`): `NO_PRESENTA`
+   * para una severidad, `false` para «falta elemento», `true` para «junta limpia»… Un campo que lo
+   * declara es un indicador; los demás (material, medidas) describen el elemento.
+   */
+  sinDanos?: unknown;
 }
 
 export interface NodoObjeto extends NodoBase {
