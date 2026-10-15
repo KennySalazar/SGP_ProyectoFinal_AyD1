@@ -37,7 +37,7 @@ class DatabaseMigrationIntegrationTest {
             .load();
 
     var result = flyway.migrate();
-    assertEquals(16, result.migrationsExecuted);
+    assertEquals(17, result.migrationsExecuted);
 
     flyway.validate();
 
@@ -63,12 +63,12 @@ class DatabaseMigrationIntegrationTest {
       try (ResultSet limite =
           statement.executeQuery(
               """
-                           SELECT codigo,
-                                  ST_SRID(geometria) AS srid,
-                                  ST_IsValid(geometria) AS valida,
-                                  ST_IsEmpty(geometria) AS vacia
-                           FROM limite_territorial
-                           """)) {
+                                        SELECT codigo,
+                                               ST_SRID(geometria) AS srid,
+                                               ST_IsValid(geometria) AS valida,
+                                               ST_IsEmpty(geometria) AS vacia
+                                        FROM limite_territorial
+                                        """)) {
         assertTrue(limite.next());
         assertEquals("GTM", limite.getString("codigo"));
         assertEquals(4326, limite.getInt("srid"));
@@ -77,6 +77,32 @@ class DatabaseMigrationIntegrationTest {
       }
       assertTrue(tableExists(statement, "asignatura"));
       assertTrue(tableExists(statement, "puente"));
+      assertTrue(columnExists(statement, "puente", "estado_actual"));
+      assertTrue(columnExists(statement, "puente", "indice_condicion_actual"));
+      assertTrue(columnExists(statement, "puente", "fecha_ultima_inspeccion"));
+      assertTrue(columnExists(statement, "puente", "inspeccion_vigente_id"));
+      assertTrue(columnExists(statement, "puente", "resultado_ic_vigente_id"));
+      assertTrue(columnExists(statement, "puente", "inspeccion_vigente_publicada_en"));
+      assertTrue(constraintExists(statement, "puente_estado_actual_valido"));
+      assertTrue(constraintExists(statement, "puente_ic_actual_rango"));
+      assertTrue(constraintExists(statement, "puente_estado_vigente_completo"));
+      assertTrue(constraintExists(statement, "fk_puente_inspeccion_vigente"));
+      assertTrue(constraintExists(statement, "fk_puente_resultado_ic_vigente"));
+
+      try (ResultSet estado =
+          statement.executeQuery(
+              """
+                           SELECT column_default, is_nullable
+                           FROM information_schema.columns
+                           WHERE table_schema = 'public'
+                             AND table_name = 'puente'
+                             AND column_name = 'estado_actual'
+                           """)) {
+        assertTrue(estado.next());
+        assertTrue(estado.getString("column_default").contains("Sin evaluar"));
+        assertEquals("NO", estado.getString("is_nullable"));
+      }
+
       assertTrue(tableExists(statement, "version_formulario"));
       assertTrue(tableExists(statement, "inspeccion"));
       assertTrue(tableExists(statement, "inspeccion_dato_tecnico"));
@@ -121,23 +147,22 @@ class DatabaseMigrationIntegrationTest {
       try (ResultSet limites =
           statement.executeQuery(
               """
-                           SELECT
-                               NOT EXISTS (
-                                   SELECT 1
-                                   FROM municipio_limite
-                                   WHERE ST_SRID(geometria) <> 4326
-                                      OR NOT ST_IsValid(geometria)
-                                      OR ST_IsEmpty(geometria)
-                                      OR ST_GeometryType(geometria) <> 'ST_MultiPolygon'
-                               ) AS geometr ias_validas,
-                               NOT EXISTS (
-                                   SELECT 1
-                                   FROM municipio m
-                                   LEFT JOIN municipio_limite l ON l.municipio_id = m.id
-                                   WHERE l.municipio_id IS NULL
-                               ) AS catalogo_completo
-                           """
-                  .replace("geometr ias_validas", "geometrias_validas"))) {
+                                        SELECT
+                                            NOT EXISTS (
+                                                SELECT 1
+                                                FROM municipio_limite
+                                                WHERE ST_SRID(geometria) <> 4326
+                                                   OR NOT ST_IsValid(geometria)
+                                                   OR ST_IsEmpty(geometria)
+                                                   OR ST_GeometryType(geometria) <> 'ST_MultiPolygon'
+                                            ) AS geometrias_validas,
+                                            NOT EXISTS (
+                                                SELECT 1
+                                                FROM municipio m
+                                                LEFT JOIN municipio_limite l ON l.municipio_id = m.id
+                                                WHERE l.municipio_id IS NULL
+                                            ) AS catalogo_completo
+                                        """)) {
         assertTrue(limites.next());
         assertTrue(limites.getBoolean("geometrias_validas"));
         assertTrue(limites.getBoolean("catalogo_completo"));
@@ -222,13 +247,13 @@ class DatabaseMigrationIntegrationTest {
   private boolean municipiosCorrespondenADepartamento(Statement statement) throws Exception {
     String query =
         """
-        SELECT NOT EXISTS (
-            SELECT 1
-            FROM municipio AS municipio
-            JOIN departamento AS departamento ON departamento.id = municipio.departamento_id
-            WHERE left(municipio.codigo_ine, 2) <> departamento.codigo_ine
-        )
-        """;
+            SELECT NOT EXISTS (
+                SELECT 1
+                FROM municipio AS municipio
+                JOIN departamento AS departamento ON departamento.id = municipio.departamento_id
+                WHERE left(municipio.codigo_ine, 2) <> departamento.codigo_ine
+            )
+            """;
 
     try (ResultSet result = statement.executeQuery(query)) {
       result.next();

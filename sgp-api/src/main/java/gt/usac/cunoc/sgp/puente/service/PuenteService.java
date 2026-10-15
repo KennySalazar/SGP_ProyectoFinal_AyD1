@@ -375,11 +375,11 @@ public class PuenteService {
     var pageable =
         PageRequest.of(pagina, tamanio, Sort.by(Sort.Order.asc("nombre"), Sort.Order.asc("id")));
 
-    // Hasta implementar inspecciones publicadas, todos los puentes están sin evaluar.
-    if (estado != null && !"Sin evaluar".equals(estado)) {
-      return Page.empty(pageable);
-    }
-    return puentes.findCatalogo(departamentoId, activo, pageable).map(mapper::toCatalogoResponse);
+    Page<Puente> resultado =
+        estado == null
+            ? puentes.findCatalogo(departamentoId, activo, pageable)
+            : puentes.findCatalogoPorEstado(departamentoId, activo, estado, pageable);
+    return resultado.map(mapper::toCatalogoResponse);
   }
 
   private ApiException validacion(String codigo, String detalle) {

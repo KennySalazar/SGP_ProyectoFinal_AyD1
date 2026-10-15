@@ -1,5 +1,6 @@
 package gt.usac.cunoc.sgp.puente.entity;
 
+import gt.usac.cunoc.sgp.inspeccion.model.EstadoCondicion;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -10,6 +11,8 @@ import jakarta.persistence.Table;
 import jakarta.persistence.Version;
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.util.Objects;
 import java.util.UUID;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
@@ -56,6 +59,24 @@ public class Puente {
   @Column(name = "motivo_inactivacion", length = 1000)
   private String motivoInactivacion;
 
+  @Column(name = "estado_actual", nullable = false, length = 20)
+  private String estadoActual = "Sin evaluar";
+
+  @Column(name = "indice_condicion_actual", precision = 8, scale = 5)
+  private BigDecimal indiceCondicionActual;
+
+  @Column(name = "fecha_ultima_inspeccion")
+  private LocalDate fechaUltimaInspeccion;
+
+  @Column(name = "inspeccion_vigente_id")
+  private UUID inspeccionVigenteId;
+
+  @Column(name = "resultado_ic_vigente_id")
+  private UUID resultadoIcVigenteId;
+
+  @Column(name = "inspeccion_vigente_publicada_en")
+  private Instant inspeccionVigentePublicadaEn;
+
   @Column(name = "creado_por_id", nullable = false, updatable = false)
   private UUID creadoPorId;
 
@@ -94,6 +115,42 @@ public class Puente {
     this.creadoPorId = creadoPorId;
     this.creadoEn = creadoEn;
     this.actualizadoEn = creadoEn;
+  }
+
+  public void actualizarEstadoPorPublicacion(
+      UUID inspeccionId,
+      UUID resultadoId,
+      EstadoCondicion estado,
+      BigDecimal indice,
+      LocalDate fechaInspeccion,
+      Instant publicadaEn,
+      Instant ahora) {
+    Objects.requireNonNull(inspeccionId, "La inspeccion es obligatoria");
+    Objects.requireNonNull(resultadoId, "El resultado es obligatorio");
+    Objects.requireNonNull(estado, "El estado es obligatorio");
+    Objects.requireNonNull(indice, "El indice es obligatorio");
+    Objects.requireNonNull(fechaInspeccion, "La fecha de inspeccion es obligatoria");
+    Objects.requireNonNull(publicadaEn, "La fecha de publicacion es obligatoria");
+    Objects.requireNonNull(ahora, "La fecha de actualizacion es obligatoria");
+
+    if (indice.signum() < 0 || indice.compareTo(BigDecimal.valueOf(100)) > 0) {
+      throw new IllegalArgumentException("El indice debe estar entre 0 y 100");
+    }
+
+    String estadoFinal =
+        switch (estado) {
+          case BUENO -> "Bueno";
+          case REGULAR -> "Regular";
+          case MALO -> "Malo";
+        };
+
+    this.estadoActual = estadoFinal;
+    this.indiceCondicionActual = indice;
+    this.fechaUltimaInspeccion = fechaInspeccion;
+    this.inspeccionVigenteId = inspeccionId;
+    this.resultadoIcVigenteId = resultadoId;
+    this.inspeccionVigentePublicadaEn = publicadaEn;
+    this.actualizadoEn = ahora;
   }
 
   public UUID getId() {
@@ -142,6 +199,30 @@ public class Puente {
 
   public String getMotivoInactivacion() {
     return motivoInactivacion;
+  }
+
+  public String getEstadoActual() {
+    return estadoActual;
+  }
+
+  public BigDecimal getIndiceCondicionActual() {
+    return indiceCondicionActual;
+  }
+
+  public LocalDate getFechaUltimaInspeccion() {
+    return fechaUltimaInspeccion;
+  }
+
+  public UUID getInspeccionVigenteId() {
+    return inspeccionVigenteId;
+  }
+
+  public UUID getResultadoIcVigenteId() {
+    return resultadoIcVigenteId;
+  }
+
+  public Instant getInspeccionVigentePublicadaEn() {
+    return inspeccionVigentePublicadaEn;
   }
 
   public void darDeBaja(String motivo, UUID usuarioId, Instant ahora) {
