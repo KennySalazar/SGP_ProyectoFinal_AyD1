@@ -1,6 +1,7 @@
 import {
   ChangeDetectionStrategy,
   Component,
+  computed,
   DestroyRef,
   inject,
   OnInit,
@@ -24,10 +25,14 @@ import {
   AnalisisMapeo,
   ConfiguracionIcElemento,
   DeclaracionMapeoRequest,
+  PreguntaVisual,
+  SeccionVisual,
+  TipoDatoVisual,
   TipoMapeoCampo,
   VersionFormulario,
 } from '../../models/formulario.models';
 import { FormularioApiService } from '../../services/formulario-api.service';
+import { esquemaASeccionesVisuales, seccionesVisualesAEsquema } from '../../utils/esquema-visual';
 
 type SeccionActiva = 'esquema' | 'vinculos' | 'pesos' | 'mapeos' | 'publicar';
 
@@ -81,6 +86,57 @@ export class EditorVersionFormularioPage implements OnInit {
   pesosEditables = signal<ConfiguracionIcElemento[]>([]);
   mapeosEditables = signal<DeclaracionMapeoRequest[]>([]);
 
+  // Estado del Editor Visual
+  modoEdicion = signal<'visual' | 'codigo'>('visual');
+  seccionesVisuales = signal<SeccionVisual[]>([]);
+  dialogoSeccion = signal<boolean>(false);
+  modoSeccion = signal<'crear' | 'editar'>('crear');
+  seccionSeleccionadaClave = signal<string | null>(null);
+
+  dialogoPregunta = signal<boolean>(false);
+  modoPregunta = signal<'crear' | 'editar'>('crear');
+  preguntaSeleccionadaClave = signal<string | null>(null);
+  seccionDestinoClave = signal<string>('');
+  opcionesSeleccion = signal<string[]>([]);
+
+  readonly totalSecciones = computed(() => this.seccionesVisuales().length);
+  readonly totalPreguntas = computed(() =>
+    this.seccionesVisuales().reduce((acc, s) => acc + s.preguntas.length, 0),
+  );
+
+  readonly tiposDato: { label: string; value: TipoDatoVisual; icon: string }[] = [
+    { label: 'Texto corto', value: 'string', icon: 'pi pi-align-left' },
+    { label: 'Texto largo / Área de texto', value: 'multiline', icon: 'pi pi-align-justify' },
+    { label: 'Número entero', value: 'integer', icon: 'pi pi-hashtag' },
+    { label: 'Número decimal', value: 'number', icon: 'pi pi-percentage' },
+    { label: 'Booleano (Sí/No)', value: 'boolean', icon: 'pi pi-check-square' },
+    { label: 'Selección única (Dropdown)', value: 'select', icon: 'pi pi-list' },
+    { label: 'Fecha', value: 'date', icon: 'pi pi-calendar' },
+  ];
+
+  readonly seccionForm = this.fb.nonNullable.group({
+    clave: ['', [Validators.required, Validators.pattern(/^[a-z0-9_]+$/)]],
+    titulo: ['', [Validators.required, Validators.maxLength(150)]],
+    descripcion: [''],
+    esRepetible: [false],
+  });
+
+  readonly preguntaForm = this.fb.nonNullable.group({
+    seccionClave: ['', Validators.required],
+    clave: ['', [Validators.required, Validators.pattern(/^[a-z0-9_]+$/)]],
+    titulo: ['', [Validators.required, Validators.maxLength(200)]],
+    descripcion: [''],
+    tipo: ['string' as TipoDatoVisual, Validators.required],
+    obligatorio: [false],
+    soloLectura: [false],
+    longitudMinima: [null as number | null],
+    longitudMaxima: [null as number | null],
+    valorMinimo: [null as number | null],
+    valorMaximo: [null as number | null],
+    vinculo: [''],
+    opcionNueva: [''],
+  });
+
   // Diálogos
   dialogoConfirmarPublicar = signal(false);
   dialogoNuevoMapeo = signal(false);
@@ -129,6 +185,9 @@ export class EditorVersionFormularioPage implements OnInit {
           this.esquemaTexto.set(JSON.stringify(ver.esquema ?? {}, null, 2));
           this.vinculosTexto.set(JSON.stringify(ver.vinculosAlmacenamiento ?? {}, null, 2));
           this.pesosEditables.set(ver.pesos ? JSON.parse(JSON.stringify(ver.pesos)) : []);
+          this.seccionesVisuales.set(
+            esquemaASeccionesVisuales(ver.esquema, ver.vinculosAlmacenamiento),
+          );
 
           if (ver.versionAnteriorId) {
             this.cargarAnalisisMapeos(id);
@@ -164,9 +223,252 @@ export class EditorVersionFormularioPage implements OnInit {
     this.errorValidacion.set(null);
   }
 
+  obtenerEtiquetaTipo(tipo: TipoDatoVisual): string {
+    const t = this.tiposDato.find((item) => item.value === tipo);
+    return t ? t.label : tipo;
+  }
+
+  obtenerIconoTipo(tipo: TipoDatoVisual): string {
+    const t = this.tiposDato.find((item) => item.value === tipo);
+    return t ? t.icon : 'pi pi-tag';
+  }
+
+  cambiarModoEdicion(modo: 'visual' | 'codigo'): void {
+    if (modo === 'visual') {
+      try {
+        const parsed = JSON.parse(this.esquemaTexto() || '{}');
+        const vinculos = this.vinculosTexto() ? JSON.parse(this.vinculosTexto()) : {};
+        this.seccionesVisuales.set(esquemaASeccionesVisuales(parsed, vinculos));
+        this.errorValidacion.set(null);
+      } catch {
+        this.errorValidacion.set(
+          'El JSON Schema contiene errores de formato y no puede cambiarse a la vista visual sin corregirlos.',
+        );
+        return;
+      }
+    } else {
+      this.sincronizarVisualACodigo();
+    }
+    this.modoEdicion.set(modo);
+  }
+
+  sincronizarVisualACodigo(): void {
+    const ver = this.version();
+    let vinculosActuales: Record<string, unknown> = {};
+    try {
+      vinculosActuales = this.vinculosTexto() ? JSON.parse(this.vinculosTexto()) : {};
+    } catch {
+      vinculosActuales = ver?.vinculosAlmacenamiento ?? {};
+    }
+
+    const { esquema, vinculos } = seccionesVisualesAEsquema(
+      this.seccionesVisuales(),
+      ver?.esquema,
+      vinculosActuales,
+    );
+
+    this.esquemaTexto.set(JSON.stringify(esquema, null, 2));
+    this.vinculosTexto.set(JSON.stringify(vinculos, null, 2));
+  }
+
+  abrirCrearSeccion(): void {
+    this.modoSeccion.set('crear');
+    this.seccionForm.reset({
+      clave: '',
+      titulo: '',
+      descripcion: '',
+      esRepetible: false,
+    });
+    this.dialogoSeccion.set(true);
+  }
+
+  abrirEditarSeccion(sec: SeccionVisual): void {
+    this.modoSeccion.set('editar');
+    this.seccionSeleccionadaClave.set(sec.clave);
+    this.seccionForm.reset({
+      clave: sec.clave,
+      titulo: sec.titulo,
+      descripcion: sec.descripcion || '',
+      esRepetible: Boolean(sec.esRepetible),
+    });
+    this.dialogoSeccion.set(true);
+  }
+
+  guardarSeccionModal(): void {
+    if (this.seccionForm.invalid) {
+      this.seccionForm.markAllAsTouched();
+      return;
+    }
+
+    const val = this.seccionForm.getRawValue();
+    const clave = val.clave.trim();
+    const titulo = val.titulo.trim();
+    const descripcion = val.descripcion.trim();
+    const esRepetible = val.esRepetible;
+
+    const lista = [...this.seccionesVisuales()];
+
+    if (this.modoSeccion() === 'crear') {
+      if (lista.some((s) => s.clave === clave)) {
+        this.errorValidacion.set('Ya existe una sección con esa clave.');
+        return;
+      }
+      lista.push({
+        clave,
+        titulo,
+        descripcion,
+        esRepetible,
+        preguntas: [],
+      });
+    } else {
+      const idx = lista.findIndex((s) => s.clave === this.seccionSeleccionadaClave());
+      if (idx !== -1) {
+        lista[idx] = {
+          ...lista[idx],
+          titulo,
+          descripcion,
+          esRepetible,
+        };
+      }
+    }
+
+    this.seccionesVisuales.set(lista);
+    this.sincronizarVisualACodigo();
+    this.dialogoSeccion.set(false);
+  }
+
+  eliminarSeccion(secClave: string): void {
+    const lista = this.seccionesVisuales().filter((s) => s.clave !== secClave);
+    this.seccionesVisuales.set(lista);
+    this.sincronizarVisualACodigo();
+  }
+
+  abrirCrearPregunta(secClave?: string): void {
+    this.modoPregunta.set('crear');
+    const defaultSec = secClave || this.seccionesVisuales()[0]?.clave || '';
+    this.preguntaForm.reset({
+      seccionClave: defaultSec,
+      clave: '',
+      titulo: '',
+      descripcion: '',
+      tipo: 'string',
+      obligatorio: false,
+      soloLectura: false,
+      longitudMinima: null,
+      longitudMaxima: null,
+      valorMinimo: null,
+      valorMaximo: null,
+      vinculo: '',
+      opcionNueva: '',
+    });
+    this.opcionesSeleccion.set([]);
+    this.dialogoPregunta.set(true);
+  }
+
+  abrirEditarPregunta(secClave: string, p: PreguntaVisual): void {
+    this.modoPregunta.set('editar');
+    this.seccionDestinoClave.set(secClave);
+    this.preguntaSeleccionadaClave.set(p.clave);
+    this.preguntaForm.reset({
+      seccionClave: secClave,
+      clave: p.clave,
+      titulo: p.titulo,
+      descripcion: p.descripcion || '',
+      tipo: p.tipo,
+      obligatorio: p.obligatorio,
+      soloLectura: Boolean(p.soloLectura),
+      longitudMinima: p.longitudMinima ?? null,
+      longitudMaxima: p.longitudMaxima ?? null,
+      valorMinimo: p.valorMinimo ?? null,
+      valorMaximo: p.valorMaximo ?? null,
+      vinculo: p.vinculo || '',
+      opcionNueva: '',
+    });
+    this.opcionesSeleccion.set(p.opciones ? [...p.opciones] : []);
+    this.dialogoPregunta.set(true);
+  }
+
+  agregarOpcion(): void {
+    const opcion = this.preguntaForm.controls.opcionNueva.value.trim();
+    if (opcion && !this.opcionesSeleccion().includes(opcion)) {
+      this.opcionesSeleccion.update((opts) => [...opts, opcion]);
+      this.preguntaForm.controls.opcionNueva.setValue('');
+    }
+  }
+
+  eliminarOpcion(index: number): void {
+    this.opcionesSeleccion.update((opts) => opts.filter((_, i) => i !== index));
+  }
+
+  guardarPreguntaModal(): void {
+    if (this.preguntaForm.invalid) {
+      this.preguntaForm.markAllAsTouched();
+      return;
+    }
+
+    const val = this.preguntaForm.getRawValue();
+    const secClave = val.seccionClave;
+    const sec = this.seccionesVisuales().find((s) => s.clave === secClave);
+    if (!sec) return;
+
+    const clave = val.clave.trim();
+    if (this.modoPregunta() === 'crear' && sec.preguntas.some((p) => p.clave === clave)) {
+      this.errorValidacion.set('Ya existe una pregunta con esa clave en esta sección.');
+      return;
+    }
+
+    const opciones =
+      val.tipo === 'select'
+        ? this.opcionesSeleccion().length > 0
+          ? [...this.opcionesSeleccion()]
+          : ['OPCION_1']
+        : undefined;
+
+    const nueva: PreguntaVisual = {
+      clave,
+      titulo: val.titulo.trim(),
+      descripcion: val.descripcion.trim() || undefined,
+      tipo: val.tipo,
+      obligatorio: val.obligatorio,
+      soloLectura: val.soloLectura,
+      opciones,
+      longitudMinima: val.longitudMinima != null ? Number(val.longitudMinima) : undefined,
+      longitudMaxima: val.longitudMaxima != null ? Number(val.longitudMaxima) : undefined,
+      valorMinimo: val.valorMinimo != null ? Number(val.valorMinimo) : undefined,
+      valorMaximo: val.valorMaximo != null ? Number(val.valorMaximo) : undefined,
+      vinculo: val.vinculo.trim() || undefined,
+    };
+
+    if (this.modoPregunta() === 'crear') {
+      sec.preguntas.push(nueva);
+    } else {
+      const idx = sec.preguntas.findIndex((p) => p.clave === this.preguntaSeleccionadaClave());
+      if (idx !== -1) {
+        sec.preguntas[idx] = nueva;
+      }
+    }
+
+    this.seccionesVisuales.set([...this.seccionesVisuales()]);
+    this.sincronizarVisualACodigo();
+    this.dialogoPregunta.set(false);
+  }
+
+  eliminarPregunta(secClave: string, pregClave: string): void {
+    const sec = this.seccionesVisuales().find((s) => s.clave === secClave);
+    if (sec) {
+      sec.preguntas = sec.preguntas.filter((p) => p.clave !== pregClave);
+      this.seccionesVisuales.set([...this.seccionesVisuales()]);
+      this.sincronizarVisualACodigo();
+    }
+  }
+
   guardarEsquema(): void {
     const ver = this.version();
     if (!ver || ver.estado === 'PUBLICADA') return;
+
+    if (this.modoEdicion() === 'visual') {
+      this.sincronizarVisualACodigo();
+    }
 
     let esquemaJson: Record<string, unknown>;
     let vinculosJson: Record<string, unknown>;
@@ -203,6 +505,9 @@ export class EditorVersionFormularioPage implements OnInit {
       .subscribe({
         next: (actualizada) => {
           this.version.set(actualizada);
+          this.seccionesVisuales.set(
+            esquemaASeccionesVisuales(actualizada.esquema, actualizada.vinculosAlmacenamiento),
+          );
           this.mensajeExito.set(this.transloco.translate('formulario.schemaSaved'));
           if (actualizada.versionAnteriorId) {
             this.cargarAnalisisMapeos(actualizada.id);

@@ -14,13 +14,14 @@ El alcance completo teórico contemplaba un editor visual interactivo ("drag-and
 
 Se aprueba el **alcance mínimo acordado** documentado en la Decisión abierta 8:
 
-1. **Gestión declarativa del formulario**:
-   - El Administrador gestiona y edita las versiones del formulario mediante estructuras estructuradas de datos: JSON Schema autoritativo, vínculos de almacenamiento relacional (`vinculos_almacenamiento`) y reglas de evaluación (`reglas_evaluacion_ic`).
+1. **Gestión declarativa del formulario con capa visual amigable**:
+   - El Administrador gestiona y edita las versiones del formulario mediante un **editor visual interactivo** que organiza secciones y preguntas en tarjetas y tablas de fácil comprensión.
+   - Mediante diálogos modales amigables, el Administrador puede crear, editar y eliminar secciones y preguntas, configurar tipos de dato (texto, párrafo multilínea, entero, decimal, fecha, sí/no, selección única con opciones dinámicas), definir restricciones (obligatoriedad, solo lectura, rangos de longitud o valor) y vincular columnas de almacenamiento relacional (`puente.*`).
+   - Se mantiene un selector de modo que permite alternar bidireccionalmente entre el **Editor visual** (modo predeterminado amigable) y el modo **Código JSON Schema** (modo avanzado), garantizando sincronización en tiempo real sin pérdida de metadatos del esquema.
    - Se provee precarga directa de la plantilla oficial inicial del manual SIECA (`sieca-v1`) con las 8 secciones, reporte fotográfico, recomendaciones y propuestas de mantenimiento (RN-FRM-07).
-   - El editor visual interactivo de preguntas queda formalmente fuera del alcance de este ciclo.
 
 2. **Validación autoritativa en backend**:
-   - Todo guardado de borrador o intento de publicación valida el JSON Schema contra la especificación formal antes de persistir, retornando ruta exacta y causa del error ante inconsistencias de sintaxis o estructura.
+   - Todo guardado de borrador o intento de publicación valida el JSON Schema contra la especificación formal (Draft 2020-12) antes de persistir, retornando ruta exacta y causa del error ante inconsistencias de sintaxis o estructura.
 
 3. **Inmutabilidad y ciclo de vida (RN-FRM-03, RN-FRM-04)**:
    - Las versiones inician en estado `BORRADOR` y pueden modificarse libremente.
@@ -34,8 +35,8 @@ Se aprueba el **alcance mínimo acordado** documentado en la Decisión abierta 8
 ## Consecuencias
 
 - **Positivas**:
-  - Cumplimiento estricto de RN-FRM-01, RN-FRM-03, RN-FRM-04, RN-FRM-06 y RN-FRM-07 sin dependencias de librerías visuales complejas o pesadas en el cliente.
-  - Mayor precisión y control técnico al definir reglas de validación avanzadas (condicionales `if`/`then`/`else`, rangos y tipos estrictos de JSON Schema).
-  - Presupuesto de bundle CSS/JS del cliente controlado y mantenido dentro de los límites exigidos.
+  - Cumplimiento estricto de RN-FRM-01, RN-FRM-03, RN-FRM-04, RN-FRM-06 y RN-FRM-07 ofreciendo una experiencia amigable y accesible para el Administrador según la retroalimentación recibida.
+  - Sincronización transparente con el estándar JSON Schema sin dependencias externas pesadas, manteniendo el presupuesto de bundle inicial del cliente por debajo del límite de 500 kB.
+  - Flexibilidad dual: interfaz gráfica intuitiva para usuarios funcionales y vista de código JSON Schema para reglas avanzadas o depuración técnica.
 - **Negativas**:
-  - El Administrador edita o ajusta el esquema mediante editores de texto/JSON asistidos por validación de esquema en lugar de una interfaz gráfica de arrastrar y soltar bloques.
+  - Requiere sincronización bidireccional entre el modelo visual y el esquema JSON al cambiar de modo o guardar, lo cual se mitiga mediante validaciones sintácticas previas.

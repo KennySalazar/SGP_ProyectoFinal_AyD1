@@ -109,28 +109,253 @@
   }
 </nav>
 
-<!-- Sección 1: Esquema JSON -->
+<!-- Sección 1: Esquema (Editor Visual y Código) -->
 @if (seccionActiva() === 'esquema') {
 <section class="surface-card editor-card">
   <div class="card-header">
-    <h2 class="card-title">{{ 'formulario.schemaTab' | transloco }}</h2>
-    @if (ver.estado === 'BORRADOR') {
-    <button pButton type="button" [disabled]="guardandoEsquema()" (click)="guardarEsquema()">
-      <i class="pi pi-save" aria-hidden="true"></i>
-      <span
-        >{{ (guardandoEsquema() ? 'formulario.savingSchema' : 'formulario.saveSchema') | transloco
-        }}</span
+    <div>
+      <h2 class="card-title">{{ 'formulario.schemaTab' | transloco }}</h2>
+      <p class="card-subtitle">
+        {{ totalSecciones() }} {{ 'formulario.totalSections' | transloco }} · {{ totalPreguntas() }}
+        {{ 'formulario.totalQuestions' | transloco }}
+      </p>
+    </div>
+
+    <div class="editor-header-actions">
+      <!-- Selector de Modo: Visual vs Código -->
+      <div class="modo-selector" role="group">
+        <button
+          pButton
+          type="button"
+          size="small"
+          [severity]="modoEdicion() === 'visual' ? 'primary' : 'secondary'"
+          [outlined]="modoEdicion() !== 'visual'"
+          (click)="cambiarModoEdicion('visual')"
+        >
+          <i class="pi pi-pencil" aria-hidden="true"></i>
+          <span>{{ 'formulario.modeVisual' | transloco }}</span>
+        </button>
+        <button
+          pButton
+          type="button"
+          size="small"
+          [severity]="modoEdicion() === 'codigo' ? 'primary' : 'secondary'"
+          [outlined]="modoEdicion() !== 'codigo'"
+          (click)="cambiarModoEdicion('codigo')"
+        >
+          <i class="pi pi-code" aria-hidden="true"></i>
+          <span>{{ 'formulario.modeCode' | transloco }}</span>
+        </button>
+      </div>
+
+      @if (ver.estado === 'BORRADOR') { @if (modoEdicion() === 'visual') {
+      <button
+        pButton
+        type="button"
+        severity="secondary"
+        [outlined]="true"
+        (click)="abrirCrearSeccion()"
       >
-    </button>
-    }
+        <i class="pi pi-plus" aria-hidden="true"></i>
+        <span>{{ 'formulario.addSection' | transloco }}</span>
+      </button>
+      }
+      <button pButton type="button" [disabled]="guardandoEsquema()" (click)="guardarEsquema()">
+        <i class="pi pi-save" aria-hidden="true"></i>
+        <span
+          >{{ (guardandoEsquema() ? 'formulario.savingSchema' : 'formulario.saveSchema') | transloco
+          }}</span
+        >
+      </button>
+      }
+    </div>
   </div>
 
+  @if (modoEdicion() === 'visual') {
+  <div class="visual-sections-container">
+    @if (seccionesVisuales().length === 0) {
+    <div class="empty-visual">
+      <i class="pi pi-inbox" aria-hidden="true"></i>
+      <p>{{ 'formulario.emptySections' | transloco }}</p>
+      @if (ver.estado === 'BORRADOR') {
+      <button pButton type="button" (click)="abrirCrearSeccion()">
+        <i class="pi pi-plus" aria-hidden="true"></i>
+        <span>{{ 'formulario.addSection' | transloco }}</span>
+      </button>
+      }
+    </div>
+    } @for (sec of seccionesVisuales(); track sec.clave) {
+    <article class="seccion-bloque">
+      <header class="seccion-bloque-header">
+        <div class="seccion-info">
+          <div class="seccion-titulo-fila">
+            <h3 class="seccion-titulo">{{ sec.titulo }}</h3>
+            <span class="clave-tag"><code>{{ sec.clave }}</code></span>
+            <p-tag
+              [value]="sec.preguntas.length + ' ' + ('formulario.totalQuestions' | transloco)"
+              severity="info"
+            ></p-tag>
+            @if (sec.esRepetible) {
+            <p-tag value="Repetible" severity="warn"></p-tag>
+            }
+          </div>
+          @if (sec.descripcion) {
+          <p class="seccion-desc">{{ sec.descripcion }}</p>
+          }
+        </div>
+
+        @if (ver.estado === 'BORRADOR') {
+        <div class="seccion-acciones">
+          <button
+            pButton
+            type="button"
+            size="small"
+            severity="secondary"
+            [outlined]="true"
+            (click)="abrirCrearPregunta(sec.clave)"
+          >
+            <i class="pi pi-plus" aria-hidden="true"></i>
+            <span>{{ 'formulario.addQuestion' | transloco }}</span>
+          </button>
+          <button
+            pButton
+            type="button"
+            size="small"
+            severity="secondary"
+            [outlined]="true"
+            [attr.aria-label]="'formulario.editSection' | transloco"
+            (click)="abrirEditarSeccion(sec)"
+          >
+            <i class="pi pi-pencil" aria-hidden="true"></i>
+          </button>
+          <button
+            pButton
+            type="button"
+            size="small"
+            severity="danger"
+            [outlined]="true"
+            [attr.aria-label]="'formulario.deleteSection' | transloco"
+            (click)="eliminarSeccion(sec.clave)"
+          >
+            <i class="pi pi-trash" aria-hidden="true"></i>
+          </button>
+        </div>
+        }
+      </header>
+
+      <div class="preguntas-tabla-wrapper">
+        @if (sec.preguntas.length === 0) {
+        <p class="seccion-sin-preguntas">{{ 'formulario.emptyQuestions' | transloco }}</p>
+        } @else {
+        <table class="tabla-preguntas">
+          <thead>
+            <tr>
+              <th scope="col">Pregunta / Campo</th>
+              <th scope="col">Tipo de dato</th>
+              <th scope="col">Reglas / Restricciones</th>
+              <th scope="col">Vínculo</th>
+              @if (ver.estado === 'BORRADOR') {
+              <th scope="col" class="acciones-col">Acciones</th>
+              }
+            </tr>
+          </thead>
+          <tbody>
+            @for (p of sec.preguntas; track p.clave) {
+            <tr>
+              <td class="pregunta-col">
+                <strong class="pregunta-titulo">{{ p.titulo }}</strong>
+                <div class="pregunta-meta">
+                  <code>{{ p.clave }}</code>
+                  @if (p.descripcion) {
+                  <span class="pregunta-desc-text">— {{ p.descripcion }}</span>
+                  }
+                </div>
+              </td>
+              <td>
+                <span class="tipo-badge">
+                  <i [class]="obtenerIconoTipo(p.tipo)" aria-hidden="true"></i>
+                  <span>{{ obtenerEtiquetaTipo(p.tipo) }}</span>
+                </span>
+              </td>
+              <td>
+                <div class="reglas-tags">
+                  @if (p.obligatorio) {
+                  <span class="regla-tag obligatoria">Obligatorio</span>
+                  } @else {
+                  <span class="regla-tag opcional">Opcional</span>
+                  } @if (p.soloLectura) {
+                  <span class="regla-tag lectura">Solo lectura</span>
+                  } @if ((p.longitudMinima !== undefined && p.longitudMinima !== null) ||
+                  (p.longitudMaxima !== undefined && p.longitudMaxima !== null)) {
+                  <span class="regla-tag"
+                    >Long: {{ p.longitudMinima ?? 0 }}-{{ p.longitudMaxima ?? '∞' }}</span
+                  >
+                  } @if ((p.valorMinimo !== undefined && p.valorMinimo !== null) || (p.valorMaximo
+                  !== undefined && p.valorMaximo !== null)) {
+                  <span class="regla-tag"
+                    >Val: [{{ p.valorMinimo ?? '-∞' }}, {{ p.valorMaximo ?? '∞' }}]</span
+                  >
+                  } @if (p.opciones && p.opciones.length > 0) {
+                  <span class="regla-tag opciones" [title]="p.opciones.join(', ')">
+                    {{ p.opciones.length }} opciones
+                  </span>
+                  }
+                </div>
+              </td>
+              <td>
+                @if (p.vinculo) {
+                <code class="vinculo-code"
+                  ><i class="pi pi-database" aria-hidden="true"></i> {{ p.vinculo }}</code
+                >
+                } @else {
+                <span class="texto-apagado">—</span>
+                }
+              </td>
+              @if (ver.estado === 'BORRADOR') {
+              <td class="acciones-col">
+                <div class="acciones-grupo">
+                  <button
+                    pButton
+                    type="button"
+                    size="small"
+                    severity="secondary"
+                    [outlined]="true"
+                    [attr.aria-label]="'formulario.editQuestion' | transloco"
+                    (click)="abrirEditarPregunta(sec.clave, p)"
+                  >
+                    <i class="pi pi-pencil" aria-hidden="true"></i>
+                  </button>
+                  <button
+                    pButton
+                    type="button"
+                    size="small"
+                    severity="danger"
+                    [outlined]="true"
+                    [attr.aria-label]="'formulario.deleteQuestion' | transloco"
+                    (click)="eliminarPregunta(sec.clave, p.clave)"
+                  >
+                    <i class="pi pi-trash" aria-hidden="true"></i>
+                  </button>
+                </div>
+              </td>
+              }
+            </tr>
+            }
+          </tbody>
+        </table>
+        }
+      </div>
+    </article>
+    }
+  </div>
+  } @else {
   <textarea
     class="codigo-editor"
     rows="22"
     [readonly]="ver.estado === 'PUBLICADA'"
     [(ngModel)]="esquemaTexto"
   ></textarea>
+  }
 </section>
 }
 
@@ -510,6 +735,302 @@
       </button>
       <button pButton type="submit" [disabled]="nuevaDerivadaForm.invalid || cargando()">
         <span>{{ 'formulario.create' | transloco }}</span>
+      </button>
+    </div>
+  </form>
+</p-dialog>
+
+<!-- Diálogo para crear/editar Sección -->
+<p-dialog
+  [header]="(modoSeccion() === 'crear' ? 'formulario.addSection' : 'formulario.editSection') | transloco"
+  [visible]="dialogoSeccion()"
+  [modal]="true"
+  [style]="{ width: '480px', maxWidth: '95vw' }"
+  (onHide)="dialogoSeccion.set(false)"
+>
+  <form [formGroup]="seccionForm" (ngSubmit)="guardarSeccionModal()" class="dialog-form" novalidate>
+    <div class="form-field">
+      <label for="sec-clave" class="field-label">{{ 'formulario.sectionKey' | transloco }} *</label>
+      <input
+        pInputText
+        id="sec-clave"
+        type="text"
+        formControlName="clave"
+        placeholder="ej. subestructura_pilotes"
+        [readonly]="modoSeccion() === 'editar'"
+      />
+      @if (seccionForm.controls.clave.invalid && seccionForm.controls.clave.touched) {
+      <small class="validation-msg">Solo letras minúsculas, números y guión bajo.</small>
+      }
+    </div>
+
+    <div class="form-field">
+      <label for="sec-titulo" class="field-label"
+        >{{ 'formulario.sectionTitle' | transloco }} *</label
+      >
+      <input
+        pInputText
+        id="sec-titulo"
+        type="text"
+        formControlName="titulo"
+        placeholder="ej. 9. Cimentación y pilotes"
+      />
+    </div>
+
+    <div class="form-field">
+      <label for="sec-desc" class="field-label"
+        >{{ 'formulario.sectionDescription' | transloco }}</label
+      >
+      <textarea
+        pTextarea
+        id="sec-desc"
+        formControlName="descripcion"
+        rows="2"
+        placeholder="Descripción o instrucciones"
+      ></textarea>
+    </div>
+
+    <div class="field-checkbox">
+      <input id="sec-rep" type="checkbox" formControlName="esRepetible" />
+      <label for="sec-rep">{{ 'formulario.repeatableSection' | transloco }}</label>
+    </div>
+
+    <div class="dialog-actions">
+      <button
+        pButton
+        type="button"
+        severity="secondary"
+        [outlined]="true"
+        (click)="dialogoSeccion.set(false)"
+      >
+        <span>{{ 'formulario.cancel' | transloco }}</span>
+      </button>
+      <button pButton type="submit" [disabled]="seccionForm.invalid">
+        <span
+          >{{ (modoSeccion() === 'crear' ? 'formulario.create' : 'common.save') | transloco }}</span
+        >
+      </button>
+    </div>
+  </form>
+</p-dialog>
+
+<!-- Diálogo para crear/editar Pregunta -->
+<p-dialog
+  [header]="(modoPregunta() === 'crear' ? 'formulario.addQuestion' : 'formulario.editQuestion') | transloco"
+  [visible]="dialogoPregunta()"
+  [modal]="true"
+  [style]="{ width: '620px', maxWidth: '95vw' }"
+  (onHide)="dialogoPregunta.set(false)"
+>
+  <form
+    [formGroup]="preguntaForm"
+    (ngSubmit)="guardarPreguntaModal()"
+    class="dialog-form"
+    novalidate
+  >
+    <div class="form-field">
+      <label for="preg-sec" class="field-label"
+        >{{ 'formulario.sectionTitle' | transloco }} *</label
+      >
+      <select id="preg-sec" class="sgp-select" formControlName="seccionClave">
+        @for (sec of seccionesVisuales(); track sec.clave) {
+        <option [value]="sec.clave">{{ sec.titulo }} ({{ sec.clave }})</option>
+        }
+      </select>
+    </div>
+
+    <div class="form-row-2">
+      <div class="form-field">
+        <label for="preg-clave" class="field-label"
+          >{{ 'formulario.questionKey' | transloco }} *</label
+        >
+        <input
+          pInputText
+          id="preg-clave"
+          type="text"
+          formControlName="clave"
+          placeholder="ej. ancho_acera_m"
+          [readonly]="modoPregunta() === 'editar'"
+        />
+        @if (preguntaForm.controls.clave.invalid && preguntaForm.controls.clave.touched) {
+        <small class="validation-msg">Solo letras minúsculas, números y guión bajo.</small>
+        }
+      </div>
+
+      <div class="form-field">
+        <label for="preg-tipo" class="field-label">{{ 'formulario.dataType' | transloco }} *</label>
+        <select id="preg-tipo" class="sgp-select" formControlName="tipo">
+          @for (t of tiposDato; track t.value) {
+          <option [value]="t.value">{{ t.label }}</option>
+          }
+        </select>
+      </div>
+    </div>
+
+    <div class="form-field">
+      <label for="preg-titulo" class="field-label"
+        >{{ 'formulario.questionTitle' | transloco }} *</label
+      >
+      <input
+        pInputText
+        id="preg-titulo"
+        type="text"
+        formControlName="titulo"
+        placeholder="ej. Ancho de acera derecha (m)"
+      />
+    </div>
+
+    <div class="form-field">
+      <label for="preg-desc" class="field-label"
+        >{{ 'formulario.questionDescription' | transloco }}</label
+      >
+      <input
+        pInputText
+        id="preg-desc"
+        type="text"
+        formControlName="descripcion"
+        placeholder="Instrucciones o ayuda para el inspector"
+      />
+    </div>
+
+    @if (preguntaForm.controls.tipo.value === 'select') {
+    <div class="form-field opciones-block">
+      <label for="preg-opcion-nueva" class="field-label"
+        >{{ 'formulario.options' | transloco }} *</label
+      >
+      <div class="opcion-input-row">
+        <input
+          pInputText
+          id="preg-opcion-nueva"
+          type="text"
+          formControlName="opcionNueva"
+          placeholder="Escriba una opción y presione Agregar"
+          (keydown.enter)="$event.preventDefault(); agregarOpcion()"
+        />
+        <button
+          pButton
+          type="button"
+          severity="secondary"
+          [outlined]="true"
+          (click)="agregarOpcion()"
+        >
+          <i class="pi pi-plus" aria-hidden="true"></i>
+          <span>{{ 'formulario.addOption' | transloco }}</span>
+        </button>
+      </div>
+      <div class="opciones-chips">
+        @for (op of opcionesSeleccion(); track op; let idx = $index) {
+        <span class="opcion-chip">
+          {{ op }}
+          <button type="button" class="btn-quitar-chip" (click)="eliminarOpcion(idx)">×</button>
+        </span>
+        } @if (opcionesSeleccion().length === 0) {
+        <small class="validation-msg">Debe agregar al menos una opción para selección.</small>
+        }
+      </div>
+    </div>
+    } @if (preguntaForm.controls.tipo.value === 'integer' || preguntaForm.controls.tipo.value ===
+    'number') {
+    <div class="form-row-2">
+      <div class="form-field">
+        <label for="preg-val-min" class="field-label"
+          >{{ 'formulario.minValue' | transloco }}</label
+        >
+        <input
+          id="preg-val-min"
+          type="number"
+          pInputText
+          formControlName="valorMinimo"
+          placeholder="Sin mínimo"
+        />
+      </div>
+      <div class="form-field">
+        <label for="preg-val-max" class="field-label"
+          >{{ 'formulario.maxValue' | transloco }}</label
+        >
+        <input
+          id="preg-val-max"
+          type="number"
+          pInputText
+          formControlName="valorMaximo"
+          placeholder="Sin máximo"
+        />
+      </div>
+    </div>
+    } @if (preguntaForm.controls.tipo.value === 'string' || preguntaForm.controls.tipo.value ===
+    'multiline') {
+    <div class="form-row-2">
+      <div class="form-field">
+        <label for="preg-len-min" class="field-label"
+          >{{ 'formulario.minLength' | transloco }}</label
+        >
+        <input
+          id="preg-len-min"
+          type="number"
+          pInputText
+          formControlName="longitudMinima"
+          placeholder="Sin mínimo"
+        />
+      </div>
+      <div class="form-field">
+        <label for="preg-len-max" class="field-label"
+          >{{ 'formulario.maxLength' | transloco }}</label
+        >
+        <input
+          id="preg-len-max"
+          type="number"
+          pInputText
+          formControlName="longitudMaxima"
+          placeholder="Sin máximo"
+        />
+      </div>
+    </div>
+    }
+
+    <div class="form-field">
+      <label for="preg-vinc" class="field-label"
+        >{{ 'formulario.storageBinding' | transloco }}</label
+      >
+      <input
+        pInputText
+        id="preg-vinc"
+        type="text"
+        formControlName="vinculo"
+        placeholder="ej. puente.ancho_acera_derecha_m"
+      />
+    </div>
+
+    <div class="form-row-checkboxes">
+      <div class="field-checkbox">
+        <input id="preg-req" type="checkbox" formControlName="obligatorio" />
+        <label for="preg-req">{{ 'formulario.required' | transloco }}</label>
+      </div>
+
+      <div class="field-checkbox">
+        <input id="preg-ro" type="checkbox" formControlName="soloLectura" />
+        <label for="preg-ro">{{ 'formulario.readOnly' | transloco }}</label>
+      </div>
+    </div>
+
+    <div class="dialog-actions">
+      <button
+        pButton
+        type="button"
+        severity="secondary"
+        [outlined]="true"
+        (click)="dialogoPregunta.set(false)"
+      >
+        <span>{{ 'formulario.cancel' | transloco }}</span>
+      </button>
+      <button
+        pButton
+        type="submit"
+        [disabled]="preguntaForm.invalid || (preguntaForm.controls.tipo.value === 'select' && opcionesSeleccion().length === 0)"
+      >
+        <span
+          >{{ (modoPregunta() === 'crear' ? 'formulario.create' : 'common.save') | transloco
+          }}</span
+        >
       </button>
     </div>
   </form>

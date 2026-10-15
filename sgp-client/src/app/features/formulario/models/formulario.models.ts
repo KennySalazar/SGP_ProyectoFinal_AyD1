@@ -111,3 +111,29 @@ export interface DeclaracionMapeoRequest {
 export interface PublicarVersionRequest {
   mapeos?: DeclaracionMapeoRequest[] | null;
 }
+
+export type TipoDatoVisual =
+  'string' | 'multiline' | 'integer' | 'number' | 'boolean' | 'select' | 'date';
+
+export interface PreguntaVisual {
+  clave: string;
+  titulo: string;
+  descripcion?: string;
+  tipo: TipoDatoVisual;
+  obligatorio: boolean;
+  soloLectura?: boolean;
+  opciones?: string[];
+  longitudMinima?: number;
+  longitudMaxima?: number;
+  valorMinimo?: number;
+  valorMaximo?: number;
+  vinculo?: string;
+}
+
+export interface SeccionVisual {
+  clave: string;
+  titulo: string;
+  descripcion?: string;
+  esRepetible?: boolean;
+  preguntas: PreguntaVisual[];
+}
