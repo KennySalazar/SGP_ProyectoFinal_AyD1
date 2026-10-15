@@ -289,7 +289,7 @@
               <th scope="col">Pregunta / Campo</th>
               <th scope="col">Tipo de dato</th>
               <th scope="col">Reglas / Restricciones</th>
-              <th scope="col">Vínculo</th>
+              <th scope="col">{{ 'formulario.storageTargetHeader' | transloco }}</th>
               @if (ver.estado === 'BORRADOR') {
               <th scope="col" class="acciones-col">Acciones</th>
               }
@@ -339,12 +339,20 @@
                 </div>
               </td>
               <td>
-                @if (p.vinculo) {
-                <code class="vinculo-code"
-                  ><i class="pi pi-database" aria-hidden="true"></i> {{ p.vinculo }}</code
-                >
+                @if (p.vinculo) { @let info = describirVinculo(p.vinculo);
+                <div class="vinculo-cell" [title]="p.vinculo">
+                  <span class="vinculo-pill" [class]="'cat-' + info.categoria">
+                    <i [class]="info.icono" aria-hidden="true"></i>
+                    <span>{{ info.etiquetaCategoria }}</span>
+                  </span>
+                  <span class="vinculo-campo-texto">{{ info.etiquetaCampo }}</span>
+                </div>
                 } @else {
-                <span class="texto-apagado">—</span>
+                <span
+                  class="texto-apagado"
+                  title="Se almacena en el documento de respuestas de la inspección"
+                  >Formulario (JSON)</span
+                >
                 }
               </td>
               @if (ver.estado === 'BORRADOR') {
@@ -514,16 +522,21 @@
         @for (v of vinculosFiltrados(); track v.id) {
         <tr>
           <td class="pregunta-col">
+            <strong class="vinculo-campo-titulo">{{ obtenerTituloCampoRef(v.campoRef) }}</strong>
             <div class="vinculo-campo-ref">
               <i class="pi pi-file-edit" aria-hidden="true"></i>
               <code>{{ v.campoRef }}</code>
             </div>
           </td>
           <td>
-            <code class="vinculo-code destino">
-              <i class="pi pi-database" aria-hidden="true"></i>
-              {{ v.columnaDestino }}
-            </code>
+            @let info = describirVinculo(v.columnaDestino);
+            <div class="vinculo-destino-humano">
+              <strong class="vinculo-humano-titulo">{{ info.nombreCompleto }}</strong>
+              <div class="vinculo-tecnico-sub">
+                <i class="pi pi-database" aria-hidden="true"></i>
+                <code>{{ v.columnaDestino }}</code>
+              </div>
+            </div>
           </td>
           <td>
             <p-tag
@@ -1197,8 +1210,21 @@
         id="preg-vinc"
         type="text"
         formControlName="vinculo"
-        placeholder="ej. puente.ancho_acera_derecha_m"
+        list="sugerencias-columnas-list-preg"
+        placeholder="ej. puente.codigo o inspeccion_dato_tecnico.longitud_m"
       />
+      <datalist id="sugerencias-columnas-list-preg">
+        @for (sug of sugerenciasColumnasDestino; track sug) {
+        <option [value]="sug">{{ formatearDestinoHumano(sug) }}</option>
+        }
+      </datalist>
+      <small class="field-help-text">{{ 'formulario.storageBindingHint' | transloco }}</small>
+      @if (preguntaForm.controls.vinculo.value; as vincVal) {
+      <div class="vinculo-preview-helper">
+        <i class="pi pi-info-circle" aria-hidden="true"></i>
+        <span>Destino: <strong>{{ formatearDestinoHumano(vincVal) }}</strong></span>
+      </div>
+      }
     </div>
 
     <div class="form-row-checkboxes">
@@ -1282,10 +1308,16 @@
       />
       <datalist id="sugerencias-columnas-list">
         @for (sug of sugerenciasColumnasDestino; track sug) {
-        <option [value]="sug"></option>
+        <option [value]="sug">{{ formatearDestinoHumano(sug) }}</option>
         }
       </datalist>
-      <small class="field-help-text">Tabla y columna o propiedad destino donde se persistirá</small>
+      <small class="field-help-text">Propiedad o columna del sistema donde se persistirá</small>
+      @if (vinculoForm.controls.columnaDestino.value; as destVal) {
+      <div class="vinculo-preview-helper">
+        <i class="pi pi-info-circle" aria-hidden="true"></i>
+        <span>Destino: <strong>{{ formatearDestinoHumano(destVal) }}</strong></span>
+      </div>
+      }
     </div>
 
     <div class="form-row-2">

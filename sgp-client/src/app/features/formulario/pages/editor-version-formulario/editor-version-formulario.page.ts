@@ -42,6 +42,14 @@ import {
 
 type SeccionActiva = 'esquema' | 'vinculos' | 'pesos' | 'mapeos' | 'publicar';
 
+export interface InfoVinculoDestino {
+  categoria: 'puente' | 'tecnico' | 'inspeccion' | 'otro';
+  etiquetaCategoria: string;
+  etiquetaCampo: string;
+  nombreCompleto: string;
+  icono: string;
+}
+
 @Component({
   selector: 'app-editor-version-formulario-page',
   standalone: true,
@@ -447,6 +455,154 @@ export class EditorVersionFormularioPage implements OnInit {
   limpiarTituloSeccion(titulo: string): string {
     if (!titulo) return '';
     return titulo.replace(/^\d+[.\-\s:]+\s*/, '').trim();
+  }
+
+  describirVinculo(destino: string | null | undefined): InfoVinculoDestino {
+    if (!destino || destino.trim().length === 0) {
+      return {
+        categoria: 'otro',
+        etiquetaCategoria: 'Formulario',
+        etiquetaCampo: 'Documento JSON',
+        nombreCompleto: 'Formulario de inspección (JSON)',
+        icono: 'pi pi-file',
+      };
+    }
+
+    const d = destino.trim();
+
+    // Ficha del puente / Inventario
+    if (
+      d.startsWith('puente.') ||
+      d.includes('puente.municipio_id') ||
+      d.startsWith('municipio.') ||
+      d.startsWith('departamento.')
+    ) {
+      let campo = 'Dato de inventario';
+      if (d === 'puente.codigo') campo = 'Código del puente';
+      else if (d === 'puente.nombre') campo = 'Nombre del puente';
+      else if (d === 'puente.ruta') campo = 'Ruta';
+      else if (d === 'puente.kilometraje') campo = 'Kilometraje';
+      else if (d.includes('municipio')) campo = 'Municipio del puente';
+      else if (d.includes('departamento')) campo = 'Departamento del puente';
+      else {
+        const sub = d.replace(/^puente\./, '').replace(/_/g, ' ');
+        campo = sub.charAt(0).toUpperCase() + sub.slice(1);
+      }
+      return {
+        categoria: 'puente',
+        etiquetaCategoria: 'Ficha del puente',
+        etiquetaCampo: campo,
+        nombreCompleto: `Ficha del puente: ${campo}`,
+        icono: 'pi pi-id-card',
+      };
+    }
+
+    // Cabecera inspección
+    if (d.startsWith('inspeccion.')) {
+      let campo = 'Dato de inspección';
+      if (d === 'inspeccion.fecha_inspeccion') campo = 'Fecha de inspección';
+      else if (d === 'inspeccion.nombre_autor_capturado') campo = 'Inspector asignado';
+      else {
+        const sub = d.replace(/^inspeccion\./, '').replace(/_/g, ' ');
+        campo = sub.charAt(0).toUpperCase() + sub.slice(1);
+      }
+      return {
+        categoria: 'inspeccion',
+        etiquetaCategoria: 'Inspección',
+        etiquetaCampo: campo,
+        nombreCompleto: `Inspección: ${campo}`,
+        icono: 'pi pi-calendar',
+      };
+    }
+
+    // Ficha técnica relacional
+    if (d.startsWith('inspeccion_dato_tecnico.')) {
+      const col = d.replace('inspeccion_dato_tecnico.', '');
+      const mapaCamposTecnicos: Record<string, string> = {
+        longitud_m: 'Longitud total (m)',
+        numero_tramos: 'Número de tramos',
+        ancho_rodadura_m: 'Ancho de rodadura (m)',
+        ancho_acera_derecha_m: 'Ancho acera derecha (m)',
+        ancho_acera_izquierda_m: 'Ancho acera izquierda (m)',
+        altura_libre_superior_m: 'Gálibo / Altura superior (m)',
+        altura_libre_sobre_cauce_m: 'Altura libre sobre cauce (m)',
+        tipologia_puente: 'Tipología del puente',
+        tipo_cruce: 'Tipo de cruce',
+        numero_vias_por_sentido: 'Vías por sentido',
+        material_superestructura: 'Material de superestructura',
+        material_subestructura: 'Material de subestructura',
+        carga_diseno: 'Carga de diseño',
+        anio_construccion: 'Año de construcción',
+        trafico_vehiculos_dia: 'Tráfico diario (veh/día)',
+        porcentaje_camiones_buses: 'Porcentaje camiones y buses',
+        ruta_pavimentada: 'Ruta pavimentada',
+        alineamiento_horizontal: 'Alineamiento horizontal',
+        esviaje: 'Esviaje',
+        poblacion_antes: 'Población antes del puente',
+        poblacion_despues: 'Población después del puente',
+        tipo_cuerpo_agua: 'Tipo de cuerpo de agua',
+        nombre_rio: 'Nombre del río / cauce',
+        encauzamiento: 'Encauzamiento',
+        antecedente_desbordamiento: 'Antecedente de desbordamiento',
+        frecuencia_desbordamiento_anios: 'Frecuencia desbordamiento (años)',
+        fecha_ultimo_desbordamiento: 'Fecha último desbordamiento',
+        alumbrado_existe: 'Alumbrado artificial',
+        drenajes_aledanos_existen: 'Drenajes aledaños',
+      };
+      const campo = mapaCamposTecnicos[col] || col.replace(/_/g, ' ');
+      return {
+        categoria: 'tecnico',
+        etiquetaCategoria: 'Dato técnico',
+        etiquetaCampo: campo,
+        nombreCompleto: `Dato técnico: ${campo}`,
+        icono: 'pi pi-table',
+      };
+    }
+
+    if (d.startsWith('inspeccion_tramo.')) {
+      const col = d.replace('inspeccion_tramo.', '').replace(/_/g, ' ');
+      return {
+        categoria: 'tecnico',
+        etiquetaCategoria: 'Tramo',
+        etiquetaCampo: col,
+        nombreCompleto: `Detalle de tramo: ${col}`,
+        icono: 'pi pi-list',
+      };
+    }
+
+    return {
+      categoria: 'otro',
+      etiquetaCategoria: 'Enlazado',
+      etiquetaCampo: d,
+      nombreCompleto: d,
+      icono: 'pi pi-database',
+    };
+  }
+
+  formatearDestinoHumano(destino: string | null | undefined): string {
+    return this.describirVinculo(destino).nombreCompleto;
+  }
+
+  obtenerTituloCampoRef(campoRef: string): string {
+    if (!campoRef) return '';
+    const partes = campoRef.replace(/^\//, '').split('/');
+    if (partes.length >= 2) {
+      const secClave = partes[0];
+      const pregClave = partes[1];
+      const sec = this.seccionesVisuales().find((s) => s.clave === secClave);
+      if (sec) {
+        const p = sec.preguntas.find(
+          (preg) => preg.clave === pregClave || preg.clave.startsWith(pregClave),
+        );
+        if (p) {
+          const titSec = this.limpiarTituloSeccion(sec.titulo);
+          return `${p.titulo} (${titSec})`;
+        }
+        const titSec = this.limpiarTituloSeccion(sec.titulo);
+        return `${pregClave.replace(/_/g, ' ')} (${titSec})`;
+      }
+    }
+    return campoRef.replace(/^\//, '').replace(/\//g, ' › ').replace(/_/g, ' ');
   }
 
   eliminarSeccion(secClave: string): void {
