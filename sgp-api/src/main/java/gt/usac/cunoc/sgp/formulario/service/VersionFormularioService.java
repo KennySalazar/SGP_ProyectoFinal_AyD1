@@ -115,6 +115,28 @@ public class VersionFormularioService {
     return mapper.toActivoResponse(activa);
   }
 
+  /**
+   * Esquema de una versión publicada (activa o anterior) para mostrar una inspección con la
+   * estructura con la que se levantó (RN-FRM-05). Los borradores no se exponen.
+   */
+  @Transactional(readOnly = true)
+  @PreAuthorize("isAuthenticated()")
+  public FormularioActivoResponse obtenerPublicadaPorId(UUID id) {
+    VersionFormulario version =
+        versiones
+            .findById(id)
+            .filter(candidata -> candidata.getEstado() == EstadoVersionFormulario.PUBLICADA)
+            .orElseThrow(
+                () ->
+                    new ApiException(
+                        HttpStatus.NOT_FOUND,
+                        "version_no_encontrada",
+                        "Versión no encontrada",
+                        "No existe una versión publicada con identificador " + id));
+
+    return mapper.toActivoResponse(version);
+  }
+
   @Transactional
   @PreAuthorize("hasRole('ADMINISTRADOR')")
   @Auditable(accion = AccionAuditoria.CREAR, entidad = "version_formulario")
