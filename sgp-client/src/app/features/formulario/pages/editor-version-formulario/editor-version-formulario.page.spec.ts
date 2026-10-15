@@ -113,18 +113,104 @@ describe('EditorVersionFormularioPage', () => {
   });
 
   it('debe guardar cambios del esquema', () => {
+    component.modoEdicion.set('codigo');
     component.esquemaTexto.set('{"type": "object", "title": "Nuevo"}');
     component.guardarEsquema();
 
     expect(apiMock.actualizarBorrador).toHaveBeenCalled();
   });
 
-  it('debe rechazar esquema con JSON malformado', () => {
+  it('debe rechazar esquema con JSON malformado en modo código', () => {
+    component.modoEdicion.set('codigo');
     component.esquemaTexto.set('{invalido json');
     component.guardarEsquema();
 
     expect(component.errorValidacion()).not.toBeNull();
     expect(apiMock.actualizarBorrador).not.toHaveBeenCalled();
+  });
+
+  it('debe alternar entre modo visual y modo código', () => {
+    expect(component.modoEdicion()).toBe('visual');
+    component.cambiarModoEdicion('codigo');
+    expect(component.modoEdicion()).toBe('codigo');
+    component.cambiarModoEdicion('visual');
+    expect(component.modoEdicion()).toBe('visual');
+  });
+
+  it('debe permitir crear y editar una sección visualmente', () => {
+    component.abrirCrearSeccion();
+    expect(component.dialogoSeccion()).toBe(true);
+    expect(component.modoSeccion()).toBe('crear');
+
+    component.seccionForm.setValue({
+      clave: 'superestructura_arcos',
+      titulo: 'Superestructura de Arcos',
+      descripcion: 'Evaluación de arcos',
+      esRepetible: false,
+    });
+    component.guardarSeccionModal();
+
+    expect(component.dialogoSeccion()).toBe(false);
+    const secCreada = component
+      .seccionesVisuales()
+      .find((s) => s.clave === 'superestructura_arcos');
+    expect(secCreada).toBeTruthy();
+    expect(secCreada?.titulo).toBe('Superestructura de Arcos');
+
+    // Editar sección
+    component.abrirEditarSeccion(secCreada!);
+    expect(component.modoSeccion()).toBe('editar');
+    component.seccionForm.controls.titulo.setValue('Superestructura de Arcos Modificada');
+    component.guardarSeccionModal();
+
+    const secEditada = component
+      .seccionesVisuales()
+      .find((s) => s.clave === 'superestructura_arcos');
+    expect(secEditada?.titulo).toBe('Superestructura de Arcos Modificada');
+  });
+
+  it('debe permitir agregar y eliminar preguntas visualmente', () => {
+    component.seccionesVisuales.set([{ clave: 'geometria', titulo: 'Geometría', preguntas: [] }]);
+
+    component.abrirCrearPregunta('geometria');
+    expect(component.dialogoPregunta()).toBe(true);
+    expect(component.modoPregunta()).toBe('crear');
+
+    component.preguntaForm.setValue({
+      seccionClave: 'geometria',
+      clave: 'ancho_calzada',
+      titulo: 'Ancho de la calzada (m)',
+      descripcion: 'Medida en metros',
+      tipo: 'number',
+      obligatorio: true,
+      soloLectura: false,
+      longitudMinima: null,
+      longitudMaxima: null,
+      valorMinimo: 1,
+      valorMaximo: 50,
+      vinculo: 'puente.ancho_calzada_m',
+      opcionNueva: '',
+    });
+    component.guardarPreguntaModal();
+
+    expect(component.dialogoPregunta()).toBe(false);
+    const sec = component.seccionesVisuales().find((s) => s.clave === 'geometria');
+    expect(sec?.preguntas).toHaveLength(1);
+    expect(sec?.preguntas[0].clave).toBe('ancho_calzada');
+    expect(sec?.preguntas[0].obligatorio).toBe(true);
+
+    // Eliminar pregunta
+    component.eliminarPregunta('geometria', 'ancho_calzada');
+    expect(sec?.preguntas).toHaveLength(0);
+  });
+
+  it('debe gestionar opciones en preguntas de selección', () => {
+    component.preguntaForm.controls.opcionNueva.setValue('BUENO');
+    component.agregarOpcion();
+    expect(component.opcionesSeleccion()).toContain('BUENO');
+
+    component.eliminarOpcion(0);
+    expect(component.opcionesSeleccion()).not.toContain('BUENO');
   });
 
   it('debe calibrar y guardar pesos', () => {
