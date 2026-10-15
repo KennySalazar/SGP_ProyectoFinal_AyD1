@@ -26,7 +26,7 @@ public interface PuenteMapper {
   @Mapping(target = "departamento", source = "municipio.departamento")
   @Mapping(target = "latitud", expression = "java(puente.getUbicacion().getY())")
   @Mapping(target = "longitud", expression = "java(puente.getUbicacion().getX())")
-  @Mapping(target = "estadoActual", constant = "Sin evaluar")
+  @Mapping(target = "estadoActual", source = "estadoActual")
   PuenteCatalogoResponse toCatalogoResponse(Puente puente);
 
   DepartamentoResponse toDepartamentoResponse(Departamento departamento);
@@ -43,9 +43,9 @@ public interface PuenteMapper {
   @Mapping(target = "latitud", expression = "java(puente.getUbicacion().getY())")
   @Mapping(target = "longitud", expression = "java(puente.getUbicacion().getX())")
   @Mapping(target = "utm", source = "utm")
-  @Mapping(target = "estadoActual", constant = "Sin evaluar")
-  @Mapping(target = "indiceCondicionActual", expression = "java((java.math.BigDecimal) null)")
-  @Mapping(target = "fechaUltimaInspeccion", expression = "java((java.time.LocalDate) null)")
+  @Mapping(target = "estadoActual", source = "puente.estadoActual")
+  @Mapping(target = "indiceCondicionActual", source = "puente.indiceCondicionActual")
+  @Mapping(target = "fechaUltimaInspeccion", source = "puente.fechaUltimaInspeccion")
   @Mapping(
       target = "creadoEn",
       expression =

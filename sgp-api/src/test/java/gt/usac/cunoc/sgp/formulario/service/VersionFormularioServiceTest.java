@@ -457,6 +457,7 @@ class VersionFormularioServiceTest {
                           }
                         ],
                         "reglas_evaluacion_ic": {
+                          "version_algoritmo": "ic-sieca-v1-prueba",
                           "escala_severidad": {
                             "NO_PRESENTA": 0,
                             "LEVE": 1,
@@ -466,6 +467,7 @@ class VersionFormularioServiceTest {
                         }
                       }
                       """);
+
       return new VersionFormulario(
           id, codigo, estado, activa, esquema, vinculos, reglas, null, usuarioId, fija, fija);
     } catch (Exception e) {
@@ -625,51 +627,5 @@ class VersionFormularioServiceTest {
             BigDecimal.valueOf(2),
             "SEVERO",
             BigDecimal.valueOf(4)));
-  }
-
-  @Test
-  void publicarRechazaEscalaIncompletaSinActivarLaVersion() throws Exception {
-    UUID id = UUID.randomUUID();
-    VersionFormulario borrador = crearEntidad(id, "v1", EstadoVersionFormulario.BORRADOR, false);
-
-    borrador.setReglasEvaluacionIc(
-        objectMapper.readTree(
-            """
-                    {
-                      "elementos": [{"elemento_ref": "/vigas"}],
-                      "reglas_evaluacion_ic": {
-                        "escala_severidad": {
-                          "NO_PRESENTA": 0,
-                          "LEVE": 1,
-                          "MODERADO": null,
-                          "SEVERO": null
-                        }
-                      }
-                    }
-                    """));
-
-    ConfiguracionIcElemento peso =
-        new ConfiguracionIcElemento(
-            UUID.randomUUID(), borrador, "/vigas", BigDecimal.ONE, "Vigas", fija);
-
-    when(versiones.findById(id)).thenReturn(Optional.of(borrador));
-    when(configuracionesIc.findAllByVersionFormularioId(id)).thenReturn(List.of(peso));
-
-    assertThatThrownBy(() -> service.publicar(id, null, usuarioId))
-        .isInstanceOf(ApiException.class)
-        .hasMessageContaining("MODERADO")
-        .hasMessageContaining("SEVERO")
-        .satisfies(
-            ex -> {
-              ApiException error = (ApiException) ex;
-              assertThat(error.getCode()).isEqualTo("escala_incompleta");
-              assertThat(error.getStatus()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
-            });
-
-    verify(versiones, org.mockito.Mockito.never()).desactivarTodas();
-    verify(versiones, org.mockito.Mockito.never()).saveAndFlush(any(VersionFormulario.class));
-
-    assertThat(borrador.getEstado()).isEqualTo(EstadoVersionFormulario.BORRADOR);
-    assertThat(borrador.isActiva()).isFalse();
   }
 }

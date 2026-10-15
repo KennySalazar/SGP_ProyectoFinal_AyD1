@@ -655,6 +655,21 @@ public class VersionFormularioService {
 
     Instant ahora = clock.instant();
 
+    JsonNode algoritmoNode =
+        version.getReglasEvaluacionIc().at("/reglas_evaluacion_ic/version_algoritmo");
+
+    if (!algoritmoNode.isTextual()
+        || algoritmoNode.asText().isBlank()
+        || algoritmoNode.asText().length() > 50) {
+      throw new ApiException(
+          HttpStatus.UNPROCESSABLE_ENTITY,
+          "configuracion_ic_incompleta",
+          "Algoritmo IC invalido",
+          "Debe configurar version_algoritmo con un identificador de hasta 50 caracteres.");
+    }
+
+    String versionAlgoritmo = algoritmoNode.asText();
+
     // 5. Desactivar versión activa anterior asegurando que solo exista una activa (RN-FRM-04)
     versiones.desactivarTodas();
     versiones.flush();
@@ -662,7 +677,7 @@ public class VersionFormularioService {
     // 6. Publicar y activar
     String hash = calcularSha256(version.getEsquema());
     version.setHashContenido(hash);
-    version.setVersionAlgoritmoIc("IC-SIECA-v1");
+    version.setVersionAlgoritmoIc(versionAlgoritmo);
     version.setEstado(EstadoVersionFormulario.PUBLICADA);
     version.setActiva(true);
     version.setPublicadoPorId(usuarioId);

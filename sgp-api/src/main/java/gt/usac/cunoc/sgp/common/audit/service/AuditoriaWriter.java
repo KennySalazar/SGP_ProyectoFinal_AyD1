@@ -31,7 +31,29 @@ public class AuditoriaWriter {
       JsonNode valoresAnteriores,
       JsonNode valoresPosteriores,
       String proceso) {
+    guardar(usuarioId, accion, entidad, entidadId, valoresAnteriores, valoresPosteriores, proceso);
+  }
 
+  @Transactional(propagation = Propagation.MANDATORY)
+  public void registrarEnTransaccion(
+      UUID usuarioId,
+      AccionAuditoria accion,
+      String entidad,
+      UUID entidadId,
+      JsonNode valoresAnteriores,
+      JsonNode valoresPosteriores,
+      String proceso) {
+    guardar(usuarioId, accion, entidad, entidadId, valoresAnteriores, valoresPosteriores, proceso);
+  }
+
+  private void guardar(
+      UUID usuarioId,
+      AccionAuditoria accion,
+      String entidad,
+      UUID entidadId,
+      JsonNode valoresAnteriores,
+      JsonNode valoresPosteriores,
+      String proceso) {
     var auditoria =
         new Auditoria(
             UuidV7Generator.generate(),
