@@ -9,6 +9,8 @@ import gt.usac.cunoc.sgp.common.audit.service.AuditoriaWriter;
 import gt.usac.cunoc.sgp.common.exception.ApiException;
 import gt.usac.cunoc.sgp.common.util.UuidV7Generator;
 import gt.usac.cunoc.sgp.inspeccion.entity.ResultadoIc;
+import gt.usac.cunoc.sgp.inspeccion.model.EstadoCondicion;
+import gt.usac.cunoc.sgp.inspeccion.model.ResultadoCalculoIc;
 import gt.usac.cunoc.sgp.inspeccion.repository.ResultadoIcRepository;
 import gt.usac.cunoc.sgp.puente.entity.Puente;
 import gt.usac.cunoc.sgp.puente.repository.PuenteRepository;
@@ -118,6 +120,7 @@ public class PublicacionIndiceCondicionService {
     var entrada = preparador.preparar(inspeccion.versionFormularioId(), inspeccion.datos());
     var calculo = calculador.calcular(entrada);
     Instant ahora = clock.instant();
+    DecisionEstado decision = resolverDecision(inspeccionId, inspeccion.autorId(), calculo);
 
     ResultadoIc resultado =
         new ResultadoIc(
@@ -132,7 +135,11 @@ public class PublicacionIndiceCondicionService {
             calculo.hashEntrada(),
             calculo.versionAlgoritmo(),
             usuarioId,
-            ahora);
+            ahora,
+            decision.estado(),
+            decision.justificacion(),
+            decision.autorId(),
+            decision.fecha());
 
     resultados.saveAndFlush(resultado);
 
@@ -149,11 +156,11 @@ public class PublicacionIndiceCondicionService {
     UUID ultimaPublicadaId =
         jdbc.queryForObject(
             """
-                SELECT id FROM inspeccion
-                WHERE puente_id = ? AND estado = 'PUBLICADA'
-                ORDER BY publicado_en DESC, id DESC
-                LIMIT 1
-                """,
+                        SELECT id FROM inspeccion
+                        WHERE puente_id = ? AND estado = 'PUBLICADA'
+                        ORDER BY publicado_en DESC, id DESC
+                        LIMIT 1
+                        """,
             UUID.class,
             puente.getId());
 
@@ -218,19 +225,69 @@ public class PublicacionIndiceCondicionService {
     return resultado;
   }
 
+  private DecisionEstado resolverDecision(
+      UUID inspeccionId, UUID autorInspeccionId, ResultadoCalculoIc calculo) {
+    var decisiones =
+        jdbc.query(
+            """
+            SELECT estado_confirmado, justificacion_ajuste, realizado_por_id, realizado_en,
+                   calculo = CAST(? AS jsonb) AS calculo_vigente
+            FROM confirmacion_estado_inspeccion
+            WHERE inspeccion_id = ?
+            """,
+            (rs, numero) -> {
+              if (!autorInspeccionId.equals(rs.getObject("realizado_por_id", UUID.class))) {
+                throw error(
+                    HttpStatus.CONFLICT,
+                    "confirmacion_ic_autor_invalido",
+                    "La confirmacion no pertenece al autor responsable actual de la inspeccion.");
+              }
+              if (!rs.getBoolean("calculo_vigente")) {
+                throw error(
+                    HttpStatus.CONFLICT,
+                    "confirmacion_ic_desactualizada",
+                    "El calculo cambio desde la confirmacion. El evaluador debe confirmar nuevamente.");
+              }
+              EstadoCondicion confirmado =
+                  EstadoCondicion.valueOf(rs.getString("estado_confirmado"));
+              if (confirmado == calculo.estadoCalculado()) {
+                return new DecisionEstado(confirmado, null, null, null);
+              }
+              String justificacion = rs.getString("justificacion_ajuste");
+              UUID autorId = rs.getObject("realizado_por_id", UUID.class);
+              OffsetDateTime fecha = rs.getObject("realizado_en", OffsetDateTime.class);
+              if (justificacion == null || justificacion.isBlank() || fecha == null) {
+                throw error(
+                    HttpStatus.CONFLICT,
+                    "confirmacion_ic_incompleta",
+                    "El ajuste requiere justificacion, autor y fecha.");
+              }
+              return new DecisionEstado(confirmado, justificacion, autorId, fecha.toInstant());
+            },
+            json.valueToTree(calculo).toString(),
+            inspeccionId);
+    return decisiones.isEmpty()
+        ? new DecisionEstado(calculo.estadoCalculado(), null, null, null)
+        : decisiones.get(0);
+  }
+
+  private record DecisionEstado(
+      EstadoCondicion estado, String justificacion, UUID autorId, Instant fecha) {}
+
   private InspeccionPublicada cargarInspeccion(UUID id) {
     var encontrados =
         jdbc.query(
             """
-                SELECT puente_id, version_formulario_id, estado, fecha_inspeccion,
-                       publicado_en, datos, eliminado_en
-                FROM inspeccion WHERE id = ?
-                FOR UPDATE
-                """,
+                        SELECT puente_id, autor_id, version_formulario_id, estado, fecha_inspeccion,
+                               publicado_en, datos, eliminado_en
+                        FROM inspeccion WHERE id = ?
+                        FOR UPDATE
+                        """,
             (rs, numero) -> {
               OffsetDateTime publicadaEn = rs.getObject("publicado_en", OffsetDateTime.class);
               return new InspeccionPublicada(
                   rs.getObject("puente_id", UUID.class),
+                  rs.getObject("autor_id", UUID.class),
                   rs.getObject("version_formulario_id", UUID.class),
                   rs.getString("estado"),
                   rs.getObject("fecha_inspeccion", LocalDate.class),
@@ -277,6 +334,7 @@ public class PublicacionIndiceCondicionService {
 
   private record InspeccionPublicada(
       UUID puenteId,
+      UUID autorId,
       UUID versionFormularioId,
       String estado,
       LocalDate fechaInspeccion,
