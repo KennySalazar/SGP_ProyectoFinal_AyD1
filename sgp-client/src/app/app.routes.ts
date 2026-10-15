@@ -23,6 +23,13 @@ export const routes: Routes = [
       },
 
       {
+        path: 'formulario/vista-previa',
+        loadComponent: () =>
+          import('./features/formulario/pages/vista-previa-formulario/vista-previa-formulario.page').then(
+            (m) => m.VistaPreviaFormularioPage,
+          ),
+      },
+      {
         path: 'admin',
         canActivate: [roleGuard('ADMINISTRADOR')],
         loadChildren: () => import('./features/admin/admin.routes').then((m) => m.adminRoutes),

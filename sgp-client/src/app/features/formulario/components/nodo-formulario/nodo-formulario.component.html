@@ -1,0 +1,121 @@
+@let r = renderizador();
+@if (r) {
+  <ng-container
+    [appRenderizadorNodo]="r.componente"
+    [appRenderizadorNodoEntradas]="entradasRenderizador()"
+  />
+} @else {
+  @switch (nodo().clase) {
+    @case ('campo') {
+      <app-campo-formulario [nodo]="campo()" [control]="control()" [construido]="construido()" />
+    }
+    @case ('objeto') {
+      @if (esOpcional()) {
+        <details class="opcional" [open]="empezado()" [attr.data-ruta]="objeto().ruta">
+          <summary>
+            <span class="titulo">{{ objeto().titulo }}</span>
+            <span class="etiqueta-opcional">{{ 'formulario.dinamico.optional' | transloco }}</span>
+          </summary>
+          <div class="campos">
+            @for (hijo of hijosVisibles(); track hijo.clave) {
+              <app-nodo-formulario
+                [nodo]="hijo"
+                [control]="controlDe(hijo)"
+                [construido]="construido()"
+                [nivel]="nivel() + 1"
+              />
+            }
+          </div>
+          @if (puedeLimpiar()) {
+            <div class="pie-bloque">
+              <button type="button" class="limpiar-bloque" (click)="limpiar()">
+                <i class="pi pi-eraser" aria-hidden="true"></i>
+                {{ 'formulario.dinamico.clearBlock' | transloco }}
+              </button>
+            </div>
+          }
+        </details>
+      } @else {
+        <fieldset
+          class="grupo"
+          [class.elemento]="objeto().evaluable"
+          [class.anidado]="nivel() > 0 && mostrarLeyenda()"
+          [attr.data-ruta]="objeto().ruta"
+        >
+          @if (nivel() > 0 && mostrarLeyenda()) {
+            <legend>{{ objeto().titulo }}</legend>
+          }
+          <div class="campos" [class.con-grupos]="conGrupos()">
+            @for (hijo of hijosVisibles(); track hijo.clave) {
+              <app-nodo-formulario
+                [nodo]="hijo"
+                [control]="controlDe(hijo)"
+                [construido]="construido()"
+                [nivel]="nivel() + 1"
+              />
+            }
+          </div>
+        </fieldset>
+      }
+    }
+    @case ('arreglo') {
+      <section class="lista" [attr.aria-label]="arreglo().titulo" [attr.data-ruta]="arreglo().ruta">
+        @if (nivel() > 0) {
+          <h3>{{ arreglo().titulo }}</h3>
+        }
+
+        @for (instancia of instancias(); track instancia; let i = $index) {
+          <div
+            class="instancia"
+            role="group"
+            [attr.aria-label]="
+              'formulario.dinamico.instance'
+                | transloco: { nombre: arreglo().nombreElemento, numero: i + 1 }
+            "
+          >
+            <div class="cabecera">
+              <strong>{{
+                'formulario.dinamico.instance'
+                  | transloco: { nombre: arreglo().nombreElemento, numero: i + 1 }
+              }}</strong>
+              <button
+                pButton
+                type="button"
+                severity="danger"
+                size="small"
+                [outlined]="true"
+                [disabled]="!puedeQuitar()"
+                (click)="quitar(i)"
+              >
+                <i class="pi pi-trash" aria-hidden="true"></i>
+                {{
+                  'formulario.dinamico.remove'
+                    | transloco: { nombre: arreglo().nombreElemento, numero: i + 1 }
+                }}
+              </button>
+            </div>
+            <app-nodo-formulario
+              [nodo]="arreglo().elemento"
+              [control]="instancia"
+              [construido]="construido()"
+              [nivel]="nivel() + 1"
+              [mostrarLeyenda]="false"
+            />
+          </div>
+        } @empty {
+          <p class="vacio">{{ 'formulario.dinamico.noInstances' | transloco }}</p>
+        }
+
+        <div class="acciones">
+          <button pButton type="button" [disabled]="!puedeAgregar()" (click)="agregar()">
+            <i class="pi pi-plus" aria-hidden="true"></i>
+            {{ 'formulario.dinamico.add' | transloco: { nombre: arreglo().nombreElemento } }}
+          </button>
+          @if (!puedeAgregar() && arreglo().maximoElementos !== undefined) {
+            <small>{{ 'formulario.dinamico.limitReached' | transloco }}</small>
+          }
+        </div>
+      </section>
+    }
+  }
+}

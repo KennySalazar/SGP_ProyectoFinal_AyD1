@@ -1,0 +1,79 @@
+<section class="pagina">
+  <header class="encabezado">
+    <div>
+      <h1>{{ 'formulario.vistaPrevia.title' | transloco }}</h1>
+      <p class="subtitulo">{{ 'formulario.vistaPrevia.subtitle' | transloco }}</p>
+      @if (version(); as v) {
+      <p class="meta">
+        <span>{{ 'formulario.vistaPrevia.version' | transloco: { codigo: v.codigo } }}</span>
+        <span
+          >{{ 'formulario.vistaPrevia.hash' | transloco: { hash: v.hashContenido.slice(0, 12) }
+          }}</span
+        >
+      </p>
+      }
+    </div>
+
+    @if (version()) {
+    <div class="acciones">
+      <button
+        pButton
+        type="button"
+        severity="secondary"
+        [outlined]="true"
+        [attr.aria-pressed]="soloLectura()"
+        (click)="alternarSoloLectura()"
+      >
+        <i [class]="soloLectura() ? 'pi pi-pencil' : 'pi pi-lock'" aria-hidden="true"></i>
+        {{ (soloLectura() ? 'formulario.vistaPrevia.readOnlyOff' :
+        'formulario.vistaPrevia.readOnlyOn') | transloco }}
+      </button>
+      @if (!soloLectura()) {
+      <button pButton type="button" (click)="revisar()">
+        <i class="pi pi-check-square" aria-hidden="true"></i>
+        {{ 'formulario.vistaPrevia.review' | transloco }}
+      </button>
+      }
+    </div>
+    }
+  </header>
+
+  @if (cargando()) {
+  <p role="status">{{ 'formulario.vistaPrevia.loading' | transloco }}</p>
+  } @else if (sinVersionActiva()) {
+  <p class="aviso" role="status">{{ 'formulario.vistaPrevia.noActive' | transloco }}</p>
+  } @else if (errorCarga(); as mensaje) {
+  <p class="aviso error" role="alert">{{ mensaje }}</p>
+  } @else if (version(); as v) { @if (resultadoRevision(); as resultado) {
+  <div class="aviso" [class.error]="!resultado.valido" role="status">
+    @if (resultado.valido) {
+    <p>{{ 'formulario.vistaPrevia.reviewValid' | transloco }}</p>
+    } @else { @if (resultado.faltantes > 0) {
+    <p>
+      {{ 'formulario.vistaPrevia.reviewMissing' | transloco: { cantidad: resultado.faltantes } }}
+    </p>
+    } @if (resultado.invalidos > 0) {
+    <p>
+      {{ 'formulario.vistaPrevia.reviewInvalid' | transloco: { cantidad: resultado.invalidos } }}
+    </p>
+    }
+    <p>{{ 'formulario.vistaPrevia.reviewHint' | transloco }}</p>
+    }
+  </div>
+  }
+
+  <app-formulario-dinamico
+    [esquema]="v.esquema"
+    [valoresIniciales]="valoresIniciales"
+    [soloLectura]="soloLectura()"
+    [seccionesApoyo]="seccionesApoyo()"
+    (valorChange)="valor.set($event)"
+  />
+
+  <details class="valor">
+    <summary>{{ 'formulario.vistaPrevia.valueTitle' | transloco }}</summary>
+    <p>{{ 'formulario.vistaPrevia.valueHint' | transloco }}</p>
+    <pre>{{ json() }}</pre>
+  </details>
+  }
+</section>

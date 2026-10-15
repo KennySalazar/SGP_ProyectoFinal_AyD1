@@ -1,0 +1,206 @@
+@let n = nodo();
+@if (n.tipo !== 'uuid') {
+  <div
+    class="campo"
+    [class.invalido]="mensaje() !== null"
+    [class.precargado]="n.soloLectura"
+    [attr.data-ruta]="n.ruta"
+    (focusout)="alSalir()"
+  >
+    @if (n.tipo === 'booleano' || n.tipo === 'seleccionMultiple' || enBotones()) {
+      <fieldset class="opciones" [attr.aria-describedby]="mensaje() ? idError : null">
+        <legend>
+          {{ n.titulo }}
+          @if (obligatorio()) {
+            <span class="marca-obligatorio" aria-hidden="true">*</span>
+            <span class="solo-lectores">({{ 'formulario.dinamico.required' | transloco }})</span>
+          }
+          @if (opcional()) {
+            <span class="marca-opcional">({{ 'formulario.dinamico.optional' | transloco }})</span>
+          }
+          @if (ayudas().length > 0) {
+            <button
+              type="button"
+              class="ayuda-boton"
+              [attr.aria-expanded]="ayudaAbierta()"
+              [attr.aria-controls]="idAyuda"
+              [attr.aria-label]="'formulario.dinamico.help' | transloco"
+              [attr.title]="'formulario.dinamico.help' | transloco"
+              (click)="alternarAyuda()"
+            >
+              <i class="pi pi-question-circle" aria-hidden="true"></i>
+            </button>
+          }
+        </legend>
+
+        @if (ayudas().length > 0) {
+          <dl class="ayuda" [id]="idAyuda" [hidden]="!ayudaAbierta()">
+            @for (ayuda of ayudas(); track ayuda.etiqueta) {
+              <div>
+                <dt>{{ ayuda.etiqueta }}</dt>
+                <dd>{{ ayuda.texto }}</dd>
+              </div>
+            }
+          </dl>
+        }
+
+        @if (n.tipo !== 'seleccionMultiple') {
+          <div
+            class="segmentos"
+            [class.amplios]="n.tipo === 'enumerado'"
+            [class.cuatro]="opcionesRadio().length === 4"
+            role="radiogroup"
+          >
+            @for (opcion of opcionesRadio(); track opcion.etiqueta) {
+              <label
+                class="segmento"
+                [class.marcado]="valorActual() === opcion.valor"
+                [class.deshabilitado]="deshabilitado()"
+              >
+                <input
+                  type="radio"
+                  [name]="id"
+                  [checked]="valorActual() === opcion.valor"
+                  [disabled]="deshabilitado()"
+                  (click)="elegir(opcion.valor)"
+                />
+                <span>{{ opcion.etiqueta }}</span>
+              </label>
+            }
+          </div>
+        } @else {
+          <div class="casillas">
+            @for (opcion of opciones(); track opcion.valor; let i = $index) {
+              <label class="casilla" [class.deshabilitado]="deshabilitado()">
+                <input
+                  #entrada
+                  type="checkbox"
+                  [checked]="seleccionadas().includes(opcion.valor)"
+                  [disabled]="deshabilitado()"
+                  (change)="alternar(opcion.valor, entrada.checked)"
+                />
+                <span>{{ opcion.etiqueta }}</span>
+              </label>
+            }
+          </div>
+        }
+        @if (puedeQuitarSeleccion()) {
+          <button type="button" class="quitar" (click)="quitarSeleccion()">
+            <i class="pi pi-times" aria-hidden="true"></i>
+            {{ 'formulario.dinamico.clear' | transloco }}
+          </button>
+        }
+      </fieldset>
+    } @else {
+      <label [for]="id">
+        {{ n.titulo }}
+        @if (obligatorio()) {
+          <span class="marca-obligatorio" aria-hidden="true">*</span>
+          <span class="solo-lectores">({{ 'formulario.dinamico.required' | transloco }})</span>
+        }
+        @if (opcional()) {
+          <span class="marca-opcional">({{ 'formulario.dinamico.optional' | transloco }})</span>
+        }
+        @if (n.soloLectura) {
+          <i
+            class="pi pi-lock icono-precargado"
+            aria-hidden="true"
+            [attr.title]="'formulario.dinamico.preloaded' | transloco"
+          ></i>
+          <span class="solo-lectores">{{ 'formulario.dinamico.preloaded' | transloco }}</span>
+        }
+      </label>
+
+      @switch (n.tipo) {
+        @case ('enumerado') {
+          <p-select
+            [inputId]="id"
+            [options]="opciones()"
+            optionLabel="etiqueta"
+            optionValue="valor"
+            [formControl]="controlCampo()"
+            [placeholder]="'formulario.dinamico.select' | transloco"
+            [showClear]="true"
+            appendTo="body"
+            [attr.aria-invalid]="mensaje() ? 'true' : null"
+            [attr.aria-describedby]="mensaje() ? idError : null"
+          />
+        }
+        @case ('numero') {
+          <input
+            pInputText
+            type="number"
+            inputmode="decimal"
+            step="any"
+            [id]="id"
+            [formControl]="controlCampo()"
+            [attr.min]="n.minimo ?? null"
+            [attr.max]="n.maximo ?? null"
+            [attr.aria-invalid]="mensaje() ? 'true' : null"
+            [attr.aria-describedby]="mensaje() ? idError : null"
+          />
+        }
+        @case ('entero') {
+          <input
+            pInputText
+            type="number"
+            inputmode="numeric"
+            step="1"
+            [id]="id"
+            [formControl]="controlCampo()"
+            [attr.min]="n.minimo ?? null"
+            [attr.max]="n.maximo ?? null"
+            [attr.aria-invalid]="mensaje() ? 'true' : null"
+            [attr.aria-describedby]="mensaje() ? idError : null"
+          />
+        }
+        @case ('fecha') {
+          <input
+            pInputText
+            type="date"
+            [id]="id"
+            [formControl]="controlCampo()"
+            [attr.aria-invalid]="mensaje() ? 'true' : null"
+            [attr.aria-describedby]="mensaje() ? idError : null"
+          />
+        }
+        @default {
+          @if (esTextoLargo()) {
+            <textarea
+              pTextarea
+              rows="3"
+              [id]="id"
+              [formControl]="controlCampo()"
+              [attr.maxlength]="n.longitudMaxima ?? null"
+              [attr.aria-invalid]="mensaje() ? 'true' : null"
+              [attr.aria-describedby]="mensaje() ? idError : null"
+            ></textarea>
+          } @else {
+            <input
+              pInputText
+              type="text"
+              autocomplete="off"
+              [id]="id"
+              [formControl]="controlCampo()"
+              [attr.maxlength]="n.longitudMaxima ?? null"
+              [attr.list]="n.sugerencias.length > 0 ? id + '-sugerencias' : null"
+              [attr.aria-invalid]="mensaje() ? 'true' : null"
+              [attr.aria-describedby]="mensaje() ? idError : null"
+            />
+            @if (n.sugerencias.length > 0) {
+              <datalist [id]="id + '-sugerencias'">
+                @for (sugerencia of n.sugerencias; track sugerencia) {
+                  <option [value]="sugerencia"></option>
+                }
+              </datalist>
+            }
+          }
+        }
+      }
+    }
+
+    @if (mensaje(); as texto) {
+      <small class="error" role="alert" [id]="idError">{{ texto }}</small>
+    }
+  </div>
+}
