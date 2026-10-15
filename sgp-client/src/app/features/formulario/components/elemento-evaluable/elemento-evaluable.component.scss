@@ -1,0 +1,404 @@
+:host {
+  display: block;
+  min-width: 0;
+}
+
+/* El diseño responde al ancho de la propia tarjeta, no al de la pantalla. */
+.elemento {
+  container-type: inline-size;
+  display: grid;
+  gap: 0.6rem;
+  min-width: 0;
+  padding: 0.75rem;
+  border: 1px solid var(--sgp-border, #d8e2ec);
+  border-left-width: 5px;
+  border-radius: 12px;
+  background: var(--sgp-surface, #ffffff);
+
+  /* El borde cambia con el estado, pero el estado siempre se escribe junto al título. */
+  &[data-estado='sano'] {
+    border-left-color: #166534;
+  }
+
+  &[data-estado='con-danos'] {
+    border-left-color: #c2410c;
+  }
+
+  &[data-estado='en-proceso'] {
+    border-left-color: #a16207;
+  }
+
+  &[data-estado='pendiente'] {
+    border-left-color: var(--sgp-border, #d8e2ec);
+  }
+
+  /* «No aplica» (el diseño no lo incluye) y «Ausente» (debería estar y falta) no se parecen. */
+  &[data-estado='no-presente'] {
+    border-left-color: var(--sgp-steel-500);
+    background: var(--sgp-surface-soft, #f6f9fc);
+  }
+
+  &[data-subtipo='no_aplica'] {
+    border-left-color: #475569;
+    background: #f1f5f9;
+  }
+
+  &[data-subtipo='ausente'] {
+    border-left-color: #7e22ce;
+    background: #faf5ff;
+  }
+
+  &.sin-revisar {
+    border-color: #b91c1c;
+    background: #fef2f2;
+  }
+}
+
+@container (min-width: 28rem) {
+  .elemento {
+    padding: 1rem;
+  }
+}
+
+/* Título, estado y la acción «Sin daños» en una sola cabecera. */
+.cabecera {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem 0.75rem;
+
+  h4 {
+    flex: 1 1 auto;
+    margin: 0;
+    color: var(--sgp-navy-900);
+    font-size: 1.05rem;
+  }
+}
+
+.estado {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0;
+  color: var(--sgp-steel-700);
+  font-size: 0.9rem;
+  font-weight: 600;
+
+  &[data-estado='sano'] {
+    color: #166534;
+  }
+
+  &[data-estado='con-danos'] {
+    color: #c2410c;
+  }
+
+  &[data-estado='en-proceso'] {
+    color: #854d0e;
+  }
+
+  &[data-subtipo='no_aplica'] {
+    color: #475569;
+  }
+
+  &[data-subtipo='ausente'] {
+    color: #6b21a8;
+  }
+
+  .alerta {
+    color: #b91c1c;
+  }
+}
+
+/* «Sin daños en este elemento»: un solo toque, sin necesidad de apuntar. Ancho completo en el
+   celular; en una tarjeta ancha se acomoda junto al título para no ocupar una fila. */
+.sin-danos {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  flex: 1 1 100%;
+  min-height: 44px;
+  padding: 0.4rem 1rem;
+  border: 2px solid #166534;
+  border-radius: 10px;
+  background: var(--sgp-surface, #ffffff);
+  color: #166534;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+
+  &:hover {
+    background: #f0fdf4;
+  }
+
+  &[aria-pressed='true'] {
+    background: #166534;
+    color: #ffffff;
+  }
+
+  &:focus-visible {
+    outline: 3px solid var(--sgp-cyan-500);
+    outline-offset: 3px;
+  }
+}
+
+@container (min-width: 34rem) {
+  .sin-danos {
+    flex: 0 0 auto;
+  }
+}
+
+.solo-lectores {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+}
+
+.datos,
+.grilla {
+  display: grid;
+  gap: 0.5rem 0.6rem;
+  min-width: 0;
+}
+
+/* Datos del elemento: lo que se responde con botones ocupa su fila; material y medidas se reparten
+   en dos columnas (tres si la tarjeta es ancha), en lugar de una pila de campos. */
+.datos {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+
+  > .fila {
+    grid-column: 1 / -1;
+  }
+}
+
+@container (min-width: 34rem) {
+  .datos {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+/* Grilla de indicadores: tarjetas en tantas columnas como quepan, sin listas largas (DT-FE-09). */
+.grilla {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr));
+}
+
+.indicadores {
+  /* Mientras el elemento no está sano, los indicadores están abiertos y el título sobra: la
+     matriz ya trae su encabezado. Solo un elemento sano necesita el resumen para desplegarse. */
+  &:not(.plegable) > summary {
+    display: none;
+  }
+
+  summary {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.25rem 0.5rem;
+    min-height: 44px;
+    color: var(--sgp-navy-900);
+    font-weight: 700;
+    cursor: pointer;
+
+    &:focus-visible {
+      outline: 3px solid var(--sgp-cyan-500);
+      outline-offset: 2px;
+      border-radius: 8px;
+    }
+  }
+
+  summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .chevron {
+    margin-left: auto;
+    color: var(--sgp-steel-500);
+    font-size: 0.85rem;
+    transition: transform 0.15s;
+  }
+
+  &[open] .chevron {
+    transform: rotate(180deg);
+  }
+
+  .resumen-sano {
+    color: #166534;
+    font-weight: 600;
+  }
+
+  .grilla {
+    margin-top: 0.25rem;
+  }
+}
+
+/* Sin caja con borde: un fondo suave separa un indicador de otro con menos ruido visual. */
+.indicador {
+  min-width: 0;
+  padding: 0.4rem 0.6rem 0.55rem;
+  border-radius: 10px;
+  background: var(--sgp-surface-soft, #f6f9fc);
+}
+
+/* Matriz de severidad: el encabezado de columnas y las filas de celdas comparten el mismo ancho. */
+.matriz-cabecera {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
+  grid-auto-flow: column;
+  gap: 0.3rem;
+  margin-top: 0.25rem;
+
+  span {
+    padding-top: 0.2rem;
+    border-top: 4px solid var(--sgp-border, #d8e2ec);
+    color: var(--sgp-navy-900);
+    font-size: 0.82rem;
+    font-weight: 700;
+    line-height: 1.2;
+    text-align: center;
+    /* Un nombre largo se parte en lugar de salirse de su columna. */
+    overflow-wrap: anywhere;
+  }
+
+  span[data-gravedad='g0'] {
+    border-top-color: #166534;
+  }
+
+  span[data-gravedad='g1'] {
+    border-top-color: #facc15;
+  }
+
+  span[data-gravedad='g2'] {
+    border-top-color: #c2410c;
+  }
+
+  span[data-gravedad='g3'] {
+    border-top-color: #b91c1c;
+  }
+}
+
+.grilla.matriz {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0.1rem;
+  margin-top: 0;
+
+  .indicador {
+    padding: 0.2rem 0 0.35rem;
+    background: none;
+  }
+}
+
+/* Acciones de la cabecera: «Sin daños» (ocupa lo que sobre) y el botón de plegar el detalle. */
+.acciones {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex: 1 1 100%;
+
+  .sin-danos {
+    flex: 1 1 auto;
+  }
+}
+
+@container (min-width: 34rem) {
+  .acciones {
+    flex: 0 0 auto;
+  }
+}
+
+.alternar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 44px;
+  min-height: 44px;
+  border: 1px solid var(--sgp-border, #d8e2ec);
+  border-radius: 10px;
+  background: var(--sgp-surface, #ffffff);
+  color: var(--sgp-steel-700);
+  cursor: pointer;
+
+  .pi {
+    transition: transform 0.15s;
+  }
+
+  &[aria-expanded='true'] .pi {
+    transform: rotate(180deg);
+  }
+
+  &:focus-visible {
+    outline: 3px solid var(--sgp-cyan-500);
+    outline-offset: 2px;
+  }
+}
+
+.detalle {
+  display: grid;
+  gap: 0.6rem;
+  min-width: 0;
+
+  &[hidden] {
+    display: none;
+  }
+}
+
+.existencia {
+  display: block;
+}
+
+/* Medidas opcionales: plegadas, para no repetir dos campos vacíos en cada elemento. */
+.medidas {
+  summary {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-height: 44px;
+    color: var(--sgp-steel-700);
+    font-weight: 600;
+    cursor: pointer;
+
+    &:focus-visible {
+      outline: 3px solid var(--sgp-cyan-500);
+      outline-offset: 2px;
+      border-radius: 8px;
+    }
+  }
+
+  summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .chevron {
+    margin-left: auto;
+    color: var(--sgp-steel-500);
+    font-size: 0.85rem;
+    transition: transform 0.15s;
+  }
+
+  &[open] .chevron {
+    transform: rotate(180deg);
+  }
+}
+
+/* «Otros (especificar)» dentro de la tarjeta: una fila sencilla, sin recuadro punteado. */
+.detalle ::ng-deep details.opcional {
+  border-style: none;
+  background: var(--sgp-surface-soft, #f6f9fc);
+
+  summary {
+    padding-block: 0;
+  }
+}
+
+.elemento {
+  padding: 0.65rem;
+}
+
+/* El título «Medidas (opcional)» ya lo dice: no se repite en cada campo. */
+.medidas ::ng-deep .marca-opcional {
+  display: none;
+}

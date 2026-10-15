@@ -142,7 +142,9 @@ input[type='date'] {
   align-items: center;
   gap: 0.35rem;
   width: fit-content;
-  min-height: 32px;
+  /* Área táctil de 44 px (DT-FE-09) sin añadir altura a la tarjeta. */
+  min-height: 44px;
+  margin-block: -0.6rem;
   padding: 0.2rem 0.5rem 0.2rem 0;
   border: 0;
   background: none;
@@ -279,4 +281,177 @@ input[type='date'] {
     margin: 0;
     color: var(--sgp-steel-700);
   }
+}
+
+/* Indicadores de daño (HU-034): el color acompaña al nombre y la opción elegida lleva una marca. */
+.marca-eleccion {
+  margin-right: 0.4rem;
+  font-size: 0.8rem;
+}
+
+.segmento.marcado[data-gravedad='g0'] {
+  border-color: #166534;
+  background: #166534;
+  color: #ffffff;
+}
+
+.segmento.marcado[data-gravedad='g1'] {
+  border-color: #a16207;
+  background: #facc15;
+  color: #422006;
+}
+
+.segmento.marcado[data-gravedad='g2'] {
+  border-color: #c2410c;
+  background: #c2410c;
+  color: #ffffff;
+}
+
+.segmento.marcado[data-gravedad='g3'] {
+  border-color: #991b1b;
+  background: #b91c1c;
+  color: #ffffff;
+}
+
+/* Dentro de la grilla de un elemento: título compacto, botones de al menos 44 × 44 px. */
+.en-grilla {
+  legend,
+  label {
+    font-size: 0.95rem;
+  }
+
+  /* La ✕ de «Limpiar» va dentro del título, a la derecha. Su zona táctil mide 44 × 44 px sin
+     invadir a las opciones: la fila del título solo crece cuando hay algo que limpiar. */
+  legend {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    width: 100%;
+  }
+
+  legend:has(.quitar) {
+    min-height: 44px;
+  }
+
+  .quitar {
+    justify-content: center;
+    width: 44px;
+    margin: 0 -0.5rem 0 auto;
+    padding: 0;
+    font-size: 0.9rem;
+
+    .texto-quitar {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+    }
+  }
+
+  .segmento {
+    min-width: 44px;
+    min-height: 44px;
+    padding: 0.45rem 0.7rem;
+    font-size: 0.95rem;
+    white-space: normal;
+    line-height: 1.25;
+    /* Un nombre largo se parte en lugar de salirse del botón. */
+    overflow-wrap: anywhere;
+    hyphens: auto;
+    text-align: center;
+  }
+
+  /* Hasta tres opciones (la existencia): siempre en una sola fila, a partes iguales. */
+  .amplios .segmento {
+    flex: 1 1 0;
+  }
+
+  .amplios.cuatro .segmento {
+    flex: 1 1 calc(50% - 0.4rem);
+  }
+
+  :host ::ng-deep .p-select {
+    min-height: 44px;
+  }
+}
+
+/* Cuatro severidades en una fila cuando el campo mide al menos 20 rem; si no, 2 × 2. */
+@container (min-width: 20rem) {
+  .en-grilla .amplios.cuatro .segmento {
+    flex: 1 1 0;
+  }
+}
+
+/* Con nombres largos («Asentamiento de la estructura») cuatro en una fila no caben: 2 × 2, y una
+   sola fila únicamente cuando el campo es muy ancho. Menos relleno lateral para que la palabra
+   más larga quepa entera en lugar de partirse a la mitad. */
+.en-grilla .amplios.cuatro.largas .segmento {
+  flex: 1 1 calc(50% - 0.4rem);
+  padding-inline: 0.35rem;
+  font-size: 0.9rem;
+}
+
+@container (min-width: 44rem) {
+  .en-grilla .amplios.cuatro.largas .segmento {
+    flex: 1 1 0;
+  }
+}
+
+/* Existencia del elemento: cada opción con su color, para distinguirlas de un vistazo. */
+.segmento.marcado[data-valor='NO_APLICA'] {
+  border-color: #475569;
+  background: #475569;
+  color: #ffffff;
+}
+
+.segmento.marcado[data-valor='AUSENTE'] {
+  border-color: #6b21a8;
+  background: #7e22ce;
+  color: #ffffff;
+}
+
+:host ::ng-deep .p-select {
+  min-height: 44px;
+}
+
+/* Indicador como fila de celdas: una columna por opción, todas del mismo ancho que el encabezado. */
+.segmentos.celdas {
+  display: grid;
+  grid-template-columns: repeat(var(--columnas, 4), minmax(0, 1fr));
+  gap: 0.3rem;
+
+  .segmento {
+    min-width: 0;
+    padding: 0;
+    /* Una franja del color de la gravedad en cada celda: ayuda, pero no es lo único (hay texto). */
+    border-top-width: 4px;
+  }
+
+  .segmento[data-gravedad='g0'] {
+    border-top-color: #166534;
+  }
+
+  .segmento[data-gravedad='g1'] {
+    border-top-color: #facc15;
+  }
+
+  .segmento[data-gravedad='g2'] {
+    border-top-color: #c2410c;
+  }
+
+  .segmento[data-gravedad='g3'] {
+    border-top-color: #b91c1c;
+  }
+
+  .segmento.marcado {
+    border-top-color: transparent;
+  }
+}
+
+.celda-vacia {
+  color: var(--sgp-steel-500);
+  font-size: 0.8rem;
+  opacity: 0.7;
 }

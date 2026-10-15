@@ -1,5 +1,7 @@
 .pagina {
   display: grid;
+  /* Un texto largo (el JSON) no debe ensanchar la página: la columna nunca pasa del ancho disponible. */
+  grid-template-columns: minmax(0, 1fr);
   gap: 1.25rem;
 }
 
@@ -60,6 +62,7 @@
 }
 
 .valor {
+  min-width: 0;
   padding: 1rem;
   border: 1px solid var(--sgp-border);
   border-radius: 12px;
@@ -71,6 +74,7 @@
   }
 
   pre {
+    max-width: 100%;
     max-height: 24rem;
     overflow: auto;
     padding: 0.75rem;

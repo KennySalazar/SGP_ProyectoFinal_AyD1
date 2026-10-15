@@ -207,6 +207,7 @@ class Resolutor {
     campo.minimoElementos = numero(esquema['minItems']);
     campo.maximoElementos = numero(esquema['maxItems']);
     campo.reglasLista = this.reglasDeLista(esquema);
+    if ('x-sgp-sin-danos' in esquema) campo.sinDanos = esquema['x-sgp-sin-danos'];
     return campo;
   }
 
@@ -272,6 +273,7 @@ class Resolutor {
       sugerencias: lista(esquema['examples']).filter(
         (valor): valor is string => typeof valor === 'string',
       ),
+      ...('x-sgp-sin-danos' in esquema ? { sinDanos: esquema['x-sgp-sin-danos'] } : {}),
     };
   }
 

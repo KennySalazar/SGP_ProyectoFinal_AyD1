@@ -846,3 +846,398 @@ describe('FormularioDinamicoComponent con unos 450 campos', () => {
     expect(porCambio).toBeLessThan(250);
   });
 });
+
+describe('FormularioDinamicoComponent: captura táctil de daños (HU-034)', () => {
+  let fixture: ComponentFixture<FormularioDinamicoComponent>;
+
+  const tarjeta = (ruta: string) =>
+    raiz(fixture).querySelector<HTMLElement>(`section.elemento[data-ruta="${ruta}"]`)!;
+  const textoEstado = (ruta: string) =>
+    tarjeta(ruta).querySelector('.estado')!.textContent!.replace(/\s+/g, ' ').trim();
+  const botonSinDanos = (ruta: string) =>
+    tarjeta(ruta).querySelector<HTMLButtonElement>('button.sin-danos')!;
+  const marcadas = (ruta: string) =>
+    Array.from(tarjeta(ruta).querySelectorAll('.grilla .segmento.marcado')).map((s) =>
+      s.textContent!.trim(),
+    );
+  const existenciaMarcada = (ruta: string) =>
+    tarjeta(ruta).querySelector('.existencia .segmento.marcado')?.textContent?.trim();
+  const alPulsar = async (boton: HTMLElement) => {
+    boton.click();
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+  };
+
+  beforeEach(async () => {
+    fixture = await crear(ESQUEMA_SIECA);
+    for (let i = 0; i < 3; i++) await ir(fixture, 'Sección siguiente'); // 4. Sub-estructura
+  });
+
+  it('cada elemento se muestra como una tarjeta con su estado escrito', () => {
+    expect(tarjeta(CORTINA).querySelector('h4')?.textContent).toBe('Cortina superior');
+    expect(tarjeta(CORTINA).getAttribute('role')).toBe('group');
+    expect(textoEstado(CORTINA)).toBe('Pendiente');
+    // Antes de declarar que existe no hay indicadores que mostrar.
+    expect(tarjeta(CORTINA).querySelector('.grilla')).toBeNull();
+  });
+
+  it('los indicadores se agrupan en una grilla de tarjetas, no en una lista vertical', () => {
+    declararPresente(fixture, CORTINA);
+
+    const grilla = tarjeta(CORTINA).querySelector('.grilla')!;
+    expect(grilla.querySelectorAll('.indicador')).toHaveLength(4);
+    // Cada indicador ofrece sus cuatro severidades como botones, con el nombre escrito.
+    const primero = grilla.querySelector('.indicador')!;
+    expect(
+      Array.from(primero.querySelectorAll('.segmento')).map((s) => s.textContent!.trim()),
+    ).toEqual(['No presenta', 'Leve', 'Moderado', 'Severo']);
+  });
+
+  it('los daños inician vacíos: ninguna severidad viene marcada (RN-INS-10)', () => {
+    declararPresente(fixture, CORTINA);
+
+    expect(marcadas(CORTINA)).toEqual([]);
+    expect(fixture.componentInstance.valor()['subestructura']).toMatchObject({
+      estribo_entrada: { cortina_superior: { existencia: 'PRESENTE' } },
+    });
+  });
+
+  it('«Sin daños en este elemento» marca todo el grupo como sano en una sola pulsación', async () => {
+    await alPulsar(botonSinDanos(CORTINA));
+
+    expect(textoEstado(CORTINA)).toBe('Sin daños');
+    expect(existenciaMarcada(CORTINA)).toBe('Presente');
+    expect(marcadas(CORTINA)).toHaveLength(4);
+    const indicadores = Array.from(tarjeta(CORTINA).querySelectorAll('.grilla .segmento.marcado'));
+    expect(indicadores.map((s) => s.textContent!.trim())).toEqual(Array(4).fill('No presenta'));
+    expect(fixture.componentInstance.valor()['subestructura']).toMatchObject({
+      estribo_entrada: {
+        cortina_superior: {
+          existencia: 'PRESENTE',
+          grietas_una_direccion: 'NO_PRESENTA',
+          exposicion_acero: 'NO_PRESENTA',
+        },
+      },
+    });
+    expect(botonSinDanos(CORTINA).getAttribute('aria-pressed')).toBe('true');
+  });
+
+  it('un elemento sano pliega sus indicadores y al editar uno se vuelven a abrir', async () => {
+    const indicadores = () =>
+      tarjeta(CORTINA).querySelector<HTMLDetailsElement>('details.indicadores')!;
+    declararPresente(fixture, CORTINA);
+    expect(indicadores().open).toBe(true);
+
+    await alPulsar(botonSinDanos(CORTINA));
+    expect(indicadores().open).toBe(false);
+    expect(indicadores().querySelector('summary')!.textContent).toContain('todos sin daño');
+    // Siguen en la página: se pueden abrir y editar.
+    expect(indicadores().querySelectorAll('.indicador')).toHaveLength(4);
+
+    await alPulsar(indicadores().querySelectorAll<HTMLInputElement>('input[type="radio"]')[2]);
+    expect(textoEstado(CORTINA)).toBe('Con daños');
+    expect(indicadores().open).toBe(true);
+  });
+
+  it('volver a pulsarla la deshace', async () => {
+    await alPulsar(botonSinDanos(CORTINA));
+    await alPulsar(botonSinDanos(CORTINA));
+
+    expect(textoEstado(CORTINA)).toBe('Pendiente');
+    expect(marcadas(CORTINA)).toEqual([]);
+    expect(existenciaMarcada(CORTINA)).toBe('Presente');
+  });
+
+  it('editar un indicador de un grupo sano lo deja de marcar como sano y conserva el cambio', async () => {
+    await alPulsar(botonSinDanos(CORTINA));
+    const primero = tarjeta(CORTINA).querySelector('.grilla .indicador')!;
+
+    await alPulsar(primero.querySelectorAll<HTMLInputElement>('input[type="radio"]')[1]); // Leve
+
+    expect(textoEstado(CORTINA)).toBe('Con daños');
+    expect(primero.querySelector('.segmento.marcado')?.textContent).toContain('Leve');
+    expect(botonSinDanos(CORTINA).getAttribute('aria-pressed')).toBe('false');
+    // Los demás indicadores siguen marcados como sanos.
+    expect(marcadas(CORTINA).filter((m) => m === 'No presenta')).toHaveLength(3);
+  });
+
+  it('un grupo a medias queda «En proceso» con la cuenta escrita', () => {
+    declararPresente(fixture, CORTINA);
+    tarjeta(CORTINA).querySelector<HTMLInputElement>('.grilla input[type="radio"]')!.click();
+    fixture.detectChanges();
+
+    expect(textoEstado(CORTINA)).toBe('En proceso: 1 de 4');
+  });
+
+  it('muestra la severidad con su nombre y con una marca, además del color', async () => {
+    declararPresente(fixture, CORTINA);
+    const indicador = tarjeta(CORTINA).querySelector('.grilla .indicador')!;
+    const leve = indicador.querySelectorAll<HTMLInputElement>('input[type="radio"]')[1];
+
+    await alPulsar(leve);
+
+    const elegida = indicador.querySelector('.segmento.marcado')!;
+    expect(elegida.textContent).toContain('Leve');
+    expect(elegida.getAttribute('data-gravedad')).toBe('g1');
+    expect(elegida.querySelector('.marca-eleccion')).not.toBeNull();
+    // Las demás conservan su nombre aunque no estén elegidas, y sin marca.
+    const otras = Array.from(indicador.querySelectorAll('.segmento:not(.marcado)'));
+    expect(otras.map((s) => s.textContent!.trim())).toEqual(['No presenta', 'Moderado', 'Severo']);
+    expect(otras.some((s) => s.querySelector('.marca-eleccion'))).toBe(false);
+  });
+
+  it('el color sube con la gravedad: sano, leve, moderado y severo', () => {
+    declararPresente(fixture, CORTINA);
+    const segmentos = tarjeta(CORTINA).querySelectorAll('.grilla .indicador:first-child .segmento');
+
+    expect(Array.from(segmentos).map((s) => s.getAttribute('data-gravedad'))).toEqual([
+      'g0',
+      'g1',
+      'g2',
+      'g3',
+    ]);
+  });
+
+  it('un elemento que no aplica o está ausente lo refleja y no ofrece marcarlo sano', async () => {
+    const opciones = tarjeta(CORTINA).querySelectorAll<HTMLInputElement>('input[type="radio"]');
+
+    await alPulsar(opciones[1]); // No aplica
+    expect(textoEstado(CORTINA)).toBe('No aplica');
+    expect(tarjeta(CORTINA).querySelector('.grilla')).toBeNull();
+    expect(tarjeta(CORTINA).querySelector('button.sin-danos')).toBeNull();
+
+    await alPulsar(opciones[2]); // Ausente
+    expect(textoEstado(CORTINA)).toBe('Ausente');
+  });
+
+  it('al revisar, el elemento sin revisar se destaca con texto y no solo con color', async () => {
+    expect(tarjeta(CORTINA).classList.contains('sin-revisar')).toBe(false);
+
+    fixture.componentInstance.revisar(); // lleva a la primera sección incompleta
+    for (let i = 0; i < 3; i++) await ir(fixture, 'Sección siguiente'); // de vuelta a la 4
+
+    expect(tarjeta(CORTINA).classList.contains('sin-revisar')).toBe(true);
+    expect(textoEstado(CORTINA)).toContain('Falta revisarlo');
+  });
+
+  it('la navegación cuenta los elementos revisados de cada sección', async () => {
+    const resumen = () =>
+      raiz(fixture).querySelector('.seccion.activa .seccion-elementos')!.textContent!.trim();
+
+    expect(resumen()).toMatch(/^0 de \d+ elementos revisados$/);
+    const total = Number(/de (\d+)/.exec(resumen())![1]);
+
+    await alPulsar(botonSinDanos(CORTINA));
+
+    expect(resumen()).toBe(`1 de ${total} elementos revisados`);
+  });
+
+  it('los elementos de una pila repetible también usan la grilla', async () => {
+    await alPulsar(botonesPorTexto('Agregar Pila')[0]);
+
+    expect(
+      raiz(fixture).querySelector('section.elemento[data-ruta="subestructura/pilas/viga_cabezal"]'),
+    ).not.toBeNull();
+    expect(
+      raiz(fixture).querySelectorAll('section.elemento[data-ruta^="subestructura/pilas/"]'),
+    ).toHaveLength(5);
+  });
+
+  it('los controles son nativos y enfocables, para recorrer la grilla con el teclado', () => {
+    declararPresente(fixture, CORTINA);
+    const indicador = tarjeta(CORTINA).querySelector('.grilla .indicador')!;
+    const radios = Array.from(indicador.querySelectorAll<HTMLInputElement>('input[type="radio"]'));
+
+    // Un mismo nombre agrupa las opciones: las flechas se mueven entre ellas y Tab sale del grupo.
+    expect(new Set(radios.map((r) => r.name)).size).toBe(1);
+    expect(radios).toHaveLength(4);
+    expect(radios.every((r) => !r.disabled && r.tabIndex >= 0)).toBe(true);
+    expect(botonSinDanos(CORTINA).tagName).toBe('BUTTON');
+  });
+
+  it('«No aplica» y «Ausente» se distinguen por color, ícono y texto', async () => {
+    const opciones = tarjeta(CORTINA).querySelectorAll<HTMLInputElement>('input[type="radio"]');
+    const chip = () => tarjeta(CORTINA).querySelector('.estado')!;
+    const icono = () => chip().querySelector('i')!.className;
+
+    await alPulsar(opciones[1]); // No aplica
+    expect(tarjeta(CORTINA).getAttribute('data-subtipo')).toBe('no_aplica');
+    expect(chip().getAttribute('data-subtipo')).toBe('no_aplica');
+    expect(icono()).toContain('pi-minus-circle');
+    expect(
+      tarjeta(CORTINA).querySelector('.existencia .segmento.marcado')!.getAttribute('data-valor'),
+    ).toBe('NO_APLICA');
+
+    await alPulsar(opciones[2]); // Ausente
+    expect(tarjeta(CORTINA).getAttribute('data-subtipo')).toBe('ausente');
+    expect(icono()).toContain('pi-times-circle');
+    expect(chip().textContent).toContain('Ausente');
+    expect(
+      tarjeta(CORTINA).querySelector('.existencia .segmento.marcado')!.getAttribute('data-valor'),
+    ).toBe('AUSENTE');
+  });
+
+  it('los indicadores de severidad forman una matriz: los nombres van una sola vez', () => {
+    declararPresente(fixture, CORTINA);
+
+    const encabezado = tarjeta(CORTINA).querySelector('.matriz-cabecera')!;
+    expect(encabezado.getAttribute('aria-hidden')).toBe('true');
+    expect(
+      Array.from(encabezado.querySelectorAll('span')).map((e) => e.textContent!.trim()),
+    ).toEqual(['No presenta', 'Leve', 'Moderado', 'Severo']);
+    // Cada fila son celdas táctiles; su nombre sigue disponible para lectores de pantalla.
+    const celdas = tarjeta(CORTINA).querySelectorAll('.matriz .indicador:first-child .segmento');
+    expect(celdas).toHaveLength(4);
+    expect(celdas[1].querySelector('.solo-lectores')!.textContent).toBe('Leve');
+    expect(tarjeta(CORTINA).querySelectorAll('.matriz-cabecera')).toHaveLength(1);
+  });
+
+  it('las medidas opcionales van plegadas hasta que alguna tiene un valor', async () => {
+    declararPresente(fixture, CORTINA);
+    const medidas = () => tarjeta(CORTINA).querySelector<HTMLDetailsElement>('details.medidas')!;
+
+    expect(medidas().querySelector('summary')!.textContent).toContain('Medidas (opcional)');
+    expect(medidas().open).toBe(false);
+
+    const altura = medidas().querySelector('input[type="number"]') as HTMLInputElement;
+    escribir(altura, '2.5');
+    fixture.detectChanges();
+
+    expect(medidas().open).toBe(true);
+  });
+
+  it('el detalle de un elemento sano y completo se pliega y se puede volver a abrir', async () => {
+    const detalle = () => tarjeta(CORTINA).querySelector<HTMLElement>('.detalle')!;
+    const alternar = () => tarjeta(CORTINA).querySelector<HTMLButtonElement>('button.alternar')!;
+    const construido = fixture.componentInstance['construido']()!;
+
+    // Sano, pero todavía falta el material (obligatorio): no se pliega solo.
+    await alPulsar(botonSinDanos(CORTINA));
+    expect(detalle().hidden).toBe(false);
+
+    construido.form
+      .get('subestructura.estribo_entrada.cortina_superior.material')!
+      .setValue('ACERO');
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+    expect(detalle().hidden).toBe(true);
+    expect(alternar().getAttribute('aria-expanded')).toBe('false');
+    expect(alternar().getAttribute('aria-controls')).toBe(detalle().id);
+
+    await alPulsar(alternar());
+    expect(detalle().hidden).toBe(false);
+    expect(alternar().getAttribute('aria-expanded')).toBe('true');
+
+    await alPulsar(alternar());
+    expect(detalle().hidden).toBe(true);
+    // La existencia nunca se oculta: es la primera decisión.
+    expect(tarjeta(CORTINA).querySelector('.existencia')).not.toBeNull();
+  });
+
+  it('limpiar un indicador es una ✕ en su título, sin fila propia, con nombre accesible', async () => {
+    declararPresente(fixture, CORTINA);
+    const fila = tarjeta(CORTINA).querySelector('.matriz .indicador')!;
+    expect(fila.querySelector('.quitar')).toBeNull();
+
+    await alPulsar(fila.querySelectorAll<HTMLInputElement>('input[type="radio"]')[1]);
+
+    const quitar = fila.querySelector<HTMLButtonElement>('legend .quitar')!;
+    expect(quitar).not.toBeNull();
+    expect(quitar.querySelector('.texto-quitar')!.textContent).toBe('Limpiar selección');
+    expect(quitar.getAttribute('title')).toBe('Limpiar selección');
+
+    await alPulsar(quitar);
+    expect(fila.querySelector('.segmento.marcado')).toBeNull();
+    expect(fila.querySelector('.quitar')).toBeNull();
+  });
+
+  it('los indicadores con nombres largos usan botones más anchos y no entran en la matriz', () => {
+    const socavacion = 'subestructura/estribo_entrada/socavacion';
+    const aguasArriba = tarjeta(socavacion).querySelector('[data-ruta$="/aguas_arriba"]')!;
+
+    // «Asentamiento de la estructura» no cabe en una celda estrecha: el grupo pide 2 × 2.
+    expect(aguasArriba.querySelector('.segmentos.cuatro.largas')).not.toBeNull();
+    expect(tarjeta(socavacion).querySelector('.matriz')).toBeNull();
+    expect(
+      Array.from(aguasArriba.querySelectorAll('.segmento')).map((s) => s.textContent!.trim()),
+    ).toEqual(['No hay', 'Sin exposición', 'Con exposición', 'Asentamiento de la estructura']);
+
+    // La severidad, con nombres cortos, sí es una fila de celdas y no lleva esa clase.
+    declararPresente(fixture, CORTINA);
+    expect(tarjeta(CORTINA).querySelector('.matriz .segmentos.largas')).toBeNull();
+  });
+
+  it('los bloques anidados de un elemento («Otros») usan también botones de la grilla', () => {
+    declararPresente(fixture, CORTINA);
+    const severidad = tarjeta(CORTINA).querySelector<HTMLElement>(
+      'details.opcional .campo[data-ruta$="/otros/severidad"]',
+    )!;
+
+    // Mismos botones amplios que el resto de la tarjeta: nada de texto pegado a los bordes.
+    expect(severidad.classList.contains('en-grilla')).toBe(true);
+    expect(severidad.querySelectorAll('.segmento')).toHaveLength(4);
+  });
+
+  it('un elemento en proceso mantiene su detalle abierto', () => {
+    declararPresente(fixture, CORTINA);
+
+    expect(tarjeta(CORTINA).querySelector<HTMLElement>('.detalle')!.hidden).toBe(false);
+  });
+
+  it('con el teclado, Espacio y Enter marcan una opción y la desmarcan', () => {
+    declararPresente(fixture, CORTINA);
+    const indicador = tarjeta(CORTINA).querySelector('.grilla .indicador')!;
+    const leve = indicador.querySelectorAll<HTMLInputElement>('input[type="radio"]')[1];
+    const teclear = (tecla: string) => {
+      const evento = new KeyboardEvent('keydown', { key: tecla, bubbles: true, cancelable: true });
+      leve.dispatchEvent(evento);
+      fixture.detectChanges();
+      return evento;
+    };
+    const elegida = () => indicador.querySelector('.segmento.marcado')?.textContent?.trim() ?? null;
+
+    expect(teclear(' ').defaultPrevented).toBe(true);
+    expect(elegida()).toBe('Leve');
+
+    teclear(' ');
+    expect(elegida()).toBeNull();
+
+    teclear('Enter');
+    expect(elegida()).toBe('Leve');
+    teclear('Enter');
+    expect(elegida()).toBeNull();
+
+    // Otras teclas no hacen nada y siguen su curso normal (Tab, flechas…).
+    expect(teclear('Tab').defaultPrevented).toBe(false);
+    expect(elegida()).toBeNull();
+  });
+
+  it('en modo de solo lectura no se ofrece marcar el elemento', async () => {
+    fixture.componentRef.setInput('soloLectura', true);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(tarjeta(CORTINA).querySelector('button.sin-danos')).toBeNull();
+  });
+
+  it('la señalización se marca sin daños con «Hay» y «Bueno»', async () => {
+    for (let i = 0; i < 4; i++) await ir(fixture, 'Sección siguiente'); // 8. Otros
+    const informativa = 'otros/senalizacion/informativa';
+
+    await alPulsar(botonSinDanos(informativa));
+
+    expect(textoEstado(informativa)).toBe('Sin daños');
+    expect(fixture.componentInstance.valor()['otros']).toMatchObject({
+      senalizacion: { informativa: { existe: true, estado: 'BUENO' } },
+    });
+  });
+});
+
+function botonesPorTexto(texto: string): HTMLButtonElement[] {
+  return Array.from(document.querySelectorAll<HTMLButtonElement>('button')).filter((b) =>
+    b.textContent?.includes(texto),
+  );
+}
