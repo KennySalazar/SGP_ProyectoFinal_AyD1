@@ -181,6 +181,8 @@ describe('esquema-visual utility', () => {
             readOnly?: boolean;
             minLength?: number;
             maxLength?: number;
+            minimum?: number;
+            maximum?: number;
             enum?: string[];
           }
         >;
