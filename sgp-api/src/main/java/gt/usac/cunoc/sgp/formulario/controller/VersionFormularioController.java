@@ -66,6 +66,17 @@ public class VersionFormularioController {
     return ResponseEntity.ok(service.obtenerActiva());
   }
 
+  @GetMapping("/{id}/esquema")
+  @PreAuthorize("isAuthenticated()")
+  @Operation(
+      summary = "Consultar el esquema de una versión publicada",
+      description =
+          "Retorna el esquema de una versión publicada, activa o anterior, para mostrar una "
+              + "inspección con la estructura de su versión original. Los borradores responden 404.")
+  public ResponseEntity<FormularioActivoResponse> obtenerEsquemaPublicado(@PathVariable UUID id) {
+    return ResponseEntity.ok(service.obtenerPublicadaPorId(id));
+  }
+
   @GetMapping("/{id}")
   @PreAuthorize("hasRole('ADMINISTRADOR')")
   @Operation(
@@ -183,5 +194,17 @@ public class VersionFormularioController {
           "Se requiere una sesión válida para gestionar versiones del formulario.");
     }
     return jwtData.userId();
+  }
+
+  @PutMapping("/{id}/escala")
+  @PreAuthorize("hasRole('ADMINISTRADOR')")
+  @Operation(
+      summary = "Configurar escala de severidad del IC",
+      description = "Configura los valores de severidad de una version en BORRADOR.")
+  public ResponseEntity<VersionFormularioResponse> configurarEscala(
+      @PathVariable UUID id,
+      @Valid @RequestBody gt.usac.cunoc.sgp.formulario.dto.ConfigurarEscalaIcRequest request,
+      Authentication authentication) {
+    return ResponseEntity.ok(service.configurarEscala(id, request, usuarioId(authentication)));
   }
 }

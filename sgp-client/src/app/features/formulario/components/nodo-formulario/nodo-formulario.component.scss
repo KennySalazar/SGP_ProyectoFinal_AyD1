@@ -1,0 +1,177 @@
+:host {
+  display: block;
+  min-width: 0;
+}
+
+/* Ocupa toda la fila de la cuadrícula del grupo que lo contiene. */
+:host(.ancho-completo) {
+  grid-column: 1 / -1;
+}
+
+fieldset.grupo {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+fieldset.anidado {
+  padding: 1rem;
+  border: 1px solid var(--sgp-border, #d8e2ec);
+  border-radius: 12px;
+}
+
+fieldset.elemento {
+  background: var(--sgp-surface-soft, #f8fafc);
+}
+
+legend {
+  padding: 0 0.5rem;
+  color: var(--sgp-navy-900);
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.campos {
+  /* `dense` rellena con lo pequeño los huecos que deja lo que ocupa toda la fila. */
+  grid-auto-flow: row dense;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr));
+  gap: 1rem;
+  min-width: 0;
+}
+
+.campos.con-grupos {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 22rem), 1fr));
+}
+
+/* Los grupos anidados y las listas ocupan todo el ancho de la cuadrícula. */
+.campos > app-nodo-formulario {
+  min-width: 0;
+}
+
+.lista {
+  display: grid;
+  gap: 1rem;
+}
+
+.lista h3 {
+  margin: 0;
+  color: var(--sgp-navy-900);
+  font-size: 1.05rem;
+}
+
+.instancia {
+  display: grid;
+  gap: 1rem;
+  padding: 1rem;
+  border: 1px solid var(--sgp-border, #d8e2ec);
+  border-radius: 12px;
+  background: var(--sgp-surface, #ffffff);
+}
+
+.cabecera {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  color: var(--sgp-navy-900);
+}
+
+.acciones {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.vacio {
+  margin: 0;
+  color: var(--sgp-steel-500);
+}
+
+@media (max-width: 700px) {
+  .cabecera,
+  .acciones {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
+
+/* Objeto opcional: plegado hasta que se empieza a llenar, para no cargar la pantalla. */
+details.opcional {
+  border: 1px dashed var(--sgp-border, #d8e2ec);
+  border-radius: 12px;
+  background: var(--sgp-surface, #ffffff);
+
+  summary {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+    min-height: 44px;
+    padding: 0.5rem 0.9rem;
+    color: var(--sgp-navy-900);
+    font-weight: 700;
+    cursor: pointer;
+
+    &:focus-visible {
+      outline: 3px solid var(--sgp-cyan-500);
+      outline-offset: 2px;
+      border-radius: 10px;
+    }
+  }
+
+  &[open] {
+    border-style: solid;
+
+    summary {
+      border-bottom: 1px solid var(--sgp-border, #d8e2ec);
+    }
+  }
+
+  .campos {
+    padding: 1rem;
+  }
+}
+
+.etiqueta-opcional {
+  padding: 0.1rem 0.5rem;
+  border-radius: 999px;
+  background: var(--sgp-surface-soft, #f1f5f9);
+  color: var(--sgp-steel-700);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.pie-bloque {
+  display: flex;
+  justify-content: flex-end;
+  padding: 0 1rem 0.75rem;
+}
+
+.limpiar-bloque {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-height: 36px;
+  padding: 0 0.75rem;
+  border: 1px solid var(--sgp-border, #d8e2ec);
+  border-radius: 8px;
+  background: var(--sgp-surface, #ffffff);
+  color: var(--sgp-steel-700);
+  font: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+
+  &:hover {
+    border-color: var(--sgp-steel-500);
+    color: var(--sgp-navy-900);
+  }
+
+  &:focus-visible {
+    outline: 3px solid var(--sgp-cyan-500);
+    outline-offset: 2px;
+  }
+}

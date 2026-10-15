@@ -1,0 +1,282 @@
+:host {
+  display: block;
+  min-width: 0;
+}
+
+.campo {
+  display: grid;
+  gap: 0.4rem;
+  min-width: 0;
+  /* Permite que los botones de opciones se acomoden según el ancho del campo, no el de la ventana. */
+  container-type: inline-size;
+}
+
+label,
+legend {
+  color: var(--sgp-navy-900);
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+fieldset.opciones {
+  display: grid;
+  gap: 0.5rem;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+legend {
+  padding: 0;
+}
+
+.marca-obligatorio {
+  margin-left: 0.15rem;
+  color: #b91c1c;
+}
+
+.marca-opcional {
+  margin-left: 0.35rem;
+  color: var(--sgp-steel-500);
+  font-size: 0.85rem;
+  font-weight: 400;
+}
+
+.icono-precargado {
+  margin-left: 0.4rem;
+  color: var(--sgp-steel-500);
+  font-size: 0.8rem;
+}
+
+input,
+textarea,
+p-select {
+  width: 100%;
+  min-width: 0;
+}
+
+/* Controles táctiles de al menos 44 px (DT-FE-09). */
+input[type='text'],
+input[type='number'],
+input[type='date'] {
+  min-height: 46px;
+}
+
+/* Opciones como botones: un solo toque, objetivos de al menos 44 px y salto de línea si no caben. */
+.segmentos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.segmento {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 1 auto;
+  min-width: 4.5rem;
+  min-height: 44px;
+  padding: 0 0.9rem;
+  border: 1px solid var(--sgp-border);
+  border-radius: 10px;
+  background: var(--sgp-surface);
+  color: var(--sgp-navy-900);
+  font-weight: 600;
+  text-align: center;
+  white-space: nowrap;
+  cursor: pointer;
+  user-select: none;
+
+  input {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    opacity: 0;
+    cursor: inherit;
+  }
+
+  &:hover:not(.marcado):not(.deshabilitado) {
+    background: var(--sgp-surface-soft);
+    border-color: var(--sgp-steel-500);
+  }
+
+  &:has(input:focus-visible) {
+    outline: 3px solid var(--sgp-cyan-500);
+    outline-offset: 2px;
+  }
+
+  &.marcado {
+    border-color: var(--sgp-blue-600);
+    background: var(--sgp-blue-600);
+    color: #ffffff;
+  }
+
+  &.deshabilitado {
+    cursor: not-allowed;
+    opacity: 0.65;
+  }
+}
+
+/* Los enumerados reparten el ancho entre sus opciones. */
+.amplios .segmento {
+  flex: 1 1 auto;
+}
+
+/* Cuatro opciones (la severidad): 2 × 2 en un campo angosto y todas en una fila si hay lugar. */
+.amplios.cuatro .segmento {
+  flex: 1 1 calc(50% - 0.4rem);
+}
+
+@container (min-width: 26rem) {
+  .amplios.cuatro .segmento {
+    flex: 1 1 0;
+  }
+}
+
+.quitar {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  width: fit-content;
+  min-height: 32px;
+  padding: 0.2rem 0.5rem 0.2rem 0;
+  border: 0;
+  background: none;
+  color: var(--sgp-steel-700);
+  font: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+
+  i {
+    font-size: 0.7rem;
+  }
+
+  &:hover {
+    color: var(--sgp-navy-900);
+    text-decoration: underline;
+  }
+
+  &:focus-visible {
+    outline: 3px solid var(--sgp-cyan-500);
+    outline-offset: 2px;
+    border-radius: 6px;
+  }
+}
+
+.casillas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.casilla {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  min-height: 44px;
+  padding: 0 0.9rem 0 0.75rem;
+  border: 1px solid var(--sgp-border);
+  border-radius: 10px;
+  background: var(--sgp-surface);
+  font-weight: 500;
+  cursor: pointer;
+
+  input {
+    width: 1.25rem;
+    height: 1.25rem;
+    margin: 0;
+    accent-color: var(--sgp-blue-600);
+    cursor: inherit;
+  }
+
+  &:has(input:checked) {
+    border-color: var(--sgp-blue-600);
+    background: var(--sgp-surface-soft);
+  }
+
+  &:has(input:focus-visible) {
+    outline: 3px solid var(--sgp-cyan-500);
+    outline-offset: 2px;
+  }
+
+  &.deshabilitado {
+    cursor: not-allowed;
+    opacity: 0.65;
+  }
+}
+
+.error {
+  color: #b91c1c;
+}
+
+.invalido input,
+.invalido textarea {
+  border-color: #b91c1c;
+}
+
+.solo-lectores {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+}
+
+/* Ayuda plegable de las opciones: un ícono junto al título y una lista que se despliega debajo. */
+.ayuda-boton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  /* Área táctil de 44 px sin agrandar la línea del título. */
+  min-width: 44px;
+  min-height: 44px;
+  margin: -0.7rem -0.5rem -0.7rem -0.3rem;
+  border: 0;
+  background: none;
+  color: var(--sgp-steel-500);
+  font-size: 1.05rem;
+  vertical-align: middle;
+  cursor: pointer;
+
+  &:hover,
+  &[aria-expanded='true'] {
+    color: var(--sgp-blue-600);
+  }
+
+  &:focus-visible {
+    outline: 3px solid var(--sgp-cyan-500);
+    outline-offset: -6px;
+    border-radius: 10px;
+  }
+}
+
+.ayuda {
+  display: grid;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0.6rem 0.8rem;
+  border-left: 3px solid var(--sgp-blue-600);
+  border-radius: 0 8px 8px 0;
+  background: var(--sgp-surface-soft);
+  font-size: 0.85rem;
+  line-height: 1.45;
+
+  &[hidden] {
+    display: none;
+  }
+
+  dt {
+    color: var(--sgp-navy-900);
+    font-weight: 700;
+  }
+
+  dd {
+    margin: 0;
+    color: var(--sgp-steel-700);
+  }
+}

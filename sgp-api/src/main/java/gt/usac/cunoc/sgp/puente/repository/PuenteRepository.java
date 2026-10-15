@@ -1,16 +1,36 @@
 package gt.usac.cunoc.sgp.puente.repository;
 
 import gt.usac.cunoc.sgp.puente.entity.Puente;
+import jakarta.persistence.LockModeType;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 public interface PuenteRepository extends JpaRepository<Puente, UUID> {
+
+  @Lock(LockModeType.PESSIMISTIC_WRITE)
+  @Query("SELECT p FROM Puente p WHERE p.id = :id")
+  Optional<Puente> findByIdForUpdate(@Param("id") UUID id);
+
+  @EntityGraph(attributePaths = {"municipio", "municipio.departamento"})
+  @Query(
+      """
+          SELECT p FROM Puente p
+          WHERE (:activo IS NULL OR p.activo = :activo)
+            AND (:departamentoId IS NULL OR p.municipio.departamento.id = :departamentoId)
+            AND p.estadoActual = :estado
+          """)
+  Page<Puente> findCatalogoPorEstado(
+      @Param("departamentoId") UUID departamentoId,
+      @Param("activo") Boolean activo,
+      @Param("estado") String estado,
+      Pageable pageable);
 
   @EntityGraph(attributePaths = {"municipio", "municipio.departamento"})
   @Query(

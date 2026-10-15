@@ -31,8 +31,8 @@
     "myAssignedBridges": "Mis puentes asignados",
     "users": "Usuarios",
     "formularioSieca": "Formulario SIECA",
-
-    "logout": "Cerrar sesion"
+    "logout": "Cerrar sesion",
+    "inspectionForm": "Formulario de inspección"
   },
   "connectivity": {
     "online": "En linea",
@@ -207,7 +207,6 @@
     "empty": "No hay estudiantes pendientes de activación.",
     "noCourses": "No tienes cursos vigentes disponibles para vincular estudiantes."
   },
-
   "bridgeAssignments": {
     "kicker": "GESTION ACADÉMICA",
     "title": "Asignar puentes",
@@ -234,7 +233,6 @@
     "revoking": "Revocando...",
     "cancel": "Cancelar"
   },
-
   "myAssignedBridges": {
     "kicker": "TRABAJO ACADÉMICO",
     "title": "Mis puentes asignados",
@@ -245,7 +243,6 @@
     "loading": "Cargando puentes asignados...",
     "empty": "No tienes puentes asignados actualmente."
   },
-
   "puentes": {
     "revision": {
       "title": "Revisión de solicitudes de alta",
@@ -853,6 +850,124 @@
     "newOption": "Nueva opción",
     "addOption": "Agregar opción",
     "emptySections": "No hay secciones registradas en el formulario.",
-    "emptyQuestions": "Esta sección aún no tiene preguntas. Agrega la primera pregunta."
+    "emptyQuestions": "Esta sección aún no tiene preguntas. Agrega la primera pregunta.",
+    "dinamico": {
+      "sections": "Secciones del formulario",
+      "previous": "Sección anterior",
+      "next": "Sección siguiente",
+      "progress": "{{completos}} de {{obligatorios}} obligatorios",
+      "sectionComplete": "Completa",
+      "sectionPending": "Pendiente",
+      "sectionErrors": "Con errores",
+      "sectionProgressLabel": "Avance de la sección",
+      "required": "obligatorio",
+      "preloaded": "Dato precargado",
+      "yes": "Sí",
+      "no": "No",
+      "select": "Seleccionar…",
+      "clear": "Limpiar selección",
+      "add": "Agregar {{nombre}}",
+      "remove": "Quitar {{nombre}} {{numero}}",
+      "instance": "{{nombre}} {{numero}}",
+      "noInstances": "Todavía no hay elementos. Usa el botón para agregar el primero.",
+      "limitReached": "Se alcanzó el máximo de elementos.",
+      "invalidSchema": "No se puede mostrar el formulario: el esquema de la versión no es válido ({{detalle}}).",
+      "readOnlyNotice": "Esta inspección se muestra en solo lectura con la estructura de la versión con la que se levantó.",
+      "sectionOf": "Sección {{actual}} de {{total}}",
+      "sectionStatus": "{{titulo}}: {{estado}}",
+      "reviewHint": "Revisa los campos marcados antes de continuar.",
+      "optional": "opcional",
+      "sectionMissing": "Faltan datos",
+      "clearBlock": "Limpiar este bloque",
+      "legend": "Campo obligatorio. Los que dicen «opcional» pueden quedar vacíos.",
+      "help": "¿Qué significa cada opción?",
+      "supportSection": "Sección de apoyo"
+    },
+    "validacion": {
+      "requerido": "Este campo es obligatorio.",
+      "minimo": "El valor debe ser mayor o igual a {{minimo}}.",
+      "maximo": "El valor debe ser menor o igual a {{maximo}}.",
+      "minimoExclusivo": "El valor debe ser mayor que {{minimo}}.",
+      "maximoExclusivo": "El valor debe ser menor que {{maximo}}.",
+      "longitudMinima": "Escribe al menos {{minimo}} caracteres.",
+      "longitudMaxima": "Escribe como máximo {{maximo}} caracteres.",
+      "entero": "Escribe un número entero.",
+      "fechaInvalida": "Escribe una fecha válida.",
+      "minimoElementos": "Agrega al menos {{minimo}}.",
+      "maximoElementos": "No puedes agregar más de {{maximo}}.",
+      "maximoSiContiene": "Si eliges «{{valor}}» no puedes marcar otras opciones."
+    },
+    "opciones": {
+      "SI": "Sí",
+      "NO": "No",
+      "PARCIAL": "Parcial",
+      "TANGENTE": "Tangente",
+      "CURVA": "Curva",
+      "RECTO": "Recto",
+      "INDEFINIDO": "Indefinido",
+      "RIO": "Río",
+      "QUEBRADA": "Quebrada",
+      "CARRETERA": "Carretera",
+      "LINEA_FERREA": "Línea férrea",
+      "OTRO": "Otro",
+      "LIMPIOS": "Limpios",
+      "OBSTRUIDOS": "Obstruidos",
+      "BUENO": "Bueno",
+      "MALO": "Malo",
+      "PRESENTE": "Presente",
+      "NO_APLICA": "No aplica",
+      "AUSENTE": "Ausente",
+      "NO_PRESENTA": "No presenta",
+      "LEVE": "Leve",
+      "MODERADO": "Moderado",
+      "SEVERO": "Severo",
+      "CONCRETO_REFORZADO": "Concreto reforzado",
+      "CONCRETO_PRETENSADO": "Concreto pretensado",
+      "CONCRETO_POSTENSADO": "Concreto postensado",
+      "CONCRETO_CICLOPEO": "Concreto ciclópeo",
+      "ACERO": "Acero",
+      "MADERA": "Madera",
+      "PIEDRA_LIGADA_MORTERO": "Piedra ligada con mortero",
+      "MIXTO": "Mixto",
+      "DERECHO": "Derecho",
+      "IZQUIERDO": "Izquierdo",
+      "AMBOS": "Ambos",
+      "NO_HAY": "No hay",
+      "SIN_EXPOSICION": "Sin exposición",
+      "CON_EXPOSICION": "Con exposición",
+      "ASENTAMIENTO_ESTRUCTURA": "Asentamiento de la estructura",
+      "NEOPRENO": "Neopreno",
+      "ACERO_BALANCIN": "Acero (balancín)",
+      "ACERO_RODILLO": "Acero (rodillo)",
+      "LIMPIO": "Limpio",
+      "ASOLVADO_SEDIMENTADO": "Asolvado o sedimentado",
+      "EROSIONADO": "Erosionado"
+    },
+    "vistaPrevia": {
+      "title": "Formulario de inspección",
+      "subtitle": "Vista previa del formulario que se genera a partir del esquema de la versión publicada. Lo que captures aquí no se guarda.",
+      "version": "Versión {{codigo}}",
+      "hash": "Huella {{hash}}",
+      "loading": "Cargando el formulario…",
+      "loadError": "No se pudo cargar el formulario.",
+      "noActive": "Todavía no hay una versión activa del formulario. Un administrador debe publicar una en Formulario SIECA.",
+      "readOnlyOn": "Solo lectura",
+      "readOnlyOff": "Editar",
+      "review": "Revisar formulario",
+      "reviewValid": "El formulario está completo y cumple las reglas del esquema.",
+      "valueTitle": "Datos capturados (JSON)",
+      "valueHint": "Es lo que se enviaría al servidor: sin campos ocultos ni vacíos.",
+      "reviewMissing": "Faltan {{cantidad}} campos obligatorios.",
+      "reviewInvalid": "Hay {{cantidad}} campos con valores no válidos.",
+      "reviewHint": "Te llevamos al primero para que lo completes.",
+      "photoReportTitle": "Reporte fotográfico",
+      "photoReportDescription": "Fotografías del puente: accesos, calzada, juntas de dilatación y detalle de los daños.",
+      "photoReportPending": "Aquí se adjuntarán las fotografías de la inspección. Esta sección se habilita al integrar el módulo de archivos (HU-028)."
+    },
+    "ayudaOpciones": {
+      "PRESENTE": "El elemento existe y se evalúa: llena sus medidas y los daños que observes.",
+      "NO_APLICA": "El diseño del puente no incluye este elemento (por ejemplo, un estribo de muro de gravedad no tiene columnas). No se evalúa ni afecta el índice de condición.",
+      "AUSENTE": "El elemento debería existir pero falta por completo. Cuenta como una falla y, si es un elemento portante, el puente queda en estado Malo."
+    }
   }
 }

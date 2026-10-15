@@ -2,7 +2,6 @@
 set -Eeuo pipefail
 
 readonly COMPOSE_VERSION="v2.40.3"
-readonly COMPOSE_ARCH="x86_64"
 readonly COMPOSE_DIR="/usr/local/lib/docker/cli-plugins"
 readonly COMPOSE_PATH="${COMPOSE_DIR}/docker-compose"
 
@@ -11,12 +10,20 @@ if [[ "${EUID}" -ne 0 ]]; then
   exit 1
 fi
 
-if [[ "$(uname -m)" != "x86_64" ]]; then
-  echo "Este script esta preparado para una instancia EC2 x86_64." >&2
-  exit 1
-fi
+case "$(uname -m)" in
+  aarch64 | arm64)
+    readonly COMPOSE_ARCH="aarch64"
+    ;;
+  x86_64 | amd64)
+    readonly COMPOSE_ARCH="x86_64"
+    ;;
+  *)
+    echo "Arquitectura no soportada: $(uname -m). Se requiere ARM64 o x86_64." >&2
+    exit 1
+    ;;
+esac
 
-dnf install --assumeyes docker curl
+dnf install --assumeyes docker postgresql16
 systemctl enable --now docker
 systemctl enable --now chronyd
 
@@ -44,7 +51,7 @@ if [[ -z "${expected_checksum}" || "${actual_checksum}" != "${expected_checksum}
 fi
 install -m 0755 "${temporary_compose}" "${COMPOSE_PATH}"
 
-install -d -m 0755 /opt/sgp/staging /opt/sgp/postgres/init
+install -d -m 0755 /opt/sgp/staging
 install -d -m 0700 /etc/sgp/staging
 
 if [[ ! -f /swapfile ]]; then
