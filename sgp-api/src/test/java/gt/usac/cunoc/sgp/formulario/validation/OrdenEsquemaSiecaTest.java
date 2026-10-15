@@ -12,8 +12,8 @@ import org.junit.jupiter.api.Test;
 
 /**
  * PostgreSQL guarda el esquema como JSONB, que reordena las claves de cada objeto. El orden en que
- * el inspector ve las secciones y los campos viaja entonces en {@code x-sgp-orden}, una lista
- * (las listas sí conservan el orden) que debe nombrar todas las propiedades del objeto.
+ * el inspector ve las secciones y los campos viaja entonces en {@code x-sgp-orden}, una lista (las
+ * listas sí conservan el orden) que debe nombrar todas las propiedades del objeto.
  */
 class OrdenEsquemaSiecaTest {
 
@@ -22,7 +22,8 @@ class OrdenEsquemaSiecaTest {
   @BeforeAll
   static void cargarEsquema() throws Exception {
     try (InputStream in =
-        OrdenEsquemaSiecaTest.class.getResourceAsStream("/formulario/sieca-v1/esquema.schema.json")) {
+        OrdenEsquemaSiecaTest.class.getResourceAsStream(
+            "/formulario/sieca-v1/esquema.schema.json")) {
       esquema = new ObjectMapper().readTree(in);
     }
   }
@@ -93,7 +94,8 @@ class OrdenEsquemaSiecaTest {
     propiedades.fieldNames().forEachRemaining(reales::add);
 
     if (declaradas.size() != reales.size() || !declaradas.containsAll(reales)) {
-      fallos.add(ruta + ": x-sgp-orden " + declaradas + " no coincide con las propiedades " + reales);
+      fallos.add(
+          ruta + ": x-sgp-orden " + declaradas + " no coincide con las propiedades " + reales);
     }
   }
 }
