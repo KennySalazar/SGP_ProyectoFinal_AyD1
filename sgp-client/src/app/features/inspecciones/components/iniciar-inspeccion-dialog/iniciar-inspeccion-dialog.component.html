@@ -1,0 +1,329 @@
+<p-dialog
+  [visible]="visible"
+  (visibleChange)="onVisibleChange($event)"
+  [modal]="true"
+  appendTo="body"
+  [header]="
+    resultado()
+      ? ('inspecciones.iniciar.exitoTitulo' | transloco)
+      : ('inspecciones.iniciar.titulo' | transloco)
+  "
+  [style]="{ width: '90%', maxWidth: '640px' }"
+  [draggable]="false"
+  [resizable]="false"
+>
+  <div class="dialog-cuerpo">
+    @if (resultado(); as res) {
+      <!-- Vista de resultado exitoso -->
+      <div class="resultado-exito" role="status">
+        <div class="exito-cabecera">
+          <i class="pi pi-check-circle icono-exito" aria-hidden="true"></i>
+          <div>
+            <h3>{{ 'inspecciones.iniciar.creadaExito' | transloco }}</h3>
+            <p class="resultado-sub">{{ 'inspecciones.iniciar.creadaNota' | transloco }}</p>
+          </div>
+          <p-tag [value]="res.estado" severity="warn" />
+        </div>
+
+        @if (res.advertenciaGps) {
+          <div class="alerta-advertencia alerta-gps" role="alert">
+            <i class="pi pi-exclamation-triangle" aria-hidden="true"></i>
+            <div>
+              <strong>{{ 'inspecciones.iniciar.advertenciaGpsTitulo' | transloco }}</strong>
+              <p>{{ res.mensajeAdvertenciaGps }}</p>
+              @if (res.distanciaAlPuenteM) {
+                <small>{{
+                  'inspecciones.iniciar.distanciaCalculada'
+                    | transloco: { distancia: res.distanciaAlPuenteM }
+                }}</small>
+              }
+            </div>
+          </div>
+        }
+
+        <div class="resultado-detalles surface-card">
+          <div class="detalle-fila">
+            <span class="detalle-etiqueta">{{ 'inspecciones.iniciar.puente' | transloco }}:</span>
+            <span class="detalle-valor">{{ res.codigoPuente }} - {{ res.nombrePuente }}</span>
+          </div>
+          <div class="detalle-fila">
+            <span class="detalle-etiqueta"
+              >{{ 'inspecciones.iniciar.formulario' | transloco }}:</span
+            >
+            <span class="detalle-valor"
+              >{{ res.codigoVersionFormulario }} ({{
+                'inspecciones.iniciar.versionCongelada' | transloco
+              }})</span
+            >
+          </div>
+          <div class="detalle-fila">
+            <span class="detalle-etiqueta">{{ 'inspecciones.iniciar.autor' | transloco }}:</span>
+            <span class="detalle-valor">{{ res.nombreAutor }} ({{ res.rolAutor }})</span>
+          </div>
+          <div class="detalle-fila">
+            <span class="detalle-etiqueta">{{ 'inspecciones.iniciar.fecha' | transloco }}:</span>
+            <span class="detalle-valor">{{ res.fechaInspeccion }}</span>
+          </div>
+          <div class="detalle-fila">
+            <span class="detalle-etiqueta"
+              >{{ 'inspecciones.iniciar.dispositivo' | transloco }}:</span
+            >
+            <span class="detalle-valor valor-dispositivo">{{ res.dispositivoId }}</span>
+          </div>
+          <div class="detalle-fila">
+            <span class="detalle-etiqueta"
+              >{{ 'inspecciones.iniciar.idInspeccion' | transloco }}:</span
+            >
+            <span class="detalle-valor valor-id">{{ res.id }}</span>
+          </div>
+          <div class="detalle-fila">
+            <span class="detalle-etiqueta"
+              >{{ 'inspecciones.iniciar.precargaPermanentes' | transloco }}:</span
+            >
+            <span class="detalle-valor">
+              {{
+                (res.datosPermanentesConfirmados
+                  ? 'inspecciones.iniciar.permanentesConfirmados'
+                  : 'inspecciones.iniciar.permanentesNoPrecargados'
+                ) | transloco
+              }}
+            </span>
+          </div>
+          @if (res.acompanantes && res.acompanantes.length > 0) {
+            <div class="detalle-fila acompanantes-fila">
+              <span class="detalle-etiqueta"
+                >{{ 'inspecciones.iniciar.acompanantes' | transloco }}:</span
+              >
+              <ul class="lista-acompanantes">
+                @for (ac of res.acompanantes; track ac.nombre) {
+                  <li>{{ ac.nombre }}{{ ac.colegiado ? ' (' + ac.colegiado + ')' : '' }}</li>
+                }
+              </ul>
+            </div>
+          }
+        </div>
+
+        <div class="dialog-acciones">
+          <button pButton type="button" (click)="cerrar()">
+            <i class="pi pi-check" aria-hidden="true"></i>
+            <span>{{ 'common.close' | transloco }}</span>
+          </button>
+        </div>
+      </div>
+    } @else {
+      <!-- Formulario para iniciar inspección -->
+      <form [formGroup]="form" (ngSubmit)="iniciarInspeccion()" class="formulario-iniciar">
+        @if (puente) {
+          <div class="resumen-puente">
+            <strong>{{ puente.nombre }}</strong>
+            <span>{{ puente.codigo }} · {{ puente.ruta }}</span>
+          </div>
+        }
+
+        <!-- Estado de GPS -->
+        <div class="bloque-gps">
+          <span class="gps-etiqueta">{{ 'inspecciones.iniciar.gpsUbicacion' | transloco }}:</span>
+          @if (gpsEstado() === 'obteniendo') {
+            <span class="gps-estado obteniendo">
+              <i class="pi pi-spin pi-spinner" aria-hidden="true"></i>
+              {{ 'inspecciones.iniciar.gpsObteniendo' | transloco }}
+            </span>
+          } @else if (gpsEstado() === 'obtenido') {
+            <span class="gps-estado obtenido">
+              <i class="pi pi-map-marker" aria-hidden="true"></i>
+              {{
+                'inspecciones.iniciar.gpsObtenido'
+                  | transloco: { lat: gpsLatitud(), lng: gpsLongitud(), acc: gpsPrecision() }
+              }}
+            </span>
+          } @else {
+            <span class="gps-estado no-disponible">
+              <i class="pi pi-info-circle" aria-hidden="true"></i>
+              {{ 'inspecciones.iniciar.gpsNoDisponible' | transloco }}
+            </span>
+          }
+        </div>
+
+        <!-- Fecha de inspección -->
+        <div class="campo-grupo">
+          <label for="fechaInspeccion" class="campo-label">
+            <span>{{ 'inspecciones.iniciar.fechaInspeccion' | transloco }} *</span>
+            <input
+              id="fechaInspeccion"
+              pInputText
+              type="date"
+              [max]="hoy"
+              formControlName="fechaInspeccion"
+              class="campo-input"
+            />
+          </label>
+        </div>
+
+        <!-- Nombre del inspector -->
+        <div class="campo-grupo">
+          <label for="nombreAutor" class="campo-label">
+            <span>{{ 'inspecciones.iniciar.nombreInspector' | transloco }}</span>
+            <input
+              id="nombreAutor"
+              pInputText
+              type="text"
+              formControlName="nombreAutor"
+              class="campo-input"
+              [placeholder]="'inspecciones.iniciar.nombreInspectorPlaceholder' | transloco"
+            />
+          </label>
+        </div>
+
+        <!-- Precarga de datos técnicos permanentes -->
+        <div class="seccion-permanentes surface-card">
+          <h4>{{ 'inspecciones.iniciar.datosPermanentesTitulo' | transloco }}</h4>
+          @if (cargandoPermanentes()) {
+            <p class="permanentes-nota">
+              <i class="pi pi-spin pi-spinner" aria-hidden="true"></i>
+              {{ 'inspecciones.iniciar.cargandoPermanentes' | transloco }}
+            </p>
+          } @else if (datosPermanentes(); as dp) {
+            <div class="resumen-permanentes">
+              <p class="permanentes-aviso">
+                <i class="pi pi-info-circle" aria-hidden="true"></i>
+                {{ 'inspecciones.iniciar.permanentesEncontrados' | transloco }}
+              </p>
+              <ul class="datos-permanentes-lista">
+                @if (dp.longitudM) {
+                  <li>
+                    <strong>{{ 'inspecciones.iniciar.longitud' | transloco }}:</strong>
+                    {{ dp.longitudM }} m
+                  </li>
+                }
+                @if (dp.numeroTramos) {
+                  <li>
+                    <strong>{{ 'inspecciones.iniciar.tramos' | transloco }}:</strong>
+                    {{ dp.numeroTramos }}
+                  </li>
+                }
+                @if (dp.tipologiaPuente) {
+                  <li>
+                    <strong>{{ 'inspecciones.iniciar.tipologia' | transloco }}:</strong>
+                    {{ dp.tipologiaPuente }}
+                  </li>
+                }
+                @if (dp.materialSuperestructura) {
+                  <li>
+                    <strong>{{ 'inspecciones.iniciar.material' | transloco }}:</strong>
+                    {{ dp.materialSuperestructura }}
+                  </li>
+                }
+                @if (dp.anioConstruccion) {
+                  <li>
+                    <strong>{{ 'inspecciones.iniciar.anioConstruccion' | transloco }}:</strong>
+                    {{ dp.anioConstruccion }}
+                  </li>
+                }
+              </ul>
+              <div class="checkbox-confirmacion">
+                <p-checkbox
+                  formControlName="confirmarDatosPermanentes"
+                  [binary]="true"
+                  inputId="confirmarDatosPermanentes"
+                />
+                <label for="confirmarDatosPermanentes">
+                  <strong>{{ 'inspecciones.iniciar.confirmarPrecarga' | transloco }}</strong>
+                  <small>{{ 'inspecciones.iniciar.noDaniosNota' | transloco }}</small>
+                </label>
+              </div>
+            </div>
+          } @else {
+            <p class="permanentes-nota primera-vez">
+              <i class="pi pi-info-circle" aria-hidden="true"></i>
+              {{ 'inspecciones.iniciar.primeraInspeccionNota' | transloco }}
+            </p>
+          }
+        </div>
+
+        <!-- Acompañantes -->
+        <div class="seccion-acompanantes">
+          <h4>{{ 'inspecciones.iniciar.acompanantesTitulo' | transloco }}</h4>
+          <p class="acompanantes-sub">{{ 'inspecciones.iniciar.acompanantesNota' | transloco }}</p>
+          <div class="fila-nuevo-acompanante">
+            <input
+              pInputText
+              type="text"
+              formControlName="nombreAcompanante"
+              [placeholder]="'inspecciones.iniciar.nombreAcompanantePlaceholder' | transloco"
+              class="input-acompanante"
+            />
+            <input
+              pInputText
+              type="text"
+              formControlName="colegiadoAcompanante"
+              [placeholder]="'inspecciones.iniciar.colegiadoAcompanantePlaceholder' | transloco"
+              class="input-colegiado"
+            />
+            <button
+              pButton
+              type="button"
+              severity="secondary"
+              [outlined]="true"
+              (click)="agregarAcompanante()"
+              [disabled]="!form.get('nombreAcompanante')?.value"
+            >
+              <i class="pi pi-plus" aria-hidden="true"></i>
+              <span>{{ 'inspecciones.iniciar.agregarAcompanante' | transloco }}</span>
+            </button>
+          </div>
+          @if (acompanantes().length > 0) {
+            <ul class="lista-acompanantes-agregados">
+              @for (ac of acompanantes(); track ac.nombre; let i = $index) {
+                <li class="item-acompanante">
+                  <span>{{ ac.nombre }} {{ ac.colegiado ? '(' + ac.colegiado + ')' : '' }}</span>
+                  <button
+                    type="button"
+                    class="btn-quitar-acompanante"
+                    (click)="eliminarAcompanante(i)"
+                    [attr.aria-label]="'inspecciones.iniciar.quitarAcompanante' | transloco"
+                  >
+                    <i class="pi pi-times" aria-hidden="true"></i>
+                  </button>
+                </li>
+              }
+            </ul>
+          }
+        </div>
+
+        <!-- Error del servidor o de validación -->
+        @if (error()) {
+          <div class="alerta-error" role="alert">
+            <i class="pi pi-exclamation-circle" aria-hidden="true"></i>
+            <span>{{ error() }}</span>
+          </div>
+        }
+
+        <!-- Botones de acción -->
+        <div class="dialog-acciones">
+          <button
+            pButton
+            type="button"
+            severity="secondary"
+            [outlined]="true"
+            (click)="cerrar()"
+            [disabled]="guardando()"
+          >
+            {{ 'common.cancel' | transloco }}
+          </button>
+          <button
+            pButton
+            type="submit"
+            [disabled]="form.invalid || guardando()"
+            [loading]="guardando()"
+          >
+            <i class="pi pi-play" aria-hidden="true"></i>
+            <span>{{
+              (guardando() ? 'inspecciones.iniciar.iniciando' : 'inspecciones.iniciar.botonIniciar')
+                | transloco
+            }}</span>
+          </button>
+        </div>
+      </form>
+    }
+  </div>
+</p-dialog>

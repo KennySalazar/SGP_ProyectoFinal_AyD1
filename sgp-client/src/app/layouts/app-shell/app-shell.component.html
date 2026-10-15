@@ -65,6 +65,9 @@
           <a routerLink="/admin/formularios" routerLinkActive="active">
             <i class="pi pi-file-edit"></i><span>{{ 'nav.formularioSieca' | transloco }}</span>
           </a>
+          <a routerLink="/admin/cursos" routerLinkActive="active">
+            <i class="pi pi-book"></i><span>{{ 'nav.courses' | transloco }}</span>
+          </a>
 
           <a routerLink="/puentes/nuevo" routerLinkActive="active">
             <i class="pi pi-map"></i>
@@ -80,8 +83,6 @@
             <i class="pi pi-send" aria-hidden="true"></i>
             <span>{{ 'nav.myBridgeRequests' | transloco }}</span>
           </a>
-        }
-        @if (auth.user()?.role === 'CATEDRATICO') {
           <a routerLink="/estudiantes/pendientes" routerLinkActive="active">
             <i class="pi pi-users"></i><span>{{ 'nav.pendingStudents' | transloco }}</span>
           </a>
