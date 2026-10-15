@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { SeccionVisual } from '../models/formulario.models';
-import { esquemaASeccionesVisuales, seccionesVisualesAEsquema } from './esquema-visual';
+import {
+  esquemaASeccionesVisuales,
+  extraerVinculosVisuales,
+  seccionesVisualesAEsquema,
+  vinculosVisualesAObjeto,
+} from './esquema-visual';
 
 describe('esquema-visual utility', () => {
   it('convierte esquema nulo o vacío en arreglo vacío', () => {
@@ -210,5 +215,42 @@ describe('esquema-visual utility', () => {
     expect(propAncho.maximum).toBe(50);
 
     expect(resultado.vinculos['datos_basicos.codigo_puente']).toBe('puente.codigo');
+  });
+
+  it('extrae vínculos visuales desde formato columnas e instantánea', () => {
+    const raw = {
+      columnas: [
+        {
+          puntero: '/identificacion/fecha',
+          columna: 'inspeccion.fecha_inspeccion',
+          nota: 'Nota 1',
+        },
+      ],
+      instantanea_inventario: {
+        campos: {
+          '/identificacion/codigo': 'puente.codigo',
+        },
+      },
+      'datos.extra': 'puente.extra',
+    };
+
+    const visuales = extraerVinculosVisuales(raw);
+    expect(visuales.length).toBe(3);
+
+    const vCol = visuales.find((v) => v.campoRef === '/identificacion/fecha');
+    expect(vCol?.columnaDestino).toBe('inspeccion.fecha_inspeccion');
+    expect(vCol?.tipo).toBe('Columna técnica');
+
+    const vInv = visuales.find((v) => v.campoRef === '/identificacion/codigo');
+    expect(vInv?.columnaDestino).toBe('puente.codigo');
+    expect(vInv?.tipo).toBe('Inventario puente');
+
+    const vFlat = visuales.find((v) => v.campoRef === 'datos.extra');
+    expect(vFlat?.columnaDestino).toBe('puente.extra');
+
+    // Serializar de vuelta a objeto
+    const reconstruido = vinculosVisualesAObjeto(visuales, raw);
+    expect(Array.isArray(reconstruido['columnas'])).toBe(true);
+    expect(reconstruido['instantanea_inventario']).toBeTruthy();
   });
 });

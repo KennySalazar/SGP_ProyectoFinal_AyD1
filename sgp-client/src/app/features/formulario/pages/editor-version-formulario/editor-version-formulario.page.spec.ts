@@ -213,6 +213,67 @@ describe('EditorVersionFormularioPage', () => {
     expect(component.opcionesSeleccion()).not.toContain('BUENO');
   });
 
+  it('debe permitir seleccionar pestañas de sección y obtener la sección actual', () => {
+    component.seccionesVisuales.set([
+      { clave: 'sec_1', titulo: 'Sección 1', preguntas: [] },
+      { clave: 'sec_2', titulo: 'Sección 2', preguntas: [] },
+    ]);
+    component.seleccionarSeccionVisual('sec_2');
+    expect(component.seccionVisualActiva()).toBe('sec_2');
+    expect(component.seccionVisualActual()?.clave).toBe('sec_2');
+    expect(component.seccionVisualActual()?.titulo).toBe('Sección 2');
+  });
+
+  it('debe gestionar vínculos de almacenamiento de forma visual', () => {
+    expect(component.modoVinculos()).toBe('visual');
+    component.cambiarModoVinculos('codigo');
+    expect(component.modoVinculos()).toBe('codigo');
+    component.cambiarModoVinculos('visual');
+    expect(component.modoVinculos()).toBe('visual');
+
+    // Crear vínculo
+    component.abrirCrearVinculo();
+    expect(component.dialogoVinculo()).toBe(true);
+    expect(component.modoVinculo()).toBe('crear');
+
+    component.vinculoForm.setValue({
+      campoRef: '/identificacion/codigo',
+      columnaDestino: 'puente.codigo',
+      tipo: 'Inventario puente',
+      descripcion: 'Código del puente',
+    });
+    component.guardarVinculoModal();
+
+    expect(component.dialogoVinculo()).toBe(false);
+    expect(component.vinculosVisuales()).toHaveLength(1);
+    const vinc = component.vinculosVisuales()[0];
+    expect(vinc.campoRef).toBe('/identificacion/codigo');
+    expect(vinc.columnaDestino).toBe('puente.codigo');
+
+    // Filtro
+    component.filtroVinculos.set('puente');
+    expect(component.vinculosFiltrados()).toHaveLength(1);
+    component.filtroVinculos.set('inexistente');
+    expect(component.vinculosFiltrados()).toHaveLength(0);
+    component.filtroVinculos.set('');
+
+    // Editar vínculo
+    component.abrirEditarVinculo(vinc);
+    expect(component.modoVinculo()).toBe('editar');
+    component.vinculoForm.controls.columnaDestino.setValue('puente.codigo_oficial');
+    component.guardarVinculoModal();
+
+    expect(component.vinculosVisuales()[0].columnaDestino).toBe('puente.codigo_oficial');
+
+    // Guardar vínculos vía API
+    component.guardarVinculos();
+    expect(apiMock.actualizarBorrador).toHaveBeenCalled();
+
+    // Eliminar vínculo
+    component.eliminarVinculo(vinc.id);
+    expect(component.vinculosVisuales()).toHaveLength(0);
+  });
+
   it('debe calibrar y guardar pesos', () => {
     component.guardarPesos();
     expect(apiMock.calibrarPesos).toHaveBeenCalledWith('v-1', [
