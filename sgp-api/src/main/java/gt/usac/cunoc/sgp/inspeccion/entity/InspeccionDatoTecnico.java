@@ -13,6 +13,8 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.UUID;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 @Entity
 @Table(name = "inspeccion_dato_tecnico")
@@ -66,6 +68,7 @@ public class InspeccionDatoTecnico {
   @Column(name = "carga_diseno", length = 100)
   private String cargaDiseno;
 
+  @JdbcTypeCode(SqlTypes.SMALLINT)
   @Column(name = "anio_construccion")
   private Integer anioConstruccion;
 
