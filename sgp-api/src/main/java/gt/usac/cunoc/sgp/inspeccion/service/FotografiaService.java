@@ -9,6 +9,7 @@ import gt.usac.cunoc.sgp.archivo.service.*;
 import gt.usac.cunoc.sgp.common.exception.ApiException;
 import gt.usac.cunoc.sgp.inspeccion.dto.*;
 import gt.usac.cunoc.sgp.inspeccion.entity.Inspeccion;
+import gt.usac.cunoc.sgp.inspeccion.model.ContextoArchivosInspeccion;
 import gt.usac.cunoc.sgp.inspeccion.repository.InspeccionRepository;
 import gt.usac.cunoc.sgp.inspeccion.validation.ValidadorAnclajeFotografico;
 import gt.usac.cunoc.sgp.sync.model.SolicitudOperacion;
@@ -36,6 +37,9 @@ public class FotografiaService {
   private final ObjetosImagenService objetos;
   private final AlmacenamientoArchivos almacenamiento;
   private final OperacionIdempotenteService operaciones;
+  private final RegistroFotografiasInspeccion registro;
+  private final PoliticaArchivosInspeccion politica;
+  private final AccesoFotografiasInspeccionService acceso;
   private final ObjectMapper json;
   private final Clock clock;
   private final TransactionTemplate tx;
@@ -51,6 +55,9 @@ public class FotografiaService {
       ObjetosImagenService objetos,
       AlmacenamientoArchivos almacenamiento,
       OperacionIdempotenteService operaciones,
+      RegistroFotografiasInspeccion registro,
+      PoliticaArchivosInspeccion politica,
+      AccesoFotografiasInspeccionService acceso,
       ObjectMapper json,
       Clock clock,
       PlatformTransactionManager tm) {
@@ -64,6 +71,9 @@ public class FotografiaService {
     this.objetos = objetos;
     this.almacenamiento = almacenamiento;
     this.operaciones = operaciones;
+    this.registro = registro;
+    this.politica = politica;
+    this.acceso = acceso;
     this.json = json;
     this.clock = clock;
     this.tx = new TransactionTemplate(tm);
@@ -75,7 +85,7 @@ public class FotografiaService {
       AdjuntarFotografiaRequest request,
       MultipartFile fichero,
       String clave) {
-    // Estos controles básicos HU-028 se conectarán con la política HU-029 al integrar ambas ramas.
+    // La reproducción confirmada reautoriza al autor sin exigir estado de carga nueva ni capacidad.
     tx.executeWithoutResult(t -> autorizar(inspeccionId, actor, false));
     CategoriaFoto categoria = validar(request, clave);
     if (fichero.isEmpty())
@@ -126,7 +136,18 @@ public class FotografiaService {
           tx.execute(
               t -> {
                 var inspeccion = autorizar(inspeccionId, actor, true);
-                borrador(inspeccion);
+                long disponibles =
+                    registro.consultar(inspeccionId).stream()
+                        .filter(foto -> foto.estado() == EstadoArchivo.DISPONIBLE)
+                        .count();
+                politica.validarCarga(
+                    new ContextoArchivosInspeccion(
+                        inspeccion.getId(),
+                        inspeccion.getAutorId(),
+                        inspeccion.getEstado(),
+                        inspeccion.getEliminadoEn()),
+                    actor,
+                    disponibles);
                 anclajes.validar(inspeccion, request.elementoRef(), request.instanciaElementoId());
                 operaciones.bloquearEntidad("archivo", request.id());
                 if (archivos.existsById(request.id()))
@@ -236,6 +257,13 @@ public class FotografiaService {
   }
 
   private Inspeccion autorizar(UUID id, UUID actor, boolean bloquear) {
+    var i = cargarInspeccion(id, actor, bloquear);
+    if (!i.getAutorId().equals(actor))
+      throw error(HttpStatus.NOT_FOUND, "inspeccion_no_encontrada", "Inspección no encontrada.");
+    return i;
+  }
+
+  private Inspeccion cargarInspeccion(UUID id, UUID actor, boolean bloquear) {
     if (actor == null)
       throw error(
           HttpStatus.UNAUTHORIZED, "autenticacion_requerida", "Se requiere una sesión válida.");
@@ -249,8 +277,6 @@ public class FotografiaService {
                         HttpStatus.NOT_FOUND,
                         "inspeccion_no_encontrada",
                         "Inspección no encontrada."));
-    if (!i.getAutorId().equals(actor))
-      throw error(HttpStatus.NOT_FOUND, "inspeccion_no_encontrada", "Inspección no encontrada.");
     return i;
   }
 
@@ -265,7 +291,7 @@ public class FotografiaService {
   public List<FotografiaResponse> listar(UUID id, UUID actor) {
     return tx.execute(
         t -> {
-          autorizar(id, actor, false);
+          acceso.validarLectura(cargarInspeccion(id, actor, false), actor);
           return vinculos
               .findByInspeccionIdAndTipoUsoOrderByCreadoEnAsc(id, TipoUsoArchivo.FOTO_INSPECCION)
               .stream()
@@ -279,7 +305,7 @@ public class FotografiaService {
     String clave =
         tx.execute(
             t -> {
-              autorizar(id, actor, false);
+              acceso.validarLectura(cargarInspeccion(id, actor, false), actor);
               var v =
                   vinculos
                       .findByInspeccionIdAndArchivoIdAndTipoUso(

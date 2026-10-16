@@ -5,6 +5,8 @@ Rama de preparación: `feature/hu-029-impl-contratos-asignacion`.
 
 Este documento concreta la preparación técnica de la fase 1 del [plan HU-029](implementacion-hu29.md). Las firmas futuras se implementarán en las fases indicadas. Los contratos existentes se comprobaron en el código. Las decisiones de trabajo se distinguen de la ratificación académica y de la coordinación todavía pendiente con otros responsables; no se afirma haber obtenido su aprobación.
 
+Actualización: fase 2 implementada sobre `022d2e9`, con autorización posterior del usuario. Las firmas de política/acceso y las propiedades de mínimos ya existen. Las firmas de fase 3 y las integraciones de fases 4/5 permanecen futuras. La validación ejecutada se registra en el plan.
+
 ## 1. Contratos disponibles y responsabilidad
 
 Base Java: `sgp-api/src/main/java/gt/usac/cunoc/sgp/`.
@@ -86,9 +88,9 @@ Resolver un POST idempotente ya confirmado no consume capacidad ni vuelve a exig
 
 ## 5. Fuente única de mínimos
 
-Decisión técnica: propiedades de servidor bajo `app.evidencia-fotografica.minimos`, consumidas por una única clase `inspeccion/config/EvidenciaFotograficaProperties` en fase 2. Se utilizarán `@ConfigurationProperties` y validación al inicializar. No existe esta clase ni se han añadido todavía estas propiedades.
+Implementado en fase 2: propiedades de servidor bajo `app.evidencia-fotografica.minimos`, consumidas por una única clase `inspeccion/config/EvidenciaFotograficaProperties`, con `@ConfigurationProperties` y validación al inicializar. Las propiedades de trabajo están en `application.properties` y los mapas expuestos son inmutables.
 
-Configuración de trabajo a incorporar en fase 2, usando el formato `.properties` del backend:
+Configuración de trabajo incorporada en fase 2, usando el formato `.properties` del backend:
 
 ```properties
 # Política de desarrollo pendiente de ratificación académica.
@@ -163,8 +165,9 @@ Los modelos, repositorios y adaptadores entregados por HU-028 se reutilizan. Est
 - [x] Orden de bloqueos y puntos de integración precisados.
 - [ ] Ratificación académica de mínimos y reglas adicionales de asignación/estados.
 - [ ] Coordinación de edición con HU-028 y entrega del vínculo por el flujo académico.
-- [ ] Implementación y verificación de fases 2–5.
+- [x] Implementación y verificación backend de fase 2 (87 pruebas seleccionadas aprobadas, incluidas integración PostGIS y regresión HU-028).
+- [ ] Implementación y verificación de fases 3–5.
 
 La entrega técnica documental de fase 1 está preparada para revisión. Las casillas pendientes conservan explícitamente las dependencias externas; no se declaran acuerdos que no han ocurrido. Puede iniciarse fase 2 con los contratos de trabajo y mantener esas dependencias como condiciones de cierre del recorrido académico.
 
-Validación de esta entrega: firmas y rutas contrastadas con el código, enlaces locales y `git diff --check`. No se ejecutan pruebas de aplicación por ser una entrega documental; los resultados históricos de las reglas no validan los servicios futuros.
+Validación original de fase 1: firmas y rutas contrastadas con el código, enlaces locales y `git diff --check`; entrega documental sin pruebas de aplicación. La validación posterior de los servicios implementados en fase 2 se registra en el plan. Ninguno de esos resultados valida las fases aún pendientes.

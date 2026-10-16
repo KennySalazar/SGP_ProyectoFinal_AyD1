@@ -36,6 +36,10 @@ import org.testcontainers.utility.DockerImageName;
   InspeccionService.class,
   AuditoriaWriter.class,
   gt.usac.cunoc.sgp.inspeccion.service.FotografiaService.class,
+  gt.usac.cunoc.sgp.inspeccion.service.PoliticaArchivosInspeccion.class,
+  gt.usac.cunoc.sgp.inspeccion.service.AccesoFotografiasInspeccionService.class,
+  gt.usac.cunoc.sgp.inspeccion.service.ReglasEvidenciaFotografica.class,
+  RegistroFotografiasInspeccionJpa.class,
   gt.usac.cunoc.sgp.inspeccion.validation.ValidadorAnclajeFotografico.class,
   gt.usac.cunoc.sgp.archivo.mapper.FotografiaMapperImpl.class,
   InspectorImagenesImageIo.class,
@@ -53,6 +57,8 @@ class FotografiaFlujoIntegrationTest {
     final AlmacenamientoLocal real;
     boolean fallarMiniatura;
     Runnable despuesOriginal;
+    volatile Runnable antesMiniatura;
+    final Set<String> escritas = ConcurrentHashMap.newKeySet();
 
     Storage() throws java.io.IOException {
       real =
@@ -63,7 +69,9 @@ class FotografiaFlujoIntegrationTest {
         throws java.io.IOException {
       if (fallarMiniatura && k.endsWith("-mini.jpg"))
         throw new java.io.IOException("fallo de prueba");
+      if (k.endsWith("-mini.jpg") && antesMiniatura != null) antesMiniatura.run();
       real.guardar(k, in, n, mime);
+      escritas.add(k);
       if (!k.endsWith("-mini.jpg") && despuesOriginal != null) {
         var accion = despuesOriginal;
         despuesOriginal = null;
@@ -81,6 +89,7 @@ class FotografiaFlujoIntegrationTest {
 
     public void eliminar(String k) throws java.io.IOException {
       real.eliminar(k);
+      escritas.remove(k);
     }
   }
 
@@ -132,6 +141,8 @@ class FotografiaFlujoIntegrationTest {
   void preparar() {
     storage.fallarMiniatura = false;
     storage.despuesOriginal = null;
+    storage.antesMiniatura = null;
+    storage.escritas.clear();
     usuario = UUID.randomUUID();
     version = UUID.randomUUID();
     puente = UUID.randomUUID();
@@ -361,6 +372,194 @@ class FotografiaFlujoIntegrationTest {
         .isInstanceOfSatisfying(
             ApiException.class, e -> assertThat(e.getStatus().value()).isEqualTo(409));
     assertThat(fotos.listar(id, usuario)).hasSize(1);
+  }
+
+  @Test
+  void rechazaFotoSesentaYUnoYCompensaLosObjetosDelIntento() throws Exception {
+    var id = iniciar();
+    sembrarFotografias(id, 60);
+
+    assertThatThrownBy(() -> fotos.adjuntar(id, usuario, metadatos(), imagen("jpeg"), "limite"))
+        .isInstanceOfSatisfying(
+            ApiException.class,
+            e -> {
+              assertThat(e.getStatus().value()).isEqualTo(422);
+              assertThat(e.getCode()).isEqualTo("limite_fotografias_excedido");
+            });
+
+    assertThat(disponibles(id)).isEqualTo(60);
+    assertThat(storage.escritas).isEmpty();
+  }
+
+  @Test
+  void excluyeHistoricasYReproduceConfirmadaInclusoConSesentaYEstadoEnviada() throws Exception {
+    var id = iniciar();
+    sembrarFotografias(id, 61);
+    var ids =
+        jdbc.queryForList(
+            "select archivo_id from archivo_inspeccion where inspeccion_id=? order by archivo_id limit 2",
+            UUID.class,
+            id);
+    jdbc.update(
+        "update archivo set estado='RETIRADO',retirado_en=CURRENT_TIMESTAMP where id=?",
+        ids.get(0));
+    jdbc.update(
+        "update archivo set estado='PURGADO',purgado_en=CURRENT_TIMESTAMP where id=?", ids.get(1));
+    var metadatos = metadatos();
+    var fichero = imagen("jpeg");
+
+    var dto = fotos.adjuntar(id, usuario, metadatos, fichero, "ultima");
+    assertThat(disponibles(id)).isEqualTo(60);
+    assertThat(fotos.listar(id, usuario)).hasSize(60);
+    assertThat(fotos.adjuntar(id, usuario, metadatos, fichero, "ultima")).isEqualTo(dto);
+    jdbc.update("update inspeccion set estado='ENVIADA' where id=?", id);
+    assertThat(fotos.adjuntar(id, usuario, metadatos, fichero, "ultima")).isEqualTo(dto);
+    assertThat(storage.escritas).hasSize(2);
+    assertThat(disponibles(id)).isEqualTo(60);
+  }
+
+  @Test
+  void dosCargasDistintasDesdeCincuentaYNueveSoloConfirmanUna() throws Exception {
+    var id = iniciar();
+    sembrarFotografias(id, 59);
+    var listas = new CountDownLatch(2);
+    storage.antesMiniatura =
+        () -> {
+          listas.countDown();
+          try {
+            if (!listas.await(15, TimeUnit.SECONDS))
+              throw new IllegalStateException("timeout de prueba");
+          } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException(e);
+          }
+        };
+    var primera = metadatos();
+    var segunda = metadatos();
+    var fichero = imagen("jpeg");
+    try (var pool = Executors.newFixedThreadPool(2)) {
+      var a = pool.submit(() -> resultadoCarga(id, primera, fichero, "plaza-a"));
+      var b = pool.submit(() -> resultadoCarga(id, segunda, fichero, "plaza-b"));
+      assertThat(List.of(a.get(25, TimeUnit.SECONDS), b.get(25, TimeUnit.SECONDS)))
+          .containsExactlyInAnyOrder(201, 422);
+    } finally {
+      storage.antesMiniatura = null;
+    }
+    assertThat(disponibles(id)).isEqualTo(60);
+    assertThat(storage.escritas).hasSize(2);
+  }
+
+  @Test
+  void asignadoLeeBorradorPeroNoCargaYRevocacionImpideLecturasPosteriores() throws Exception {
+    var id = iniciar();
+    var metadatos = metadatos();
+    var fichero = imagen("jpeg");
+    var dto = fotos.adjuntar(id, usuario, metadatos, fichero, "lectura");
+    UUID lector = UUID.randomUUID(), estudiante = UUID.randomUUID(), asignatura = UUID.randomUUID();
+    UUID curso = UUID.randomUUID(), inscripcion = UUID.randomUUID(), asignacion = UUID.randomUUID();
+    crearUsuario(lector, "CATEDRATICO");
+    crearUsuario(estudiante, "ESTUDIANTE");
+    jdbc.update(
+        "insert into asignatura(id,codigo,nombre) values (?,?,'prueba')",
+        asignatura,
+        asignatura.toString());
+    jdbc.update(
+        "insert into curso(id,asignatura_id,periodo,catedratico_id,fecha_inicio,fecha_fin) values (?,?,'2026',?,'2026-01-01','2026-12-31')",
+        curso,
+        asignatura,
+        lector);
+    jdbc.update(
+        "insert into curso_estudiante(id,curso_id,estudiante_id,inscrito_por_id,seccion) values (?,?,?,?,'A')",
+        inscripcion,
+        curso,
+        estudiante,
+        lector);
+    jdbc.update(
+        "insert into asignacion_puente(id,curso_estudiante_id,puente_id,asignado_por_id) values (?,?,?,?)",
+        asignacion,
+        inscripcion,
+        puente,
+        lector);
+    // Fixture de la relación que el futuro flujo académico debe persistir.
+    jdbc.update("update inspeccion set asignacion_puente_id=? where id=?", asignacion, id);
+
+    assertThat(fotos.listar(id, lector)).containsExactly(dto);
+    for (boolean miniatura : List.of(false, true)) {
+      try (var entrada = fotos.contenido(id, dto.id(), lector, miniatura)) {
+        assertThat(entrada.read()).isNotEqualTo(-1);
+      }
+    }
+    assertThatThrownBy(() -> fotos.adjuntar(id, lector, metadatos(), fichero, "ajena"))
+        .isInstanceOfSatisfying(
+            ApiException.class, e -> assertThat(e.getStatus().value()).isEqualTo(404));
+    jdbc.update(
+        "update asignacion_puente set revocado_en=CURRENT_TIMESTAMP,motivo_revocacion='prueba' where id=?",
+        asignacion);
+    assertThatThrownBy(() -> fotos.listar(id, lector))
+        .isInstanceOfSatisfying(
+            ApiException.class, e -> assertThat(e.getStatus().value()).isEqualTo(404));
+    for (boolean miniatura : List.of(false, true)) {
+      assertThatThrownBy(() -> fotos.contenido(id, dto.id(), lector, miniatura))
+          .isInstanceOfSatisfying(
+              ApiException.class, e -> assertThat(e.getStatus().value()).isEqualTo(404));
+    }
+    assertThat(fotos.listar(id, usuario)).containsExactly(dto);
+  }
+
+  private void crearUsuario(UUID id, String rol) {
+    jdbc.update(
+        "insert into usuario(id,email,password_hash,rol_id,verificado,activado,activo) select ?,?,'test',id,true,true,true from rol where nombre=?",
+        id,
+        id + "@test.com",
+        rol);
+  }
+
+  private long disponibles(UUID id) {
+    return jdbc.queryForObject(
+        "select count(*) from archivo a join archivo_inspeccion v on v.archivo_id=a.id where v.inspeccion_id=? and a.tipo_uso='FOTO_INSPECCION' and a.estado='DISPONIBLE'",
+        Long.class,
+        id);
+  }
+
+  private int resultadoCarga(
+      UUID id,
+      AdjuntarFotografiaRequest metadatos,
+      org.springframework.mock.web.MockMultipartFile fichero,
+      String clave) {
+    try {
+      fotos.adjuntar(id, usuario, metadatos, fichero, clave);
+      return 201;
+    } catch (ApiException e) {
+      assertThat(e.getCode()).isEqualTo("limite_fotografias_excedido");
+      return e.getStatus().value();
+    }
+  }
+
+  private void sembrarFotografias(UUID id, int cantidad) {
+    // Metadatos de inventario para probar conteo; estas fotos de fixture no se descargan.
+    jdbc.update(
+        """
+        with nuevas as (
+          insert into archivo(id,tipo_uso,categoria_foto,nombre_almacenado,
+              clave_objeto_original,clave_objeto_miniatura,mime_real,tamano_bytes,
+              checksum_sha256,ancho_px,alto_px,ubicacion_captura,capturado_en,
+              subido_por_id,confirmado_en)
+          select uuid_generate_v4(),'FOTO_INSPECCION','ACCESO','fixture.jpg',
+              'fixture/' || cast(? as text) || '/' || numero || '.jpg',
+              'fixture/' || cast(? as text) || '/' || numero || '-mini.jpg',
+              'image/jpeg',100,repeat('a',64),100,100,
+              ST_SetSRID(ST_MakePoint(-90,14),4326)::geography,CURRENT_TIMESTAMP,
+              ?,CURRENT_TIMESTAMP from generate_series(1,?) as serie(numero)
+          returning id
+        )
+        insert into archivo_inspeccion(archivo_id,tipo_uso,inspeccion_id)
+          select id,'FOTO_INSPECCION',? from nuevas
+        """,
+        id,
+        id,
+        usuario,
+        cantidad,
+        id);
   }
 
   @Test

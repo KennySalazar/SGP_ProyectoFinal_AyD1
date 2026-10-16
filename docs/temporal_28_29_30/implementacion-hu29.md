@@ -8,6 +8,8 @@ Este documento sustituye la planificación que suponía ausentes los contratos d
 
 La preparación técnica de fase 1 se desarrolló en `feature/hu-029-impl-contratos-asignacion` y se concreta en [contratos-hu29.md](contratos-hu29.md). Allí se fijan las firmas de trabajo, la fuente de mínimos y el error estructurado; las ratificaciones académicas y acuerdos externos pendientes permanecen identificados. La autorización de esta entrega se limita a fase 1.
 
+Actualización de implementación: el usuario autorizó posteriormente la fase 2, desarrollada sobre `022d2e9`. Se implementaron las políticas, la lectura mediante relación académica, las propiedades de mínimos y el control concurrente de capacidad en la carga. Las fases 3–5 continúan pendientes. La sección 9 registra la validación ejecutada.
+
 ## 1. Fuentes y alcance
 
 - Historias originales: `../HUS/hu29.md` y `../HUS/hu28.md`, relativas a la raíz del repositorio; están en el directorio padre y ambas fueron localizadas.
@@ -27,12 +29,12 @@ Objetivo: integrar mínimos, máximo 60, permisos y retirada con la infraestruct
 | Registro | `RegistroFotografiasInspeccion` y `RegistroFotografiasInspeccionJpa` | Conectar diagnóstico y retirada autorizada |
 | Persistencia | `Archivo`, `ArchivoInspeccion`, sus repositorios y `FotografiaMapper` | Reutilizar; no se identifica una migración necesaria para HU-029 |
 | Bloqueo | `InspeccionRepository.findByIdAndEliminadoEnIsNullForUpdate` con `@Query` y `PESSIMISTIC_WRITE` | Aplicar el mismo bloqueo al conteo final, retirada y transiciones |
-| Carga | `FotografiaService.adjuntar`: autor, borrador, metadatos, anclaje, procesamiento, reserva y confirmación | No consulta ni invoca el máximo de 60 |
-| Lectura | Listado, original y miniatura; exige autor y archivo DISPONIBLE | No permite al Catedrático asignado leer borradores |
+| Carga | `FotografiaService.adjuntar`: autor, borrador, metadatos, anclaje, procesamiento, reserva, conteo final bajo bloqueo y confirmación | Capacidad integrada en fase 2; conservar regresión en siguientes fases |
+| Lectura | Listado, original y miniatura; autor o Catedrático relacionado para BORRADOR y archivo DISPONIBLE | Permiso backend integrado en fase 2; el flujo académico todavía debe fijar la asignación |
 | Contenido real | `InspectorImagenesImageIo` decodifica JPEG/WebP con límites; `ProcesadorImagenes` normaliza a JPEG y genera miniatura | Verificar y ampliar cobertura, sin repetir el decodificador |
 | Almacenamiento | `AlmacenamientoArchivos`, adaptadores local/S3, configuración MinIO/S3, cargas y recuperación | Pruebas conjuntas; no crear otro cliente ni cambiar infraestructura para implementar reglas |
 | Idempotencia | `OperacionIdempotenteService`, reservas y compensación ya consumidas por carga | Conservar reintentos confirmados al añadir capacidad/estado |
-| Reglas HU-029 | `ReglasEvidenciaFotografica` y dos DTO ya integrados | La búsqueda de referencias muestra que el servicio de carga todavía no consume estas reglas |
+| Reglas HU-029 | Evaluador, DTO, política de permisos, resolución académica y propiedades del servidor | Capacidad conectada; diagnóstico y transiciones pendientes de fases 3/5 |
 | Retirada | `Archivo.retirar` y registro JPA implementados | Faltan caso de uso autorizado y endpoint DELETE |
 | Frontend | `ReporteFotograficoComponent`, API de fotos, procesamiento y persistencia local | Diagnóstico, acción de retirada, error de capacidad y lectura autorizada del Catedrático |
 | Publicación | `PublicacionIndiceCondicionService` exige transacción existente e inspección ya PUBLICADA | Falta conectar evidencia antes de enviar/publicar en los flujos correspondientes |
@@ -48,12 +50,12 @@ El plan HU-028 conserva afirmaciones históricas sobre ausencia de infraestructu
 |---|---|---|
 | Mínimo en ACCESO/SUPERESTRUCTURA/SUBESTRUCTURA/CAUCE | Evaluador puro parametrizado | Filtrar inventario real, agrupar, fijar política de servidor e invocar antes de enviar/publicar |
 | Evidencia completa | Se evalúan conteos, no inventario persistente | Demostrar cuatro categorías con fotos DISPONIBLE reales |
-| Foto 61 rechazada con 422 | Regla implementada, desconectada de POST | Contar y validar dentro de la transacción final bajo bloqueo |
+| Foto 61 rechazada con 422 | Integrada en POST y probada con PostGIS en fase 2 | Mantener garantía al incorporar retirada/transiciones |
 | Tipo real JPEG/WebP | Implementado en decoder y utilizado por carga | Regresión con bytes reales válidos, falsos, PNG y truncados |
 | Retirar foto del borrador | Mutación persistente disponible | Autorizar, bloquear, ejecutar retirada y actualizar diagnóstico/panel |
 | Publicada rechaza retirada con 409 | No existe endpoint | Implementar política y probar estado vigente en transacción |
 | Acceso protegido | Endpoints autenticados y cabeceras privadas | Completar matriz de acceso por entidad y verificar proveedor privado |
-| Borrador visible al autor/Catedrático asignado | Solo autor | Resolver relación académica desde el servidor y compartir autorización de lectura |
+| Borrador visible al autor/Catedrático asignado | Política y consulta real integradas; prueba con vínculo persistido y revocación | Completar creación del vínculo y navegación académica |
 | Visitante recibe 401 | Seguridad configurada; existen pruebas de lectura anónima | Cubrir también nuevos endpoints y POST |
 | Prueba por rol en cada endpoint | Cobertura parcial con servicios simulados | Matriz completa por rol, relación, estado y variante de contenido |
 
@@ -98,7 +100,7 @@ Conservar la cabecera JPEG del controlador mientras el formato de salida siga si
 
 ### Política única de fotografías
 
-Crear `inspeccion/service/PoliticaArchivosInspeccion.java`, sin acceso a almacenamiento. Propuesta de firmas, todavía no implementadas:
+`inspeccion/service/PoliticaArchivosInspeccion.java` se implementó en fase 2, sin acceso a almacenamiento. Firmas disponibles:
 
 ```java
 void validarCarga(ContextoArchivosInspeccion contexto, UUID actorId, long disponibles);
@@ -107,7 +109,7 @@ void validarLectura(ContextoArchivosInspeccion contexto, UUID actorId,
 void validarRetirada(ContextoArchivosInspeccion contexto, UUID actorId);
 ```
 
-Reutilizar el contexto existente sin cambiar su record. La identidad procede de `JwtData`. El booleano se calcula en el servidor, nunca llega del cliente. Un servicio HU-029 `AccesoFotografiasInspeccionService` centralizará la resolución académica y su llamada a la política para que listado, contenido, miniatura y diagnóstico compartan el mismo control.
+Se reutiliza el contexto existente sin cambiar su record. La identidad procede de `JwtData`. El booleano se calcula en el servidor, nunca llega del cliente. `AccesoFotografiasInspeccionService` centraliza la resolución académica y su llamada a la política; listado, contenido y miniatura ya lo consumen. El diagnóstico de fase 3 reutilizará ese control.
 
 Existe `Inspeccion.getAsignacionPuenteId()` y la consulta `AsignacionPuenteRepository.findByIdAndCursoEstudiante_Curso_Catedratico_IdAndRevocadoEnIsNull`. Sin embargo, el constructor/flujo de inicio revisado no fija dicha relación. No inferirla por coincidencia de puente ni conceder acceso a cualquier Catedrático. Acordar la fuente de asignación y su vigencia con el responsable académico. Un vínculo nulo no concede permiso adicional. Si el dominio exige comprobar curso activo o inscripción vigente, la consulta actual no basta y ese requisito debe confirmarse antes de ampliarla.
 
@@ -129,7 +131,7 @@ Crear `EvidenciaFotograficaService`: cargar inspección no eliminada, autorizar 
 
 Proponer `consultar(UUID inspeccionId, UUID actorId)` y una entrada interna `exigirParaTransicion(UUID inspeccionId)` con `Propagation.MANDATORY`. Esta última exige inspección bloqueada por el llamador y mínimos definidos; la autorización para enviar/publicar pertenece al flujo correspondiente. MANDATORY verifica transacción, no comprueba por sí mismo que exista un bloqueo: ese requisito se demuestra con integración concurrente.
 
-La fase 1 define una única fuente parametrizada: `app.evidencia-fotografica.minimos`, consumida por `EvidenciaFotograficaProperties`, que se implementará en fase 2. Se mantiene la propuesta 1 por cada categoría obligatoria y no se aceptan parámetros HTTP que reduzcan mínimos. Política vacía/inválida o ausencia de categorías obligatorias debe impedir el arranque. No agregar tablas ni una pantalla de configuración. El binding, validación y conversión al mapa existente se precisan en [el contrato](contratos-hu29.md#5-fuente-única-de-mínimos).
+La fase 2 implementa la fuente parametrizada `app.evidencia-fotografica.minimos`, consumida por `EvidenciaFotograficaProperties`. Se mantiene la propuesta 1 por cada categoría obligatoria y no se aceptan parámetros HTTP que reduzcan mínimos. Política vacía/inválida o ausencia de categorías obligatorias impide inicializar el bean; las pruebas de binding lo verifican. El binding, validación y conversión al mapa existente se precisan en [el contrato](contratos-hu29.md#5-fuente-única-de-mínimos). El consumidor de diagnóstico se incorporará en fase 3.
 
 ## 6. Fases de implementación y dependencias
 
@@ -147,6 +149,8 @@ La fase 1 define una única fuente parametrizada: `app.evidencia-fotografica.min
 
 ### Fase 2. Completar las políticas y conectar el máximo
 
+**Estado: implementada y verificada en su alcance backend.** Se crearon política, resolución de asignación y propiedades; se integró el control final de capacidad y lectura en `FotografiaService`. La prueba de asignación utiliza un vínculo real persistido como fixture, no demuestra que HU-024 ya lo genere. La política de retirada está disponible, pero su caso de uso y endpoint siguen en fase 3.
+
 - Conservar los dos DTO y `ReglasEvidenciaFotografica`, ya integrados.
 - Implementar política y resolución de acceso académico; probar autor, no autor, asignado/no asignado, eliminado y estados.
 - En `FotografiaService`, separar autorización de acceso de validación de una carga nueva. La reproducción idempotente confirmada debe mantener el comportamiento existente incluso si la inspección pasó a ENVIADA; existe una prueba de regresión explícita.
@@ -155,7 +159,7 @@ La fase 1 define una única fuente parametrizada: `app.evidencia-fotografica.min
 - No mantener bloqueo durante procesamiento ni transferencia de objetos. Si el rechazo final ocurre después de escribir bytes, reutilizar la compensación y recuperación actuales.
 - Conectar lectura de listado/original/miniatura a la autorización compartida sin exigir BORRADOR para todo GET.
 
-**Salida:** POST ya impide la foto 61; dos cargas desde 59 no confirman ambas. Catedrático asignado puede leer el borrador en backend cuando la relación está resuelta. Un reintento no consume otra plaza.
+**Salida comprobada:** POST impide la foto 61; dos cargas distintas desde 59 producen una confirmación 201 y un rechazo 422. El rechazo compensa sus objetos. RETIRADO/PURGADO no cuentan. El Catedrático relacionado lee listado, original y miniatura del borrador; la revocación impide lecturas posteriores. Un reintento confirmado sigue funcionando con 60 fotos y después de pasar a ENVIADA.
 
 ### Fase 3. Diagnóstico y retirada persistente
 
@@ -212,11 +216,11 @@ Para transición incompleta: 422 `evidencia_fotografica_incompleta` con categor�
 |---|---|---|
 | Reutilizar | `archivo/model/*`, `Archivo`, `ArchivoInspeccion`, registro JPA, mapper, almacenamiento, procesador y recuperación | Entregados por HU-028 |
 | Conservar | `ReglasEvidenciaFotografica`, `FaltanteEvidenciaResponse`, `ValidacionEvidenciaResponse` y pruebas | HU-029 ya implementado |
-| Crear | `inspeccion/service/PoliticaArchivosInspeccion.java`, `AccesoFotografiasInspeccionService.java` | HU-029 |
+| Implementado en fase 2 | `inspeccion/service/PoliticaArchivosInspeccion.java`, `AccesoFotografiasInspeccionService.java` | HU-029 |
 | Crear | `inspeccion/service/EvidenciaFotograficaService.java`, `RetiradaFotografiaService.java` | HU-029 |
 | Crear | `inspeccion/controller/EvidenciaFotograficaController.java`, `RetiradaFotografiaController.java` | HU-029 |
-| Implementar según contrato de fase 1 | `inspeccion/config/EvidenciaFotograficaProperties` y excepción de evidencia con faltantes | HU-029; fases 2/3 respectivamente |
-| Modificar de forma acotada | `inspeccion/service/FotografiaService.java` y pruebas existentes | Integración HU-029 coordinada con HU-028 |
+| Propiedades implementadas; excepción pendiente | `inspeccion/config/EvidenciaFotograficaProperties` y excepción de evidencia con faltantes | HU-029; fases 2/3 respectivamente |
+| Integrado en fase 2 | `inspeccion/service/FotografiaService.java` y pruebas existentes | Integración HU-029 sobre HU-028 |
 | Ampliar para error estructurado específico | `common/exception/ApiExceptionHandler.java` | Un único responsable; coordinación pendiente |
 | Ampliar | API/modelos de inspecciones, componente `reporte-fotografico`, traducciones y pruebas frontend | Un único responsable coordinado con HU-028 |
 | Integrar | Servicio real de envío/publicación | Responsable del flujo/HU-026 |
@@ -253,7 +257,20 @@ No convertir pruebas simuladas de controlador en evidencia de permisos del servi
 
 Validación al implementar: Java/Maven 21, pruebas focalizadas de cada fase, suites relacionadas, `mvn verify` con su cobertura configurada y frontend `npm test`, `npm run lint`, `npm run build`, `npm run format:check`. Leer `docs/UI_GUIDELINES.md` antes de cambios de interfaz. Los fallos preexistentes y las limitaciones de Docker deben documentarse por separado, sin cambiar configuración para ocultarlos.
 
-**Esta revisión fue estática:** se leyeron código, pruebas y configuración; no se ejecutaron pruebas de aplicación, contenedores, migraciones ni comprobaciones de disponibilidad de MinIO. La existencia de una prueba se distingue de su resultado actual.
+**El análisis previo fue estático:** se leyeron código, pruebas y configuración. La validación posterior de implementación se registra a continuación; la existencia de una prueba se distingue de su resultado actual.
+
+### Validación posterior: implementación de fase 2
+
+El 16 de octubre de 2026 se compiló el backend y sus fuentes de prueba con Java 21.0.12. La primera ejecución offline se detuvo porque faltaban dependencias ya declaradas por HU-028 (S3 y WebP); Maven las resolvió sin modificar `pom.xml`. Docker funcionó con permisos adicionales y se utilizaron contenedores temporales PostGIS, sin migraciones contra bases existentes.
+
+```bash
+mvn -B -Dstyle.color=never \
+  -Dtest=PoliticaArchivosInspeccionTest,AccesoFotografiasInspeccionServiceTest,EvidenciaFotograficaPropertiesTest,ReglasEvidenciaFotograficaTest,ValidacionEvidenciaResponseTest,FotografiaFlujoIntegrationTest,FotografiaControllerSecurityTest,ImagenesYAlmacenamientoTest,IdempotenciaArchivosIntegrationTest test
+```
+
+Resultado: **87 pruebas aprobadas en 9 clases, sin fallos, errores ni omitidas**. Incluye 11 pruebas del flujo fotográfico real, con las cuatro nuevas de fase 2: límite/compensación, exclusión de históricas/reintento, concurrencia de IDs distintos y acceso académico/revocación. Las pruebas del flujo usan almacenamiento local aislado; no acreditan MinIO real ni frontend.
+
+Spotless se aplicó y verificó exclusivamente sobre los ocho archivos Java nuevos/modificados. No se ejecutó la suite completa ni `mvn verify`. Diagnóstico, DELETE y validación de envío/publicación permanecen sin implementar.
 
 ## 10. Decisiones pendientes y criterios de cierre
 
