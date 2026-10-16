@@ -7,39 +7,43 @@ se actualiza de forma incremental durante la historia de usuario.
 
 | Área | Estado |
 |---|---|
-| Imágenes reutilizables de backend y frontend | Build multi-arquitectura implementado en la rama feature; las imágenes actuales de `develop` no ofrecen ARM64. |
+| Imágenes reutilizables de backend y frontend | Publicadas desde `develop` para AMD64/ARM64; descarga ARM64 verificada en EC2. |
 | Compose aislado de staging | Adaptado para ejecutar solo Nginx/Angular y Spring Boot; RDS y S3 son externos a la EC2. |
 | Preparación de Amazon Linux 2023 | Completada exitosamente en la EC2 ARM64 el 11 de octubre de 2026. |
-| Workflow de validación, publicación y despliegue | Cambio implementado en la rama feature; PR, integración y ejecución actualizada pendientes. |
-| Publicación en GHCR | Las referencias `develop` existen y son accesibles, pero no incluyen ARM64; republicación multi-arquitectura pendiente del PR. |
-| Despliegue automático desde `develop` | Implementado con variables de repositorio y deshabilitado hasta completar los requisitos restantes. |
+| Workflow de validación, publicación y despliegue | Integrado en `develop`; validación, publicación y primer despliegue completados correctamente. |
+| Publicación en GHCR | Referencias multi-arquitectura publicadas; autenticación, manifiestos y descarga ARM64 verificados desde EC2. |
+| Despliegue automático desde `develop` | Activo con `STAGING_ENABLED=true`, OIDC y Systems Manager; primera ejecución exitosa. |
 | Red AWS | VPC, tabla privada, dos subredes dedicadas y DB Subnet Group de RDS confirmados. |
-| Security Groups | Grupos de EC2 y RDS creados; la regla 5432 de RDS referencia únicamente al grupo de staging. |
-| IAM y Systems Manager | Rol asociado a la EC2 y acceso interactivo mediante Session Manager verificado. |
+| Security Groups | EC2 permite públicamente solo TCP 80/443; RDS permite 5432 únicamente desde el grupo de staging. |
+| IAM y Systems Manager | Session Manager, confianza OIDC con identificadores inmutables y Run Command verificados. |
 | S3 | Bucket privado de staging creado y vacío; integración de aplicación no implementada. |
-| RDS | `sgp-rds-postgres` disponible; conectividad TCP desde EC2 verificada, con autenticación, bases, extensiones y migraciones pendientes. |
+| RDS | `sgp-rds-postgres` disponible; backend saludable y API operativa confirman conexión y migraciones de staging. `verify-full` sigue pendiente. |
 | EC2 | `sgp-staging-ec2` creada, en ejecución y con sus tres comprobaciones superadas; preparación inicial y autenticación en GHCR completadas. |
-| Despliegue real en AWS | No ejecutado. |
+| Despliegue real en AWS | Automatización operativa desde `develop`; el despliegue posterior a la integración HTTPS dejó ambos contenedores saludables. |
+| HTTPS público | Operativo y validado en `https://3.235.197.36`; certificado IP de Let's Encrypt y comprobación automática de renovación instalados. |
 
 Se crearon los dos Security Groups, el bucket S3, RDS y la EC2 de staging. El rol
 de instancia está asociado y el acceso mediante Session Manager funciona. Una
 prueba desde EC2 confirmó alcance TCP al endpoint privado de RDS en el puerto
-5432. La preparación inicial del servidor finalizó correctamente. El rol OIDC de
-GitHub Actions y sus variables de repositorio ya tienen identificadores
-asignados, pero la confianza para `develop` y la asunción del rol todavía no han
-sido validadas. Tampoco se han preparado la base ni el despliegue real.
+5432. La preparación inicial del servidor finalizó correctamente. GitHub Actions
+asumió el rol OIDC, ordenó el despliegue mediante Systems Manager y dejó ambos
+contenedores saludables. La primera revisión desplegada fue
+`488dae1ea7278eefc5f39e557eaadde4c07d00f9`. Git identifica la integración de
+los archivos HTTPS en `develop` con el merge commit `e006c19`; no se dispone de
+un identificador de ejecución de GitHub Actions ni de una lectura posterior de
+`/opt/sgp/staging/REVISION`, por lo que no se inventa una revisión desplegada más
+reciente.
 
 En la EC2 se creó `/etc/sgp/staging/staging.env` con propietario `root` y modo
-`0600`. Se verificaron las cinco variables de PostgreSQL y `SECRET_KEY_JWT`. La
-configuración de las dos variables del administrador inicial y las cinco
-variables `MAIL_*` fue reportada como completada posteriormente, pero no se
-conserva una nueva salida
-que demuestre la validación conjunta de todas las variables obligatorias. No se
-registran sus valores en esta guía.
+`0600`. Se verificaron las 12 variables obligatorias: las cinco de PostgreSQL,
+`SECRET_KEY_JWT`, las dos del administrador inicial y cuatro variables SMTP. La
+comprobación devolvió `[OK]` para todas ellas. No se registran valores sensibles
+en esta guía. SMTP conserva valores ficticios y no constituye una prueba de
+envío de correo.
 
 ## Inventario AWS confirmado
 
-Estado consolidado al 14 de octubre de 2026 a partir de las comprobaciones
+Estado consolidado al 15 de octubre de 2026 a partir de las comprobaciones
 manuales realizadas en AWS y GitHub:
 
 | Elemento | Valor o estado |
@@ -58,12 +62,12 @@ manuales realizadas en AWS y GitHub:
 | Instancia RDS | `sgp-rds-postgres`, estado observado `Disponible` en `us-east-1b`. |
 | Endpoint RDS | `sgp-rds-postgres.c8hwo202k9fb.us-east-1.rds.amazonaws.com:5432`. |
 | Administrador RDS | `postgres`; `rolsuper=false` y `rolcreaterole=true`. El script comprueba además `rolcreatedb` antes de crear la base. |
-| Extensiones disponibles | PostGIS 3.4.6, `pg_trgm` 1.6 y `uuid-ossp` 1.1 confirmadas como disponibles; todavía no instaladas en `sgp_staging`. |
+| Extensiones de staging | El backend inició, Flyway terminó y Hibernate validó el esquema; la inspección SQL independiente de extensiones sigue sin registrarse. |
 | Instancia EC2 | `sgp-staging-ec2` (`i-0385c95df8cd7909d`), Amazon Linux 2023 ARM64, `t4g.micro`, en ejecución y con comprobaciones `3/3`. |
 | Ubicación EC2 | Subred pública `subnet-0745affbda7ec4bb1`, CIDR `172.31.64.0/20`, en `us-east-1f`. |
-| Almacenamiento EC2 | 20 GiB gp3 cifrados con `aws/ebs`. |
-| IPv4 pública observada | `3.235.197.36`, asignada automáticamente y dinámica; no existe Elastic IP. |
-| Security Group de EC2 | `sgp-staging-ec2-sg` (`sg-0e617972b3eedeb73`), sin reglas de entrada y con salida hacia `0.0.0.0/0`. |
+| Almacenamiento EC2 | 20 GiB gp3 cifrados con `aws/ebs`; se observaron 5.4 GB utilizados, 15 GB disponibles y 27 % de uso. |
+| Red de EC2 | IPv4 pública dinámica `3.235.197.36`, IPv4 privada `172.31.64.35` y DNS público `ec2-3-235-197-36.compute-1.amazonaws.com`; no existe Elastic IP. |
+| Security Group de EC2 | `sgp-staging-ec2-sg` (`sg-0e617972b3eedeb73`), entrada TCP 80 y 443 desde `0.0.0.0/0`; salida hacia `0.0.0.0/0`. |
 | Security Group de RDS | `sgp-rds-sg` (`sg-0ab8d04a2ef4d3db8`), con salida predeterminada. |
 | Regla de entrada de RDS | PostgreSQL TCP 5432 desde `sg-0e617972b3eedeb73` (`sgp-staging-ec2-sg`); no usa un CIDR público. |
 | Bucket S3 | `sgp-staging-archivos-ayd1-2026-gt01`, propósito general, creado vacío en `us-east-1`. |
@@ -75,7 +79,10 @@ manuales realizadas en AWS y GitHub:
 | Administración EC2 | Acceso interactivo mediante AWS Systems Manager Session Manager verificado. |
 | Par de claves | `sgp-staging-key`, ED25519 y formato privado `.pem`; archivo conservado fuera del repositorio. SSH no probado y sin regla de entrada pública. |
 | Acceso S3 desde IAM | No concedido todavía; el rol confirmado solo habilita la administración mediante SSM. |
-| Rol OIDC de GitHub Actions | `arn:aws:iam::416086757987:role/sgp-staging-github-actions-role`; es independiente del rol de instancia EC2. Su confianza para la rama `develop` y su uso real siguen pendientes de configurar o validar. |
+| Rol OIDC de GitHub Actions | `arn:aws:iam::416086757987:role/sgp-staging-github-actions-role`; asunción y ejecución de SSM verificadas desde `develop`. |
+| Nginx del host | Versión `1.30.5`, activo como terminación TLS y proxy hacia `127.0.0.1:8088`; configuración validada con `nginx -t`. |
+| Certificado HTTPS | Let's Encrypt para `3.235.197.36`, línea `sgp-staging-ip`, vigente desde `2026-10-15 23:30:54 UTC` hasta `2026-10-22 15:30:53 UTC`. |
+| Renovación HTTPS | `sgp-certbot-renew.timer` habilitado, dos comprobaciones diarias; ejecución manual del servicio exitosa, sin renovación porque aún no correspondía. |
 | Créditos disponibles | USD 120 al momento de la revisión. |
 | Alertas de presupuesto | No fue posible configurarlas; quedan a cargo del propietario de la cuenta y el consumo se revisará manualmente. |
 
@@ -91,7 +98,9 @@ local.
 
 El nombre del bucket queda registrado como identificador de infraestructura, no
 como variable del backend. No debe agregarse a Compose ni al archivo de entorno
-hasta que el código implemente y defina el contrato de almacenamiento S3.
+hasta que el código implemente y defina el contrato de almacenamiento S3. El
+estado, los requisitos y el orden de implementación están transferidos en la
+[guía de integración S3](GUIA_INTEGRACION_S3.md).
 
 ### Red privada para RDS
 
@@ -128,8 +137,10 @@ Multi-AZ ni proporcionan conmutación automática ante la falla de una zona.
 ### Instancia RDS compartida
 
 AWS completó la creación de la instancia compartida y se observó el estado
-`Disponible`. La conectividad TCP desde EC2 está confirmada, pero no la
-autenticación PostgreSQL ni la preparación de las bases.
+`Disponible`. Además de la conectividad TCP inicial, el despliegue real confirmó
+que el backend puede autenticarse, ejecutar Flyway, validar el esquema y atender
+consultas. La comprobación administrativa independiente con `verify-full`
+continúa pendiente.
 
 | Propiedad | Configuración solicitada |
 |---|---|
@@ -144,7 +155,7 @@ autenticación PostgreSQL ni la preparación de las bases.
 | DB Subnet Group | `sgp-rds-subnet-group` |
 | Security Group | `sg-0ab8d04a2ef4d3db8` (`sgp-rds-sg`) |
 | Acceso y puerto | Sin acceso público; PostgreSQL TCP 5432 |
-| Base inicial | Sin nombre de base inicial; `sgp_staging` aún no existe |
+| Base inicial | Se creó `sgp_staging` durante la preparación; `sgp_prod` no corresponde a staging. |
 | Credenciales | Autoadministradas, autenticación mediante contraseña |
 | Entidad certificadora | `rds-ca-rsa2048-g1` |
 | RDS Proxy | Deshabilitado |
@@ -158,9 +169,11 @@ producción. Esta historia solo preparará `sgp_staging`; no debe crear
 `sgp_prod`, sus usuarios ni ejecutar migraciones de producción.
 
 Desde la EC2 se abrió correctamente una conexión TCP al endpoint en el puerto
-5432 mediante `/dev/tcp`. Esta prueba confirma resolución DNS, enrutamiento y
-reglas de red; no valida TLS, autenticación PostgreSQL, el usuario administrador,
-PostGIS, Flyway ni el backend.
+5432 mediante `/dev/tcp`. Después, la ejecución saludable del backend y una
+consulta HTTP real confirmaron autenticación de aplicación, Flyway y acceso al
+esquema. La prueba TCP por sí sola solo confirmó resolución DNS, enrutamiento y
+reglas de red; no sustituye la comprobación administrativa de TLS e inventario
+de extensiones.
 
 #### Excepción de retención de respaldos
 
@@ -229,17 +242,21 @@ MinIO permanecen únicamente en el Compose de desarrollo local.
 
 ## Arquitectura de staging
 
-El punto de entrada es Nginx. El puerto se publica únicamente en la interfaz de
-loopback de la instancia para acceder mediante un túnel de AWS Systems Manager.
-El backend no publica puertos en el host. RDS debe permanecer en subredes
-privadas y el bucket S3 debe bloquear todo acceso público.
+El punto de entrada interno es el Nginx del contenedor. El puerto se publica
+únicamente en loopback y se comprobó directamente desde EC2. Un segundo Nginx
+`1.30.5` en el host termina TLS en 443, conserva el desafío ACME por HTTP,
+redirige el resto de 80 a HTTPS y reenvía a `127.0.0.1:8088`. El backend no
+publica puertos en el host. RDS permanece en subredes privadas y el bucket S3
+bloquea todo acceso público.
 
 ```text
 Equipo del proyecto
         |
-        | túnel SSM a la aplicación (pendiente de probar)
+        | HTTPS 443 (operativo)
         v
-127.0.0.1:8088 en EC2
+Nginx del host + certificado IP
+        |
+        | proxy a 127.0.0.1:8088
         |
         v
 Nginx + Angular ---- red sgp_staging_proxy ---- Spring Boot
@@ -268,6 +285,10 @@ de instancia y limitarse al bucket de staging.
 | `infra/staging/.env.example` | Plantilla sin credenciales reales. |
 | `infra/staging/bootstrap-amazon-linux-2023.sh` | Prepara Amazon Linux 2023 ARM64 o x86_64 con Docker, Compose, SSM y swap. |
 | `infra/staging/deploy.sh` | Valida, actualiza y comprueba el stack con bloqueo y rollback. |
+| `infra/staging/https/install-https.sh` | Instala Nginx del host, obtiene el certificado IP y activa la renovación. |
+| `infra/staging/https/renew-certificate.sh` | Comprueba la IP mediante IMDSv2, renueva con Certbot y recarga Nginx. |
+| `infra/staging/https/nginx-*.conf.template` | Configuración ACME, redirección HTTP y proxy HTTPS hacia loopback. |
+| `infra/staging/https/sgp-certbot-renew.*` | Unidad y temporizador systemd para comprobar la renovación dos veces al día. |
 | `infra/rds/prepare-database.sql` | Prepara una base RDS con extensiones y roles separados, sin incluir nombres ni secretos reales. |
 | `infra/postgres/init/00-create-app-user.sh` | Inicializa PostgreSQL únicamente en desarrollo local. |
 
@@ -305,17 +326,18 @@ La infraestructura objetivo asigna una EC2 independiente a staging:
 - IMDSv2 obligatorio y salto de respuesta igual a `2`, necesario para que un SDK
   dentro de Docker pueda obtener credenciales temporales del rol de instancia.
 - No se comprará un dominio ni se creará una zona DNS pública para el proyecto.
-  El acceso inicial de staging continuará mediante túnel SSM, sin publicar
-  puertos.
-- Si posteriormente se exige acceso público a staging, HTTPS deberá resolverse
-  sobre una IPv4 pública estable con un certificado válido para esa IP. No se
-  abrirán 80/443 hasta aprobar y validar ese mecanismo.
+- El Security Group permite TCP 80/443 para el proxy público. Los puertos 8088,
+  8090 y 5432 no están publicados.
+- HTTPS opera con Nginx del host y un certificado de corta duración válido para
+  la IPv4 dinámica. No se usará Elastic IP; un cambio de dirección requiere
+  actualizar la configuración y emitir un certificado nuevo.
 - No se usarán ALB, NAT Gateway, ECS ni EKS.
 
-La EC2 y su disco están aprovisionados. RDS está `Disponible` y su puerto 5432 es
-alcanzable desde la instancia, pero quedan pendientes TLS, autenticación y la
-preparación de PostgreSQL. La imposibilidad de configurar alertas automáticas
-obliga a mantener un control manual del saldo.
+La EC2 y su disco están aprovisionados. RDS está `Disponible`; el despliegue
+inició el backend, ejecutó Flyway, validó el esquema con Hibernate y atendió una
+consulta real de la API. La comprobación independiente de TLS con
+`sslmode=verify-full` y el bundle CA sigue pendiente. La imposibilidad de
+configurar alertas automáticas obliga a mantener un control manual del saldo.
 
 ### EC2 de staging creada
 
@@ -330,16 +352,24 @@ La instancia confirmada tiene la siguiente configuración:
 | Disco | 20 GiB gp3 cifrados con `aws/ebs` |
 | VPC | `vpc-04c3c96ee06abd1bc` |
 | Subred | `subnet-0745affbda7ec4bb1`, `172.31.64.0/20`, `us-east-1f` |
-| IPv4 pública | Asignación automática; se observó `3.235.197.36`, sin Elastic IP |
+| IPv4 pública | Dinámica `3.235.197.36`, sin Elastic IP |
+| IPv4 privada | `172.31.64.35` |
+| DNS público | `ec2-3-235-197-36.compute-1.amazonaws.com` |
 | Security Group | `sgp-staging-ec2-sg` (`sg-0e617972b3eedeb73`) |
 | Rol IAM | `sgp-staging-ec2-role` |
-| Administración | Session Manager verificado; SSH no probado y sin entrada pública |
+| Administración | Session Manager verificado; SSH no probado ni expuesto |
 | Estado | En ejecución; comprobaciones `3/3` superadas |
 
-La IPv4 pública dinámica proporciona la salida necesaria sin usar NAT Gateway,
-pero no autoriza tráfico entrante: el Security Group sigue sin ingress y Nginx
-permanecerá ligado a loopback. La dirección puede cambiar al detener e iniciar
-la instancia y no se considera una interfaz pública estable.
+El Security Group permite TCP 80 y 443 desde `0.0.0.0/0`; no expone 8088, 8090
+ni 5432. El contenedor Nginx continúa ligado exclusivamente a
+`127.0.0.1:8088`; el Nginx del host es el único proceso que atiende los puertos
+públicos y reenvía el tráfico al contenedor.
+
+Se decidió conservar la IPv4 pública dinámica por la fecha de entrega del 28 de
+octubre de 2026 y no asumir el costo ni la operación de una Elastic IP. La
+dirección suele mantenerse mientras la instancia permanece encendida, pero
+puede cambiar al detenerla e iniciarla. Un cambio exige actualizar las URLs
+públicas y emitir otro certificado para la nueva IP; no se comprará un dominio.
 
 EC2 está en `us-east-1f` y RDS en `us-east-1b`. La comunicación privada funciona,
 pero cruza zonas de disponibilidad y puede implicar costo de transferencia y
@@ -447,52 +477,29 @@ detiene contenedores en ejecución, pero impide descargar imágenes en el siguie
 despliegue. Debe registrarse externamente una fecha de renovación sin registrar el
 valor del token.
 
-### Diagnóstico de las imágenes ARM64
+### Resolución del problema ARM64
 
-Desde la EC2 se confirmó mediante `docker manifest inspect` que existen y son
-accesibles estas referencias:
+La primera publicación de `develop` contenía solo AMD64 y los `docker pull
+--platform linux/arm64` fallaban con `no matching manifest for linux/arm64`.
+Después de integrar el build multi-arquitectura, GitHub Actions publicó de nuevo:
 
 ```text
 ghcr.io/kennysalazar/sgp-api:develop
 ghcr.io/kennysalazar/sgp-client:develop
 ```
 
-Esta comprobación solo demostró existencia y acceso. Al solicitar explícitamente
-la variante de la instancia Graviton:
+Desde la EC2 se descargaron correctamente ambas referencias con:
 
 ```bash
 sudo docker pull --platform linux/arm64 ghcr.io/kennysalazar/sgp-api:develop
 sudo docker pull --platform linux/arm64 ghcr.io/kennysalazar/sgp-client:develop
 ```
 
-ambas descargas fallaron con:
-
-```text
-no matching manifest for linux/arm64 in the manifest list entries
-```
-
-Por ello ninguna imagen quedó descargada y `docker image inspect` respondió
-`No such image`. La causa es que el workflow actualmente integrado en `develop`
-publica solo `linux/amd64`; la rama `feature/staging-aws-rds-s3` ya configura
-`linux/amd64,linux/arm64`. No se requiere cambiar la EC2 ARM64: debe integrarse
-el cambio mediante PR y permitir que `develop` vuelva a publicar ambas imágenes.
-
-Después del merge, y antes de habilitar el despliegue, compruebe ambas
-arquitecturas y repita las descargas:
-
-```bash
-sudo docker manifest inspect ghcr.io/kennysalazar/sgp-api:develop \
-  | grep -E '"architecture"|"os"'
-sudo docker manifest inspect ghcr.io/kennysalazar/sgp-client:develop \
-  | grep -E '"architecture"|"os"'
-
-sudo docker pull --platform linux/arm64 ghcr.io/kennysalazar/sgp-api:develop
-sudo docker pull --platform linux/arm64 ghcr.io/kennysalazar/sgp-client:develop
-```
-
-El resultado debe enumerar `linux/amd64` y `linux/arm64`. Para el despliegue se
-mantiene la regla de consumir los digests producidos por el workflow, no la
-etiqueta móvil `develop`.
+La inspección local confirmó `linux/arm64` para backend y frontend. Esto valida
+publicación, autenticación GHCR, acceso desde EC2 y compatibilidad Graviton. No es
+necesario cambiar la arquitectura de la instancia ni volver al build exclusivo
+AMD64. El despliegue continúa consumiendo digests inmutables producidos por el
+workflow, no la etiqueta móvil `develop`.
 
 ## GitHub Actions y GHCR
 
@@ -525,30 +532,40 @@ El job no depende de un GitHub Environment. Configure todas las entradas en
 
 | Variable | Nivel | Estado inicial | Propósito |
 |---|---|---|---|
-| `STAGING_ENABLED` | Repositorio | Ausente o `false` | Interruptor del job. Solo debe cambiarse a `true` después de completar los requisitos y validar la confianza OIDC. |
+| `STAGING_ENABLED` | Repositorio | Configurada: `true` | Interruptor del job; el despliegue automático está activo. |
 | `AWS_REGION` | Repositorio | Configurada: `us-east-1` | Región de la instancia y del rol. |
 | `AWS_ROLE_ARN` | Repositorio | Configurada: `arn:aws:iam::416086757987:role/sgp-staging-github-actions-role` | Rol asumido mediante OIDC. |
 | `STAGING_INSTANCE_ID` | Repositorio | Configurada: `i-0385c95df8cd7909d` | Instancia administrada por SSM. |
 
 Las variables anteriores son identificadores de infraestructura, no
 credenciales. No deben agregarse access keys, contraseñas ni tokens como
-variables de repositorio. La ausencia de `STAGING_ENABLED`, o cualquier valor
-distinto de la cadena exacta `true`, mantiene omitido el job de despliegue.
+variables de repositorio. Para suspender nuevos despliegues sin retirar OIDC,
+cambie `STAGING_ENABLED` a `false`; esto no detiene las imágenes ya ejecutadas.
 
 La publicación en GHCR no requiere GitHub Secrets: utiliza el `GITHUB_TOKEN`
 efímero. La descarga desde la EC2 es una operación diferente y utiliza el PAT de
 solo lectura instalado manualmente en Docker. AWS usa OIDC y tampoco requiere
-claves permanentes en GitHub. La relación de confianza del rol debe limitar el
-sujeto a
-`repo:KennySalazar/SGP_ProyectoFinal_AyD1:ref:refs/heads/develop`. Su
-política debe permitir únicamente enviar `AWS-RunShellScript` a la instancia de
+claves permanentes en GitHub. El primer intento falló en
+`Configure temporary AWS credentials` con
+`Not authorized to perform sts:AssumeRoleWithWebIdentity`. La confianza basada
+únicamente en el nombre del repositorio no coincidió con el sujeto emitido. Se
+corrigió y validó el sujeto inmutable:
+
+```text
+repo:KennySalazar@99755600/SGP_ProyectoFinal_AyD1@1386435373:ref:refs/heads/develop
+```
+
+No debe restaurarse el formato anterior
+`repo:KennySalazar/SGP_ProyectoFinal_AyD1:ref:refs/heads/develop`. La política
+mantiene permisos limitados a enviar `AWS-RunShellScript` a la instancia de
 staging, consultar el resultado y cancelar el comando en caso de timeout.
 
 La protección que antes habría aportado el Environment se reemplaza de forma
 explícita por tres controles: el workflow solo recibe eventos `push` de
 `develop`, el job vuelve a comprobar `github.ref == 'refs/heads/develop'` y la
-confianza de AWS acepta únicamente el sujeto OIDC de esa misma referencia. Esta
-adaptación no agrega claves permanentes ni cambia el despliegue mediante SSM.
+confianza de AWS acepta únicamente el sujeto OIDC inmutable de esa misma
+referencia. Esta adaptación no agrega claves permanentes ni cambia el despliegue
+mediante SSM.
 
 Cada job vuelve a consultar el SHA actual de `develop` antes de publicar o
 desplegar. La publicación por imagen está serializada, el despliegue tiene una
@@ -560,14 +577,12 @@ se evitan despliegues simultáneos y revisiones antiguas fuera de orden.
 La plantilla es `infra/staging/.env.example`. El archivo real debe existir solo
 en `/etc/sgp/staging/staging.env` y nunca debe registrarse en Git.
 
-El archivo ya existe en la EC2 con propietario `root` y modo `0600`. Las
-variables `DATABASE_URL`, `DATABASE_USERNAME`, `DATABASE_PASSWORD`,
-`MIGRATION_DATABASE_USERNAME`, `MIGRATION_DATABASE_PASSWORD` y
-`SECRET_KEY_JWT` fueron verificadas. Se reportó la configuración posterior de
-`INITIAL_ADMIN_EMAIL`, `INITIAL_ADMIN_PASSWORD`, `MAIL_HOST`, `MAIL_PORT`,
-`MAIL_USERNAME`, `MAIL_PASSWORD` y `MAIL_FROM`, sin una nueva evidencia completa
-que permita marcarlas como verificadas. Los valores reales permanecen fuera de
-Git y de esta documentación.
+El archivo ya existe en la EC2 con propietario `root` y modo `0600`. Una
+comprobación devolvió `[OK]` para `DATABASE_URL`, `DATABASE_USERNAME`,
+`DATABASE_PASSWORD`, `MIGRATION_DATABASE_USERNAME`,
+`MIGRATION_DATABASE_PASSWORD`, `SECRET_KEY_JWT`, `INITIAL_ADMIN_EMAIL`,
+`INITIAL_ADMIN_PASSWORD`, `MAIL_HOST`, `MAIL_USERNAME`, `MAIL_PASSWORD` y
+`MAIL_FROM`. Los valores reales permanecen fuera de Git y de esta documentación.
 
 | Variable | Servicio | Obligatoria | Propósito / ejemplo seguro |
 |---|---|---:|---|
@@ -595,8 +610,9 @@ Git y de esta documentación.
 | `OTP_MAX_ATTEMPTS` | Backend | No | Intentos permitidos; `5`. |
 | `OTP_RESEND_COOLDOWN_SECONDS` | Backend | No | Espera para reenvío; `60`. |
 | `INVITACION_VIGENCIA_HORAS` | Backend | No | Vigencia de invitación; `72`. |
-| `INVITACION_URL_ACTIVACION` | Backend | No | `http://localhost:8088/activar-cuenta` mientras se use el túnel. |
-| `CORS_ALLOWED_ORIGINS` | Backend | No | `http://localhost:8088` para el acceso privado. |
+| `INVITACION_URL_ACTIVACION` | Backend | No | URL pública exacta; `https://3.235.197.36/activar-cuenta`. |
+| `REFRESH_COOKIE_SECURE` | Backend | No | `true`; impide enviar la cookie de refresh mediante HTTP. |
+| `CORS_ALLOWED_ORIGINS` | Backend | No | Origen público exacto; `https://3.235.197.36`. |
 | `JAVA_TOOL_OPTIONS` | Backend | No | Límites de JVM definidos en la plantilla. |
 
 ### SMTP temporal sin servicio de correo
@@ -620,9 +636,10 @@ declarar staging funcional debe configurarse un servicio SMTP real y probar esos
 flujos. El marcador `SMTP_NO_CONFIGURADO` no debe reutilizarse en producción.
 
 En staging, `SPRING_PROFILES_ACTIVE=staging`, `OPENAPI_PUBLIC=false` y
-`REFRESH_COOKIE_SECURE=false` están fijados por Compose. La cookie no se marca
-`Secure` porque el HTTP viaja dentro del túnel cifrado de SSM. Producción deberá
-usar HTTPS y el perfil `prod`, que exige cookie segura.
+`REFRESH_COOKIE_SECURE=true` están definidos por Compose. El perfil mantiene
+este último valor configurable desde el exterior, con `true` como valor seguro
+predeterminado. El túnel SSM sigue disponible para diagnóstico, pero los flujos
+de autenticación del navegador deben validarse mediante HTTPS público.
 
 Para generar secretos que no requieran escapar caracteres especiales en el
 archivo de entorno puede utilizarse:
@@ -638,11 +655,12 @@ consuma.
 
 ## Preparación de la base RDS
 
-Con RDS ya observada `Disponible`, y antes del primer despliegue, copie
-temporalmente `infra/rds/prepare-database.sql` a un equipo con acceso de red a
-la instancia, por ejemplo la EC2 de staging administrada mediante SSM.
-La base `sgp_staging` todavía no existe. Ejecute la versión corregida como
-`postgres` solo después de descargar el bundle oficial y validar TLS:
+Antes del primer despliegue se prepararon la base y los roles de staging. El
+siguiente procedimiento queda como referencia reproducible y de recuperación;
+no debe repetirse sobre la base existente sin revisar primero su estado y contar
+con autorización. Copie temporalmente `infra/rds/prepare-database.sql` a un
+equipo con acceso de red, por ejemplo la EC2 administrada mediante SSM, y
+ejecútelo como `postgres` con el bundle oficial:
 
 ```bash
 export SGP_DATABASE_NAME=sgp_staging
@@ -701,8 +719,11 @@ REVOKE sgp_staging_migrator FROM postgres;
 
 La primera migración también contiene `CREATE EXTENSION IF NOT EXISTS`; al estar
 las extensiones ya instaladas, Flyway puede ejecutarla sin elevar privilegios.
-La ejecución contra RDS y la validación completa con `verify-full` siguen
-pendientes; no deben declararse exitosas hasta realizar la prueba real.
+El arranque exitoso de Spring Boot confirmó que los roles y el esquema son
+utilizables por la aplicación y que Flyway completó sus migraciones. No se
+conservó evidencia de una ejecución administrativa independiente con
+`sslmode=verify-full` ni de una consulta directa de versiones de extensiones;
+esas comprobaciones permanecen pendientes.
 
 ## Docker Compose
 
@@ -744,8 +765,13 @@ El script:
    de conectarse a RDS, ejecutar Flyway y validar el esquema con Hibernate.
 7. Registra el SHA desplegado en `/opt/sgp/staging/REVISION`.
 
-La publicación de imágenes y el despliegue serán jobs independientes para que
+La publicación de imágenes y el despliegue son jobs independientes para que
 un fallo de AWS no obligue a reconstruirlas.
+
+La primera ejecución completa finalizó correctamente para la revisión
+`488dae1ea7278eefc5f39e557eaadde4c07d00f9`: las validaciones, ambas
+publicaciones y `Deploy staging` terminaron en `SUCCESS`. Systems Manager aplicó
+los digests publicados y `REVISION` conserva el SHA desplegado.
 
 ## Acceso privado propuesto
 
@@ -763,6 +789,213 @@ Mientras la sesión esté abierta, la aplicación se accederá en
 ejecución desde un equipo local, sus permisos y el Session Manager Plugin siguen
 pendientes. El acceso interactivo desde la consola sí fue verificado, pero el
 comando de port forwarding anterior aún no se ha ejecutado.
+
+## HTTPS público mediante la IP
+
+### Diseño y vigencia del certificado
+
+La solución implementada usa el Nginx del sistema operativo como terminación TLS.
+Este proceso escucha 80/443 y reenvía a `127.0.0.1:8088`; el Nginx de Angular y
+el backend conservan su aislamiento actual. El directorio ACME queda disponible
+por HTTP y todo el resto se redirige a HTTPS. No se versionan claves privadas ni
+certificados.
+
+Let's Encrypt ofrece certificados IP de perfil `shortlived` con vigencia de 160
+horas. El flujo `webroot` para IP requiere Certbot 5.4 o posterior y el plugin de
+Nginx no instala automáticamente certificados IP. Amazon Linux 2023 ofrece una
+versión anterior, por lo que los scripts usan la imagen oficial 5.8.0 fijada
+también por el digest del índice multi-arquitectura
+`sha256:f70ad0adbb7e117f0fe42a63c553f28ea451edabc0148757b6efcd9735acaa20`,
+que incluye ARM64. Nginx sí se instala desde DNF.
+
+La renovación se comprueba dos veces al día mediante systemd. Certbot intenta
+renovar los certificados de menos de diez días cuando han consumido la mitad de
+su vigencia. Tras una ejecución correcta, el script valida y recarga Nginx sin
+detener los contenedores. No se habilita HSTS mientras staging dependa de una IP
+dinámica y certificados de corta duración.
+
+La instalación real se completó con Nginx `1.30.5` y la imagen
+`certbot/certbot:v5.8.0` fijada por digest. Let's Encrypt emitió el certificado
+de la línea `sgp-staging-ip` para `3.235.197.36` y lo almacenó en:
+
+```text
+/etc/letsencrypt/live/sgp-staging-ip/fullchain.pem
+/etc/letsencrypt/live/sgp-staging-ip/privkey.pem
+```
+
+La vigencia comprobada es `notBefore=Oct 15 23:30:54 2026 GMT` y
+`notAfter=Oct 22 15:30:53 2026 GMT`. Los certificados y la clave privada solo
+existen en EC2; no forman parte del repositorio.
+
+### Configuración aplicada al backend
+
+Desde Session Manager, edite el archivo protegido sin imprimirlo en la consola:
+
+```bash
+sudoedit /etc/sgp/staging/staging.env
+```
+
+Se verificó que contiene, además de las variables obligatorias:
+
+```dotenv
+REFRESH_COOKIE_SECURE=true
+CORS_ALLOWED_ORIGINS=https://3.235.197.36
+INVITACION_URL_ACTIVACION=https://3.235.197.36/activar-cuenta
+```
+
+Compruebe solo presencia y permisos, nunca valores sensibles:
+
+```bash
+sudo stat --format='Permisos: %a Propietario: %U' \
+  /etc/sgp/staging/staging.env
+sudo awk -F= '
+  /^(REFRESH_COOKIE_SECURE|CORS_ALLOWED_ORIGINS|INVITACION_URL_ACTIVACION)=/ {
+    print "[OK] " $1
+  }
+' /etc/sgp/staging/staging.env
+```
+
+El archivo conserva propietario `root` y modo `0600`. La configuración de
+staging acepta encabezados reenviados y mantiene la cookie
+de refresh con `Secure`, `HttpOnly` y `SameSite=Strict`. El Nginx del contenedor
+preserva `X-Forwarded-Proto` y `X-Forwarded-Port` recibidos del proxy del host.
+Un despliegue posterior sigue validando el servicio directamente por loopback;
+el HTTPS del host no modifica el procedimiento OIDC/SSM.
+
+### Procedimiento de instalación reproducible
+
+Los pasos siguientes son el procedimiento que se ejecutó desde Session Manager y
+quedan como referencia de recuperación. Los archivos se descargaron desde un
+commit aprobado, se copiaron a `/opt/sgp/staging/https/` y se instalaron con
+propietario `root` y permisos controlados. No deben repetirse sobre la instancia
+operativa sin revisar su estado y contar con autorización:
+
+```bash
+HTTPS_REF=<SHA_APROBADO_EN_DEVELOP>
+HTTPS_TMP_DIR=$(mktemp -d)
+
+curl --fail --show-error --location \
+  "https://github.com/KennySalazar/SGP_ProyectoFinal_AyD1/archive/${HTTPS_REF}.tar.gz" \
+  --output "${HTTPS_TMP_DIR}/sgp.tar.gz"
+tar --extract --gzip --file "${HTTPS_TMP_DIR}/sgp.tar.gz" \
+  --directory "${HTTPS_TMP_DIR}"
+
+sudo install -d -m 0755 /opt/sgp/staging/https
+sudo cp -a \
+  "${HTTPS_TMP_DIR}"/SGP_ProyectoFinal_AyD1-*/infra/staging/https/. \
+  /opt/sgp/staging/https/
+sudo chown -R root:root /opt/sgp/staging/https
+```
+
+La instalación comprobó que los puertos 80/443 estaban libres, obtuvo la IP con
+IMDSv2 y ejecutó el instalador con un correo operativo para avisos ACME:
+
+```bash
+IMDS_TOKEN=$(curl --fail --silent --show-error --request PUT \
+  --header 'X-aws-ec2-metadata-token-ttl-seconds: 60' \
+  http://169.254.169.254/latest/api/token)
+PUBLIC_IP=$(curl --fail --silent --show-error \
+  --header "X-aws-ec2-metadata-token: ${IMDS_TOKEN}" \
+  http://169.254.169.254/latest/meta-data/public-ipv4)
+
+sudo /opt/sgp/staging/https/install-https.sh \
+  "${PUBLIC_IP}" '<CORREO_OPERATIVO>'
+```
+
+El script comprueba primero `/healthz` por loopback, vuelve a consultar IMDSv2,
+rechaza una IP distinta, instala Nginx, publica temporalmente solo el desafío
+HTTP, descarga la imagen fijada de Certbot 5.8.0, solicita el certificado con
+`--preferred-profile shortlived --ip-address`, activa el proxy y habilita el
+temporizador. Una repetición con la misma IP reutiliza un certificado vigente y
+con SAN correcto para evitar emisiones innecesarias; un cambio de IP fuerza su
+reemplazo. Si falla, restaura la configuración Nginx anterior. La renovación
+vuelve a descargar la misma imagen por digest únicamente si fue eliminada del
+host. El correo y los archivos privados de `/etc/letsencrypt` no deben
+registrarse.
+
+### Comprobaciones posteriores en EC2
+
+```bash
+sudo nginx -t
+sudo systemctl status nginx --no-pager
+sudo systemctl status sgp-certbot-renew.timer --no-pager
+sudo systemctl list-timers sgp-certbot-renew.timer --no-pager
+
+curl --fail --head http://3.235.197.36/
+curl --fail https://3.235.197.36/healthz
+curl --fail https://3.235.197.36/
+curl --fail 'https://3.235.197.36/api/v1/puentes?size=1'
+
+echo | openssl s_client \
+  -connect 3.235.197.36:443 \
+  -servername 3.235.197.36 2>/dev/null \
+  | openssl x509 -noout -issuer -subject -dates -ext subjectAltName
+```
+
+Las pruebas reales devolvieron `301 Moved Permanently` con
+`Location: https://3.235.197.36/` para HTTP y `200` para `/`, `/healthz` y
+`/api/v1/puentes?size=1` mediante HTTPS. También se confirmó el acceso desde un
+navegador externo. El frontend, la API y la cadena de proxy quedaron validados;
+los flujos completos de autenticación, OTP y recuperación de contraseña no se
+han probado y no deben inferirse de estas respuestas.
+
+Para probar el mecanismo de renovación sin forzar una emisión:
+
+```bash
+sudo systemctl start sgp-certbot-renew.service
+sudo systemctl status sgp-certbot-renew.service --no-pager
+sudo journalctl -u sgp-certbot-renew.service --since '24 hours ago' --no-pager
+```
+
+La unidad se ejecutó manualmente y terminó correctamente. Certbot procesó
+`/etc/letsencrypt/renewal/sgp-staging-ip.conf`, informó que el certificado aún no
+debía renovarse, no intentó una emisión y `nginx -t` siguió siendo satisfactorio.
+Después, `/healthz` continuó devolviendo HTTP 200 por HTTPS. Esto valida el
+mecanismo de comprobación y recarga, no una renovación efectiva; observar una
+renovación antes de la expiración es seguimiento operativo pendiente. Para
+revisar la vigencia almacenada:
+
+```bash
+sudo openssl x509 \
+  -in /etc/letsencrypt/live/sgp-staging-ip/fullchain.pem \
+  -noout -issuer -subject -dates -ext subjectAltName
+```
+
+### Cambio de IP pública
+
+El temporizador compara la IP guardada con IMDSv2. Si EC2 cambia de dirección,
+la renovación falla de forma visible en `journalctl` en vez de solicitar un
+certificado incoherente. El procedimiento de recuperación es:
+
+1. Obtener la nueva IP mediante IMDSv2 y confirmar que 80/443 continúan
+   permitidos en el Security Group.
+2. Actualizar `CORS_ALLOWED_ORIGINS` e `INVITACION_URL_ACTIVACION` en
+   `/etc/sgp/staging/staging.env`; conservar `REFRESH_COOKIE_SECURE=true`.
+3. Actualizar también los ejemplos y valores predeterminados del repositorio en
+   un cambio revisado, porque la IP anterior deja de ser válida.
+4. Volver a ejecutar `install-https.sh <NUEVA_IP> <CORREO_OPERATIVO>`. El script
+   reemplaza el certificado de la línea `sgp-staging-ip` y actualiza el proxy.
+5. Permitir que el siguiente `push` aprobado a `develop`, o la repetición
+   controlada del job correspondiente, recree el backend mediante el CI/CD. No
+   ejecutar un despliegue manual con Compose.
+6. Repetir la redirección, los tres GET HTTPS, la inspección del SAN y la prueba
+   de cookie.
+
+### Diagnóstico de HTTPS
+
+| Síntoma | Revisión |
+|---|---|
+| ACME no valida | Confirmar que la IP detectada coincide, TCP 80 es público y `/.well-known/acme-challenge/` no se redirige. Revisar `journalctl -u nginx`. |
+| Certbot no reconoce `--ip-address` | Confirmar que se usa la imagen 5.8.0 y el digest fijado en los scripts, no el paquete antiguo de DNF. |
+| 502 desde Nginx del host | Confirmar `curl http://127.0.0.1:8088/healthz` y los contenedores saludables. |
+| Navegador rechaza el certificado | Revisar SAN, fechas e IP actual; no ocultar el problema con `--insecure` ni certificados autofirmados. |
+| Renovación falla por IP distinta | Seguir el procedimiento de cambio de IP; no editar solo el archivo de estado. |
+| CORS o activación usa HTTP/IP anterior | Corregir el archivo de entorno y aplicar el cambio únicamente mediante el flujo CI/CD. |
+
+La configuración real de Nginx reside en `/etc/nginx/conf.d/sgp-staging.conf` y
+los certificados en `/etc/letsencrypt`; el workflow no modifica esas rutas. Los
+scripts versionados permanecen en `/opt/sgp/staging/https`. Así, los despliegues
+posteriores solo reemplazan el Compose y las imágenes y no eliminan HTTPS.
 
 ## Verificación y operación
 
@@ -824,10 +1057,10 @@ PostgreSQL/PostGIS 16: se comprobaron las extensiones, los privilegios DML y de
 secuencias del usuario de aplicación, y la prohibición de crear tablas con ese
 usuario. Luego la imagen local del backend inició saludablemente con esos roles
 y Flyway registró 16 migraciones exitosas y ninguna fallida. En AWS, la EC2 está
-en ejecución, Session Manager funciona y el endpoint de RDS respondió a una
-prueba TCP desde esa instancia. Todavía no se han probado TLS, autenticación,
-PostGIS, Flyway ni la conexión del backend contra RDS. El bucket S3 tampoco tiene
-una integración funcional que probar.
+en ejecución, Session Manager funciona y el endpoint de RDS respondió primero a
+una prueba TCP. El despliegue posterior confirmó además que el backend se
+autentica, completa Flyway, valida el esquema y atiende la API. El bucket S3
+todavía no tiene una integración funcional que probar.
 
 El script de preparación de Amazon Linux 2023 se ejecutó correctamente en la EC2
 el 11 de octubre de 2026 después de eliminar de DNF la solicitud del paquete
@@ -848,36 +1081,58 @@ ejecutó en una sola transacción, como lo hace Flyway, debido a su tabla tempor
 `ON COMMIT DROP`. Una tabla de prueba creada posteriormente por el migrador
 heredó los privilegios predeterminados: la aplicación pudo realizar
 `INSERT`, `SELECT`, `UPDATE` y `DELETE`, pero su intento de `CREATE TABLE` fue
-rechazado. Esta prueba es local; el SQL corregido todavía no se ha ejecutado en
-la RDS real.
+rechazado. Esta prueba local cubrió en detalle los permisos. En RDS, el
+funcionamiento de los roles y migraciones quedó demostrado indirectamente por
+el arranque saludable de la aplicación; falta conservar una comprobación SQL
+administrativa independiente de extensiones y TLS `verify-full`.
 
-El workflow también se ejecutó en GitHub después de integrar los cambios en
-`develop`: las validaciones de backend y frontend finalizaron correctamente y se
-publicaron ambas imágenes en GHCR. El job `Deploy staging` permaneció omitido,
-como se esperaba, porque `STAGING_ENABLED` no está activo. Desde EC2 se validó
-posteriormente `docker login` y el acceso a las referencias privadas. Las
-descargas explícitas para ARM64 fallaron porque los manifiestos publicados por
-la versión actual de `develop` no contienen esa arquitectura. La corrección está
-en la rama feature, cuyo PR, revisión e integración aún no se han confirmado.
-OIDC y el despliegue real tampoco se han validado. Session Manager sí quedó
-validado en `i-0385c95df8cd7909d`. La URL o el identificador de cada ejecución
-debe agregarse cuando se recopile la evidencia final.
+El workflow se ejecutó en GitHub después de integrar los cambios en `develop`.
+`Validate backend`, `Validate frontend`, `Publish backend image`, `Publish
+frontend image` y `Deploy staging` finalizaron en `SUCCESS`. La primera asunción
+OIDC falló hasta corregir el sujeto de confianza al identificador inmutable
+documentado; después, Systems Manager desplegó la revisión
+`488dae1ea7278eefc5f39e557eaadde4c07d00f9` mediante digests.
+
+Desde EC2 se validaron Docker Compose `v2.40.3`, `docker login` a GHCR y las
+descargas explícitas de backend y frontend para `linux/arm64`. Ambos contenedores
+quedaron `healthy`. Las siguientes pruebas reales devolvieron HTTP 200:
+
+```text
+GET http://127.0.0.1:8088/healthz
+GET http://127.0.0.1:8088/
+GET http://127.0.0.1:8088/api/v1/puentes?size=1
+```
+
+Esto valida el despliegue técnico básico, el frontend, el proxy Nginx, Spring
+Boot y la conexión con RDS. Tras integrar el cambio HTTPS mediante el merge
+commit `e006c19`, GitHub Actions volvió a completar `Validate backend`,
+`Validate frontend`, `Publish backend image`, `Publish frontend image` y
+`Deploy staging`. No se proporcionó el identificador de esa ejecución.
+
+En EC2 se validó la sintaxis Bash de los instaladores, se instaló Nginx `1.30.5`
+y `nginx -t` finalizó correctamente. Certbot 5.8.0 emitió un certificado válido
+para `3.235.197.36`. Un navegador externo abrió la aplicación y las pruebas
+reales confirmaron:
+
+```text
+GET http://3.235.197.36/                         -> 301 a HTTPS
+GET https://3.235.197.36/                        -> 200
+GET https://3.235.197.36/healthz                 -> 200
+GET https://3.235.197.36/api/v1/puentes?size=1   -> 200
+```
+
+`sgp-certbot-renew.timer` quedó habilitado y la ejecución manual de
+`sgp-certbot-renew.service` finalizó correctamente sin renovar, porque el
+certificado aún no había alcanzado su ventana. Se verificó de nuevo `/healthz`
+por HTTPS después de la comprobación. Esto no constituye una prueba funcional
+completa: SMTP, flujos de autenticación dependientes del correo y S3 siguen sin
+validación funcional.
 
 ## Limitaciones y trabajo pendiente
 
-- Registrar la URL o el identificador de la ejecución exitosa de GitHub Actions.
-- Publicar y verificar los manifiestos AMD64/ARM64 después de integrar este
-  cambio en `develop`.
-- Crear, revisar y fusionar el PR de `feature/staging-aws-rds-s3` hacia
-  `develop`; todavía no se ha confirmado ninguna de estas acciones.
 - Probar autenticación PostgreSQL desde EC2 con `sslmode=verify-full` y el bundle
-  CA de RDS; la prueba TCP actual no cubre esa validación.
-- Configurar y verificar la confianza OIDC del rol
-  `sgp-staging-github-actions-role`, limitada a `refs/heads/develop`, y su
-  política SSM limitada a la instancia de staging.
-- Ejecutar y validar `infra/rds/prepare-database.sql` contra RDS PostgreSQL 16.
-- Confirmar en la versión elegida de RDS la disponibilidad de PostGIS antes de
-  crear datos.
+  CA de RDS; el funcionamiento de la aplicación no sustituye esa evidencia.
+- Registrar una consulta SQL administrativa de extensiones y permisos en RDS.
 - Definir responsable y recordatorio de rotación del PAT; su disponibilidad
   depende de que la cuenta conserve acceso a los paquetes privados.
 - Sustituir el SMTP ficticio por un servicio real y validar OTP, invitaciones,
@@ -892,29 +1147,44 @@ debe agregarse cuando se recopile la evidencia final.
   restricción del plan gratuito. La retención requerida de 30 días, los 12
   respaldos mensuales y la prueba de restauración permanecen pendientes.
 - Los respaldos y restauraciones de S3 están fuera del alcance de esta historia.
-- Definir y validar, solo si staging debe hacerse público, HTTPS válido sobre IP
-  pública sin comprar dominio. Un certificado autofirmado no satisface este
-  requisito.
+- Observar y registrar al menos una renovación efectiva del certificado. El
+  temporizador y el servicio ya funcionan, pero Certbot determinó que aún no
+  correspondía renovar durante la prueba manual.
+- HSTS no está habilitado por la combinación de IP dinámica y certificados de
+  corta duración. Esto deja pendiente el requisito global DT-SEC-10 y necesita
+  aceptación explícita o una solución operativa estable antes del cierre final
+  de todos los requisitos del proyecto.
 
-## Secuencia de implementación pendiente
+## Seguimiento operativo y funcional
 
-1. Crear y revisar el PR de `feature/staging-aws-rds-s3` hacia `develop`, sin
-   activar `STAGING_ENABLED`; después del merge, esperar las validaciones y la
-   publicación de ambas imágenes.
-2. Confirmar que los manifiestos publicados enumeren `linux/amd64` y
-   `linux/arm64`, y repetir desde EC2 los `docker pull --platform linux/arm64`.
+1. Vigilar `sgp-certbot-renew.timer` y conservar evidencia de la primera
+   renovación efectiva antes del vencimiento del certificado.
+2. Sustituir el SMTP ficticio por un proveedor autorizado y probar los flujos
+   dependientes del correo.
 3. Descargar el bundle CA desde su origen oficial y probar PostgreSQL con
    `sslmode=verify-full`. Registrar el resultado sin exponer la contraseña.
-4. Preparar `sgp_staging` y sus usuarios
-   mediante `infra/rds/prepare-database.sql`; comprobar extensiones y Flyway sin
-   modificar migraciones existentes. No crear `sgp_prod`.
-5. Verificar de forma completa `/etc/sgp/staging/staging.env`, conservar sus
-   permisos `0600` y reemplazar el SMTP ficticio antes de probar flujos de correo.
-6. Terminar la política de confianza del rol OIDC, revisar las variables de
-   repositorio y probar el flujo manteniendo `STAGING_ENABLED` ausente o en
-   `false` hasta que las comprobaciones manuales anteriores sean satisfactorias.
-7. Habilitar el despliegue automático y recopilar evidencia de SSM, descarga por
-   digest, salud, Flyway, frontend y `/api/v1`.
+4. Incorporar la interfaz de almacenamiento en el backend y validar S3 con un
+   rol de mínimo privilegio cuando esa funcionalidad entre en alcance.
+5. Ejecutar pruebas funcionales completas y conservar el enlace o identificador
+   de la ejecución de GitHub Actions como evidencia del sprint.
+
+## Evaluación de cierre de la HU de staging
+
+El alcance acordado de infraestructura, publicación y despliegue automatizado de
+staging está implementado: existen los recursos AWS, RDS atiende a la
+aplicación, GHCR publica imágenes multi-arquitectura, OIDC y SSM despliegan desde
+`develop`, los contenedores están saludables y el acceso público HTTPS respondió
+correctamente. La integración funcional de S3, el SMTP real, producción y los
+respaldos fueron asignados a otras historias o excluidos de esta HU.
+
+Por ello se recomienda cerrar la HU de staging en su alcance de sprint, dejando
+seguimiento operativo para la renovación efectiva del certificado y las
+excepciones ya registradas. Este cierre no equivale a declarar cumplido todo el
+enunciado final: DT-SEC-10 (HSTS), la política de respaldos, la retención de logs,
+`verify-full` de RDS, SMTP y la integración S3 continúan pendientes. Si HSTS o
+alguno de esos puntos forma parte explícita de los criterios de aceptación de la
+HU en el tablero, el cierre debe ser condicionado a una excepción aceptada por
+el equipo o la HU debe permanecer abierta.
 
 ## Referencias de AWS
 
@@ -923,6 +1193,9 @@ debe agregarse cuando se recopile la evidencia final.
 - [Uso de TLS con RDS PostgreSQL](https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/PostgreSQL.Concepts.General.SSL.html).
 - [Creación de bases de datos en PostgreSQL 16](https://www.postgresql.org/docs/16/sql-createdatabase.html).
 - [Privilegios predeterminados en PostgreSQL 16](https://www.postgresql.org/docs/16/sql-alterdefaultprivileges.html).
+- [Certificados IP y Certbot 5.4+](https://letsencrypt.org/2026/03/11/shorter-certs-certbot).
+- [Perfil `shortlived` de Let's Encrypt](https://letsencrypt.org/ca/docs/profiles/).
+- [Renovación con Certbot](https://eff-certbot.readthedocs.io/en/stable/using.html#renewing-certificates).
 - [Membresía de roles en PostgreSQL 16](https://www.postgresql.org/docs/16/role-membership.html).
 - [Roles IAM para aplicaciones en EC2](https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_use_switch-role-ec2.html).
 - [IMDSv2 en entornos con contenedores](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/configuring-IMDS-new-instances.html).

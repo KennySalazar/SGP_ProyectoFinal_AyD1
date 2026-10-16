@@ -4,16 +4,21 @@ import gt.usac.cunoc.sgp.common.exception.ApiException;
 import gt.usac.cunoc.sgp.common.security.JwtData;
 import gt.usac.cunoc.sgp.inspeccion.dto.DatosPermanentesResponse;
 import gt.usac.cunoc.sgp.inspeccion.dto.GuardarBorradorRequest;
+import gt.usac.cunoc.sgp.inspeccion.dto.GuardarRespuestasRequest;
 import gt.usac.cunoc.sgp.inspeccion.dto.IniciarInspeccionRequest;
 import gt.usac.cunoc.sgp.inspeccion.dto.IniciarInspeccionResponse;
+import gt.usac.cunoc.sgp.inspeccion.dto.IniciarInspeccionVersionadaRequest;
+import gt.usac.cunoc.sgp.inspeccion.dto.IniciarInspeccionVersionadaResponse;
 import gt.usac.cunoc.sgp.inspeccion.dto.InspeccionBorradorResponse;
 import gt.usac.cunoc.sgp.inspeccion.dto.InspeccionResumenResponse;
+import gt.usac.cunoc.sgp.inspeccion.dto.ValidarRespuestasRequest;
 import gt.usac.cunoc.sgp.inspeccion.service.InspeccionService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.net.URI;
+import java.util.Map;
 import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.http.HttpStatus;
@@ -33,6 +38,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/v1/inspecciones")
+@SecurityRequirement(name = "bearerAuth")
 @Tag(name = "Inspecciones", description = "Gestión e inicio de inspecciones de puentes")
 public class InspeccionController {
 
@@ -57,9 +63,24 @@ public class InspeccionController {
       Authentication authentication) {
     UUID usuarioId = usuarioId(authentication);
     IniciarInspeccionResponse response =
-        inspeccionService.iniciarInspeccion(request, usuarioId, idempotencyKey);
+        inspeccionService.iniciarInspeccionHu024(request, usuarioId, idempotencyKey);
     return ResponseEntity.created(URI.create("/api/v1/inspecciones/" + response.id()))
         .body(response);
+  }
+
+  @PostMapping("/iniciar")
+  @PreAuthorize("isAuthenticated()")
+  @Operation(
+      summary = "Iniciar una inspección con una versión publicada específica",
+      description =
+          "Crea una inspección en BORRADOR con la versión publicada indicada y valida las respuestas iniciales contra su esquema. No sustituye la versión solicitada por la versión activa.",
+      security = @SecurityRequirement(name = "bearerAuth"))
+  public ResponseEntity<IniciarInspeccionVersionadaResponse> iniciarConVersion(
+      @Valid @RequestBody IniciarInspeccionVersionadaRequest request,
+      Authentication authentication) {
+    UUID usuarioId = usuarioId(authentication);
+    var response = inspeccionService.iniciarInspeccion(request, usuarioId, rol(authentication));
+    return ResponseEntity.status(HttpStatus.CREATED).body(response);
   }
 
   @GetMapping("/puentes/{puenteId}/datos-permanentes")
@@ -78,7 +99,7 @@ public class InspeccionController {
         .orElseGet(() -> ResponseEntity.noContent().build());
   }
 
-  @PutMapping({"/{id}", "/{id}/borrador"})
+  @PutMapping("/{id}/borrador")
   @PreAuthorize("isAuthenticated()")
   @Operation(
       summary = "Guardar avances parciales de una inspección en borrador",
@@ -95,7 +116,7 @@ public class InspeccionController {
     return ResponseEntity.ok(response);
   }
 
-  @GetMapping({"/{id}", "/{id}/borrador"})
+  @GetMapping("/{id}/borrador")
   @PreAuthorize("isAuthenticated()")
   @Operation(
       summary = "Consultar borrador de una inspección para reanudar edición",
@@ -143,6 +164,41 @@ public class InspeccionController {
     return ResponseEntity.noContent().build();
   }
 
+  @GetMapping("/{id}")
+  @PreAuthorize("isAuthenticated()")
+  public ResponseEntity<InspeccionResumenResponse> consultar(
+      @PathVariable UUID id, Authentication authentication) {
+    return ResponseEntity.ok(inspeccionService.consultarPorId(id, usuarioId(authentication)));
+  }
+
+  @PutMapping({"/{id}", "/{id}/datos"})
+  @PreAuthorize("isAuthenticated()")
+  public ResponseEntity<InspeccionResumenResponse> guardarRespuestas(
+      @PathVariable UUID id,
+      @Valid @RequestBody GuardarRespuestasRequest request,
+      Authentication authentication) {
+    return ResponseEntity.ok(
+        inspeccionService.guardarRespuestas(id, request, usuarioId(authentication)));
+  }
+
+  @PostMapping("/{id}/enviar")
+  @PreAuthorize("isAuthenticated()")
+  public ResponseEntity<InspeccionResumenResponse> enviar(
+      @PathVariable UUID id, Authentication authentication) {
+    return ResponseEntity.ok(inspeccionService.enviarInspeccion(id, usuarioId(authentication)));
+  }
+
+  @PostMapping("/{id}/validar")
+  @PreAuthorize("isAuthenticated()")
+  public ResponseEntity<Map<String, Object>> validar(
+      @PathVariable UUID id,
+      @Valid @RequestBody ValidarRespuestasRequest request,
+      Authentication authentication) {
+    inspeccionService.validarRespuestasInspeccion(
+        id, request.datos(), request.esBorrador(), usuarioId(authentication));
+    return ResponseEntity.ok(Map.of("valido", true, "mensaje", "Las respuestas son válidas"));
+  }
+
   private UUID usuarioId(Authentication authentication) {
     if (authentication == null || !(authentication.getDetails() instanceof JwtData jwtData)) {
       throw new ApiException(
@@ -152,5 +208,11 @@ public class InspeccionController {
           "Se requiere una sesión válida para iniciar inspecciones.");
     }
     return jwtData.userId();
+  }
+
+  private String rol(Authentication authentication) {
+    return authentication != null && authentication.getDetails() instanceof JwtData jwtData
+        ? jwtData.role() != null ? jwtData.role().name() : "INSPECTOR"
+        : "INSPECTOR";
   }
 }

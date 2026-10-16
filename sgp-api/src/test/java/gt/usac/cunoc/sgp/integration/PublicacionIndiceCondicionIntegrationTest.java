@@ -13,9 +13,11 @@ import gt.usac.cunoc.sgp.inspeccion.model.ResultadoCalculoIc;
 import gt.usac.cunoc.sgp.inspeccion.service.CalculoIndiceCondicionService;
 import gt.usac.cunoc.sgp.inspeccion.service.PreparadorEntradaIcService;
 import gt.usac.cunoc.sgp.inspeccion.service.PublicacionIndiceCondicionService;
+import gt.usac.cunoc.sgp.puente.dto.ActualizarPuenteRequest;
 import gt.usac.cunoc.sgp.puente.mapper.PuenteMapper;
 import gt.usac.cunoc.sgp.puente.mapper.PuenteMapperImpl;
 import gt.usac.cunoc.sgp.puente.repository.PuenteRepository;
+import gt.usac.cunoc.sgp.puente.service.PuenteService;
 import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Instant;
@@ -45,6 +47,7 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
+import org.springframework.validation.beanvalidation.LocalValidatorFactoryBean;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -60,6 +63,7 @@ import org.testcontainers.utility.DockerImageName;
   PublicacionIndiceCondicionService.class,
   PreparadorEntradaIcService.class,
   AuditoriaWriter.class,
+  PuenteService.class,
   PuenteMapperImpl.class,
   PublicacionIndiceCondicionIntegrationTest.Config.class
 })
@@ -94,6 +98,7 @@ class PublicacionIndiceCondicionIntegrationTest {
   @Autowired private ObjectMapper json;
   @Autowired private PuenteRepository puentes;
   @Autowired private PuenteMapper mapper;
+  @Autowired private PuenteService puenteService;
   @MockBean private CalculoIndiceCondicionService calculador;
 
   private UUID usuarioId;
@@ -364,11 +369,16 @@ class PublicacionIndiceCondicionIntegrationTest {
           assertThat(catalogo.estadoActual()).isEqualTo(estado);
           if ("Sin evaluar".equals(estado)) {
             assertThat(detalle.indiceCondicionActual()).isNull();
+            assertThat(catalogo.indiceCondicionActual()).isNull();
+            assertThat(catalogo.fechaUltimaInspeccion()).isNull();
             assertThat(detalle.fechaUltimaInspeccion()).isNull();
           } else {
             assertThat(detalle.indiceCondicionActual())
                 .isEqualByComparingTo(Integer.toString(indice));
             assertThat(detalle.fechaUltimaInspeccion()).isEqualTo(LocalDate.of(2026, 10, 14));
+            assertThat(catalogo.indiceCondicionActual())
+                .isEqualByComparingTo(Integer.toString(indice));
+            assertThat(catalogo.fechaUltimaInspeccion()).isEqualTo(LocalDate.of(2026, 10, 14));
           }
 
           UUID departamentoId = puente.getMunicipio().getDepartamento().getId();
@@ -378,10 +388,10 @@ class PublicacionIndiceCondicionIntegrationTest {
           Long totalEsperado =
               jdbc.queryForObject(
                   """
-              SELECT count(*) FROM puente p
-              JOIN municipio m ON m.id = p.municipio_id
-              WHERE m.departamento_id = ? AND p.activo = true AND p.estado_actual = ?
-              """,
+                    SELECT count(*) FROM puente p
+                    JOIN municipio m ON m.id = p.municipio_id
+                    WHERE m.departamento_id = ? AND p.activo = true AND p.estado_actual = ?
+                    """,
                   Long.class,
                   departamentoId,
                   estado);
@@ -408,10 +418,10 @@ class PublicacionIndiceCondicionIntegrationTest {
     publicar(inspeccionId, AHORA);
     jdbc.update(
         """
-            UPDATE puente SET activo = false, inactivado_en = ?, inactivado_por_id = ?,
-              motivo_inactivacion = 'Baja de prueba'
-            WHERE id = ?
-            """,
+                UPDATE puente SET activo = false, inactivado_en = ?, inactivado_por_id = ?,
+                  motivo_inactivacion = 'Baja de prueba'
+                WHERE id = ?
+                """,
         OffsetDateTime.ofInstant(AHORA, ZoneOffset.UTC),
         usuarioId,
         puenteId);
@@ -430,6 +440,90 @@ class PublicacionIndiceCondicionIntegrationTest {
           assertThat(inactivos.getContent()).extracting(item -> item.getId()).contains(puenteId);
           assertThat(todos.getContent()).extracting(item -> item.getId()).contains(puenteId);
           assertThat(mapper.toAltaResponse(puente, null).estadoActual()).isEqualTo("Bueno");
+          return null;
+        });
+  }
+
+  @Test
+  void editarDatosGeneralesConservaEstadoIcFechaYPublicacionVigente() {
+    when(calculador.calcular(any())).thenReturn(resultado("80", EstadoCondicion.MALO, true));
+    UUID resultadoId = publicar(inspeccionId, AHORA);
+    UUID departamentoId =
+        jdbc.queryForObject(
+            "SELECT m.departamento_id FROM puente p JOIN municipio m ON m.id = p.municipio_id WHERE p.id = ?",
+            UUID.class,
+            puenteId);
+    UUID municipioId =
+        jdbc.queryForObject("SELECT municipio_id FROM puente WHERE id = ?", UUID.class, puenteId);
+
+    var solicitud =
+        new ActualizarPuenteRequest(
+            "Puente renombrado",
+            departamentoId,
+            municipioId,
+            "RN-10",
+            new BigDecimal("12.750"),
+            new BigDecimal("14.481"),
+            new BigDecimal("-90.615"),
+            true,
+            null);
+    var actualizado = puenteService.actualizar(puenteId, solicitud, usuarioId);
+
+    assertThat(actualizado.nombre()).isEqualTo("Puente renombrado");
+    assertThat(actualizado.ruta()).isEqualTo("RN-10");
+    assertThat(actualizado.kilometraje()).isEqualByComparingTo("12.750");
+    assertThat(actualizado.estadoActual()).isEqualTo("Malo");
+    assertThat(actualizado.indiceCondicionActual()).isEqualByComparingTo("80");
+    assertThat(actualizado.fechaUltimaInspeccion()).isEqualTo(LocalDate.of(2026, 10, 14));
+    comprobarFichaYCatalogo("Malo", "80", LocalDate.of(2026, 10, 14));
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT resultado_ic_vigente_id FROM puente WHERE id = ?", UUID.class, puenteId))
+        .isEqualTo(resultadoId);
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT inspeccion_vigente_id FROM puente WHERE id = ?", UUID.class, puenteId))
+        .isEqualTo(inspeccionId);
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT indice_calculado FROM resultado_ic WHERE id = ?",
+                BigDecimal.class,
+                resultadoId))
+        .isEqualByComparingTo("80");
+  }
+
+  @Test
+  void fichaYCatalogoReflejanNuevaPublicacionAlVolverAConsultar() {
+    publicar(inspeccionId, AHORA);
+    comprobarFichaYCatalogo("Bueno", "80", LocalDate.of(2026, 10, 14));
+
+    UUID segunda = UUID.randomUUID();
+    crearInspeccion(segunda, LocalDate.of(2026, 10, 15));
+    when(calculador.calcular(any())).thenReturn(resultado("60", EstadoCondicion.REGULAR, false));
+    publicar(segunda, AHORA.plusSeconds(60));
+
+    comprobarFichaYCatalogo("Regular", "60", LocalDate.of(2026, 10, 15));
+  }
+
+  private void comprobarFichaYCatalogo(String estado, String indice, LocalDate fecha) {
+    var ficha = puenteService.obtenerPorId(puenteId);
+    assertThat(ficha.estadoActual()).isEqualTo(estado);
+    assertThat(ficha.indiceCondicionActual()).isEqualByComparingTo(indice);
+    assertThat(ficha.fechaUltimaInspeccion()).isEqualTo(fecha);
+
+    transaccion.execute(
+        status -> {
+          var puente = puentes.findPuenteConRelacionesById(puenteId).orElseThrow();
+          UUID departamentoId = puente.getMunicipio().getDepartamento().getId();
+          var pagina = puenteService.listarCatalogo(departamentoId, estado, 0, 100);
+          var catalogo =
+              pagina.getContent().stream()
+                  .filter(item -> item.id().equals(puenteId))
+                  .findFirst()
+                  .orElseThrow();
+          assertThat(catalogo.estadoActual()).isEqualTo(estado);
+          assertThat(catalogo.indiceCondicionActual()).isEqualByComparingTo(indice);
+          assertThat(catalogo.fechaUltimaInspeccion()).isEqualTo(fecha);
           return null;
         });
   }
@@ -537,6 +631,11 @@ class PublicacionIndiceCondicionIntegrationTest {
 
   @TestConfiguration
   static class Config {
+    @Bean
+    LocalValidatorFactoryBean validator() {
+      return new LocalValidatorFactoryBean();
+    }
+
     @Bean
     Clock clock() {
       return Clock.fixed(AHORA, ZoneOffset.UTC);

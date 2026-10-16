@@ -1,5 +1,7 @@
 package gt.usac.cunoc.sgp.puente.dto;
 
+import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.UUID;
 
 public record PuenteCatalogoResponse(
@@ -11,4 +13,6 @@ public record PuenteCatalogoResponse(
     Double latitud,
     Double longitud,
     boolean activo,
-    String estadoActual) {}
+    String estadoActual,
+    BigDecimal indiceCondicionActual,
+    LocalDate fechaUltimaInspeccion) {}

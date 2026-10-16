@@ -12,9 +12,14 @@
       <p class="page-kicker">{{ 'admin.kicker' | transloco }}</p>
       <h1 class="page-title">{{ ver.codigo }}</h1>
       <p class="page-description">
-        {{ 'formulario.algorithm' | transloco }}: {{ ver.versionAlgoritmoIc }} @if
-        (ver.versionAnteriorCodigo) { · Base: {{ ver.versionAnteriorCodigo }} } @if
-        (ver.hashContenido) { · SHA-256: <code>{{ ver.hashContenido.substring(0, 16) }}...</code>
+        @if (ver.estado === 'PUBLICADA') {
+        <span>Versión publicada y activa del formulario SIECA.</span>
+        } @else {
+        <span>Borrador en edición del formulario SIECA.</span>
+        } @if (ver.versionAnteriorCodigo) {
+        <span> · Basado en: <strong>{{ ver.versionAnteriorCodigo }}</strong></span>
+        } @if (ver.versionAlgoritmoIc) {
+        <span> · Algoritmo IC: {{ ver.versionAlgoritmoIc }}</span>
         }
       </p>
     </div>
@@ -184,8 +189,39 @@
       </button>
       }
     </div>
-    } @for (sec of seccionesVisuales(); track sec.clave) {
-    <article class="seccion-bloque">
+    } @else {
+    <!-- Pestañas horizontales de secciones -->
+    <div class="secciones-tab-bar" role="tablist" aria-label="Secciones del formulario">
+      @for (sec of seccionesVisuales(); track sec.clave) {
+      <button
+        type="button"
+        class="seccion-tab-btn"
+        [class.active]="seccionVisualActiva() === sec.clave"
+        [attr.aria-selected]="seccionVisualActiva() === sec.clave"
+        (click)="seleccionarSeccionVisual(sec.clave)"
+      >
+        <span class="tab-badge-num">{{ $index + 1 }}</span>
+        <span class="tab-nombre">{{ limpiarTituloSeccion(sec.titulo) || sec.titulo }}</span>
+        <span class="tab-preguntas-count">({{ sec.preguntas.length }})</span>
+        @if (sec.esRepetible) {
+        <span class="tab-repetible-pill">R</span>
+        }
+      </button>
+      } @if (ver.estado === 'BORRADOR') {
+      <button
+        type="button"
+        class="btn-nueva-seccion-tab"
+        (click)="abrirCrearSeccion()"
+        [attr.aria-label]="'formulario.addSection' | transloco"
+      >
+        <i class="pi pi-plus" aria-hidden="true"></i>
+        <span>{{ 'formulario.addSection' | transloco }}</span>
+      </button>
+      }
+    </div>
+
+    @if (seccionVisualActual(); as sec) {
+    <article class="seccion-bloque seccion-activa-bloque">
       <header class="seccion-bloque-header">
         <div class="seccion-info">
           <div class="seccion-titulo-fila">
@@ -253,7 +289,7 @@
               <th scope="col">Pregunta / Campo</th>
               <th scope="col">Tipo de dato</th>
               <th scope="col">Reglas / Restricciones</th>
-              <th scope="col">Vínculo</th>
+              <th scope="col">{{ 'formulario.storageTargetHeader' | transloco }}</th>
               @if (ver.estado === 'BORRADOR') {
               <th scope="col" class="acciones-col">Acciones</th>
               }
@@ -303,12 +339,20 @@
                 </div>
               </td>
               <td>
-                @if (p.vinculo) {
-                <code class="vinculo-code"
-                  ><i class="pi pi-database" aria-hidden="true"></i> {{ p.vinculo }}</code
-                >
+                @if (p.vinculo) { @let info = describirVinculo(p.vinculo);
+                <div class="vinculo-cell" [title]="p.vinculo">
+                  <span class="vinculo-pill" [class]="'cat-' + info.categoria">
+                    <i [class]="info.icono" aria-hidden="true"></i>
+                    <span>{{ info.etiquetaCategoria }}</span>
+                  </span>
+                  <span class="vinculo-campo-texto">{{ info.etiquetaCampo }}</span>
+                </div>
                 } @else {
-                <span class="texto-apagado">—</span>
+                <span
+                  class="texto-apagado"
+                  title="Se almacena en el documento de respuestas de la inspección"
+                  >Formulario (JSON)</span
+                >
                 }
               </td>
               @if (ver.estado === 'BORRADOR') {
@@ -346,7 +390,7 @@
         }
       </div>
     </article>
-    }
+    } }
   </div>
   } @else {
   <textarea
@@ -363,24 +407,186 @@
 @if (seccionActiva() === 'vinculos') {
 <section class="surface-card editor-card">
   <div class="card-header">
-    <h2 class="card-title">{{ 'formulario.linksTab' | transloco }}</h2>
-    @if (ver.estado === 'BORRADOR') {
-    <button pButton type="button" [disabled]="guardandoEsquema()" (click)="guardarEsquema()">
-      <i class="pi pi-save" aria-hidden="true"></i>
-      <span
-        >{{ (guardandoEsquema() ? 'formulario.savingSchema' : 'formulario.saveSchema') | transloco
-        }}</span
+    <div>
+      <h2 class="card-title">{{ 'formulario.linksTab' | transloco }}</h2>
+      <p class="card-subtitle">
+        {{ 'formulario.storageBindingsSubtitle' | transloco }} · {{ vinculosVisuales().length }} {{
+        'formulario.totalBindings' | transloco }}
+      </p>
+    </div>
+
+    <div class="editor-header-actions">
+      <!-- Selector de Modo: Visual vs Código -->
+      <div class="modo-selector" role="group">
+        <button
+          pButton
+          type="button"
+          size="small"
+          [severity]="modoVinculos() === 'visual' ? 'primary' : 'secondary'"
+          [outlined]="modoVinculos() !== 'visual'"
+          (click)="cambiarModoVinculos('visual')"
+        >
+          <i class="pi pi-table" aria-hidden="true"></i>
+          <span>{{ 'formulario.modeVisual' | transloco }}</span>
+        </button>
+        <button
+          pButton
+          type="button"
+          size="small"
+          [severity]="modoVinculos() === 'codigo' ? 'primary' : 'secondary'"
+          [outlined]="modoVinculos() !== 'codigo'"
+          (click)="cambiarModoVinculos('codigo')"
+        >
+          <i class="pi pi-code" aria-hidden="true"></i>
+          <span>{{ 'formulario.modeCode' | transloco }}</span>
+        </button>
+      </div>
+
+      @if (ver.estado === 'BORRADOR') { @if (modoVinculos() === 'visual') {
+      <button
+        pButton
+        type="button"
+        severity="secondary"
+        [outlined]="true"
+        (click)="abrirCrearVinculo()"
       >
+        <i class="pi pi-plus" aria-hidden="true"></i>
+        <span>{{ 'formulario.addStorageBinding' | transloco }}</span>
+      </button>
+      }
+      <button pButton type="button" [disabled]="guardandoVinculos()" (click)="guardarVinculos()">
+        <i class="pi pi-save" aria-hidden="true"></i>
+        <span
+          >{{ (guardandoVinculos() ? 'formulario.savingBindings' : 'formulario.saveBindings') |
+          transloco }}</span
+        >
+      </button>
+      }
+    </div>
+  </div>
+
+  @if (modoVinculos() === 'visual') {
+  <div class="vinculos-filtros-bar">
+    <div class="vinculo-search-wrap">
+      <i class="pi pi-search" aria-hidden="true"></i>
+      <input
+        pInputText
+        type="text"
+        [value]="filtroVinculos()"
+        (input)="filtroVinculos.set($any($event.target).value)"
+        [placeholder]="'formulario.filterBindings' | transloco"
+        class="vinculo-search-input"
+      />
+      @if (filtroVinculos()) {
+      <button
+        type="button"
+        class="btn-limpiar-busqueda"
+        (click)="filtroVinculos.set('')"
+        aria-label="Limpiar filtro"
+      >
+        ×
+      </button>
+      }
+    </div>
+    <span class="vinculos-counter">
+      {{ vinculosFiltrados().length }} de {{ vinculosVisuales().length }} vínculos
+    </span>
+  </div>
+
+  @if (vinculosVisuales().length === 0) {
+  <div class="empty-visual">
+    <i class="pi pi-database" aria-hidden="true"></i>
+    <p>{{ 'formulario.emptyBindings' | transloco }}</p>
+    @if (ver.estado === 'BORRADOR') {
+    <button pButton type="button" (click)="abrirCrearVinculo()">
+      <i class="pi pi-plus" aria-hidden="true"></i>
+      <span>{{ 'formulario.addStorageBinding' | transloco }}</span>
     </button>
     }
   </div>
-
+  } @else {
+  <div class="preguntas-tabla-wrapper">
+    <table class="tabla-preguntas tabla-vinculos">
+      <thead>
+        <tr>
+          <th scope="col">{{ 'formulario.storageField' | transloco }}</th>
+          <th scope="col">{{ 'formulario.databaseTarget' | transloco }}</th>
+          <th scope="col">{{ 'formulario.bindingScope' | transloco }}</th>
+          <th scope="col">{{ 'formulario.bindingNote' | transloco }}</th>
+          @if (ver.estado === 'BORRADOR') {
+          <th scope="col" class="acciones-col">Acciones</th>
+          }
+        </tr>
+      </thead>
+      <tbody>
+        @for (v of vinculosFiltrados(); track v.id) { @let info =
+        describirVinculo(v.columnaDestino);
+        <tr>
+          <td class="pregunta-col" [title]="v.campoRef">
+            <strong class="vinculo-campo-titulo">{{ obtenerNombrePregunta(v.campoRef) }}</strong>
+            @if (obtenerNombreSeccion(v.campoRef); as secNom) {
+            <span class="vinculo-seccion-sub">Sección: {{ secNom }}</span>
+            }
+          </td>
+          <td [title]="v.columnaDestino">
+            <span class="vinculo-humano-titulo">{{ info.etiquetaCampo }}</span>
+          </td>
+          <td>
+            <p-tag
+              [value]="info.etiquetaCategoria"
+              [severity]="info.categoria === 'puente' ? 'warn' : info.categoria === 'inspeccion' ? 'success' : 'info'"
+            ></p-tag>
+          </td>
+          <td>
+            <span class="vinculo-nota-text">{{ v.descripcion || '—' }}</span>
+          </td>
+          @if (ver.estado === 'BORRADOR') {
+          <td class="acciones-col">
+            <div class="acciones-grupo">
+              <button
+                pButton
+                type="button"
+                size="small"
+                severity="secondary"
+                [outlined]="true"
+                [attr.aria-label]="'formulario.editStorageBinding' | transloco"
+                (click)="abrirEditarVinculo(v)"
+              >
+                <i class="pi pi-pencil" aria-hidden="true"></i>
+              </button>
+              <button
+                pButton
+                type="button"
+                size="small"
+                severity="danger"
+                [outlined]="true"
+                [attr.aria-label]="'formulario.deleteStorageBinding' | transloco"
+                (click)="eliminarVinculo(v.id)"
+              >
+                <i class="pi pi-trash" aria-hidden="true"></i>
+              </button>
+            </div>
+          </td>
+          }
+        </tr>
+        } @if (vinculosFiltrados().length === 0) {
+        <tr>
+          <td colspan="5" class="empty-filtro-msg">
+            No se encontraron vínculos que coincidan con "{{ filtroVinculos() }}".
+          </td>
+        </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+  } } @else {
   <textarea
     class="codigo-editor"
-    rows="18"
+    rows="20"
     [readonly]="ver.estado === 'PUBLICADA'"
     [(ngModel)]="vinculosTexto"
   ></textarea>
+  }
 </section>
 }
 
@@ -637,13 +843,11 @@
       <label for="tipo-mapeo" class="field-label"
         >{{ 'formulario.mappingType' | transloco }} *</label
       >
-      <p-select
-        inputId="tipo-mapeo"
-        formControlName="tipo"
-        [options]="tiposMapeo"
-        optionLabel="label"
-        optionValue="value"
-      ></p-select>
+      <select id="tipo-mapeo" class="sgp-select" formControlName="tipo">
+        @for (t of tiposMapeo; track t.value) {
+        <option [value]="t.value">{{ t.label }}</option>
+        }
+      </select>
     </div>
 
     <div class="form-field">
@@ -696,7 +900,7 @@
         <span>{{ 'formulario.cancel' | transloco }}</span>
       </button>
       <button pButton type="submit" [disabled]="nuevoMapeoForm.invalid">
-        <span>Agregar</span>
+        <span>Agregar mapeo</span>
       </button>
     </div>
   </form>
@@ -734,7 +938,7 @@
         <span>{{ 'formulario.cancel' | transloco }}</span>
       </button>
       <button pButton type="submit" [disabled]="nuevaDerivadaForm.invalid || cargando()">
-        <span>{{ 'formulario.create' | transloco }}</span>
+        <span>Crear nueva versión</span>
       </button>
     </div>
   </form>
@@ -806,9 +1010,7 @@
         <span>{{ 'formulario.cancel' | transloco }}</span>
       </button>
       <button pButton type="submit" [disabled]="seccionForm.invalid">
-        <span
-          >{{ (modoSeccion() === 'crear' ? 'formulario.create' : 'common.save') | transloco }}</span
-        >
+        <span>{{ modoSeccion() === 'crear' ? 'Crear sección' : 'Guardar cambios' }}</span>
       </button>
     </div>
   </form>
@@ -991,13 +1193,17 @@
       <label for="preg-vinc" class="field-label"
         >{{ 'formulario.storageBinding' | transloco }}</label
       >
-      <input
-        pInputText
-        id="preg-vinc"
-        type="text"
-        formControlName="vinculo"
-        placeholder="ej. puente.ancho_acera_derecha_m"
-      />
+      <select id="preg-vinc" class="sgp-select" formControlName="vinculo">
+        <option value="">(Ninguno - dato propio del formulario)</option>
+        @for (g of opcionesDestino; track g.grupo) {
+        <optgroup [label]="g.grupo">
+          @for (item of g.items; track item.valor) {
+          <option [value]="item.valor">{{ item.etiqueta }}</option>
+          }
+        </optgroup>
+        }
+      </select>
+      <small class="field-help-text">{{ 'formulario.storageBindingHint' | transloco }}</small>
     </div>
 
     <div class="form-row-checkboxes">
@@ -1027,10 +1233,133 @@
         type="submit"
         [disabled]="preguntaForm.invalid || (preguntaForm.controls.tipo.value === 'select' && opcionesSeleccion().length === 0)"
       >
-        <span
-          >{{ (modoPregunta() === 'crear' ? 'formulario.create' : 'common.save') | transloco
-          }}</span
+        <span>{{ modoPregunta() === 'crear' ? 'Agregar pregunta' : 'Guardar cambios' }}</span>
+      </button>
+    </div>
+  </form>
+</p-dialog>
+
+<!-- Diálogo para crear/editar Vínculo de Almacenamiento -->
+<p-dialog
+  [header]="(modoVinculo() === 'crear' ? 'formulario.addStorageBinding' : 'formulario.editStorageBinding') | transloco"
+  [visible]="dialogoVinculo()"
+  [modal]="true"
+  [style]="{ width: '640px', maxWidth: '95vw' }"
+  (onHide)="dialogoVinculo.set(false)"
+>
+  <form [formGroup]="vinculoForm" (ngSubmit)="guardarVinculoModal()" class="dialog-form" novalidate>
+    <div class="form-field">
+      <label for="vinc-campo" class="field-label">
+        {{ 'formulario.storageField' | transloco }} *
+      </label>
+      @if (camposFormularioDisponibles().length > 0) {
+      <select id="vinc-campo" class="sgp-select" formControlName="campoRef">
+        @for (c of camposFormularioDisponibles(); track c.value) {
+        <option [value]="c.value">{{ c.label }}</option>
+        }
+      </select>
+      } @else {
+      <input
+        pInputText
+        id="vinc-campo"
+        type="text"
+        formControlName="campoRef"
+        placeholder="/identificacion/codigo"
+      />
+      }
+      <small class="field-help-text">Ruta del campo en el formulario SIECA</small>
+    </div>
+
+    <div class="form-field">
+      <label for="vinc-destino" class="field-label">
+        {{ 'formulario.databaseTarget' | transloco }} *
+      </label>
+      <select
+        id="vinc-destino"
+        class="sgp-select"
+        formControlName="columnaDestino"
+        (change)="onDestinoChange($event)"
+      >
+        <option value="" disabled>Seleccione el destino en el sistema...</option>
+        @for (g of opcionesDestino; track g.grupo) {
+        <optgroup [label]="g.grupo">
+          @for (item of g.items; track item.valor) {
+          <option [value]="item.valor">{{ item.etiqueta }}</option>
+          }
+        </optgroup>
+        }
+        <optgroup label="Otro / Avanzado">
+          <option value="__custom__">Otro (especificar columna técnica personalizada)</option>
+        </optgroup>
+      </select>
+      <small class="field-help-text"
+        >Elemento o propiedad del sistema donde se registrará la respuesta</small
+      >
+
+      @if (destinoPersonalizado()) {
+      <div class="form-field" style="margin-top: 0.5rem">
+        <label for="vinc-custom" class="field-label"
+          >Nombre de columna o identificador técnico *</label
         >
+        <input
+          pInputText
+          id="vinc-custom"
+          type="text"
+          [formControl]="columnaPersonalizadaControl"
+          placeholder="ej. inspeccion_dato_tecnico.mi_columna"
+        />
+      </div>
+      } @if (vinculoForm.controls.columnaDestino.value; as destVal) { @if (destVal !== '__custom__')
+      {
+      <div class="vinculo-preview-helper">
+        <i class="pi pi-info-circle" aria-hidden="true"></i>
+        <span>Destino: <strong>{{ formatearDestinoHumano(destVal) }}</strong></span>
+      </div>
+      } }
+    </div>
+
+    <div class="form-row-2">
+      <div class="form-field">
+        <label for="vinc-tipo" class="field-label">
+          {{ 'formulario.bindingScope' | transloco }}
+        </label>
+        <select id="vinc-tipo" class="sgp-select" formControlName="tipo">
+          @for (tv of tiposVinculo; track tv.value) {
+          <option [value]="tv.value">{{ tv.label }}</option>
+          }
+        </select>
+      </div>
+
+      <div class="form-field">
+        <label for="vinc-desc" class="field-label">
+          {{ 'formulario.bindingNote' | transloco }}
+        </label>
+        <input
+          pInputText
+          id="vinc-desc"
+          type="text"
+          formControlName="descripcion"
+          placeholder="Opcional: nota técnica"
+        />
+      </div>
+    </div>
+
+    <div class="dialog-actions">
+      <button
+        pButton
+        type="button"
+        severity="secondary"
+        [outlined]="true"
+        (click)="dialogoVinculo.set(false)"
+      >
+        <span>{{ 'formulario.cancel' | transloco }}</span>
+      </button>
+      <button
+        pButton
+        type="submit"
+        [disabled]="vinculoForm.invalid || (destinoPersonalizado() && !columnaPersonalizadaControl.value.trim())"
+      >
+        <span>{{ modoVinculo() === 'crear' ? 'Agregar vínculo' : 'Guardar cambios' }}</span>
       </button>
     </div>
   </form>

@@ -17,14 +17,43 @@ responsable de producción debe conservar o coordinar antes de modificarlos.
 
 | Componente | Estado |
 |---|---|
-| Dockerfiles reutilizables | Preparados para AMD64/ARM64; la publicación multi-arquitectura sigue pendiente del PR hacia `develop`. |
-| Compose de staging | Adaptado para RDS y S3 externos; validación real en AWS pendiente. |
-| Workflow CI, publicación y staging | Validaciones y publicación ejecutadas correctamente; despliegue AWS deshabilitado. |
-| Imágenes en GHCR | Referencias `develop` existentes y accesibles desde EC2, pero sin variante ARM64 en la última comprobación. |
+| Dockerfiles reutilizables | Preparados y publicados para AMD64/ARM64 desde `develop`; variante ARM64 comprobada en EC2. |
+| Compose de staging | Adaptado para RDS y S3 externos; ejecución real validada en AWS. |
+| Workflow CI, publicación y staging | Validaciones, publicación y primer despliegue automático completados correctamente. |
+| Imágenes en GHCR | Referencias `develop` accesibles; descarga e inspección `linux/arm64` verificadas desde EC2. |
 | Convención de versiones | Definida y utilizada en la primera publicación. |
-| Infraestructura AWS compartida | Red privada y DB Subnet Group confirmados; `sgp-rds-postgres` disponible y alcanzable por TCP desde staging, todavía sin bases ni autenticación validada. |
-| Infraestructura exclusiva de staging | Security Group, bucket, rol IAM y EC2 creados; Session Manager y autenticación GHCR verificados; OIDC sin validar. |
+| Infraestructura AWS compartida | Red privada y DB Subnet Group confirmados; `sgp-rds-postgres` operativo para staging a través del backend y Flyway. |
+| Infraestructura exclusiva de staging | Security Group, bucket, rol IAM y EC2 creados; Session Manager, GHCR, OIDC, SSM y despliegue verificados. |
+| HTTPS de staging | Nginx del host, certificado IP, redirección y proxy validados; el servicio de renovación se ejecutó sin error y falta observar una renovación efectiva. |
 | Infraestructura y Compose de producción | Responsabilidad del segundo integrante. |
+
+### Flujo de promoción acordado
+
+```text
+feature/*
+    |
+    v
+develop
+    |
+    | CI/CD automático de staging
+    v
+AWS Staging
+    |
+    | validación y aprobación
+    v
+main
+    |
+    | selección de los digests aprobados
+    v
+despliegue manual en AWS Producción
+```
+
+El workflow actual valida Pull Requests dirigidos a `develop` o `main`, pero
+solo publica imágenes y despliega ante un `push` a `develop`. Un merge a `main`
+no genera una imagen, una etiqueta `main` ni un despliegue de producción. Esta
+es una limitación deliberada del flujo actual: la promoción debe conservar y
+registrar los dos digests ya validados en staging antes de integrar la revisión
+aprobada a `main`.
 
 ## 3. Decisiones que deben conservarse
 
@@ -49,10 +78,11 @@ responsable de producción debe conservar o coordinar antes de modificarlos.
 15. No se comprará un dominio ni se creará una zona DNS pública. Producción debe
     exponer HTTPS válido directamente sobre una IPv4 pública estable.
 
-La nueva arquitectura asigna una EC2 independiente a cada ambiente: `t4g.micro`
-para staging y `t4g.small` para producción. Ambas usarán una RDS compartida, pero
-con bases y credenciales separadas. La EC2, los Security Groups y el Compose de
-producción no se crean desde esta parte de la historia de usuario.
+Staging usa una EC2 `t4g.micro`. Una EC2 ARM64 independiente y `t4g.small` son
+la propuesta documentada para producción, sujeta a medición, créditos y
+autorización; no constituye un recurso aprovisionado. Ambos ambientes pueden
+usar la RDS compartida, pero con bases y credenciales separadas. La EC2, los
+Security Groups y el Compose de producción no se crean desde esta historia.
 
 ### Infraestructura compartida ya seleccionada
 
@@ -83,10 +113,12 @@ protección contra eliminación, actualizaciones secundarias automáticas, la CA
 `rds-ca-rsa2048-g1` y las etiquetas `Project=SGP` y `Environment=shared`. Se
 observó `Disponible` en `us-east-1b`, con el endpoint privado
 `sgp-rds-postgres.c8hwo202k9fb.us-east-1.rds.amazonaws.com:5432`. Una prueba
-desde la EC2 de staging confirmó conectividad TCP al puerto 5432; no se han
-confirmado TLS, autenticación, extensiones ni migraciones.
+desde la EC2 de staging confirmó conectividad TCP al puerto 5432. El primer
+despliegue confirmó además autenticación de aplicación, Flyway y acceso al
+esquema. Sigue pendiente una prueba administrativa independiente con
+`sslmode=verify-full` y una consulta directa de extensiones.
 
-No se indicó una base inicial. Staging preparará únicamente `sgp_staging`; no
+No se indicó una base inicial. Staging preparó únicamente `sgp_staging`; no
 debe crear `sgp_prod`. El responsable de producción deberá preparar después
 `sgp_prod` y sus usuarios independientes mediante el procedimiento compartido.
 Las credenciales administrativas son autoadministradas y deben transferirse por
@@ -110,8 +142,9 @@ los 12 respaldos mensuales mediante AWS Backup ni la prueba de restauración. El
 responsable de producción debe tratar los tres puntos como incumplimientos
 pendientes y coordinarlos con el propietario de la cuenta.
 
-Se creó `sgp-staging-ec2-sg` (`sg-0e617972b3eedeb73`) sin reglas de entrada y
-con salida general. También se creó `sgp-rds-sg`
+Se creó `sgp-staging-ec2-sg` (`sg-0e617972b3eedeb73`) con entrada pública solo
+para TCP 80 y 443, y con salida general. Los puertos 8088, 8090 y 5432 no están
+expuestos. También se creó `sgp-rds-sg`
 (`sg-0ab8d04a2ef4d3db8`), que acepta TCP 5432 desde el Security Group de EC2 de
 staging, no desde un CIDR público. Producción debe usar un Security Group de EC2
 propio y agregarlo como un origen independiente; no debe reutilizar
@@ -129,17 +162,27 @@ El rol `sgp-staging-ec2-role` confía en EC2 y actualmente solo tiene
 mediante Session Manager. El acceso S3 futuro requerirá una política
 adicional limitada al bucket de staging. Producción debe crear su propio rol de
 instancia, limitado a su bucket. El rol OIDC usado por GitHub Actions es una
-identidad diferente, ya tiene un ARN asignado y todavía no ha sido validado.
+identidad diferente y su uso real ya fue validado. La confianza comprobada usa
+el sujeto inmutable
+`repo:KennySalazar@99755600/SGP_ProyectoFinal_AyD1@1386435373:ref:refs/heads/develop`;
+no debe degradarse al formato basado únicamente en nombres.
 
 La instancia `sgp-staging-ec2` (`i-0385c95df8cd7909d`) ejecuta Amazon Linux
 2023 ARM64 sobre `t4g.micro`, con 20 GiB gp3 cifrados. Está en `us-east-1f`, usa
 `sgp-staging-ec2-sg`, obtuvo automáticamente la IPv4 pública dinámica
 `3.235.197.36` y no tiene Elastic IP. Sus comprobaciones `3/3` y Session Manager
 fueron satisfactorios. La preparación inicial instaló Docker, Docker Compose y
-el cliente PostgreSQL 16, configuró swap y creó los directorios operativos; la
-aplicación aún no se ha desplegado. RDS reside en `us-east-1b`; la diferencia de
+el cliente PostgreSQL 16, configuró swap y creó los directorios operativos. El
+primer despliegue automático dejó frontend y backend saludables en la revisión
+`488dae1ea7278eefc5f39e557eaadde4c07d00f9`. RDS reside en `us-east-1b`; la diferencia de
 zona no impide la conectividad, pero debe considerarse al evaluar costo de
 transferencia y latencia para producción.
+
+Staging conservará la IPv4 dinámica `3.235.197.36` sin Elastic IP por el plazo
+académico hasta el 28 de octubre de 2026. Puede cambiar al detener e iniciar la
+instancia, por lo que cualquier certificado emitido para ella debe reemplazarse
+si cambia. Esta decisión acotada a staging no resuelve la necesidad de una
+dirección pública operativamente estable para producción.
 
 Existe el par ED25519 `sgp-staging-key`, cuya clave privada permanece fuera del
 repositorio. No se ha probado SSH ni se abrió una regla de entrada para utilizarlo;
@@ -163,6 +206,9 @@ y no debe considerarse una garantía de capacidad futura.
 - Plantilla de variables sin secretos.
 - Preparación de Amazon Linux y despliegue con rollback.
 - Preparación parametrizada de RDS con extensiones y usuarios separados.
+- Plantillas y scripts para Nginx del host, certificado IP de corta duración y
+  renovación con systemd. Staging los instaló y validó con Nginx `1.30.5`,
+  Certbot 5.8.0, redirección 301 y respuestas HTTPS 200.
 
 El bootstrap se ejecutó exitosamente en staging el 11 de octubre de 2026. En
 Amazon Linux 2023 no debe instalarse el paquete `curl` encima de `curl-minimal`:
@@ -171,6 +217,24 @@ Esta corrección debe conservarse al reutilizar el script para producción.
 
 Estos elementos sirven de referencia; `infra/staging/compose.yml` no debe
 utilizarse directamente como Compose de producción.
+
+### Preparación mínima de la EC2 de producción
+
+1. Crear una EC2 autorizada, preferiblemente ARM64 si se mantiene la familia
+   `t4g`, con disco cifrado y capacidad medida para la carga de producción.
+2. Exigir IMDSv2, hop limit `2` y asociar un rol de instancia propio.
+3. Administrar el host mediante Systems Manager; no abrir SSH por defecto.
+4. Permitir entrada pública solo a TCP 80/443 y salida a GHCR, AWS, SMTP y RDS.
+   Los puertos 8088, 8090 y 5432 no deben ser públicos.
+5. Instalar Docker, Docker Compose y el cliente PostgreSQL. El bootstrap de
+   staging es una referencia, pero sus rutas y nombres deben adaptarse; no se
+   deben crear directorios `staging` en producción.
+6. Crear directorios y archivos de entorno exclusivos, propiedad de `root` y
+   modo `0600`, sin copiar secretos de staging.
+7. Crear un Security Group de EC2 propio y agregarlo como origen independiente
+   de TCP 5432 en el Security Group de RDS.
+8. Verificar capacidad, reloj, rotación de logs, Session Manager y conectividad
+   privada antes de descargar artefactos.
 
 ## 5. Imágenes y convención de versiones
 
@@ -187,20 +251,18 @@ Convención definida:
 - `develop`: etiqueta móvil para identificar la última integración exitosa.
 - `<imagen>@sha256:<digest>`: referencia que debe usarse en un despliegue.
 
-Después de integrar el cambio pendiente, cada etiqueta deberá publicar un índice
-OCI con variantes `linux/amd64` y `linux/arm64`. Una EC2 `t4g` seleccionará
+Cada etiqueta publicada desde `develop` contiene un índice OCI con variantes
+`linux/amd64` y `linux/arm64`. Una EC2 `t4g` selecciona
 automáticamente la variante ARM64 sin cambiar el nombre ni la etiqueta. El digest
 aprobado debe corresponder al índice multi-arquitectura, no a una variante
 aislada.
 
-En staging, `docker manifest inspect` confirmó que las referencias `develop`
-existían y eran accesibles. Sin embargo, las descargas con
-`--platform linux/arm64` fallaron para backend y frontend con
-`no matching manifest for linux/arm64 in the manifest list entries`. La versión
-del workflow integrada en `develop` solo publicaba AMD64; la rama
-`feature/staging-aws-rds-s3` ya contiene la configuración AMD64/ARM64, pero su
-PR, merge y nueva publicación todavía no están confirmados. Producción no debe
-aprobar un digest hasta verificar ambas arquitecturas en el índice OCI.
+En staging, `docker manifest inspect`, la descarga explícita con `--platform
+linux/arm64` y la inspección local confirmaron `linux/arm64` para backend y
+frontend. El problema histórico `no matching manifest for linux/arm64` quedó
+resuelto al integrar el build multi-arquitectura. Producción debe conservar esta
+configuración y aprobar únicamente digests cuyo índice OCI sea compatible con la
+arquitectura de su EC2.
 
 Los paquetes ya existen en GHCR y permanecen privados. El responsable de staging
 tiene acceso de lectura, pero no permisos administrativos sobre los paquetes de
@@ -217,6 +279,39 @@ documentarse; no es una decisión tomada por staging.
 Producción no debe reconstruir una versión. Debe usar exactamente los digests
 aprobados en staging, de modo que el binario validado y el desplegado sean el
 mismo.
+
+### Selección desde `main` sin reconstruir artefactos
+
+Antes de promover una revisión, deben cumplirse como mínimo las validaciones CI,
+el despliegue saludable en staging, las pruebas acordadas para la entrega y la
+aprobación del equipo. Registre un manifiesto de liberación fuera de los
+secretos con estos datos:
+
+```text
+commit-origen-develop=<SHA de 40 caracteres validado en staging>
+commit-o-tag-main=<referencia aprobada en main>
+backend-image=ghcr.io/kennysalazar/sgp-api@sha256:<digest>
+frontend-image=ghcr.io/kennysalazar/sgp-client@sha256:<digest>
+fecha=<UTC>
+responsable=<identidad del operador>
+```
+
+Los digests pueden obtenerse de las salidas del job de publicación o del archivo
+`/opt/sgp/staging/images.env` de la instancia, sin mostrar el archivo de
+secretos. Confirme además que `/opt/sgp/staging/REVISION` coincide con el commit
+de `develop` aprobado. La etiqueta `sha-<SHA>` ayuda a localizar el paquete,
+pero el despliegue debe copiar la referencia `@sha256:...` del índice OCI.
+
+Después, promueva el código mediante el Pull Request y la aprobación definidos
+por el equipo hacia `main`. Si el merge genera un SHA distinto, el registro
+anterior constituye el vínculo auditable entre el commit de `main`, el commit
+que construyó los artefactos y sus digests. No sustituya los digests por
+`develop`, `latest` o una supuesta etiqueta `main`.
+
+El workflow actual no publica desde `main`. Si en el futuro el equipo exige
+artefactos etiquetados por el SHA de `main`, deberá aprobar un cambio específico
+del workflow que vuelva a etiquetar por digest sin reconstruir. Esa mejora no se
+implementa en esta historia.
 
 ## 6. Archivos compartidos y específicos
 
@@ -291,6 +386,31 @@ operaciones necesarias sobre su bucket. Debe exigir IMDSv2 y usar hop limit `2`
 para cargas dentro de Docker. No se deben crear `AWS_ACCESS_KEY_ID` ni
 `AWS_SECRET_ACCESS_KEY` para la aplicación.
 
+### Base de datos y almacenamiento de producción
+
+- Crear `sgp_prod` y roles migrador/aplicación exclusivos mediante
+  `infra/rds/prepare-database.sql`; no copiar la base ni usuarios de staging.
+- Autorizar TCP 5432 desde el Security Group propio de la EC2, nunca desde
+  Internet. Validar TLS y, como objetivo pendiente compartido, `verify-full`
+  con el bundle de la CA de RDS.
+- Ejecutar Flyway con el rol migrador y verificar `flyway_schema_history`; la
+  aplicación debe conectarse con el rol de menor privilegio.
+- Crear un bucket privado de producción, con nombre, etiquetas, cifrado,
+  versionado y ciclo de vida decididos expresamente. No reutilizar
+  `sgp-staging-archivos-ayd1-2026-gt01`.
+- Asociar una política IAM de mínimo privilegio al rol propio de EC2. El backend
+  deberá usar credenciales temporales; las claves estáticas siguen prohibidas.
+- Definir y probar respaldos y restauración de RDS y objetos. La retención de un
+  día aplicada actualmente a la RDS compartida no satisface el requisito global
+  de 30 días ni los respaldos mensuales.
+
+La integración S3 del backend todavía no existe. El bucket no debe presentarse
+como persistencia funcional hasta que la futura HU implemente el contrato,
+metadatos, autorización y pruebas reales. La
+[guía de integración S3](GUIA_INTEGRACION_S3.md) concentra el estado del
+repositorio y los requisitos de traspaso; producción deberá adaptar sus
+decisiones sin reutilizar recursos de staging.
+
 ## 8. Descarga manual desde GHCR
 
 Mientras los paquetes sean privados, cree un Personal Access Token (classic) con
@@ -359,10 +479,21 @@ comprar dominio es definitiva para este proyecto: no debe presupuestarse un
 registro de dominio ni una zona hospedada de DNS público. La resolución DNS
 interna habilitada en la VPC no contradice esta decisión.
 
-El responsable debe confirmar una autoridad certificadora que emita certificados
-válidos con la IP como Subject Alternative Name, su método de validación y la
-renovación automática. Un certificado autofirmado no cumple el criterio de
-HTTPS válido para usuarios finales.
+Staging validó un Nginx `1.30.5` en el host y un certificado IP de Let's Encrypt
+con perfil `shortlived`. Usa Certbot 5.8.0 mediante su imagen oficial fijada por
+digest, ACME `webroot` y un temporizador systemd dos veces al día. El Nginx del
+contenedor permanece en loopback. Se comprobaron la redirección HTTP 301, el
+acceso externo y respuestas 200 de frontend, salud y API. El servicio de
+renovación se ejecutó correctamente, aunque aún no correspondía una renovación
+efectiva. Producción puede reutilizar el patrón, no los certificados, IP, rutas
+ni unidades nombradas para staging.
+
+El responsable de producción debe confirmar primero su IPv4 pública estable y
+adaptar una copia independiente de `infra/staging/https/`: nombres de
+certificado, directorios, archivo de estado, unidad systemd y destino loopback
+deben pertenecer a producción. Los certificados IP tienen vigencia corta, por
+lo que la renovación automática y su monitoreo son obligatorios. Un certificado
+autofirmado no cumple el criterio de HTTPS válido para usuarios finales.
 
 Requisitos mínimos:
 
@@ -375,27 +506,48 @@ Requisitos mínimos:
 - Exigir IMDSv2 con hop limit `2` para que el SDK ejecutado dentro de Docker
   pueda obtener las credenciales temporales del rol de instancia.
 - Probar renovación del certificado y documentar su operación.
+- Verificar una renovación efectiva antes del vencimiento, no solo una ejecución
+  sin error cuando el certificado todavía no es renovable.
+- Detectar cambios de IP con IMDSv2; actualizar CORS y URL de activación, emitir
+  un certificado para la nueva IP, validar `nginx -t`, recargar y repetir las
+  pruebas públicas.
 
-La solución de certificados y la asignación de la IPv4 pública estable no han
-sido elegidas y no deben considerarse cerradas. La compra de dominio sí está
-fuera de consideración.
+La referencia técnica ya fue probada en staging, pero la IP y su adaptación
+independiente a producción no están definidas. La compra de dominio sigue fuera
+de consideración. La plantilla de staging no habilita HSTS por depender de una
+IP dinámica y certificados cortos; producción debe resolver DT-SEC-10 o registrar
+formalmente la excepción antes de declarar completo el requisito de seguridad.
 
 ## 11. Procedimiento manual propuesto
 
-1. Obtener aprobación del commit y digests desplegados satisfactoriamente en
-   staging.
-2. Registrar los digests en la evidencia de liberación.
-3. Preparar o actualizar el archivo externo de configuración de producción.
-4. Descargar ambas imágenes por digest.
-5. Ejecutar `docker compose config --quiet`.
-6. Confirmar capacidad de disco, memoria y respaldo manual previo cuando ya
-   exista un procedimiento aprobado.
-7. Ejecutar `docker compose pull` y `docker compose up -d --wait`.
-8. Comprobar PostgreSQL, Flyway, backend, frontend y proxy.
-9. Ejecutar pruebas funcionales mínimas mediante HTTPS.
-10. Registrar commit, digests, fecha, operador y resultado.
-11. Ante un fallo, restaurar el Compose y los digests anteriores sin eliminar
-    ni modificar datos en RDS o S3.
+1. Seleccionar el SHA de `develop` que ya superó staging y registrar los digests
+   exactos de backend y frontend.
+2. Promover la revisión aprobada a `main` mediante el procedimiento del equipo y
+   esperar las validaciones del Pull Request. Registrar la relación entre ambos
+   commits; no esperar una publicación automática desde `main`.
+3. Verificar que la base, usuarios, Security Group, rol IAM, bucket y archivo de
+   entorno pertenezcan a producción. Probar RDS por la red privada y TLS.
+4. Preparar el Compose exclusivo de producción, sin `build:`, con red, nombre de
+   proyecto, límites, healthchecks y rutas propios.
+5. Autenticar el host a GHCR con una credencial de lectura propia y descargar
+   ambas imágenes por digest. Verificar el manifiesto y la arquitectura ARM64.
+6. Ejecutar `docker compose config --quiet` con los archivos externos protegidos
+   y revisar que no publique backend ni puertos internos.
+7. Registrar estado, capacidad de disco/memoria, versión anterior y punto de
+   rollback. Confirmar el respaldo previo cuando exista un procedimiento
+   aprobado.
+8. Ejecutar manualmente `docker compose pull` y
+   `docker compose up -d --wait`; no usar el workflow de staging.
+9. Comprobar contenedores, Flyway, Actuator por red interna, frontend y
+   `/api/v1` a través del proxy. Verificar la comunicación privada con RDS.
+10. Instalar o actualizar el proxy HTTPS de producción, validar el certificado,
+    la redirección 301, los encabezados `X-Forwarded-*` y el temporizador.
+11. Probar desde navegador la URL pública, salud, API, CORS, cookies y los flujos
+    funcionales autorizados. Un HTTP 200 aislado no sustituye esas pruebas.
+12. Registrar commit de `main`, commit de origen, digests, fecha, operador,
+    resultados y versión anterior.
+13. Ante un fallo, restaurar el Compose y los digests anteriores sin eliminar ni
+    modificar datos en RDS o S3.
 
 Este procedimiento es una propuesta de interfaz; debe adaptarse y probarse al
 crear el Compose real de producción.
@@ -435,23 +587,27 @@ crear el Compose real de producción.
 - No se ha medido aún el consumo real en EC2.
 - La EC2 de staging y RDS están en zonas distintas; debe medirse el impacto de
   transferencia inter-AZ antes de repetir esa distribución en producción.
-- La publicación multi-arquitectura está implementada en la rama de trabajo, pero
-  el PR hacia `develop` no está confirmado. Las referencias actuales fallaron al
-  descargarse explícitamente para ARM64 y deben volver a publicarse y comprobarse.
+- La publicación multi-arquitectura y la descarga ARM64 ya fueron verificadas;
+  producción debe conservar el índice OCI y desplegar un digest aprobado.
 - Los paquetes GHCR son privados. Cada ambiente necesita una credencial de
   lectura cuya vigencia y dependencia de una cuenta personal deben operarse.
 - El PAT classic con `read:packages` puede leer los paquetes a los que tenga
   acceso su cuenta; no es una credencial limitada exclusivamente a este proyecto.
 - El SMTP de staging es ficticio; no existe evidencia de envío de correos ni de
   los flujos de autenticación que dependen de ellos.
+- HTTPS de staging ya está instalado y validado. Falta observar una renovación
+  efectiva y producción aún debe crear su configuración independiente.
+- El workflow no publica imágenes desde `main`; producción debe conservar los
+  digests probados en staging y registrar su correspondencia con la revisión
+  aprobada en `main`.
 
 ## 14. Decisiones pendientes
 
-- Validación de conectividad TLS, extensiones y migraciones sobre
-  `sgp-rds-postgres`.
+- Validación administrativa de TLS `verify-full` y consulta directa de
+  extensiones sobre `sgp-rds-postgres`; Flyway ya funcionó desde el backend.
 - Capacidad definitiva de disco para las dos EC2 separadas.
-- Asignación de IPv4 pública estable y solución de certificado HTTPS válido para
-  esa IP, sin comprar dominio.
+- Asignación de IPv4 pública y adaptación de la solución HTTPS para producción,
+  sin comprar dominio ni reutilizar el certificado de staging.
 - Mecanismo de secretos de producción.
 - Cuenta responsable, vigencia y rotación de la credencial GHCR de producción.
 - Nombres y rutas del Compose de producción.

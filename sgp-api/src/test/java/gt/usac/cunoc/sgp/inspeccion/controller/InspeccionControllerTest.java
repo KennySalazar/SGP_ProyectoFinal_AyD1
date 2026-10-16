@@ -143,7 +143,7 @@ class InspeccionControllerTest {
             List.of(),
             Instant.now());
 
-    when(inspeccionService.iniciarInspeccion(any(), eq(usuarioId), eq("idempotency-123")))
+    when(inspeccionService.iniciarInspeccionHu024(any(), eq(usuarioId), eq("idempotency-123")))
         .thenReturn(response);
 
     mvc.perform(

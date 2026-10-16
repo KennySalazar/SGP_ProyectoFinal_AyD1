@@ -30,6 +30,9 @@ public class ApiExceptionHandler {
             exception.getMessage(),
             exception.getCode(),
             request);
+    if (exception.getErrores() != null && !exception.getErrores().isEmpty()) {
+      problem.setProperty("errores", exception.getErrores());
+    }
     return response(problem, exception.getStatus());
   }
 

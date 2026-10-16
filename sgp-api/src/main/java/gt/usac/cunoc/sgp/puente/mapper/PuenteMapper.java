@@ -27,6 +27,8 @@ public interface PuenteMapper {
   @Mapping(target = "latitud", expression = "java(puente.getUbicacion().getY())")
   @Mapping(target = "longitud", expression = "java(puente.getUbicacion().getX())")
   @Mapping(target = "estadoActual", source = "estadoActual")
+  @Mapping(target = "indiceCondicionActual", source = "indiceCondicionActual")
+  @Mapping(target = "fechaUltimaInspeccion", source = "fechaUltimaInspeccion")
   PuenteCatalogoResponse toCatalogoResponse(Puente puente);
 
   DepartamentoResponse toDepartamentoResponse(Departamento departamento);

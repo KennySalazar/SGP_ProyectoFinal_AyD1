@@ -147,8 +147,24 @@
     }
 
     input,
-    p-select {
+    p-select,
+    .sgp-select {
       width: 100%;
+    }
+
+    .sgp-select {
+      padding: 0.625rem 0.75rem;
+      font-size: 0.9375rem;
+      border: 1px solid var(--p-form-field-border-color, #cbd5e1);
+      border-radius: var(--p-form-field-border-radius, 6px);
+      background-color: var(--p-form-field-background, #ffffff);
+      color: var(--p-form-field-color, #334155);
+      font-family: inherit;
+
+      &:focus {
+        outline: none;
+        border-color: var(--p-primary-color, #0284c7);
+      }
     }
   }
 

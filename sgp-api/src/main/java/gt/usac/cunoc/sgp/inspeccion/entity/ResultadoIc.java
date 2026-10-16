@@ -64,6 +64,15 @@ public class ResultadoIc {
   @Column(name = "version_algoritmo", nullable = false, length = 50, updatable = false)
   private String versionAlgoritmo;
 
+  @Column(name = "justificacion_ajuste", updatable = false)
+  private String justificacionAjuste;
+
+  @Column(name = "confirmado_por_id", updatable = false)
+  private UUID confirmadoPorId;
+
+  @Column(name = "confirmado_en", updatable = false)
+  private Instant confirmadoEn;
+
   @Column(name = "solicitado_por_id", updatable = false)
   private UUID solicitadoPorId;
 
@@ -88,6 +97,59 @@ public class ResultadoIc {
       String versionAlgoritmo,
       UUID solicitadoPorId,
       Instant ahora) {
+    this(
+        id,
+        inspeccionId,
+        versionConfiguracionId,
+        indiceCalculado,
+        estadoPorRango,
+        estadoCalculado,
+        condicionesAnulacion,
+        desglose,
+        hashEntrada,
+        versionAlgoritmo,
+        solicitadoPorId,
+        ahora,
+        estadoCalculado,
+        null,
+        null,
+        null);
+  }
+
+  public ResultadoIc(
+      UUID id,
+      UUID inspeccionId,
+      UUID versionConfiguracionId,
+      BigDecimal indiceCalculado,
+      EstadoCondicion estadoPorRango,
+      EstadoCondicion estadoCalculado,
+      JsonNode condicionesAnulacion,
+      JsonNode desglose,
+      String hashEntrada,
+      String versionAlgoritmo,
+      UUID solicitadoPorId,
+      Instant ahora,
+      EstadoCondicion estadoConfirmado,
+      String justificacionAjuste,
+      UUID confirmadoPorId,
+      Instant confirmadoEn) {
+    if (estadoCalculado == null || estadoConfirmado == null) {
+      throw new IllegalArgumentException("Los estados calculado y confirmado son obligatorios.");
+    }
+    if (estadoCalculado != estadoConfirmado) {
+      if (justificacionAjuste == null
+          || justificacionAjuste.isBlank()
+          || confirmadoPorId == null
+          || confirmadoEn == null) {
+        throw new IllegalArgumentException("El ajuste requiere justificacion, autor y fecha.");
+      }
+    } else if (justificacionAjuste != null || confirmadoPorId != null || confirmadoEn != null) {
+      throw new IllegalArgumentException(
+          "Una confirmacion sin cambio de estado no debe contener datos de ajuste.");
+    }
+    this.justificacionAjuste = justificacionAjuste == null ? null : justificacionAjuste.strip();
+    this.confirmadoPorId = confirmadoPorId;
+    this.confirmadoEn = confirmadoEn;
     this.id = id;
     this.inspeccionId = inspeccionId;
     this.versionConfiguracionId = versionConfiguracionId;
@@ -95,7 +157,7 @@ public class ResultadoIc {
     this.indiceCalculado = indiceCalculado;
     this.estadoPorRango = estadoPorRango;
     this.estadoCalculado = estadoCalculado;
-    this.estadoConfirmado = estadoCalculado;
+    this.estadoConfirmado = estadoConfirmado;
     this.condicionesAnulacion = condicionesAnulacion.deepCopy();
     this.desglose = desglose.deepCopy();
     this.hashEntrada = hashEntrada;
@@ -151,6 +213,18 @@ public class ResultadoIc {
 
   public String getVersionAlgoritmo() {
     return versionAlgoritmo;
+  }
+
+  public String getJustificacionAjuste() {
+    return justificacionAjuste;
+  }
+
+  public UUID getConfirmadoPorId() {
+    return confirmadoPorId;
+  }
+
+  public Instant getConfirmadoEn() {
+    return confirmadoEn;
   }
 
   public UUID getSolicitadoPorId() {

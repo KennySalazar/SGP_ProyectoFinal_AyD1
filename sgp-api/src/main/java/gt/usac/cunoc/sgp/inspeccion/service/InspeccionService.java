@@ -1,24 +1,31 @@
 package gt.usac.cunoc.sgp.inspeccion.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import gt.usac.cunoc.sgp.common.audit.model.AccionAuditoria;
 import gt.usac.cunoc.sgp.common.audit.service.AuditoriaWriter;
 import gt.usac.cunoc.sgp.common.exception.ApiException;
 import gt.usac.cunoc.sgp.common.util.UuidV7Generator;
 import gt.usac.cunoc.sgp.formulario.entity.VersionFormulario;
+import gt.usac.cunoc.sgp.formulario.model.EstadoVersionFormulario;
 import gt.usac.cunoc.sgp.formulario.repository.VersionFormularioRepository;
+import gt.usac.cunoc.sgp.formulario.validation.JsonSchemaValidatorService;
 import gt.usac.cunoc.sgp.inspeccion.dto.AcompananteRequest;
 import gt.usac.cunoc.sgp.inspeccion.dto.AcompananteResponse;
 import gt.usac.cunoc.sgp.inspeccion.dto.DatosPermanentesResponse;
 import gt.usac.cunoc.sgp.inspeccion.dto.GuardarBorradorRequest;
+import gt.usac.cunoc.sgp.inspeccion.dto.GuardarRespuestasRequest;
 import gt.usac.cunoc.sgp.inspeccion.dto.IniciarInspeccionRequest;
 import gt.usac.cunoc.sgp.inspeccion.dto.IniciarInspeccionResponse;
+import gt.usac.cunoc.sgp.inspeccion.dto.IniciarInspeccionVersionadaRequest;
+import gt.usac.cunoc.sgp.inspeccion.dto.IniciarInspeccionVersionadaResponse;
 import gt.usac.cunoc.sgp.inspeccion.dto.InspeccionBorradorResponse;
 import gt.usac.cunoc.sgp.inspeccion.dto.InspeccionResumenResponse;
 import gt.usac.cunoc.sgp.inspeccion.entity.Inspeccion;
 import gt.usac.cunoc.sgp.inspeccion.entity.InspeccionAcompanante;
 import gt.usac.cunoc.sgp.inspeccion.entity.InspeccionDatoTecnico;
+import gt.usac.cunoc.sgp.inspeccion.mapper.InspeccionMapper;
 import gt.usac.cunoc.sgp.inspeccion.repository.InspeccionDatoTecnicoRepository;
 import gt.usac.cunoc.sgp.inspeccion.repository.InspeccionRepository;
 import gt.usac.cunoc.sgp.puente.entity.Puente;
@@ -47,6 +54,7 @@ import java.util.ArrayList;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Optional;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import org.locationtech.jts.geom.Coordinate;
@@ -85,6 +93,33 @@ public class InspeccionService {
   private final CalculadorProgresoBorrador calculadorProgreso;
   private final PreparadorEntradaIcService preparadorEntradaIcService;
   private final CalculoIndiceCondicionService calculoIndiceCondicionService;
+  private final JsonSchemaValidatorService jsonSchemaValidatorService;
+  private final InspeccionMapper inspeccionMapper;
+
+  public InspeccionService(
+      InspeccionRepository inspeccionRepository,
+      VersionFormularioRepository versionFormularioRepository,
+      PuenteRepository puenteRepository,
+      JsonSchemaValidatorService jsonSchemaValidatorService,
+      InspeccionMapper inspeccionMapper,
+      ObjectMapper objectMapper) {
+    this(
+        inspeccionRepository,
+        null,
+        puenteRepository,
+        versionFormularioRepository,
+        null,
+        null,
+        null,
+        null,
+        objectMapper,
+        Clock.systemUTC(),
+        null,
+        null,
+        null,
+        jsonSchemaValidatorService,
+        inspeccionMapper);
+  }
 
   public InspeccionService(
       InspeccionRepository inspeccionRepository,
@@ -110,6 +145,40 @@ public class InspeccionService {
         clock,
         null,
         null,
+        null,
+        null,
+        null);
+  }
+
+  public InspeccionService(
+      InspeccionRepository inspeccionRepository,
+      InspeccionDatoTecnicoRepository datoTecnicoRepository,
+      PuenteRepository puenteRepository,
+      VersionFormularioRepository versionFormularioRepository,
+      UserAccountRepository userAccountRepository,
+      UsuarioProfesionalRepository profesionalRepository,
+      OperacionIdempotenteRepository operacionIdempotenteRepository,
+      AuditoriaWriter auditoriaWriter,
+      ObjectMapper objectMapper,
+      Clock clock,
+      CalculadorProgresoBorrador calculadorProgreso,
+      PreparadorEntradaIcService preparadorEntradaIcService,
+      CalculoIndiceCondicionService calculoIndiceCondicionService) {
+    this(
+        inspeccionRepository,
+        datoTecnicoRepository,
+        puenteRepository,
+        versionFormularioRepository,
+        userAccountRepository,
+        profesionalRepository,
+        operacionIdempotenteRepository,
+        auditoriaWriter,
+        objectMapper,
+        clock,
+        calculadorProgreso,
+        preparadorEntradaIcService,
+        calculoIndiceCondicionService,
+        null,
         null);
   }
 
@@ -127,7 +196,9 @@ public class InspeccionService {
       Clock clock,
       CalculadorProgresoBorrador calculadorProgreso,
       PreparadorEntradaIcService preparadorEntradaIcService,
-      CalculoIndiceCondicionService calculoIndiceCondicionService) {
+      CalculoIndiceCondicionService calculoIndiceCondicionService,
+      JsonSchemaValidatorService jsonSchemaValidatorService,
+      InspeccionMapper inspeccionMapper) {
     this.inspeccionRepository = inspeccionRepository;
     this.datoTecnicoRepository = datoTecnicoRepository;
     this.puenteRepository = puenteRepository;
@@ -142,10 +213,12 @@ public class InspeccionService {
         calculadorProgreso != null ? calculadorProgreso : new CalculadorProgresoBorrador();
     this.preparadorEntradaIcService = preparadorEntradaIcService;
     this.calculoIndiceCondicionService = calculoIndiceCondicionService;
+    this.jsonSchemaValidatorService = jsonSchemaValidatorService;
+    this.inspeccionMapper = inspeccionMapper;
   }
 
   @Transactional
-  public IniciarInspeccionResponse iniciarInspeccion(
+  public IniciarInspeccionResponse iniciarInspeccionHu024(
       IniciarInspeccionRequest request, UUID usuarioId, String idempotencyKey) {
     // 1. Autorización de rol y verificación
     UserAccount user = validarInspector(usuarioId);
@@ -175,6 +248,90 @@ public class InspeccionService {
     }
 
     return crearNuevaInspeccion(request, user, idempotencyKey);
+  }
+
+  @Transactional
+  public IniciarInspeccionVersionadaResponse iniciarInspeccion(
+      IniciarInspeccionVersionadaRequest request, UUID usuarioId, String rolUsuario) {
+    if (request == null || request.puenteId() == null || request.versionFormularioId() == null) {
+      throw new ApiException(
+          HttpStatus.UNPROCESSABLE_ENTITY,
+          "solicitud_invalida",
+          "Solicitud inválida",
+          "El puente y la versión del formulario son obligatorios.");
+    }
+
+    Puente puente =
+        puenteRepository
+            .findById(request.puenteId())
+            .orElseThrow(
+                () ->
+                    new ApiException(
+                        HttpStatus.NOT_FOUND,
+                        "puente_no_encontrado",
+                        "Puente no encontrado",
+                        "El puente especificado no existe"));
+    if (!puente.isActivo()) {
+      throw new ApiException(
+          HttpStatus.UNPROCESSABLE_ENTITY,
+          "puente_inactivo",
+          "Puente inactivo",
+          "No se puede iniciar una inspección en un puente inactivo");
+    }
+
+    VersionFormulario version =
+        versionFormularioRepository
+            .findById(request.versionFormularioId())
+            .filter(candidata -> candidata.getEstado() == EstadoVersionFormulario.PUBLICADA)
+            .orElseThrow(
+                () ->
+                    new ApiException(
+                        HttpStatus.UNPROCESSABLE_ENTITY,
+                        "version_no_utilizable",
+                        "Versión de formulario no utilizable",
+                        "Solo se pueden iniciar inspecciones con versiones de formulario publicadas"));
+
+    JsonNode datos = request.datos();
+    if (datos == null || datos.isNull() || datos.isEmpty()) {
+      datos = objectMapper.createObjectNode();
+    }
+    if (jsonSchemaValidatorService != null) {
+      jsonSchemaValidatorService.validarRespuestas(version.getEsquema(), datos, true);
+    }
+
+    LocalDate fecha =
+        request.fechaInspeccion() != null
+            ? request.fechaInspeccion()
+            : LocalDate.now(clock.withZone(ZONA_GUATEMALA));
+    String dispositivo =
+        request.dispositivoId() != null && !request.dispositivoId().isBlank()
+            ? request.dispositivoId()
+            : "web";
+    String nombre =
+        request.nombreAutorCapturado() != null && !request.nombreAutorCapturado().isBlank()
+            ? request.nombreAutorCapturado()
+            : "Inspector";
+
+    Inspeccion inspeccion =
+        new Inspeccion(puente, version, usuarioId, rolUsuario, nombre, fecha, dispositivo, datos);
+    InspeccionResumenResponse response =
+        inspeccionMapper.toResumenResponse(inspeccionRepository.save(inspeccion));
+    return new IniciarInspeccionVersionadaResponse(
+        response.id(),
+        response.puenteId(),
+        response.puenteNombre(),
+        response.versionFormularioId(),
+        response.versionFormularioCodigo(),
+        response.autorId(),
+        response.rolAutorCreacion(),
+        response.nombreAutorCapturado(),
+        response.tipo(),
+        response.estado(),
+        response.fechaInspeccion(),
+        response.dispositivoId(),
+        response.datos(),
+        response.creadoEn(),
+        response.actualizadoEn());
   }
 
   @Transactional(readOnly = true)
@@ -240,7 +397,9 @@ public class InspeccionService {
     }
 
     // 8. Ediciones obsoletas / concurrencia optimista
-    if (request != null && request.version() != null && request.version() != inspeccion.getVersion()) {
+    if (request != null
+        && request.version() != null
+        && !Objects.equals(request.version(), inspeccion.getVersion())) {
       throw new ApiException(
           HttpStatus.CONFLICT,
           "concurrencia_conflicto",
@@ -517,10 +676,24 @@ public class InspeccionService {
                         "sin_formulario_activo",
                         "Formulario no disponible",
                         "No existe una versión de formulario activa para iniciar inspecciones."));
+    if (versionActiva.getEstado() != EstadoVersionFormulario.PUBLICADA) {
+      throw new ApiException(
+          HttpStatus.UNPROCESSABLE_ENTITY,
+          "version_no_utilizable",
+          "Versión de formulario no utilizable",
+          "Solo se pueden iniciar inspecciones con versiones de formulario publicadas");
+    }
+
+    JsonNode datosIniciales = objectMapper.createObjectNode();
+    if (jsonSchemaValidatorService != null) {
+      jsonSchemaValidatorService.validarRespuestas(versionActiva.getEsquema(), datosIniciales, true);
+    }
 
     // 5. Validar fechas de inspección
     LocalDate hoyGuatemala = LocalDate.now(clock.withZone(ZONA_GUATEMALA));
-    if (request.fechaInspeccion().isAfter(hoyGuatemala)) {
+    LocalDate fechaInspeccion =
+        request.fechaInspeccion() != null ? request.fechaInspeccion() : hoyGuatemala;
+    if (fechaInspeccion.isAfter(hoyGuatemala)) {
       throw new ApiException(
           HttpStatus.UNPROCESSABLE_ENTITY,
           "fecha_inspeccion_futura",
@@ -535,13 +708,13 @@ public class InspeccionService {
           datoTecnicoRepository.findByInspeccionId(puente.getInspeccionVigenteId()).orElse(null);
       if (tecnicoVigente != null
           && tecnicoVigente.getAnioConstruccion() != null
-          && request.fechaInspeccion().getYear() < tecnicoVigente.getAnioConstruccion()) {
+          && fechaInspeccion.getYear() < tecnicoVigente.getAnioConstruccion()) {
         throw new ApiException(
             HttpStatus.UNPROCESSABLE_ENTITY,
             "fecha_anterior_construccion",
             "Fecha de inspección inválida",
             "La fecha de inspección ("
-                + request.fechaInspeccion()
+                + fechaInspeccion
                 + ") no puede ser anterior al año de construcción registrado ("
                 + tecnicoVigente.getAnioConstruccion()
                 + ").");
@@ -588,10 +761,14 @@ public class InspeccionService {
 
     // 8. Crear agregada Inspeccion en BORRADOR
     UUID inspeccionId = request.id() != null ? request.id() : UuidV7Generator.generate();
-    String nombreAutor =
-        (request.nombreAutor() != null && !request.nombreAutor().isBlank())
+    String nombreAutorCapturado =
+        request.nombreAutor() != null && !request.nombreAutor().isBlank()
             ? request.nombreAutor().trim()
             : user.getEmail();
+    String dispositivoId =
+        request.dispositivoId() != null && !request.dispositivoId().isBlank()
+            ? request.dispositivoId()
+            : "web";
 
     Inspeccion inspeccion =
         new Inspeccion(
@@ -600,14 +777,14 @@ public class InspeccionService {
             versionActiva,
             user.getId(),
             user.getRole().getName().name(),
-            nombreAutor,
-            request.fechaInspeccion(),
-            request.dispositivoId(),
+            nombreAutorCapturado,
+            fechaInspeccion,
+            dispositivoId,
             ubicacionInicio,
             precisionGps,
             distanciaAlPuente,
             datosPermanentesConfirmadosEn,
-            objectMapper.createObjectNode(),
+            datosIniciales,
             ahora);
 
     if (request.confirmarDatosPermanentes() && tecnicoVigente != null) {
@@ -641,10 +818,10 @@ public class InspeccionService {
     snapshot.put("versionFormularioId", versionActiva.getId().toString());
     snapshot.put("autorId", user.getId().toString());
     snapshot.put("rolAutorCreacion", user.getRole().getName().name());
-    snapshot.put("nombreAutorCapturado", nombreAutor);
+    snapshot.put("nombreAutorCapturado", nombreAutorCapturado);
     snapshot.put("estado", "BORRADOR");
-    snapshot.put("fechaInspeccion", request.fechaInspeccion().toString());
-    snapshot.put("dispositivoId", request.dispositivoId());
+    snapshot.put("fechaInspeccion", fechaInspeccion.toString());
+    snapshot.put("dispositivoId", dispositivoId);
     snapshot.put("datosPermanentesConfirmados", datosPermanentesConfirmadosEn != null);
     if (distanciaAlPuente != null) {
       snapshot.put("distanciaAlPuenteM", distanciaAlPuente);
@@ -943,5 +1120,162 @@ public class InspeccionService {
     } catch (NoSuchAlgorithmException e) {
       throw new IllegalStateException("Error al calcular hash SHA-256", e);
     }
+  }
+
+  @Transactional
+  public InspeccionResumenResponse guardarRespuestas(
+      UUID inspeccionId, GuardarRespuestasRequest request, UUID usuarioId) {
+    if (request == null || request.datos() == null) {
+      throw new ApiException(
+          HttpStatus.UNPROCESSABLE_ENTITY,
+          "datos_obligatorios",
+          "Datos obligatorios",
+          "Los datos de la inspección son obligatorios");
+    }
+
+    Inspeccion inspeccion = obtenerInspeccionActiva(inspeccionId);
+
+    if (!inspeccion.getAutorId().equals(usuarioId)) {
+      throw new ApiException(
+          HttpStatus.FORBIDDEN,
+          "acceso_denegado",
+          "Acceso denegado",
+          "Solo el autor puede modificar esta inspección.");
+    }
+    if (!"BORRADOR".equalsIgnoreCase(inspeccion.getEstado())) {
+      throw new ApiException(
+          HttpStatus.CONFLICT,
+          "inspeccion_no_editable",
+          "Inspección no editable",
+          "Solo las inspecciones en estado BORRADOR pueden modificarse.");
+    }
+
+    if (request.version() != null && !Objects.equals(request.version(), inspeccion.getVersion())) {
+      throw new ApiException(
+          HttpStatus.CONFLICT,
+          "concurrencia_conflicto",
+          "Conflicto de concurrencia",
+          "La inspección fue modificada concurrentemente por otra sesión o dispositivo.");
+    }
+
+    // Se valida contra la versión de la inspección, NO contra la activa (RN-FRM-02)
+    VersionFormulario version = inspeccion.getVersionFormulario();
+    if (jsonSchemaValidatorService != null) {
+      jsonSchemaValidatorService.validarRespuestas(version.getEsquema(), request.datos(), true);
+    }
+    inspeccion.setDatos(request.datos());
+    Instant ahora = clock.instant();
+    inspeccion.setActualizadoEn(ahora);
+    inspeccion.setUltimaActividadEn(ahora);
+
+    inspeccion = inspeccionRepository.saveAndFlush(inspeccion);
+    return inspeccionMapper.toResumenResponse(inspeccion);
+  }
+
+  @Transactional
+  public InspeccionResumenResponse enviarInspeccion(UUID inspeccionId, UUID usuarioId) {
+    Inspeccion inspeccion = obtenerInspeccionActiva(inspeccionId);
+
+    if (!inspeccion.getAutorId().equals(usuarioId)) {
+      throw new ApiException(
+          HttpStatus.FORBIDDEN,
+          "acceso_denegado",
+          "Acceso denegado",
+          "Solo el autor puede enviar esta inspección.");
+    }
+
+    if (!"BORRADOR".equalsIgnoreCase(inspeccion.getEstado())
+        && !"CAMBIOS_SOLICITADOS".equalsIgnoreCase(inspeccion.getEstado())) {
+      throw new ApiException(
+          HttpStatus.CONFLICT,
+          "estado_invalido",
+          "Estado inválido",
+          "Solo se pueden enviar inspecciones en borrador o con cambios solicitados");
+    }
+
+    // Enviar exige todos los campos obligatorios del esquema de su versión
+    VersionFormulario version = inspeccion.getVersionFormulario();
+    jsonSchemaValidatorService.validarRespuestas(
+        version.getEsquema(), inspeccion.getDatos(), false);
+
+    inspeccion.setEstado("ENVIADA");
+    Instant ahora = clock.instant();
+    inspeccion.setEnviadoDispositivoEn(ahora);
+    inspeccion.setUltimaActividadEn(ahora);
+    inspeccion.setActualizadoEn(ahora);
+
+    inspeccion = inspeccionRepository.save(inspeccion);
+    return inspeccionMapper.toResumenResponse(inspeccion);
+  }
+
+  @Transactional(readOnly = true)
+  public InspeccionResumenResponse consultarPorId(UUID inspeccionId, UUID usuarioId) {
+    Inspeccion inspeccion = obtenerInspeccionActiva(inspeccionId);
+    if ("BORRADOR".equalsIgnoreCase(inspeccion.getEstado())
+        && !inspeccion.getAutorId().equals(usuarioId)) {
+      throw new ApiException(
+          HttpStatus.NOT_FOUND,
+          "inspeccion_no_encontrada",
+          "Inspección no encontrada",
+          "No existe la inspección solicitada.");
+    }
+    return inspeccionMapper.toResumenResponse(inspeccion);
+  }
+
+  @Transactional(readOnly = true)
+  public void validarRespuestasInspeccion(
+      UUID inspeccionId, JsonNode datos, Boolean esBorrador, UUID usuarioId) {
+    Inspeccion inspeccion = obtenerInspeccionActiva(inspeccionId);
+    if ("BORRADOR".equalsIgnoreCase(inspeccion.getEstado())
+        && !inspeccion.getAutorId().equals(usuarioId)) {
+      throw new ApiException(
+          HttpStatus.NOT_FOUND,
+          "inspeccion_no_encontrada",
+          "Inspección no encontrada",
+          "No existe la inspección solicitada.");
+    }
+    boolean modoBorrador = esBorrador == null || esBorrador;
+    if (jsonSchemaValidatorService != null) {
+      jsonSchemaValidatorService.validarRespuestas(
+          inspeccion.getVersionFormulario().getEsquema(), datos, modoBorrador);
+    }
+  }
+
+  @Transactional(readOnly = true)
+  public void validarRespuestasVersion(UUID versionId, JsonNode datos, Boolean esBorrador) {
+    VersionFormulario version =
+        versionFormularioRepository
+            .findById(versionId)
+            .orElseThrow(
+                () ->
+                    new ApiException(
+                        HttpStatus.NOT_FOUND,
+                        "version_no_encontrada",
+                        "Versión no encontrada",
+                        "La versión de formulario especificada no existe"));
+
+    boolean modoBorrador = esBorrador == null || esBorrador;
+    if (jsonSchemaValidatorService != null) {
+      jsonSchemaValidatorService.validarRespuestas(version.getEsquema(), datos, modoBorrador);
+    }
+  }
+
+  private Inspeccion obtenerInspeccionActiva(UUID id) {
+    if (id == null) {
+      throw new ApiException(
+          HttpStatus.UNPROCESSABLE_ENTITY,
+          "id_obligatorio",
+          "ID obligatorio",
+          "El identificador de la inspección es obligatorio");
+    }
+    return inspeccionRepository
+        .findActiveById(id)
+        .orElseThrow(
+            () ->
+                new ApiException(
+                    HttpStatus.NOT_FOUND,
+                    "inspeccion_no_encontrada",
+                    "Inspección no encontrada",
+                    "No existe la inspección solicitada"));
   }
 }

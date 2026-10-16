@@ -213,6 +213,73 @@ describe('EditorVersionFormularioPage', () => {
     expect(component.opcionesSeleccion()).not.toContain('BUENO');
   });
 
+  it('debe permitir seleccionar pestañas de sección y obtener la sección actual', () => {
+    component.seccionesVisuales.set([
+      { clave: 'sec_1', titulo: 'Sección 1', preguntas: [] },
+      { clave: 'sec_2', titulo: 'Sección 2', preguntas: [] },
+    ]);
+    component.seleccionarSeccionVisual('sec_2');
+    expect(component.seccionVisualActiva()).toBe('sec_2');
+    expect(component.seccionVisualActual()?.clave).toBe('sec_2');
+    expect(component.seccionVisualActual()?.titulo).toBe('Sección 2');
+
+    expect(component.limpiarTituloSeccion('1. Identificación del puente')).toBe(
+      'Identificación del puente',
+    );
+    expect(component.limpiarTituloSeccion('8. Otros')).toBe('Otros');
+    expect(component.limpiarTituloSeccion('Sin número')).toBe('Sin número');
+  });
+
+  it('debe gestionar vínculos de almacenamiento de forma visual', () => {
+    expect(component.modoVinculos()).toBe('visual');
+    component.cambiarModoVinculos('codigo');
+    expect(component.modoVinculos()).toBe('codigo');
+    component.cambiarModoVinculos('visual');
+    expect(component.modoVinculos()).toBe('visual');
+
+    // Crear vínculo
+    component.abrirCrearVinculo();
+    expect(component.dialogoVinculo()).toBe(true);
+    expect(component.modoVinculo()).toBe('crear');
+
+    component.vinculoForm.setValue({
+      campoRef: '/identificacion/codigo',
+      columnaDestino: 'puente.codigo',
+      tipo: 'Inventario puente',
+      descripcion: 'Código del puente',
+    });
+    component.guardarVinculoModal();
+
+    expect(component.dialogoVinculo()).toBe(false);
+    expect(component.vinculosVisuales()).toHaveLength(1);
+    const vinc = component.vinculosVisuales()[0];
+    expect(vinc.campoRef).toBe('/identificacion/codigo');
+    expect(vinc.columnaDestino).toBe('puente.codigo');
+
+    // Filtro
+    component.filtroVinculos.set('puente');
+    expect(component.vinculosFiltrados()).toHaveLength(1);
+    component.filtroVinculos.set('inexistente');
+    expect(component.vinculosFiltrados()).toHaveLength(0);
+    component.filtroVinculos.set('');
+
+    // Editar vínculo
+    component.abrirEditarVinculo(vinc);
+    expect(component.modoVinculo()).toBe('editar');
+    component.vinculoForm.controls.columnaDestino.setValue('puente.codigo_oficial');
+    component.guardarVinculoModal();
+
+    expect(component.vinculosVisuales()[0].columnaDestino).toBe('puente.codigo_oficial');
+
+    // Guardar vínculos vía API
+    component.guardarVinculos();
+    expect(apiMock.actualizarBorrador).toHaveBeenCalled();
+
+    // Eliminar vínculo
+    component.eliminarVinculo(vinc.id);
+    expect(component.vinculosVisuales()).toHaveLength(0);
+  });
+
   it('debe calibrar y guardar pesos', () => {
     component.guardarPesos();
     expect(apiMock.calibrarPesos).toHaveBeenCalledWith('v-1', [
@@ -225,5 +292,49 @@ describe('EditorVersionFormularioPage', () => {
     expect(apiMock.publicar).toHaveBeenCalledWith('v-1', { mapeos: [] });
     expect(component.version()?.estado).toBe('PUBLICADA');
     expect(component.version()?.activa).toBe(true);
+  });
+
+  it('debe describir vínculos y campos de manera amigable para el usuario', () => {
+    component.seccionesVisuales.set([
+      {
+        clave: 'identificacion',
+        titulo: '1. Identificación del puente',
+        preguntas: [
+          { clave: 'codigo', titulo: 'Código del puente', tipo: 'string', obligatorio: true },
+        ],
+      },
+    ]);
+
+    const infoPuente = component.describirVinculo('puente.codigo');
+    expect(infoPuente.categoria).toBe('puente');
+    expect(infoPuente.etiquetaCampo).toBe('Código del puente');
+    expect(component.formatearDestinoHumano('puente.codigo')).toBe('Código del puente');
+
+    const infoMunicipio = component.describirVinculo('municipio.nombre (vía puente.municipio_id)');
+    expect(infoMunicipio.categoria).toBe('puente');
+    expect(infoMunicipio.etiquetaCampo).toBe('Municipio del puente');
+
+    const infoTecnico = component.describirVinculo(
+      'inspeccion_dato_tecnico.drenajes_aledanos_existen',
+    );
+    expect(infoTecnico.categoria).toBe('tecnico');
+    expect(infoTecnico.etiquetaCampo).toBe('Drenajes aledaños');
+
+    const infoInspeccion = component.describirVinculo('inspeccion.fecha_inspeccion');
+    expect(infoInspeccion.categoria).toBe('inspeccion');
+    expect(infoInspeccion.etiquetaCampo).toBe('Fecha oficial de inspección');
+
+    const infoNulo = component.describirVinculo(null);
+    expect(infoNulo.categoria).toBe('otro');
+    expect(infoNulo.nombreCompleto).toBe('Documento de inspección');
+
+    expect(component.obtenerNombrePregunta('/identificacion/codigo')).toBe('Código del puente');
+    expect(component.obtenerNombreSeccion('/identificacion/codigo')).toBe(
+      'Identificación del puente',
+    );
+    expect(component.obtenerTituloCampoRef('/identificacion/codigo')).toBe(
+      'Código del puente (Identificación del puente)',
+    );
+    expect(component.obtenerTituloCampoRef('/otro/desconocido')).toBe('otro › desconocido');
   });
 });

@@ -1,25 +1,100 @@
 package gt.usac.cunoc.sgp.inspeccion.dto;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.UUID;
+import java.util.List;
 
 public record InspeccionResumenResponse(
     UUID id,
     UUID puenteId,
-    String codigoPuente,
-    String nombrePuente,
-    String departamentoNombre,
-    String municipioNombre,
+    String puenteNombre,
     UUID versionFormularioId,
-    String codigoVersionFormulario,
+    String versionFormularioCodigo,
     UUID autorId,
     String rolAutorCreacion,
     String nombreAutorCapturado,
-    String estado,
     String tipo,
+    String estado,
     LocalDate fechaInspeccion,
+    String dispositivoId,
+    JsonNode datos,
+    Instant creadoEn,
+    Instant actualizadoEn,
+    String codigoPuente,
+    String departamentoNombre,
+    String municipioNombre,
+    String codigoVersionFormulario,
     Double porcentajeAvance,
     Instant ultimaActividadEn,
-    Instant creadoEn,
-    Instant actualizadoEn) {}
+    String nombrePuente,
+    String rolAutor,
+    String nombreAutor,
+    Double latitudInicio,
+    Double longitudInicio,
+    BigDecimal precisionGpsM,
+    BigDecimal distanciaAlPuenteM,
+    boolean advertenciaGps,
+    String mensajeAdvertenciaGps,
+    boolean datosPermanentesConfirmados,
+    DatosPermanentesResponse datosPermanentes,
+    List<AcompananteResponse> acompanantes) {
+
+  public InspeccionResumenResponse(
+      UUID id,
+      UUID puenteId,
+      String codigoPuente,
+      String nombrePuente,
+      String departamentoNombre,
+      String municipioNombre,
+      UUID versionFormularioId,
+      String codigoVersionFormulario,
+      UUID autorId,
+      String rolAutorCreacion,
+      String nombreAutorCapturado,
+      String estado,
+      String tipo,
+      LocalDate fechaInspeccion,
+      Double porcentajeAvance,
+      Instant ultimaActividadEn,
+      Instant creadoEn,
+      Instant actualizadoEn) {
+    this(
+        id,
+        puenteId,
+        nombrePuente,
+        versionFormularioId,
+        codigoVersionFormulario,
+        autorId,
+        rolAutorCreacion,
+        nombreAutorCapturado,
+        tipo,
+        estado,
+        fechaInspeccion,
+        null,
+        null,
+        creadoEn,
+        actualizadoEn,
+        codigoPuente,
+        departamentoNombre,
+        municipioNombre,
+        codigoVersionFormulario,
+        porcentajeAvance,
+        ultimaActividadEn,
+        nombrePuente,
+        rolAutorCreacion,
+        nombreAutorCapturado,
+        null,
+        null,
+        null,
+        null,
+        false,
+        null,
+        false,
+        null,
+        List.of());
+  }
+
+}

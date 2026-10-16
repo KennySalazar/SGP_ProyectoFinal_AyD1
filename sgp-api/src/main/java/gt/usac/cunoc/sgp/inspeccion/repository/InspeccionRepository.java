@@ -1,6 +1,7 @@
 package gt.usac.cunoc.sgp.inspeccion.repository;
 
 import gt.usac.cunoc.sgp.inspeccion.entity.Inspeccion;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.domain.Page;
@@ -37,4 +38,10 @@ public interface InspeccionRepository extends JpaRepository<Inspeccion, UUID> {
       @Param("autorId") UUID autorId,
       @Param("estado") String estado,
       Pageable pageable);
+  List<Inspeccion> findByPuenteIdOrderByFechaInspeccionDesc(UUID puenteId);
+
+  List<Inspeccion> findByAutorIdOrderByFechaInspeccionDesc(UUID autorId);
+
+  @Query("SELECT i FROM Inspeccion i WHERE i.id = :id AND i.eliminadoEn IS NULL")
+  Optional<Inspeccion> findActiveById(@Param("id") UUID id);
 }
