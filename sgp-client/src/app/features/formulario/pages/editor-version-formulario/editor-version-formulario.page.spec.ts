@@ -308,9 +308,7 @@ describe('EditorVersionFormularioPage', () => {
     const infoPuente = component.describirVinculo('puente.codigo');
     expect(infoPuente.categoria).toBe('puente');
     expect(infoPuente.etiquetaCampo).toBe('Código del puente');
-    expect(component.formatearDestinoHumano('puente.codigo')).toBe(
-      'Ficha del puente: Código del puente',
-    );
+    expect(component.formatearDestinoHumano('puente.codigo')).toBe('Código del puente');
 
     const infoMunicipio = component.describirVinculo('municipio.nombre (vía puente.municipio_id)');
     expect(infoMunicipio.categoria).toBe('puente');
@@ -324,12 +322,16 @@ describe('EditorVersionFormularioPage', () => {
 
     const infoInspeccion = component.describirVinculo('inspeccion.fecha_inspeccion');
     expect(infoInspeccion.categoria).toBe('inspeccion');
-    expect(infoInspeccion.etiquetaCampo).toBe('Fecha de inspección');
+    expect(infoInspeccion.etiquetaCampo).toBe('Fecha oficial de inspección');
 
     const infoNulo = component.describirVinculo(null);
     expect(infoNulo.categoria).toBe('otro');
-    expect(infoNulo.nombreCompleto).toBe('Formulario de inspección (JSON)');
+    expect(infoNulo.nombreCompleto).toBe('Documento de inspección');
 
+    expect(component.obtenerNombrePregunta('/identificacion/codigo')).toBe('Código del puente');
+    expect(component.obtenerNombreSeccion('/identificacion/codigo')).toBe(
+      'Identificación del puente',
+    );
     expect(component.obtenerTituloCampoRef('/identificacion/codigo')).toBe(
       'Código del puente (Identificación del puente)',
     );

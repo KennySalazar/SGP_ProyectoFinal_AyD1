@@ -8,7 +8,13 @@ import {
   signal,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { FormBuilder, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
+import {
+  FormBuilder,
+  FormControl,
+  FormsModule,
+  ReactiveFormsModule,
+  Validators,
+} from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { ButtonModule } from 'primeng/button';
@@ -174,70 +180,179 @@ export class EditorVersionFormularioPage implements OnInit {
     descripcion: [''],
   });
 
+  readonly destinoPersonalizado = signal(false);
+  readonly columnaPersonalizadaControl = new FormControl<string>('', { nonNullable: true });
+
   readonly camposFormularioDisponibles = computed(() => {
     const list: { label: string; value: string }[] = [];
+    const valuesSet = new Set<string>();
+
     for (const sec of this.seccionesVisuales()) {
       for (const p of sec.preguntas) {
+        const val = `/${sec.clave}/${p.clave}`;
+        valuesSet.add(val);
         list.push({
-          label: `${sec.titulo} > ${p.titulo} (/${sec.clave}/${p.clave})`,
-          value: `/${sec.clave}/${p.clave}`,
+          label: `${this.limpiarTituloSeccion(sec.titulo)} › ${p.titulo}`,
+          value: val,
         });
       }
     }
+
+    // Asegurar que cualquier campoRef existente en vínculos también esté disponible para seleccionarse
+    for (const v of this.vinculosVisuales()) {
+      if (v.campoRef && !valuesSet.has(v.campoRef)) {
+        valuesSet.add(v.campoRef);
+        list.push({
+          label: this.obtenerTituloCampoRef(v.campoRef),
+          value: v.campoRef,
+        });
+      }
+    }
+
     return list;
   });
 
-  readonly sugerenciasColumnasDestino: string[] = [
-    'puente.codigo',
-    'puente.nombre',
-    'puente.ruta',
-    'puente.kilometraje',
-    'inspeccion.fecha_inspeccion',
-    'inspeccion.nombre_autor_capturado',
-    'inspeccion_dato_tecnico.longitud_m',
-    'inspeccion_dato_tecnico.ancho_rodadura_m',
-    'inspeccion_dato_tecnico.ancho_acera_derecha_m',
-    'inspeccion_dato_tecnico.ancho_acera_izquierda_m',
-    'inspeccion_dato_tecnico.numero_tramos',
-    'inspeccion_dato_tecnico.numero_vias_por_sentido',
-    'inspeccion_dato_tecnico.altura_libre_superior_m',
-    'inspeccion_dato_tecnico.altura_libre_sobre_cauce_m',
-    'inspeccion_dato_tecnico.tipologia_puente',
-    'inspeccion_dato_tecnico.material_superestructura',
-    'inspeccion_dato_tecnico.material_subestructura',
-    'inspeccion_dato_tecnico.tipo_cruce',
-    'inspeccion_dato_tecnico.carga_diseno',
-    'inspeccion_dato_tecnico.anio_construccion',
-    'inspeccion_dato_tecnico.trafico_vehiculos_dia',
-    'inspeccion_dato_tecnico.porcentaje_camiones_buses',
-    'inspeccion_dato_tecnico.ruta_pavimentada',
-    'inspeccion_dato_tecnico.alineamiento_horizontal',
-    'inspeccion_dato_tecnico.esviaje',
-    'inspeccion_dato_tecnico.poblacion_antes',
-    'inspeccion_dato_tecnico.poblacion_despues',
-    'inspeccion_dato_tecnico.tipo_cuerpo_agua',
-    'inspeccion_dato_tecnico.nombre_rio',
-    'inspeccion_dato_tecnico.encauzamiento',
-    'inspeccion_dato_tecnico.alumbrado_existe',
-    'inspeccion_dato_tecnico.drenajes_aledanos_existen',
+  readonly opcionesDestino = [
+    {
+      grupo: 'Ficha del puente (Inventario)',
+      items: [
+        { valor: 'puente.codigo', etiqueta: 'Código del puente' },
+        { valor: 'puente.nombre', etiqueta: 'Nombre del puente' },
+        { valor: 'puente.ruta', etiqueta: 'Ruta del puente' },
+        { valor: 'puente.kilometraje', etiqueta: 'Kilometraje' },
+        { valor: 'puente.municipio_id', etiqueta: 'Municipio del puente' },
+        { valor: 'puente.departamento_id', etiqueta: 'Departamento del puente' },
+      ],
+    },
+    {
+      grupo: 'Registro de inspección',
+      items: [
+        { valor: 'inspeccion.fecha_inspeccion', etiqueta: 'Fecha oficial de inspección' },
+        { valor: 'inspeccion.nombre_autor_capturado', etiqueta: 'Inspector asignado' },
+      ],
+    },
+    {
+      grupo: 'Ficha técnica de inspección',
+      items: [
+        { valor: 'inspeccion_dato_tecnico.longitud_m', etiqueta: 'Longitud total (m)' },
+        { valor: 'inspeccion_dato_tecnico.numero_tramos', etiqueta: 'Número de tramos' },
+        { valor: 'inspeccion_dato_tecnico.ancho_rodadura_m', etiqueta: 'Ancho de rodadura (m)' },
+        {
+          valor: 'inspeccion_dato_tecnico.ancho_acera_derecha_m',
+          etiqueta: 'Ancho acera derecha (m)',
+        },
+        {
+          valor: 'inspeccion_dato_tecnico.ancho_acera_izquierda_m',
+          etiqueta: 'Ancho acera izquierda (m)',
+        },
+        {
+          valor: 'inspeccion_dato_tecnico.altura_libre_superior_m',
+          etiqueta: 'Gálibo / Altura superior (m)',
+        },
+        {
+          valor: 'inspeccion_dato_tecnico.altura_libre_sobre_cauce_m',
+          etiqueta: 'Altura libre sobre cauce (m)',
+        },
+        { valor: 'inspeccion_dato_tecnico.tipologia_puente', etiqueta: 'Tipología del puente' },
+        { valor: 'inspeccion_dato_tecnico.tipo_cruce', etiqueta: 'Tipo de cruce' },
+        { valor: 'inspeccion_dato_tecnico.numero_vias_por_sentido', etiqueta: 'Vías por sentido' },
+        {
+          valor: 'inspeccion_dato_tecnico.material_superestructura',
+          etiqueta: 'Material de superestructura',
+        },
+        {
+          valor: 'inspeccion_dato_tecnico.material_subestructura',
+          etiqueta: 'Material de subestructura',
+        },
+        { valor: 'inspeccion_dato_tecnico.carga_diseno', etiqueta: 'Carga de diseño' },
+        { valor: 'inspeccion_dato_tecnico.anio_construccion', etiqueta: 'Año de construcción' },
+        {
+          valor: 'inspeccion_dato_tecnico.trafico_vehiculos_dia',
+          etiqueta: 'Tráfico diario (veh/día)',
+        },
+        {
+          valor: 'inspeccion_dato_tecnico.porcentaje_camiones_buses',
+          etiqueta: 'Porcentaje camiones y buses',
+        },
+        { valor: 'inspeccion_dato_tecnico.ruta_pavimentada', etiqueta: 'Ruta pavimentada' },
+        {
+          valor: 'inspeccion_dato_tecnico.alineamiento_horizontal',
+          etiqueta: 'Alineamiento horizontal',
+        },
+        { valor: 'inspeccion_dato_tecnico.esviaje', etiqueta: 'Esviaje / sesgo' },
+        {
+          valor: 'inspeccion_dato_tecnico.poblacion_antes',
+          etiqueta: 'Población antes del puente',
+        },
+        {
+          valor: 'inspeccion_dato_tecnico.poblacion_despues',
+          etiqueta: 'Población después del puente',
+        },
+        { valor: 'inspeccion_dato_tecnico.tipo_cuerpo_agua', etiqueta: 'Tipo de cuerpo de agua' },
+        { valor: 'inspeccion_dato_tecnico.nombre_rio', etiqueta: 'Nombre del río / cauce' },
+        { valor: 'inspeccion_dato_tecnico.encauzamiento', etiqueta: 'Encauzamiento' },
+        {
+          valor: 'inspeccion_dato_tecnico.antecedente_desbordamiento',
+          etiqueta: 'Antecedente de desbordamiento',
+        },
+        {
+          valor: 'inspeccion_dato_tecnico.frecuencia_desbordamiento_anios',
+          etiqueta: 'Frecuencia desbordamiento (años)',
+        },
+        {
+          valor: 'inspeccion_dato_tecnico.fecha_ultimo_desbordamiento',
+          etiqueta: 'Fecha último desbordamiento',
+        },
+        { valor: 'inspeccion_dato_tecnico.alumbrado_existe', etiqueta: 'Alumbrado artificial' },
+        {
+          valor: 'inspeccion_dato_tecnico.drenajes_aledanos_existen',
+          etiqueta: 'Drenajes aledaños',
+        },
+      ],
+    },
   ];
 
   readonly tiposVinculo = [
-    { label: 'Columna técnica (inspección / dato técnico)', value: 'Columna técnica' },
-    { label: 'Inventario puente (puente.*)', value: 'Inventario puente' },
-    { label: 'Directo / Otro', value: 'Directo' },
+    { label: 'Ficha técnica de inspección', value: 'Columna técnica' },
+    { label: 'Ficha del puente (Inventario)', value: 'Inventario puente' },
+    { label: 'Enlazado general', value: 'Directo' },
   ];
+
+  onDestinoChange(event: Event): void {
+    const val = (event.target as HTMLSelectElement).value;
+    if (val === '__custom__') {
+      this.destinoPersonalizado.set(true);
+      this.vinculoForm.controls.columnaDestino.setValue('__custom__');
+      this.vinculoForm.controls.tipo.setValue('Directo');
+    } else {
+      this.destinoPersonalizado.set(false);
+      this.vinculoForm.controls.columnaDestino.setValue(val);
+      if (val.startsWith('puente.')) {
+        this.vinculoForm.controls.tipo.setValue('Inventario puente');
+      } else {
+        this.vinculoForm.controls.tipo.setValue('Columna técnica');
+      }
+    }
+  }
 
   readonly vinculosFiltrados = computed(() => {
     const term = this.filtroVinculos().toLowerCase().trim();
     const list = this.vinculosVisuales();
     if (!term) return list;
-    return list.filter(
-      (v) =>
+    return list.filter((v) => {
+      const nomPreg = this.obtenerNombrePregunta(v.campoRef).toLowerCase();
+      const nomSec = this.obtenerNombreSeccion(v.campoRef).toLowerCase();
+      const info = this.describirVinculo(v.columnaDestino);
+      return (
+        nomPreg.includes(term) ||
+        nomSec.includes(term) ||
+        info.etiquetaCampo.toLowerCase().includes(term) ||
+        info.etiquetaCategoria.toLowerCase().includes(term) ||
         v.campoRef.toLowerCase().includes(term) ||
         v.columnaDestino.toLowerCase().includes(term) ||
-        (v.descripcion && v.descripcion.toLowerCase().includes(term)),
-    );
+        Boolean(v.descripcion && v.descripcion.toLowerCase().includes(term))
+      );
+    });
   });
 
   // Diálogos
@@ -462,8 +577,8 @@ export class EditorVersionFormularioPage implements OnInit {
       return {
         categoria: 'otro',
         etiquetaCategoria: 'Formulario',
-        etiquetaCampo: 'Documento JSON',
-        nombreCompleto: 'Formulario de inspección (JSON)',
+        etiquetaCampo: 'Documento de inspección',
+        nombreCompleto: 'Documento de inspección',
         icono: 'pi pi-file',
       };
     }
@@ -480,7 +595,7 @@ export class EditorVersionFormularioPage implements OnInit {
       let campo = 'Dato de inventario';
       if (d === 'puente.codigo') campo = 'Código del puente';
       else if (d === 'puente.nombre') campo = 'Nombre del puente';
-      else if (d === 'puente.ruta') campo = 'Ruta';
+      else if (d === 'puente.ruta') campo = 'Ruta del puente';
       else if (d === 'puente.kilometraje') campo = 'Kilometraje';
       else if (d.includes('municipio')) campo = 'Municipio del puente';
       else if (d.includes('departamento')) campo = 'Departamento del puente';
@@ -492,15 +607,15 @@ export class EditorVersionFormularioPage implements OnInit {
         categoria: 'puente',
         etiquetaCategoria: 'Ficha del puente',
         etiquetaCampo: campo,
-        nombreCompleto: `Ficha del puente: ${campo}`,
+        nombreCompleto: campo,
         icono: 'pi pi-id-card',
       };
     }
 
     // Cabecera inspección
     if (d.startsWith('inspeccion.')) {
-      let campo = 'Dato de inspección';
-      if (d === 'inspeccion.fecha_inspeccion') campo = 'Fecha de inspección';
+      let campo = 'Registro de inspección';
+      if (d === 'inspeccion.fecha_inspeccion') campo = 'Fecha oficial de inspección';
       else if (d === 'inspeccion.nombre_autor_capturado') campo = 'Inspector asignado';
       else {
         const sub = d.replace(/^inspeccion\./, '').replace(/_/g, ' ');
@@ -510,7 +625,7 @@ export class EditorVersionFormularioPage implements OnInit {
         categoria: 'inspeccion',
         etiquetaCategoria: 'Inspección',
         etiquetaCampo: campo,
-        nombreCompleto: `Inspección: ${campo}`,
+        nombreCompleto: campo,
         icono: 'pi pi-calendar',
       };
     }
@@ -537,7 +652,7 @@ export class EditorVersionFormularioPage implements OnInit {
         porcentaje_camiones_buses: 'Porcentaje camiones y buses',
         ruta_pavimentada: 'Ruta pavimentada',
         alineamiento_horizontal: 'Alineamiento horizontal',
-        esviaje: 'Esviaje',
+        esviaje: 'Esviaje / sesgo',
         poblacion_antes: 'Población antes del puente',
         poblacion_despues: 'Población después del puente',
         tipo_cuerpo_agua: 'Tipo de cuerpo de agua',
@@ -552,9 +667,9 @@ export class EditorVersionFormularioPage implements OnInit {
       const campo = mapaCamposTecnicos[col] || col.replace(/_/g, ' ');
       return {
         categoria: 'tecnico',
-        etiquetaCategoria: 'Dato técnico',
+        etiquetaCategoria: 'Ficha técnica',
         etiquetaCampo: campo,
-        nombreCompleto: `Dato técnico: ${campo}`,
+        nombreCompleto: campo,
         icono: 'pi pi-table',
       };
     }
@@ -564,8 +679,8 @@ export class EditorVersionFormularioPage implements OnInit {
       return {
         categoria: 'tecnico',
         etiquetaCategoria: 'Tramo',
-        etiquetaCampo: col,
-        nombreCompleto: `Detalle de tramo: ${col}`,
+        etiquetaCampo: `Tramo: ${col}`,
+        nombreCompleto: `Tramo: ${col}`,
         icono: 'pi pi-list',
       };
     }
@@ -583,7 +698,7 @@ export class EditorVersionFormularioPage implements OnInit {
     return this.describirVinculo(destino).nombreCompleto;
   }
 
-  obtenerTituloCampoRef(campoRef: string): string {
+  obtenerNombrePregunta(campoRef: string): string {
     if (!campoRef) return '';
     const partes = campoRef.replace(/^\//, '').split('/');
     if (partes.length >= 2) {
@@ -594,15 +709,28 @@ export class EditorVersionFormularioPage implements OnInit {
         const p = sec.preguntas.find(
           (preg) => preg.clave === pregClave || preg.clave.startsWith(pregClave),
         );
-        if (p) {
-          const titSec = this.limpiarTituloSeccion(sec.titulo);
-          return `${p.titulo} (${titSec})`;
-        }
-        const titSec = this.limpiarTituloSeccion(sec.titulo);
-        return `${pregClave.replace(/_/g, ' ')} (${titSec})`;
+        if (p) return p.titulo;
+        return pregClave.replace(/_/g, ' ');
       }
     }
     return campoRef.replace(/^\//, '').replace(/\//g, ' › ').replace(/_/g, ' ');
+  }
+
+  obtenerNombreSeccion(campoRef: string): string {
+    if (!campoRef) return '';
+    const partes = campoRef.replace(/^\//, '').split('/');
+    if (partes.length >= 1) {
+      const secClave = partes[0];
+      const sec = this.seccionesVisuales().find((s) => s.clave === secClave);
+      if (sec) return this.limpiarTituloSeccion(sec.titulo);
+    }
+    return '';
+  }
+
+  obtenerTituloCampoRef(campoRef: string): string {
+    const nom = this.obtenerNombrePregunta(campoRef);
+    const sec = this.obtenerNombreSeccion(campoRef);
+    return sec ? `${nom} (${sec})` : nom;
   }
 
   eliminarSeccion(secClave: string): void {
@@ -840,11 +968,14 @@ export class EditorVersionFormularioPage implements OnInit {
   abrirCrearVinculo(): void {
     this.modoVinculo.set('crear');
     this.vinculoSeleccionadoId.set(null);
+    this.destinoPersonalizado.set(false);
+    this.columnaPersonalizadaControl.setValue('');
     const primerCampo = this.camposFormularioDisponibles()[0]?.value || '';
+    const primerDestino = this.opcionesDestino[0]?.items[0]?.valor || 'puente.codigo';
     this.vinculoForm.reset({
       campoRef: primerCampo,
-      columnaDestino: 'inspeccion_dato_tecnico.',
-      tipo: 'Columna técnica',
+      columnaDestino: primerDestino,
+      tipo: 'Inventario puente',
       descripcion: '',
     });
     this.dialogoVinculo.set(true);
@@ -853,12 +984,33 @@ export class EditorVersionFormularioPage implements OnInit {
   abrirEditarVinculo(v: VinculoVisual): void {
     this.modoVinculo.set('editar');
     this.vinculoSeleccionadoId.set(v.id);
-    this.vinculoForm.reset({
-      campoRef: v.campoRef,
-      columnaDestino: v.columnaDestino,
-      tipo: v.tipo || 'Columna técnica',
-      descripcion: v.descripcion || '',
-    });
+
+    const esConocido = this.opcionesDestino.some((g) =>
+      g.items.some((item) => item.valor === v.columnaDestino),
+    );
+
+    if (esConocido) {
+      this.destinoPersonalizado.set(false);
+      this.columnaPersonalizadaControl.setValue('');
+      this.vinculoForm.reset({
+        campoRef: v.campoRef,
+        columnaDestino: v.columnaDestino,
+        tipo:
+          v.tipo ||
+          (v.columnaDestino.startsWith('puente.') ? 'Inventario puente' : 'Columna técnica'),
+        descripcion: v.descripcion || '',
+      });
+    } else {
+      this.destinoPersonalizado.set(true);
+      this.columnaPersonalizadaControl.setValue(v.columnaDestino);
+      this.vinculoForm.reset({
+        campoRef: v.campoRef,
+        columnaDestino: '__custom__',
+        tipo: v.tipo || 'Directo',
+        descripcion: v.descripcion || '',
+      });
+    }
+
     this.dialogoVinculo.set(true);
   }
 
@@ -870,7 +1022,15 @@ export class EditorVersionFormularioPage implements OnInit {
 
     const val = this.vinculoForm.getRawValue();
     const campoRef = val.campoRef.trim();
-    const columnaDestino = val.columnaDestino.trim();
+    let columnaDestino = val.columnaDestino.trim();
+
+    if (columnaDestino === '__custom__') {
+      columnaDestino = this.columnaPersonalizadaControl.value.trim();
+      if (!columnaDestino) {
+        return;
+      }
+    }
+
     const tipo = val.tipo;
     const descripcion = val.descripcion.trim();
 

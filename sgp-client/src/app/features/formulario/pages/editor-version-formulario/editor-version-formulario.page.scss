@@ -405,10 +405,22 @@
   border-radius: 4px;
   width: fit-content;
   text-transform: uppercase;
-  &.cat-puente { background: #fef3c7; color: #92400e; }
-  &.cat-tecnico { background: #e0f2fe; color: #0369a1; }
-  &.cat-inspeccion { background: #dcfce7; color: #15803d; }
-  &.cat-otro { background: #f1f5f9; color: #475569; }
+  &.cat-puente {
+    background: #fef3c7;
+    color: #92400e;
+  }
+  &.cat-tecnico {
+    background: #e0f2fe;
+    color: #0369a1;
+  }
+  &.cat-inspeccion {
+    background: #dcfce7;
+    color: #15803d;
+  }
+  &.cat-otro {
+    background: #f1f5f9;
+    color: #475569;
+  }
 }
 
 .vinculo-campo-texto {
@@ -424,28 +436,16 @@
   margin-bottom: 0.15rem;
 }
 
-.vinculo-destino-humano {
-  display: flex;
-  flex-direction: column;
-  gap: 0.15rem;
+.vinculo-seccion-sub {
+  font-size: 0.75rem;
+  color: #64748b;
+  display: block;
 }
 
 .vinculo-humano-titulo {
   font-size: 0.85rem;
   color: #0f172a;
-}
-
-.vinculo-tecnico-sub {
-  font-size: 0.7rem;
-  color: #64748b;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.25rem;
-  code {
-    background: #f1f5f9;
-    padding: 0.05rem 0.25rem;
-    border-radius: 3px;
-  }
+  font-weight: 500;
 }
 
 .vinculo-preview-helper {
@@ -515,18 +515,6 @@
 }
 
 .tabla-vinculos {
-  .vinculo-campo-ref {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.3rem;
-    font-size: 0.8rem;
-    code {
-      background: #f1f5f9;
-      padding: 0.1rem 0.25rem;
-      border-radius: 4px;
-      font-weight: 600;
-    }
-  }
   .vinculo-nota-text {
     font-size: 0.8rem;
     color: #40546b;

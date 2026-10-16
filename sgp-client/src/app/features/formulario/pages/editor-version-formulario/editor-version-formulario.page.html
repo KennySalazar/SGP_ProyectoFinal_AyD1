@@ -519,29 +519,22 @@
         </tr>
       </thead>
       <tbody>
-        @for (v of vinculosFiltrados(); track v.id) {
+        @for (v of vinculosFiltrados(); track v.id) { @let info =
+        describirVinculo(v.columnaDestino);
         <tr>
-          <td class="pregunta-col">
-            <strong class="vinculo-campo-titulo">{{ obtenerTituloCampoRef(v.campoRef) }}</strong>
-            <div class="vinculo-campo-ref">
-              <i class="pi pi-file-edit" aria-hidden="true"></i>
-              <code>{{ v.campoRef }}</code>
-            </div>
+          <td class="pregunta-col" [title]="v.campoRef">
+            <strong class="vinculo-campo-titulo">{{ obtenerNombrePregunta(v.campoRef) }}</strong>
+            @if (obtenerNombreSeccion(v.campoRef); as secNom) {
+            <span class="vinculo-seccion-sub">Sección: {{ secNom }}</span>
+            }
           </td>
-          <td>
-            @let info = describirVinculo(v.columnaDestino);
-            <div class="vinculo-destino-humano">
-              <strong class="vinculo-humano-titulo">{{ info.nombreCompleto }}</strong>
-              <div class="vinculo-tecnico-sub">
-                <i class="pi pi-database" aria-hidden="true"></i>
-                <code>{{ v.columnaDestino }}</code>
-              </div>
-            </div>
+          <td [title]="v.columnaDestino">
+            <span class="vinculo-humano-titulo">{{ info.etiquetaCampo }}</span>
           </td>
           <td>
             <p-tag
-              [value]="v.tipo || 'Columna técnica'"
-              [severity]="v.tipo === 'Inventario puente' ? 'warn' : 'info'"
+              [value]="info.etiquetaCategoria"
+              [severity]="info.categoria === 'puente' ? 'warn' : info.categoria === 'inspeccion' ? 'success' : 'info'"
             ></p-tag>
           </td>
           <td>
@@ -850,13 +843,11 @@
       <label for="tipo-mapeo" class="field-label"
         >{{ 'formulario.mappingType' | transloco }} *</label
       >
-      <p-select
-        inputId="tipo-mapeo"
-        formControlName="tipo"
-        [options]="tiposMapeo"
-        optionLabel="label"
-        optionValue="value"
-      ></p-select>
+      <select id="tipo-mapeo" class="sgp-select" formControlName="tipo">
+        @for (t of tiposMapeo; track t.value) {
+        <option [value]="t.value">{{ t.label }}</option>
+        }
+      </select>
     </div>
 
     <div class="form-field">
@@ -909,7 +900,7 @@
         <span>{{ 'formulario.cancel' | transloco }}</span>
       </button>
       <button pButton type="submit" [disabled]="nuevoMapeoForm.invalid">
-        <span>Agregar</span>
+        <span>Agregar mapeo</span>
       </button>
     </div>
   </form>
@@ -947,7 +938,7 @@
         <span>{{ 'formulario.cancel' | transloco }}</span>
       </button>
       <button pButton type="submit" [disabled]="nuevaDerivadaForm.invalid || cargando()">
-        <span>{{ 'formulario.create' | transloco }}</span>
+        <span>Crear nueva versión</span>
       </button>
     </div>
   </form>
@@ -1019,10 +1010,7 @@
         <span>{{ 'formulario.cancel' | transloco }}</span>
       </button>
       <button pButton type="submit" [disabled]="seccionForm.invalid">
-        <span
-          >{{ (modoSeccion() === 'crear' ? 'formulario.create' : 'formulario.save') | transloco
-          }}</span
-        >
+        <span>{{ modoSeccion() === 'crear' ? 'Crear sección' : 'Guardar cambios' }}</span>
       </button>
     </div>
   </form>
@@ -1205,26 +1193,17 @@
       <label for="preg-vinc" class="field-label"
         >{{ 'formulario.storageBinding' | transloco }}</label
       >
-      <input
-        pInputText
-        id="preg-vinc"
-        type="text"
-        formControlName="vinculo"
-        list="sugerencias-columnas-list-preg"
-        placeholder="ej. puente.codigo o inspeccion_dato_tecnico.longitud_m"
-      />
-      <datalist id="sugerencias-columnas-list-preg">
-        @for (sug of sugerenciasColumnasDestino; track sug) {
-        <option [value]="sug">{{ formatearDestinoHumano(sug) }}</option>
+      <select id="preg-vinc" class="sgp-select" formControlName="vinculo">
+        <option value="">(Ninguno - dato propio del formulario)</option>
+        @for (g of opcionesDestino; track g.grupo) {
+        <optgroup [label]="g.grupo">
+          @for (item of g.items; track item.valor) {
+          <option [value]="item.valor">{{ item.etiqueta }}</option>
+          }
+        </optgroup>
         }
-      </datalist>
+      </select>
       <small class="field-help-text">{{ 'formulario.storageBindingHint' | transloco }}</small>
-      @if (preguntaForm.controls.vinculo.value; as vincVal) {
-      <div class="vinculo-preview-helper">
-        <i class="pi pi-info-circle" aria-hidden="true"></i>
-        <span>Destino: <strong>{{ formatearDestinoHumano(vincVal) }}</strong></span>
-      </div>
-      }
     </div>
 
     <div class="form-row-checkboxes">
@@ -1254,10 +1233,7 @@
         type="submit"
         [disabled]="preguntaForm.invalid || (preguntaForm.controls.tipo.value === 'select' && opcionesSeleccion().length === 0)"
       >
-        <span
-          >{{ (modoPregunta() === 'crear' ? 'formulario.create' : 'formulario.save') | transloco
-          }}</span
-        >
+        <span>{{ modoPregunta() === 'crear' ? 'Agregar pregunta' : 'Guardar cambios' }}</span>
       </button>
     </div>
   </form>
@@ -1298,26 +1274,48 @@
       <label for="vinc-destino" class="field-label">
         {{ 'formulario.databaseTarget' | transloco }} *
       </label>
-      <input
-        pInputText
+      <select
         id="vinc-destino"
-        type="text"
+        class="sgp-select"
         formControlName="columnaDestino"
-        list="sugerencias-columnas-list"
-        placeholder="ej. inspeccion_dato_tecnico.longitud_m"
-      />
-      <datalist id="sugerencias-columnas-list">
-        @for (sug of sugerenciasColumnasDestino; track sug) {
-        <option [value]="sug">{{ formatearDestinoHumano(sug) }}</option>
+        (change)="onDestinoChange($event)"
+      >
+        <option value="" disabled>Seleccione el destino en el sistema...</option>
+        @for (g of opcionesDestino; track g.grupo) {
+        <optgroup [label]="g.grupo">
+          @for (item of g.items; track item.valor) {
+          <option [value]="item.valor">{{ item.etiqueta }}</option>
+          }
+        </optgroup>
         }
-      </datalist>
-      <small class="field-help-text">Propiedad o columna del sistema donde se persistirá</small>
-      @if (vinculoForm.controls.columnaDestino.value; as destVal) {
+        <optgroup label="Otro / Avanzado">
+          <option value="__custom__">Otro (especificar columna técnica personalizada)</option>
+        </optgroup>
+      </select>
+      <small class="field-help-text"
+        >Elemento o propiedad del sistema donde se registrará la respuesta</small
+      >
+
+      @if (destinoPersonalizado()) {
+      <div class="form-field" style="margin-top: 0.5rem">
+        <label for="vinc-custom" class="field-label"
+          >Nombre de columna o identificador técnico *</label
+        >
+        <input
+          pInputText
+          id="vinc-custom"
+          type="text"
+          [formControl]="columnaPersonalizadaControl"
+          placeholder="ej. inspeccion_dato_tecnico.mi_columna"
+        />
+      </div>
+      } @if (vinculoForm.controls.columnaDestino.value; as destVal) { @if (destVal !== '__custom__')
+      {
       <div class="vinculo-preview-helper">
         <i class="pi pi-info-circle" aria-hidden="true"></i>
         <span>Destino: <strong>{{ formatearDestinoHumano(destVal) }}</strong></span>
       </div>
-      }
+      } }
     </div>
 
     <div class="form-row-2">
@@ -1356,11 +1354,12 @@
       >
         <span>{{ 'formulario.cancel' | transloco }}</span>
       </button>
-      <button pButton type="submit" [disabled]="vinculoForm.invalid">
-        <span
-          >{{ (modoVinculo() === 'crear' ? 'formulario.create' : 'formulario.save') | transloco
-          }}</span
-        >
+      <button
+        pButton
+        type="submit"
+        [disabled]="vinculoForm.invalid || (destinoPersonalizado() && !columnaPersonalizadaControl.value.trim())"
+      >
+        <span>{{ modoVinculo() === 'crear' ? 'Agregar vínculo' : 'Guardar cambios' }}</span>
       </button>
     </div>
   </form>

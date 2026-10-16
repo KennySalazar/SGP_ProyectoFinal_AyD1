@@ -857,7 +857,7 @@
     "addOption": "Agregar opción",
     "emptySections": "No hay secciones registradas en el formulario.",
     "emptyQuestions": "Esta sección aún no tiene preguntas. Agrega la primera pregunta.",
-    "storageBindingsSubtitle": "Mapeo entre campos del formulario y columnas relacionales de la base de datos (puente, inspección, etc.)",
+    "storageBindingsSubtitle": "Correspondencia de campos para sincronizar respuestas con la ficha del puente y registros de inspección.",
     "addStorageBinding": "Nuevo vínculo",
     "editStorageBinding": "Editar vínculo",
     "deleteStorageBinding": "Eliminar vínculo",
