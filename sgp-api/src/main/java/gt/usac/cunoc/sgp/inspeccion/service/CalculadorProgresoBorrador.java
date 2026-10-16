@@ -182,7 +182,7 @@ public class CalculadorProgresoBorrador {
   }
 
   private ProgresoSeccionResponse calcularSubestructura(JsonNode datos) {
-    String[] elementos = {
+    String[] elementosEstribos = {
       "cortina_superior",
       "cortina_inferior",
       "viga_apoyo",
@@ -193,13 +193,18 @@ public class CalculadorProgresoBorrador {
       "aletones/aguas_abajo",
       "socavacion"
     };
+    String[] elementosPilas = {
+      "viga_cabezal", "columnas", "cuerpo_muro_gravedad", "apoyos", "socavacion"
+    };
 
-    int total = elementos.length * 3; // estribo_entrada (9), estribo_salida (9), pilas (9)
+    int total = elementosEstribos.length * 2 + elementosPilas.length;
     int completados = 0;
 
-    for (String elem : elementos) {
+    for (String elem : elementosEstribos) {
       if (tieneElemento(datos, "/subestructura/estribo_entrada/" + elem)) completados++;
       if (tieneElemento(datos, "/subestructura/estribo_salida/" + elem)) completados++;
+    }
+    for (String elem : elementosPilas) {
       if (tieneElementoPilas(datos, elem)) completados++;
     }
 
