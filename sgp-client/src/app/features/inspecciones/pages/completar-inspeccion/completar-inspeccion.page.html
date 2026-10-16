@@ -49,7 +49,7 @@
           type="date"
           [max]="hoy"
           [ngModel]="fechaInspeccion()"
-          (ngModelChange)="fechaInspeccion.set($event)"
+          (ngModelChange)="onFechaInspeccionChange($event)"
           class="input-fecha"
         />
       </div>
@@ -83,10 +83,22 @@
   </header>
 
   <!-- Avisos de resultado de guardado -->
-  @if (mensajeExito(); as exito) {
-  <div class="alerta-exito surface-card" role="status">
-    <i class="pi pi-check-circle" aria-hidden="true"></i>
-    <span>{{ exito }}</span>
+  @if (estadoAutoguardado(); as estado) {
+  <div
+    class="surface-card"
+    [class.alerta-exito]="estado === 'guardado'"
+    [class.alerta-autoguardado]="estado !== 'guardado'"
+    role="status"
+  >
+    <i
+      [class]="estado === 'guardando' ? 'pi pi-spin pi-spinner' : estado === 'guardado' ? 'pi pi-check-circle' : 'pi pi-clock'"
+      aria-hidden="true"
+    ></i>
+    <span>
+      {{ (estado === 'guardando' ? 'inspecciones.borrador.autoguardando' : estado === 'guardado' ?
+      'inspecciones.borrador.guardadoExitoso' : 'inspecciones.borrador.cambiosPendientes') |
+      transloco }}
+    </span>
   </div>
   } @if (errorGuardado(); as errGuardado) {
   <div class="alerta-error surface-card" role="alert">
@@ -171,6 +183,7 @@
       [esquema]="esq"
       [valoresIniciales]="valoresIniciales()"
       (valorChange)="onValorChange($event)"
+      (seccionCambiando)="onSeccionCambiando()"
     />
   </div>
   } }

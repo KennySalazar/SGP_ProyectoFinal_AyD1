@@ -1046,6 +1046,8 @@
       "volverPuente": "Volver a ficha del puente",
       "guardar": "Guardar borrador",
       "guardando": "Guardando...",
+      "autoguardando": "Guardando cambios...",
+      "cambiosPendientes": "Cambios pendientes; se guardarán automáticamente.",
       "guardadoExitoso": "Avance de borrador guardado exitosamente.",
       "cargando": "Cargando inspección y esquema del formulario...",
       "notFound": "Inspección no encontrada o no tiene permisos para acceder a este borrador.",

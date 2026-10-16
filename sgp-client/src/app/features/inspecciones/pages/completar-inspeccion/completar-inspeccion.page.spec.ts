@@ -230,6 +230,28 @@ describe('CompletarInspeccionPage', () => {
     expect(component.errorGuardado()).toBeNull();
   });
 
+  it('guarda automáticamente los cambios después de la pausa de escritura', () => {
+    vi.useFakeTimers();
+    fixture.detectChanges();
+    mockInspeccionApi.guardarBorrador.mockReturnValue(of(mockBorrador));
+
+    component.onValorChange(mockBorrador.datos!);
+    component.onValorChange({ identificacion: { nombre_puente: 'Puente actualizado' } });
+    vi.advanceTimersByTime(1199);
+    expect(mockInspeccionApi.guardarBorrador).not.toHaveBeenCalled();
+
+    vi.advanceTimersByTime(1);
+    expect(mockInspeccionApi.guardarBorrador).toHaveBeenCalledWith(
+      'inspeccion-123',
+      expect.objectContaining({
+        version: 1,
+        datos: { identificacion: { nombre_puente: 'Puente actualizado' } },
+      }),
+    );
+    expect(component.estadoAutoguardado()).toBe('guardado');
+    vi.useRealTimers();
+  });
+
   it('maneja error 404 al cargar si el borrador no existe o no tiene permisos', () => {
     mockInspeccionApi.obtenerBorrador.mockReturnValue(
       throwError(() => new HttpErrorResponse({ status: 404 })),

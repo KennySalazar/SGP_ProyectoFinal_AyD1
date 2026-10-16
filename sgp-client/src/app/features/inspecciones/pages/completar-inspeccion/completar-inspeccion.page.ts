@@ -13,6 +13,7 @@ import { FormsModule } from '@angular/forms';
 import { HttpErrorResponse } from '@angular/common/http';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { debounceTime, Subject } from 'rxjs';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { ButtonModule } from 'primeng/button';
 import { TagModule } from 'primeng/tag';
@@ -48,6 +49,11 @@ export class CompletarInspeccionPage implements OnInit {
   private readonly inspeccionApi = inject(InspeccionApiService);
   private readonly formularioApi = inject(FormularioApiService);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly cambios = new Subject<void>();
+  private revisionDatos = 0;
+  private revisionGuardada = 0;
+  private ultimaHuellaDatos: string | null = null;
+  private guardadoForzadoDuranteSolicitud = false;
 
   protected readonly formulario = viewChild(FormularioDinamicoComponent);
 
@@ -56,15 +62,17 @@ export class CompletarInspeccionPage implements OnInit {
   readonly errorCarga = signal<string | null>(null);
   readonly errorGuardado = signal<string | null>(null);
   readonly mensajeExito = signal<string | null>(null);
+  readonly estadoAutoguardado = signal<'pendiente' | 'guardando' | 'guardado' | null>(null);
   readonly borrador = signal<InspeccionBorradorResponse | null>(null);
   readonly esquema = signal<EsquemaJson | null>(null);
   readonly fechaInspeccion = signal<string>('');
   readonly hoy = new Date().toISOString().slice(0, 10);
 
   private readonly datosEnMemoria = signal<Record<string, unknown>>({});
+  private readonly datosIniciales = signal<InspeccionBorradorResponse | null>(null);
 
   readonly valoresIniciales = computed<Record<string, unknown> | null>(() => {
-    const b = this.borrador();
+    const b = this.datosIniciales();
     if (!b) return null;
 
     const iniciales: Record<string, unknown> = {
@@ -102,6 +110,15 @@ export class CompletarInspeccionPage implements OnInit {
     return iniciales;
   });
 
+  constructor() {
+    this.cambios.pipe(debounceTime(1200), takeUntilDestroyed(this.destroyRef)).subscribe(() => {
+      this.guardarBorrador(false);
+    });
+    this.destroyRef.onDestroy(() => {
+      if (this.revisionDatos > this.revisionGuardada) this.guardarBorrador(false);
+    });
+  }
+
   ngOnInit(): void {
     const id = this.route.snapshot.paramMap.get('id');
     if (!id) {
@@ -123,6 +140,7 @@ export class CompletarInspeccionPage implements OnInit {
       .subscribe({
         next: (b) => {
           this.borrador.set(b);
+          this.datosIniciales.set(b);
           this.fechaInspeccion.set(b.fechaInspeccion || this.hoy);
           if (b.datos) {
             this.datosEnMemoria.set(b.datos);
@@ -168,11 +186,42 @@ export class CompletarInspeccionPage implements OnInit {
 
   onValorChange(valor: Record<string, unknown>): void {
     this.datosEnMemoria.set(valor);
+    const huella = JSON.stringify(valor);
+    if (this.ultimaHuellaDatos === null) {
+      this.ultimaHuellaDatos = huella;
+      return;
+    }
+    if (huella !== this.ultimaHuellaDatos) {
+      this.ultimaHuellaDatos = huella;
+      this.marcarCambio();
+    }
   }
 
-  guardarBorrador(): void {
+  onFechaInspeccionChange(fecha: string): void {
+    if (fecha === this.fechaInspeccion()) return;
+    this.fechaInspeccion.set(fecha);
+    this.marcarCambio();
+  }
+
+  onSeccionCambiando(): void {
+    this.guardarBorrador(false);
+  }
+
+  private marcarCambio(): void {
+    this.revisionDatos++;
+    this.estadoAutoguardado.set('pendiente');
+    this.errorGuardado.set(null);
+    this.mensajeExito.set(null);
+    this.cambios.next();
+  }
+
+  guardarBorrador(forzar = true): void {
     const b = this.borrador();
-    if (!b || this.guardando()) return;
+    if (!b || (!forzar && this.revisionDatos <= this.revisionGuardada)) return;
+    if (this.guardando()) {
+      this.guardadoForzadoDuranteSolicitud = true;
+      return;
+    }
 
     this.errorGuardado.set(null);
     this.mensajeExito.set(null);
@@ -180,6 +229,7 @@ export class CompletarInspeccionPage implements OnInit {
     const fecha = this.fechaInspeccion();
     if (fecha > this.hoy) {
       this.errorGuardado.set('La fecha de inspección no puede ser posterior a la fecha actual.');
+      this.estadoAutoguardado.set('pendiente');
       return;
     }
 
@@ -190,11 +240,13 @@ export class CompletarInspeccionPage implements OnInit {
         this.errorGuardado.set(
           `La fecha de inspección (${anioInspeccion}) no puede ser anterior al año de construcción registrado (${anioConstruccion}).`,
         );
+        this.estadoAutoguardado.set('pendiente');
         return;
       }
     }
 
     const valorActual = this.formulario()?.valor() ?? this.datosEnMemoria();
+    const revisionSolicitud = this.revisionDatos;
 
     const request: GuardarBorradorRequest = {
       version: b.version,
@@ -215,24 +267,35 @@ export class CompletarInspeccionPage implements OnInit {
     };
 
     this.guardando.set(true);
+    this.estadoAutoguardado.set('guardando');
 
-    this.inspeccionApi
-      .guardarBorrador(b.id, request)
-      .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe({
-        next: (actualizada) => {
-          this.guardando.set(false);
-          this.borrador.set(actualizada);
-          if (actualizada.datos) {
-            this.datosEnMemoria.set(actualizada.datos);
-          }
+    this.inspeccionApi.guardarBorrador(b.id, request).subscribe({
+      next: (actualizada) => {
+        this.guardando.set(false);
+        this.borrador.set(actualizada);
+        this.revisionGuardada = Math.max(this.revisionGuardada, revisionSolicitud);
+        const hayCambiosNuevos = this.revisionDatos > revisionSolicitud;
+        if (!hayCambiosNuevos && actualizada.datos) {
+          this.datosEnMemoria.set(actualizada.datos);
+        }
+        if (hayCambiosNuevos) {
+          this.estadoAutoguardado.set('pendiente');
+        } else {
+          this.estadoAutoguardado.set('guardado');
           this.mensajeExito.set('Avance de borrador guardado exitosamente.');
-        },
-        error: (err: HttpErrorResponse) => {
-          this.guardando.set(false);
-          this.procesarErrorGuardado(err);
-        },
-      });
+        }
+        const guardarCambiosPendientes = this.guardadoForzadoDuranteSolicitud && hayCambiosNuevos;
+        this.guardadoForzadoDuranteSolicitud = false;
+        if (guardarCambiosPendientes) {
+          this.guardarBorrador(false);
+        }
+      },
+      error: (err: HttpErrorResponse) => {
+        this.guardando.set(false);
+        this.estadoAutoguardado.set(null);
+        this.procesarErrorGuardado(err);
+      },
+    });
   }
 
   severidadIc(estado: string | null | undefined): 'success' | 'warn' | 'danger' | 'secondary' {
