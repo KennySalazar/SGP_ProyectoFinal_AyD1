@@ -5,6 +5,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -17,8 +18,11 @@ import gt.usac.cunoc.sgp.common.security.JwtService;
 import gt.usac.cunoc.sgp.common.security.ProblemAccessDeniedHandler;
 import gt.usac.cunoc.sgp.common.security.ProblemAuthenticationEntryPoint;
 import gt.usac.cunoc.sgp.inspeccion.dto.DatosPermanentesResponse;
+import gt.usac.cunoc.sgp.inspeccion.dto.GuardarBorradorRequest;
 import gt.usac.cunoc.sgp.inspeccion.dto.IniciarInspeccionRequest;
 import gt.usac.cunoc.sgp.inspeccion.dto.IniciarInspeccionResponse;
+import gt.usac.cunoc.sgp.inspeccion.dto.InspeccionBorradorResponse;
+import gt.usac.cunoc.sgp.inspeccion.dto.ProgresoBorradorResponse;
 import gt.usac.cunoc.sgp.inspeccion.service.InspeccionService;
 import gt.usac.cunoc.sgp.usuario.model.RoleName;
 import gt.usac.cunoc.sgp.usuario.repository.UserAccountRepository;
@@ -204,5 +208,140 @@ class InspeccionControllerTest {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.tipologiaPuente").value("Viga losa"))
         .andExpect(jsonPath("$.anioConstruccion").value(2010));
+  }
+
+  @Test
+  @DisplayName("HU-025: PUT /api/v1/inspecciones/{id}/borrador guarda avances del borrador y responde 200")
+  void guardarBorrador_retorna200ConProgreso() throws Exception {
+    UUID usuarioId = UUID.randomUUID();
+    UUID inspeccionId = UUID.randomUUID();
+    UUID puenteId = UUID.randomUUID();
+    UUID versionFormularioId = UUID.randomUUID();
+
+    var auth = autenticacionMock(usuarioId, RoleName.CATEDRATICO);
+    SecurityContext context = SecurityContextHolder.createEmptyContext();
+    context.setAuthentication(auth);
+    SecurityContextHolder.setContext(context);
+
+    GuardarBorradorRequest request =
+        new GuardarBorradorRequest(0L, objectMapper.createObjectNode(), null, null, null);
+
+    ProgresoBorradorResponse progreso =
+        new ProgresoBorradorResponse(79, 12, 15.19, List.of());
+
+    InspeccionBorradorResponse response =
+        new InspeccionBorradorResponse(
+            inspeccionId,
+            puenteId,
+            "P-001",
+            "Puente Central",
+            versionFormularioId,
+            "SIECA-v1",
+            usuarioId,
+            "CATEDRATICO",
+            "Profesor",
+            "BORRADOR",
+            LocalDate.of(2026, 10, 15),
+            "disp-1",
+            null,
+            null,
+            null,
+            null,
+            false,
+            null,
+            false,
+            null,
+            null,
+            objectMapper.createObjectNode(),
+            List.of(),
+            1L,
+            Instant.now(),
+            Instant.now(),
+            Instant.now(),
+            progreso,
+            null);
+
+    when(inspeccionService.guardarBorrador(eq(inspeccionId), any(), eq(usuarioId)))
+        .thenReturn(response);
+
+    mvc.perform(
+            put("/api/v1/inspecciones/" + inspeccionId + "/borrador")
+                .principal(auth)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.id").value(inspeccionId.toString()))
+        .andExpect(jsonPath("$.estado").value("BORRADOR"))
+        .andExpect(jsonPath("$.progreso.totalCamposRequeridos").value(79));
+  }
+
+  @Test
+  @DisplayName("HU-025: GET /api/v1/inspecciones/{id}/borrador retorna información del borrador para reanudar edición")
+  void obtenerBorrador_retorna200ConDetalles() throws Exception {
+    UUID usuarioId = UUID.randomUUID();
+    UUID inspeccionId = UUID.randomUUID();
+    UUID puenteId = UUID.randomUUID();
+    UUID versionFormularioId = UUID.randomUUID();
+
+    var auth = autenticacionMock(usuarioId, RoleName.CATEDRATICO);
+    SecurityContext context = SecurityContextHolder.createEmptyContext();
+    context.setAuthentication(auth);
+    SecurityContextHolder.setContext(context);
+
+    ProgresoBorradorResponse progreso =
+        new ProgresoBorradorResponse(79, 12, 15.19, List.of());
+
+    InspeccionBorradorResponse response =
+        new InspeccionBorradorResponse(
+            inspeccionId,
+            puenteId,
+            "P-001",
+            "Puente Central",
+            versionFormularioId,
+            "SIECA-v1",
+            usuarioId,
+            "CATEDRATICO",
+            "Profesor",
+            "BORRADOR",
+            LocalDate.of(2026, 10, 15),
+            "disp-1",
+            null,
+            null,
+            null,
+            null,
+            false,
+            null,
+            false,
+            null,
+            null,
+            objectMapper.createObjectNode(),
+            List.of(),
+            0L,
+            Instant.now(),
+            Instant.now(),
+            Instant.now(),
+            progreso,
+            null);
+
+    when(inspeccionService.obtenerBorrador(eq(inspeccionId), eq(usuarioId)))
+        .thenReturn(response);
+
+    mvc.perform(
+            get("/api/v1/inspecciones/" + inspeccionId + "/borrador")
+                .principal(auth)
+                .accept(MediaType.APPLICATION_JSON))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.id").value(inspeccionId.toString()))
+        .andExpect(jsonPath("$.estado").value("BORRADOR"))
+        .andExpect(jsonPath("$.progreso.secciones").isArray());
+  }
+
+  private UsernamePasswordAuthenticationToken autenticacionMock(UUID usuarioId, RoleName rol) {
+    JwtData jwtData = new JwtData("usuario@cunoc.edu.gt", usuarioId, rol, 0);
+    UsernamePasswordAuthenticationToken auth =
+        new UsernamePasswordAuthenticationToken(
+            jwtData.email(), null, List.of(new SimpleGrantedAuthority("ROLE_" + rol.name())));
+    auth.setDetails(jwtData);
+    return auth;
   }
 }

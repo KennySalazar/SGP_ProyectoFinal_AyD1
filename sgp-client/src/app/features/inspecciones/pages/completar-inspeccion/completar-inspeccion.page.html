@@ -1,0 +1,177 @@
+<section class="pagina-borrador">
+  @if (cargando()) {
+  <div class="estado-cargando surface-card" role="status">
+    <i class="pi pi-spin pi-spinner" aria-hidden="true"></i>
+    <p>{{ 'inspecciones.borrador.cargando' | transloco }}</p>
+  </div>
+  } @else if (errorCarga(); as errCarga) {
+  <div class="estado-mensaje estado-error surface-card" role="alert">
+    <i class="pi pi-exclamation-circle" aria-hidden="true"></i>
+    <h2>{{ errCarga }}</h2>
+    <a pButton routerLink="/puentes" class="btn-volver">
+      <i class="pi pi-arrow-left" aria-hidden="true"></i>
+      <span>{{ 'inspecciones.borrador.volverPuente' | transloco }}</span>
+    </a>
+  </div>
+  } @else if (borrador(); as b) {
+  <!-- Encabezado de la página -->
+  <header class="page-heading encabezado-inspeccion">
+    <div>
+      <p class="page-kicker">{{ 'inspecciones.borrador.kicker' | transloco }}</p>
+      <h1 class="page-title">{{ b.nombrePuente }} ({{ b.codigoPuente }})</h1>
+      <div class="meta-inspeccion">
+        <p-tag [value]="b.estado" severity="warn" />
+        <span class="meta-item">
+          <strong>{{ 'inspecciones.borrador.formulario' | transloco }}:</strong>
+          {{ b.codigoVersionFormulario }}
+        </span>
+        <span class="meta-item">
+          <strong>{{ 'inspecciones.borrador.inspector' | transloco }}:</strong>
+          {{ b.nombreAutor }} ({{ b.rolAutor }})
+        </span>
+        @if (b.ultimaActividadEn) {
+        <span class="meta-item meta-tiempo">
+          <strong>{{ 'inspecciones.borrador.ultimaActividad' | transloco }}:</strong>
+          {{ b.ultimaActividadEn | date: 'dd/MM/yyyy HH:mm' }}
+        </span>
+        }
+      </div>
+    </div>
+
+    <div class="acciones-encabezado">
+      <div class="campo-fecha">
+        <label for="fechaInspeccionInput" class="etiqueta-fecha">
+          {{ 'inspecciones.borrador.fechaInspeccion' | transloco }}:
+        </label>
+        <input
+          id="fechaInspeccionInput"
+          pInputText
+          type="date"
+          [max]="hoy"
+          [ngModel]="fechaInspeccion()"
+          (ngModelChange)="fechaInspeccion.set($event)"
+          class="input-fecha"
+        />
+      </div>
+
+      <a
+        pButton
+        severity="secondary"
+        [outlined]="true"
+        [routerLink]="['/puentes', b.puenteId]"
+        class="btn-volver"
+      >
+        <i class="pi pi-arrow-left" aria-hidden="true"></i>
+        <span>{{ 'inspecciones.borrador.volverPuente' | transloco }}</span>
+      </a>
+
+      <button
+        pButton
+        type="button"
+        (click)="guardarBorrador()"
+        [disabled]="guardando()"
+        [loading]="guardando()"
+        class="btn-guardar"
+      >
+        <i class="pi pi-save" aria-hidden="true"></i>
+        <span
+          >{{ (guardando() ? 'inspecciones.borrador.guardando' : 'inspecciones.borrador.guardar' ) |
+          transloco }}</span
+        >
+      </button>
+    </div>
+  </header>
+
+  <!-- Avisos de resultado de guardado -->
+  @if (mensajeExito(); as exito) {
+  <div class="alerta-exito surface-card" role="status">
+    <i class="pi pi-check-circle" aria-hidden="true"></i>
+    <span>{{ exito }}</span>
+  </div>
+  } @if (errorGuardado(); as errGuardado) {
+  <div class="alerta-error surface-card" role="alert">
+    <i class="pi pi-exclamation-triangle" aria-hidden="true"></i>
+    <span>{{ errGuardado }}</span>
+  </div>
+  }
+
+  <!-- Panel de Avance y Condición Preliminar -->
+  <div class="resumen-panel surface-card">
+    <div class="avance-general">
+      <div class="avance-cabecera">
+        <h3>
+          <i class="pi pi-chart-line" aria-hidden="true"></i>
+          {{ 'inspecciones.borrador.progresoTitulo' | transloco }}
+        </h3>
+        <span class="avance-badge">
+          {{ 'inspecciones.borrador.progresoResumen' | transloco : { completados:
+          b.progreso.totalCamposCompletados, total: b.progreso.totalCamposRequeridos, porcentaje:
+          b.progreso.porcentajeTotal } }}
+        </span>
+      </div>
+      <p-progressBar [value]="b.progreso.porcentajeTotal" [showValue]="false" />
+    </div>
+
+    <!-- Índice de Condición Preliminar (cuando backend lo proporcione) -->
+    @if (b.icPreliminar; as ic) {
+    <div class="ic-preliminar-card">
+      <div class="ic-cabecera">
+        <span class="ic-titulo"
+          >{{ 'inspecciones.borrador.indicePreliminarTitulo' | transloco }}</span
+        >
+        <p-tag
+          [value]="ic.etiqueta || ('inspecciones.borrador.etiquetaPreliminar' | transloco)"
+          severity="info"
+        />
+      </div>
+      <div class="ic-valores">
+        <span class="ic-numero">{{ ic.indice | number: '1.2-2' }}</span>
+        <p-tag [value]="ic.estado" [severity]="severidadIc(ic.estado)" class="ic-tag-estado" />
+      </div>
+      <p class="ic-nota">{{ 'inspecciones.borrador.indicePreliminarNota' | transloco }}</p>
+    </div>
+    }
+
+    <!-- Avance por las 8 secciones -->
+    @if (b.progreso.secciones && b.progreso.secciones.length > 0) {
+    <div class="secciones-progreso">
+      <h4>{{ 'inspecciones.borrador.seccionesTitulo' | transloco }}</h4>
+      <div class="secciones-grid">
+        @for (sec of b.progreso.secciones; track sec.seccion) {
+        <div class="seccion-item" [class.completa]="sec.completada">
+          <div class="seccion-item-cabecera">
+            <span class="seccion-item-titulo">{{ sec.titulo }}</span>
+            <p-tag
+              [value]="
+                      (sec.completada
+                        ? 'inspecciones.borrador.seccionCompleta'
+                        : 'inspecciones.borrador.seccionPendiente'
+                      ) | transloco
+                    "
+              [severity]="sec.completada ? 'success' : 'warn'"
+            />
+          </div>
+          <div class="seccion-item-datos">
+            <span class="seccion-item-contador">
+              {{ sec.camposCompletados }}/{{ sec.camposRequeridos }} campos
+            </span>
+            <span class="seccion-item-porcentaje">{{ sec.porcentaje }}%</span>
+          </div>
+        </div>
+        }
+      </div>
+    </div>
+    }
+  </div>
+
+  <!-- Formulario Dinámico -->
+  @if (esquema(); as esq) {
+  <div class="formulario-contenedor">
+    <app-formulario-dinamico
+      [esquema]="esq"
+      [valoresIniciales]="valoresIniciales()"
+      (valorChange)="onValorChange($event)"
+    />
+  </div>
+  } }
+</section>

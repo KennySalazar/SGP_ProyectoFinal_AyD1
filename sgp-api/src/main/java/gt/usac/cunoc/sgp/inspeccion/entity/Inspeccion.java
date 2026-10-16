@@ -308,4 +308,29 @@ public class Inspeccion {
   public void agregarAcompanante(InspeccionAcompanante acompanante) {
     this.acompanantes.add(acompanante);
   }
+
+  public void actualizarBorrador(
+      JsonNode datos,
+      JsonNode identificacionCapturada,
+      LocalDate fechaInspeccion,
+      Instant ahora) {
+    if (datos != null) {
+      this.datos = datos;
+    }
+    if (identificacionCapturada != null) {
+      this.identificacionCapturada = identificacionCapturada;
+    }
+    if (fechaInspeccion != null) {
+      this.fechaInspeccion = fechaInspeccion;
+    }
+    this.ultimaActividadEn = ahora;
+    this.actualizadoEn = ahora;
+  }
+
+  public void reemplazarAcompanantes(List<InspeccionAcompanante> nuevosAcompanantes) {
+    this.acompanantes.clear();
+    if (nuevosAcompanantes != null) {
+      this.acompanantes.addAll(nuevosAcompanantes);
+    }
+  }
 }

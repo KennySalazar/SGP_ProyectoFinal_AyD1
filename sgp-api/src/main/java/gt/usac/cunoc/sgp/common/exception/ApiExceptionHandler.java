@@ -5,6 +5,7 @@ import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ProblemDetail;
@@ -83,6 +84,19 @@ public class ApiExceptionHandler {
             "Conflicto de datos",
             "La operacion entra en conflicto con los datos existentes",
             "data_conflict",
+            request);
+    return response(problem, HttpStatus.CONFLICT);
+  }
+
+  @ExceptionHandler(OptimisticLockingFailureException.class)
+  ResponseEntity<ProblemDetail> handleOptimisticLock(
+      OptimisticLockingFailureException exception, HttpServletRequest request) {
+    ProblemDetail problem =
+        ProblemDetails.create(
+            409,
+            "Conflicto de concurrencia",
+            "La inspección fue modificada concurrentemente por otra sesión o dispositivo",
+            "concurrencia_conflicto",
             request);
     return response(problem, HttpStatus.CONFLICT);
   }

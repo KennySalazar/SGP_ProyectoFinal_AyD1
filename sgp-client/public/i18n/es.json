@@ -1035,7 +1035,35 @@
       "agregarAcompanante": "Agregar",
       "quitarAcompanante": "Quitar acompañante",
       "iniciando": "Iniciando inspección...",
-      "botonIniciar": "Iniciar inspección"
+      "botonIniciar": "Iniciar inspección",
+      "irAFormulario": "Ir al formulario"
+    },
+    "borrador": {
+      "kicker": "INSPECCIÓN TÉCNICA · BORRADOR",
+      "titulo": "Completar inspección técnica",
+      "subtitulo": "Captura y edición incremental de borrador de inspección de puente",
+      "volverPuente": "Volver a ficha del puente",
+      "guardar": "Guardar borrador",
+      "guardando": "Guardando...",
+      "guardadoExitoso": "Avance de borrador guardado exitosamente.",
+      "cargando": "Cargando inspección y esquema del formulario...",
+      "notFound": "Inspección no encontrada o no tiene permisos para acceder a este borrador.",
+      "forbidden": "Acceso denegado: Solo el autor de la inspección puede modificar este borrador.",
+      "conflictStale": "Conflicto de concurrencia: El borrador fue modificado concurrentemente por otra sesión o dispositivo.",
+      "conflictNonDraft": "La inspección no es editable porque ya no se encuentra en estado Borrador.",
+      "generalError": "Ocurrió un error al procesar la solicitud.",
+      "fechaInspeccion": "Fecha de inspección",
+      "inspector": "Inspector",
+      "formulario": "Versión del formulario",
+      "ultimaActividad": "Última actividad",
+      "progresoTitulo": "Progreso general de la inspección",
+      "progresoResumen": "{{completados}} de {{total}} campos obligatorios completados ({{porcentaje}}%)",
+      "seccionesTitulo": "Progreso por sección (8 secciones)",
+      "seccionCompleta": "Completa",
+      "seccionPendiente": "Pendiente",
+      "indicePreliminarTitulo": "Índice de Condición Preliminar",
+      "etiquetaPreliminar": "Preliminar",
+      "indicePreliminarNota": "Este cálculo es preliminar con base en los elementos evaluados hasta el momento. No altera el estado oficial del puente."
     }
   }
 }

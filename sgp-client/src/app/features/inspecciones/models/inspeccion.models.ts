@@ -1,13 +1,17 @@
 export interface AcompananteRequest {
   id?: string | null;
+  usuarioId?: string | null;
   nombre: string;
   colegiado?: string | null;
+  numeroColegiado?: string | null;
 }
 
 export interface AcompananteResponse {
   id: string;
+  usuarioId?: string | null;
   nombre: string;
   colegiado?: string | null;
+  numeroColegiado?: string | null;
 }
 
 export interface IniciarInspeccionRequest {
@@ -71,4 +75,59 @@ export interface IniciarInspeccionResponse {
   datosPermanentes?: DatosPermanentesResponse | null;
   acompanantes: AcompananteResponse[];
   creadoEn: string;
+}
+
+export interface ProgresoSeccionResponse {
+  seccion: string;
+  titulo: string;
+  camposRequeridos: number;
+  camposCompletados: number;
+  porcentaje: number;
+  completada: boolean;
+}
+
+export interface ProgresoBorradorResponse {
+  totalCamposRequeridos: number;
+  totalCamposCompletados: number;
+  porcentajeTotal: number;
+  secciones: ProgresoSeccionResponse[];
+}
+
+export interface IndiceCondicionPreliminarResponse {
+  indice: number;
+  estado: string;
+  etiqueta: string;
+}
+
+export interface GuardarBorradorRequest {
+  version?: number | null;
+  datos?: Record<string, unknown> | null;
+  identificacionCapturada?: Record<string, unknown> | null;
+  fechaInspeccion?: string | null;
+  acompanantes?: AcompananteRequest[] | null;
+}
+
+export interface InspeccionBorradorResponse {
+  id: string;
+  puenteId: string;
+  codigoPuente: string;
+  nombrePuente: string;
+  versionFormularioId: string;
+  codigoVersionFormulario: string;
+  autorId: string;
+  rolAutor: string;
+  nombreAutor: string;
+  estado: string;
+  fechaInspeccion: string;
+  dispositivoId: string;
+  datosPermanentes?: DatosPermanentesResponse | null;
+  datos?: Record<string, unknown> | null;
+  identificacionCapturada?: Record<string, unknown> | null;
+  acompanantes: AcompananteResponse[];
+  version: number;
+  ultimaActividadEn?: string | null;
+  creadoEn: string;
+  actualizadoEn?: string | null;
+  progreso: ProgresoBorradorResponse;
+  icPreliminar?: IndiceCondicionPreliminarResponse | null;
 }

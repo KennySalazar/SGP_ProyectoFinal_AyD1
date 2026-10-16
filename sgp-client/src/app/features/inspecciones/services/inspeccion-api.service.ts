@@ -3,8 +3,10 @@ import { inject, Injectable } from '@angular/core';
 import { map, Observable } from 'rxjs';
 import {
   DatosPermanentesResponse,
+  GuardarBorradorRequest,
   IniciarInspeccionRequest,
   IniciarInspeccionResponse,
+  InspeccionBorradorResponse,
 } from '../models/inspeccion.models';
 
 @Injectable({ providedIn: 'root' })
@@ -30,5 +32,21 @@ export class InspeccionApiService {
         observe: 'response',
       })
       .pipe(map((res) => (res.status === 204 ? null : res.body)));
+  }
+
+  obtenerBorrador(id: string): Observable<InspeccionBorradorResponse> {
+    return this.http.get<InspeccionBorradorResponse>(
+      `/api/v1/inspecciones/${encodeURIComponent(id)}/borrador`,
+    );
+  }
+
+  guardarBorrador(
+    id: string,
+    request: GuardarBorradorRequest,
+  ): Observable<InspeccionBorradorResponse> {
+    return this.http.put<InspeccionBorradorResponse>(
+      `/api/v1/inspecciones/${encodeURIComponent(id)}/borrador`,
+      request,
+    );
   }
 }

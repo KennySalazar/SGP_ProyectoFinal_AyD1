@@ -21,6 +21,11 @@ export const routes: Routes = [
         loadComponent: () =>
           import('./offline/pages/diagnostics/diagnostics.page').then((m) => m.DiagnosticsPage),
       },
+      {
+        path: 'inspecciones',
+        loadChildren: () =>
+          import('./features/inspecciones/inspecciones.routes').then((m) => m.inspeccionesRoutes),
+      },
 
       {
         path: 'formulario/vista-previa',

@@ -104,9 +104,13 @@
         </div>
 
         <div class="dialog-acciones">
-          <button pButton type="button" (click)="cerrar()">
+          <button pButton type="button" severity="secondary" [outlined]="true" (click)="cerrar()">
             <i class="pi pi-check" aria-hidden="true"></i>
             <span>{{ 'common.close' | transloco }}</span>
+          </button>
+          <button pButton type="button" (click)="irAFormulario(res.id)">
+            <i class="pi pi-pencil" aria-hidden="true"></i>
+            <span>{{ 'inspecciones.iniciar.irAFormulario' | transloco }}</span>
           </button>
         </div>
       </div>

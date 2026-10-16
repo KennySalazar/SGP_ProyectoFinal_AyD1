@@ -11,8 +11,10 @@ import gt.usac.cunoc.sgp.formulario.repository.VersionFormularioRepository;
 import gt.usac.cunoc.sgp.inspeccion.dto.AcompananteRequest;
 import gt.usac.cunoc.sgp.inspeccion.dto.AcompananteResponse;
 import gt.usac.cunoc.sgp.inspeccion.dto.DatosPermanentesResponse;
+import gt.usac.cunoc.sgp.inspeccion.dto.GuardarBorradorRequest;
 import gt.usac.cunoc.sgp.inspeccion.dto.IniciarInspeccionRequest;
 import gt.usac.cunoc.sgp.inspeccion.dto.IniciarInspeccionResponse;
+import gt.usac.cunoc.sgp.inspeccion.dto.InspeccionBorradorResponse;
 import gt.usac.cunoc.sgp.inspeccion.entity.Inspeccion;
 import gt.usac.cunoc.sgp.inspeccion.entity.InspeccionAcompanante;
 import gt.usac.cunoc.sgp.inspeccion.entity.InspeccionDatoTecnico;
@@ -26,6 +28,10 @@ import gt.usac.cunoc.sgp.usuario.entity.UserAccount;
 import gt.usac.cunoc.sgp.usuario.model.RoleName;
 import gt.usac.cunoc.sgp.usuario.repository.UserAccountRepository;
 import gt.usac.cunoc.sgp.usuario.repository.UsuarioProfesionalRepository;
+import gt.usac.cunoc.sgp.inspeccion.dto.IndiceCondicionPreliminarResponse;
+import gt.usac.cunoc.sgp.inspeccion.dto.ProgresoBorradorResponse;
+import gt.usac.cunoc.sgp.inspeccion.model.EntradaCalculoIc;
+import gt.usac.cunoc.sgp.inspeccion.model.ResultadoCalculoIc;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.nio.charset.StandardCharsets;
@@ -36,6 +42,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
+import java.util.ArrayList;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Optional;
@@ -44,6 +51,7 @@ import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.GeometryFactory;
 import org.locationtech.jts.geom.Point;
 import org.locationtech.jts.geom.PrecisionModel;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -65,6 +73,9 @@ public class InspeccionService {
   private final AuditoriaWriter auditoriaWriter;
   private final ObjectMapper objectMapper;
   private final Clock clock;
+  private final CalculadorProgresoBorrador calculadorProgreso;
+  private final PreparadorEntradaIcService preparadorEntradaIcService;
+  private final CalculoIndiceCondicionService calculoIndiceCondicionService;
 
   public InspeccionService(
       InspeccionRepository inspeccionRepository,
@@ -77,6 +88,37 @@ public class InspeccionService {
       AuditoriaWriter auditoriaWriter,
       ObjectMapper objectMapper,
       Clock clock) {
+    this(
+        inspeccionRepository,
+        datoTecnicoRepository,
+        puenteRepository,
+        versionFormularioRepository,
+        userAccountRepository,
+        profesionalRepository,
+        operacionIdempotenteRepository,
+        auditoriaWriter,
+        objectMapper,
+        clock,
+        null,
+        null,
+        null);
+  }
+
+  @Autowired
+  public InspeccionService(
+      InspeccionRepository inspeccionRepository,
+      InspeccionDatoTecnicoRepository datoTecnicoRepository,
+      PuenteRepository puenteRepository,
+      VersionFormularioRepository versionFormularioRepository,
+      UserAccountRepository userAccountRepository,
+      UsuarioProfesionalRepository profesionalRepository,
+      OperacionIdempotenteRepository operacionIdempotenteRepository,
+      AuditoriaWriter auditoriaWriter,
+      ObjectMapper objectMapper,
+      Clock clock,
+      CalculadorProgresoBorrador calculadorProgreso,
+      PreparadorEntradaIcService preparadorEntradaIcService,
+      CalculoIndiceCondicionService calculoIndiceCondicionService) {
     this.inspeccionRepository = inspeccionRepository;
     this.datoTecnicoRepository = datoTecnicoRepository;
     this.puenteRepository = puenteRepository;
@@ -87,6 +129,10 @@ public class InspeccionService {
     this.auditoriaWriter = auditoriaWriter;
     this.objectMapper = objectMapper;
     this.clock = clock;
+    this.calculadorProgreso =
+        calculadorProgreso != null ? calculadorProgreso : new CalculadorProgresoBorrador();
+    this.preparadorEntradaIcService = preparadorEntradaIcService;
+    this.calculoIndiceCondicionService = calculoIndiceCondicionService;
   }
 
   @Transactional
@@ -142,6 +188,150 @@ public class InspeccionService {
     return datoTecnicoRepository
         .findByInspeccionId(puente.getInspeccionVigenteId())
         .map(this::aDatosPermanentesResponse);
+  }
+
+  @Transactional
+  public InspeccionBorradorResponse guardarBorrador(
+      UUID id, GuardarBorradorRequest request, UUID usuarioId) {
+    Inspeccion inspeccion =
+        inspeccionRepository
+            .findConDetallesById(id)
+            .orElseThrow(
+                () ->
+                    new ApiException(
+                        HttpStatus.NOT_FOUND,
+                        "inspeccion_no_encontrada",
+                        "Inspección no encontrada",
+                        "No se encontró la inspección especificada."));
+
+    if (inspeccion.getEliminadoEn() != null) {
+      throw new ApiException(
+          HttpStatus.NOT_FOUND,
+          "inspeccion_no_encontrada",
+          "Inspección no encontrada",
+          "No se encontró la inspección especificada.");
+    }
+
+    // 7. Solo el autor puede editar
+    if (!inspeccion.getAutorId().equals(usuarioId)) {
+      throw new ApiException(
+          HttpStatus.FORBIDDEN,
+          "acceso_denegado",
+          "Acceso denegado",
+          "Solo el autor puede modificar esta inspección en borrador.");
+    }
+
+    // 6. Solo BORRADOR puede editarse
+    if (!"BORRADOR".equals(inspeccion.getEstado())) {
+      throw new ApiException(
+          HttpStatus.CONFLICT,
+          "inspeccion_no_editable",
+          "Inspección no editable",
+          "Solo las inspecciones en estado BORRADOR pueden ser modificadas.");
+    }
+
+    // 8. Ediciones obsoletas / concurrencia optimista
+    if (request != null && request.version() != null && request.version() != inspeccion.getVersion()) {
+      throw new ApiException(
+          HttpStatus.CONFLICT,
+          "concurrencia_conflicto",
+          "Conflicto de concurrencia",
+          "La inspección fue modificada concurrentemente por otra sesión o dispositivo.");
+    }
+
+    // 9. Fechas futuras o anteriores a la construcción
+    if (request != null && request.fechaInspeccion() != null) {
+      LocalDate hoy = LocalDate.now(clock);
+      if (request.fechaInspeccion().isAfter(hoy)) {
+        throw new ApiException(
+            HttpStatus.UNPROCESSABLE_ENTITY,
+            "fecha_futura",
+            "Fecha de inspección inválida",
+            "La fecha de inspección no puede ser posterior a la fecha actual.");
+      }
+
+      Short anioConstruccion = null;
+      if (inspeccion.getDatoTecnico() != null
+          && inspeccion.getDatoTecnico().getAnioConstruccion() != null) {
+        anioConstruccion = inspeccion.getDatoTecnico().getAnioConstruccion();
+      } else if (inspeccion.getPuente().getInspeccionVigenteId() != null) {
+        var tv =
+            datoTecnicoRepository
+                .findByInspeccionId(inspeccion.getPuente().getInspeccionVigenteId())
+                .orElse(null);
+        if (tv != null) {
+          anioConstruccion = tv.getAnioConstruccion();
+        }
+      }
+
+      if (anioConstruccion != null && request.fechaInspeccion().getYear() < anioConstruccion) {
+        throw new ApiException(
+            HttpStatus.UNPROCESSABLE_ENTITY,
+            "fecha_anterior_construccion",
+            "Fecha de inspección inválida",
+            "La fecha de inspección ("
+                + request.fechaInspeccion()
+                + ") no puede ser anterior al año de construcción registrado ("
+                + anioConstruccion
+                + ").");
+      }
+    }
+
+    Instant ahora = clock.instant();
+
+    if (request != null) {
+      inspeccion.actualizarBorrador(
+          request.datos(),
+          request.identificacionCapturada(),
+          request.fechaInspeccion(),
+          ahora);
+
+      if (request.acompanantes() != null) {
+        List<InspeccionAcompanante> nuevos = new ArrayList<>();
+        for (AcompananteRequest a : request.acompanantes()) {
+          nuevos.add(
+              new InspeccionAcompanante(
+                  UuidV7Generator.generate(),
+                  inspeccion,
+                  a.usuarioId(),
+                  a.nombre().trim(),
+                  a.numeroColegiado() != null ? a.numeroColegiado().trim() : null,
+                  ahora));
+        }
+        inspeccion.reemplazarAcompanantes(nuevos);
+      }
+    } else {
+      inspeccion.actualizarBorrador(null, null, null, ahora);
+    }
+
+    inspeccionRepository.save(inspeccion);
+
+    return aBorradorResponse(inspeccion);
+  }
+
+  @Transactional(readOnly = true)
+  public InspeccionBorradorResponse obtenerBorrador(UUID id, UUID usuarioId) {
+    Inspeccion inspeccion =
+        inspeccionRepository
+            .findConDetallesById(id)
+            .orElseThrow(
+                () ->
+                    new ApiException(
+                        HttpStatus.NOT_FOUND,
+                        "inspeccion_no_encontrada",
+                        "Inspección no encontrada",
+                        "No se encontró la inspección especificada o no tiene acceso a ella."));
+
+    // 4. Privacidad: 404 para usuarios no autorizados o eliminados
+    if (inspeccion.getEliminadoEn() != null || !inspeccion.getAutorId().equals(usuarioId)) {
+      throw new ApiException(
+          HttpStatus.NOT_FOUND,
+          "inspeccion_no_encontrada",
+          "Inspección no encontrada",
+          "No se encontró la inspección especificada o no tiene acceso a ella.");
+    }
+
+    return aBorradorResponse(inspeccion);
   }
 
   private IniciarInspeccionResponse crearNuevaInspeccion(
@@ -473,6 +663,87 @@ public class InspeccionService {
         i.getCreadoEn());
   }
 
+  private InspeccionBorradorResponse aBorradorResponse(Inspeccion inspeccion) {
+    List<AcompananteResponse> acompanantes =
+        inspeccion.getAcompanantes().stream()
+            .map(
+                a ->
+                    new AcompananteResponse(
+                        a.getId(), a.getUsuarioId(), a.getNombre(), a.getNumeroColegiado()))
+            .toList();
+
+    DatosPermanentesResponse dp =
+        inspeccion.getDatoTecnico() != null
+            ? aDatosPermanentesResponse(inspeccion.getDatoTecnico())
+            : null;
+
+    Double latitud =
+        inspeccion.getUbicacionInicio() != null ? inspeccion.getUbicacionInicio().getY() : null;
+    Double longitud =
+        inspeccion.getUbicacionInicio() != null ? inspeccion.getUbicacionInicio().getX() : null;
+
+    ProgresoBorradorResponse progreso = calculadorProgreso.calcularProgreso(inspeccion);
+    IndiceCondicionPreliminarResponse icPreliminar = calcularIcPreliminar(inspeccion);
+
+    return new InspeccionBorradorResponse(
+        inspeccion.getId(),
+        inspeccion.getPuente().getId(),
+        inspeccion.getPuente().getCodigo(),
+        inspeccion.getPuente().getNombre(),
+        inspeccion.getVersionFormulario().getId(),
+        inspeccion.getVersionFormulario().getCodigo(),
+        inspeccion.getAutorId(),
+        inspeccion.getRolAutorCreacion(),
+        inspeccion.getNombreAutorCapturado(),
+        inspeccion.getEstado(),
+        inspeccion.getFechaInspeccion(),
+        inspeccion.getDispositivoId(),
+        latitud,
+        longitud,
+        inspeccion.getPrecisionGpsM(),
+        inspeccion.getDistanciaAlPuenteM(),
+        false,
+        null,
+        inspeccion.getDatosPermanentesConfirmadosEn() != null,
+        dp,
+        inspeccion.getIdentificacionCapturada(),
+        inspeccion.getDatos(),
+        acompanantes,
+        inspeccion.getVersion(),
+        inspeccion.getUltimaActividadEn(),
+        inspeccion.getCreadoEn(),
+        inspeccion.getActualizadoEn(),
+        progreso,
+        icPreliminar);
+  }
+
+  private IndiceCondicionPreliminarResponse calcularIcPreliminar(Inspeccion inspeccion) {
+    if (preparadorEntradaIcService == null || calculoIndiceCondicionService == null) {
+      return null;
+    }
+    try {
+      if (inspeccion.getVersionFormulario() == null
+          || inspeccion.getDatos() == null
+          || !inspeccion.getDatos().isObject()
+          || inspeccion.getDatos().isEmpty()) {
+        return null;
+      }
+      EntradaCalculoIc entrada =
+          preparadorEntradaIcService.preparar(
+              inspeccion.getVersionFormulario().getId(), inspeccion.getDatos());
+      ResultadoCalculoIc resultado = calculoIndiceCondicionService.calcular(entrada);
+      if (resultado != null && resultado.indiceCalculado() != null) {
+        String estado =
+            resultado.estadoCalculado() != null ? resultado.estadoCalculado().name() : null;
+        return new IndiceCondicionPreliminarResponse(
+            resultado.indiceCalculado(), estado, "Preliminar");
+      }
+    } catch (Exception ignored) {
+      // Incomplete data for IC calculation is expected during partial draft saves
+    }
+    return null;
+  }
+
   private DatosPermanentesResponse aDatosPermanentesResponse(InspeccionDatoTecnico d) {
     return new DatosPermanentesResponse(
         d.getLongitudM(),
@@ -488,7 +759,7 @@ public class InspeccionService {
         d.getMaterialSuperestructura(),
         d.getMaterialSubestructura(),
         d.getCargaDiseno(),
-        d.getAnioConstruccion(),
+        d.getAnioConstruccion() != null ? d.getAnioConstruccion().intValue() : null,
         d.getRutaPavimentada(),
         d.getAlineamientoHorizontal(),
         d.getEsviaje(),
