@@ -100,6 +100,34 @@ public class ApiExceptionHandler {
     return response(problem, HttpStatus.FORBIDDEN);
   }
 
+  @ExceptionHandler(org.springframework.web.multipart.MaxUploadSizeExceededException.class)
+  ResponseEntity<ProblemDetail> handleTamano(Exception e, HttpServletRequest request) {
+    return response(
+        ProblemDetails.create(
+            413,
+            "Carga demasiado grande",
+            "El archivo o la petición exceden el tamaño permitido",
+            "carga_demasiado_grande",
+            request),
+        HttpStatus.PAYLOAD_TOO_LARGE);
+  }
+
+  @ExceptionHandler({
+    org.springframework.http.converter.HttpMessageNotReadableException.class,
+    org.springframework.web.multipart.support.MissingServletRequestPartException.class,
+    org.springframework.web.bind.MissingRequestHeaderException.class
+  })
+  ResponseEntity<ProblemDetail> handleMultipart(Exception e, HttpServletRequest request) {
+    return response(
+        ProblemDetails.create(
+            400,
+            "Solicitud inválida",
+            "Faltan partes o los metadatos no tienen un formato válido",
+            "validation_error",
+            request),
+        HttpStatus.BAD_REQUEST);
+  }
+
   @ExceptionHandler(Exception.class)
   ResponseEntity<ProblemDetail> handleUnexpected(Exception exception, HttpServletRequest request) {
     LOGGER.error("Unexpected API failure", exception);
