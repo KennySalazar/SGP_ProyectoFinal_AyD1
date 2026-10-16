@@ -1,6 +1,6 @@
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
-import { Pipe, PipeTransform, signal } from '@angular/core';
+import { Component, EventEmitter, Input, Output, Pipe, PipeTransform, signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
 import { ActivatedRoute, provideRouter } from '@angular/router';
@@ -11,6 +11,7 @@ import { UserSession } from '../../../../core/models/auth.models';
 import { AppShellComponent } from '../../../../layouts/app-shell/app-shell.component';
 import { SelectorUbicacionComponent } from '../../../../shared/components/selector-ubicacion/selector-ubicacion.component';
 import { SelectorUbicacionStubComponent } from '../../../../shared/components/selector-ubicacion/selector-ubicacion.testing';
+import { IniciarInspeccionDialogComponent } from '../../../inspecciones/components/iniciar-inspeccion-dialog/iniciar-inspeccion-dialog.component';
 import { PuenteResponse } from '../../models/puente.models';
 import { FichaPuentePage } from './ficha-puente.page';
 
@@ -19,6 +20,14 @@ class TraduccionTestPipe implements PipeTransform {
   transform(key: string): string {
     return key;
   }
+}
+
+@Component({ selector: 'app-iniciar-inspeccion-dialog', standalone: true, template: '' })
+class IniciarInspeccionDialogStubComponent {
+  @Input() visible = false;
+  @Input() puente: PuenteResponse | null = null;
+  @Output() visibleChange = new EventEmitter<boolean>();
+  @Output() inspeccionIniciada = new EventEmitter<unknown>();
 }
 
 describe('FichaPuentePage', () => {
@@ -121,8 +130,16 @@ describe('FichaPuentePage', () => {
     });
 
     TestBed.overrideComponent(FichaPuentePage, {
-      remove: { imports: [TranslocoPipe, SelectorUbicacionComponent] },
-      add: { imports: [TraduccionTestPipe, SelectorUbicacionStubComponent] },
+      remove: {
+        imports: [TranslocoPipe, SelectorUbicacionComponent, IniciarInspeccionDialogComponent],
+      },
+      add: {
+        imports: [
+          TraduccionTestPipe,
+          SelectorUbicacionStubComponent,
+          IniciarInspeccionDialogStubComponent,
+        ],
+      },
     });
 
     TestBed.overrideComponent(AppShellComponent, {
@@ -310,5 +327,135 @@ describe('FichaPuentePage', () => {
     expect(filaKm?.query(By.css('.dato-valor'))?.nativeElement.textContent.trim()).toBe(
       'puentes.ficha.notAvailable',
     );
+  });
+
+  it('muestra boton "Iniciar inspeccion" para Catedratico en puente activo', () => {
+    authStoreMock.authenticated.set(true);
+    authStoreMock.user.set({
+      id: 'prof-1',
+      email: 'catedratico@cunoc.edu.gt',
+      role: 'CATEDRATICO',
+      active: true,
+      activated: true,
+      verified: true,
+      twoFactorEnabled: false,
+    });
+
+    iniciarComponente();
+    fixture.detectChanges();
+
+    const peticion = http.expectOne('/api/v1/puentes/puente-sin-evaluar');
+    peticion.flush(puenteSinEvaluar);
+    fixture.detectChanges();
+
+    const btn = fixture.debugElement.query(By.css('.btn-iniciar-inspeccion'));
+    expect(btn).not.toBeNull();
+    expect(page.puedeIniciarInspeccion()).toBe(true);
+
+    btn.nativeElement.click();
+    fixture.detectChanges();
+    expect(page.mostrarModalIniciar()).toBe(true);
+  });
+
+  it('muestra boton "Iniciar inspeccion" para Profesional Externo verificado en puente activo', () => {
+    authStoreMock.authenticated.set(true);
+    authStoreMock.user.set({
+      id: 'prof-ext-1',
+      email: 'profesional@ejemplo.com',
+      role: 'PROFESIONAL_EXTERNO',
+      active: true,
+      activated: true,
+      verified: true,
+      twoFactorEnabled: false,
+      colegiadoVerificado: true,
+    });
+
+    iniciarComponente();
+    fixture.detectChanges();
+
+    const peticion = http.expectOne('/api/v1/puentes/puente-sin-evaluar');
+    peticion.flush(puenteSinEvaluar);
+    fixture.detectChanges();
+
+    const btn = fixture.debugElement.query(By.css('.btn-iniciar-inspeccion'));
+    expect(btn).not.toBeNull();
+    expect(page.puedeIniciarInspeccion()).toBe(true);
+  });
+
+  it('NO muestra boton "Iniciar inspeccion" para Profesional Externo NO verificado', () => {
+    authStoreMock.authenticated.set(true);
+    authStoreMock.user.set({
+      id: 'prof-ext-2',
+      email: 'profesional2@ejemplo.com',
+      role: 'PROFESIONAL_EXTERNO',
+      active: true,
+      activated: true,
+      verified: true,
+      twoFactorEnabled: false,
+      colegiadoVerificado: false,
+    });
+
+    iniciarComponente();
+    fixture.detectChanges();
+
+    const peticion = http.expectOne('/api/v1/puentes/puente-sin-evaluar');
+    peticion.flush(puenteSinEvaluar);
+    fixture.detectChanges();
+
+    const btn = fixture.debugElement.query(By.css('.btn-iniciar-inspeccion'));
+    expect(btn).toBeNull();
+    expect(page.puedeIniciarInspeccion()).toBe(false);
+  });
+
+  it('NO muestra boton "Iniciar inspeccion" para Estudiante o Administrador', () => {
+    authStoreMock.authenticated.set(true);
+    authStoreMock.user.set({
+      id: 'est-1',
+      email: 'estudiante@cunoc.edu.gt',
+      role: 'ESTUDIANTE',
+      active: true,
+      activated: true,
+      verified: true,
+      twoFactorEnabled: false,
+    });
+
+    iniciarComponente();
+    fixture.detectChanges();
+
+    const peticion = http.expectOne('/api/v1/puentes/puente-sin-evaluar');
+    peticion.flush(puenteSinEvaluar);
+    fixture.detectChanges();
+
+    const btn = fixture.debugElement.query(By.css('.btn-iniciar-inspeccion'));
+    expect(btn).toBeNull();
+    expect(page.puedeIniciarInspeccion()).toBe(false);
+  });
+
+  it('NO muestra boton "Iniciar inspeccion" cuando el puente es inactivo', () => {
+    authStoreMock.authenticated.set(true);
+    authStoreMock.user.set({
+      id: 'prof-1',
+      email: 'catedratico@cunoc.edu.gt',
+      role: 'CATEDRATICO',
+      active: true,
+      activated: true,
+      verified: true,
+      twoFactorEnabled: false,
+    });
+
+    iniciarComponente();
+    fixture.detectChanges();
+
+    const puenteInactivo: PuenteResponse = {
+      ...puenteSinEvaluar,
+      activo: false,
+    };
+    const peticion = http.expectOne('/api/v1/puentes/puente-sin-evaluar');
+    peticion.flush(puenteInactivo);
+    fixture.detectChanges();
+
+    const btn = fixture.debugElement.query(By.css('.btn-iniciar-inspeccion'));
+    expect(btn).toBeNull();
+    expect(page.puedeIniciarInspeccion()).toBe(false);
   });
 });

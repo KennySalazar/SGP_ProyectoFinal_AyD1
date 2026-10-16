@@ -1,8 +1,10 @@
 package gt.usac.cunoc.sgp.inspeccion.dto;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.List;
 import java.util.UUID;
 
 public record InspeccionResumenResponse(
@@ -20,4 +22,78 @@ public record InspeccionResumenResponse(
     String dispositivoId,
     JsonNode datos,
     Instant creadoEn,
-    Instant actualizadoEn) {}
+    Instant actualizadoEn,
+    String codigoPuente,
+    String departamentoNombre,
+    String municipioNombre,
+    String codigoVersionFormulario,
+    Double porcentajeAvance,
+    Instant ultimaActividadEn,
+    String nombrePuente,
+    String rolAutor,
+    String nombreAutor,
+    Double latitudInicio,
+    Double longitudInicio,
+    BigDecimal precisionGpsM,
+    BigDecimal distanciaAlPuenteM,
+    boolean advertenciaGps,
+    String mensajeAdvertenciaGps,
+    boolean datosPermanentesConfirmados,
+    DatosPermanentesResponse datosPermanentes,
+    List<AcompananteResponse> acompanantes) {
+
+  public InspeccionResumenResponse(
+      UUID id,
+      UUID puenteId,
+      String codigoPuente,
+      String nombrePuente,
+      String departamentoNombre,
+      String municipioNombre,
+      UUID versionFormularioId,
+      String codigoVersionFormulario,
+      UUID autorId,
+      String rolAutorCreacion,
+      String nombreAutorCapturado,
+      String estado,
+      String tipo,
+      LocalDate fechaInspeccion,
+      Double porcentajeAvance,
+      Instant ultimaActividadEn,
+      Instant creadoEn,
+      Instant actualizadoEn) {
+    this(
+        id,
+        puenteId,
+        nombrePuente,
+        versionFormularioId,
+        codigoVersionFormulario,
+        autorId,
+        rolAutorCreacion,
+        nombreAutorCapturado,
+        tipo,
+        estado,
+        fechaInspeccion,
+        null,
+        null,
+        creadoEn,
+        actualizadoEn,
+        codigoPuente,
+        departamentoNombre,
+        municipioNombre,
+        codigoVersionFormulario,
+        porcentajeAvance,
+        ultimaActividadEn,
+        nombrePuente,
+        rolAutorCreacion,
+        nombreAutorCapturado,
+        null,
+        null,
+        null,
+        null,
+        false,
+        null,
+        false,
+        null,
+        List.of());
+  }
+}

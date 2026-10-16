@@ -11,6 +11,7 @@ public interface InspeccionMapper {
 
   @Mapping(target = "puenteId", source = "puente.id")
   @Mapping(target = "puenteNombre", source = "puente.nombre")
+  @Mapping(target = "nombrePuente", source = "puente.nombre")
   @Mapping(target = "versionFormularioId", source = "versionFormulario.id")
   @Mapping(target = "versionFormularioCodigo", source = "versionFormulario.codigo")
   InspeccionResumenResponse toResumenResponse(Inspeccion inspeccion);

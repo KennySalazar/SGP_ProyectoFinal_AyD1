@@ -125,6 +125,7 @@ export interface PuenteCatalogoResponse {
 }
 
 export interface ConsultaCatalogoPuentes {
+  busqueda?: string;
   departamentoId?: string;
   estado?: EstadoPuente;
   activo?: boolean;

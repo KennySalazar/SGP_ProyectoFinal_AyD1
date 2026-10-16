@@ -15,7 +15,8 @@ import gt.usac.cunoc.sgp.formulario.model.EstadoVersionFormulario;
 import gt.usac.cunoc.sgp.formulario.repository.VersionFormularioRepository;
 import gt.usac.cunoc.sgp.formulario.validation.JsonSchemaValidatorService;
 import gt.usac.cunoc.sgp.inspeccion.dto.GuardarRespuestasRequest;
-import gt.usac.cunoc.sgp.inspeccion.dto.IniciarInspeccionRequest;
+import gt.usac.cunoc.sgp.inspeccion.dto.IniciarInspeccionVersionadaRequest;
+import gt.usac.cunoc.sgp.inspeccion.dto.IniciarInspeccionVersionadaResponse;
 import gt.usac.cunoc.sgp.inspeccion.dto.InspeccionResumenResponse;
 import gt.usac.cunoc.sgp.inspeccion.entity.Inspeccion;
 import gt.usac.cunoc.sgp.inspeccion.mapper.InspeccionMapper;
@@ -34,7 +35,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
 
 @ExtendWith(MockitoExtension.class)
-class InspeccionServiceTest {
+class InspeccionServiceVersionadaTest {
 
   @Mock private InspeccionRepository inspeccionRepository;
   @Mock private VersionFormularioRepository versionFormularioRepository;
@@ -211,13 +212,28 @@ class InspeccionServiceTest {
   }
 
   @Test
+  void iniciarInspeccion_sinVersion_rechazadaSinUsarVersionActiva() {
+    IniciarInspeccionVersionadaRequest request =
+        new IniciarInspeccionVersionadaRequest(
+            puenteActivo.getId(), null, LocalDate.now(), "web", "Inspector 1", null);
+
+    assertThatThrownBy(() -> service.iniciarInspeccion(request, UUID.randomUUID(), "INSPECTOR"))
+        .isInstanceOf(ApiException.class)
+        .satisfies(
+            ex ->
+                assertThat(((ApiException) ex).getStatus())
+                    .isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY));
+    verify(inspeccionRepository, never()).save(any());
+  }
+
+  @Test
   void iniciarInspeccion_versionBorrador_rechazada() {
     when(puenteRepository.findById(puenteActivo.getId())).thenReturn(Optional.of(puenteActivo));
     when(versionFormularioRepository.findById(versionBorrador.getId()))
         .thenReturn(Optional.of(versionBorrador));
 
-    IniciarInspeccionRequest request =
-        new IniciarInspeccionRequest(
+    IniciarInspeccionVersionadaRequest request =
+        new IniciarInspeccionVersionadaRequest(
             puenteActivo.getId(),
             versionBorrador.getId(),
             LocalDate.now(),
@@ -243,8 +259,8 @@ class InspeccionServiceTest {
     when(puenteRepository.findById(puenteActivo.getId())).thenReturn(Optional.of(puenteActivo));
     when(versionFormularioRepository.findById(idInexistente)).thenReturn(Optional.empty());
 
-    IniciarInspeccionRequest request =
-        new IniciarInspeccionRequest(
+    IniciarInspeccionVersionadaRequest request =
+        new IniciarInspeccionVersionadaRequest(
             puenteActivo.getId(), idInexistente, LocalDate.now(), "web", "Inspector 1", null);
 
     assertThatThrownBy(() -> service.iniciarInspeccion(request, UUID.randomUUID(), "INSPECTOR"))
@@ -266,8 +282,8 @@ class InspeccionServiceTest {
         .thenReturn(Optional.of(version1Publicada));
     when(inspeccionRepository.save(any(Inspeccion.class))).thenAnswer(i -> i.getArgument(0));
 
-    IniciarInspeccionRequest request =
-        new IniciarInspeccionRequest(
+    IniciarInspeccionVersionadaRequest request =
+        new IniciarInspeccionVersionadaRequest(
             puenteActivo.getId(),
             version1Publicada.getId(),
             LocalDate.now(),
@@ -275,7 +291,7 @@ class InspeccionServiceTest {
             "Ing. Pérez",
             null);
 
-    InspeccionResumenResponse response =
+    IniciarInspeccionVersionadaResponse response =
         service.iniciarInspeccion(request, UUID.randomUUID(), "INSPECTOR");
 
     assertThat(response).isNotNull();
@@ -286,11 +302,12 @@ class InspeccionServiceTest {
   @Test
   void guardarRespuestas_seValidaContraVersionDeInspeccionNoContraActiva() throws Exception {
     // Inspección creada con versión 1
+    UUID autorId = UUID.randomUUID();
     Inspeccion inspeccionV1 =
         new Inspeccion(
             puenteActivo,
             version1Publicada,
-            UUID.randomUUID(),
+            autorId,
             "INSPECTOR",
             "Ing. Pérez",
             LocalDate.now(),
@@ -299,7 +316,8 @@ class InspeccionServiceTest {
 
     UUID inspeccionId = inspeccionV1.getId();
     when(inspeccionRepository.findActiveById(inspeccionId)).thenReturn(Optional.of(inspeccionV1));
-    when(inspeccionRepository.save(any(Inspeccion.class))).thenAnswer(i -> i.getArgument(0));
+    when(inspeccionRepository.saveAndFlush(any(Inspeccion.class)))
+        .thenAnswer(i -> i.getArgument(0));
 
     // Datos válidos según versión 1 ("MAMPOSTERIA" es válido en v1 pero no existe en v2)
     // En v2 se exigiría además "codigo_nuevo" y "superestructura_v2"
@@ -320,20 +338,21 @@ class InspeccionServiceTest {
 
     InspeccionResumenResponse response =
         service.guardarRespuestas(
-            inspeccionId, new GuardarRespuestasRequest(datosValidosV1), UUID.randomUUID());
+            inspeccionId, new GuardarRespuestasRequest(datosValidosV1), autorId);
 
     assertThat(response).isNotNull();
     assertThat(inspeccionV1.getDatos()).isEqualTo(datosValidosV1);
-    verify(inspeccionRepository).save(inspeccionV1);
+    verify(inspeccionRepository).saveAndFlush(inspeccionV1);
   }
 
   @Test
   void guardarRespuestas_borradorAceptaDatosIncompletos() throws Exception {
+    UUID autorId = UUID.randomUUID();
     Inspeccion inspeccion =
         new Inspeccion(
             puenteActivo,
             version1Publicada,
-            UUID.randomUUID(),
+            autorId,
             "INSPECTOR",
             "Ing. Pérez",
             LocalDate.now(),
@@ -342,7 +361,8 @@ class InspeccionServiceTest {
 
     UUID inspeccionId = inspeccion.getId();
     when(inspeccionRepository.findActiveById(inspeccionId)).thenReturn(Optional.of(inspeccion));
-    when(inspeccionRepository.save(any(Inspeccion.class))).thenAnswer(i -> i.getArgument(0));
+    when(inspeccionRepository.saveAndFlush(any(Inspeccion.class)))
+        .thenAnswer(i -> i.getArgument(0));
 
     // Solo se manda identificacion.nombre_puente, omitiendo subestructura por completo
     JsonNode datosIncompletos =
@@ -357,7 +377,7 @@ class InspeccionServiceTest {
 
     InspeccionResumenResponse response =
         service.guardarRespuestas(
-            inspeccionId, new GuardarRespuestasRequest(datosIncompletos), UUID.randomUUID());
+            inspeccionId, new GuardarRespuestasRequest(datosIncompletos), autorId);
 
     assertThat(response).isNotNull();
     assertThat(inspeccion.getDatos().path("identificacion").path("nombre_puente").asText())
@@ -366,11 +386,12 @@ class InspeccionServiceTest {
 
   @Test
   void guardarRespuestas_rechazaCamposDesconocidos() throws Exception {
+    UUID autorId = UUID.randomUUID();
     Inspeccion inspeccion =
         new Inspeccion(
             puenteActivo,
             version1Publicada,
-            UUID.randomUUID(),
+            autorId,
             "INSPECTOR",
             "Ing. Pérez",
             LocalDate.now(),
@@ -394,9 +415,7 @@ class InspeccionServiceTest {
     assertThatThrownBy(
             () ->
                 service.guardarRespuestas(
-                    inspeccionId,
-                    new GuardarRespuestasRequest(datosConCampoDesconocido),
-                    UUID.randomUUID()))
+                    inspeccionId, new GuardarRespuestasRequest(datosConCampoDesconocido), autorId))
         .isInstanceOf(ApiException.class)
         .satisfies(
             ex -> {
@@ -417,11 +436,12 @@ class InspeccionServiceTest {
 
   @Test
   void guardarRespuestas_rechazaTipoOValorIncorrectoCon422Rfc7807() throws Exception {
+    UUID autorId = UUID.randomUUID();
     Inspeccion inspeccion =
         new Inspeccion(
             puenteActivo,
             version1Publicada,
-            UUID.randomUUID(),
+            autorId,
             "INSPECTOR",
             "Ing. Pérez",
             LocalDate.now(),
@@ -447,7 +467,7 @@ class InspeccionServiceTest {
     assertThatThrownBy(
             () ->
                 service.guardarRespuestas(
-                    inspeccionId, new GuardarRespuestasRequest(datosInvalidos), UUID.randomUUID()))
+                    inspeccionId, new GuardarRespuestasRequest(datosInvalidos), autorId))
         .isInstanceOf(ApiException.class)
         .satisfies(
             ex -> {
@@ -478,11 +498,12 @@ class InspeccionServiceTest {
             }
             """);
 
+    UUID autorId = UUID.randomUUID();
     Inspeccion inspeccion =
         new Inspeccion(
             puenteActivo,
             version1Publicada,
-            UUID.randomUUID(),
+            autorId,
             "INSPECTOR",
             "Ing. Pérez",
             LocalDate.now(),
@@ -493,7 +514,7 @@ class InspeccionServiceTest {
     when(inspeccionRepository.findActiveById(inspeccionId)).thenReturn(Optional.of(inspeccion));
 
     // Al intentar enviar sin subestructura (que es obligatoria para enviar)
-    assertThatThrownBy(() -> service.enviarInspeccion(inspeccionId, UUID.randomUUID()))
+    assertThatThrownBy(() -> service.enviarInspeccion(inspeccionId, autorId))
         .isInstanceOf(ApiException.class)
         .satisfies(
             ex -> {
@@ -528,11 +549,12 @@ class InspeccionServiceTest {
             }
             """);
 
+    UUID autorId = UUID.randomUUID();
     Inspeccion inspeccion =
         new Inspeccion(
             puenteActivo,
             version1Publicada,
-            UUID.randomUUID(),
+            autorId,
             "INSPECTOR",
             "Ing. Pérez",
             LocalDate.now(),
@@ -543,7 +565,7 @@ class InspeccionServiceTest {
     when(inspeccionRepository.findActiveById(inspeccionId)).thenReturn(Optional.of(inspeccion));
     when(inspeccionRepository.save(any(Inspeccion.class))).thenAnswer(i -> i.getArgument(0));
 
-    InspeccionResumenResponse response = service.enviarInspeccion(inspeccionId, UUID.randomUUID());
+    InspeccionResumenResponse response = service.enviarInspeccion(inspeccionId, autorId);
 
     assertThat(response).isNotNull();
     assertThat(response.estado()).isEqualTo("ENVIADA");

@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import { ESQUEMA_SIECA } from '../motor/testing/esquema-sieca';
+import { resolverEsquema } from '../motor/esquema/resolutor';
 import { SeccionVisual } from '../models/formulario.models';
 import {
   esquemaASeccionesVisuales,
@@ -235,6 +237,35 @@ describe('esquema-visual utility', () => {
     expect(propAncho.maximum).toBe(50);
 
     expect(resultado.vinculos['datos_basicos.codigo_puente']).toBe('puente.codigo');
+  });
+
+  it('conserva subestructura anidada y pilas repetibles al guardar en modo visual', () => {
+    const esquemaOriginal = ESQUEMA_SIECA as Record<string, unknown>;
+    const secciones = esquemaASeccionesVisuales(esquemaOriginal);
+    const subestructuraVisual = secciones.find((seccion) => seccion.clave === 'subestructura')!;
+
+    expect(subestructuraVisual.preguntas.map((pregunta) => pregunta.clave)).not.toContain(
+      'estribo_entrada',
+    );
+    expect(subestructuraVisual.preguntas.map((pregunta) => pregunta.clave)).not.toContain('pilas');
+
+    const resultado = seccionesVisualesAEsquema(secciones, esquemaOriginal, {});
+    const propiedadesOriginales = esquemaOriginal['properties'] as Record<string, unknown>;
+    const propiedadesResultado = resultado.esquema['properties'] as Record<string, unknown>;
+
+    expect(propiedadesResultado['subestructura']).toEqual(propiedadesOriginales['subestructura']);
+
+    const subestructura = resolverEsquema(resultado.esquema).secciones.find(
+      (seccion) => seccion.clave === 'subestructura',
+    )!;
+    expect(subestructura.hijos.find((hijo) => hijo.clave === 'estribo_entrada')?.clase).toBe(
+      'objeto',
+    );
+    const pilas = subestructura.hijos.find((hijo) => hijo.clave === 'pilas');
+    expect(pilas?.clase).toBe('arreglo');
+    if (pilas?.clase === 'arreglo') {
+      expect(pilas.elemento.hijos.map((hijo) => hijo.clave)).toContain('viga_cabezal');
+    }
   });
 
   it('extrae vínculos visuales desde formato columnas e instantánea', () => {

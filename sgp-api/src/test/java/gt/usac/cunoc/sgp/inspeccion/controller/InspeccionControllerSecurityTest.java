@@ -16,8 +16,8 @@ import gt.usac.cunoc.sgp.common.exception.ApiException;
 import gt.usac.cunoc.sgp.common.exception.ApiExceptionHandler;
 import gt.usac.cunoc.sgp.common.security.JwtData;
 import gt.usac.cunoc.sgp.inspeccion.dto.GuardarRespuestasRequest;
-import gt.usac.cunoc.sgp.inspeccion.dto.IniciarInspeccionRequest;
-import gt.usac.cunoc.sgp.inspeccion.dto.InspeccionResumenResponse;
+import gt.usac.cunoc.sgp.inspeccion.dto.IniciarInspeccionVersionadaRequest;
+import gt.usac.cunoc.sgp.inspeccion.dto.IniciarInspeccionVersionadaResponse;
 import gt.usac.cunoc.sgp.inspeccion.dto.ValidarRespuestasRequest;
 import gt.usac.cunoc.sgp.inspeccion.service.InspeccionService;
 import gt.usac.cunoc.sgp.usuario.model.RoleName;
@@ -78,12 +78,12 @@ class InspeccionControllerSecurityTest {
     UUID versionId = UUID.randomUUID();
     UUID inspeccionId = UUID.randomUUID();
 
-    IniciarInspeccionRequest request =
-        new IniciarInspeccionRequest(
+    IniciarInspeccionVersionadaRequest request =
+        new IniciarInspeccionVersionadaRequest(
             puenteId, versionId, LocalDate.now(), "web", "Estudiante Inspector", null);
 
-    InspeccionResumenResponse dummy =
-        new InspeccionResumenResponse(
+    IniciarInspeccionVersionadaResponse dummy =
+        new IniciarInspeccionVersionadaResponse(
             inspeccionId,
             puenteId,
             "Puente San José",
@@ -104,7 +104,7 @@ class InspeccionControllerSecurityTest {
 
     mockMvc
         .perform(
-            post("/api/v1/inspecciones")
+            post("/api/v1/inspecciones/iniciar")
                 .principal(auth)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(OBJECT_MAPPER.writeValueAsString(request)))
@@ -116,8 +116,8 @@ class InspeccionControllerSecurityTest {
   @Test
   void iniciarInspeccion_conVersionNoUtilizable_retorna422Rfc7807() throws Exception {
     var auth = autenticar(RoleName.ESTUDIANTE);
-    IniciarInspeccionRequest request =
-        new IniciarInspeccionRequest(
+    IniciarInspeccionVersionadaRequest request =
+        new IniciarInspeccionVersionadaRequest(
             UUID.randomUUID(), UUID.randomUUID(), LocalDate.now(), "web", "Inspector", null);
 
     when(service.iniciarInspeccion(any(), eq(USUARIO_ID), any()))
@@ -130,7 +130,7 @@ class InspeccionControllerSecurityTest {
 
     mockMvc
         .perform(
-            post("/api/v1/inspecciones")
+            post("/api/v1/inspecciones/iniciar")
                 .principal(auth)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(OBJECT_MAPPER.writeValueAsString(request)))
@@ -240,7 +240,7 @@ class InspeccionControllerSecurityTest {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.valido").value(true));
 
-    verify(service).validarRespuestasInspeccion(eq(inspeccionId), any(), eq(true));
+    verify(service).validarRespuestasInspeccion(eq(inspeccionId), any(), eq(true), eq(USUARIO_ID));
   }
 
   private UsernamePasswordAuthenticationToken autenticar(RoleName rol) {

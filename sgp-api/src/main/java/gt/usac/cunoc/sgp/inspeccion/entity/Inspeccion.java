@@ -4,12 +4,15 @@ import com.fasterxml.jackson.databind.JsonNode;
 import gt.usac.cunoc.sgp.common.util.UuidV7Generator;
 import gt.usac.cunoc.sgp.formulario.entity.VersionFormulario;
 import gt.usac.cunoc.sgp.puente.entity.Puente;
+import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OneToMany;
+import jakarta.persistence.OneToOne;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
@@ -17,6 +20,8 @@ import jakarta.persistence.Version;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 import org.hibernate.annotations.JdbcTypeCode;
@@ -71,10 +76,10 @@ public class Inspeccion {
   private LocalDate fechaInspeccion;
 
   @Column(name = "dispositivo_id", nullable = false, length = 100)
-  private String dispositivoId = "web";
+  private String dispositivoId;
 
   @JdbcTypeCode(SqlTypes.GEOGRAPHY)
-  @Column(name = "ubicacion_inicio")
+  @Column(name = "ubicacion_inicio", columnDefinition = "geography(Point,4326)")
   private Point ubicacionInicio;
 
   @Column(name = "precision_gps_m", precision = 10, scale = 2)
@@ -91,7 +96,7 @@ public class Inspeccion {
   private JsonNode identificacionCapturada;
 
   @JdbcTypeCode(SqlTypes.JSON)
-  @Column(nullable = false)
+  @Column(name = "datos", nullable = false)
   private JsonNode datos;
 
   @Column(name = "creado_dispositivo_en")
@@ -125,7 +130,48 @@ public class Inspeccion {
   @Column(nullable = false)
   private Long version;
 
+  @OneToMany(mappedBy = "inspeccion", cascade = CascadeType.ALL, orphanRemoval = true)
+  private List<InspeccionAcompanante> acompanantes = new ArrayList<>();
+
+  @OneToOne(mappedBy = "inspeccion", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+  private InspeccionDatoTecnico datoTecnico;
+
   public Inspeccion() {}
+
+  public Inspeccion(
+      UUID id,
+      Puente puente,
+      VersionFormulario versionFormulario,
+      UUID autorId,
+      String rolAutorCreacion,
+      String nombreAutorCapturado,
+      LocalDate fechaInspeccion,
+      String dispositivoId,
+      Point ubicacionInicio,
+      BigDecimal precisionGpsM,
+      BigDecimal distanciaAlPuenteM,
+      Instant datosPermanentesConfirmadosEn,
+      JsonNode datos,
+      Instant ahora) {
+    this.id = id;
+    this.puente = puente;
+    this.versionFormulario = versionFormulario;
+    this.autorId = autorId;
+    this.rolAutorCreacion = rolAutorCreacion;
+    this.nombreAutorCapturado = nombreAutorCapturado;
+    this.fechaInspeccion = fechaInspeccion;
+    this.dispositivoId = dispositivoId;
+    this.ubicacionInicio = ubicacionInicio;
+    this.precisionGpsM = precisionGpsM;
+    this.distanciaAlPuenteM = distanciaAlPuenteM;
+    this.datosPermanentesConfirmadosEn = datosPermanentesConfirmadosEn;
+    this.datos = datos;
+    this.tipo = "ORIGINAL";
+    this.estado = "BORRADOR";
+    this.ultimaActividadEn = ahora;
+    this.creadoEn = ahora;
+    this.actualizadoEn = ahora;
+  }
 
   public Inspeccion(
       Puente puente,
@@ -136,21 +182,21 @@ public class Inspeccion {
       LocalDate fechaInspeccion,
       String dispositivoId,
       JsonNode datos) {
-    this.id = UuidV7Generator.generate();
-    this.puente = puente;
-    this.versionFormulario = versionFormulario;
-    this.autorId = autorId;
-    this.rolAutorCreacion = rolAutorCreacion;
-    this.nombreAutorCapturado = nombreAutorCapturado;
-    this.fechaInspeccion = fechaInspeccion;
-    this.dispositivoId = dispositivoId != null ? dispositivoId : "web";
-    this.tipo = "ORIGINAL";
-    this.estado = "BORRADOR";
-    this.datos = datos;
-    Instant ahora = Instant.now();
-    this.creadoEn = ahora;
-    this.actualizadoEn = ahora;
-    this.ultimaActividadEn = ahora;
+    this(
+        UuidV7Generator.generate(),
+        puente,
+        versionFormulario,
+        autorId,
+        rolAutorCreacion,
+        nombreAutorCapturado,
+        fechaInspeccion,
+        dispositivoId != null ? dispositivoId : "web",
+        null,
+        null,
+        null,
+        null,
+        datos,
+        Instant.now());
   }
 
   @PrePersist
@@ -411,6 +457,50 @@ public class Inspeccion {
 
   public Instant getActualizadoEn() {
     return actualizadoEn;
+  }
+
+  public List<InspeccionAcompanante> getAcompanantes() {
+    return acompanantes;
+  }
+
+  public InspeccionDatoTecnico getDatoTecnico() {
+    return datoTecnico;
+  }
+
+  public void setDatoTecnico(InspeccionDatoTecnico datoTecnico) {
+    this.datoTecnico = datoTecnico;
+  }
+
+  public void agregarAcompanante(InspeccionAcompanante acompanante) {
+    this.acompanantes.add(acompanante);
+  }
+
+  public void actualizarBorrador(
+      JsonNode datos, JsonNode identificacionCapturada, LocalDate fechaInspeccion, Instant ahora) {
+    if (datos != null) {
+      this.datos = datos;
+    }
+    if (identificacionCapturada != null) {
+      this.identificacionCapturada = identificacionCapturada;
+    }
+    if (fechaInspeccion != null) {
+      this.fechaInspeccion = fechaInspeccion;
+    }
+    this.ultimaActividadEn = ahora;
+    this.actualizadoEn = ahora;
+  }
+
+  public void reemplazarAcompanantes(List<InspeccionAcompanante> nuevosAcompanantes) {
+    this.acompanantes.clear();
+    if (nuevosAcompanantes != null) {
+      this.acompanantes.addAll(nuevosAcompanantes);
+    }
+  }
+
+  public void marcarEliminado(UUID usuarioId, Instant ahora) {
+    this.eliminadoEn = ahora;
+    this.eliminadoPorId = usuarioId;
+    this.actualizadoEn = ahora;
   }
 
   public void setActualizadoEn(Instant actualizadoEn) {

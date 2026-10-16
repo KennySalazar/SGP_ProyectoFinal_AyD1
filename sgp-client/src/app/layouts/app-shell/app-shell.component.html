@@ -51,6 +51,16 @@
           <i class="pi pi-clipboard" aria-hidden="true"></i
           ><span>{{ 'nav.inspectionForm' | transloco }}</span>
         </a>
+        @if (auth.user()?.role === 'CATEDRATICO' || auth.user()?.role === 'PROFESIONAL_EXTERNO') {
+          <a
+            routerLink="/inspecciones"
+            [routerLinkActiveOptions]="{ exact: true }"
+            routerLinkActive="active"
+          >
+            <i class="pi pi-clipboard" aria-hidden="true"></i
+            ><span>{{ 'nav.myInspections' | transloco }}</span>
+          </a>
+        }
         <a routerLink="/seguridad" routerLinkActive="active">
           <i class="pi pi-shield"></i><span>{{ 'nav.security' | transloco }}</span>
         </a>
@@ -64,6 +74,9 @@
           </a>
           <a routerLink="/admin/formularios" routerLinkActive="active">
             <i class="pi pi-file-edit"></i><span>{{ 'nav.formularioSieca' | transloco }}</span>
+          </a>
+          <a routerLink="/admin/cursos" routerLinkActive="active">
+            <i class="pi pi-book"></i><span>{{ 'nav.courses' | transloco }}</span>
           </a>
 
           <a routerLink="/puentes/nuevo" routerLinkActive="active">
@@ -80,8 +93,6 @@
             <i class="pi pi-send" aria-hidden="true"></i>
             <span>{{ 'nav.myBridgeRequests' | transloco }}</span>
           </a>
-        }
-        @if (auth.user()?.role === 'CATEDRATICO') {
           <a routerLink="/estudiantes/pendientes" routerLinkActive="active">
             <i class="pi pi-users"></i><span>{{ 'nav.pendingStudents' | transloco }}</span>
           </a>
