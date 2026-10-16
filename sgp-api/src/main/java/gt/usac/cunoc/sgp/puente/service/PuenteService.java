@@ -368,7 +368,12 @@ public class PuenteService {
 
   @Transactional(readOnly = true)
   public Page<PuenteCatalogoResponse> listarCatalogo(
-      UUID departamentoId, String estado, Boolean activo, String busqueda, int pagina, int tamanio) {
+      UUID departamentoId,
+      String estado,
+      Boolean activo,
+      String busqueda,
+      int pagina,
+      int tamanio) {
     if (pagina < 0 || tamanio < 1 || tamanio > 100) {
       throw validacion(
           "paginacion_invalida",

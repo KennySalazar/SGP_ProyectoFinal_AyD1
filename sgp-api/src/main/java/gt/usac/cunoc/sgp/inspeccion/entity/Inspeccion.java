@@ -1,10 +1,10 @@
 package gt.usac.cunoc.sgp.inspeccion.entity;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import gt.usac.cunoc.sgp.common.util.UuidV7Generator;
 import gt.usac.cunoc.sgp.formulario.entity.VersionFormulario;
 import gt.usac.cunoc.sgp.puente.entity.Puente;
 import jakarta.persistence.CascadeType;
-import gt.usac.cunoc.sgp.common.util.UuidV7Generator;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -476,10 +476,7 @@ public class Inspeccion {
   }
 
   public void actualizarBorrador(
-      JsonNode datos,
-      JsonNode identificacionCapturada,
-      LocalDate fechaInspeccion,
-      Instant ahora) {
+      JsonNode datos, JsonNode identificacionCapturada, LocalDate fechaInspeccion, Instant ahora) {
     if (datos != null) {
       this.datos = datos;
     }

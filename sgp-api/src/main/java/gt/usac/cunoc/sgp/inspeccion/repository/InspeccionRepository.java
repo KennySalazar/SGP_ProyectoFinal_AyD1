@@ -35,9 +35,8 @@ public interface InspeccionRepository extends JpaRepository<Inspeccion, UUID> {
             AND (:estado IS NULL OR i.estado = :estado)
           """)
   Page<Inspeccion> findMisInspecciones(
-      @Param("autorId") UUID autorId,
-      @Param("estado") String estado,
-      Pageable pageable);
+      @Param("autorId") UUID autorId, @Param("estado") String estado, Pageable pageable);
+
   List<Inspeccion> findByPuenteIdOrderByFechaInspeccionDesc(UUID puenteId);
 
   List<Inspeccion> findByAutorIdOrderByFechaInspeccionDesc(UUID autorId);

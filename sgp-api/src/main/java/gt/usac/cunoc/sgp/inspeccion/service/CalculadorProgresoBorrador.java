@@ -65,7 +65,8 @@ public class CalculadorProgresoBorrador {
                 .doubleValue()
             : 100.0;
 
-    return new ProgresoBorradorResponse(totalRequeridos, totalCompletados, porcentajeTotal, secciones);
+    return new ProgresoBorradorResponse(
+        totalRequeridos, totalCompletados, porcentajeTotal, secciones);
   }
 
   private ProgresoSeccionResponse calcularIdentificacion(
@@ -91,11 +92,15 @@ public class CalculadorProgresoBorrador {
 
     if (tieneValor(datos, "/identificacion/departamento")
         || tieneValor(idCap, "/departamento")
-        || (puente != null && puente.getMunicipio() != null && puente.getMunicipio().getDepartamento() != null)) completados++;
+        || (puente != null
+            && puente.getMunicipio() != null
+            && puente.getMunicipio().getDepartamento() != null)) completados++;
 
     if (tieneValor(datos, "/identificacion/municipio")
         || tieneValor(idCap, "/municipio")
-        || (puente != null && puente.getMunicipio() != null && puente.getMunicipio().getNombre() != null)) completados++;
+        || (puente != null
+            && puente.getMunicipio() != null
+            && puente.getMunicipio().getNombre() != null)) completados++;
 
     if (tieneValor(datos, "/identificacion/ruta_pavimentada")
         || (tecnico != null && tecnico.getRutaPavimentada() != null)) completados++;
@@ -256,13 +261,15 @@ public class CalculadorProgresoBorrador {
       }
     }
 
-    return crearSeccion("elementos_no_estructurales", "6. Elementos no estructurales", total, completados);
+    return crearSeccion(
+        "elementos_no_estructurales", "6. Elementos no estructurales", total, completados);
   }
 
   private ProgresoSeccionResponse calcularCauce(JsonNode datos) {
     int total = 1;
     int completados = tieneValor(datos, "/caracteristicas_cauce/aplica") ? 1 : 0;
-    return crearSeccion("caracteristicas_cauce", "7. Características del cauce", total, completados);
+    return crearSeccion(
+        "caracteristicas_cauce", "7. Características del cauce", total, completados);
   }
 
   private ProgresoSeccionResponse calcularOtros(JsonNode datos, InspeccionDatoTecnico tecnico) {
@@ -323,13 +330,15 @@ public class CalculadorProgresoBorrador {
     return true;
   }
 
-  private ProgresoSeccionResponse crearSeccion(String seccion, String titulo, int total, int completados) {
+  private ProgresoSeccionResponse crearSeccion(
+      String seccion, String titulo, int total, int completados) {
     double porcentaje =
         total > 0
             ? BigDecimal.valueOf((completados * 100.0) / total)
                 .setScale(2, RoundingMode.HALF_UP)
                 .doubleValue()
             : 100.0;
-    return new ProgresoSeccionResponse(seccion, titulo, total, completados, porcentaje, completados >= total);
+    return new ProgresoSeccionResponse(
+        seccion, titulo, total, completados, porcentaje, completados >= total);
   }
 }

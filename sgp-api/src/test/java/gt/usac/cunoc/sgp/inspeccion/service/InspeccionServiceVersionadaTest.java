@@ -316,7 +316,8 @@ class InspeccionServiceVersionadaTest {
 
     UUID inspeccionId = inspeccionV1.getId();
     when(inspeccionRepository.findActiveById(inspeccionId)).thenReturn(Optional.of(inspeccionV1));
-    when(inspeccionRepository.saveAndFlush(any(Inspeccion.class))).thenAnswer(i -> i.getArgument(0));
+    when(inspeccionRepository.saveAndFlush(any(Inspeccion.class)))
+        .thenAnswer(i -> i.getArgument(0));
 
     // Datos válidos según versión 1 ("MAMPOSTERIA" es válido en v1 pero no existe en v2)
     // En v2 se exigiría además "codigo_nuevo" y "superestructura_v2"
@@ -360,7 +361,8 @@ class InspeccionServiceVersionadaTest {
 
     UUID inspeccionId = inspeccion.getId();
     when(inspeccionRepository.findActiveById(inspeccionId)).thenReturn(Optional.of(inspeccion));
-    when(inspeccionRepository.saveAndFlush(any(Inspeccion.class))).thenAnswer(i -> i.getArgument(0));
+    when(inspeccionRepository.saveAndFlush(any(Inspeccion.class)))
+        .thenAnswer(i -> i.getArgument(0));
 
     // Solo se manda identificacion.nombre_puente, omitiendo subestructura por completo
     JsonNode datosIncompletos =
@@ -413,9 +415,7 @@ class InspeccionServiceVersionadaTest {
     assertThatThrownBy(
             () ->
                 service.guardarRespuestas(
-                    inspeccionId,
-                    new GuardarRespuestasRequest(datosConCampoDesconocido),
-                    autorId))
+                    inspeccionId, new GuardarRespuestasRequest(datosConCampoDesconocido), autorId))
         .isInstanceOf(ApiException.class)
         .satisfies(
             ex -> {

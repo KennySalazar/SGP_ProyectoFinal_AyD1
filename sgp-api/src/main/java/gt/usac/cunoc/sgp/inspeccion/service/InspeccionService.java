@@ -1,7 +1,7 @@
 package gt.usac.cunoc.sgp.inspeccion.service;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import gt.usac.cunoc.sgp.common.audit.model.AccionAuditoria;
 import gt.usac.cunoc.sgp.common.audit.service.AuditoriaWriter;
@@ -16,16 +16,20 @@ import gt.usac.cunoc.sgp.inspeccion.dto.AcompananteResponse;
 import gt.usac.cunoc.sgp.inspeccion.dto.DatosPermanentesResponse;
 import gt.usac.cunoc.sgp.inspeccion.dto.GuardarBorradorRequest;
 import gt.usac.cunoc.sgp.inspeccion.dto.GuardarRespuestasRequest;
+import gt.usac.cunoc.sgp.inspeccion.dto.IndiceCondicionPreliminarResponse;
 import gt.usac.cunoc.sgp.inspeccion.dto.IniciarInspeccionRequest;
 import gt.usac.cunoc.sgp.inspeccion.dto.IniciarInspeccionResponse;
 import gt.usac.cunoc.sgp.inspeccion.dto.IniciarInspeccionVersionadaRequest;
 import gt.usac.cunoc.sgp.inspeccion.dto.IniciarInspeccionVersionadaResponse;
 import gt.usac.cunoc.sgp.inspeccion.dto.InspeccionBorradorResponse;
 import gt.usac.cunoc.sgp.inspeccion.dto.InspeccionResumenResponse;
+import gt.usac.cunoc.sgp.inspeccion.dto.ProgresoBorradorResponse;
 import gt.usac.cunoc.sgp.inspeccion.entity.Inspeccion;
 import gt.usac.cunoc.sgp.inspeccion.entity.InspeccionAcompanante;
 import gt.usac.cunoc.sgp.inspeccion.entity.InspeccionDatoTecnico;
 import gt.usac.cunoc.sgp.inspeccion.mapper.InspeccionMapper;
+import gt.usac.cunoc.sgp.inspeccion.model.EntradaCalculoIc;
+import gt.usac.cunoc.sgp.inspeccion.model.ResultadoCalculoIc;
 import gt.usac.cunoc.sgp.inspeccion.repository.InspeccionDatoTecnicoRepository;
 import gt.usac.cunoc.sgp.inspeccion.repository.InspeccionRepository;
 import gt.usac.cunoc.sgp.puente.entity.Puente;
@@ -36,10 +40,6 @@ import gt.usac.cunoc.sgp.usuario.entity.UserAccount;
 import gt.usac.cunoc.sgp.usuario.model.RoleName;
 import gt.usac.cunoc.sgp.usuario.repository.UserAccountRepository;
 import gt.usac.cunoc.sgp.usuario.repository.UsuarioProfesionalRepository;
-import gt.usac.cunoc.sgp.inspeccion.dto.IndiceCondicionPreliminarResponse;
-import gt.usac.cunoc.sgp.inspeccion.dto.ProgresoBorradorResponse;
-import gt.usac.cunoc.sgp.inspeccion.model.EntradaCalculoIc;
-import gt.usac.cunoc.sgp.inspeccion.model.ResultadoCalculoIc;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.nio.charset.StandardCharsets;
@@ -53,8 +53,8 @@ import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.HexFormat;
 import java.util.List;
-import java.util.Optional;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import org.locationtech.jts.geom.Coordinate;
@@ -77,8 +77,7 @@ public class InspeccionService {
       new GeometryFactory(new PrecisionModel(), 4326);
   private static final ZoneId ZONA_GUATEMALA = ZoneId.of("America/Guatemala");
   private static final Set<String> ESTADOS_VALIDOS =
-      Set.of(
-          "BORRADOR", "ENVIADA", "EN_REVISION", "CAMBIOS_SOLICITADOS", "PUBLICADA", "RECHAZADA");
+      Set.of("BORRADOR", "ENVIADA", "EN_REVISION", "CAMBIOS_SOLICITADOS", "PUBLICADA", "RECHAZADA");
 
   private final InspeccionRepository inspeccionRepository;
   private final InspeccionDatoTecnicoRepository datoTecnicoRepository;
@@ -233,10 +232,7 @@ public class InspeccionService {
         return inspeccionRepository
             .findConDetallesById(opExistente.get().getEntidadId())
             .map(this::aResponse)
-            .orElseGet(
-                () ->
-                    crearNuevaInspeccion(
-                        request, user, idempotencyKey));
+            .orElseGet(() -> crearNuevaInspeccion(request, user, idempotencyKey));
       }
     }
 
@@ -449,10 +445,7 @@ public class InspeccionService {
 
     if (request != null) {
       inspeccion.actualizarBorrador(
-          request.datos(),
-          request.identificacionCapturada(),
-          request.fechaInspeccion(),
-          ahora);
+          request.datos(), request.identificacionCapturada(), request.fechaInspeccion(), ahora);
 
       if (request.acompanantes() != null) {
         List<InspeccionAcompanante> nuevos = new ArrayList<>();
@@ -686,7 +679,8 @@ public class InspeccionService {
 
     JsonNode datosIniciales = objectMapper.createObjectNode();
     if (jsonSchemaValidatorService != null) {
-      jsonSchemaValidatorService.validarRespuestas(versionActiva.getEsquema(), datosIniciales, true);
+      jsonSchemaValidatorService.validarRespuestas(
+          versionActiva.getEsquema(), datosIniciales, true);
     }
 
     // 5. Validar fechas de inspección
@@ -1097,8 +1091,7 @@ public class InspeccionService {
         d.getDrenajesAledanosExisten());
   }
 
-  public static double calcularDistanciaMetros(
-      double lat1, double lon1, double lat2, double lon2) {
+  public static double calcularDistanciaMetros(double lat1, double lon1, double lat2, double lon2) {
     final double R = 6371000.0;
     double dLat = Math.toRadians(lat2 - lat1);
     double dLon = Math.toRadians(lon2 - lon1);

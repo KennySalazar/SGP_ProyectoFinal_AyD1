@@ -240,8 +240,7 @@ class InspeccionControllerSecurityTest {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.valido").value(true));
 
-    verify(service).validarRespuestasInspeccion(
-        eq(inspeccionId), any(), eq(true), eq(USUARIO_ID));
+    verify(service).validarRespuestasInspeccion(eq(inspeccionId), any(), eq(true), eq(USUARIO_ID));
   }
 
   private UsernamePasswordAuthenticationToken autenticar(RoleName rol) {

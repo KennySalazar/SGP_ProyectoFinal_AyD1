@@ -211,7 +211,8 @@ class InspeccionControllerTest {
   }
 
   @Test
-  @DisplayName("HU-025: PUT /api/v1/inspecciones/{id}/borrador guarda avances del borrador y responde 200")
+  @DisplayName(
+      "HU-025: PUT /api/v1/inspecciones/{id}/borrador guarda avances del borrador y responde 200")
   void guardarBorrador_retorna200ConProgreso() throws Exception {
     UUID usuarioId = UUID.randomUUID();
     UUID inspeccionId = UUID.randomUUID();
@@ -226,8 +227,7 @@ class InspeccionControllerTest {
     GuardarBorradorRequest request =
         new GuardarBorradorRequest(0L, objectMapper.createObjectNode(), null, null, null);
 
-    ProgresoBorradorResponse progreso =
-        new ProgresoBorradorResponse(79, 12, 15.19, List.of());
+    ProgresoBorradorResponse progreso = new ProgresoBorradorResponse(79, 12, 15.19, List.of());
 
     InspeccionBorradorResponse response =
         new InspeccionBorradorResponse(
@@ -276,7 +276,8 @@ class InspeccionControllerTest {
   }
 
   @Test
-  @DisplayName("HU-025: GET /api/v1/inspecciones/{id}/borrador retorna información del borrador para reanudar edición")
+  @DisplayName(
+      "HU-025: GET /api/v1/inspecciones/{id}/borrador retorna información del borrador para reanudar edición")
   void obtenerBorrador_retorna200ConDetalles() throws Exception {
     UUID usuarioId = UUID.randomUUID();
     UUID inspeccionId = UUID.randomUUID();
@@ -288,8 +289,7 @@ class InspeccionControllerTest {
     context.setAuthentication(auth);
     SecurityContextHolder.setContext(context);
 
-    ProgresoBorradorResponse progreso =
-        new ProgresoBorradorResponse(79, 12, 15.19, List.of());
+    ProgresoBorradorResponse progreso = new ProgresoBorradorResponse(79, 12, 15.19, List.of());
 
     InspeccionBorradorResponse response =
         new InspeccionBorradorResponse(
@@ -323,8 +323,7 @@ class InspeccionControllerTest {
             progreso,
             null);
 
-    when(inspeccionService.obtenerBorrador(eq(inspeccionId), eq(usuarioId)))
-        .thenReturn(response);
+    when(inspeccionService.obtenerBorrador(eq(inspeccionId), eq(usuarioId))).thenReturn(response);
 
     mvc.perform(
             get("/api/v1/inspecciones/" + inspeccionId + "/borrador")
