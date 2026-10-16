@@ -7,7 +7,10 @@ import {
   Output,
   SimpleChanges,
   inject,
+  Injector,
   signal,
+  effect,
+  untracked,
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
@@ -25,6 +28,7 @@ import {
   IniciarInspeccionRequest,
   IniciarInspeccionResponse,
 } from '../../models/inspeccion.models';
+import { uuidV7 } from '../../../../offline/services/uuid-v7';
 import { InspeccionApiService } from '../../services/inspeccion-api.service';
 
 @Component({
@@ -50,6 +54,7 @@ export class IniciarInspeccionDialogComponent implements OnChanges {
   @Output() readonly visibleChange = new EventEmitter<boolean>();
   @Output() readonly inspeccionIniciada = new EventEmitter<IniciarInspeccionResponse>();
 
+  private readonly injector = inject(Injector);
   private readonly fb = inject(FormBuilder);
   private readonly auth = inject(AuthStore);
   private readonly api = inject(InspeccionApiService);
@@ -66,6 +71,53 @@ export class IniciarInspeccionDialogComponent implements OnChanges {
   readonly guardando = signal(false);
   readonly error = signal<string | null>(null);
   readonly resultado = signal<IniciarInspeccionResponse | null>(null);
+  readonly reporteFotografico = signal<import('@angular/core').Type<unknown> | null>(null);
+  readonly errorReporte = signal(false);
+  readonly pendienteAnterior = signal<IniciarInspeccionResponse | null>(null);
+  private async recuperarPendiente(): Promise<void> {
+    this.pendienteAnterior.set(null);
+    const actor = this.auth.user()?.id,
+      puente = this.puente?.id;
+    if (!actor || !puente || typeof indexedDB === 'undefined') return;
+    try {
+      const { FotografiasLocalesService } =
+        await import('../../../../offline/services/fotografias-locales.service');
+      const datos = await this.injector
+        .get(FotografiasLocalesService)
+        .contextoPendiente(actor, puente);
+      const contexto = datos as Partial<IniciarInspeccionResponse> | null;
+      if (
+        this.auth.user()?.id === actor &&
+        this.puente?.id === puente &&
+        contexto?.autorId === actor &&
+        contexto.puenteId === puente &&
+        typeof contexto.id === 'string'
+      )
+        this.pendienteAnterior.set(contexto as IniciarInspeccionResponse);
+    } catch {
+      /* El formulario puede seguir funcionando sin persistencia disponible. */
+    }
+  }
+  continuarPendiente(): void {
+    const contexto = this.pendienteAnterior();
+    if (
+      !contexto ||
+      contexto.autorId !== this.auth.user()?.id ||
+      contexto.puenteId !== this.puente?.id
+    )
+      return;
+    this.resultado.set(contexto);
+    void this.cargarReporte();
+  }
+  async cargarReporte(): Promise<void> {
+    this.errorReporte.set(false);
+    try {
+      const modulo = await import('../reporte-fotografico/reporte-fotografico.component');
+      this.reporteFotografico.set(modulo.ReporteFotograficoComponent);
+    } catch {
+      this.errorReporte.set(true);
+    }
+  }
 
   readonly datosPermanentes = signal<DatosPermanentesResponse | null>(null);
   readonly acompanantes = signal<AcompananteRequest[]>([]);
@@ -75,11 +127,45 @@ export class IniciarInspeccionDialogComponent implements OnChanges {
   readonly gpsLongitud = signal<number | null>(null);
   readonly gpsPrecision = signal<number | null>(null);
 
-  readonly hoy: string = new Date().toISOString().slice(0, 10);
+  private solicitudAutorId: string | null = null;
+  constructor() {
+    effect(() => {
+      const actor = this.auth.user()?.id;
+      untracked(() => {
+        if (this.resultado() && this.resultado()?.autorId !== actor) {
+          this.resultado.set(null);
+          this.solicitudInicio = null;
+          this.reporteFotografico.set(null);
+          this.cerrar();
+        }
+      });
+    });
+  }
+  private solicitudInicio: IniciarInspeccionRequest | null = null;
+
+  readonly hoy: string = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Guatemala',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(new Date());
 
   ngOnChanges(changes: SimpleChanges): void {
     if (changes['visible'] && this.visible) {
+      if (
+        this.resultado()?.puenteId === this.puente?.id &&
+        this.resultado()?.autorId === this.auth.user()?.id
+      )
+        return;
+      if (
+        this.solicitudInicio &&
+        (this.solicitudInicio.puenteId !== this.puente?.id ||
+          this.solicitudAutorId !== this.auth.user()?.id)
+      )
+        this.solicitudInicio = null;
+      if (this.solicitudInicio) return;
       this.reiniciarEstado();
+      void this.recuperarPendiente();
       this.obtenerGps();
       if (this.puente?.id) {
         this.cargarDatosPermanentes(this.puente.id);
@@ -137,7 +223,7 @@ export class IniciarInspeccionDialogComponent implements OnChanges {
   }
 
   iniciarInspeccion(): void {
-    if (this.form.invalid || !this.puente) {
+    if (this.guardando() || this.form.invalid || !this.puente) {
       return;
     }
 
@@ -161,10 +247,10 @@ export class IniciarInspeccionDialogComponent implements OnChanges {
     this.guardando.set(true);
     this.error.set(null);
 
-    const clientUuid = crypto.randomUUID();
+    const clientUuid = this.solicitudInicio?.id ?? uuidV7();
     const dispositivoId = this.obtenerDispositivoId();
 
-    const request: IniciarInspeccionRequest = {
+    const request: IniciarInspeccionRequest = this.solicitudInicio ?? {
       id: clientUuid,
       puenteId: this.puente.id,
       fechaInspeccion: fecha,
@@ -177,10 +263,17 @@ export class IniciarInspeccionDialogComponent implements OnChanges {
       acompanantes: this.acompanantes().length > 0 ? this.acompanantes() : null,
     };
 
+    this.solicitudInicio = request;
+    this.form.disable({ emitEvent: false });
+    this.solicitudAutorId = this.auth.user()?.id ?? null;
+    const actor = this.solicitudAutorId;
     this.api.iniciarInspeccion(request, clientUuid).subscribe({
       next: (res) => {
+        if (this.auth.user()?.id !== actor || this.puente?.id !== request.puenteId) return;
         this.guardando.set(false);
         this.resultado.set(res);
+        this.solicitudInicio = null;
+        void this.cargarReporte();
         this.inspeccionIniciada.emit(res);
       },
       error: (err) => {
@@ -214,6 +307,7 @@ export class IniciarInspeccionDialogComponent implements OnChanges {
     this.guardando.set(false);
     this.acompanantes.set([]);
     const emailUsuario = this.auth.user()?.email || '';
+    this.form.enable({ emitEvent: false });
     this.form.reset({
       fechaInspeccion: this.hoy,
       nombreAutor: emailUsuario,

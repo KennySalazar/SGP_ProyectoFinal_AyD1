@@ -1,0 +1,100 @@
+<section class="reporte surface-card" [attr.aria-label]="'inspecciones.fotos.titulo' | transloco">
+  <h3>{{ 'inspecciones.fotos.titulo' | transloco }}</h3>
+  <p>{{ 'inspecciones.fotos.descripcion' | transloco }}</p>
+  @if (error(); as error) {
+    <p class="mensaje-error" role="alert">
+      {{ 'inspecciones.fotos.errores.' + error | transloco }}
+    </p>
+  }
+  @if (aviso()) {
+    <p role="status">{{ 'inspecciones.fotos.confirmada' | transloco }}</p>
+  }
+  @if (inspeccion().estado === 'BORRADOR') {
+    <div class="acciones">
+      <label
+        >{{ 'inspecciones.fotos.galeria' | transloco
+        }}<input
+          type="file"
+          accept="image/jpeg,image/webp"
+          [disabled]="ocupado()"
+          (change)="seleccionar($event)"
+      /></label>
+      <button
+        pButton
+        type="button"
+        [disabled]="ocupado() || camaraAbierta()"
+        (click)="abrirCamara()"
+      >
+        {{ 'inspecciones.fotos.camara' | transloco }}
+      </button>
+    </div>
+    @if (camaraAbierta()) {
+      <video
+        #video
+        autoplay
+        muted
+        playsinline
+        [attr.aria-label]="'inspecciones.fotos.camara' | transloco"
+      ></video>
+      <div class="acciones">
+        <button pButton type="button" [disabled]="ocupado()" (click)="capturar()">
+          {{ 'inspecciones.fotos.capturar' | transloco }}</button
+        ><button pButton type="button" (click)="cerrarCamara()">
+          {{ 'common.close' | transloco }}
+        </button>
+      </div>
+    }
+    @if (previsualizacion(); as url) {
+      <img [src]="url" [alt]="'inspecciones.fotos.previa' | transloco" />
+      <label for="categoria-foto">{{ 'inspecciones.fotos.categoria' | transloco }}</label
+      ><p-select
+        inputId="categoria-foto"
+        [formControl]="categoria"
+        [options]="categorias"
+        appendTo="body"
+      >
+        <ng-template #item let-opcion>{{ etiqueta(opcion) }}</ng-template>
+        <ng-template #selectedItem let-opcion>{{ etiqueta(opcion) }}</ng-template>
+      </p-select>
+      @if (contextoElemento(); as contexto) {
+        <p>{{ 'inspecciones.fotos.anclaje' | transloco }}: {{ contexto.elementoRef }}</p>
+      }
+      <button
+        pButton
+        type="button"
+        [disabled]="categoria.invalid || ocupado()"
+        (click)="adjuntar()"
+      >
+        {{ 'inspecciones.fotos.adjuntar' | transloco }}
+      </button>
+    }
+  }
+  @if (ocupado()) {
+    <p role="status">{{ 'inspecciones.fotos.procesando' | transloco }}</p>
+  }
+  @for (foto of pendientes(); track foto.id) {
+    <div class="pendiente">
+      <span
+        >{{ etiqueta(foto.metadatos.categoria) }} ·
+        {{ 'inspecciones.fotos.pendiente' | transloco }}</span
+      ><button pButton type="button" [disabled]="ocupado()" (click)="reintentar(foto)">
+        {{ 'inspecciones.fotos.reintentar' | transloco }}
+      </button>
+    </div>
+  }
+  <div class="fotografias">
+    @for (foto of confirmadas(); track foto.id) {
+      <figure>
+        @if (foto.miniatura) {
+          <img [src]="foto.miniatura" [alt]="etiqueta(foto.categoria)" />
+        }
+        <figcaption>
+          {{ etiqueta(foto.categoria) }} · {{ 'inspecciones.fotos.confirmada' | transloco }}
+        </figcaption>
+        <button pButton type="button" (click)="abrirOriginal(foto)">
+          {{ 'inspecciones.fotos.original' | transloco }}
+        </button>
+      </figure>
+    }
+  </div>
+</section>

@@ -1,3 +1,4 @@
+import { FotografiaResponse, MetadatosFotografia } from '../models/fotografia.models';
 import { HttpClient } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
 import { map, Observable } from 'rxjs';
@@ -30,5 +31,30 @@ export class InspeccionApiService {
         observe: 'response',
       })
       .pipe(map((res) => (res.status === 204 ? null : res.body)));
+  }
+
+  adjuntarFotografia(
+    inspeccionId: string,
+    blob: Blob,
+    metadatos: MetadatosFotografia,
+    clave: string,
+  ): Observable<FotografiaResponse> {
+    const datos = new FormData();
+    datos.append('metadatos', new Blob([JSON.stringify(metadatos)], { type: 'application/json' }));
+    datos.append('archivo', blob, `${metadatos.id}.jpg`);
+    return this.http.post<FotografiaResponse>(
+      `/api/v1/inspecciones/${inspeccionId}/fotografias`,
+      datos,
+      { headers: { 'Idempotency-Key': clave } },
+    );
+  }
+  listarFotografias(inspeccionId: string): Observable<FotografiaResponse[]> {
+    return this.http.get<FotografiaResponse[]>(`/api/v1/inspecciones/${inspeccionId}/fotografias`);
+  }
+  contenidoFotografia(inspeccionId: string, fotoId: string, miniatura = false): Observable<Blob> {
+    return this.http.get(
+      `/api/v1/inspecciones/${inspeccionId}/fotografias/${fotoId}/${miniatura ? 'miniatura' : 'contenido'}`,
+      { responseType: 'blob' },
+    );
   }
 }

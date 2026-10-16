@@ -88,6 +88,7 @@ describe('IniciarInspeccionDialogComponent', () => {
 
     fixture = TestBed.createComponent(IniciarInspeccionDialogComponent);
     component = fixture.componentInstance;
+    vi.spyOn(component, 'cargarReporte').mockResolvedValue(undefined);
     component.puente = puentePrueba;
   });
 
@@ -237,5 +238,28 @@ describe('IniciarInspeccionDialogComponent', () => {
 
     expect(component.error()).toBe('El puente se encuentra inactivo.');
     expect(component.guardando()).toBe(false);
+  });
+
+  it('conserva solicitud y clave si se pierde la respuesta de inicio', () => {
+    mockApi.iniciarInspeccion.mockReturnValue(throwError(() => ({ status: 0 })));
+    component.form.patchValue({ fechaInspeccion: component.hoy });
+    component.iniciarInspeccion();
+    component.iniciarInspeccion();
+    expect(mockApi.iniciarInspeccion.mock.calls[0]).toEqual(
+      mockApi.iniciarInspeccion.mock.calls[1],
+    );
+    expect(mockApi.iniciarInspeccion.mock.calls[0][1][14]).toBe('7');
+  });
+
+  it('continúa las fotografías guardadas sin volver a crear la inspección', () => {
+    const contexto = {
+      id: 'inspeccion-local',
+      autorId: 'usr-1',
+      puenteId: puentePrueba.id,
+    } as IniciarInspeccionResponse;
+    component.pendienteAnterior.set(contexto);
+    component.continuarPendiente();
+    expect(component.resultado()).toEqual(contexto);
+    expect(mockApi.iniciarInspeccion).not.toHaveBeenCalled();
   });
 });

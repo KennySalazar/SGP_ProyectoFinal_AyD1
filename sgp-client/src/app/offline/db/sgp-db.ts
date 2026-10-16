@@ -7,6 +7,7 @@ export interface LocalBridge {
   payload: unknown;
 }
 export interface LocalInspection {
+  propietarioId?: string;
   id: string;
   puenteId: string;
   estado: string;
@@ -15,6 +16,17 @@ export interface LocalInspection {
   sincronizado: boolean;
 }
 export interface LocalPhoto {
+  propietarioId?: string;
+  idempotencyKey?: string;
+  metadatos?: {
+    id: string;
+    categoria: string;
+    latitud: number;
+    longitud: number;
+    capturadoEn: string;
+    elementoRef?: string;
+    instanciaElementoId?: string;
+  };
   id: string;
   inspeccionId: string;
   blob: Blob;
