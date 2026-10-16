@@ -5,9 +5,13 @@
 Aceptada para staging el 10 de octubre de 2026. La región y VPC están
 confirmadas; se crearon los Security Groups, el bucket S3, la red privada, el DB
 Subnet Group, RDS y la EC2 de staging. Session Manager y el alcance TCP desde la
-EC2 hacia RDS están verificados, aunque todavía no se han autenticado conexiones
-PostgreSQL ni creado las bases. El rol OIDC ya tiene un ARN asignado, pero su
-confianza limitada a `develop` y el despliegue real aún no han sido validados.
+EC2 hacia RDS están verificados. El backend se autenticó, ejecutó Flyway y quedó
+saludable durante el primer despliegue automático. La publicación
+multi-arquitectura, la descarga ARM64, la asunción OIDC y Systems Manager también
+fueron validados para la revisión
+`488dae1ea7278eefc5f39e557eaadde4c07d00f9`.
+La terminación HTTPS sobre IP quedó preparada en el repositorio, pero aún no se
+ha instalado ni probado en EC2.
 La configuración y el despliegue de producción permanecen fuera del alcance de
 esta historia.
 
@@ -87,6 +91,19 @@ claves AWS estáticas ni compilar Java o Angular en EC2.
 - **SSH público restringido:** simple, pero amplía la superficie de ataque.
 - **VPN:** no se justifica para el tamaño del equipo.
 
+### HTTPS sin dominio
+
+- **Certificado autofirmado:** descartado porque los clientes no lo consideran
+  una identidad pública válida.
+- **ALB o un servicio adicional:** descartado por costo y complejidad para este
+  staging académico.
+- **Nginx del host y certificado IP de Let's Encrypt:** elegido. Mantiene el
+  contenedor en loopback, permite ACME `webroot` y no requiere dominio.
+- **Certbot de DNF:** descartado porque la versión disponible en Amazon Linux
+  2023 no soporta el flujo actual de certificados IP.
+- **Imagen oficial Certbot 5.8.0:** elegida por compatibilidad ARM64, versión y
+  digest explícitos, y ausencia de instalación Python adicional en el host.
+
 ## Decisión
 
 1. Usar una EC2 Amazon Linux 2023 ARM64 independiente por ambiente:
@@ -127,25 +144,33 @@ claves AWS estáticas ni compilar Java o Angular en EC2.
     depende de un GitHub Environment: consume `AWS_REGION`, `AWS_ROLE_ARN`,
     `STAGING_INSTANCE_ID` y el interruptor `STAGING_ENABLED` como variables de
     repositorio. Solo un `push` a `develop` puede desplegar y la confianza de AWS
-    se limita al sujeto
-    `repo:KennySalazar/SGP_ProyectoFinal_AyD1:ref:refs/heads/develop`. La EC2 lee
+    se limita al sujeto inmutable
+    `repo:KennySalazar@99755600/SGP_ProyectoFinal_AyD1@1386435373:ref:refs/heads/develop`.
+    La EC2 lee
     GHCR privado con un PAT classic de solo `read:packages`, instalado fuera del
     repositorio y de GitHub Actions.
 13. Guardar la configuración de staging en
     `/etc/sgp/staging/staging.env`, modo `0600`, e impedir despliegues simultáneos
     con concurrencia de GitHub y `flock` en el servidor.
-14. Mantener temporalmente Nginx en loopback hasta implementar y validar el
-    acceso HTTPS público definido para la arquitectura final.
+14. Mantener el Nginx/Angular del contenedor en loopback y agregar un Nginx del
+    host como único punto público. El host redirige 80 a 443, conserva el
+    directorio ACME y reenvía a `127.0.0.1:8088` con `X-Forwarded-*`.
 15. No comprar un dominio ni crear una zona DNS pública. Staging se administrará
-    inicialmente mediante túnel SSM; producción deberá ofrecer HTTPS válido
-    sobre una IPv4 pública. El mecanismo de emisión y renovación del certificado
-    para IP continúa pendiente de validación.
+    mediante SSM y ofrecerá HTTPS válido directamente sobre su IPv4. Se usará el
+    perfil `shortlived` de Let's Encrypt con Certbot 5.8.0 en Docker y un
+    temporizador systemd de comprobación dos veces al día. Su instalación real
+    continúa pendiente de autorización y validación.
+16. Conservar para staging la IPv4 pública dinámica observada y no asignar una
+    Elastic IP, dado el plazo académico hasta el 28 de octubre de 2026. Se acepta
+    que detener e iniciar EC2 puede cambiar la IP y obligar a actualizar URLs y
+    emitir otro certificado.
 
 ### Estado de implementación en AWS
 
 En `us-east-1` se confirmaron los siguientes recursos de staging:
 
-- `sgp-staging-ec2-sg` (`sg-0e617972b3eedeb73`), sin entrada pública.
+- `sgp-staging-ec2-sg` (`sg-0e617972b3eedeb73`), con entrada pública solo para
+  TCP 80 y 443; los puertos internos 8088, 8090 y 5432 no están expuestos.
 - `sgp-rds-sg` (`sg-0ab8d04a2ef4d3db8`), con PostgreSQL TCP 5432 permitido solo
   desde el Security Group anterior.
 - `sgp-staging-archivos-ayd1-2026-gt01`, bucket con bloqueo de acceso público,
@@ -168,7 +193,8 @@ En `us-east-1` se confirmaron los siguientes recursos de staging:
   `t4g.micro`, 20 GiB gp3 cifrados con `aws/ebs`, en la subred pública
   `subnet-0745affbda7ec4bb1` (`172.31.64.0/20`) de `us-east-1f`. Se observó en
   ejecución, con las comprobaciones `3/3` superadas y la IPv4 pública dinámica
-  `3.235.197.36`; no tiene Elastic IP.
+  `3.235.197.36`, IPv4 privada `172.31.64.35` y DNS público
+  `ec2-3-235-197-36.compute-1.amazonaws.com`; no tiene Elastic IP.
 - La EC2 usa `sgp-staging-ec2-sg` y `sgp-staging-ec2-role`. El acceso mediante
   Session Manager fue exitoso y una prueba desde la sesión abrió TCP 5432 hacia
   el endpoint de RDS.
@@ -176,16 +202,18 @@ En `us-east-1` se confirmaron los siguientes recursos de staging:
   octubre de 2026. El bootstrap instala Docker y PostgreSQL 16 sin solicitar el
   paquete `curl`, porque la AMI ya proporciona el comando mediante
   `curl-minimal` y ambos paquetes entran en conflicto.
-- Se creó `sgp-staging-key`, ED25519, pero SSH no se ha probado y el Security
-  Group continúa sin reglas de entrada. La clave privada permanece fuera del
+- Se creó `sgp-staging-key`, ED25519, pero SSH no se ha probado ni se abrió el
+  puerto 22. La clave privada permanece fuera del
   repositorio.
 
-La prueba TCP demuestra conectividad de red entre EC2 y RDS, no un despliegue
-funcional ni autenticación PostgreSQL. El rol OIDC de GitHub Actions
+La prueba TCP inicial demostró conectividad de red. El despliegue posterior
+demostró autenticación de aplicación, Flyway, validación del esquema y respuesta
+HTTP 200 del frontend, `/healthz` y `/api/v1/puentes?size=1`. El rol OIDC
 `arn:aws:iam::416086757987:role/sgp-staging-github-actions-role` es distinto del
-rol de instancia; su política de confianza para `develop` y su asunción real
-continúan pendientes de validar. No existen todavía `sgp_staging` ni `sgp_prod`;
-no se han probado TLS, PostGIS, Flyway ni el backend contra RDS.
+rol de instancia y su asunción quedó validada después de corregir el sujeto de
+confianza al identificador inmutable. `sgp_staging` está operativa; no se creó
+`sgp_prod`. Sigue pendiente una comprobación administrativa independiente de
+TLS `verify-full` y extensiones.
 
 ### Excepción operativa de respaldos
 
@@ -254,24 +282,25 @@ promover los mismos digests entre ambientes sin reconstruir artefactos.
 
 ## Limitaciones
 
-- Se crearon ambos Security Groups, el bucket, el rol IAM, la red privada, el DB
-  Subnet Group y la EC2; todavía no se ha ejecutado una carga de aplicación real.
-- RDS está disponible y responde por TCP desde EC2, pero faltan TLS,
-  autenticación, bases, usuarios, extensiones y migraciones reales.
-- El host EC2 ya está preparado; todavía falta validar el rol OIDC con la
-  confianza limitada a `develop` y faltan los certificados. La compra de dominio
-  y la creación de una zona DNS pública se descartaron.
+- La aplicación ya se desplegó y superó las comprobaciones técnicas básicas,
+  pero no las pruebas funcionales completas ni los flujos dependientes de SMTP.
+- RDS está operativa para el backend y Flyway; falta una prueba administrativa
+  de `verify-full` y una consulta directa de extensiones.
+- El host EC2, OIDC y Systems Manager están validados; todavía falta HTTPS
+  público real. Los scripts y plantillas están preparados, pero no se han
+  aplicado. La compra de dominio, una zona DNS pública y Elastic IP se
+  descartaron para staging.
 - No incluye Compose ni despliegue de producción.
 - Solo existe una retención automática solicitada de 1 día en RDS. La política
   requerida de respaldos, restauración y la retención centralizada de logs no
   están implementadas.
 - S3 está decidido como servicio, pero su integración de aplicación permanece
   pendiente de la funcionalidad de archivos.
-- Brotli y HTTPS público sobre IP todavía no están implementados.
-- El bucket S3 existe, pero la aplicación no lo consume; RDS está disponible,
-  pero todavía no tiene autenticación o esquema validados.
-- La publicación multi-arquitectura, OIDC y GHCR desde EC2 aún requieren
-  validación real. Session Manager sí fue verificado.
+- Brotli no está implementado. HTTPS sobre IP está implementado en el
+  repositorio, pero sigue pendiente de instalación y prueba en AWS.
+- El bucket S3 existe, pero la aplicación todavía no lo consume.
+- La publicación multi-arquitectura, descarga ARM64, GHCR, OIDC, SSM y el primer
+  despliegue ya cuentan con validación real.
 
 ## Relación con el enunciado
 
