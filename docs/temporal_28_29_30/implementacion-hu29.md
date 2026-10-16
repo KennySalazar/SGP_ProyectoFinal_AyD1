@@ -1,16 +1,16 @@
 # Preparación de HU-029 — Validación de evidencia fotográfica y seguridad de archivos
 
-Fecha: 15 de octubre de 2026. Revisión analizada: `2d9f40a`.
+Fecha: 15 de octubre de 2026. Revisión del análisis inicial: `2d9f40a`. Componentes independientes de fase 2 desarrollados sobre `a38437c`.
 
-Este documento propone contratos para desarrollar HU-029 y HU-028 en ramas independientes. No acredita implementación ni aprobación de las firmas propuestas. Mushin puede comenzar las reglas y pruebas indicadas aquí; los contratos compartidos deben acordarse antes de que ambos responsables creen archivos con los mismos nombres.
+Este documento propone contratos para desarrollar HU-029 y HU-028 en ramas independientes. La sección 4.4 identifica los DTO y reglas independientes implementados en fase 2; los restantes contratos siguen siendo propuestas y no acreditan aprobación entre responsables. Los contratos compartidos deben acordarse antes de que ambos responsables creen archivos con los mismos nombres.
 
 ## 1. Fuentes y límites del análisis
 
 Se revisaron [AGENTS.md](../../AGENTS.md), [README.md](../../README.md), [ARCHITECTURE.md](../ARCHITECTURE.md), la [propuesta HU-028](implementacion-hu28.md), V8/V10/V11, inspecciones, seguridad JWT, errores y los contratos pendientes de publicación y actas. Se contrastó la propuesta con el código actual.
 
-No están disponibles en este checkout `HUS/hu29.md`, `HUS/hu28.md` ni las definiciones completas de RN-ARC referenciadas por la propuesta. Aunque esta afirma haber leído esas historias, sus enlaces no permiten recuperarlas aquí. El usuario confirma para HU-029 evidencia obligatoria, máximo de 60 fotografías, contenido JPEG/WebP real, acceso autorizado y eliminación dependiente del estado. La propuesta menciona mínimos por categoría, pero no sus cantidades.
+En la revisión inicial no se localizaron las historias dentro del checkout. Se recuperaron `../HUS/hu29.md` y `../HUS/hu28.md` en el directorio padre al preparar fase 2. Los escenarios especifican una foto por categoría obligatoria y lectura del borrador por autor o Catedrático asignado; el encabezado de HU-029 conserva pendiente la ratificación académica de los mínimos. Las definiciones completas de RN-ARC referenciadas no se localizaron.
 
-Por tanto, los mínimos exactos, la matriz de lectura por rol y los estados que admiten eliminación necesitan confirmación de la historia original. Las decisiones provisionales se identifican expresamente; no deben convertirse silenciosamente en reglas definitivas. No se deducen requisitos fotográficos de las condiciones críticas del IC.
+Las decisiones provisionales se identifican expresamente; no deben convertirse silenciosamente en reglas definitivas. La firma de lectura debe ampliarse para comprobar la asignación del Catedrático y la validación de evidencia debe conectarse tanto al envío como a la publicación; estas integraciones permanecen pendientes. No se deducen requisitos fotográficos de las condiciones críticas del IC.
 
 ## 2. Estado actual comprobado
 
@@ -53,7 +53,7 @@ HU-019 conserva PDF, permisos administrativos de actas y asociación a versión.
 
 ## 4. Contratos compartidos propuestos
 
-**Todo el contenido de esta sección es nuevo y pendiente de acuerdo.** Los métodos existentes se enumeraron en la sección 2. Los tipos siguientes son contratos de Java, no entidades ni una nueva capa arquitectónica. Cada record/enum se materializará en su archivo correspondiente solo cuando se utilice.
+**Los contratos compartidos de esta sección siguen pendientes de acuerdo y entrega por HU-028.** La sección 4.4 señala el alcance independiente ya implementado por HU-029. Los tipos siguientes son contratos de Java, no entidades ni una nueva capa arquitectónica. Cada record/enum se materializará en su archivo correspondiente solo cuando se utilice.
 
 ### 4.1. Modelos de fotografías — propiedad HU-028
 
@@ -134,24 +134,29 @@ Servicio sin I/O en `inspeccion/service/ReglasEvidenciaFotografica.java`:
 
 ```java
 public ValidacionEvidenciaResponse evaluar(
-    List<FotografiaRegistrada> fotografias,
-    Map<CategoriaFoto, Integer> minimosPorCategoria);
+    Map<String, Long> disponiblesPorCategoria,
+    Map<String, Integer> minimosPorCategoria);
+public void validarCapacidadParaNuevaFotografia(long fotografiasDisponibles);
 ```
 
-El inventario debe corresponder a una sola inspección, con IDs únicos; el adaptador real garantiza esa condición. Los mínimos son una política del servidor, nunca un parámetro HTTP del inspector. Su origen y valores definitivos deben acordarse; el mapa permite pruebas sin inventar cantidades. No añadir una pantalla de configuración ni una tabla de reglas. Una política obligatoria sin definir no puede interpretarse como un mapa vacío que autorice publicar.
+**Alcance implementado de fase 2:** el evaluador recibe conteos agregados del servidor y no depende de los modelos de HU-028. Esta firma se conserva al integrar el inventario real: la orquestación pendiente filtrará y agrupará `FotografiaRegistrada` por el código de su categoría. No se creó un catálogo alternativo ni un tipo sustituto de fotografía. La validación del catálogo, exclusión de retiradas/purgadas, aislamiento por inspección y ausencia de IDs duplicados siguen pendientes de esa integración; las pruebas actuales no acreditan esos pasos.
+
+Los mínimos son una política del servidor, nunca un parámetro HTTP del inspector. Para esta fase se autorizó la propuesta parametrizada de una foto en ACCESO, SUPERESTRUCTURA, SUBESTRUCTURA y CAUCE, sin mínimo para OTRA; permanece pendiente su ratificación académica. No se incorpora una política fija en producción ni una pantalla o tabla de reglas. Una política vacía o ausente provoca un error y no autoriza publicar. Se cuentan fotografías DISPONIBLE conforme a la interpretación provisional del plan.
+
+`validarCapacidadParaNuevaFotografia` concentra el máximo 60 y devuelve el error de dominio 422 acordado al alcanzar el límite. La futura `PoliticaArchivosInspeccion` delegará ese control en estas reglas después de autorizar; no duplicará el límite. El llamador debe resolver reintentos confirmados y efectuar el conteo definitivo bajo bloqueo.
 
 DTO HU-029 en `inspeccion/dto/`:
 
 ```java
 public record FaltanteEvidenciaResponse(
-    CategoriaFoto categoria, int requeridas, long disponibles) {}
+    String categoria, int requeridas, long disponibles) {}
 
 public record ValidacionEvidenciaResponse(
     boolean valida, long totalDisponibles, int maximoPermitido,
     List<FaltanteEvidenciaResponse> faltantes) {}
 ```
 
-Los records deben copiar sus listas defensivamente. El resultado distingue falta de evidencia de fallo técnico de consulta; un error de BD no equivale a cero fotos ni a validación satisfactoria.
+El código de categoría es un `String` estable en la frontera JSON; el enum de dominio sigue perteneciendo exclusivamente a HU-028. El DTO no valida ni redefine el catálogo. Los records copian sus listas defensivamente. El resultado distingue falta de evidencia de fallo técnico de consulta; un error de BD no equivale a cero fotos ni a validación satisfactoria.
 
 Orquestación HU-029 en `inspeccion/service/EvidenciaFotograficaService.java`:
 
@@ -245,7 +250,7 @@ Original y miniatura deben autorizar el par inspección/foto, estado del archivo
 
 ## 6. Trabajo independiente inmediato para Mushin
 
-Tras acordar el pequeño contrato de tipos, Mushin puede crear `PoliticaArchivosInspeccion`, `ReglasEvidenciaFotografica` y sus DTO, sin almacenamiento ni Spring para las reglas puras. Puede probar todas las categorías, mínimos suministrados, faltantes, cero fotos, 59/60/61, exclusión de RETIRADO/PURGADO y matriz autor/estado. Hasta confirmar mínimos y permisos definitivos, esas partes se implementan como propuestas parametrizadas y no se declaran cerradas.
+Los DTO y `ReglasEvidenciaFotografica` ya están implementados sobre conteos, sin acceso a almacenamiento y con mínimos parametrizados. La exclusión real de RETIRADO/PURGADO queda pendiente del inventario compartido. Tras acordar y recibir los tipos de contexto, Mushin podrá crear `PoliticaArchivosInspeccion` y probar la matriz autor/estado/asignación. Hasta confirmar mínimos y permisos definitivos, esas partes no se declaran cerradas.
 
 `EvidenciaFotograficaService` y `RetiradaFotografiaService` se prueban con Mockito: inspección inexistente/eliminada, inventario simulado, vínculo a otro destino, orden de autorización, fallo del registro y repetición sin cambiar fecha. Usar `Clock` fijo y los repositorios existentes simulados; no levantar MinIO ni implementar una base de datos alternativa.
 
@@ -324,4 +329,18 @@ Para trabajar en paralelo se recomienda primero una entrega mínima de contratos
 
 En fases 2–3 Mushin puede demostrar las reglas y la interacción esperada, pero no la decodificación real, persistencia ni autorización efectiva de endpoints aún inexistentes. La lectura privada y el ciclo carga→retiro→conteo requieren fase 4. El cierre de publicación requiere fase 5. La falta de editor/repetibles persistidos afecta los recorridos de anclajes de HU-028, no las reglas generales por categoría de HU-029.
 
-Al implementar se validará Java 21 mediante `java -version` y `mvn -version`, y se ejecutarán las pruebas aplicables, `mvn test`/`mvn verify` y revisión de diff conforme a AGENTS.md. La verificación de infraestructura usará entornos aislados y el mismo proveedor configurado por HU-028. Este análisis no ejecutó builds ni pruebas de aplicación y no afirma que los contratos propuestos ya funcionen.
+Al implementar se validará Java 21 mediante `java -version` y `mvn -version`, y se ejecutarán las pruebas aplicables, `mvn test`/`mvn verify` y revisión de diff conforme a AGENTS.md. La verificación de infraestructura usará entornos aislados y el mismo proveedor configurado por HU-028. El análisis inicial no ejecutó builds ni pruebas de aplicación; la validación posterior del alcance independiente se registra a continuación.
+
+## 10. Validación del alcance independiente de fase 2
+
+Se verificó Maven con Java 21.0.12 y se ejecutó, desde `sgp-api`, utilizando dependencias ya instaladas:
+
+```bash
+mvn -o -B -Dstyle.color=never \
+  '-DspotlessFiles=.*(FaltanteEvidenciaResponse|ValidacionEvidenciaResponse|ReglasEvidenciaFotografica)(Test)?\.java' \
+  spotless:check -Dtest=ReglasEvidenciaFotograficaTest,ValidacionEvidenciaResponseTest test
+```
+
+Resultado: **29 pruebas aprobadas, sin fallos ni errores** (27 de reglas y 2 de DTO). Se compiló el backend y sus fuentes de prueba con Java 21. Spotless verificó exclusivamente los cinco archivos Java nuevos. Se cubren mínimos propuestos y alternativos, faltantes, OTRA, conteos 59/60/61, rechazo 422 para una carga nueva sin capacidad, entradas técnicas inválidas, serialización JSON e inmutabilidad de la respuesta.
+
+No se ejecutó la suite completa ni `verify`. No se probaron persistencia, filtrado de estados, concurrencia, almacenamiento, permisos ni endpoints. No se implementaron componentes de fase 3 ni contratos propiedad de HU-028.
