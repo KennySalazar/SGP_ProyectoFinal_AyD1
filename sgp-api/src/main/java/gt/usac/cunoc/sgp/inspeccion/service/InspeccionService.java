@@ -179,7 +179,8 @@ public class InspeccionService {
 
     // Enviar exige todos los campos obligatorios del esquema de su versión
     VersionFormulario version = inspeccion.getVersionFormulario();
-    jsonSchemaValidatorService.validarRespuestas(version.getEsquema(), inspeccion.getDatos(), false);
+    jsonSchemaValidatorService.validarRespuestas(
+        version.getEsquema(), inspeccion.getDatos(), false);
 
     inspeccion.setEstado("ENVIADA");
     Instant ahora = Instant.now();

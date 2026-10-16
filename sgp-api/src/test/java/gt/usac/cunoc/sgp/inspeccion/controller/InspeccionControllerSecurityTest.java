@@ -6,7 +6,6 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -139,7 +138,8 @@ class InspeccionControllerSecurityTest {
         .andExpect(jsonPath("$.code").value("version_no_utilizable"))
         .andExpect(
             jsonPath("$.detail")
-                .value("Solo se pueden iniciar inspecciones con versiones de formulario publicadas"));
+                .value(
+                    "Solo se pueden iniciar inspecciones con versiones de formulario publicadas"));
   }
 
   @Test
@@ -182,11 +182,11 @@ class InspeccionControllerSecurityTest {
                 .content(OBJECT_MAPPER.writeValueAsString(request)))
         .andExpect(status().isUnprocessableEntity())
         .andExpect(jsonPath("$.code").value("datos_formulario_invalidos"))
-        .andExpect(
-            jsonPath("$.errores[0].campo").value("subestructura.estribo_entrada.material"))
+        .andExpect(jsonPath("$.errores[0].campo").value("subestructura.estribo_entrada.material"))
         .andExpect(
             jsonPath("$.errores[0].mensaje")
-                .value("Valor no permitido para el campo 'subestructura.estribo_entrada.material'"));
+                .value(
+                    "Valor no permitido para el campo 'subestructura.estribo_entrada.material'"));
   }
 
   @Test
@@ -209,7 +209,10 @@ class InspeccionControllerSecurityTest {
                         "mensaje",
                         "El campo 'identificacion.fecha_inspeccion' es obligatorio"),
                     Map.of(
-                        "campo", "subestructura", "mensaje", "El campo 'subestructura' es obligatorio"))));
+                        "campo",
+                        "subestructura",
+                        "mensaje",
+                        "El campo 'subestructura' es obligatorio"))));
 
     mockMvc
         .perform(post("/api/v1/inspecciones/" + inspeccionId + "/enviar").principal(auth))
@@ -243,9 +246,7 @@ class InspeccionControllerSecurityTest {
   private UsernamePasswordAuthenticationToken autenticar(RoleName rol) {
     var auth =
         new UsernamePasswordAuthenticationToken(
-            "test@cunoc.edu.gt",
-            "N/A",
-            List.of(new SimpleGrantedAuthority("ROLE_" + rol.name())));
+            "test@cunoc.edu.gt", "N/A", List.of(new SimpleGrantedAuthority("ROLE_" + rol.name())));
     auth.setDetails(new JwtData("test@cunoc.edu.gt", USUARIO_ID, rol, 1));
     SecurityContextHolder.getContext().setAuthentication(auth);
     return auth;

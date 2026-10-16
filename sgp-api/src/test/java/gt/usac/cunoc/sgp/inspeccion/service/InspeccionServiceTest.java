@@ -32,7 +32,6 @@ import org.mapstruct.factory.Mappers;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
-import org.springframework.test.util.ReflectionTestUtils;
 
 @ExtendWith(MockitoExtension.class)
 class InspeccionServiceTest {
@@ -448,9 +447,7 @@ class InspeccionServiceTest {
     assertThatThrownBy(
             () ->
                 service.guardarRespuestas(
-                    inspeccionId,
-                    new GuardarRespuestasRequest(datosInvalidos),
-                    UUID.randomUUID()))
+                    inspeccionId, new GuardarRespuestasRequest(datosInvalidos), UUID.randomUUID()))
         .isInstanceOf(ApiException.class)
         .satisfies(
             ex -> {
@@ -546,8 +543,7 @@ class InspeccionServiceTest {
     when(inspeccionRepository.findActiveById(inspeccionId)).thenReturn(Optional.of(inspeccion));
     when(inspeccionRepository.save(any(Inspeccion.class))).thenAnswer(i -> i.getArgument(0));
 
-    InspeccionResumenResponse response =
-        service.enviarInspeccion(inspeccionId, UUID.randomUUID());
+    InspeccionResumenResponse response = service.enviarInspeccion(inspeccionId, UUID.randomUUID());
 
     assertThat(response).isNotNull();
     assertThat(response.estado()).isEqualTo("ENVIADA");

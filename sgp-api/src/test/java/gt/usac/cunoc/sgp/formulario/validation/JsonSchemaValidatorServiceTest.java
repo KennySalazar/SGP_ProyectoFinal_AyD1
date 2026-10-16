@@ -314,8 +314,7 @@ class JsonSchemaValidatorServiceTest {
                   apiEx.getErrores().stream()
                       .anyMatch(e -> "identificacion.fecha_inspeccion".equals(e.get("campo")));
               boolean subestructuraFaltante =
-                  apiEx.getErrores().stream()
-                      .anyMatch(e -> "subestructura".equals(e.get("campo")));
+                  apiEx.getErrores().stream().anyMatch(e -> "subestructura".equals(e.get("campo")));
 
               assertThat(fechaFaltante).as("falta identificacion.fecha_inspeccion").isTrue();
               assertThat(subestructuraFaltante).as("falta subestructura").isTrue();
@@ -326,10 +325,12 @@ class JsonSchemaValidatorServiceTest {
   void validacionDeInspeccionCompletaTardaMenosDe500Ms() throws Exception {
     JsonNode esquemaSieca;
     JsonNode ejemploInspeccion;
-    try (InputStream in = getClass().getResourceAsStream("/formulario/sieca-v1/esquema.schema.json")) {
+    try (InputStream in =
+        getClass().getResourceAsStream("/formulario/sieca-v1/esquema.schema.json")) {
       esquemaSieca = objectMapper.readTree(in);
     }
-    try (InputStream in = getClass().getResourceAsStream("/formulario/sieca-v1/ejemplo-inspeccion.json")) {
+    try (InputStream in =
+        getClass().getResourceAsStream("/formulario/sieca-v1/ejemplo-inspeccion.json")) {
       ejemploInspeccion = objectMapper.readTree(in);
     }
 

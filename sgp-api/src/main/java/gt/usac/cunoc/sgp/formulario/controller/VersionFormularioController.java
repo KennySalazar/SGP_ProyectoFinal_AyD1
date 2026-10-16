@@ -212,11 +212,13 @@ public class VersionFormularioController {
   @PreAuthorize("isAuthenticated()")
   @Operation(
       summary = "Validar respuestas contra el esquema de una versión",
-      description = "Valida un payload de respuestas contra el esquema de la versión de formulario.")
+      description =
+          "Valida un payload de respuestas contra el esquema de la versión de formulario.")
   public ResponseEntity<java.util.Map<String, Object>> validarRespuestas(
       @PathVariable UUID id,
       @Valid @RequestBody gt.usac.cunoc.sgp.inspeccion.dto.ValidarRespuestasRequest request) {
     service.validarRespuestas(id, request.datos(), request.esBorrador());
-    return ResponseEntity.ok(java.util.Map.of("valido", true, "mensaje", "Las respuestas son válidas"));
+    return ResponseEntity.ok(
+        java.util.Map.of("valido", true, "mensaje", "Las respuestas son válidas"));
   }
 }

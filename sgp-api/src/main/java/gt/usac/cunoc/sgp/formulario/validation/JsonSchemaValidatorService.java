@@ -108,9 +108,7 @@ public class JsonSchemaValidatorService {
     List<ErrorValidacionCampo> errores = obtenerErroresValidacion(esquema, datos, esBorrador);
     if (!errores.isEmpty()) {
       List<Map<String, String>> erroresMap =
-          errores.stream()
-              .map(e -> Map.of("campo", e.campo(), "mensaje", e.mensaje()))
-              .toList();
+          errores.stream().map(e -> Map.of("campo", e.campo(), "mensaje", e.mensaje())).toList();
       throw new ApiException(
           HttpStatus.UNPROCESSABLE_ENTITY,
           "datos_formulario_invalidos",
