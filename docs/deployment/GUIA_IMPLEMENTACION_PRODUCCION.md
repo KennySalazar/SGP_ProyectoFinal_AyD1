@@ -406,7 +406,10 @@ para cargas dentro de Docker. No se deben crear `AWS_ACCESS_KEY_ID` ni
 
 La integración S3 del backend todavía no existe. El bucket no debe presentarse
 como persistencia funcional hasta que la futura HU implemente el contrato,
-metadatos, autorización y pruebas reales.
+metadatos, autorización y pruebas reales. La
+[guía de integración S3](GUIA_INTEGRACION_S3.md) concentra el estado del
+repositorio y los requisitos de traspaso; producción deberá adaptar sus
+decisiones sin reutilizar recursos de staging.
 
 ## 8. Descarga manual desde GHCR
 

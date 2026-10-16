@@ -98,7 +98,9 @@ local.
 
 El nombre del bucket queda registrado como identificador de infraestructura, no
 como variable del backend. No debe agregarse a Compose ni al archivo de entorno
-hasta que el código implemente y defina el contrato de almacenamiento S3.
+hasta que el código implemente y defina el contrato de almacenamiento S3. El
+estado, los requisitos y el orden de implementación están transferidos en la
+[guía de integración S3](GUIA_INTEGRACION_S3.md).
 
 ### Red privada para RDS
 

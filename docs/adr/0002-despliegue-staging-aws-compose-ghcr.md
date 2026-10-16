@@ -326,7 +326,9 @@ residan en EC2.
 
 S3 mantiene una API de almacenamiento de objetos compatible con la intención de
 DT-ALM. MinIO continúa en desarrollo local. La interfaz intercambiable de
-DT-ALM-03 sigue pendiente en el backend y no se declara implementada.
+DT-ALM-03 sigue pendiente en el backend y no se declara implementada. El estado
+y el traspaso de esa futura HU se documentan en
+[`GUIA_INTEGRACION_S3.md`](../deployment/GUIA_INTEGRACION_S3.md).
 
 ## Referencias
 
