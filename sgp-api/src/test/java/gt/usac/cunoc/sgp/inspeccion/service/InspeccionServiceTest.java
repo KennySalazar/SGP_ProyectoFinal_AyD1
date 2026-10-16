@@ -45,7 +45,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.GeometryFactory;
-import org.locationtech.jts.geom.Point;
 import org.locationtech.jts.geom.PrecisionModel;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
@@ -70,7 +69,7 @@ class InspeccionServiceTest {
   @Mock private OperacionIdempotenteRepository operacionIdempotenteRepository;
   @Mock private AuditoriaWriter auditoriaWriter;
 
-  private final ObjectMapper objectMapper = new ObjectMapper();
+  private final ObjectMapper objectMapper = new ObjectMapper().findAndRegisterModules();
   private InspeccionService inspeccionService;
 
   private UserAccount catedratico;
@@ -81,6 +80,9 @@ class InspeccionServiceTest {
 
   @BeforeEach
   void setUp() {
+    org.mockito.Mockito.lenient()
+        .when(operacionIdempotenteRepository.saveAndFlush(any(OperacionIdempotente.class)))
+        .thenAnswer(invocacion -> invocacion.getArgument(0));
     inspeccionService =
         new InspeccionService(
             inspeccionRepository,
@@ -89,7 +91,11 @@ class InspeccionServiceTest {
             versionFormularioRepository,
             userAccountRepository,
             profesionalRepository,
-            operacionIdempotenteRepository,
+            new gt.usac.cunoc.sgp.sync.service.OperacionIdempotenteService(
+                operacionIdempotenteRepository,
+                org.mockito.Mockito.mock(org.springframework.jdbc.core.JdbcTemplate.class),
+                objectMapper,
+                CLOCK),
             auditoriaWriter,
             objectMapper,
             CLOCK);
@@ -98,18 +104,15 @@ class InspeccionServiceTest {
     Role rolProfesional = crearRol(RoleName.PROFESIONAL_EXTERNO);
     Role rolEstudiante = crearRol(RoleName.ESTUDIANTE);
 
-    catedratico =
-        new UserAccount("profesor@cunoc.edu.gt", "hash", rolCatedratico, true, true);
+    catedratico = new UserAccount("profesor@cunoc.edu.gt", "hash", rolCatedratico, true, true);
     catedratico.activate();
     ReflectionTestUtils.setField(catedratico, "id", UUID.randomUUID());
 
-    profesionalExterno =
-        new UserAccount("ing@colegio.org.gt", "hash", rolProfesional, true, true);
+    profesionalExterno = new UserAccount("ing@colegio.org.gt", "hash", rolProfesional, true, true);
     profesionalExterno.activate();
     ReflectionTestUtils.setField(profesionalExterno, "id", UUID.randomUUID());
 
-    estudiante =
-        new UserAccount("alumno@cunoc.edu.gt", "hash", rolEstudiante, true, true);
+    estudiante = new UserAccount("alumno@cunoc.edu.gt", "hash", rolEstudiante, true, true);
     estudiante.activate();
     ReflectionTestUtils.setField(estudiante, "id", UUID.randomUUID());
 
@@ -406,7 +409,8 @@ class InspeccionServiceTest {
   }
 
   @Test
-  @DisplayName("Precarga datos permanentes de la última inspección publicada con confirmación explícita (sin daños)")
+  @DisplayName(
+      "Precarga datos permanentes de la última inspección publicada con confirmación explícita (sin daños)")
   void iniciarInspeccion_precargaDatosPermanentes_conConfirmacion() {
     UUID usuarioId = catedratico.getId();
     UUID inspeccionVigenteId = UUID.randomUUID();
@@ -523,7 +527,8 @@ class InspeccionServiceTest {
   }
 
   @Test
-  @DisplayName("Idempotencia: reenvío con Idempotency-Key devuelve la inspección previa sin duplicar")
+  @DisplayName(
+      "Idempotencia: reenvío con Idempotency-Key devuelve la inspección previa sin duplicar")
   void iniciarInspeccion_idempotencia_retornaMismaInspeccion() {
     UUID usuarioId = catedratico.getId();
     String key = "req-idempotent-key-123";
@@ -554,10 +559,10 @@ class InspeccionServiceTest {
             key,
             "POST",
             "/api/v1/inspecciones",
-            "hash",
+            hashSolicitudInicio(),
             "COMPLETADA",
             201,
-            objectMapper.createObjectNode(),
+            objectMapper.createObjectNode().put("id", inspeccionPrevia.getId().toString()),
             "inspeccion",
             inspeccionPrevia.getId(),
             AHORA,
@@ -587,5 +592,28 @@ class InspeccionServiceTest {
 
     assertThat(response.id()).isEqualTo(inspeccionPrevia.getId());
     verify(inspeccionRepository, never()).save(any());
+  }
+
+  private String hashSolicitudInicio() {
+    var r =
+        new IniciarInspeccionRequest(
+            null,
+            puenteActivo.getId(),
+            LocalDate.of(2026, 10, 15),
+            "disp-1",
+            null,
+            null,
+            null,
+            null,
+            false,
+            null);
+    try {
+      return java.util.HexFormat.of()
+          .formatHex(
+              java.security.MessageDigest.getInstance("SHA-256")
+                  .digest(r.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+    } catch (Exception e) {
+      throw new AssertionError(e);
+    }
   }
 }

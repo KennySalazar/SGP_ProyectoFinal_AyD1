@@ -144,4 +144,26 @@ public class OperacionIdempotente {
   public Instant getCreadoEn() {
     return creadoEn;
   }
+
+  public void iniciarIntento(JsonNode manifiesto, Instant vence) {
+    estado = "EN_PROCESO";
+    respuesta = manifiesto.deepCopy();
+    expiraEn = vence;
+    codigoRespuesta = null;
+    completadoEn = null;
+  }
+
+  public void completar(JsonNode resultado, int codigo, UUID destino, Instant ahora) {
+    respuesta = resultado.deepCopy();
+    codigoRespuesta = codigo;
+    entidadId = destino;
+    estado = "COMPLETADA";
+    completadoEn = ahora;
+    expiraEn = ahora.plus(java.time.Duration.ofDays(7));
+  }
+
+  public void marcarRecuperada(JsonNode manifiesto) {
+    respuesta = manifiesto.deepCopy();
+    expiraEn = null;
+  }
 }
