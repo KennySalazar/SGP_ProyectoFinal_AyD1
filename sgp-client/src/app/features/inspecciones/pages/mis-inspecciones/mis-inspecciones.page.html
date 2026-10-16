@@ -1,0 +1,174 @@
+<header class="page-heading">
+  <div>
+    <p class="page-kicker">{{ 'inspecciones.mis.kicker' | transloco }}</p>
+    <h1 class="page-title">{{ 'inspecciones.mis.title' | transloco }}</h1>
+    <p class="page-description">{{ 'inspecciones.mis.description' | transloco }}</p>
+  </div>
+</header>
+
+@if (puedeIniciarInspeccion()) {
+<section class="surface-card selector-puente">
+  <div>
+    <h2>{{ 'inspecciones.mis.startTitle' | transloco }}</h2>
+    <p>{{ 'inspecciones.mis.startDescription' | transloco }}</p>
+  </div>
+  <label>
+    <span>{{ 'inspecciones.mis.searchBridge' | transloco }}</span>
+    <div class="busqueda-control">
+      <input
+        pInputText
+        [(ngModel)]="busquedaPuente"
+        (keyup.enter)="buscarPuentes()"
+        [placeholder]="'inspecciones.mis.searchPlaceholder' | transloco"
+      />
+      <button
+        pButton
+        type="button"
+        (click)="buscarPuentes()"
+        [disabled]="!busquedaPuente().trim() || buscandoPuentes()"
+      >
+        <i class="pi pi-search" aria-hidden="true"></i
+        ><span
+          >{{ buscandoPuentes() ? ('inspecciones.mis.searching' | transloco) :
+          ('inspecciones.mis.search' | transloco) }}</span
+        >
+      </button>
+    </div>
+  </label>
+  @if (resultadosPuente().length) {
+  <ul class="resultados-puente">
+    @for (puente of resultadosPuente(); track puente.id) {
+    <li>
+      <button type="button" (click)="seleccionarPuente(puente)" [disabled]="cargandoPuente()">
+        <strong>{{ puente.codigo }} · {{ puente.nombre }}</strong
+        ><span>{{ puente.departamento.nombre }}, {{ puente.municipio.nombre }}</span>
+      </button>
+    </li>
+    }
+  </ul>
+  }
+</section>
+}
+
+<section class="surface-card lista-inspecciones">
+  <div class="lista-cabecera">
+    <div>
+      <h2>{{ 'inspecciones.mis.listTitle' | transloco }}</h2>
+      <p>{{ 'inspecciones.mis.listDescription' | transloco }}</p>
+    </div>
+    <p-select
+      [options]="estados"
+      optionLabel="label"
+      optionValue="value"
+      [ngModel]="estadoFiltro()"
+      (ngModelChange)="cambiarEstado($event)"
+      [ariaLabel]="'inspecciones.mis.filterState' | transloco"
+    />
+  </div>
+  @if (error()) {
+  <p class="mensaje error" role="alert">{{ 'inspecciones.mis.loadError' | transloco }}</p>
+  } @if (cargando()) {
+  <p class="mensaje" role="status">{{ 'inspecciones.mis.loading' | transloco }}</p>
+  } @if (!cargando() && pagina()?.empty) {
+  <p class="mensaje" role="status">{{ 'inspecciones.mis.empty' | transloco }}</p>
+  } @for (inspeccion of pagina()?.content ?? []; track inspeccion.id) {
+  <article class="inspeccion-fila">
+    <div class="inspeccion-principal">
+      <div class="fila-titulo">
+        <h3>{{ inspeccion.codigoPuente }} · {{ inspeccion.nombrePuente }}</h3>
+        <p-tag
+          [value]="etiquetaEstado(inspeccion.estado) | transloco"
+          [severity]="severidad(inspeccion.estado)"
+        />
+      </div>
+      <p>
+        {{ inspeccion.departamentoNombre }}{{ inspeccion.municipioNombre ? ', ' +
+        inspeccion.municipioNombre : '' }} · {{ inspeccion.fechaInspeccion }}
+      </p>
+      @if (inspeccion.estado === 'BORRADOR' && inspeccion.porcentajeAvance !== null) {
+      <small
+        >{{ 'inspecciones.mis.progress' | transloco: { avance: inspeccion.porcentajeAvance }
+        }}</small
+      >
+      }
+    </div>
+    <div class="acciones">
+      @if (inspeccion.estado === 'BORRADOR') {
+      <button
+        pButton
+        type="button"
+        severity="secondary"
+        [outlined]="true"
+        (click)="reanudar(inspeccion)"
+      >
+        <i class="pi pi-pencil" aria-hidden="true"></i
+        ><span>{{ 'inspecciones.mis.resume' | transloco }}</span></button
+      ><button
+        pButton
+        type="button"
+        severity="danger"
+        [outlined]="true"
+        (click)="confirmarEliminar(inspeccion)"
+      >
+        <i class="pi pi-trash" aria-hidden="true"></i
+        ><span>{{ 'inspecciones.mis.delete' | transloco }}</span>
+      </button>
+      } @else { <span class="sin-acciones">{{ 'inspecciones.mis.noActions' | transloco }}</span> }
+    </div>
+  </article>
+  } @if (pagina() && !pagina()!.empty) {
+  <p-paginator
+    [first]="pagina()!.number * pagina()!.size"
+    [rows]="pagina()!.size"
+    [totalRecords]="pagina()!.totalElements"
+    [rowsPerPageOptions]="[10, 20, 50, 100]"
+    (onPageChange)="cambiarPagina($event)"
+  />
+  }
+</section>
+
+<p-dialog
+  [visible]="!!inspeccionEliminar()"
+  (visibleChange)="!eliminando() && inspeccionEliminar.set(null)"
+  [modal]="true"
+  [style]="{ width: 'min(32rem, 94vw)' }"
+  [header]="'inspecciones.mis.deleteTitle' | transloco"
+>
+  <p>
+    {{ 'inspecciones.mis.deleteConfirmation' | transloco: { puente:
+    inspeccionEliminar()?.nombrePuente } }}
+  </p>
+  @if (errorEliminar()) {
+  <p class="mensaje error" role="alert">{{ 'inspecciones.mis.deleteError' | transloco }}</p>
+  }
+  <div class="dialog-acciones">
+    <button
+      pButton
+      type="button"
+      severity="secondary"
+      [outlined]="true"
+      (click)="inspeccionEliminar.set(null)"
+      [disabled]="eliminando()"
+    >
+      <span>{{ 'common.cancel' | transloco }}</span></button
+    ><button
+      pButton
+      type="button"
+      severity="danger"
+      (click)="eliminarBorrador()"
+      [disabled]="eliminando()"
+    >
+      <i class="pi pi-trash" aria-hidden="true"></i
+      ><span
+        >{{ eliminando() ? ('inspecciones.mis.deleting' | transloco) : ('inspecciones.mis.delete' |
+        transloco) }}</span
+      >
+    </button>
+  </div>
+</p-dialog>
+
+<app-iniciar-inspeccion-dialog
+  [(visible)]="mostrarInicio"
+  [puente]="puenteSeleccionado()"
+  (inspeccionIniciada)="cargar()"
+/>

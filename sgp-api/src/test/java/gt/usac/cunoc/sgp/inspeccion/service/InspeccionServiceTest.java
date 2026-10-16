@@ -653,6 +653,77 @@ class InspeccionServiceTest {
   }
 
   @Test
+  @DisplayName("HU-031: El autor elimina lógicamente su borrador y se registra auditoría")
+  void eliminarBorrador_propietario_marcaEliminacionYAudita() {
+    UUID usuarioId = catedratico.getId();
+    UUID inspeccionId = UUID.randomUUID();
+    Inspeccion inspeccion =
+        new Inspeccion(
+            inspeccionId,
+            puenteActivo,
+            versionActiva,
+            usuarioId,
+            "CATEDRATICO",
+            "Profesor",
+            LocalDate.of(2026, 10, 15),
+            "disp-1",
+            null,
+            null,
+            null,
+            null,
+            objectMapper.createObjectNode(),
+            AHORA);
+    when(inspeccionRepository.findConDetallesById(inspeccionId)).thenReturn(Optional.of(inspeccion));
+    when(userAccountRepository.findWithRoleById(usuarioId)).thenReturn(Optional.of(catedratico));
+
+    inspeccionService.eliminarBorrador(inspeccionId, usuarioId);
+
+    assertThat(inspeccion.getEliminadoEn()).isEqualTo(AHORA);
+    assertThat(inspeccion.getEliminadoPorId()).isEqualTo(usuarioId);
+    verify(inspeccionRepository).save(inspeccion);
+    verify(auditoriaWriter)
+        .registrarEnTransaccion(
+            eq(usuarioId),
+            eq(AccionAuditoria.CAMBIAR_ESTADO),
+            eq("inspeccion"),
+            eq(inspeccionId),
+            any(),
+            any(),
+            eq("HU-031"));
+  }
+
+  @Test
+  @DisplayName("HU-031: No permite eliminar una inspección publicada")
+  void eliminarBorrador_publicada_lanza409() {
+    UUID usuarioId = catedratico.getId();
+    UUID inspeccionId = UUID.randomUUID();
+    Inspeccion inspeccion =
+        new Inspeccion(
+            inspeccionId,
+            puenteActivo,
+            versionActiva,
+            usuarioId,
+            "CATEDRATICO",
+            "Profesor",
+            LocalDate.of(2026, 10, 15),
+            "disp-1",
+            null,
+            null,
+            null,
+            null,
+            objectMapper.createObjectNode(),
+            AHORA);
+    ReflectionTestUtils.setField(inspeccion, "estado", "PUBLICADA");
+    when(inspeccionRepository.findConDetallesById(inspeccionId)).thenReturn(Optional.of(inspeccion));
+    when(userAccountRepository.findWithRoleById(usuarioId)).thenReturn(Optional.of(catedratico));
+
+    assertThatThrownBy(() -> inspeccionService.eliminarBorrador(inspeccionId, usuarioId))
+        .isInstanceOf(ApiException.class)
+        .matches(e -> ((ApiException) e).getStatus() == HttpStatus.CONFLICT);
+    verify(inspeccionRepository, never()).save(any());
+  }
+
+  @Test
   @DisplayName("HU-025: Calcula IC preliminar etiquetado cuando existen datos suficientes sin alterar estado del puente")
   void guardarBorrador_conSuficientesDatos_calculaIcPreliminar() {
     UUID usuarioId = catedratico.getId();
@@ -951,6 +1022,35 @@ class InspeccionServiceTest {
     assertThat(response.id()).isEqualTo(inspeccionId);
     assertThat(response.progreso()).isNotNull();
     assertThat(response.progreso().secciones()).hasSize(8);
+  }
+
+  @Test
+  @DisplayName("HU-031: Una inspección propia fuera de BORRADOR no puede abrirse para edición")
+  void obtenerBorrador_estadoNoBorrador_lanza404() {
+    UUID usuarioId = catedratico.getId();
+    UUID inspeccionId = UUID.randomUUID();
+    Inspeccion inspeccion =
+        new Inspeccion(
+            inspeccionId,
+            puenteActivo,
+            versionActiva,
+            usuarioId,
+            "CATEDRATICO",
+            "Profesor",
+            LocalDate.of(2026, 10, 15),
+            "disp-1",
+            null,
+            null,
+            null,
+            null,
+            objectMapper.createObjectNode(),
+            AHORA);
+    ReflectionTestUtils.setField(inspeccion, "estado", "PUBLICADA");
+    when(inspeccionRepository.findConDetallesById(inspeccionId)).thenReturn(Optional.of(inspeccion));
+
+    assertThatThrownBy(() -> inspeccionService.obtenerBorrador(inspeccionId, usuarioId))
+        .isInstanceOf(ApiException.class)
+        .matches(e -> ((ApiException) e).getStatus() == HttpStatus.NOT_FOUND);
   }
 
   @Test

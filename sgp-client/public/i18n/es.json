@@ -33,7 +33,8 @@
     "formularioSieca": "Formulario SIECA",
     "courses": "Cursos",
     "logout": "Cerrar sesion",
-    "inspectionForm": "Formulario de inspección"
+    "inspectionForm": "Formulario de inspección",
+    "myInspections": "Mis inspecciones"
   },
   "connectivity": {
     "online": "En linea",
@@ -1064,6 +1065,39 @@
       "indicePreliminarTitulo": "Índice de Condición Preliminar",
       "etiquetaPreliminar": "Preliminar",
       "indicePreliminarNota": "Este cálculo es preliminar con base en los elementos evaluados hasta el momento. No altera el estado oficial del puente."
+    },
+    "mis": {
+      "kicker": "INSPECCIONES TÉCNICAS",
+      "title": "Mis inspecciones",
+      "description": "Consulta el estado de tus inspecciones, continúa los borradores y comienza una nueva visita de campo.",
+      "startTitle": "Iniciar una inspección",
+      "startDescription": "Busca un puente activo por nombre, código o departamento y selecciónalo para iniciar la inspección.",
+      "searchBridge": "Buscar puente",
+      "searchPlaceholder": "Nombre, código o departamento",
+      "search": "Buscar",
+      "searching": "Buscando...",
+      "listTitle": "Historial propio",
+      "listDescription": "Solo se muestran tus inspecciones no eliminadas.",
+      "filterState": "Filtrar por estado",
+      "loading": "Cargando inspecciones...",
+      "loadError": "No fue posible cargar tus inspecciones. Intenta nuevamente.",
+      "empty": "No hay inspecciones que coincidan con el filtro seleccionado.",
+      "progress": "Avance guardado: {{avance}}%",
+      "resume": "Reanudar",
+      "delete": "Eliminar borrador",
+      "deleting": "Eliminando...",
+      "noActions": "Sin acciones disponibles",
+      "deleteTitle": "Eliminar borrador",
+      "deleteConfirmation": "Eliminarás de forma lógica el borrador de {{puente}}. Esta acción no se puede deshacer desde la aplicación.",
+      "deleteError": "No fue posible eliminar el borrador. Es posible que ya no esté disponible.",
+      "estados": {
+        "BORRADOR": "Borrador",
+        "ENVIADA": "Enviada",
+        "EN_REVISION": "En revisión",
+        "CAMBIOS_SOLICITADOS": "Cambios solicitados",
+        "PUBLICADA": "Publicada",
+        "RECHAZADA": "Rechazada"
+      }
     }
   }
 }

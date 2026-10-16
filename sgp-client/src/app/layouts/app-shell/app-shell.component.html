@@ -51,6 +51,16 @@
           <i class="pi pi-clipboard" aria-hidden="true"></i
           ><span>{{ 'nav.inspectionForm' | transloco }}</span>
         </a>
+        @if (auth.user()?.role === 'CATEDRATICO' || auth.user()?.role === 'PROFESIONAL_EXTERNO') {
+          <a
+            routerLink="/inspecciones"
+            [routerLinkActiveOptions]="{ exact: true }"
+            routerLinkActive="active"
+          >
+            <i class="pi pi-clipboard" aria-hidden="true"></i
+            ><span>{{ 'nav.myInspections' | transloco }}</span>
+          </a>
+        }
         <a routerLink="/seguridad" routerLinkActive="active">
           <i class="pi pi-shield"></i><span>{{ 'nav.security' | transloco }}</span>
         </a>

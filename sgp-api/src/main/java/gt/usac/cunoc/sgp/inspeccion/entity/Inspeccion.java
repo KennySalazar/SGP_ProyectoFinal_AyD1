@@ -333,4 +333,10 @@ public class Inspeccion {
       this.acompanantes.addAll(nuevosAcompanantes);
     }
   }
+
+  public void marcarEliminado(UUID usuarioId, Instant ahora) {
+    this.eliminadoEn = ahora;
+    this.eliminadoPorId = usuarioId;
+    this.actualizadoEn = ahora;
+  }
 }

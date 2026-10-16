@@ -15,6 +15,7 @@ import gt.usac.cunoc.sgp.inspeccion.dto.GuardarBorradorRequest;
 import gt.usac.cunoc.sgp.inspeccion.dto.IniciarInspeccionRequest;
 import gt.usac.cunoc.sgp.inspeccion.dto.IniciarInspeccionResponse;
 import gt.usac.cunoc.sgp.inspeccion.dto.InspeccionBorradorResponse;
+import gt.usac.cunoc.sgp.inspeccion.dto.InspeccionResumenResponse;
 import gt.usac.cunoc.sgp.inspeccion.entity.Inspeccion;
 import gt.usac.cunoc.sgp.inspeccion.entity.InspeccionAcompanante;
 import gt.usac.cunoc.sgp.inspeccion.entity.InspeccionDatoTecnico;
@@ -46,12 +47,17 @@ import java.util.ArrayList;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.GeometryFactory;
 import org.locationtech.jts.geom.Point;
 import org.locationtech.jts.geom.PrecisionModel;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -62,6 +68,9 @@ public class InspeccionService {
   private static final GeometryFactory GEOMETRY_FACTORY =
       new GeometryFactory(new PrecisionModel(), 4326);
   private static final ZoneId ZONA_GUATEMALA = ZoneId.of("America/Guatemala");
+  private static final Set<String> ESTADOS_VALIDOS =
+      Set.of(
+          "BORRADOR", "ENVIADA", "EN_REVISION", "CAMBIOS_SOLICITADOS", "PUBLICADA", "RECHAZADA");
 
   private final InspeccionRepository inspeccionRepository;
   private final InspeccionDatoTecnicoRepository datoTecnicoRepository;
@@ -322,8 +331,10 @@ public class InspeccionService {
                         "Inspección no encontrada",
                         "No se encontró la inspección especificada o no tiene acceso a ella."));
 
-    // 4. Privacidad: 404 para usuarios no autorizados o eliminados
-    if (inspeccion.getEliminadoEn() != null || !inspeccion.getAutorId().equals(usuarioId)) {
+    // Privacidad y edición: 404 para usuarios no autorizados, eliminadas o no editables.
+    if (inspeccion.getEliminadoEn() != null
+        || !inspeccion.getAutorId().equals(usuarioId)
+        || !"BORRADOR".equals(inspeccion.getEstado())) {
       throw new ApiException(
           HttpStatus.NOT_FOUND,
           "inspeccion_no_encontrada",
@@ -332,6 +343,145 @@ public class InspeccionService {
     }
 
     return aBorradorResponse(inspeccion);
+  }
+
+  @Transactional(readOnly = true)
+  public Page<InspeccionResumenResponse> listarMisInspecciones(
+      UUID usuarioId, String estado, int pagina, int tamanio) {
+    validarInspector(usuarioId);
+
+    if (pagina < 0 || tamanio < 1 || tamanio > 100) {
+      throw new ApiException(
+          HttpStatus.UNPROCESSABLE_ENTITY,
+          "paginacion_invalida",
+          "Paginación inválida",
+          "La página debe ser mayor o igual a 0 y el tamaño debe estar entre 1 y 100.");
+    }
+
+    String estadoFiltro = null;
+    if (estado != null && !estado.isBlank()) {
+      estadoFiltro = estado.trim();
+      if (!ESTADOS_VALIDOS.contains(estadoFiltro)) {
+        throw new ApiException(
+            HttpStatus.UNPROCESSABLE_ENTITY,
+            "estado_invalido",
+            "Estado inválido",
+            "El estado debe ser uno de: " + ESTADOS_VALIDOS);
+      }
+    }
+
+    Pageable pageable =
+        PageRequest.of(
+            pagina,
+            tamanio,
+            Sort.by(Sort.Order.desc("ultimaActividadEn"), Sort.Order.desc("creadoEn")));
+
+    return inspeccionRepository
+        .findMisInspecciones(usuarioId, estadoFiltro, pageable)
+        .map(this::aResumenResponse);
+  }
+
+  @Transactional
+  public void eliminarBorrador(UUID id, UUID usuarioId) {
+    Inspeccion inspeccion =
+        inspeccionRepository
+            .findConDetallesById(id)
+            .orElseThrow(
+                () ->
+                    new ApiException(
+                        HttpStatus.NOT_FOUND,
+                        "inspeccion_no_encontrada",
+                        "Inspección no encontrada",
+                        "No se encontró la inspección especificada o no tiene acceso a ella."));
+
+    if (inspeccion.getEliminadoEn() != null || !inspeccion.getAutorId().equals(usuarioId)) {
+      throw new ApiException(
+          HttpStatus.NOT_FOUND,
+          "inspeccion_no_encontrada",
+          "Inspección no encontrada",
+          "No se encontró la inspección especificada o no tiene acceso a ella.");
+    }
+
+    validarInspector(usuarioId);
+
+    if ("PUBLICADA".equals(inspeccion.getEstado())) {
+      throw new ApiException(
+          HttpStatus.CONFLICT,
+          "inspeccion_publicada",
+          "Inspección publicada",
+          "No se puede eliminar una inspección publicada.");
+    }
+
+    if (!"BORRADOR".equals(inspeccion.getEstado())) {
+      throw new ApiException(
+          HttpStatus.CONFLICT,
+          "inspeccion_no_eliminable",
+          "Inspección no eliminable",
+          "Solo las inspecciones en estado BORRADOR pueden ser eliminadas.");
+    }
+
+    Instant ahora = clock.instant();
+    inspeccion.marcarEliminado(usuarioId, ahora);
+    inspeccionRepository.save(inspeccion);
+
+    ObjectNode snapshotAnterior = objectMapper.createObjectNode();
+    snapshotAnterior.put("id", inspeccion.getId().toString());
+    snapshotAnterior.put("puenteId", inspeccion.getPuente().getId().toString());
+    snapshotAnterior.put("codigoPuente", inspeccion.getPuente().getCodigo());
+    snapshotAnterior.put("estado", inspeccion.getEstado());
+    snapshotAnterior.put("autorId", inspeccion.getAutorId().toString());
+
+    ObjectNode snapshotNuevo = objectMapper.createObjectNode();
+    snapshotNuevo.put("eliminadoEn", ahora.toString());
+    snapshotNuevo.put("eliminadoPorId", usuarioId.toString());
+
+    auditoriaWriter.registrarEnTransaccion(
+        usuarioId,
+        AccionAuditoria.CAMBIAR_ESTADO,
+        "inspeccion",
+        inspeccion.getId(),
+        snapshotAnterior,
+        snapshotNuevo,
+        "HU-031");
+  }
+
+  private InspeccionResumenResponse aResumenResponse(Inspeccion i) {
+    String depto = null;
+    String muni = null;
+    if (i.getPuente() != null && i.getPuente().getMunicipio() != null) {
+      muni = i.getPuente().getMunicipio().getNombre();
+      if (i.getPuente().getMunicipio().getDepartamento() != null) {
+        depto = i.getPuente().getMunicipio().getDepartamento().getNombre();
+      }
+    }
+
+    Double avance = null;
+    if ("BORRADOR".equals(i.getEstado())) {
+      ProgresoBorradorResponse progreso = calculadorProgreso.calcularProgreso(i);
+      avance = progreso != null ? progreso.porcentajeTotal() : 0.0;
+    } else if ("PUBLICADA".equals(i.getEstado())) {
+      avance = 100.0;
+    }
+
+    return new InspeccionResumenResponse(
+        i.getId(),
+        i.getPuente().getId(),
+        i.getPuente().getCodigo(),
+        i.getPuente().getNombre(),
+        depto,
+        muni,
+        i.getVersionFormulario().getId(),
+        i.getVersionFormulario().getCodigo(),
+        i.getAutorId(),
+        i.getRolAutorCreacion(),
+        i.getNombreAutorCapturado(),
+        i.getEstado(),
+        i.getTipo(),
+        i.getFechaInspeccion(),
+        avance,
+        i.getUltimaActividadEn(),
+        i.getCreadoEn(),
+        i.getActualizadoEn());
   }
 
   private IniciarInspeccionResponse crearNuevaInspeccion(

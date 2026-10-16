@@ -23,6 +23,7 @@ export const routes: Routes = [
       },
       {
         path: 'inspecciones',
+        canActivate: [roleGuard('CATEDRATICO', 'PROFESIONAL_EXTERNO')],
         loadChildren: () =>
           import('./features/inspecciones/inspecciones.routes').then((m) => m.inspeccionesRoutes),
       },

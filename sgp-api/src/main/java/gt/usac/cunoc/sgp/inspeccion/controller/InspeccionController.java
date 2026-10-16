@@ -7,6 +7,7 @@ import gt.usac.cunoc.sgp.inspeccion.dto.GuardarBorradorRequest;
 import gt.usac.cunoc.sgp.inspeccion.dto.IniciarInspeccionRequest;
 import gt.usac.cunoc.sgp.inspeccion.dto.IniciarInspeccionResponse;
 import gt.usac.cunoc.sgp.inspeccion.dto.InspeccionBorradorResponse;
+import gt.usac.cunoc.sgp.inspeccion.dto.InspeccionResumenResponse;
 import gt.usac.cunoc.sgp.inspeccion.service.InspeccionService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -14,10 +15,12 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.net.URI;
 import java.util.UUID;
+import org.springframework.data.domain.Page;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -25,6 +28,7 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -103,6 +107,40 @@ public class InspeccionController {
       @PathVariable UUID id, Authentication authentication) {
     UUID usuarioId = usuarioId(authentication);
     return ResponseEntity.ok(inspeccionService.obtenerBorrador(id, usuarioId));
+  }
+
+  @GetMapping
+  @PreAuthorize("isAuthenticated()")
+  @Operation(
+      summary = "Listar inspecciones del inspector autenticado",
+      description =
+          "Retorna la lista paginada de inspecciones no eliminadas del inspector autenticado, con filtro opcional por estado. "
+              + "Página desde 0, tamaño entre 1 y 100. Orden descendente por última actividad y fecha de creación.",
+      security = @SecurityRequirement(name = "bearerAuth"))
+  public ResponseEntity<Page<InspeccionResumenResponse>> listarMisInspecciones(
+      @RequestParam(required = false) String estado,
+      @RequestParam(defaultValue = "0") int pagina,
+      @RequestParam(defaultValue = "20") int tamanio,
+      Authentication authentication) {
+    UUID usuarioId = usuarioId(authentication);
+    Page<InspeccionResumenResponse> response =
+        inspeccionService.listarMisInspecciones(usuarioId, estado, pagina, tamanio);
+    return ResponseEntity.ok(response);
+  }
+
+  @DeleteMapping({"/{id}", "/{id}/borrador"})
+  @PreAuthorize("isAuthenticated()")
+  @Operation(
+      summary = "Eliminar lógicamente un borrador de inspección",
+      description =
+          "Elimina lógicamente un borrador propio. Retorna 404 si no existe o pertenece a otro usuario. "
+              + "Retorna 409 si la inspección está publicada o no es borrador. Retorna 204 en caso exitoso.",
+      security = @SecurityRequirement(name = "bearerAuth"))
+  public ResponseEntity<Void> eliminarBorrador(
+      @PathVariable UUID id, Authentication authentication) {
+    UUID usuarioId = usuarioId(authentication);
+    inspeccionService.eliminarBorrador(id, usuarioId);
+    return ResponseEntity.noContent().build();
   }
 
   private UUID usuarioId(Authentication authentication) {

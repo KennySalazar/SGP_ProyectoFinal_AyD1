@@ -131,3 +131,27 @@ export interface InspeccionBorradorResponse {
   progreso: ProgresoBorradorResponse;
   icPreliminar?: IndiceCondicionPreliminarResponse | null;
 }
+
+export type EstadoInspeccion =
+  'BORRADOR' | 'ENVIADA' | 'EN_REVISION' | 'CAMBIOS_SOLICITADOS' | 'PUBLICADA' | 'RECHAZADA';
+
+export interface InspeccionResumenResponse {
+  id: string;
+  puenteId: string;
+  codigoPuente: string;
+  nombrePuente: string;
+  departamentoNombre?: string | null;
+  municipioNombre?: string | null;
+  versionFormularioId: string;
+  codigoVersionFormulario: string;
+  autorId: string;
+  rolAutorCreacion: string;
+  nombreAutorCapturado: string;
+  estado: EstadoInspeccion;
+  tipo: string;
+  fechaInspeccion: string;
+  porcentajeAvance?: number | null;
+  ultimaActividadEn?: string | null;
+  creadoEn: string;
+  actualizadoEn?: string | null;
+}

@@ -7,7 +7,10 @@ import {
   IniciarInspeccionRequest,
   IniciarInspeccionResponse,
   InspeccionBorradorResponse,
+  InspeccionResumenResponse,
+  EstadoInspeccion,
 } from '../models/inspeccion.models';
+import { PaginaResponse } from '../../puentes/models/puente.models';
 
 @Injectable({ providedIn: 'root' })
 export class InspeccionApiService {
@@ -48,5 +51,21 @@ export class InspeccionApiService {
       `/api/v1/inspecciones/${encodeURIComponent(id)}/borrador`,
       request,
     );
+  }
+
+  listarMisInspecciones(
+    pagina = 0,
+    tamanio = 20,
+    estado?: EstadoInspeccion,
+  ): Observable<PaginaResponse<InspeccionResumenResponse>> {
+    const params: Record<string, string | number> = { pagina, tamanio };
+    if (estado) params['estado'] = estado;
+    return this.http.get<PaginaResponse<InspeccionResumenResponse>>('/api/v1/inspecciones', {
+      params,
+    });
+  }
+
+  eliminarBorrador(id: string): Observable<void> {
+    return this.http.delete<void>(`/api/v1/inspecciones/${encodeURIComponent(id)}`);
   }
 }
