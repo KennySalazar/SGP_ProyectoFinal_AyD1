@@ -7,6 +7,8 @@ Este documento concreta la preparación técnica de la fase 1 del [plan HU-029](
 
 Actualización: fase 2 implementada sobre `022d2e9`, con autorización posterior del usuario. Las firmas de política/acceso y las propiedades de mínimos ya existen. Las firmas de fase 3 y las integraciones de fases 4/5 permanecen futuras. La validación ejecutada se registra en el plan.
 
+Actualización posterior sobre `58a2976`: fase 3 implementada. Diagnóstico, retirada, excepción informativa y validación interna están disponibles. Fases 4/5 permanecen pendientes. Las pruebas nuevas se describen y ejecutan en Gherkin; véase la [guía de pruebas](../../sgp-api/src/test/resources/features/README.md).
+
 ## 1. Contratos disponibles y responsabilidad
 
 Base Java: `sgp-api/src/main/java/gt/usac/cunoc/sgp/`.
@@ -131,7 +133,7 @@ Decisión técnica para envío/publicación: respuesta `application/problem+json
 
 `instance` será la URI real de la solicitud; `/publicar` solo ilustra una transición futura y no define una ruta HU-026 existente.
 
-En fase 3, una excepción específica HU-029 conservará una `ValidacionEvidenciaResponse` y una ampliación acotada del handler la serializará. No alterar el comportamiento de las demás `ApiException`. Si el inventario excede 60, usar 422 `limite_fotografias_excedido`, sin inventar categorías faltantes. El GET diagnóstico devuelve `valida=false` y total real en ese caso.
+Implementado en fase 3: `EvidenciaFotograficaIncompletaException` conserva una `ValidacionEvidenciaResponse` y un handler específico la serializa sin alterar el manejo de las demás `ApiException`. Si el inventario excede 60, se utiliza 422 `limite_fotografias_excedido`, sin inventar categorías faltantes. El GET diagnóstico devuelve `valida=false` y total real en ese caso.
 
 ## 7. Transacciones e integración con HU-028/HU-026
 
@@ -166,7 +168,9 @@ Los modelos, repositorios y adaptadores entregados por HU-028 se reutilizan. Est
 - [ ] Ratificación académica de mínimos y reglas adicionales de asignación/estados.
 - [ ] Coordinación de edición con HU-028 y entrega del vínculo por el flujo académico.
 - [x] Implementación y verificación backend de fase 2 (87 pruebas seleccionadas aprobadas, incluidas integración PostGIS y regresión HU-028).
-- [ ] Implementación y verificación de fases 3–5.
+- [x] Implementación de fase 3 y 36 escenarios Gherkin aprobados con JWT y PostGIS reales.
+- [x] Regresión completa posterior: 932 pruebas aprobadas, empaquetado y controles de cobertura cumplidos (`mvn verify`).
+- [ ] Implementación y verificación de fases 4/5.
 
 La entrega técnica documental de fase 1 está preparada para revisión. Las casillas pendientes conservan explícitamente las dependencias externas; no se declaran acuerdos que no han ocurrido. Puede iniciarse fase 2 con los contratos de trabajo y mantener esas dependencias como condiciones de cierre del recorrido académico.
 

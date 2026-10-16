@@ -10,6 +10,8 @@ La preparación técnica de fase 1 se desarrolló en `feature/hu-029-impl-contra
 
 Actualización de implementación: el usuario autorizó posteriormente la fase 2, desarrollada sobre `022d2e9`. Se implementaron las políticas, la lectura mediante relación académica, las propiedades de mínimos y el control concurrente de capacidad en la carga. Las fases 3–5 continúan pendientes. La sección 9 registra la validación ejecutada.
 
+Actualización de fase 3 sobre `58a2976`: implementados diagnóstico, retirada persistente, excepción informativa y entrada interna de validación transaccional. Por instrucción del usuario, todas las pruebas nuevas se describen en Gherkin ejecutable. Las fases 4/5 siguen pendientes; no se implementó el flujo real de envío/publicación.
+
 ## 1. Fuentes y alcance
 
 - Historias originales: `../HUS/hu29.md` y `../HUS/hu28.md`, relativas a la raíz del repositorio; están en el directorio padre y ambas fueron localizadas.
@@ -26,7 +28,7 @@ Objetivo: integrar mínimos, máximo 60, permisos y retirada con la infraestruct
 | Área | Implementación localizada | Pendiente para HU-029 |
 |---|---|---|
 | Tipos compartidos | `CategoriaFoto`, `EstadoArchivo`, `FotografiaRegistrada`, `ContextoArchivosInspeccion`, `ImagenInspeccionada` | Consumirlos sin duplicación; el contexto no contiene asignación académica |
-| Registro | `RegistroFotografiasInspeccion` y `RegistroFotografiasInspeccionJpa` | Conectar diagnóstico y retirada autorizada |
+| Registro | Registro JPA consumido por diagnóstico y retirada autorizada | Integrado en fase 3 |
 | Persistencia | `Archivo`, `ArchivoInspeccion`, sus repositorios y `FotografiaMapper` | Reutilizar; no se identifica una migración necesaria para HU-029 |
 | Bloqueo | `InspeccionRepository.findByIdAndEliminadoEnIsNullForUpdate` con `@Query` y `PESSIMISTIC_WRITE` | Aplicar el mismo bloqueo al conteo final, retirada y transiciones |
 | Carga | `FotografiaService.adjuntar`: autor, borrador, metadatos, anclaje, procesamiento, reserva, conteo final bajo bloqueo y confirmación | Capacidad integrada en fase 2; conservar regresión en siguientes fases |
@@ -34,10 +36,10 @@ Objetivo: integrar mínimos, máximo 60, permisos y retirada con la infraestruct
 | Contenido real | `InspectorImagenesImageIo` decodifica JPEG/WebP con límites; `ProcesadorImagenes` normaliza a JPEG y genera miniatura | Verificar y ampliar cobertura, sin repetir el decodificador |
 | Almacenamiento | `AlmacenamientoArchivos`, adaptadores local/S3, configuración MinIO/S3, cargas y recuperación | Pruebas conjuntas; no crear otro cliente ni cambiar infraestructura para implementar reglas |
 | Idempotencia | `OperacionIdempotenteService`, reservas y compensación ya consumidas por carga | Conservar reintentos confirmados al añadir capacidad/estado |
-| Reglas HU-029 | Evaluador, DTO, política de permisos, resolución académica y propiedades del servidor | Capacidad conectada; diagnóstico y transiciones pendientes de fases 3/5 |
-| Retirada | `Archivo.retirar` y registro JPA implementados | Faltan caso de uso autorizado y endpoint DELETE |
+| Reglas HU-029 | Evaluador, DTO, política de permisos, resolución académica y propiedades del servidor | Capacidad y diagnóstico conectados; validación interna disponible para integrar transiciones en fase 5 |
+| Retirada | Caso de uso transaccional y DELETE implementados sobre registro JPA | Panel pendiente de fase 4 |
 | Frontend | `ReporteFotograficoComponent`, API de fotos, procesamiento y persistencia local | Diagnóstico, acción de retirada, error de capacidad y lectura autorizada del Catedrático |
-| Publicación | `PublicacionIndiceCondicionService` exige transacción existente e inspección ya PUBLICADA | Falta conectar evidencia antes de enviar/publicar en los flujos correspondientes |
+| Publicación | Validador de evidencia MANDATORY disponible; integración IC existente | Falta conectar evidencia antes de enviar/publicar en los flujos correspondientes |
 | Actas | Documento de pendientes vigente; no se localizaron servicios de actas en lo revisado | No declarar HU-019 terminada por existir almacenamiento fotográfico |
 
 La frase anterior «hay que esperar los siete tipos de HU-028» ya no aplica. También dejó de ser necesario introducir un `ValidadorContenidoFotografico` que únicamente repita las comprobaciones actuales: el procesador ya utiliza el decodificador real y este rechaza otros formatos. Solo considerar extracción de una política si aparece una necesidad concreta, conservando una sola decodificación por carga.
@@ -48,12 +50,12 @@ El plan HU-028 conserva afirmaciones históricas sobre ausencia de infraestructu
 
 | Criterio | Estado actual | Trabajo de cierre |
 |---|---|---|
-| Mínimo en ACCESO/SUPERESTRUCTURA/SUBESTRUCTURA/CAUCE | Evaluador puro parametrizado | Filtrar inventario real, agrupar, fijar política de servidor e invocar antes de enviar/publicar |
-| Evidencia completa | Se evalúan conteos, no inventario persistente | Demostrar cuatro categorías con fotos DISPONIBLE reales |
+| Mínimo en ACCESO/SUPERESTRUCTURA/SUBESTRUCTURA/CAUCE | Diagnóstico sobre inventario persistente y validador interno parametrizado | Invocar en envío/publicación reales en fase 5 |
+| Evidencia completa | Probada con inventario persistido por categoría | Mantener regresión e integrar las transiciones |
 | Foto 61 rechazada con 422 | Integrada en POST y probada con PostGIS en fase 2 | Mantener garantía al incorporar retirada/transiciones |
 | Tipo real JPEG/WebP | Implementado en decoder y utilizado por carga | Regresión con bytes reales válidos, falsos, PNG y truncados |
-| Retirar foto del borrador | Mutación persistente disponible | Autorizar, bloquear, ejecutar retirada y actualizar diagnóstico/panel |
-| Publicada rechaza retirada con 409 | No existe endpoint | Implementar política y probar estado vigente en transacción |
+| Retirar foto del borrador | DELETE autorizado, bloqueo, persistencia y diagnóstico actualizados | Panel pendiente de fase 4 |
+| Publicada rechaza retirada con 409 | Probado por endpoint con autenticación real y PostGIS | Mantener regresión |
 | Acceso protegido | Endpoints autenticados y cabeceras privadas | Completar matriz de acceso por entidad y verificar proveedor privado |
 | Borrador visible al autor/Catedrático asignado | Política y consulta real integradas; prueba con vínculo persistido y revocación | Completar creación del vínculo y navegación académica |
 | Visitante recibe 401 | Seguridad configurada; existen pruebas de lectura anónima | Cubrir también nuevos endpoints y POST |
@@ -127,9 +129,9 @@ La lectura del autor fuera de BORRADOR existe hoy; conservarla salvo decisión e
 
 ### Orquestación de evidencia
 
-Crear `EvidenciaFotograficaService`: cargar inspección no eliminada, autorizar lectura para diagnóstico, consultar registro, filtrar disponibles, agrupar por código y llamar al evaluador existente.
+`EvidenciaFotograficaService` implementado en fase 3: cargar inspección no eliminada, autorizar lectura para diagnóstico, consultar registro, filtrar disponibles, agrupar por código y llamar al evaluador existente. Rechaza inventarios inconsistentes (destino, IDs duplicados o metadatos obligatorios ausentes) como fallos técnicos, sin producir una aprobación silenciosa.
 
-Proponer `consultar(UUID inspeccionId, UUID actorId)` y una entrada interna `exigirParaTransicion(UUID inspeccionId)` con `Propagation.MANDATORY`. Esta última exige inspección bloqueada por el llamador y mínimos definidos; la autorización para enviar/publicar pertenece al flujo correspondiente. MANDATORY verifica transacción, no comprueba por sí mismo que exista un bloqueo: ese requisito se demuestra con integración concurrente.
+Disponibles `consultar(UUID inspeccionId, UUID actorId)` y la entrada interna `exigirParaTransicion(UUID inspeccionId)` con `Propagation.MANDATORY`. Esta última exige inspección bloqueada por el llamador y mínimos definidos; la autorización para enviar/publicar pertenece al flujo correspondiente. MANDATORY verifica transacción, no comprueba por sí mismo que exista un bloqueo: el llamador de prueba lo toma explícitamente, y las carreras con flujos reales se verificarán al integrarlos.
 
 La fase 2 implementa la fuente parametrizada `app.evidencia-fotografica.minimos`, consumida por `EvidenciaFotograficaProperties`. Se mantiene la propuesta 1 por cada categoría obligatoria y no se aceptan parámetros HTTP que reduzcan mínimos. Política vacía/inválida o ausencia de categorías obligatorias impide inicializar el bean; las pruebas de binding lo verifican. El binding, validación y conversión al mapa existente se precisan en [el contrato](contratos-hu29.md#5-fuente-única-de-mínimos). El consumidor de diagnóstico se incorporará en fase 3.
 
@@ -163,13 +165,15 @@ La fase 2 implementa la fuente parametrizada `app.evidencia-fotografica.minimos`
 
 ### Fase 3. Diagnóstico y retirada persistente
 
+**Estado: implementada.** Los dos servicios y controladores consumen la política y el registro existentes. La excepción específica y el handler informan faltantes, total y máximo. Los 36 escenarios Gherkin se ejecutaron contra JWT real, Spring MVC, servicios reales, PostGIS temporal y almacenamiento local.
+
 - Implementar `EvidenciaFotograficaService` y `EvidenciaFotograficaController`.
 - Implementar `RetiradaFotografiaService` con `@Transactional`: bloquear inspección, autorizar, buscar por ambos IDs y retirar mediante registro con `Clock.instant()`.
 - Implementar `RetiradaFotografiaController` como único propietario del DELETE.
 - Repetición autorizada de una retirada devuelve 204 y mantiene su fecha. PURGADO o vínculo ajeno/inexistente devuelve 404. Si cambió el estado o permiso, revalidarlo antes de repetir.
 - Un reintento del POST después de retirar no debe reactivar el archivo ni crear asociación nueva. Preservar el resultado idempotente acordado y hacer que listado/diagnóstico reflejen su estado actual.
 
-**Salida:** ciclo carga → consulta → retirada → consulta coherente, reversión transaccional y ausencia de lectura de retiradas.
+**Salida comprobada:** diagnóstico por categoría y estado; retirada autorizada e idempotente; conservación de asociación y bytes; rollback del llamador; 401/404/409 por sesión/relación/estado; carga retirada no se reactiva al reintentar; una retirada libera una plaza. La validación interna exige transacción y genera 422 estructurado. La prueba de transición es un llamador exclusivo de test, no una implementación de HU-026.
 
 ### Fase 4. Integración con panel existente y pruebas reales
 
@@ -203,12 +207,12 @@ Orden recomendado: **1 → 2 → 3 → 4 → 5**. Tras acordar firmas, las prueb
 | GET `/inspecciones/{id}/fotografias` | Existente, ampliar lectura | 200, únicamente DISPONIBLE |
 | GET `/inspecciones/{id}/fotografias/{fotoId}/contenido` | Existente | Bytes JPEG normalizados y autorización vigente |
 | GET `/inspecciones/{id}/fotografias/{fotoId}/miniatura` | Existente | Misma autorización y disponibilidad |
-| GET `/inspecciones/{id}/evidencia-fotografica` | Nuevo HU-029 | 200 con `ValidacionEvidenciaResponse`, aunque falten fotos |
-| DELETE `/inspecciones/{id}/fotografias/{fotoId}` | Nuevo HU-029 | 204 tras retirada lógica autorizada |
+| GET `/inspecciones/{id}/evidencia-fotografica` | Implementado en fase 3 | 200 con `ValidacionEvidenciaResponse`, aunque falten fotos; respuesta privada |
+| DELETE `/inspecciones/{id}/fotografias/{fotoId}` | Implementado en fase 3 | 204 tras retirada lógica autorizada |
 
 Conservar `inspeccion_no_encontrada`/`fotografia_no_encontrada` (404), `estado_inspeccion_no_permite_archivos` (409), `limite_fotografias_excedido` y `contenido_fotografico_invalido` (422), autenticación 401 y límites multipart 413 existentes.
 
-Para transición incompleta: 422 `evidencia_fotografica_incompleta` con categorías faltantes en la respuesta. El handler actual de `ApiException` no transporta el DTO de faltantes. La decisión de fase 1 es implementar en fase 3 una excepción específica y una ampliación acotada de ProblemDetail para añadir `faltantes`, `totalDisponibles` y `maximoPermitido`, conservando el comportamiento de los demás errores. El ejemplo JSON figura en [el contrato](contratos-hu29.md#6-contrato-http-y-error-informativo). El GET por separado no cumple el rechazo informativo de la transición. Si el inventario supera 60, usar `limite_fotografias_excedido`, sin inventar categorías faltantes.
+Para transición incompleta: 422 `evidencia_fotografica_incompleta` con categorías faltantes. `EvidenciaFotograficaIncompletaException` y su handler específico implementados en fase 3 añaden `faltantes`, `totalDisponibles` y `maximoPermitido` a ProblemDetail, conservando el manejo de las demás `ApiException`. El ejemplo JSON figura en [el contrato](contratos-hu29.md#6-contrato-http-y-error-informativo). La conexión con la transición real sigue pendiente; el GET por separado no la sustituye. Si el inventario supera 60, se utiliza `limite_fotografias_excedido`, sin inventar categorías faltantes.
 
 ## 8. Archivos previstos y responsabilidad
 
@@ -217,11 +221,11 @@ Para transición incompleta: 422 `evidencia_fotografica_incompleta` con categor�
 | Reutilizar | `archivo/model/*`, `Archivo`, `ArchivoInspeccion`, registro JPA, mapper, almacenamiento, procesador y recuperación | Entregados por HU-028 |
 | Conservar | `ReglasEvidenciaFotografica`, `FaltanteEvidenciaResponse`, `ValidacionEvidenciaResponse` y pruebas | HU-029 ya implementado |
 | Implementado en fase 2 | `inspeccion/service/PoliticaArchivosInspeccion.java`, `AccesoFotografiasInspeccionService.java` | HU-029 |
-| Crear | `inspeccion/service/EvidenciaFotograficaService.java`, `RetiradaFotografiaService.java` | HU-029 |
-| Crear | `inspeccion/controller/EvidenciaFotograficaController.java`, `RetiradaFotografiaController.java` | HU-029 |
-| Propiedades implementadas; excepción pendiente | `inspeccion/config/EvidenciaFotograficaProperties` y excepción de evidencia con faltantes | HU-029; fases 2/3 respectivamente |
+| Implementado en fase 3 | `inspeccion/service/EvidenciaFotograficaService.java`, `RetiradaFotografiaService.java` | HU-029 |
+| Implementado en fase 3 | `inspeccion/controller/EvidenciaFotograficaController.java`, `RetiradaFotografiaController.java` | HU-029 |
+| Implementado en fases 2/3 | Propiedades y `inspeccion/exception/EvidenciaFotograficaIncompletaException.java` | HU-029 |
 | Integrado en fase 2 | `inspeccion/service/FotografiaService.java` y pruebas existentes | Integración HU-029 sobre HU-028 |
-| Ampliar para error estructurado específico | `common/exception/ApiExceptionHandler.java` | Un único responsable; coordinación pendiente |
+| Ampliado en fase 3 | `common/exception/ApiExceptionHandler.java` | Handler específico del error de evidencia |
 | Ampliar | API/modelos de inspecciones, componente `reporte-fotografico`, traducciones y pruebas frontend | Un único responsable coordinado con HU-028 |
 | Integrar | Servicio real de envío/publicación | Responsable del flujo/HU-026 |
 
@@ -272,6 +276,24 @@ Resultado: **87 pruebas aprobadas en 9 clases, sin fallos, errores ni omitidas**
 
 Spotless se aplicó y verificó exclusivamente sobre los ocho archivos Java nuevos/modificados. No se ejecutó la suite completa ni `mvn verify`. Diagnóstico, DELETE y validación de envío/publicación permanecen sin implementar.
 
+### Validación posterior: implementación de fase 3 en Gherkin
+
+Se incorporaron Cucumber 7.20.1 (Java, Spring y JUnit Platform Engine) y JUnit Platform Suite únicamente con alcance `test`. Todas las pruebas nuevas se describen en `.feature` en español; sus pasos Java utilizan servicios, repositorios, filtros JWT y controladores reales. Las pruebas existentes se conservaron para regresión. Véase la [guía de Gherkin](../../sgp-api/src/test/resources/features/README.md).
+
+```bash
+# Suite nueva: 36 escenarios aprobados, sin omitidos.
+mvn -Dtest=Hu029Fase3Test test
+
+# Regresión completa, empaquetado y cobertura configurada.
+mvn -o -B verify
+```
+
+Resultado final del 16 de octubre de 2026: **932 pruebas aprobadas en 74 clases/suites, sin fallos, errores ni omitidas; BUILD SUCCESS**. Incluye los 36 escenarios Gherkin, la regresión HU-028 y las tres pruebas existentes del adaptador contra MinIO temporal. Se cumplieron los controles JaCoCo configurados. Spotless comprobó exclusivamente los nueve archivos Java nuevos/modificados de esta fase y `git diff --check` pasó.
+
+Los escenarios se encuentran en `sgp-api/src/test/resources/features/hu029/fase3/{evidencia,retirada}.feature`. Reportes: `sgp-api/target/cucumber/hu029-fase3.{html,json}` y `target/surefire-reports/`. Los logs de ejecución quedaron en `/tmp/hu029-fase3-bdd.log` y `/tmp/hu029-fase3-verify.log`.
+
+El contexto Gherkin usa PostGIS y almacenamiento local temporales, con identidades y relaciones académicas de fixture. El llamador `/prueba/inspecciones/{id}/validar-transicion` existe únicamente en `src/test`: demuestra MANDATORY, bloqueo, respuesta 422 y rollback, pero no reemplaza ni acredita los flujos reales de HU-026. Las migraciones existentes se aplicaron solo en contenedores de pruebas; no se modificaron migraciones ni bases existentes. La integración visual sigue pendiente de fase 4.
+
 ## 10. Decisiones pendientes y criterios de cierre
 
 | Decisión | Propuesta y alcance del bloqueo |
@@ -287,4 +309,4 @@ Spotless se aplicó y verificó exclusivamente sobre los ocho archivos Java nuev
 
 HU-029 se considera completa cuando sus criterios se demuestran en endpoints y transiciones reales: mínimo requerido, máximo concurrente, contenido real, retirada según permisos/estado, lectura privada, 401/404/409/422 correctos y pruebas por rol. La regresión HU-028 debe conservar captura, compresión, miniaturas, anclajes, idempotencia y recuperación.
 
-**Se puede continuar ahora con las fases 2 y 3.** Los contratos compartidos que antes bloqueaban la implementación ya existen. Las dependencias restantes son decisiones concretas de permisos y la conexión final con envío/publicación; no es necesario esperar a una nueva infraestructura de HU-028.
+**Las fases 2 y 3 están implementadas en backend.** La siguiente entrega es fase 4: integrar diagnóstico/retirada en el panel existente. Se conservan las dependencias de navegación y creación académicas, ratificación de reglas y conexión real con envío/publicación de fase 5.

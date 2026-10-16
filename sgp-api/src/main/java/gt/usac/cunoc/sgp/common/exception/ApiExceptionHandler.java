@@ -1,5 +1,6 @@
 package gt.usac.cunoc.sgp.common.exception;
 
+import gt.usac.cunoc.sgp.inspeccion.exception.EvidenciaFotograficaIncompletaException;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.List;
 import org.slf4j.Logger;
@@ -19,6 +20,23 @@ import org.springframework.web.method.annotation.MethodArgumentTypeMismatchExcep
 public class ApiExceptionHandler {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(ApiExceptionHandler.class);
+
+  @ExceptionHandler(EvidenciaFotograficaIncompletaException.class)
+  ResponseEntity<ProblemDetail> handleEvidencia(
+      EvidenciaFotograficaIncompletaException exception, HttpServletRequest request) {
+    var problem =
+        ProblemDetails.create(
+            exception.getStatus().value(),
+            exception.getTitle(),
+            exception.getMessage(),
+            exception.getCode(),
+            request);
+    var validacion = exception.getValidacion();
+    problem.setProperty("faltantes", validacion.faltantes());
+    problem.setProperty("totalDisponibles", validacion.totalDisponibles());
+    problem.setProperty("maximoPermitido", validacion.maximoPermitido());
+    return response(problem, exception.getStatus());
+  }
 
   @ExceptionHandler(ApiException.class)
   ResponseEntity<ProblemDetail> handleApi(ApiException exception, HttpServletRequest request) {
