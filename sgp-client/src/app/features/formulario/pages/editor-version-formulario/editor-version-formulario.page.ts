@@ -8,7 +8,13 @@ import {
   signal,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { FormBuilder, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
+import {
+  FormBuilder,
+  FormControl,
+  FormsModule,
+  ReactiveFormsModule,
+  Validators,
+} from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { ButtonModule } from 'primeng/button';
@@ -30,11 +36,25 @@ import {
   TipoDatoVisual,
   TipoMapeoCampo,
   VersionFormulario,
+  VinculoVisual,
 } from '../../models/formulario.models';
 import { FormularioApiService } from '../../services/formulario-api.service';
-import { esquemaASeccionesVisuales, seccionesVisualesAEsquema } from '../../utils/esquema-visual';
+import {
+  esquemaASeccionesVisuales,
+  extraerVinculosVisuales,
+  seccionesVisualesAEsquema,
+  vinculosVisualesAObjeto,
+} from '../../utils/esquema-visual';
 
 type SeccionActiva = 'esquema' | 'vinculos' | 'pesos' | 'mapeos' | 'publicar';
+
+export interface InfoVinculoDestino {
+  categoria: 'puente' | 'tecnico' | 'inspeccion' | 'otro';
+  etiquetaCategoria: string;
+  etiquetaCampo: string;
+  nombreCompleto: string;
+  icono: string;
+}
 
 @Component({
   selector: 'app-editor-version-formulario-page',
@@ -86,9 +106,16 @@ export class EditorVersionFormularioPage implements OnInit {
   pesosEditables = signal<ConfiguracionIcElemento[]>([]);
   mapeosEditables = signal<DeclaracionMapeoRequest[]>([]);
 
-  // Estado del Editor Visual
+  // Estado del Editor Visual de Esquema
   modoEdicion = signal<'visual' | 'codigo'>('visual');
   seccionesVisuales = signal<SeccionVisual[]>([]);
+  seccionVisualActiva = signal<string>('');
+  readonly seccionVisualActual = computed(() => {
+    const list = this.seccionesVisuales();
+    const active = this.seccionVisualActiva();
+    return list.find((s) => s.clave === active) || list[0] || null;
+  });
+
   dialogoSeccion = signal<boolean>(false);
   modoSeccion = signal<'crear' | 'editar'>('crear');
   seccionSeleccionadaClave = signal<string | null>(null);
@@ -135,6 +162,197 @@ export class EditorVersionFormularioPage implements OnInit {
     valorMaximo: [null as number | null],
     vinculo: [''],
     opcionNueva: [''],
+  });
+
+  // Estado de Vínculos de Almacenamiento Visuales
+  modoVinculos = signal<'visual' | 'codigo'>('visual');
+  vinculosVisuales = signal<VinculoVisual[]>([]);
+  filtroVinculos = signal<string>('');
+  guardandoVinculos = signal<boolean>(false);
+  dialogoVinculo = signal<boolean>(false);
+  modoVinculo = signal<'crear' | 'editar'>('crear');
+  vinculoSeleccionadoId = signal<string | null>(null);
+
+  readonly vinculoForm = this.fb.nonNullable.group({
+    campoRef: ['', Validators.required],
+    columnaDestino: ['', [Validators.required, Validators.maxLength(150)]],
+    tipo: ['Columna técnica'],
+    descripcion: [''],
+  });
+
+  readonly destinoPersonalizado = signal(false);
+  readonly columnaPersonalizadaControl = new FormControl<string>('', { nonNullable: true });
+
+  readonly camposFormularioDisponibles = computed(() => {
+    const list: { label: string; value: string }[] = [];
+    const valuesSet = new Set<string>();
+
+    for (const sec of this.seccionesVisuales()) {
+      for (const p of sec.preguntas) {
+        const val = `/${sec.clave}/${p.clave}`;
+        valuesSet.add(val);
+        list.push({
+          label: `${this.limpiarTituloSeccion(sec.titulo)} › ${p.titulo}`,
+          value: val,
+        });
+      }
+    }
+
+    // Asegurar que cualquier campoRef existente en vínculos también esté disponible para seleccionarse
+    for (const v of this.vinculosVisuales()) {
+      if (v.campoRef && !valuesSet.has(v.campoRef)) {
+        valuesSet.add(v.campoRef);
+        list.push({
+          label: this.obtenerTituloCampoRef(v.campoRef),
+          value: v.campoRef,
+        });
+      }
+    }
+
+    return list;
+  });
+
+  readonly opcionesDestino = [
+    {
+      grupo: 'Ficha del puente (Inventario)',
+      items: [
+        { valor: 'puente.codigo', etiqueta: 'Código del puente' },
+        { valor: 'puente.nombre', etiqueta: 'Nombre del puente' },
+        { valor: 'puente.ruta', etiqueta: 'Ruta del puente' },
+        { valor: 'puente.kilometraje', etiqueta: 'Kilometraje' },
+        { valor: 'puente.municipio_id', etiqueta: 'Municipio del puente' },
+        { valor: 'puente.departamento_id', etiqueta: 'Departamento del puente' },
+      ],
+    },
+    {
+      grupo: 'Registro de inspección',
+      items: [
+        { valor: 'inspeccion.fecha_inspeccion', etiqueta: 'Fecha oficial de inspección' },
+        { valor: 'inspeccion.nombre_autor_capturado', etiqueta: 'Inspector asignado' },
+      ],
+    },
+    {
+      grupo: 'Ficha técnica de inspección',
+      items: [
+        { valor: 'inspeccion_dato_tecnico.longitud_m', etiqueta: 'Longitud total (m)' },
+        { valor: 'inspeccion_dato_tecnico.numero_tramos', etiqueta: 'Número de tramos' },
+        { valor: 'inspeccion_dato_tecnico.ancho_rodadura_m', etiqueta: 'Ancho de rodadura (m)' },
+        {
+          valor: 'inspeccion_dato_tecnico.ancho_acera_derecha_m',
+          etiqueta: 'Ancho acera derecha (m)',
+        },
+        {
+          valor: 'inspeccion_dato_tecnico.ancho_acera_izquierda_m',
+          etiqueta: 'Ancho acera izquierda (m)',
+        },
+        {
+          valor: 'inspeccion_dato_tecnico.altura_libre_superior_m',
+          etiqueta: 'Gálibo / Altura superior (m)',
+        },
+        {
+          valor: 'inspeccion_dato_tecnico.altura_libre_sobre_cauce_m',
+          etiqueta: 'Altura libre sobre cauce (m)',
+        },
+        { valor: 'inspeccion_dato_tecnico.tipologia_puente', etiqueta: 'Tipología del puente' },
+        { valor: 'inspeccion_dato_tecnico.tipo_cruce', etiqueta: 'Tipo de cruce' },
+        { valor: 'inspeccion_dato_tecnico.numero_vias_por_sentido', etiqueta: 'Vías por sentido' },
+        {
+          valor: 'inspeccion_dato_tecnico.material_superestructura',
+          etiqueta: 'Material de superestructura',
+        },
+        {
+          valor: 'inspeccion_dato_tecnico.material_subestructura',
+          etiqueta: 'Material de subestructura',
+        },
+        { valor: 'inspeccion_dato_tecnico.carga_diseno', etiqueta: 'Carga de diseño' },
+        { valor: 'inspeccion_dato_tecnico.anio_construccion', etiqueta: 'Año de construcción' },
+        {
+          valor: 'inspeccion_dato_tecnico.trafico_vehiculos_dia',
+          etiqueta: 'Tráfico diario (veh/día)',
+        },
+        {
+          valor: 'inspeccion_dato_tecnico.porcentaje_camiones_buses',
+          etiqueta: 'Porcentaje camiones y buses',
+        },
+        { valor: 'inspeccion_dato_tecnico.ruta_pavimentada', etiqueta: 'Ruta pavimentada' },
+        {
+          valor: 'inspeccion_dato_tecnico.alineamiento_horizontal',
+          etiqueta: 'Alineamiento horizontal',
+        },
+        { valor: 'inspeccion_dato_tecnico.esviaje', etiqueta: 'Esviaje / sesgo' },
+        {
+          valor: 'inspeccion_dato_tecnico.poblacion_antes',
+          etiqueta: 'Población antes del puente',
+        },
+        {
+          valor: 'inspeccion_dato_tecnico.poblacion_despues',
+          etiqueta: 'Población después del puente',
+        },
+        { valor: 'inspeccion_dato_tecnico.tipo_cuerpo_agua', etiqueta: 'Tipo de cuerpo de agua' },
+        { valor: 'inspeccion_dato_tecnico.nombre_rio', etiqueta: 'Nombre del río / cauce' },
+        { valor: 'inspeccion_dato_tecnico.encauzamiento', etiqueta: 'Encauzamiento' },
+        {
+          valor: 'inspeccion_dato_tecnico.antecedente_desbordamiento',
+          etiqueta: 'Antecedente de desbordamiento',
+        },
+        {
+          valor: 'inspeccion_dato_tecnico.frecuencia_desbordamiento_anios',
+          etiqueta: 'Frecuencia desbordamiento (años)',
+        },
+        {
+          valor: 'inspeccion_dato_tecnico.fecha_ultimo_desbordamiento',
+          etiqueta: 'Fecha último desbordamiento',
+        },
+        { valor: 'inspeccion_dato_tecnico.alumbrado_existe', etiqueta: 'Alumbrado artificial' },
+        {
+          valor: 'inspeccion_dato_tecnico.drenajes_aledanos_existen',
+          etiqueta: 'Drenajes aledaños',
+        },
+      ],
+    },
+  ];
+
+  readonly tiposVinculo = [
+    { label: 'Ficha técnica de inspección', value: 'Columna técnica' },
+    { label: 'Ficha del puente (Inventario)', value: 'Inventario puente' },
+    { label: 'Enlazado general', value: 'Directo' },
+  ];
+
+  onDestinoChange(event: Event): void {
+    const val = (event.target as HTMLSelectElement).value;
+    if (val === '__custom__') {
+      this.destinoPersonalizado.set(true);
+      this.vinculoForm.controls.columnaDestino.setValue('__custom__');
+      this.vinculoForm.controls.tipo.setValue('Directo');
+    } else {
+      this.destinoPersonalizado.set(false);
+      this.vinculoForm.controls.columnaDestino.setValue(val);
+      if (val.startsWith('puente.')) {
+        this.vinculoForm.controls.tipo.setValue('Inventario puente');
+      } else {
+        this.vinculoForm.controls.tipo.setValue('Columna técnica');
+      }
+    }
+  }
+
+  readonly vinculosFiltrados = computed(() => {
+    const term = this.filtroVinculos().toLowerCase().trim();
+    const list = this.vinculosVisuales();
+    if (!term) return list;
+    return list.filter((v) => {
+      const nomPreg = this.obtenerNombrePregunta(v.campoRef).toLowerCase();
+      const nomSec = this.obtenerNombreSeccion(v.campoRef).toLowerCase();
+      const info = this.describirVinculo(v.columnaDestino);
+      return (
+        nomPreg.includes(term) ||
+        nomSec.includes(term) ||
+        info.etiquetaCampo.toLowerCase().includes(term) ||
+        info.etiquetaCategoria.toLowerCase().includes(term) ||
+        v.campoRef.toLowerCase().includes(term) ||
+        v.columnaDestino.toLowerCase().includes(term) ||
+        Boolean(v.descripcion && v.descripcion.toLowerCase().includes(term))
+      );
+    });
   });
 
   // Diálogos
@@ -185,9 +403,16 @@ export class EditorVersionFormularioPage implements OnInit {
           this.esquemaTexto.set(JSON.stringify(ver.esquema ?? {}, null, 2));
           this.vinculosTexto.set(JSON.stringify(ver.vinculosAlmacenamiento ?? {}, null, 2));
           this.pesosEditables.set(ver.pesos ? JSON.parse(JSON.stringify(ver.pesos)) : []);
-          this.seccionesVisuales.set(
-            esquemaASeccionesVisuales(ver.esquema, ver.vinculosAlmacenamiento),
-          );
+          const secs = esquemaASeccionesVisuales(ver.esquema, ver.vinculosAlmacenamiento);
+          this.seccionesVisuales.set(secs);
+          if (
+            secs.length > 0 &&
+            (!this.seccionVisualActiva() ||
+              !secs.some((s) => s.clave === this.seccionVisualActiva()))
+          ) {
+            this.seccionVisualActiva.set(secs[0].clave);
+          }
+          this.vinculosVisuales.set(extraerVinculosVisuales(ver.vinculosAlmacenamiento, secs));
 
           if (ver.versionAnteriorId) {
             this.cargarAnalisisMapeos(id);
@@ -320,6 +545,7 @@ export class EditorVersionFormularioPage implements OnInit {
         esRepetible,
         preguntas: [],
       });
+      this.seccionVisualActiva.set(clave);
     } else {
       const idx = lista.findIndex((s) => s.clave === this.seccionSeleccionadaClave());
       if (idx !== -1) {
@@ -337,9 +563,182 @@ export class EditorVersionFormularioPage implements OnInit {
     this.dialogoSeccion.set(false);
   }
 
+  seleccionarSeccionVisual(clave: string): void {
+    this.seccionVisualActiva.set(clave);
+  }
+
+  limpiarTituloSeccion(titulo: string): string {
+    if (!titulo) return '';
+    return titulo.replace(/^\d+[.\-\s:]+\s*/, '').trim();
+  }
+
+  describirVinculo(destino: string | null | undefined): InfoVinculoDestino {
+    if (!destino || destino.trim().length === 0) {
+      return {
+        categoria: 'otro',
+        etiquetaCategoria: 'Formulario',
+        etiquetaCampo: 'Documento de inspección',
+        nombreCompleto: 'Documento de inspección',
+        icono: 'pi pi-file',
+      };
+    }
+
+    const d = destino.trim();
+
+    // Ficha del puente / Inventario
+    if (
+      d.startsWith('puente.') ||
+      d.includes('puente.municipio_id') ||
+      d.startsWith('municipio.') ||
+      d.startsWith('departamento.')
+    ) {
+      let campo = 'Dato de inventario';
+      if (d === 'puente.codigo') campo = 'Código del puente';
+      else if (d === 'puente.nombre') campo = 'Nombre del puente';
+      else if (d === 'puente.ruta') campo = 'Ruta del puente';
+      else if (d === 'puente.kilometraje') campo = 'Kilometraje';
+      else if (d.includes('municipio')) campo = 'Municipio del puente';
+      else if (d.includes('departamento')) campo = 'Departamento del puente';
+      else {
+        const sub = d.replace(/^puente\./, '').replace(/_/g, ' ');
+        campo = sub.charAt(0).toUpperCase() + sub.slice(1);
+      }
+      return {
+        categoria: 'puente',
+        etiquetaCategoria: 'Ficha del puente',
+        etiquetaCampo: campo,
+        nombreCompleto: campo,
+        icono: 'pi pi-id-card',
+      };
+    }
+
+    // Cabecera inspección
+    if (d.startsWith('inspeccion.')) {
+      let campo = 'Registro de inspección';
+      if (d === 'inspeccion.fecha_inspeccion') campo = 'Fecha oficial de inspección';
+      else if (d === 'inspeccion.nombre_autor_capturado') campo = 'Inspector asignado';
+      else {
+        const sub = d.replace(/^inspeccion\./, '').replace(/_/g, ' ');
+        campo = sub.charAt(0).toUpperCase() + sub.slice(1);
+      }
+      return {
+        categoria: 'inspeccion',
+        etiquetaCategoria: 'Inspección',
+        etiquetaCampo: campo,
+        nombreCompleto: campo,
+        icono: 'pi pi-calendar',
+      };
+    }
+
+    // Ficha técnica relacional
+    if (d.startsWith('inspeccion_dato_tecnico.')) {
+      const col = d.replace('inspeccion_dato_tecnico.', '');
+      const mapaCamposTecnicos: Record<string, string> = {
+        longitud_m: 'Longitud total (m)',
+        numero_tramos: 'Número de tramos',
+        ancho_rodadura_m: 'Ancho de rodadura (m)',
+        ancho_acera_derecha_m: 'Ancho acera derecha (m)',
+        ancho_acera_izquierda_m: 'Ancho acera izquierda (m)',
+        altura_libre_superior_m: 'Gálibo / Altura superior (m)',
+        altura_libre_sobre_cauce_m: 'Altura libre sobre cauce (m)',
+        tipologia_puente: 'Tipología del puente',
+        tipo_cruce: 'Tipo de cruce',
+        numero_vias_por_sentido: 'Vías por sentido',
+        material_superestructura: 'Material de superestructura',
+        material_subestructura: 'Material de subestructura',
+        carga_diseno: 'Carga de diseño',
+        anio_construccion: 'Año de construcción',
+        trafico_vehiculos_dia: 'Tráfico diario (veh/día)',
+        porcentaje_camiones_buses: 'Porcentaje camiones y buses',
+        ruta_pavimentada: 'Ruta pavimentada',
+        alineamiento_horizontal: 'Alineamiento horizontal',
+        esviaje: 'Esviaje / sesgo',
+        poblacion_antes: 'Población antes del puente',
+        poblacion_despues: 'Población después del puente',
+        tipo_cuerpo_agua: 'Tipo de cuerpo de agua',
+        nombre_rio: 'Nombre del río / cauce',
+        encauzamiento: 'Encauzamiento',
+        antecedente_desbordamiento: 'Antecedente de desbordamiento',
+        frecuencia_desbordamiento_anios: 'Frecuencia desbordamiento (años)',
+        fecha_ultimo_desbordamiento: 'Fecha último desbordamiento',
+        alumbrado_existe: 'Alumbrado artificial',
+        drenajes_aledanos_existen: 'Drenajes aledaños',
+      };
+      const campo = mapaCamposTecnicos[col] || col.replace(/_/g, ' ');
+      return {
+        categoria: 'tecnico',
+        etiquetaCategoria: 'Ficha técnica',
+        etiquetaCampo: campo,
+        nombreCompleto: campo,
+        icono: 'pi pi-table',
+      };
+    }
+
+    if (d.startsWith('inspeccion_tramo.')) {
+      const col = d.replace('inspeccion_tramo.', '').replace(/_/g, ' ');
+      return {
+        categoria: 'tecnico',
+        etiquetaCategoria: 'Tramo',
+        etiquetaCampo: `Tramo: ${col}`,
+        nombreCompleto: `Tramo: ${col}`,
+        icono: 'pi pi-list',
+      };
+    }
+
+    return {
+      categoria: 'otro',
+      etiquetaCategoria: 'Enlazado',
+      etiquetaCampo: d,
+      nombreCompleto: d,
+      icono: 'pi pi-database',
+    };
+  }
+
+  formatearDestinoHumano(destino: string | null | undefined): string {
+    return this.describirVinculo(destino).nombreCompleto;
+  }
+
+  obtenerNombrePregunta(campoRef: string): string {
+    if (!campoRef) return '';
+    const partes = campoRef.replace(/^\//, '').split('/');
+    if (partes.length >= 2) {
+      const secClave = partes[0];
+      const pregClave = partes[1];
+      const sec = this.seccionesVisuales().find((s) => s.clave === secClave);
+      if (sec) {
+        const p = sec.preguntas.find(
+          (preg) => preg.clave === pregClave || preg.clave.startsWith(pregClave),
+        );
+        if (p) return p.titulo;
+        return pregClave.replace(/_/g, ' ');
+      }
+    }
+    return campoRef.replace(/^\//, '').replace(/\//g, ' › ').replace(/_/g, ' ');
+  }
+
+  obtenerNombreSeccion(campoRef: string): string {
+    if (!campoRef) return '';
+    const partes = campoRef.replace(/^\//, '').split('/');
+    if (partes.length >= 1) {
+      const secClave = partes[0];
+      const sec = this.seccionesVisuales().find((s) => s.clave === secClave);
+      if (sec) return this.limpiarTituloSeccion(sec.titulo);
+    }
+    return '';
+  }
+
+  obtenerTituloCampoRef(campoRef: string): string {
+    const nom = this.obtenerNombrePregunta(campoRef);
+    const sec = this.obtenerNombreSeccion(campoRef);
+    return sec ? `${nom} (${sec})` : nom;
+  }
+
   eliminarSeccion(secClave: string): void {
     const lista = this.seccionesVisuales().filter((s) => s.clave !== secClave);
     this.seccionesVisuales.set(lista);
+    if (this.seccionVisualActiva() === secClave) {
+      this.seccionVisualActiva.set(lista[0]?.clave || '');
+    }
     this.sincronizarVisualACodigo();
   }
 
@@ -469,6 +868,9 @@ export class EditorVersionFormularioPage implements OnInit {
     if (this.modoEdicion() === 'visual') {
       this.sincronizarVisualACodigo();
     }
+    if (this.modoVinculos() === 'visual') {
+      this.sincronizarVinculosVisualACodigo();
+    }
 
     let esquemaJson: Record<string, unknown>;
     let vinculosJson: Record<string, unknown>;
@@ -505,8 +907,13 @@ export class EditorVersionFormularioPage implements OnInit {
       .subscribe({
         next: (actualizada) => {
           this.version.set(actualizada);
-          this.seccionesVisuales.set(
-            esquemaASeccionesVisuales(actualizada.esquema, actualizada.vinculosAlmacenamiento),
+          const secs = esquemaASeccionesVisuales(
+            actualizada.esquema,
+            actualizada.vinculosAlmacenamiento,
+          );
+          this.seccionesVisuales.set(secs);
+          this.vinculosVisuales.set(
+            extraerVinculosVisuales(actualizada.vinculosAlmacenamiento, secs),
           );
           this.mensajeExito.set(this.transloco.translate('formulario.schemaSaved'));
           if (actualizada.versionAnteriorId) {
@@ -521,6 +928,222 @@ export class EditorVersionFormularioPage implements OnInit {
           } else {
             this.apiError.normalize(err);
           }
+        },
+      });
+  }
+
+  cambiarModoVinculos(modo: 'visual' | 'codigo'): void {
+    if (modo === 'visual') {
+      try {
+        const parsed = this.vinculosTexto() ? JSON.parse(this.vinculosTexto()) : {};
+        this.vinculosVisuales.set(extraerVinculosVisuales(parsed, this.seccionesVisuales()));
+        this.errorValidacion.set(null);
+      } catch {
+        this.errorValidacion.set(
+          'El JSON de vínculos contiene errores de formato y no puede cambiarse a la vista visual sin corregirlos.',
+        );
+        return;
+      }
+    } else {
+      this.sincronizarVinculosVisualACodigo();
+    }
+    this.modoVinculos.set(modo);
+  }
+
+  sincronizarVinculosVisualACodigo(): void {
+    const ver = this.version();
+    let baseRaw: unknown = undefined;
+    try {
+      baseRaw = this.vinculosTexto()
+        ? JSON.parse(this.vinculosTexto())
+        : ver?.vinculosAlmacenamiento;
+    } catch {
+      baseRaw = ver?.vinculosAlmacenamiento;
+    }
+
+    const obj = vinculosVisualesAObjeto(this.vinculosVisuales(), baseRaw);
+    this.vinculosTexto.set(JSON.stringify(obj, null, 2));
+  }
+
+  abrirCrearVinculo(): void {
+    this.modoVinculo.set('crear');
+    this.vinculoSeleccionadoId.set(null);
+    this.destinoPersonalizado.set(false);
+    this.columnaPersonalizadaControl.setValue('');
+    const primerCampo = this.camposFormularioDisponibles()[0]?.value || '';
+    const primerDestino = this.opcionesDestino[0]?.items[0]?.valor || 'puente.codigo';
+    this.vinculoForm.reset({
+      campoRef: primerCampo,
+      columnaDestino: primerDestino,
+      tipo: 'Inventario puente',
+      descripcion: '',
+    });
+    this.dialogoVinculo.set(true);
+  }
+
+  abrirEditarVinculo(v: VinculoVisual): void {
+    this.modoVinculo.set('editar');
+    this.vinculoSeleccionadoId.set(v.id);
+
+    const esConocido = this.opcionesDestino.some((g) =>
+      g.items.some((item) => item.valor === v.columnaDestino),
+    );
+
+    if (esConocido) {
+      this.destinoPersonalizado.set(false);
+      this.columnaPersonalizadaControl.setValue('');
+      this.vinculoForm.reset({
+        campoRef: v.campoRef,
+        columnaDestino: v.columnaDestino,
+        tipo:
+          v.tipo ||
+          (v.columnaDestino.startsWith('puente.') ? 'Inventario puente' : 'Columna técnica'),
+        descripcion: v.descripcion || '',
+      });
+    } else {
+      this.destinoPersonalizado.set(true);
+      this.columnaPersonalizadaControl.setValue(v.columnaDestino);
+      this.vinculoForm.reset({
+        campoRef: v.campoRef,
+        columnaDestino: '__custom__',
+        tipo: v.tipo || 'Directo',
+        descripcion: v.descripcion || '',
+      });
+    }
+
+    this.dialogoVinculo.set(true);
+  }
+
+  guardarVinculoModal(): void {
+    if (this.vinculoForm.invalid) {
+      this.vinculoForm.markAllAsTouched();
+      return;
+    }
+
+    const val = this.vinculoForm.getRawValue();
+    const campoRef = val.campoRef.trim();
+    let columnaDestino = val.columnaDestino.trim();
+
+    if (columnaDestino === '__custom__') {
+      columnaDestino = this.columnaPersonalizadaControl.value.trim();
+      if (!columnaDestino) {
+        return;
+      }
+    }
+
+    const tipo = val.tipo;
+    const descripcion = val.descripcion.trim();
+
+    const lista = [...this.vinculosVisuales()];
+    if (this.modoVinculo() === 'crear') {
+      lista.push({
+        id: `vinc_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+        campoRef,
+        columnaDestino,
+        tipo,
+        descripcion,
+      });
+    } else {
+      const idx = lista.findIndex((v) => v.id === this.vinculoSeleccionadoId());
+      if (idx !== -1) {
+        lista[idx] = {
+          ...lista[idx],
+          campoRef,
+          columnaDestino,
+          tipo,
+          descripcion,
+        };
+      }
+    }
+
+    this.vinculosVisuales.set(lista);
+    this.sincronizarVinculosVisualACodigo();
+
+    // Actualizar pregunta visual si coincide
+    for (const sec of this.seccionesVisuales()) {
+      for (const p of sec.preguntas) {
+        if (`/${sec.clave}/${p.clave}` === campoRef || `${sec.clave}.${p.clave}` === campoRef) {
+          p.vinculo = columnaDestino;
+        }
+      }
+    }
+    this.seccionesVisuales.set([...this.seccionesVisuales()]);
+    this.dialogoVinculo.set(false);
+  }
+
+  eliminarVinculo(id: string): void {
+    const encontrado = this.vinculosVisuales().find((v) => v.id === id);
+    const lista = this.vinculosVisuales().filter((v) => v.id !== id);
+    this.vinculosVisuales.set(lista);
+    this.sincronizarVinculosVisualACodigo();
+
+    if (encontrado) {
+      for (const sec of this.seccionesVisuales()) {
+        for (const p of sec.preguntas) {
+          if (
+            `/${sec.clave}/${p.clave}` === encontrado.campoRef ||
+            `${sec.clave}.${p.clave}` === encontrado.campoRef
+          ) {
+            p.vinculo = undefined;
+          }
+        }
+      }
+      this.seccionesVisuales.set([...this.seccionesVisuales()]);
+    }
+  }
+
+  guardarVinculos(): void {
+    const ver = this.version();
+    if (!ver || ver.estado === 'PUBLICADA') return;
+
+    if (this.modoVinculos() === 'visual') {
+      this.sincronizarVinculosVisualACodigo();
+    }
+
+    let vinculosJson: Record<string, unknown>;
+    try {
+      vinculosJson = this.vinculosTexto() ? JSON.parse(this.vinculosTexto()) : {};
+    } catch {
+      this.errorValidacion.set('El contenido de vínculos no es un JSON válido.');
+      return;
+    }
+
+    let esquemaJson: Record<string, unknown>;
+    try {
+      esquemaJson = JSON.parse(this.esquemaTexto());
+    } catch {
+      esquemaJson = ver.esquema;
+    }
+
+    this.guardandoVinculos.set(true);
+    this.errorValidacion.set(null);
+    this.mensajeExito.set(null);
+
+    this.formularioApi
+      .actualizarBorrador(ver.id, {
+        codigo: ver.codigo,
+        esquema: esquemaJson,
+        vinculosAlmacenamiento: vinculosJson,
+        reglasEvaluacionIc: ver.reglasEvaluacionIc,
+      })
+      .pipe(
+        takeUntilDestroyed(this.destroyRef),
+        finalize(() => this.guardandoVinculos.set(false)),
+      )
+      .subscribe({
+        next: (actualizada) => {
+          this.version.set(actualizada);
+          this.vinculosTexto.set(JSON.stringify(actualizada.vinculosAlmacenamiento ?? {}, null, 2));
+          this.vinculosVisuales.set(
+            extraerVinculosVisuales(actualizada.vinculosAlmacenamiento, this.seccionesVisuales()),
+          );
+          this.mensajeExito.set(
+            this.transloco.translate('formulario.saveBindings') + ' exitosamente.',
+          );
+        },
+        error: (err) => {
+          const msg = this.apiError.normalize(err);
+          this.errorValidacion.set(msg);
         },
       });
   }

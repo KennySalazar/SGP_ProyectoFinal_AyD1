@@ -160,13 +160,11 @@
       <label for="nueva-version-base" class="field-label"
         >{{ 'formulario.baseVersion' | transloco }}</label
       >
-      <p-select
-        inputId="nueva-version-base"
-        formControlName="versionBaseId"
-        [options]="obtenerOpcionesBase()"
-        optionLabel="label"
-        optionValue="value"
-      ></p-select>
+      <select id="nueva-version-base" class="sgp-select" formControlName="versionBaseId">
+        @for (opt of obtenerOpcionesBase(); track opt.value) {
+        <option [ngValue]="opt.value">{{ opt.label }}</option>
+        }
+      </select>
     </div>
 
     <div class="dialog-actions">

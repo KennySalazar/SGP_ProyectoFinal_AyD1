@@ -137,3 +137,11 @@ export interface SeccionVisual {
   esRepetible?: boolean;
   preguntas: PreguntaVisual[];
 }
+
+export interface VinculoVisual {
+  id: string;
+  campoRef: string;
+  columnaDestino: string;
+  tipo?: string;
+  descripcion?: string;
+}
