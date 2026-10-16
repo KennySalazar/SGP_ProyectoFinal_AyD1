@@ -1,4 +1,8 @@
-import { FotografiaResponse, MetadatosFotografia } from '../models/fotografia.models';
+import {
+  FotografiaResponse,
+  MetadatosFotografia,
+  ValidacionEvidenciaResponse,
+} from '../models/fotografia.models';
 import { HttpClient } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
 import { map, Observable } from 'rxjs';
@@ -50,6 +54,14 @@ export class InspeccionApiService {
   }
   listarFotografias(inspeccionId: string): Observable<FotografiaResponse[]> {
     return this.http.get<FotografiaResponse[]>(`/api/v1/inspecciones/${inspeccionId}/fotografias`);
+  }
+  consultarEvidenciaFotografica(inspeccionId: string): Observable<ValidacionEvidenciaResponse> {
+    return this.http.get<ValidacionEvidenciaResponse>(
+      `/api/v1/inspecciones/${inspeccionId}/evidencia-fotografica`,
+    );
+  }
+  retirarFotografia(inspeccionId: string, fotoId: string): Observable<void> {
+    return this.http.delete<void>(`/api/v1/inspecciones/${inspeccionId}/fotografias/${fotoId}`);
   }
   contenidoFotografia(inspeccionId: string, fotoId: string, miniatura = false): Observable<Blob> {
     return this.http.get(

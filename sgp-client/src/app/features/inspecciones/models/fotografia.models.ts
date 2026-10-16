@@ -29,3 +29,14 @@ export interface ImagenPreparada {
   capturadoEn: string;
   orientacion: number;
 }
+export interface FaltanteEvidenciaResponse {
+  categoria: CategoriaFoto;
+  requeridas: number;
+  disponibles: number;
+}
+export interface ValidacionEvidenciaResponse {
+  valida: boolean;
+  totalDisponibles: number;
+  maximoPermitido: number;
+  faltantes: FaltanteEvidenciaResponse[];
+}

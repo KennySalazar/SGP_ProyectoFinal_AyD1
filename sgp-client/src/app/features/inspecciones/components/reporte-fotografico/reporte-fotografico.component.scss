@@ -49,3 +49,16 @@ figcaption {
 .mensaje-error {
   color: #b91c1c;
 }
+
+.evidencia {
+  margin: 1rem 0;
+  padding: 1rem;
+  border: 1px solid var(--sgp-border);
+  border-radius: 12px;
+}
+button {
+  min-height: 44px;
+}
+figure button {
+  margin: 0.25rem;
+}

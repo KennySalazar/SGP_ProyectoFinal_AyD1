@@ -1,7 +1,9 @@
 import { Injectable } from '@angular/core';
 import { sgpDb, LocalPhoto } from '../db/sgp-db';
 export type FotografiaPendiente = LocalPhoto &
-  Required<Pick<LocalPhoto, 'propietarioId' | 'idempotencyKey' | 'metadatos'>>;
+  Required<Pick<LocalPhoto, 'propietarioId' | 'idempotencyKey' | 'metadatos'>> & {
+    ultimoError?: string;
+  };
 @Injectable({ providedIn: 'root' })
 export class FotografiasLocalesService {
   async guardar(foto: FotografiaPendiente): Promise<void> {
@@ -21,13 +23,31 @@ export class FotografiasLocalesService {
   }
   async pendientes(propietarioId: string, inspeccionId: string): Promise<FotografiaPendiente[]> {
     const fotos = await sgpDb.fotos.where('inspeccionId').equals(inspeccionId).toArray();
-    return fotos.filter(
+    const propias = fotos.filter(
       (foto): foto is FotografiaPendiente =>
         foto.propietarioId === propietarioId &&
         !foto.sincronizado &&
         !!foto.metadatos &&
         !!foto.idempotencyKey,
     );
+    return Promise.all(
+      propias.map(async (foto) => {
+        const operacion = await sgpDb.cola_sync.get(foto.id);
+        return operacion?.ultimoError ? { ...foto, ultimoError: operacion.ultimoError } : foto;
+      }),
+    );
+  }
+  async registrarError(id: string, propietarioId: string, codigo: string): Promise<void> {
+    await sgpDb.transaction('rw', sgpDb.fotos, sgpDb.cola_sync, async () => {
+      const foto = await sgpDb.fotos.get(id);
+      if (foto?.propietarioId !== propietarioId) throw new Error('propietario');
+      const operacion = await sgpDb.cola_sync.get(id);
+      if (!operacion) throw new Error('operacion');
+      await sgpDb.cola_sync.update(id, {
+        ultimoError: codigo,
+        intentos: operacion.intentos + 1,
+      });
+    });
   }
   async confirmar(id: string, propietarioId: string): Promise<void> {
     await sgpDb.transaction('rw', sgpDb.fotos, sgpDb.cola_sync, async () => {

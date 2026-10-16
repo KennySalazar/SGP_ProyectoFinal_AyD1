@@ -37,6 +37,7 @@ describe('Persistencia de reintentos fotográficos', () => {
         toArray: async () => [...memoria.values()].filter((f) => f.inspeccionId === id),
       }),
     } as never);
+    vi.spyOn(sgpDb.cola_sync, 'get').mockResolvedValue(undefined);
     vi.spyOn(sgpDb.cola_sync, 'put').mockResolvedValue('cola');
     vi.spyOn(sgpDb.cola_sync, 'delete').mockResolvedValue();
   });

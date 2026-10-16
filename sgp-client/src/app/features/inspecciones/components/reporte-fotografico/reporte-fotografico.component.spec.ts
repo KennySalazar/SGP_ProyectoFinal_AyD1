@@ -13,6 +13,7 @@ describe('Reporte fotográfico', () => {
   const auth = { user: signal<{ id: string } | null>({ id: 'autor' }) };
   const api = {
     listarFotografias: vi.fn(),
+    consultarEvidenciaFotografica: vi.fn(),
     contenidoFotografia: vi.fn(),
     adjuntarFotografia: vi.fn(),
   };
@@ -21,12 +22,17 @@ describe('Reporte fotográfico', () => {
     guardar: vi.fn(),
     pendientes: vi.fn(),
     confirmar: vi.fn(),
+    registrarError: vi.fn(),
   };
   beforeEach(async () => {
     auth.user.set({ id: 'autor' });
     Object.values(api).forEach((f) => f.mockReset());
     Object.values(locales).forEach((f) => f.mockReset());
     api.listarFotografias.mockReturnValue(of([]));
+    api.consultarEvidenciaFotografica.mockReturnValue(
+      of({ valida: false, totalDisponibles: 0, maximoPermitido: 60, faltantes: [] }),
+    );
+    locales.registrarError.mockResolvedValue(undefined);
     locales.pendientes.mockResolvedValue([]);
     locales.guardar.mockResolvedValue(undefined);
     locales.confirmar.mockResolvedValue(undefined);

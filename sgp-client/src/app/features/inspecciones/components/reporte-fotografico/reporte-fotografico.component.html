@@ -9,20 +9,74 @@
   @if (aviso()) {
     <p role="status">{{ 'inspecciones.fotos.confirmada' | transloco }}</p>
   }
-  @if (inspeccion().estado === 'BORRADOR') {
+  @if (retiradaConfirmada()) {
+    <p role="status">{{ 'inspecciones.fotos.retiradaConfirmada' | transloco }}</p>
+  }
+  <div class="evidencia" aria-live="polite">
+    @if (evidencia(); as diagnostico) {
+      <p>
+        {{
+          'inspecciones.fotos.contador'
+            | transloco
+              : { total: diagnostico.totalDisponibles, maximo: diagnostico.maximoPermitido }
+        }}
+      </p>
+      <p>
+        {{
+          (diagnostico.valida
+            ? 'inspecciones.fotos.evidenciaCompleta'
+            : 'inspecciones.fotos.evidenciaIncompleta'
+          ) | transloco
+        }}
+      </p>
+      @if (diagnostico.faltantes.length) {
+        <ul>
+          @for (faltante of diagnostico.faltantes; track faltante.categoria) {
+            <li>
+              {{ etiqueta(faltante.categoria) }}:
+              {{
+                'inspecciones.fotos.faltante'
+                  | transloco
+                    : { requeridas: faltante.requeridas, disponibles: faltante.disponibles }
+              }}
+            </li>
+          }
+        </ul>
+      }
+    } @else {
+      <p>
+        {{
+          (cargando() ? 'inspecciones.fotos.consultando' : 'inspecciones.fotos.sinDiagnostico')
+            | transloco
+        }}
+      </p>
+    }
+    <button
+      pButton
+      type="button"
+      [disabled]="ocupado() || cargando() || accesoDenegado()"
+      (click)="actualizar()"
+    >
+      {{ 'inspecciones.fotos.actualizar' | transloco }}
+    </button>
+  </div>
+  @if (!puedeModificar() && !accesoDenegado()) {
+    <p>{{ 'inspecciones.fotos.soloLectura' | transloco }}</p>
+  }
+  @if (puedeModificar()) {
     <div class="acciones">
       <label
         >{{ 'inspecciones.fotos.galeria' | transloco
         }}<input
           type="file"
           accept="image/jpeg,image/webp"
-          [disabled]="ocupado()"
+          [disabled]="ocupado() || cargando()"
           (change)="seleccionar($event)"
       /></label>
       <button
         pButton
         type="button"
-        [disabled]="ocupado() || camaraAbierta()"
+        [disabled]="ocupado() || cargando() || camaraAbierta()"
         (click)="abrirCamara()"
       >
         {{ 'inspecciones.fotos.camara' | transloco }}
@@ -37,7 +91,7 @@
         [attr.aria-label]="'inspecciones.fotos.camara' | transloco"
       ></video>
       <div class="acciones">
-        <button pButton type="button" [disabled]="ocupado()" (click)="capturar()">
+        <button pButton type="button" [disabled]="ocupado() || cargando()" (click)="capturar()">
           {{ 'inspecciones.fotos.capturar' | transloco }}</button
         ><button pButton type="button" (click)="cerrarCamara()">
           {{ 'common.close' | transloco }}
@@ -62,7 +116,7 @@
       <button
         pButton
         type="button"
-        [disabled]="categoria.invalid || ocupado()"
+        [disabled]="categoria.invalid || ocupado() || cargando()"
         (click)="adjuntar()"
       >
         {{ 'inspecciones.fotos.adjuntar' | transloco }}
@@ -72,12 +126,24 @@
   @if (ocupado()) {
     <p role="status">{{ 'inspecciones.fotos.procesando' | transloco }}</p>
   }
+  @if (pendientes().length) {
+    <p>{{ 'inspecciones.fotos.pendientesNota' | transloco: { total: pendientes().length } }}</p>
+  }
   @for (foto of pendientes(); track foto.id) {
     <div class="pendiente">
       <span
         >{{ etiqueta(foto.metadatos.categoria) }} ·
         {{ 'inspecciones.fotos.pendiente' | transloco }}</span
-      ><button pButton type="button" [disabled]="ocupado()" (click)="reintentar(foto)">
+      >
+      @if (foto.ultimoError; as motivo) {
+        <span>{{ 'inspecciones.fotos.errores.' + motivo | transloco }}</span>
+      }
+      <button
+        pButton
+        type="button"
+        [disabled]="ocupado() || cargando() || !puedeReintentar(foto)"
+        (click)="reintentar(foto)"
+      >
         {{ 'inspecciones.fotos.reintentar' | transloco }}
       </button>
     </div>
@@ -94,7 +160,65 @@
         <button pButton type="button" (click)="abrirOriginal(foto)">
           {{ 'inspecciones.fotos.original' | transloco }}
         </button>
+        @if (puedeModificar()) {
+          <button
+            pButton
+            type="button"
+            severity="danger"
+            [outlined]="true"
+            [disabled]="ocupado() || cargando()"
+            (click)="solicitarRetirada(foto)"
+          >
+            {{ 'inspecciones.fotos.retirar' | transloco }}
+          </button>
+        }
       </figure>
     }
   </div>
 </section>
+
+<p-dialog
+  [visible]="!!fotoPorRetirar()"
+  (visibleChange)="!$event && cancelarRetirada()"
+  [header]="'inspecciones.fotos.retirarTitulo' | transloco"
+  [modal]="true"
+  [closable]="!ocupado()"
+  [closeOnEscape]="!ocupado()"
+  [style]="{ width: '30rem', maxWidth: '95vw' }"
+  appendTo="body"
+>
+  @if (fotoPorRetirar(); as foto) {
+    <p>{{ 'inspecciones.fotos.retirarDetalle' | transloco }}</p>
+    @if (!accesoDenegado()) {
+      <p>{{ etiqueta(foto.categoria) }} · {{ foto.capturadoEn }}</p>
+    }
+    @if (errorRetirada(); as error) {
+      <p class="mensaje-error" role="alert">
+        {{ 'inspecciones.fotos.errores.' + error | transloco }}
+      </p>
+    }
+    <div class="acciones">
+      <button
+        pButton
+        type="button"
+        severity="secondary"
+        [outlined]="true"
+        [disabled]="ocupado()"
+        (click)="cancelarRetirada()"
+      >
+        {{ 'common.cancel' | transloco }}
+      </button>
+      <button
+        pButton
+        type="button"
+        severity="danger"
+        [disabled]="ocupado() || !puedeModificar()"
+        (click)="confirmarRetirada()"
+      >
+        {{
+          (ocupado() ? 'inspecciones.fotos.retirando' : 'inspecciones.fotos.retirar') | transloco
+        }}
+      </button>
+    </div>
+  }
+</p-dialog>
