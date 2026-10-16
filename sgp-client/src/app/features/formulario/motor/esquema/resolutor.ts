@@ -136,8 +136,16 @@ class Resolutor {
     const ruta = rutaPadre ? `${rutaPadre}/${clave}` : clave;
     const tipos = lista(esquema['type']);
     const anulable = tipos.includes('null');
+    const tipoDeclarado = tipos.find((tipo) => tipo !== 'null') ?? esquema['type'];
+    const tipoEstructural = esObjeto(esquema['properties'])
+      ? 'object'
+      : esObjeto(esquema['items'])
+        ? 'array'
+        : undefined;
     const principal =
-      tipos.find((tipo) => tipo !== 'null') ?? (esquema['type'] as unknown) ?? inferirTipo(esquema);
+      tipoEstructural && tipoDeclarado === 'string'
+        ? tipoEstructural
+        : (tipoDeclarado ?? tipoEstructural ?? inferirTipo(esquema));
 
     const base = {
       ruta,

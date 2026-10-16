@@ -44,6 +44,7 @@ export function esquemaASeccionesVisuales(
     for (const [pregClave, pregDefRaw] of Object.entries(propsObj)) {
       if (!pregDefRaw || typeof pregDefRaw !== 'object') continue;
       const p = pregDefRaw as Record<string, unknown>;
+      if (!esCampoVisualEditable(p)) continue;
 
       let tipo: TipoDatoVisual = 'string';
       const rawEnum = p['enum'];
@@ -146,15 +147,28 @@ export function seccionesVisualesAEsquema(
     nuevasRequeridas.push(sec.clave);
     const secBase = propiedadesActuales[sec.clave] || {};
 
-    const propsObj: Record<string, unknown> = {};
-    const reqList: string[] = [];
+    const esquemaBasePreguntas = sec.esRepetible
+      ? ((secBase['items'] as Record<string, unknown>) ?? {})
+      : secBase;
+    const propsBase =
+      (esquemaBasePreguntas['properties'] as Record<string, unknown> | undefined) || {};
 
-    const propsBase = sec.esRepetible
-      ? ((secBase['items'] as Record<string, unknown>)?.['properties'] as Record<
-          string,
-          unknown
-        >) || {}
-      : (secBase['properties'] as Record<string, unknown>) || {};
+    const propiedadesNoEditables = Object.fromEntries(
+      Object.entries(propsBase).filter(([, valor]) => {
+        return (
+          valor !== null &&
+          typeof valor === 'object' &&
+          !esCampoVisualEditable(valor as Record<string, unknown>)
+        );
+      }),
+    );
+    const propsObj: Record<string, unknown> = { ...propiedadesNoEditables };
+    const requeridosBase = new Set(
+      Array.isArray(esquemaBasePreguntas['required']) ? esquemaBasePreguntas['required'] : [],
+    );
+    const reqList: string[] = Object.keys(propiedadesNoEditables).filter((clave) =>
+      requeridosBase.has(clave),
+    );
 
     for (const p of sec.preguntas) {
       const pBase: Record<string, unknown> = (propsBase[p.clave] as Record<string, unknown>)
@@ -315,4 +329,12 @@ export function seccionesVisualesAEsquema(
   esquema['required'] = nuevasRequeridas;
 
   return { esquema, vinculos };
+}
+
+function esCampoVisualEditable(esquema: Record<string, unknown>): boolean {
+  if (typeof esquema['$ref'] === 'string') return false;
+
+  const tipo = esquema['type'];
+  const tipos = Array.isArray(tipo) ? tipo : [tipo];
+  return !tipos.some((valor) => valor === 'object' || valor === 'array');
 }

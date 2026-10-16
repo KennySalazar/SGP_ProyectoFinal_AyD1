@@ -649,7 +649,7 @@ class InspeccionServiceTest {
     assertThat(response.progreso().totalCamposCompletados()).isPositive();
     assertThat(response.icPreliminar()).isNull();
 
-    verify(inspeccionRepository).save(inspeccion);
+    verify(inspeccionRepository).saveAndFlush(inspeccion);
   }
 
   @Test

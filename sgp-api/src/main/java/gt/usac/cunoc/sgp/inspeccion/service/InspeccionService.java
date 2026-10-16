@@ -313,7 +313,7 @@ public class InspeccionService {
       inspeccion.actualizarBorrador(null, null, null, ahora);
     }
 
-    inspeccionRepository.save(inspeccion);
+    inspeccionRepository.saveAndFlush(inspeccion);
 
     return aBorradorResponse(inspeccion);
   }
