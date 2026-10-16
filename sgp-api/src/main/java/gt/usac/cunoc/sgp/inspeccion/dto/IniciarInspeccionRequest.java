@@ -1,0 +1,14 @@
+package gt.usac.cunoc.sgp.inspeccion.dto;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import jakarta.validation.constraints.NotNull;
+import java.time.LocalDate;
+import java.util.UUID;
+
+public record IniciarInspeccionRequest(
+    @NotNull(message = "El puente es obligatorio") UUID puenteId,
+    @NotNull(message = "La versión del formulario es obligatoria") UUID versionFormularioId,
+    LocalDate fechaInspeccion,
+    String dispositivoId,
+    String nombreAutorCapturado,
+    JsonNode datos) {}
