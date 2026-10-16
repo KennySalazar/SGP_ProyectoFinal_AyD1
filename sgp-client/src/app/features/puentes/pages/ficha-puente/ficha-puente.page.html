@@ -52,6 +52,16 @@
           <i class="pi pi-arrow-left" aria-hidden="true"></i>
           <span>{{ 'puentes.ficha.back' | transloco }}</span>
         </a>
+        } @if (puedeIniciarInspeccion()) {
+        <button
+          pButton
+          type="button"
+          class="btn-iniciar-inspeccion"
+          (click)="abrirModalIniciarInspeccion()"
+        >
+          <i class="pi pi-play" aria-hidden="true"></i>
+          <span>{{ 'inspecciones.iniciar.boton' | transloco }}</span>
+        </button>
         } @if (auth.user()?.role === 'ADMINISTRADOR' && p.activo) {
         <a pButton [routerLink]="['/puentes', p.id, 'editar']">
           <i class="pi pi-pencil" aria-hidden="true"></i>
@@ -213,6 +223,8 @@
         }
       </section>
     </div>
+
+    <app-iniciar-inspeccion-dialog [(visible)]="mostrarModalIniciar" [puente]="puente()" />
     }
   </div>
 </ng-template>

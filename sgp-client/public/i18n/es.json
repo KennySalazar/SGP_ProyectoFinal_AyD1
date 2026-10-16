@@ -31,6 +31,7 @@
     "myAssignedBridges": "Mis puentes asignados",
     "users": "Usuarios",
     "formularioSieca": "Formulario SIECA",
+    "courses": "Cursos",
     "logout": "Cerrar sesion",
     "inspectionForm": "Formulario de inspección"
   },
@@ -59,7 +60,8 @@
     "operationFailed": "No fue posible completar la operacion.",
     "save": "Guardar",
     "saveChanges": "Guardar cambios"
-  },
+    },
+
   "auth": {
     "login": {
       "title": "Iniciar sesion",
@@ -1006,6 +1008,54 @@
       "PRESENTE": "El elemento existe y se evalúa: llena sus medidas y los daños que observes.",
       "NO_APLICA": "El diseño del puente no incluye este elemento (por ejemplo, un estribo de muro de gravedad no tiene columnas). No se evalúa ni afecta el índice de condición.",
       "AUSENTE": "El elemento debería existir pero falta por completo. Cuenta como una falla y, si es un elemento portante, el puente queda en estado Malo."
+    }
+  },
+  "inspecciones": {
+    "iniciar": {
+      "boton": "Iniciar inspección",
+      "titulo": "Iniciar inspección técnica",
+      "exitoTitulo": "Inspección iniciada con éxito",
+      "creadaExito": "Inspección creada en estado Borrador",
+      "creadaNota": "La inspección ha quedado registrada y congeló la versión activa del formulario.",
+      "advertenciaGpsTitulo": "Advertencia de proximidad GPS",
+      "distanciaCalculada": "Distancia calculada al puente: {{distancia}} metros.",
+      "puente": "Puente",
+      "formulario": "Versión de formulario",
+      "versionCongelada": "Congelada",
+      "autor": "Inspector responsable",
+      "fecha": "Fecha de inspección",
+      "dispositivo": "Dispositivo",
+      "idInspeccion": "ID de inspección",
+      "precargaPermanentes": "Datos técnicos permanentes",
+      "permanentesConfirmados": "Precargados y confirmados de la última inspección publicada",
+      "permanentesNoPrecargados": "Inician vacíos para captura manual",
+      "acompanantes": "Acompañantes registrados",
+      "gpsUbicacion": "Ubicación GPS",
+      "gpsObteniendo": "Obteniendo ubicación del dispositivo...",
+      "gpsObtenido": "Lat: {{lat}}, Long: {{lng}} (±{{acc}} m)",
+      "gpsNoDisponible": "GPS no disponible o no permitido (se registrará sin ubicación)",
+      "fechaInspeccion": "Fecha de inspección",
+      "nombreInspector": "Nombre del inspector responsable",
+      "nombreInspectorPlaceholder": "Nombre o firma del inspector",
+      "datosPermanentesTitulo": "Datos técnicos permanentes del puente",
+      "cargandoPermanentes": "Consultando datos de la última inspección publicada...",
+      "permanentesEncontrados": "Se encontraron datos permanentes registrados en la última inspección publicada:",
+      "longitud": "Longitud",
+      "tramos": "Número de tramos",
+      "tipologia": "Tipología",
+      "material": "Material superestructura",
+      "anioConstruccion": "Año de construcción",
+      "confirmarPrecarga": "Confirmar la precarga de estos datos permanentes",
+      "noDaniosNota": "Los daños de inspecciones anteriores nunca se precargan y deben evaluarse en campo.",
+      "primeraInspeccionNota": "Primera inspección técnica: no existen datos permanentes previos. Deberán capturarse durante la inspección.",
+      "acompanantesTitulo": "Acompañantes en la inspección",
+      "acompanantesNota": "La inspección tiene exactamente un autor responsable, pero puede registrar acompañantes.",
+      "nombreAcompanantePlaceholder": "Nombre del acompañante",
+      "colegiadoAcompanantePlaceholder": "No. Colegiado (opc.)",
+      "agregarAcompanante": "Agregar",
+      "quitarAcompanante": "Quitar acompañante",
+      "iniciando": "Iniciando inspección...",
+      "botonIniciar": "Iniciar inspección"
     }
   }
 }
