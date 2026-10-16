@@ -87,6 +87,18 @@
                     }
                   }
                 </span>
+                @if (seccion.tipo === 'esquema' && seccion.elementos.total > 0) {
+                  <span class="seccion-elementos">
+                    {{
+                      'formulario.dinamico.elemento.revisados'
+                        | transloco
+                          : {
+                              revisados: seccion.elementos.revisados,
+                              total: seccion.elementos.total,
+                            }
+                    }}
+                  </span>
+                }
                 @if (seccion.tipo === 'esquema' && seccion.avance.obligatorios > 0) {
                   <progress
                     class="barra"

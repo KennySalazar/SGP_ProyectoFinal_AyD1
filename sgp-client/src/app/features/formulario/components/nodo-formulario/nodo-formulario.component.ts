@@ -5,12 +5,13 @@ import { ButtonModule } from 'primeng/button';
 import { NodoArreglo, NodoCampo, NodoFormulario, NodoObjeto } from '../../motor/esquema/modelos';
 import { FormularioConstruido } from '../../motor/formulario/constructor';
 import { esOpcional, valorDelNodo } from '../../motor/formulario/valor';
+import { hijosVisibles } from '../../motor/formulario/visibles';
 import {
   CampoFormularioComponent,
   LONGITUD_TEXTO_LARGO,
 } from '../campo-formulario/campo-formulario.component';
 import { RenderizadorNodoDirective } from '../renderizador-nodo.directive';
-import { RENDERIZADORES_NODO } from '../renderizadores';
+import { RENDERIZADORES_NODO, RENDERIZADORES_PREDETERMINADOS } from '../renderizadores';
 
 function esTextoLargo(nodo: NodoCampo): boolean {
   return nodo.tipo === 'texto' && (nodo.longitudMaxima ?? 0) >= LONGITUD_TEXTO_LARGO;
@@ -27,7 +28,11 @@ function esTextoLargo(nodo: NodoCampo): boolean {
   host: { '[class.ancho-completo]': 'anchoCompleto()' },
 })
 export class NodoFormularioComponent {
-  private readonly renderizadores = inject(RENDERIZADORES_NODO, { optional: true }) ?? [];
+  /** Los que aporta quien usa el formulario tienen prioridad sobre los predeterminados. */
+  private readonly renderizadores = [
+    ...(inject(RENDERIZADORES_NODO, { optional: true }) ?? []),
+    ...(inject(RENDERIZADORES_PREDETERMINADOS, { optional: true }) ?? []),
+  ];
 
   readonly nodo = input.required<NodoFormulario>();
   readonly control = input.required<AbstractControl>();
@@ -35,6 +40,8 @@ export class NodoFormularioComponent {
   /** Profundidad dentro de la sección; el nivel 0 no repite el título que ya muestra la sección. */
   readonly nivel = input(0);
   readonly mostrarLeyenda = input(true);
+  /** Dibuja los campos con el estilo de la grilla de daños (botones amplios, 44 px), como en un elemento. */
+  readonly modoGrilla = input(false);
 
   /** Renderizador alterno registrado para este nodo, si lo hay (por ejemplo, la grilla de daños). */
   protected readonly renderizador = computed(() =>
@@ -97,16 +104,7 @@ export class NodoFormularioComponent {
     this.construido().revision();
     const nodo = this.nodo();
     if (nodo.clase !== 'objeto') return [];
-
-    const grupo = this.control() as FormGroup;
-    return nodo.hijos.filter((hijo) => {
-      const control = grupo.controls[hijo.clave];
-      return (
-        control !== undefined &&
-        !this.construido().ocultos.has(control) &&
-        !(hijo.clase === 'campo' && hijo.tipo === 'uuid')
-      );
-    });
+    return hijosVisibles(nodo, this.control() as FormGroup, this.construido().ocultos);
   });
 
   protected readonly instancias = computed(() => {

@@ -902,7 +902,24 @@
       "clearBlock": "Limpiar este bloque",
       "legend": "Campo obligatorio. Los que dicen «opcional» pueden quedar vacíos.",
       "help": "¿Qué significa cada opción?",
-      "supportSection": "Sección de apoyo"
+      "supportSection": "Sección de apoyo",
+      "elemento": {
+        "pendiente": "Pendiente",
+        "enProceso": "En proceso: {{marcados}} de {{total}}",
+        "sano": "Sin daños",
+        "conDanos": "Con daños",
+        "conDanosFaltan": "Con daños · faltan {{faltan}}",
+        "noExiste": "No existe",
+        "sinRevisar": "Falta revisarlo",
+        "sinDanos": "Sin daños en este elemento",
+        "deshacer": "Toca de nuevo para deshacer",
+        "indicadores": "Indicadores de daño",
+        "revisados": "{{revisados}} de {{total}} elementos revisados",
+        "todosSanos": "todos sin daño",
+        "medidas": "Medidas (opcional)",
+        "mostrar": "Mostrar el detalle del elemento",
+        "ocultar": "Ocultar el detalle del elemento"
+      }
     },
     "validacion": {
       "requerido": "Este campo es obligatorio.",

@@ -19,7 +19,10 @@ import { EsquemaJson, NodoArreglo, NodoObjeto } from '../../motor/esquema/modelo
 import { resolverEsquema } from '../../motor/esquema/resolutor';
 import { Avance, calcularAvance } from '../../motor/formulario/avance';
 import { FormularioConstruido } from '../../motor/formulario/constructor';
+import { resumirElementos, ResumenElementos } from '../../motor/formulario/danos';
+import { RENDERIZADOR_ELEMENTO_EVALUABLE } from '../elemento-evaluable/elemento-evaluable.component';
 import { NodoFormularioComponent } from '../nodo-formulario/nodo-formulario.component';
+import { RENDERIZADORES_PREDETERMINADOS } from '../renderizadores';
 import { RenderizadorNodoDirective } from '../renderizador-nodo.directive';
 import { SeccionApoyo } from '../secciones-apoyo';
 
@@ -29,6 +32,8 @@ interface ResumenSeccion {
   nodo: NodoObjeto | NodoArreglo;
   avance: Avance;
   estado: EstadoSeccion;
+  /** Elementos evaluables de la sección y cuántos ya se revisaron. */
+  elementos: ResumenElementos;
 }
 
 /** Elemento de la navegación: una sección del esquema o una sección de apoyo. */
@@ -47,6 +52,11 @@ type Resultado = { construido: FormularioConstruido } | { error: string } | null
   selector: 'app-formulario-dinamico',
   standalone: true,
   imports: [TranslocoPipe, ButtonModule, NodoFormularioComponent, RenderizadorNodoDirective],
+  // La captura de daños por elemento (HU-034) viene incluida; quien use el formulario puede sumar
+  // sus propios renderizadores con RENDERIZADORES_NODO, que tienen prioridad.
+  providers: [
+    { provide: RENDERIZADORES_PREDETERMINADOS, useValue: [RENDERIZADOR_ELEMENTO_EVALUABLE] },
+  ],
   templateUrl: './formulario-dinamico.component.html',
   styleUrl: './formulario-dinamico.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -67,8 +77,6 @@ export class FormularioDinamicoComponent {
 
   protected readonly resultado = signal<Resultado>(null);
   protected readonly indiceActivo = signal(0);
-  /** Tras pedir la revisión, lo incompleto se marca como faltante en lugar de «pendiente». */
-  private readonly revisado = signal(false);
   private readonly encabezado = viewChild<ElementRef<HTMLElement>>('encabezado');
   private readonly anfitrion = inject<ElementRef<HTMLElement>>(ElementRef);
   private readonly injector = inject(Injector);
@@ -92,7 +100,10 @@ export class FormularioDinamicoComponent {
       const avance = control
         ? calcularAvance(nodo, control, construido.ocultos)
         : { obligatorios: 0, completos: 0, invalidos: 0 };
-      return { nodo, avance, estado: estadoDe(avance, this.revisado()) };
+      const elementos = control
+        ? resumirElementos(nodo, control, construido.ocultos)
+        : { total: 0, revisados: 0 };
+      return { nodo, avance, elementos, estado: estadoDe(avance, construido.revisado()) };
     });
   });
 
@@ -191,7 +202,6 @@ export class FormularioDinamicoComponent {
     const construido = this.construido();
     if (!construido) return false;
 
-    this.revisado.set(true);
     construido.revisar();
     const valido = construido.form.status !== 'INVALID';
 

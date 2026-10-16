@@ -1,0 +1,180 @@
+<section
+  class="elemento"
+  role="group"
+  [class.sin-revisar]="sinRevisar()"
+  [attr.data-estado]="estado().tipo"
+  [attr.data-subtipo]="subtipo()"
+  [attr.data-ruta]="elemento().ruta"
+  [attr.aria-labelledby]="idTitulo"
+>
+  <header class="cabecera">
+    <h4 [id]="idTitulo">{{ elemento().titulo }}</h4>
+    <p class="estado" [attr.data-estado]="estado().tipo" [attr.data-subtipo]="subtipo()">
+      <i class="pi" [class]="icono()" aria-hidden="true"></i>
+      <span>{{ textoEstado() }}</span>
+      @if (sinRevisar()) {
+        <strong class="alerta">{{ 'formulario.dinamico.elemento.sinRevisar' | transloco }}</strong>
+      }
+    </p>
+    <div class="acciones">
+      @if (puedeMarcarSinDanos()) {
+        <button
+          type="button"
+          class="sin-danos"
+          [attr.aria-pressed]="estaSano()"
+          [attr.title]="estaSano() ? ('formulario.dinamico.elemento.deshacer' | transloco) : null"
+          (click)="alternarSinDanos()"
+        >
+          <i class="pi pi-check-circle" aria-hidden="true"></i>
+          <span>{{ 'formulario.dinamico.elemento.sinDanos' | transloco }}</span>
+          @if (estaSano()) {
+            <span class="solo-lectores">{{
+              'formulario.dinamico.elemento.deshacer' | transloco
+            }}</span>
+          }
+        </button>
+      }
+      @if (hayDetalle()) {
+        <button
+          type="button"
+          class="alternar"
+          [attr.aria-expanded]="abierto()"
+          [attr.aria-controls]="idDetalle"
+          [attr.title]="
+            (abierto()
+              ? 'formulario.dinamico.elemento.ocultar'
+              : 'formulario.dinamico.elemento.mostrar'
+            ) | transloco
+          "
+          (click)="alternarDetalle()"
+        >
+          <i class="pi pi-chevron-down" aria-hidden="true"></i>
+          <span class="solo-lectores">{{
+            (abierto()
+              ? 'formulario.dinamico.elemento.ocultar'
+              : 'formulario.dinamico.elemento.mostrar'
+            ) | transloco
+          }}</span>
+        </button>
+      }
+    </div>
+  </header>
+
+  <!-- La existencia es la primera decisión: siempre a la vista, aunque el detalle esté plegado. -->
+  @if (existencia(); as campoExistencia) {
+    <app-campo-formulario
+      class="existencia"
+      [nodo]="campoExistencia"
+      [control]="controlDe(campoExistencia)"
+      [construido]="construido()"
+      [modoGrilla]="true"
+    />
+  }
+
+  <div class="detalle" [id]="idDetalle" [hidden]="!abierto()">
+    @if (datos().length > 0) {
+      <div class="datos">
+        @for (hijo of datos(); track hijo.clave) {
+          <app-campo-formulario
+            [class.fila]="ocupaFila(hijo)"
+            [nodo]="hijo"
+            [control]="controlDe(hijo)"
+            [construido]="construido()"
+            [modoGrilla]="true"
+          />
+        }
+      </div>
+    }
+
+    @if (medidas().length > 0) {
+      <details class="medidas" [open]="medidasAbiertas()">
+        <summary>
+          <span>{{ 'formulario.dinamico.elemento.medidas' | transloco }}</span>
+          <i class="pi pi-chevron-down chevron" aria-hidden="true"></i>
+        </summary>
+        <div class="datos">
+          @for (hijo of medidas(); track hijo.clave) {
+            <app-campo-formulario
+              [nodo]="hijo"
+              [control]="controlDe(hijo)"
+              [construido]="construido()"
+              [modoGrilla]="true"
+            />
+          }
+        </div>
+      </details>
+    }
+
+    @if (indicadores().length > 0) {
+      <!-- Un elemento sano pliega sus indicadores para no alargar la pantalla; siguen a un toque. -->
+      <details class="indicadores" [class.plegable]="estaSano()" [open]="!estaSano()">
+        <summary>
+          <span
+            >{{ 'formulario.dinamico.elemento.indicadores' | transloco }} ({{
+              indicadores().length
+            }})</span
+          >
+          @if (estaSano()) {
+            <span class="resumen-sano"
+              >· {{ 'formulario.dinamico.elemento.todosSanos' | transloco }}</span
+            >
+          }
+          <i class="pi pi-chevron-down chevron" aria-hidden="true"></i>
+        </summary>
+        @if (matriz(); as m) {
+          <!-- Los nombres de las opciones van una sola vez; cada indicador es una fila de celdas. -->
+          <div class="matriz-cabecera" aria-hidden="true">
+            @for (encabezado of m.encabezados; track encabezado.etiqueta) {
+              <span [attr.data-gravedad]="encabezado.gravedad">{{ encabezado.etiqueta }}</span>
+            }
+          </div>
+          <div
+            class="grilla matriz"
+            role="group"
+            [attr.aria-label]="'formulario.dinamico.elemento.indicadores' | transloco"
+          >
+            @for (hijo of m.campos; track hijo.clave) {
+              <div class="indicador">
+                <app-campo-formulario
+                  [nodo]="hijo"
+                  [control]="controlDe(hijo)"
+                  [construido]="construido()"
+                  [modoGrilla]="true"
+                  [modoCeldas]="true"
+                />
+              </div>
+            }
+          </div>
+        }
+        @if (otrosIndicadores().length > 0) {
+          <div
+            class="grilla"
+            role="group"
+            [attr.aria-label]="'formulario.dinamico.elemento.indicadores' | transloco"
+          >
+            @for (hijo of otrosIndicadores(); track hijo.clave) {
+              <div class="indicador">
+                <app-campo-formulario
+                  [nodo]="hijo"
+                  [control]="controlDe(hijo)"
+                  [construido]="construido()"
+                  [modoGrilla]="true"
+                />
+              </div>
+            }
+          </div>
+        }
+      </details>
+    }
+
+    @for (hijo of bloques(); track hijo.clave) {
+      <app-nodo-formulario
+        [nodo]="hijo"
+        [control]="controlDe(hijo)"
+        [construido]="construido()"
+        [nivel]="2"
+        [modoGrilla]="true"
+      />
+    }
+  </div>
+</section>

@@ -13,3 +13,12 @@ export interface RenderizadorNodo {
 }
 
 export const RENDERIZADORES_NODO = new InjectionToken<RenderizadorNodo[]>('RENDERIZADORES_NODO');
+
+/**
+ * Renderizadores que trae el propio formulario dinámico (la grilla de daños de un elemento). Van
+ * aparte de `RENDERIZADORES_NODO` para que quien lo use pueda sumar los suyos, que tienen
+ * prioridad, sin reemplazar a estos.
+ */
+export const RENDERIZADORES_PREDETERMINADOS = new InjectionToken<RenderizadorNodo[]>(
+  'RENDERIZADORES_PREDETERMINADOS',
+);
