@@ -13,7 +13,8 @@ IPv4 estable y ningún secreto en el repositorio.
 | Archivos del repositorio | `infra/production/` y `infra/backup/` preparados. |
 | Recursos AWS de producción | Creados en `us-east-1`: `sgp-prod-ec2-sg`, regla 5432 en `sgp-rds-sg`, rol `sgp-prod-ec2-role`, bucket `sgp-prod-respaldos-ayd1-2026-gt01`, EC2 `sgp-prod-ec2` (`t4g.small`, IPv4 privada `172.31.85.45`, subred pública predeterminada de `us-east-1b`) y Elastic IP `35.174.88.15`. Session Manager y TCP 5432 hacia RDS verificados. |
 | Base `sgp_prod` | Preparada con `prepare-database.sql` usando `sslmode=verify-full`; extensiones `postgis` 3.4.6, `pg_trgm` 1.6 y `uuid-ossp` 1.1 confirmadas con `\dx`. |
-| Despliegue real | Revisión `61dae8a43bbaa064159d03b15872f6b8eceb7d4f` desplegada el 17 de octubre de 2026 con `deploy.sh`; backend y Nginx saludables. Ver el manifiesto de liberación más abajo. |
+| Despliegue real | Revisión `61dae8a43bbaa064159d03b15872f6b8eceb7d4f` desplegada manualmente el 17 de octubre de 2026 con `deploy.sh`; backend y Nginx saludables. Ver el manifiesto de liberación más abajo. |
+| Despliegue automático | Job `deploy-production` agregado al workflow (ADR-0004); pendiente de crear el rol OIDC y las variables de repositorio (sección 7). |
 | HTTPS público | Operativo en `https://35.174.88.15` con certificado IP de Let's Encrypt y temporizador `sgp-prod-certbot-renew` habilitado. |
 | SMTP | Gmail con contraseña de aplicación configurado en `production.env`. |
 | Respaldos | Temporizador diario activo; primer volcado subido a S3 y prueba de restauración exitosa el 17 de octubre de 2026 (ver [`RESPALDO_Y_RESTAURACION.md`](RESPALDO_Y_RESTAURACION.md)). |
@@ -45,6 +46,8 @@ registre contraseñas, tokens ni el contenido de los archivos de entorno.
 | `infra/production/deploy.sh` | Despliegue manual por digest con bloqueo, comprobaciones y rollback, derivado del de staging. |
 | `infra/production/https/` | Nginx del host, certificado IP de Let's Encrypt y temporizador `sgp-prod-certbot-renew`. |
 | `infra/production/push-files.sh` | Copia archivos del repositorio a la EC2 mediante Systems Manager, desde el equipo del operador. |
+| `infra/production/iam/` | Política de confianza y permisos del rol OIDC que usa `deploy-production`. |
+| `.github/workflows/ci.yml` | Job `deploy-production`, que despliega producción en cada `push` a `main`. |
 | `infra/backup/` | Respaldo diario con `pg_dump` a S3 y prueba de restauración. |
 | `sgp-api/src/main/resources/application-prod.properties` | Perfil `prod`; incluye `server.forward-headers-strategy=framework` y `server.shutdown=graceful`, necesarios detrás del Nginx del host. |
 
@@ -179,11 +182,51 @@ responsable y cuándo expira.
 
 ## 7. Despliegue
 
-1. Elegir el commit de `develop` validado en staging y obtener sus digests. En
-   la EC2 de staging, `/opt/sgp/staging/images.env` contiene las referencias y
-   `/opt/sgp/staging/REVISION` el commit desplegado.
-2. Registrar el manifiesto de liberación de la sección 5 de la guía de traspaso.
-3. Copiar el Compose y el script a `candidate/`. No copiarlos directamente en
+### Automático desde `main` (procedimiento normal)
+
+Según [ADR-0004](../adr/0004-despliegue-automatico-produccion-desde-main.md),
+cada `push` a `main` (normalmente el merge de un Pull Request) ejecuta el
+workflow `CI`:
+
+```text
+push a main -> backend + frontend -> publicar API y cliente (sha-<SHA>, main)
+            -> deploy-production (OIDC + Systems Manager + deploy.sh)
+```
+
+`deploy-production` copia `infra/production/compose.yml` como candidato y
+`infra/production/deploy.sh` a `/opt/sgp/production`, y ejecuta el despliegue con
+los digests publicados por el mismo run. El resultado de `deploy.sh` (salud,
+comprobaciones y rollback) aparece en el log del job, y el run de GitHub Actions
+es el registro de la liberación.
+
+Configuración inicial, una sola vez:
+
+1. **Rol OIDC.** En IAM → Roles → *Create role* → *Custom trust policy*, pegar
+   `infra/production/iam/github-actions-trust-policy.json`. Nombre:
+   `sgp-prod-github-actions-role`. Agregar una política en línea
+   `sgp-prod-ssm-deploy` con `infra/production/iam/github-actions-ssm-policy.json`,
+   reemplazando `REEMPLAZAR_ID_INSTANCIA_PRODUCCION` por el ID de `sgp-prod-ec2`.
+   La confianza solo acepta el sujeto de `refs/heads/main`; la política solo
+   permite `AWS-RunShellScript` sobre la instancia de producción.
+2. **Variables de repositorio.** En GitHub → *Settings → Secrets and variables →
+   Actions → Variables*: `PRODUCTION_ROLE_ARN` (ARN del rol),
+   `PRODUCTION_INSTANCE_ID` (ID de `sgp-prod-ec2`) y `PRODUCTION_ENABLED=true`.
+   `AWS_REGION` ya existe. No son secretos.
+3. **Protección de `main`.** En *Settings → Branches*, exigir Pull Request y que
+   los checks `Validate backend` y `Validate frontend` pasen antes de fusionar.
+   Sin esta regla, un `push` directo a `main` desplegaría producción.
+
+Para suspender los despliegues automáticos, cambie `PRODUCTION_ENABLED` a
+`false`; los contenedores en ejecución no se detienen.
+
+### Manual (contingencia)
+
+Para restaurar una versión anterior por digest, o si GitHub Actions no está
+disponible:
+
+1. Obtener los digests de la versión: del log del job de publicación, de
+   GHCR (etiqueta `sha-<SHA>`) o de `/opt/sgp/production/images.env.previous`.
+2. Copiar el Compose y el script a `candidate/`. No copiarlos directamente en
    `/opt/sgp/production`: ahí está el Compose activo, que `deploy.sh` guarda como
    punto de rollback antes de reemplazarlo.
 
@@ -192,13 +235,13 @@ responsable y cuándo expira.
      infra/production/compose.yml infra/production/deploy.sh
    ```
 
-4. En Session Manager:
+3. En Session Manager:
 
    ```bash
    sudo /opt/sgp/production/candidate/deploy.sh \
      /opt/sgp/production/candidate/compose.yml \
-     ghcr.io/kennysalazar/sgp-api@sha256:<digest-aprobado> \
-     ghcr.io/kennysalazar/sgp-client@sha256:<digest-aprobado> \
+     ghcr.io/kennysalazar/sgp-api@sha256:<digest> \
+     ghcr.io/kennysalazar/sgp-client@sha256:<digest> \
      <SHA-de-40-caracteres>
    ```
 
@@ -246,7 +289,8 @@ con IMDSv2, emite el certificado de corta duración y activa el temporizador.
 ## 10. Rollback
 
 `deploy.sh` restaura automáticamente el Compose y los digests anteriores si el
-despliegue falla. Para volver manualmente a una versión anterior, ejecute
-`deploy.sh` con los digests registrados en el manifiesto de esa versión. Ni el
+despliegue falla. Para volver a una versión anterior, revierta el cambio en
+`main` mediante un Pull Request (el workflow desplegará la reversión) o use el
+procedimiento manual de la sección 7 con los digests de esa versión. Ni el
 rollback ni un redespliegue modifican datos de RDS; una migración Flyway ya
 aplicada no se revierte automáticamente.

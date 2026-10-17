@@ -1,0 +1,20 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "EnviarDespliegueSoloAProduccion",
+      "Effect": "Allow",
+      "Action": "ssm:SendCommand",
+      "Resource": [
+        "arn:aws:ec2:us-east-1:416086757987:instance/REEMPLAZAR_ID_INSTANCIA_PRODUCCION",
+        "arn:aws:ssm:us-east-1::document/AWS-RunShellScript"
+      ]
+    },
+    {
+      "Sid": "ConsultarYCancelarComandos",
+      "Effect": "Allow",
+      "Action": ["ssm:GetCommandInvocation", "ssm:CancelCommand"],
+      "Resource": "*"
+    }
+  ]
+}
