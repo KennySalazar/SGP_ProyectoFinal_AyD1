@@ -55,6 +55,14 @@ describe('PuenteApiService', () => {
     request.flush({ content: [] });
   });
 
+  it('envía el texto de búsqueda de puentes', () => {
+    service.listarCatalogo({ busqueda: 'Guatemala' }).subscribe();
+
+    const request = http.expectOne((req) => req.url === '/api/v1/puentes');
+    expect(request.request.params.get('busqueda')).toBe('Guatemala');
+    request.flush({ content: [] });
+  });
+
   it('omite filtros ausentes y usa la paginación predeterminada', () => {
     service.listarCatalogo().subscribe();
 

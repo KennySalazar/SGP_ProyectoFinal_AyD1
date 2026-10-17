@@ -24,17 +24,36 @@
     </p>
   }
 
-  @if (cercanos.length > 0) {
-    <p class="ayuda">
-      Los marcadores naranjas representan los puentes cercanos. Selecciónalos para consultar su
-      identificación.
-    </p>
+  @if (hayUbicacion || existentes.length > 0 || cercanos.length > 0) {
+    <ul class="leyenda" aria-label="Leyenda del mapa">
+      @if (hayUbicacion) {
+        <li>
+          <span class="muestra muestra--azul" aria-hidden="true"></span>
+          {{ soloLectura ? 'Azul: ubicación de la solicitud' : 'Azul: ubicación seleccionada' }}
+        </li>
+      }
+      @if (existentes.length > 0) {
+        <li>
+          <span class="muestra muestra--gris" aria-hidden="true"></span>
+          Gris: puente registrado
+        </li>
+      }
+      @if (hayCercanosActivos) {
+        <li>
+          <span class="muestra muestra--naranja" aria-hidden="true"></span>
+          Naranja: puente cercano (a menos de 100 m)
+        </li>
+      }
+      @if (hayCercanosInactivos) {
+        <li>
+          <span class="muestra muestra--inactivo" aria-hidden="true"></span>
+          Naranja atenuado: puente cercano inactivo
+        </li>
+      }
+    </ul>
   }
 
-  @if (existentes.length > 0) {
-    <p class="ayuda">
-      Los marcadores grises son puentes ya registrados. Selecciónalos para consultar su
-      identificación.
-    </p>
+  @if (existentes.length > 0 || cercanos.length > 0) {
+    <p class="ayuda">Selecciona un marcador de puente para consultar su identificación.</p>
   }
 </div>

@@ -168,6 +168,22 @@ export class SelectorUbicacionComponent implements AfterViewInit, OnChanges, OnD
     });
   }
 
+  get hayUbicacion(): boolean {
+    return coordenadaValida(this.latitud, this.longitud);
+  }
+
+  get hayCercanosActivos(): boolean {
+    return this.cercanos.some((cercano) => !cercano.inactivo);
+  }
+
+  get hayCercanosInactivos(): boolean {
+    return this.cercanos.some((cercano) => cercano.inactivo);
+  }
+
+  private etiqueta(punto: PuntoMapa): string {
+    return punto.inactivo ? `${punto.titulo} — Inactivo` : punto.titulo;
+  }
+
   private get arrastrable(): boolean {
     return !this.deshabilitado && !this.soloLectura;
   }
@@ -223,14 +239,19 @@ export class SelectorUbicacionComponent implements AfterViewInit, OnChanges, OnD
     for (const cercano of this.cercanos) {
       if (!coordenadaValida(cercano.latitud, cercano.longitud)) continue;
 
-      const popup: Popup = new libreria.Popup({ offset: 25 }).setText(cercano.titulo);
+      const etiqueta = this.etiqueta(cercano);
+      const popup: Popup = new libreria.Popup({ offset: 25 }).setText(etiqueta);
 
-      const marcador = new libreria.Marker({ color: '#d97706' })
+      // Un puente inactivo se atenúa y se achica; además se rotula como "Inactivo" para que no
+      // dependa solo del color.
+      const marcador = new libreria.Marker(
+        cercano.inactivo ? { color: '#d97706', scale: 0.8, opacity: 0.6 } : { color: '#d97706' },
+      )
         .setLngLat([cercano.longitud, cercano.latitud])
         .setPopup(popup)
         .addTo(mapa);
 
-      marcador.getElement().setAttribute('aria-label', cercano.titulo);
+      marcador.getElement().setAttribute('aria-label', etiqueta);
       this.marcadoresCercanos.push(marcador);
     }
   }
@@ -250,14 +271,15 @@ export class SelectorUbicacionComponent implements AfterViewInit, OnChanges, OnD
       if (cercanos.has(existente.id)) continue;
       if (!coordenadaValida(existente.latitud, existente.longitud)) continue;
 
-      const popup: Popup = new libreria.Popup({ offset: 25 }).setText(existente.titulo);
+      const etiqueta = this.etiqueta(existente);
+      const popup: Popup = new libreria.Popup({ offset: 25 }).setText(etiqueta);
 
       const marcador = new libreria.Marker({ color: '#64748b' })
         .setLngLat([existente.longitud, existente.latitud])
         .setPopup(popup)
         .addTo(mapa);
 
-      marcador.getElement().setAttribute('aria-label', existente.titulo);
+      marcador.getElement().setAttribute('aria-label', etiqueta);
       this.marcadoresExistentes.push(marcador);
     }
   }

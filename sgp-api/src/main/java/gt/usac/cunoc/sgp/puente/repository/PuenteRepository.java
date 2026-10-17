@@ -1,16 +1,69 @@
 package gt.usac.cunoc.sgp.puente.repository;
 
 import gt.usac.cunoc.sgp.puente.entity.Puente;
+import jakarta.persistence.LockModeType;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 public interface PuenteRepository extends JpaRepository<Puente, UUID> {
+
+  @Lock(LockModeType.PESSIMISTIC_WRITE)
+  @Query("SELECT p FROM Puente p WHERE p.id = :id")
+  Optional<Puente> findByIdForUpdate(@Param("id") UUID id);
+
+  @EntityGraph(attributePaths = {"municipio", "municipio.departamento"})
+  @Query(
+      """
+          SELECT p FROM Puente p
+          WHERE (:activo IS NULL OR p.activo = :activo)
+            AND (:departamentoId IS NULL OR p.municipio.departamento.id = :departamentoId)
+            AND p.estadoActual = :estado
+          """)
+  Page<Puente> findCatalogoPorEstado(
+      @Param("departamentoId") UUID departamentoId,
+      @Param("activo") Boolean activo,
+      @Param("estado") String estado,
+      Pageable pageable);
+
+  @EntityGraph(attributePaths = {"municipio", "municipio.departamento"})
+  @Query(
+      value =
+          """
+          SELECT p FROM Puente p
+          WHERE (:activo IS NULL OR p.activo = :activo)
+            AND (:departamentoId IS NULL OR p.municipio.departamento.id = :departamentoId)
+            AND p.estadoActual = :estado
+            AND (
+              LOWER(p.nombre) LIKE LOWER(CONCAT('%', :busqueda, '%'))
+              OR LOWER(p.codigo) LIKE LOWER(CONCAT('%', :busqueda, '%'))
+              OR LOWER(p.municipio.departamento.nombre) LIKE LOWER(CONCAT('%', :busqueda, '%'))
+            )
+          """,
+      countQuery =
+          """
+          SELECT count(p) FROM Puente p
+          WHERE (:activo IS NULL OR p.activo = :activo)
+            AND (:departamentoId IS NULL OR p.municipio.departamento.id = :departamentoId)
+            AND p.estadoActual = :estado
+            AND (
+              LOWER(p.nombre) LIKE LOWER(CONCAT('%', :busqueda, '%'))
+              OR LOWER(p.codigo) LIKE LOWER(CONCAT('%', :busqueda, '%'))
+              OR LOWER(p.municipio.departamento.nombre) LIKE LOWER(CONCAT('%', :busqueda, '%'))
+            )
+          """)
+  Page<Puente> findCatalogoPorEstadoConBusqueda(
+      @Param("departamentoId") UUID departamentoId,
+      @Param("activo") Boolean activo,
+      @Param("estado") String estado,
+      @Param("busqueda") String busqueda,
+      Pageable pageable);
 
   @EntityGraph(attributePaths = {"municipio", "municipio.departamento"})
   @Query(
@@ -31,6 +84,36 @@ public interface PuenteRepository extends JpaRepository<Puente, UUID> {
   Page<Puente> findCatalogo(
       @Param("departamentoId") UUID departamentoId,
       @Param("activo") Boolean activo,
+      Pageable pageable);
+
+  @EntityGraph(attributePaths = {"municipio", "municipio.departamento"})
+  @Query(
+      value =
+          """
+          SELECT p FROM Puente p
+          WHERE (:activo IS NULL OR p.activo = :activo)
+            AND (:departamentoId IS NULL OR p.municipio.departamento.id = :departamentoId)
+            AND (
+              LOWER(p.nombre) LIKE LOWER(CONCAT('%', :busqueda, '%'))
+              OR LOWER(p.codigo) LIKE LOWER(CONCAT('%', :busqueda, '%'))
+              OR LOWER(p.municipio.departamento.nombre) LIKE LOWER(CONCAT('%', :busqueda, '%'))
+            )
+          """,
+      countQuery =
+          """
+          SELECT count(p) FROM Puente p
+          WHERE (:activo IS NULL OR p.activo = :activo)
+            AND (:departamentoId IS NULL OR p.municipio.departamento.id = :departamentoId)
+            AND (
+              LOWER(p.nombre) LIKE LOWER(CONCAT('%', :busqueda, '%'))
+              OR LOWER(p.codigo) LIKE LOWER(CONCAT('%', :busqueda, '%'))
+              OR LOWER(p.municipio.departamento.nombre) LIKE LOWER(CONCAT('%', :busqueda, '%'))
+            )
+          """)
+  Page<Puente> findCatalogoConBusqueda(
+      @Param("departamentoId") UUID departamentoId,
+      @Param("activo") Boolean activo,
+      @Param("busqueda") String busqueda,
       Pageable pageable);
 
   @EntityGraph(attributePaths = {"municipio", "municipio.departamento"})

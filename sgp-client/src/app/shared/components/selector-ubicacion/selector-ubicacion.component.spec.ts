@@ -64,7 +64,9 @@ const fake = vi.hoisted(() => {
       this.agregado = false;
     });
 
-    constructor(readonly opciones: { color: string; draggable?: boolean }) {
+    constructor(
+      readonly opciones: { color: string; draggable?: boolean; scale?: number; opacity?: number },
+    ) {
       this.arrastrable = opciones.draggable;
       estado.marcadores.push(this);
     }
@@ -316,7 +318,71 @@ describe('SelectorUbicacionComponent: selector de ubicación en el mapa', () => 
     expect(grises).toHaveLength(1);
     expect(grises[0].popup?.texto).toBe('GT-01-0114-0001 — A');
     expect(naranjas).toHaveLength(1);
-    expect(fixture.nativeElement.textContent).toContain('marcadores grises');
+    expect(fixture.nativeElement.textContent).toContain('Gris: puente registrado');
+  });
+
+  describe('leyenda y puentes inactivos', () => {
+    const activo = { id: 'a', titulo: 'GT-01-0114-0001 — A', latitud: 14.48, longitud: -90.61 };
+    const inactivo = {
+      id: 'i',
+      titulo: 'GT-01-0114-0002 — B',
+      latitud: 14.49,
+      longitud: -90.62,
+      inactivo: true,
+    };
+
+    const leyenda = () =>
+      [...fixture.nativeElement.querySelectorAll('.leyenda li')].map((li) =>
+        (li as HTMLElement).textContent?.trim(),
+      );
+
+    it('no muestra leyenda cuando no hay nada que explicar', async () => {
+      await crear();
+
+      expect(fixture.nativeElement.querySelector('.leyenda')).toBeNull();
+    });
+
+    it('explica con texto cada color presente en el mapa', async () => {
+      await crear({
+        latitud: 14.481,
+        longitud: -90.615,
+        existentes: [activo],
+        cercanos: [{ ...activo, id: 'c' }, inactivo],
+      });
+
+      expect(leyenda()).toEqual([
+        'Azul: ubicación seleccionada',
+        'Gris: puente registrado',
+        'Naranja: puente cercano (a menos de 100 m)',
+        'Naranja atenuado: puente cercano inactivo',
+      ]);
+      expect(fixture.nativeElement.querySelector('.leyenda').getAttribute('aria-label')).toBe(
+        'Leyenda del mapa',
+      );
+    });
+
+    it('solo lista lo que realmente se dibuja', async () => {
+      await crear({ cercanos: [inactivo] });
+
+      expect(leyenda()).toEqual(['Naranja atenuado: puente cercano inactivo']);
+    });
+
+    it('en solo lectura nombra la ubicación como de la solicitud', async () => {
+      await crear({ latitud: 14.481, longitud: -90.615, soloLectura: true });
+
+      expect(leyenda()).toEqual(['Azul: ubicación de la solicitud']);
+    });
+
+    it('dibuja atenuado y rotula como inactivo al puente cercano dado de baja', async () => {
+      await crear({ cercanos: [activo, inactivo] });
+
+      const [normal, atenuado] = fake.estado.marcadores;
+      expect(normal.opciones).toEqual({ color: '#d97706' });
+      expect(normal.elemento.getAttribute('aria-label')).toBe('GT-01-0114-0001 — A');
+      expect(atenuado.opciones).toEqual({ color: '#d97706', scale: 0.8, opacity: 0.6 });
+      expect(atenuado.elemento.getAttribute('aria-label')).toBe('GT-01-0114-0002 — B — Inactivo');
+      expect(atenuado.popup?.texto).toBe('GT-01-0114-0002 — B — Inactivo');
+    });
   });
 
   it('no rehace los marcadores existentes cuando solo cambia la coordenada', async () => {

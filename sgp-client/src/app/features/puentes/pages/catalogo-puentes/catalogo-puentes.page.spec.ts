@@ -11,6 +11,7 @@ import { CatalogoPuentesPage } from './catalogo-puentes.page';
 import { EstadoPuente, PuenteCatalogoResponse } from '../../models/puente.models';
 import { AuthStore } from '../../../../core/services/auth.store';
 import { AppShellComponent } from '../../../../layouts/app-shell/app-shell.component';
+import { MapaPuentesComponent } from './mapa-puentes/mapa-puentes.component';
 
 @Pipe({ name: 'transloco' })
 class TraduccionTestPipe implements PipeTransform {
@@ -25,9 +26,16 @@ describe('Base compartida del catálogo HU014', () => {
   let fixture: ComponentFixture<CatalogoPuentesPage>;
 
   beforeEach(() => {
+    vi.spyOn(MapaPuentesComponent.prototype, 'ngAfterViewInit').mockResolvedValue();
     TestBed.configureTestingModule({
-      providers: [provideHttpClient(), provideHttpClientTesting(), provideRouter([])],
+      providers: [
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        provideRouter([]),
+        { provide: TranslocoService, useValue: { translate: (key: string) => key } },
+      ],
     });
+    TestBed.overrideComponent(MapaPuentesComponent, { set: { template: '', imports: [] } });
     TestBed.overrideComponent(CatalogoPuentesPage, {
       remove: { imports: [TranslocoPipe] },
       add: { imports: [TraduccionTestPipe] },
@@ -50,6 +58,7 @@ describe('Base compartida del catálogo HU014', () => {
     http.verify();
     fixture.destroy();
     vi.unstubAllGlobals();
+    vi.restoreAllMocks();
   });
 
   it('abre departamentos con panel opaco y opciones etiquetadas fuera de la tabla', async () => {
@@ -229,14 +238,14 @@ describe('Base compartida del catálogo HU014', () => {
     expect(page.cargando()).toBe(true);
     http.expectOne((req) => req.url === '/api/v1/puentes').flush(response);
     expect(page.vista()).toBe('lista');
-    page.vista.set('mapa');
+    page.cambiarVista('mapa');
     expect(page.pagina()).toEqual(response);
-    page.vista.set('lista');
+    page.cambiarVista('lista');
     expect(page.cargando()).toBe(false);
     http.expectNone('/api/v1/puentes');
   });
 
-  it('destaca la lista y mantiene el mapa pendiente deshabilitado', () => {
+  it('activa mapa y permite volver a la lista sin consultar de nuevo un catálogo completo', () => {
     http.expectOne((req) => req.url === '/api/v1/puentes').flush({ content: [], totalElements: 0 });
     fixture.detectChanges();
     const buttons: NodeListOf<HTMLButtonElement> =
@@ -244,14 +253,77 @@ describe('Base compartida del catálogo HU014', () => {
     expect(buttons[0].getAttribute('aria-pressed')).toBe('true');
     buttons[1].click();
     fixture.detectChanges();
-    expect(buttons[0].getAttribute('aria-pressed')).toBe('true');
-    expect(buttons[1].getAttribute('aria-pressed')).toBe('false');
-    expect(buttons[1].disabled).toBe(true);
-    expect(buttons[1].textContent).toContain('puentes.catalogo.comingSoon');
-    expect(fixture.nativeElement.querySelector('h2').textContent).toContain(
-      'puentes.catalogo.list',
-    );
+    expect(buttons[0].getAttribute('aria-pressed')).toBe('false');
+    expect(buttons[1].getAttribute('aria-pressed')).toBe('true');
+    expect(buttons[1].disabled).toBe(false);
+    expect(buttons[1].textContent).not.toContain('puentes.catalogo.comingSoon');
+    expect(fixture.nativeElement.querySelector('app-mapa-puentes')).not.toBeNull();
+    expect(fixture.nativeElement.querySelector('p-table')).toBeNull();
+    buttons[0].click();
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('p-table')).not.toBeNull();
     http.expectNone('/api/v1/puentes');
+  });
+
+  it('reúne todas las páginas del mapa, conserva la página de lista y reutiliza la carga', () => {
+    responderPagina(1, 20, 201);
+    const paginaLista = page.pagina();
+    page.cambiarVista('mapa');
+    for (let pagina = 0; pagina < 3; pagina++) {
+      const request = http.expectOne((req) => req.url === '/api/v1/puentes');
+      expect(request.request.params.get('pagina')).toBe(String(pagina));
+      expect(request.request.params.get('tamanio')).toBe('100');
+      request.flush({ content: [{ id: `p-${pagina}` }], number: pagina, totalPages: 3 });
+    }
+    expect(page.puentesMapa().map((p) => p.id)).toEqual(['p-0', 'p-1', 'p-2']);
+    expect(page.pagina()).toBe(paginaLista);
+    page.cambiarVista('lista');
+    page.cambiarVista('mapa');
+    http.expectNone((req) => req.url === '/api/v1/puentes');
+  });
+
+  it('aplica y limpia los mismos filtros en mapa y actualiza la lista al regresar', () => {
+    responderPagina(0, 20, 0);
+    page.cambiarVista('mapa');
+    page.filtros.patchValue({ departamentoId: 'departamento-1', estado: 'Regular' });
+    page.aplicarFiltros();
+    page.filtros.patchValue({ estado: 'Malo' });
+    const request = http.expectOne((req) => req.url === '/api/v1/puentes');
+    expect(request.request.params.get('departamentoId')).toBe('departamento-1');
+    expect(request.request.params.get('estado')).toBe('Regular');
+    request.flush({ content: [], number: 0, totalPages: 0 });
+    page.limpiarFiltros();
+    const limpio = http.expectOne((req) => req.url === '/api/v1/puentes');
+    expect(limpio.request.params.keys().sort()).toEqual(['pagina', 'tamanio']);
+    limpio.flush({ content: [], number: 0, totalPages: 0 });
+    page.cambiarVista('lista');
+    expect(page.pagina()?.size).toBe(20);
+    expect(page.pagina()?.content).toEqual([]);
+    http.expectNone((req) => req.url === '/api/v1/puentes');
+  });
+
+  it('descarta una carga parcial fallida y reintenta con los filtros aplicados', () => {
+    responderPagina(0, 20, 101);
+    page.cambiarVista('mapa');
+    http
+      .expectOne((req) => req.url === '/api/v1/puentes')
+      .flush({
+        content: [{ id: 'parcial' }],
+        number: 0,
+        totalPages: 2,
+      });
+    http
+      .expectOne((req) => req.url === '/api/v1/puentes')
+      .flush({}, { status: 503, statusText: 'Service Unavailable' });
+    expect(page.errorConsulta()).toBe(true);
+    expect(page.puentesMapa()).toEqual([]);
+    page.filtros.patchValue({ estado: 'Malo' });
+    page.cargarCatalogo();
+    const reintento = http.expectOne((req) => req.url === '/api/v1/puentes');
+    expect(reintento.request.params.get('pagina')).toBe('0');
+    expect(reintento.request.params.has('estado')).toBe(false);
+    reintento.flush({ content: [], number: 0, totalPages: 0 });
+    expect(page.errorConsulta()).toBe(false);
   });
 
   it('permite reintentar tras un error sin duplicar solicitudes en curso', () => {
@@ -619,6 +691,7 @@ describe('Baja lógica y reactivación de puentes por administrador', () => {
 
     expect(page.mostrarModalBaja()).toBe(false);
     expect(page.accionExitosa()).toBe('baja');
+    expect(page.puentesMapa()).toEqual([]);
 
     const reqRecarga = http.expectOne((req) => req.url === '/api/v1/puentes');
     reqRecarga.flush({
@@ -659,6 +732,7 @@ describe('Baja lógica y reactivación de puentes por administrador', () => {
 
     expect(page.mostrarModalReactivar()).toBe(false);
     expect(page.accionExitosa()).toBe('reactivar');
+    expect(page.puentesMapa()).toEqual([]);
 
     const reqRecarga = http.expectOne((req) => req.url === '/api/v1/puentes');
     reqRecarga.flush({
@@ -690,5 +764,27 @@ describe('Baja lógica y reactivación de puentes por administrador', () => {
     expect(requestTodos.request.params.get('todos')).toBe('true');
     expect(requestTodos.request.params.has('activo')).toBe(false);
     requestTodos.flush({ content: [], totalElements: 0 });
+  });
+
+  it('reutiliza el filtro administrativo de actividad al cargar todas las páginas del mapa', () => {
+    http.expectOne((req) => req.url === '/api/v1/puentes').flush({ content: [], totalElements: 0 });
+    page.cambiarVista('mapa');
+    page.filtroActividad.setValue('inactivos');
+    page.aplicarFiltros();
+    for (let pagina = 0; pagina < 2; pagina++) {
+      const request = http.expectOne((req) => req.url === '/api/v1/puentes');
+      expect(request.request.params.get('activo')).toBe('false');
+      expect(request.request.params.get('pagina')).toBe(String(pagina));
+      expect(request.request.params.get('tamanio')).toBe('100');
+      request.flush({ content: [puenteInactivo], number: pagina, totalPages: 2 });
+    }
+    expect(page.hayFiltrosAplicados()).toBe(true);
+    page.filtroActividad.setValue('todos');
+    page.aplicarFiltros();
+    const todos = http.expectOne((req) => req.url === '/api/v1/puentes');
+    expect(todos.request.params.get('todos')).toBe('true');
+    expect(todos.request.params.has('activo')).toBe(false);
+    todos.flush({ content: [puenteActivo, puenteInactivo], number: 0, totalPages: 1 });
+    expect(page.puentesMapa()).toEqual([puenteActivo, puenteInactivo]);
   });
 });

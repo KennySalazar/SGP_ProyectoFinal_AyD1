@@ -63,6 +63,8 @@
   [guardando]="guardando()"
   [erroresServidor]="erroresCampos()"
   [errorTerritorioServidor]="errorTerritorio()"
+  [cercanos]="puntosCercanos()"
+  [ocultarAcciones]="advertencia() !== null"
   (enviar)="solicitar($event)"
   (cambio)="alCambiarFormulario()"
 >
@@ -82,6 +84,28 @@
 
   @if (errorSolicitud(); as mensaje) {
   <p class="feedback error" role="alert">{{ mensaje }}</p>
+  } @if (advertencia(); as aviso) {
+  <app-aviso-cercania
+    [cercanos]="aviso.puentesCercanos ?? []"
+    [total]="aviso.totalPuentesCercanos ?? 0"
+    modo="solicitud"
+  >
+    <div class="actions">
+      <button pButton type="button" [disabled]="guardando()" (click)="confirmarSolicitud()">
+        {{ 'puentes.solicitud.confirm' | transloco }}
+      </button>
+
+      <button
+        pButton
+        type="button"
+        severity="secondary"
+        [disabled]="guardando()"
+        (click)="cancelarConfirmacion()"
+      >
+        {{ 'puentes.cancelConfirmation' | transloco }}
+      </button>
+    </div>
+  </app-aviso-cercania>
   }
 
   <a

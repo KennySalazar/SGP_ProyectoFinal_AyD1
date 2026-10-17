@@ -2,6 +2,7 @@ package gt.usac.cunoc.sgp.integration;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import gt.usac.cunoc.sgp.common.exception.ApiException;
 import gt.usac.cunoc.sgp.notificacion.service.NotificacionService;
@@ -167,6 +168,83 @@ class SolicitudAltaPuenteIntegrationTest {
                 Double.class,
                 response.id()))
         .isEqualTo(-90.615);
+  }
+
+  @Test
+  @WithMockUser(roles = "ADMINISTRADOR")
+  void solicitarCercaDeUnPuenteExigeConfirmarYNoGuardaNadaSinConfirmar() {
+    var existente = crearSolicitud("Existente", "14.481", "-90.615");
+    solicitudService.aprobar(
+        existente.id(), new AprobarSolicitudAltaPuenteRequest(false), ADMINISTRADOR_ID);
+    var cercana = solicitud("Cercana", departamentoId, municipioId, "14.4811", "-90.615", null);
+
+    var excepcion =
+        assertThrows(
+            CercaniaPuenteException.class,
+            () -> comoCatedratico(() -> solicitudService.crear(cercana, CATEDRATICO_ID)));
+
+    assertThat(excepcion.getCode()).isEqualTo("puente_cercano");
+    assertThat(excepcion.getCercanos().getTotalElements()).isEqualTo(1);
+    assertThat(excepcion.getCercanos().getContent().get(0).codigo()).isEqualTo("GT-01-0114-0001");
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT count(*) FROM solicitud_alta_puente WHERE nombre_propuesto = 'Cercana'",
+                Long.class))
+        .isZero();
+  }
+
+  @Test
+  @WithMockUser(roles = "ADMINISTRADOR")
+  void solicitarCercaDeUnPuenteConConfirmacionCreaLaSolicitudPendiente() {
+    var existente = crearSolicitud("Existente", "14.481", "-90.615");
+    solicitudService.aprobar(
+        existente.id(), new AprobarSolicitudAltaPuenteRequest(false), ADMINISTRADOR_ID);
+
+    var confirmada =
+        comoCatedratico(
+            () ->
+                solicitudService.crear(
+                    solicitud(
+                        "Cercana", departamentoId, municipioId, "14.4811", "-90.615", null, true),
+                    CATEDRATICO_ID));
+
+    assertThat(confirmada.estado()).isEqualTo(EstadoSolicitudAltaPuente.PENDIENTE);
+    assertThat(puenteRepository.count()).isEqualTo(1);
+  }
+
+  @Test
+  @WithMockUser(roles = "ADMINISTRADOR")
+  void unPuenteInactivoCercanoTambienExigeConfirmacion() {
+    var existente = crearSolicitud("Existente", "14.481", "-90.615");
+    var aprobada =
+        solicitudService.aprobar(
+            existente.id(), new AprobarSolicitudAltaPuenteRequest(false), ADMINISTRADOR_ID);
+    jdbc.update(
+        """
+        UPDATE puente
+        SET activo = false, inactivado_en = now(), inactivado_por_id = ?, motivo_inactivacion = 'prueba'
+        WHERE id = ?
+        """,
+        ADMINISTRADOR_ID,
+        aprobada.puenteCreadoId());
+    var cercana = solicitud("Cercana", departamentoId, municipioId, "14.4811", "-90.615", null);
+
+    var excepcion =
+        assertThrows(
+            CercaniaPuenteException.class,
+            () -> comoCatedratico(() -> solicitudService.crear(cercana, CATEDRATICO_ID)));
+
+    assertThat(excepcion.getCercanos().getContent().get(0).activo()).isFalse();
+  }
+
+  @Test
+  void sinPuentesCercanosNoPideConfirmacion() {
+    var response =
+        solicitudService.crear(
+            solicitud("Lejano", departamentoId, municipioId, "14.481", "-90.615", null),
+            CATEDRATICO_ID);
+
+    assertThat(response.estado()).isEqualTo(EstadoSolicitudAltaPuente.PENDIENTE);
   }
 
   @Test
@@ -604,7 +682,7 @@ class SolicitudAltaPuenteIntegrationTest {
     return comoCatedratico(
         () ->
             solicitudService.crear(
-                solicitud(nombre, departamentoId, municipioId, latitud, longitud, null),
+                solicitud(nombre, departamentoId, municipioId, latitud, longitud, null, true),
                 CATEDRATICO_ID));
   }
 
@@ -641,6 +719,17 @@ class SolicitudAltaPuenteIntegrationTest {
       String latitud,
       String longitud,
       String justificacion) {
+    return solicitud(nombre, departamento, municipio, latitud, longitud, justificacion, false);
+  }
+
+  private CrearSolicitudAltaPuenteRequest solicitud(
+      String nombre,
+      UUID departamento,
+      UUID municipio,
+      String latitud,
+      String longitud,
+      String justificacion,
+      boolean confirmarCercania) {
     return new CrearSolicitudAltaPuenteRequest(
         nombre,
         departamento,
@@ -649,7 +738,8 @@ class SolicitudAltaPuenteIntegrationTest {
         null,
         new BigDecimal(latitud),
         new BigDecimal(longitud),
-        justificacion);
+        justificacion,
+        confirmarCercania);
   }
 
   private void insertarUsuario(UUID id, String email, String rol) {

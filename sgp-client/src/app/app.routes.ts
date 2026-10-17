@@ -21,7 +21,20 @@ export const routes: Routes = [
         loadComponent: () =>
           import('./offline/pages/diagnostics/diagnostics.page').then((m) => m.DiagnosticsPage),
       },
+      {
+        path: 'inspecciones',
+        canActivate: [roleGuard('CATEDRATICO', 'PROFESIONAL_EXTERNO')],
+        loadChildren: () =>
+          import('./features/inspecciones/inspecciones.routes').then((m) => m.inspeccionesRoutes),
+      },
 
+      {
+        path: 'formulario/vista-previa',
+        loadComponent: () =>
+          import('./features/formulario/pages/vista-previa-formulario/vista-previa-formulario.page').then(
+            (m) => m.VistaPreviaFormularioPage,
+          ),
+      },
       {
         path: 'admin',
         canActivate: [roleGuard('ADMINISTRADOR')],

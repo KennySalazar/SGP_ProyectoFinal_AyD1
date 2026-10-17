@@ -14,6 +14,10 @@ import { ButtonModule } from 'primeng/button';
 import { finalize } from 'rxjs';
 import { ApiErrorService } from '../../../../core/services/api-error.service';
 import { PuntoMapa } from '../../../../shared/utils/ubicacion-guatemala';
+import {
+  AvisoCercaniaComponent,
+  puntosDeCercanos,
+} from '../../components/aviso-cercania/aviso-cercania.component';
 import { PuenteFormComponent } from '../../components/puente-form/puente-form.component';
 import {
   CrearPuenteRequest,
@@ -32,7 +36,7 @@ const CODIGOS_UBICACION_RECHAZADA = [
 @Component({
   selector: 'app-registrar-puente-page',
   standalone: true,
-  imports: [TranslocoPipe, DecimalPipe, ButtonModule, PuenteFormComponent],
+  imports: [TranslocoPipe, DecimalPipe, ButtonModule, PuenteFormComponent, AvisoCercaniaComponent],
   templateUrl: './registrar-puente.page.html',
   styleUrl: './registrar-puente.page.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -53,12 +57,7 @@ export class RegistrarPuentePage {
   readonly puenteRegistrado = signal<PuenteResponse | null>(null);
 
   readonly puntosCercanos = computed<PuntoMapa[]>(() =>
-    (this.advertencia()?.puentesCercanos ?? []).map((puente) => ({
-      id: puente.id,
-      titulo: `${puente.codigo} — ${puente.nombre}`,
-      latitud: puente.latitud,
-      longitud: puente.longitud,
-    })),
+    puntosDeCercanos(this.advertencia()?.puentesCercanos ?? []),
   );
 
   registrar(valores: PuenteFormValores): void {

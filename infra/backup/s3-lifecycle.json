@@ -1,0 +1,22 @@
+{
+  "Rules": [
+    {
+      "ID": "respaldos-diarios-30-dias",
+      "Status": "Enabled",
+      "Filter": { "Prefix": "diarios/" },
+      "Expiration": { "Days": 30 }
+    },
+    {
+      "ID": "respaldos-mensuales-12-meses",
+      "Status": "Enabled",
+      "Filter": { "Prefix": "mensuales/" },
+      "Expiration": { "Days": 365 }
+    },
+    {
+      "ID": "cargas-incompletas",
+      "Status": "Enabled",
+      "Filter": {},
+      "AbortIncompleteMultipartUpload": { "DaysAfterInitiation": 1 }
+    }
+  ]
+}

@@ -33,16 +33,23 @@
           pButton
           type="button"
           [attr.aria-pressed]="vista() === 'lista'"
-          class="vista-activa"
-          (click)="vista.set('lista')"
+          [class.vista-activa]="vista() === 'lista'"
+          [disabled]="cargando()"
+          (click)="cambiarVista('lista')"
         >
           <i class="pi pi-list" aria-hidden="true"></i>
           {{ 'puentes.catalogo.list' | transloco }}
         </button>
-        <button pButton type="button" [attr.aria-pressed]="vista() === 'mapa'" disabled>
+        <button
+          pButton
+          type="button"
+          [attr.aria-pressed]="vista() === 'mapa'"
+          [class.vista-activa]="vista() === 'mapa'"
+          [disabled]="cargando()"
+          (click)="cambiarVista('mapa')"
+        >
           <i class="pi pi-map" aria-hidden="true"></i>
           {{ 'puentes.catalogo.map' | transloco }}
-          <span class="proximamente">{{ 'puentes.catalogo.comingSoon' | transloco }}</span>
         </button>
       </div>
 
@@ -329,8 +336,14 @@
         </div>
         } } } } @else {
         <h2>{{ 'puentes.catalogo.map' | transloco }}</h2>
-        <p>{{ 'puentes.catalogo.mapPending' | transloco }}</p>
+        @if (!cargando() && !errorConsulta()) { @if (puentesMapa().length === 0) {
+        <p role="status">
+          {{ (hayFiltrosAplicados() ? 'puentes.catalogo.noResults' :
+          'puentes.catalogo.emptyCatalog') | transloco }}
+        </p>
         }
+        <app-mapa-puentes [puentes]="puentesMapa()" [estados]="estados" />
+        } }
       </section>
     </section>
 

@@ -1,0 +1,12 @@
+[Unit]
+Description=Check the SGP staging IP certificate twice daily
+
+[Timer]
+OnCalendar=*-*-* 00,12:00:00
+RandomizedDelaySec=30m
+Persistent=true
+AccuracySec=1m
+Unit=sgp-certbot-renew.service
+
+[Install]
+WantedBy=timers.target

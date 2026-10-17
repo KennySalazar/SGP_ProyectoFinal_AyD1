@@ -1,4 +1,3 @@
-import { DecimalPipe } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import {
   ChangeDetectionStrategy,
@@ -18,6 +17,10 @@ import { ButtonModule } from 'primeng/button';
 import { TextareaModule } from 'primeng/textarea';
 import { finalize } from 'rxjs';
 import { PuntoMapa } from '../../../../shared/utils/ubicacion-guatemala';
+import {
+  AvisoCercaniaComponent,
+  puntosDeCercanos,
+} from '../../components/aviso-cercania/aviso-cercania.component';
 import { SolicitudFichaComponent } from '../../components/solicitud-ficha/solicitud-ficha.component';
 import {
   PuenteProblemDetails,
@@ -37,12 +40,12 @@ function textoObligatorio(control: AbstractControl): { required: true } | null {
   standalone: true,
   imports: [
     TranslocoPipe,
-    DecimalPipe,
     ReactiveFormsModule,
     RouterLink,
     ButtonModule,
     TextareaModule,
     SolicitudFichaComponent,
+    AvisoCercaniaComponent,
   ],
   templateUrl: './revisar-solicitud.page.html',
   styleUrl: './revisar-solicitud.page.scss',
@@ -75,12 +78,7 @@ export class RevisarSolicitudPage {
   );
 
   readonly puntosCercanos = computed<PuntoMapa[]>(() =>
-    (this.detalle()?.puentesCercanos ?? []).map((puente) => ({
-      id: puente.id,
-      titulo: `${puente.codigo} — ${puente.nombre}`,
-      latitud: puente.latitud,
-      longitud: puente.longitud,
-    })),
+    puntosDeCercanos(this.detalle()?.puentesCercanos ?? []),
   );
 
   constructor() {

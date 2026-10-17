@@ -7,6 +7,7 @@ import { TagModule } from 'primeng/tag';
 import { AuthStore } from '../../../../core/services/auth.store';
 import { AppShellComponent } from '../../../../layouts/app-shell/app-shell.component';
 import { SelectorUbicacionComponent } from '../../../../shared/components/selector-ubicacion/selector-ubicacion.component';
+import { IniciarInspeccionDialogComponent } from '../../../inspecciones/components/iniciar-inspeccion-dialog/iniciar-inspeccion-dialog.component';
 import { PuenteResponse } from '../../models/puente.models';
 import { PuenteApiService } from '../../services/puente-api.service';
 
@@ -21,6 +22,7 @@ import { PuenteApiService } from '../../services/puente-api.service';
     TagModule,
     AppShellComponent,
     SelectorUbicacionComponent,
+    IniciarInspeccionDialogComponent,
   ],
   templateUrl: './ficha-puente.page.html',
   styleUrl: './ficha-puente.page.scss',
@@ -34,6 +36,7 @@ export class FichaPuentePage implements OnInit {
   readonly cargando = signal(true);
   readonly error = signal(false);
   readonly puente = signal<PuenteResponse | null>(null);
+  readonly mostrarModalIniciar = signal(false);
 
   ngOnInit(): void {
     const id = this.route.snapshot.paramMap.get('id');
@@ -66,5 +69,27 @@ export class FichaPuentePage implements OnInit {
       default:
         return 'secondary';
     }
+  }
+
+  puedeIniciarInspeccion(): boolean {
+    const p = this.puente();
+    if (!p || !p.activo) {
+      return false;
+    }
+    const user = this.auth.user();
+    if (!user) {
+      return false;
+    }
+    if (user.role === 'CATEDRATICO') {
+      return true;
+    }
+    if (user.role === 'PROFESIONAL_EXTERNO' && user.colegiadoVerificado === true) {
+      return true;
+    }
+    return false;
+  }
+
+  abrirModalIniciarInspeccion(): void {
+    this.mostrarModalIniciar.set(true);
   }
 }

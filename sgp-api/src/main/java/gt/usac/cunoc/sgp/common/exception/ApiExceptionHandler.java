@@ -5,6 +5,7 @@ import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ProblemDetail;
@@ -13,6 +14,7 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 @RestControllerAdvice
 public class ApiExceptionHandler {
@@ -28,6 +30,9 @@ public class ApiExceptionHandler {
             exception.getMessage(),
             exception.getCode(),
             request);
+    if (exception.getErrores() != null && !exception.getErrores().isEmpty()) {
+      problem.setProperty("errores", exception.getErrores());
+    }
     return response(problem, exception.getStatus());
   }
 
@@ -56,6 +61,23 @@ public class ApiExceptionHandler {
     return response(problem, HttpStatus.BAD_REQUEST);
   }
 
+  /** Un parámetro de ruta o consulta con formato inválido (por ejemplo un UUID mal formado). */
+  @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+  ResponseEntity<ProblemDetail> handleTipoInvalido(
+      MethodArgumentTypeMismatchException exception, HttpServletRequest request) {
+    ProblemDetail problem =
+        ProblemDetails.create(
+            400,
+            "Solicitud invalida",
+            "La solicitud contiene datos invalidos",
+            "validation_error",
+            request);
+    problem.setProperty(
+        "errores",
+        List.of(java.util.Map.of("campo", exception.getName(), "mensaje", "Valor invalido")));
+    return response(problem, HttpStatus.BAD_REQUEST);
+  }
+
   @ExceptionHandler(DataIntegrityViolationException.class)
   ResponseEntity<ProblemDetail> handleConflict(
       DataIntegrityViolationException exception, HttpServletRequest request) {
@@ -65,6 +87,19 @@ public class ApiExceptionHandler {
             "Conflicto de datos",
             "La operacion entra en conflicto con los datos existentes",
             "data_conflict",
+            request);
+    return response(problem, HttpStatus.CONFLICT);
+  }
+
+  @ExceptionHandler(OptimisticLockingFailureException.class)
+  ResponseEntity<ProblemDetail> handleOptimisticLock(
+      OptimisticLockingFailureException exception, HttpServletRequest request) {
+    ProblemDetail problem =
+        ProblemDetails.create(
+            409,
+            "Conflicto de concurrencia",
+            "La inspección fue modificada concurrentemente por otra sesión o dispositivo",
+            "concurrencia_conflicto",
             request);
     return response(problem, HttpStatus.CONFLICT);
   }

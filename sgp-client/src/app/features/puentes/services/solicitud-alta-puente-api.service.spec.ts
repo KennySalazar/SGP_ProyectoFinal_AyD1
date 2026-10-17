@@ -28,6 +28,7 @@ describe('SolicitudAltaPuenteApiService: HU010', () => {
       latitud: 14.6,
       longitud: -90.5,
       justificacion: 'No está en el catálogo',
+      confirmarCercania: true,
     };
 
     service.crear(request).subscribe();

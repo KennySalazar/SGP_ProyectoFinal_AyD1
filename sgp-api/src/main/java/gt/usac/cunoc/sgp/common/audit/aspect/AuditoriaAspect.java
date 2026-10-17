@@ -65,10 +65,19 @@ public class AuditoriaAspect {
   private void registrar(
       Auditable auditable, UUID entidadId, String email, JsonNode anteriores, Object resultado) {
     try {
-      JsonNode posteriores =
-          email == null
-              ? snapshots.serializar(resultado)
-              : snapshots.cargarPorEmail(auditable.tipo(), email);
+      JsonNode posteriores;
+
+      if (email != null) {
+        posteriores = snapshots.cargarPorEmail(auditable.tipo(), email);
+      } else if (auditable.recargarPosteriores()) {
+        if (entidadId == null) {
+          throw new IllegalStateException(
+              "La auditoria requiere el identificador para recargar el estado posterior.");
+        }
+        posteriores = snapshots.cargar(auditable.tipo(), entidadId);
+      } else {
+        posteriores = snapshots.serializar(resultado);
+      }
       if (posteriores == null && entidadId != null) {
         posteriores = snapshots.cargar(auditable.tipo(), entidadId);
       }

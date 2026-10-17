@@ -8,6 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiErrorService } from '../../../../core/services/api-error.service';
 import { SelectorUbicacionComponent } from '../../../../shared/components/selector-ubicacion/selector-ubicacion.component';
 import { SelectorUbicacionStubComponent } from '../../../../shared/components/selector-ubicacion/selector-ubicacion.testing';
+import { AvisoCercaniaComponent } from '../../components/aviso-cercania/aviso-cercania.component';
 import { PuenteFormComponent } from '../../components/puente-form/puente-form.component';
 import { UbicacionTerritorialResponse } from '../../models/puente.models';
 import { RegistrarPuentePage } from './registrar-puente.page';
@@ -72,7 +73,26 @@ describe('RegistrarPuentePage: HU009', () => {
     resolverPunto();
   }
 
-  function mostrarAdvertencia(): void {
+  const cercanoActivo = {
+    id: 'puente-existente',
+    codigo: 'GT-01-0114-0001',
+    nombre: 'Puente existente',
+    activo: true,
+    distanciaMetros: 11.1,
+    latitud: 14.4811,
+    longitud: -90.615,
+  };
+
+  const cercanoInactivo = {
+    ...cercanoActivo,
+    id: 'puente-inactivo',
+    codigo: 'GT-01-0114-0002',
+    nombre: 'Puente dado de baja',
+    activo: false,
+    distanciaMetros: 7.7,
+  };
+
+  function mostrarAdvertencia(puentesCercanos: object[] = [cercanoActivo]): void {
     formulario().enviarFormulario();
 
     http.expectOne('/api/v1/puentes').flush(
@@ -83,18 +103,8 @@ describe('RegistrarPuentePage: HU009', () => {
         detail: 'Se requiere confirmar la cercanía.',
         code: 'puente_cercano',
         requiereConfirmacion: true,
-        puentesCercanos: [
-          {
-            id: 'puente-existente',
-            codigo: 'GT-01-0114-0001',
-            nombre: 'Puente existente',
-            activo: true,
-            distanciaMetros: 11.1,
-            latitud: 14.4811,
-            longitud: -90.615,
-          },
-        ],
-        totalPuentesCercanos: 1,
+        puentesCercanos,
+        totalPuentesCercanos: puentesCercanos.length,
       },
       { status: 409, statusText: 'Conflict' },
     );
@@ -155,6 +165,10 @@ describe('RegistrarPuentePage: HU009', () => {
       ],
     });
     TestBed.overrideComponent(RegistrarPuentePage, {
+      remove: { imports: [TranslocoPipe] },
+      add: { imports: [TraduccionTestPipe] },
+    });
+    TestBed.overrideComponent(AvisoCercaniaComponent, {
       remove: { imports: [TranslocoPipe] },
       add: { imports: [TraduccionTestPipe] },
     });
@@ -228,6 +242,7 @@ describe('RegistrarPuentePage: HU009', () => {
         titulo: 'GT-01-0114-0001 — Puente existente',
         latitud: 14.4811,
         longitud: -90.615,
+        inactivo: false,
       },
     ]);
 
@@ -353,6 +368,49 @@ describe('RegistrarPuentePage: HU009', () => {
       kilometraje: null,
       latitud: null,
       longitud: null,
+    });
+  });
+
+  describe('aviso de cercanía con puentes inactivos', () => {
+    const textoAviso = () =>
+      (fixture.nativeElement.querySelector('.proximity') as HTMLElement).textContent as string;
+
+    it('con solo puentes activos usa el aviso habitual', () => {
+      formularioValido();
+      mostrarAdvertencia([cercanoActivo]);
+
+      expect(textoAviso()).toContain('puentes.proximityNote');
+      expect(textoAviso()).not.toContain('puentes.proximityOnlyInactiveNote');
+      expect(textoAviso()).not.toContain('puentes.proximityInactiveNote');
+      expect(page.puntosCercanos().map((p) => p.inactivo)).toEqual([false]);
+    });
+
+    it('con solo puentes inactivos explica que conviene reactivarlos', () => {
+      formularioValido();
+      mostrarAdvertencia([cercanoInactivo]);
+
+      expect(textoAviso()).toContain('puentes.proximityOnlyInactiveNote');
+      expect(textoAviso()).not.toContain('puentes.proximityNote');
+      expect(textoAviso()).toContain('puentes.inactive');
+      expect(page.puntosCercanos().map((p) => p.inactivo)).toEqual([true]);
+    });
+
+    it('con activos e inactivos mantiene el aviso y agrega la nota sobre los inactivos', () => {
+      formularioValido();
+      mostrarAdvertencia([cercanoActivo, cercanoInactivo]);
+
+      expect(textoAviso()).toContain('puentes.proximityNote');
+      expect(textoAviso()).toContain('puentes.proximityInactiveNote');
+      expect(page.puntosCercanos().map((p) => p.inactivo)).toEqual([false, true]);
+    });
+
+    it('sigue permitiendo confirmar el registro cuando solo hay inactivos', () => {
+      formularioValido();
+      mostrarAdvertencia([cercanoInactivo]);
+
+      page.confirmarRegistro();
+
+      expect(http.expectOne('/api/v1/puentes').request.body.confirmarCercania).toBe(true);
     });
   });
 });

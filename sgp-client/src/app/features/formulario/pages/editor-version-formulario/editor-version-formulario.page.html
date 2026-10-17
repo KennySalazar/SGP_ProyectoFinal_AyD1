@@ -1,0 +1,1366 @@
+@if (version(); as ver) {
+<header class="page-heading">
+  <div class="heading-nav">
+    <a pButton size="small" severity="secondary" [outlined]="true" routerLink="/admin/formularios">
+      <i class="pi pi-arrow-left" aria-hidden="true"></i>
+      <span>{{ 'formulario.backToList' | transloco }}</span>
+    </a>
+  </div>
+
+  <div class="heading-row">
+    <div>
+      <p class="page-kicker">{{ 'admin.kicker' | transloco }}</p>
+      <h1 class="page-title">{{ ver.codigo }}</h1>
+      <p class="page-description">
+        @if (ver.estado === 'PUBLICADA') {
+        <span>Versión publicada y activa del formulario SIECA.</span>
+        } @else {
+        <span>Borrador en edición del formulario SIECA.</span>
+        } @if (ver.versionAnteriorCodigo) {
+        <span> · Basado en: <strong>{{ ver.versionAnteriorCodigo }}</strong></span>
+        } @if (ver.versionAlgoritmoIc) {
+        <span> · Algoritmo IC: {{ ver.versionAlgoritmoIc }}</span>
+        }
+      </p>
+    </div>
+
+    <div class="heading-badges">
+      <p-tag
+        [value]="ver.estado"
+        [severity]="ver.estado === 'PUBLICADA' ? 'success' : 'warn'"
+      ></p-tag>
+      @if (ver.activa) {
+      <p-tag value="Activa" severity="success" icon="pi pi-check"></p-tag>
+      }
+      <button pButton severity="secondary" [outlined]="true" (click)="abrirDialogoNuevaDerivada()">
+        <i class="pi pi-copy" aria-hidden="true"></i>
+        <span>{{ 'formulario.deriveNew' | transloco }}</span>
+      </button>
+    </div>
+  </div>
+</header>
+
+@if (ver.estado === 'PUBLICADA') {
+<div class="aviso-inmutable" role="alert">
+  <i class="pi pi-lock" aria-hidden="true"></i>
+  <span>{{ 'formulario.immutableAlert' | transloco }}</span>
+</div>
+} @if (ver.activa) {
+<div class="aviso-activa" role="status">
+  <i class="pi pi-check-circle" aria-hidden="true"></i>
+  <span>{{ 'formulario.activeNotice' | transloco }}</span>
+</div>
+} @if (mensajeExito(); as exito) {
+<div class="aviso-exito" role="status">
+  <i class="pi pi-check-circle" aria-hidden="true"></i>
+  <span>{{ exito }}</span>
+</div>
+} @if (errorValidacion(); as err) {
+<div class="aviso-error" role="alert">
+  <i class="pi pi-exclamation-triangle" aria-hidden="true"></i>
+  <span>{{ err }}</span>
+</div>
+}
+
+<!-- Pestañas de sección -->
+<nav class="secciones-nav" role="tablist">
+  <button
+    pButton
+    [severity]="seccionActiva() === 'esquema' ? 'primary' : 'secondary'"
+    [outlined]="seccionActiva() !== 'esquema'"
+    (click)="cambiarSeccion('esquema')"
+  >
+    <i class="pi pi-code" aria-hidden="true"></i>
+    <span>{{ 'formulario.schemaTab' | transloco }}</span>
+  </button>
+  <button
+    pButton
+    [severity]="seccionActiva() === 'vinculos' ? 'primary' : 'secondary'"
+    [outlined]="seccionActiva() !== 'vinculos'"
+    (click)="cambiarSeccion('vinculos')"
+  >
+    <i class="pi pi-link" aria-hidden="true"></i>
+    <span>{{ 'formulario.linksTab' | transloco }}</span>
+  </button>
+  <button
+    pButton
+    [severity]="seccionActiva() === 'pesos' ? 'primary' : 'secondary'"
+    [outlined]="seccionActiva() !== 'pesos'"
+    (click)="cambiarSeccion('pesos')"
+  >
+    <i class="pi pi-sliders-h" aria-hidden="true"></i>
+    <span>{{ ('formulario.weightsTab' | transloco) + ' (' + pesosEditables().length + ')' }}</span>
+  </button>
+  @if (ver.versionAnteriorId) {
+  <button
+    pButton
+    [severity]="seccionActiva() === 'mapeos' ? 'primary' : 'secondary'"
+    [outlined]="seccionActiva() !== 'mapeos'"
+    (click)="cambiarSeccion('mapeos')"
+  >
+    <i class="pi pi-arrows-h" aria-hidden="true"></i>
+    <span>{{ 'formulario.mappingTab' | transloco }}</span>
+  </button>
+  } @if (ver.estado === 'BORRADOR') {
+  <button
+    pButton
+    [severity]="seccionActiva() === 'publicar' ? 'primary' : 'secondary'"
+    [outlined]="seccionActiva() !== 'publicar'"
+    (click)="cambiarSeccion('publicar')"
+  >
+    <i class="pi pi-cloud-upload" aria-hidden="true"></i>
+    <span>{{ 'formulario.publishTab' | transloco }}</span>
+  </button>
+  }
+</nav>
+
+<!-- Sección 1: Esquema (Editor Visual y Código) -->
+@if (seccionActiva() === 'esquema') {
+<section class="surface-card editor-card">
+  <div class="card-header">
+    <div>
+      <h2 class="card-title">{{ 'formulario.schemaTab' | transloco }}</h2>
+      <p class="card-subtitle">
+        {{ totalSecciones() }} {{ 'formulario.totalSections' | transloco }} · {{ totalPreguntas() }}
+        {{ 'formulario.totalQuestions' | transloco }}
+      </p>
+    </div>
+
+    <div class="editor-header-actions">
+      <!-- Selector de Modo: Visual vs Código -->
+      <div class="modo-selector" role="group">
+        <button
+          pButton
+          type="button"
+          size="small"
+          [severity]="modoEdicion() === 'visual' ? 'primary' : 'secondary'"
+          [outlined]="modoEdicion() !== 'visual'"
+          (click)="cambiarModoEdicion('visual')"
+        >
+          <i class="pi pi-pencil" aria-hidden="true"></i>
+          <span>{{ 'formulario.modeVisual' | transloco }}</span>
+        </button>
+        <button
+          pButton
+          type="button"
+          size="small"
+          [severity]="modoEdicion() === 'codigo' ? 'primary' : 'secondary'"
+          [outlined]="modoEdicion() !== 'codigo'"
+          (click)="cambiarModoEdicion('codigo')"
+        >
+          <i class="pi pi-code" aria-hidden="true"></i>
+          <span>{{ 'formulario.modeCode' | transloco }}</span>
+        </button>
+      </div>
+
+      @if (ver.estado === 'BORRADOR') { @if (modoEdicion() === 'visual') {
+      <button
+        pButton
+        type="button"
+        severity="secondary"
+        [outlined]="true"
+        (click)="abrirCrearSeccion()"
+      >
+        <i class="pi pi-plus" aria-hidden="true"></i>
+        <span>{{ 'formulario.addSection' | transloco }}</span>
+      </button>
+      }
+      <button pButton type="button" [disabled]="guardandoEsquema()" (click)="guardarEsquema()">
+        <i class="pi pi-save" aria-hidden="true"></i>
+        <span
+          >{{ (guardandoEsquema() ? 'formulario.savingSchema' : 'formulario.saveSchema') | transloco
+          }}</span
+        >
+      </button>
+      }
+    </div>
+  </div>
+
+  @if (modoEdicion() === 'visual') {
+  <div class="visual-sections-container">
+    @if (seccionesVisuales().length === 0) {
+    <div class="empty-visual">
+      <i class="pi pi-inbox" aria-hidden="true"></i>
+      <p>{{ 'formulario.emptySections' | transloco }}</p>
+      @if (ver.estado === 'BORRADOR') {
+      <button pButton type="button" (click)="abrirCrearSeccion()">
+        <i class="pi pi-plus" aria-hidden="true"></i>
+        <span>{{ 'formulario.addSection' | transloco }}</span>
+      </button>
+      }
+    </div>
+    } @else {
+    <!-- Pestañas horizontales de secciones -->
+    <div class="secciones-tab-bar" role="tablist" aria-label="Secciones del formulario">
+      @for (sec of seccionesVisuales(); track sec.clave) {
+      <button
+        type="button"
+        class="seccion-tab-btn"
+        [class.active]="seccionVisualActiva() === sec.clave"
+        [attr.aria-selected]="seccionVisualActiva() === sec.clave"
+        (click)="seleccionarSeccionVisual(sec.clave)"
+      >
+        <span class="tab-badge-num">{{ $index + 1 }}</span>
+        <span class="tab-nombre">{{ limpiarTituloSeccion(sec.titulo) || sec.titulo }}</span>
+        <span class="tab-preguntas-count">({{ sec.preguntas.length }})</span>
+        @if (sec.esRepetible) {
+        <span class="tab-repetible-pill">R</span>
+        }
+      </button>
+      } @if (ver.estado === 'BORRADOR') {
+      <button
+        type="button"
+        class="btn-nueva-seccion-tab"
+        (click)="abrirCrearSeccion()"
+        [attr.aria-label]="'formulario.addSection' | transloco"
+      >
+        <i class="pi pi-plus" aria-hidden="true"></i>
+        <span>{{ 'formulario.addSection' | transloco }}</span>
+      </button>
+      }
+    </div>
+
+    @if (seccionVisualActual(); as sec) {
+    <article class="seccion-bloque seccion-activa-bloque">
+      <header class="seccion-bloque-header">
+        <div class="seccion-info">
+          <div class="seccion-titulo-fila">
+            <h3 class="seccion-titulo">{{ sec.titulo }}</h3>
+            <span class="clave-tag"><code>{{ sec.clave }}</code></span>
+            <p-tag
+              [value]="sec.preguntas.length + ' ' + ('formulario.totalQuestions' | transloco)"
+              severity="info"
+            ></p-tag>
+            @if (sec.esRepetible) {
+            <p-tag value="Repetible" severity="warn"></p-tag>
+            }
+          </div>
+          @if (sec.descripcion) {
+          <p class="seccion-desc">{{ sec.descripcion }}</p>
+          }
+        </div>
+
+        @if (ver.estado === 'BORRADOR') {
+        <div class="seccion-acciones">
+          <button
+            pButton
+            type="button"
+            size="small"
+            severity="secondary"
+            [outlined]="true"
+            (click)="abrirCrearPregunta(sec.clave)"
+          >
+            <i class="pi pi-plus" aria-hidden="true"></i>
+            <span>{{ 'formulario.addQuestion' | transloco }}</span>
+          </button>
+          <button
+            pButton
+            type="button"
+            size="small"
+            severity="secondary"
+            [outlined]="true"
+            [attr.aria-label]="'formulario.editSection' | transloco"
+            (click)="abrirEditarSeccion(sec)"
+          >
+            <i class="pi pi-pencil" aria-hidden="true"></i>
+          </button>
+          <button
+            pButton
+            type="button"
+            size="small"
+            severity="danger"
+            [outlined]="true"
+            [attr.aria-label]="'formulario.deleteSection' | transloco"
+            (click)="eliminarSeccion(sec.clave)"
+          >
+            <i class="pi pi-trash" aria-hidden="true"></i>
+          </button>
+        </div>
+        }
+      </header>
+
+      <div class="preguntas-tabla-wrapper">
+        @if (sec.preguntas.length === 0) {
+        <p class="seccion-sin-preguntas">{{ 'formulario.emptyQuestions' | transloco }}</p>
+        } @else {
+        <table class="tabla-preguntas">
+          <thead>
+            <tr>
+              <th scope="col">Pregunta / Campo</th>
+              <th scope="col">Tipo de dato</th>
+              <th scope="col">Reglas / Restricciones</th>
+              <th scope="col">{{ 'formulario.storageTargetHeader' | transloco }}</th>
+              @if (ver.estado === 'BORRADOR') {
+              <th scope="col" class="acciones-col">Acciones</th>
+              }
+            </tr>
+          </thead>
+          <tbody>
+            @for (p of sec.preguntas; track p.clave) {
+            <tr>
+              <td class="pregunta-col">
+                <strong class="pregunta-titulo">{{ p.titulo }}</strong>
+                <div class="pregunta-meta">
+                  <code>{{ p.clave }}</code>
+                  @if (p.descripcion) {
+                  <span class="pregunta-desc-text">— {{ p.descripcion }}</span>
+                  }
+                </div>
+              </td>
+              <td>
+                <span class="tipo-badge">
+                  <i [class]="obtenerIconoTipo(p.tipo)" aria-hidden="true"></i>
+                  <span>{{ obtenerEtiquetaTipo(p.tipo) }}</span>
+                </span>
+              </td>
+              <td>
+                <div class="reglas-tags">
+                  @if (p.obligatorio) {
+                  <span class="regla-tag obligatoria">Obligatorio</span>
+                  } @else {
+                  <span class="regla-tag opcional">Opcional</span>
+                  } @if (p.soloLectura) {
+                  <span class="regla-tag lectura">Solo lectura</span>
+                  } @if ((p.longitudMinima !== undefined && p.longitudMinima !== null) ||
+                  (p.longitudMaxima !== undefined && p.longitudMaxima !== null)) {
+                  <span class="regla-tag"
+                    >Long: {{ p.longitudMinima ?? 0 }}-{{ p.longitudMaxima ?? '∞' }}</span
+                  >
+                  } @if ((p.valorMinimo !== undefined && p.valorMinimo !== null) || (p.valorMaximo
+                  !== undefined && p.valorMaximo !== null)) {
+                  <span class="regla-tag"
+                    >Val: [{{ p.valorMinimo ?? '-∞' }}, {{ p.valorMaximo ?? '∞' }}]</span
+                  >
+                  } @if (p.opciones && p.opciones.length > 0) {
+                  <span class="regla-tag opciones" [title]="p.opciones.join(', ')">
+                    {{ p.opciones.length }} opciones
+                  </span>
+                  }
+                </div>
+              </td>
+              <td>
+                @if (p.vinculo) { @let info = describirVinculo(p.vinculo);
+                <div class="vinculo-cell" [title]="p.vinculo">
+                  <span class="vinculo-pill" [class]="'cat-' + info.categoria">
+                    <i [class]="info.icono" aria-hidden="true"></i>
+                    <span>{{ info.etiquetaCategoria }}</span>
+                  </span>
+                  <span class="vinculo-campo-texto">{{ info.etiquetaCampo }}</span>
+                </div>
+                } @else {
+                <span
+                  class="texto-apagado"
+                  title="Se almacena en el documento de respuestas de la inspección"
+                  >Formulario (JSON)</span
+                >
+                }
+              </td>
+              @if (ver.estado === 'BORRADOR') {
+              <td class="acciones-col">
+                <div class="acciones-grupo">
+                  <button
+                    pButton
+                    type="button"
+                    size="small"
+                    severity="secondary"
+                    [outlined]="true"
+                    [attr.aria-label]="'formulario.editQuestion' | transloco"
+                    (click)="abrirEditarPregunta(sec.clave, p)"
+                  >
+                    <i class="pi pi-pencil" aria-hidden="true"></i>
+                  </button>
+                  <button
+                    pButton
+                    type="button"
+                    size="small"
+                    severity="danger"
+                    [outlined]="true"
+                    [attr.aria-label]="'formulario.deleteQuestion' | transloco"
+                    (click)="eliminarPregunta(sec.clave, p.clave)"
+                  >
+                    <i class="pi pi-trash" aria-hidden="true"></i>
+                  </button>
+                </div>
+              </td>
+              }
+            </tr>
+            }
+          </tbody>
+        </table>
+        }
+      </div>
+    </article>
+    } }
+  </div>
+  } @else {
+  <textarea
+    class="codigo-editor"
+    rows="22"
+    [readonly]="ver.estado === 'PUBLICADA'"
+    [(ngModel)]="esquemaTexto"
+  ></textarea>
+  }
+</section>
+}
+
+<!-- Sección 2: Vínculos de almacenamiento -->
+@if (seccionActiva() === 'vinculos') {
+<section class="surface-card editor-card">
+  <div class="card-header">
+    <div>
+      <h2 class="card-title">{{ 'formulario.linksTab' | transloco }}</h2>
+      <p class="card-subtitle">
+        {{ 'formulario.storageBindingsSubtitle' | transloco }} · {{ vinculosVisuales().length }} {{
+        'formulario.totalBindings' | transloco }}
+      </p>
+    </div>
+
+    <div class="editor-header-actions">
+      <!-- Selector de Modo: Visual vs Código -->
+      <div class="modo-selector" role="group">
+        <button
+          pButton
+          type="button"
+          size="small"
+          [severity]="modoVinculos() === 'visual' ? 'primary' : 'secondary'"
+          [outlined]="modoVinculos() !== 'visual'"
+          (click)="cambiarModoVinculos('visual')"
+        >
+          <i class="pi pi-table" aria-hidden="true"></i>
+          <span>{{ 'formulario.modeVisual' | transloco }}</span>
+        </button>
+        <button
+          pButton
+          type="button"
+          size="small"
+          [severity]="modoVinculos() === 'codigo' ? 'primary' : 'secondary'"
+          [outlined]="modoVinculos() !== 'codigo'"
+          (click)="cambiarModoVinculos('codigo')"
+        >
+          <i class="pi pi-code" aria-hidden="true"></i>
+          <span>{{ 'formulario.modeCode' | transloco }}</span>
+        </button>
+      </div>
+
+      @if (ver.estado === 'BORRADOR') { @if (modoVinculos() === 'visual') {
+      <button
+        pButton
+        type="button"
+        severity="secondary"
+        [outlined]="true"
+        (click)="abrirCrearVinculo()"
+      >
+        <i class="pi pi-plus" aria-hidden="true"></i>
+        <span>{{ 'formulario.addStorageBinding' | transloco }}</span>
+      </button>
+      }
+      <button pButton type="button" [disabled]="guardandoVinculos()" (click)="guardarVinculos()">
+        <i class="pi pi-save" aria-hidden="true"></i>
+        <span
+          >{{ (guardandoVinculos() ? 'formulario.savingBindings' : 'formulario.saveBindings') |
+          transloco }}</span
+        >
+      </button>
+      }
+    </div>
+  </div>
+
+  @if (modoVinculos() === 'visual') {
+  <div class="vinculos-filtros-bar">
+    <div class="vinculo-search-wrap">
+      <i class="pi pi-search" aria-hidden="true"></i>
+      <input
+        pInputText
+        type="text"
+        [value]="filtroVinculos()"
+        (input)="filtroVinculos.set($any($event.target).value)"
+        [placeholder]="'formulario.filterBindings' | transloco"
+        class="vinculo-search-input"
+      />
+      @if (filtroVinculos()) {
+      <button
+        type="button"
+        class="btn-limpiar-busqueda"
+        (click)="filtroVinculos.set('')"
+        aria-label="Limpiar filtro"
+      >
+        ×
+      </button>
+      }
+    </div>
+    <span class="vinculos-counter">
+      {{ vinculosFiltrados().length }} de {{ vinculosVisuales().length }} vínculos
+    </span>
+  </div>
+
+  @if (vinculosVisuales().length === 0) {
+  <div class="empty-visual">
+    <i class="pi pi-database" aria-hidden="true"></i>
+    <p>{{ 'formulario.emptyBindings' | transloco }}</p>
+    @if (ver.estado === 'BORRADOR') {
+    <button pButton type="button" (click)="abrirCrearVinculo()">
+      <i class="pi pi-plus" aria-hidden="true"></i>
+      <span>{{ 'formulario.addStorageBinding' | transloco }}</span>
+    </button>
+    }
+  </div>
+  } @else {
+  <div class="preguntas-tabla-wrapper">
+    <table class="tabla-preguntas tabla-vinculos">
+      <thead>
+        <tr>
+          <th scope="col">{{ 'formulario.storageField' | transloco }}</th>
+          <th scope="col">{{ 'formulario.databaseTarget' | transloco }}</th>
+          <th scope="col">{{ 'formulario.bindingScope' | transloco }}</th>
+          <th scope="col">{{ 'formulario.bindingNote' | transloco }}</th>
+          @if (ver.estado === 'BORRADOR') {
+          <th scope="col" class="acciones-col">Acciones</th>
+          }
+        </tr>
+      </thead>
+      <tbody>
+        @for (v of vinculosFiltrados(); track v.id) { @let info =
+        describirVinculo(v.columnaDestino);
+        <tr>
+          <td class="pregunta-col" [title]="v.campoRef">
+            <strong class="vinculo-campo-titulo">{{ obtenerNombrePregunta(v.campoRef) }}</strong>
+            @if (obtenerNombreSeccion(v.campoRef); as secNom) {
+            <span class="vinculo-seccion-sub">Sección: {{ secNom }}</span>
+            }
+          </td>
+          <td [title]="v.columnaDestino">
+            <span class="vinculo-humano-titulo">{{ info.etiquetaCampo }}</span>
+          </td>
+          <td>
+            <p-tag
+              [value]="info.etiquetaCategoria"
+              [severity]="info.categoria === 'puente' ? 'warn' : info.categoria === 'inspeccion' ? 'success' : 'info'"
+            ></p-tag>
+          </td>
+          <td>
+            <span class="vinculo-nota-text">{{ v.descripcion || '—' }}</span>
+          </td>
+          @if (ver.estado === 'BORRADOR') {
+          <td class="acciones-col">
+            <div class="acciones-grupo">
+              <button
+                pButton
+                type="button"
+                size="small"
+                severity="secondary"
+                [outlined]="true"
+                [attr.aria-label]="'formulario.editStorageBinding' | transloco"
+                (click)="abrirEditarVinculo(v)"
+              >
+                <i class="pi pi-pencil" aria-hidden="true"></i>
+              </button>
+              <button
+                pButton
+                type="button"
+                size="small"
+                severity="danger"
+                [outlined]="true"
+                [attr.aria-label]="'formulario.deleteStorageBinding' | transloco"
+                (click)="eliminarVinculo(v.id)"
+              >
+                <i class="pi pi-trash" aria-hidden="true"></i>
+              </button>
+            </div>
+          </td>
+          }
+        </tr>
+        } @if (vinculosFiltrados().length === 0) {
+        <tr>
+          <td colspan="5" class="empty-filtro-msg">
+            No se encontraron vínculos que coincidan con "{{ filtroVinculos() }}".
+          </td>
+        </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+  } } @else {
+  <textarea
+    class="codigo-editor"
+    rows="20"
+    [readonly]="ver.estado === 'PUBLICADA'"
+    [(ngModel)]="vinculosTexto"
+  ></textarea>
+  }
+</section>
+}
+
+<!-- Sección 3: Pesos de evaluación -->
+@if (seccionActiva() === 'pesos') {
+<section class="surface-card editor-card">
+  <div class="card-header">
+    <h2 class="card-title">{{ 'formulario.weightsTab' | transloco }}</h2>
+    @if (ver.estado === 'BORRADOR') {
+    <button pButton type="button" [disabled]="guardandoPesos()" (click)="guardarPesos()">
+      <i class="pi pi-save" aria-hidden="true"></i>
+      <span
+        >{{ (guardandoPesos() ? 'formulario.savingWeights' : 'formulario.saveWeights') | transloco
+        }}</span
+      >
+    </button>
+    }
+  </div>
+
+  <p-table [value]="pesosEditables()" responsiveLayout="scroll" styleClass="p-datatable-sm">
+    <ng-template #header>
+      <tr>
+        <th scope="col">{{ 'formulario.elementRef' | transloco }}</th>
+        <th scope="col">{{ 'formulario.descriptionCol' | transloco }}</th>
+        <th scope="col">{{ 'formulario.weight' | transloco }}</th>
+      </tr>
+    </ng-template>
+
+    <ng-template #body let-elem>
+      <tr>
+        <td><code>{{ elem.elementoRef }}</code></td>
+        <td>{{ elem.descripcion || '—' }}</td>
+        <td style="width: 140px">
+          @if (ver.estado === 'BORRADOR') {
+          <input
+            pInputText
+            type="number"
+            step="0.1"
+            min="0.1"
+            [value]="elem.peso"
+            (input)="actualizarPeso(elem.elementoRef, +$any($event.target).value)"
+            style="width: 100px"
+          />
+          } @else {
+          <strong>{{ elem.peso }}</strong>
+          }
+        </td>
+      </tr>
+    </ng-template>
+  </p-table>
+</section>
+}
+
+<!-- Sección 4: Mapeos de campos (RN-FRM-06) -->
+@if (seccionActiva() === 'mapeos' && ver.versionAnteriorId) {
+<section class="surface-card editor-card">
+  <div class="card-header">
+    <h2 class="card-title">{{ 'formulario.mappingTab' | transloco }}</h2>
+    @if (ver.estado === 'BORRADOR') {
+    <div class="header-acciones">
+      <button
+        pButton
+        type="button"
+        severity="secondary"
+        [outlined]="true"
+        (click)="abrirDialogoNuevoMapeo()"
+      >
+        <i class="pi pi-plus" aria-hidden="true"></i>
+        <span>{{ 'formulario.addMapping' | transloco }}</span>
+      </button>
+      <button
+        pButton
+        type="button"
+        [disabled]="guardandoMapeos()"
+        (click)="guardarDeclaracionesMapeo()"
+      >
+        <i class="pi pi-save" aria-hidden="true"></i>
+        <span
+          >{{ (guardandoMapeos() ? 'formulario.savingMappings' : 'formulario.saveMappings') |
+          transloco }}</span
+        >
+      </button>
+    </div>
+    }
+  </div>
+
+  @if (analisisMapeo(); as analisis) { @if (analisis.mapeoCompleto) {
+  <div class="aviso-exito" role="status">
+    <i class="pi pi-check-circle" aria-hidden="true"></i>
+    <span>{{ 'formulario.mappingComplete' | transloco }}</span>
+  </div>
+  } @else {
+  <div class="aviso-error" role="alert">
+    <i class="pi pi-exclamation-triangle" aria-hidden="true"></i>
+    <div>
+      <strong>{{ 'formulario.mappingIncomplete' | transloco }}</strong>
+      <ul class="lista-pendientes">
+        @for (pend of analisis.camposOrigenSinMapeo; track pend) {
+        <li><code>{{ pend }}</code></li>
+        }
+      </ul>
+    </div>
+  </div>
+  } }
+
+  <p-table [value]="mapeosEditables()" responsiveLayout="scroll" styleClass="p-datatable-sm">
+    <ng-template #header>
+      <tr>
+        <th scope="col">{{ 'formulario.sourceField' | transloco }}</th>
+        <th scope="col">{{ 'formulario.targetField' | transloco }}</th>
+        <th scope="col">{{ 'formulario.mappingType' | transloco }}</th>
+        <th scope="col">{{ 'formulario.observation' | transloco }}</th>
+        @if (ver.estado === 'BORRADOR') {
+        <th scope="col">{{ 'formulario.actions' | transloco }}</th>
+        }
+      </tr>
+    </ng-template>
+
+    <ng-template #body let-map let-i="rowIndex">
+      <tr>
+        <td><code>{{ map.elementoRefOrigen || '—' }}</code></td>
+        <td><code>{{ map.elementoRefDestino || '—' }}</code></td>
+        <td>
+          <p-tag [value]="map.tipo" severity="info"></p-tag>
+        </td>
+        <td>{{ map.observacion || '—' }}</td>
+        @if (ver.estado === 'BORRADOR') {
+        <td>
+          <button
+            pButton
+            size="small"
+            severity="danger"
+            [outlined]="true"
+            (click)="eliminarMapeo(i)"
+          >
+            <i class="pi pi-trash" aria-hidden="true"></i>
+          </button>
+        </td>
+        }
+      </tr>
+    </ng-template>
+
+    <ng-template #emptymessage>
+      <tr>
+        <td [attr.colspan]="ver.estado === 'BORRADOR' ? 5 : 4" class="tabla-vacia">
+          <p>No se han registrado declaraciones de mapeo aún.</p>
+        </td>
+      </tr>
+    </ng-template>
+  </p-table>
+</section>
+}
+
+<!-- Sección 5: Publicación y activación -->
+@if (seccionActiva() === 'publicar' && ver.estado === 'BORRADOR') {
+<section class="surface-card editor-card">
+  <div class="card-header">
+    <div>
+      <h2 class="card-title">{{ 'formulario.publishTitle' | transloco }}</h2>
+      <p class="card-subtitle">{{ 'formulario.publishDescription' | transloco }}</p>
+    </div>
+  </div>
+
+  <div class="checklist-panel">
+    <h3>{{ 'formulario.publishChecklist' | transloco }}</h3>
+    <ul class="checklist">
+      <li>
+        <i class="pi pi-check-circle check-ok" aria-hidden="true"></i>
+        <span>{{ 'formulario.checkValidSchema' | transloco }}</span>
+      </li>
+      <li>
+        @if (pesosEditables().length > 0) {
+        <i class="pi pi-check-circle check-ok" aria-hidden="true"></i>
+        <span>{{ 'formulario.checkWeights' | transloco: { total: pesosEditables().length } }}</span>
+        } @else {
+        <i class="pi pi-times-circle check-bad" aria-hidden="true"></i>
+        <span>No se han configurado pesos para la versión.</span>
+        }
+      </li>
+      @if (ver.versionAnteriorId) {
+      <li>
+        @if (analisisMapeo()?.mapeoCompleto) {
+        <i class="pi pi-check-circle check-ok" aria-hidden="true"></i>
+        <span>{{ 'formulario.checkMapping' | transloco }}</span>
+        } @else {
+        <i class="pi pi-times-circle check-bad" aria-hidden="true"></i>
+        <span>Hay campos pendientes de mapear con la versión anterior.</span>
+        }
+      </li>
+      }
+    </ul>
+  </div>
+
+  <div class="publicar-accion">
+    <button
+      pButton
+      severity="success"
+      [disabled]="publicando() || pesosEditables().length === 0 || (ver.versionAnteriorId && !analisisMapeo()?.mapeoCompleto)"
+      (click)="abrirConfirmarPublicar()"
+    >
+      <i class="pi pi-cloud-upload" aria-hidden="true"></i>
+      <span
+        >{{ (publicando() ? 'formulario.publishing' : 'formulario.publishButton') | transloco
+        }}</span
+      >
+    </button>
+  </div>
+</section>
+} } @else { @if (cargando()) {
+<div class="cargando-container">
+  <p>{{ 'formulario.loading' | transloco }}</p>
+</div>
+} }
+
+<!-- Diálogo de confirmación de publicación -->
+<p-dialog
+  [header]="'formulario.confirmPublishTitle' | transloco"
+  [visible]="dialogoConfirmarPublicar()"
+  [modal]="true"
+  [style]="{ width: '480px' }"
+  (onHide)="cerrarConfirmarPublicar()"
+>
+  <p>{{ 'formulario.confirmPublishText' | transloco: { codigo: version()?.codigo } }}</p>
+
+  <div class="dialog-actions">
+    <button
+      pButton
+      severity="secondary"
+      [outlined]="true"
+      [disabled]="publicando()"
+      (click)="cerrarConfirmarPublicar()"
+    >
+      <span>{{ 'formulario.cancel' | transloco }}</span>
+    </button>
+    <button pButton severity="success" [disabled]="publicando()" (click)="ejecutarPublicacion()">
+      <span
+        >{{ (publicando() ? 'formulario.publishing' : 'formulario.publishButton') | transloco
+        }}</span
+      >
+    </button>
+  </div>
+</p-dialog>
+
+<!-- Diálogo de nuevo mapeo -->
+<p-dialog
+  [header]="'formulario.addMapping' | transloco"
+  [visible]="dialogoNuevoMapeo()"
+  [modal]="true"
+  [style]="{ width: '480px' }"
+  (onHide)="cerrarDialogoNuevoMapeo()"
+>
+  <form [formGroup]="nuevoMapeoForm" (ngSubmit)="agregarDeclaracionMapeo()" class="dialog-form">
+    <div class="form-field">
+      <label for="tipo-mapeo" class="field-label"
+        >{{ 'formulario.mappingType' | transloco }} *</label
+      >
+      <select id="tipo-mapeo" class="sgp-select" formControlName="tipo">
+        @for (t of tiposMapeo; track t.value) {
+        <option [value]="t.value">{{ t.label }}</option>
+        }
+      </select>
+    </div>
+
+    <div class="form-field">
+      <label for="campo-origen" class="field-label"
+        >{{ 'formulario.sourceField' | transloco }}</label
+      >
+      <input
+        pInputText
+        id="campo-origen"
+        type="text"
+        formControlName="elementoRefOrigen"
+        placeholder="/seccion/campo"
+      />
+    </div>
+
+    <div class="form-field">
+      <label for="campo-destino" class="field-label"
+        >{{ 'formulario.targetField' | transloco }}</label
+      >
+      <input
+        pInputText
+        id="campo-destino"
+        type="text"
+        formControlName="elementoRefDestino"
+        placeholder="/seccion/campo"
+      />
+    </div>
+
+    <div class="form-field">
+      <label for="observacion-mapeo" class="field-label"
+        >{{ 'formulario.observation' | transloco }}</label
+      >
+      <input
+        pInputText
+        id="observacion-mapeo"
+        type="text"
+        formControlName="observacion"
+        placeholder="Motivo del cambio"
+      />
+    </div>
+
+    <div class="dialog-actions">
+      <button
+        pButton
+        type="button"
+        severity="secondary"
+        [outlined]="true"
+        (click)="cerrarDialogoNuevoMapeo()"
+      >
+        <span>{{ 'formulario.cancel' | transloco }}</span>
+      </button>
+      <button pButton type="submit" [disabled]="nuevoMapeoForm.invalid">
+        <span>Agregar mapeo</span>
+      </button>
+    </div>
+  </form>
+</p-dialog>
+
+<!-- Diálogo de nueva versión derivada -->
+<p-dialog
+  [header]="'formulario.deriveNew' | transloco"
+  [visible]="dialogoNuevaDerivada()"
+  [modal]="true"
+  [style]="{ width: '480px' }"
+  (onHide)="cerrarDialogoNuevaDerivada()"
+>
+  <form [formGroup]="nuevaDerivadaForm" (ngSubmit)="crearNuevaDerivada()" class="dialog-form">
+    <div class="form-field">
+      <label for="codigo-derivada" class="field-label">{{ 'formulario.code' | transloco }} *</label>
+      <input
+        pInputText
+        id="codigo-derivada"
+        type="text"
+        formControlName="codigo"
+        placeholder="Ej. SIECA-v2"
+        maxlength="50"
+      />
+    </div>
+
+    <div class="dialog-actions">
+      <button
+        pButton
+        type="button"
+        severity="secondary"
+        [outlined]="true"
+        (click)="cerrarDialogoNuevaDerivada()"
+      >
+        <span>{{ 'formulario.cancel' | transloco }}</span>
+      </button>
+      <button pButton type="submit" [disabled]="nuevaDerivadaForm.invalid || cargando()">
+        <span>Crear nueva versión</span>
+      </button>
+    </div>
+  </form>
+</p-dialog>
+
+<!-- Diálogo para crear/editar Sección -->
+<p-dialog
+  [header]="(modoSeccion() === 'crear' ? 'formulario.addSection' : 'formulario.editSection') | transloco"
+  [visible]="dialogoSeccion()"
+  [modal]="true"
+  [style]="{ width: '480px', maxWidth: '95vw' }"
+  (onHide)="dialogoSeccion.set(false)"
+>
+  <form [formGroup]="seccionForm" (ngSubmit)="guardarSeccionModal()" class="dialog-form" novalidate>
+    <div class="form-field">
+      <label for="sec-clave" class="field-label">{{ 'formulario.sectionKey' | transloco }} *</label>
+      <input
+        pInputText
+        id="sec-clave"
+        type="text"
+        formControlName="clave"
+        placeholder="ej. subestructura_pilotes"
+        [readonly]="modoSeccion() === 'editar'"
+      />
+      @if (seccionForm.controls.clave.invalid && seccionForm.controls.clave.touched) {
+      <small class="validation-msg">Solo letras minúsculas, números y guión bajo.</small>
+      }
+    </div>
+
+    <div class="form-field">
+      <label for="sec-titulo" class="field-label"
+        >{{ 'formulario.sectionTitle' | transloco }} *</label
+      >
+      <input
+        pInputText
+        id="sec-titulo"
+        type="text"
+        formControlName="titulo"
+        placeholder="ej. 9. Cimentación y pilotes"
+      />
+    </div>
+
+    <div class="form-field">
+      <label for="sec-desc" class="field-label"
+        >{{ 'formulario.sectionDescription' | transloco }}</label
+      >
+      <textarea
+        pTextarea
+        id="sec-desc"
+        formControlName="descripcion"
+        rows="2"
+        placeholder="Descripción o instrucciones"
+      ></textarea>
+    </div>
+
+    <div class="field-checkbox">
+      <input id="sec-rep" type="checkbox" formControlName="esRepetible" />
+      <label for="sec-rep">{{ 'formulario.repeatableSection' | transloco }}</label>
+    </div>
+
+    <div class="dialog-actions">
+      <button
+        pButton
+        type="button"
+        severity="secondary"
+        [outlined]="true"
+        (click)="dialogoSeccion.set(false)"
+      >
+        <span>{{ 'formulario.cancel' | transloco }}</span>
+      </button>
+      <button pButton type="submit" [disabled]="seccionForm.invalid">
+        <span>{{ modoSeccion() === 'crear' ? 'Crear sección' : 'Guardar cambios' }}</span>
+      </button>
+    </div>
+  </form>
+</p-dialog>
+
+<!-- Diálogo para crear/editar Pregunta -->
+<p-dialog
+  [header]="(modoPregunta() === 'crear' ? 'formulario.addQuestion' : 'formulario.editQuestion') | transloco"
+  [visible]="dialogoPregunta()"
+  [modal]="true"
+  [style]="{ width: '620px', maxWidth: '95vw' }"
+  (onHide)="dialogoPregunta.set(false)"
+>
+  <form
+    [formGroup]="preguntaForm"
+    (ngSubmit)="guardarPreguntaModal()"
+    class="dialog-form"
+    novalidate
+  >
+    <div class="form-field">
+      <label for="preg-sec" class="field-label"
+        >{{ 'formulario.sectionTitle' | transloco }} *</label
+      >
+      <select id="preg-sec" class="sgp-select" formControlName="seccionClave">
+        @for (sec of seccionesVisuales(); track sec.clave) {
+        <option [value]="sec.clave">{{ sec.titulo }} ({{ sec.clave }})</option>
+        }
+      </select>
+    </div>
+
+    <div class="form-row-2">
+      <div class="form-field">
+        <label for="preg-clave" class="field-label"
+          >{{ 'formulario.questionKey' | transloco }} *</label
+        >
+        <input
+          pInputText
+          id="preg-clave"
+          type="text"
+          formControlName="clave"
+          placeholder="ej. ancho_acera_m"
+          [readonly]="modoPregunta() === 'editar'"
+        />
+        @if (preguntaForm.controls.clave.invalid && preguntaForm.controls.clave.touched) {
+        <small class="validation-msg">Solo letras minúsculas, números y guión bajo.</small>
+        }
+      </div>
+
+      <div class="form-field">
+        <label for="preg-tipo" class="field-label">{{ 'formulario.dataType' | transloco }} *</label>
+        <select id="preg-tipo" class="sgp-select" formControlName="tipo">
+          @for (t of tiposDato; track t.value) {
+          <option [value]="t.value">{{ t.label }}</option>
+          }
+        </select>
+      </div>
+    </div>
+
+    <div class="form-field">
+      <label for="preg-titulo" class="field-label"
+        >{{ 'formulario.questionTitle' | transloco }} *</label
+      >
+      <input
+        pInputText
+        id="preg-titulo"
+        type="text"
+        formControlName="titulo"
+        placeholder="ej. Ancho de acera derecha (m)"
+      />
+    </div>
+
+    <div class="form-field">
+      <label for="preg-desc" class="field-label"
+        >{{ 'formulario.questionDescription' | transloco }}</label
+      >
+      <input
+        pInputText
+        id="preg-desc"
+        type="text"
+        formControlName="descripcion"
+        placeholder="Instrucciones o ayuda para el inspector"
+      />
+    </div>
+
+    @if (preguntaForm.controls.tipo.value === 'select') {
+    <div class="form-field opciones-block">
+      <label for="preg-opcion-nueva" class="field-label"
+        >{{ 'formulario.options' | transloco }} *</label
+      >
+      <div class="opcion-input-row">
+        <input
+          pInputText
+          id="preg-opcion-nueva"
+          type="text"
+          formControlName="opcionNueva"
+          placeholder="Escriba una opción y presione Agregar"
+          (keydown.enter)="$event.preventDefault(); agregarOpcion()"
+        />
+        <button
+          pButton
+          type="button"
+          severity="secondary"
+          [outlined]="true"
+          (click)="agregarOpcion()"
+        >
+          <i class="pi pi-plus" aria-hidden="true"></i>
+          <span>{{ 'formulario.addOption' | transloco }}</span>
+        </button>
+      </div>
+      <div class="opciones-chips">
+        @for (op of opcionesSeleccion(); track op; let idx = $index) {
+        <span class="opcion-chip">
+          {{ op }}
+          <button type="button" class="btn-quitar-chip" (click)="eliminarOpcion(idx)">×</button>
+        </span>
+        } @if (opcionesSeleccion().length === 0) {
+        <small class="validation-msg">Debe agregar al menos una opción para selección.</small>
+        }
+      </div>
+    </div>
+    } @if (preguntaForm.controls.tipo.value === 'integer' || preguntaForm.controls.tipo.value ===
+    'number') {
+    <div class="form-row-2">
+      <div class="form-field">
+        <label for="preg-val-min" class="field-label"
+          >{{ 'formulario.minValue' | transloco }}</label
+        >
+        <input
+          id="preg-val-min"
+          type="number"
+          pInputText
+          formControlName="valorMinimo"
+          placeholder="Sin mínimo"
+        />
+      </div>
+      <div class="form-field">
+        <label for="preg-val-max" class="field-label"
+          >{{ 'formulario.maxValue' | transloco }}</label
+        >
+        <input
+          id="preg-val-max"
+          type="number"
+          pInputText
+          formControlName="valorMaximo"
+          placeholder="Sin máximo"
+        />
+      </div>
+    </div>
+    } @if (preguntaForm.controls.tipo.value === 'string' || preguntaForm.controls.tipo.value ===
+    'multiline') {
+    <div class="form-row-2">
+      <div class="form-field">
+        <label for="preg-len-min" class="field-label"
+          >{{ 'formulario.minLength' | transloco }}</label
+        >
+        <input
+          id="preg-len-min"
+          type="number"
+          pInputText
+          formControlName="longitudMinima"
+          placeholder="Sin mínimo"
+        />
+      </div>
+      <div class="form-field">
+        <label for="preg-len-max" class="field-label"
+          >{{ 'formulario.maxLength' | transloco }}</label
+        >
+        <input
+          id="preg-len-max"
+          type="number"
+          pInputText
+          formControlName="longitudMaxima"
+          placeholder="Sin máximo"
+        />
+      </div>
+    </div>
+    }
+
+    <div class="form-field">
+      <label for="preg-vinc" class="field-label"
+        >{{ 'formulario.storageBinding' | transloco }}</label
+      >
+      <select id="preg-vinc" class="sgp-select" formControlName="vinculo">
+        <option value="">(Ninguno - dato propio del formulario)</option>
+        @for (g of opcionesDestino; track g.grupo) {
+        <optgroup [label]="g.grupo">
+          @for (item of g.items; track item.valor) {
+          <option [value]="item.valor">{{ item.etiqueta }}</option>
+          }
+        </optgroup>
+        }
+      </select>
+      <small class="field-help-text">{{ 'formulario.storageBindingHint' | transloco }}</small>
+    </div>
+
+    <div class="form-row-checkboxes">
+      <div class="field-checkbox">
+        <input id="preg-req" type="checkbox" formControlName="obligatorio" />
+        <label for="preg-req">{{ 'formulario.required' | transloco }}</label>
+      </div>
+
+      <div class="field-checkbox">
+        <input id="preg-ro" type="checkbox" formControlName="soloLectura" />
+        <label for="preg-ro">{{ 'formulario.readOnly' | transloco }}</label>
+      </div>
+    </div>
+
+    <div class="dialog-actions">
+      <button
+        pButton
+        type="button"
+        severity="secondary"
+        [outlined]="true"
+        (click)="dialogoPregunta.set(false)"
+      >
+        <span>{{ 'formulario.cancel' | transloco }}</span>
+      </button>
+      <button
+        pButton
+        type="submit"
+        [disabled]="preguntaForm.invalid || (preguntaForm.controls.tipo.value === 'select' && opcionesSeleccion().length === 0)"
+      >
+        <span>{{ modoPregunta() === 'crear' ? 'Agregar pregunta' : 'Guardar cambios' }}</span>
+      </button>
+    </div>
+  </form>
+</p-dialog>
+
+<!-- Diálogo para crear/editar Vínculo de Almacenamiento -->
+<p-dialog
+  [header]="(modoVinculo() === 'crear' ? 'formulario.addStorageBinding' : 'formulario.editStorageBinding') | transloco"
+  [visible]="dialogoVinculo()"
+  [modal]="true"
+  [style]="{ width: '640px', maxWidth: '95vw' }"
+  (onHide)="dialogoVinculo.set(false)"
+>
+  <form [formGroup]="vinculoForm" (ngSubmit)="guardarVinculoModal()" class="dialog-form" novalidate>
+    <div class="form-field">
+      <label for="vinc-campo" class="field-label">
+        {{ 'formulario.storageField' | transloco }} *
+      </label>
+      @if (camposFormularioDisponibles().length > 0) {
+      <select id="vinc-campo" class="sgp-select" formControlName="campoRef">
+        @for (c of camposFormularioDisponibles(); track c.value) {
+        <option [value]="c.value">{{ c.label }}</option>
+        }
+      </select>
+      } @else {
+      <input
+        pInputText
+        id="vinc-campo"
+        type="text"
+        formControlName="campoRef"
+        placeholder="/identificacion/codigo"
+      />
+      }
+      <small class="field-help-text">Ruta del campo en el formulario SIECA</small>
+    </div>
+
+    <div class="form-field">
+      <label for="vinc-destino" class="field-label">
+        {{ 'formulario.databaseTarget' | transloco }} *
+      </label>
+      <select
+        id="vinc-destino"
+        class="sgp-select"
+        formControlName="columnaDestino"
+        (change)="onDestinoChange($event)"
+      >
+        <option value="" disabled>Seleccione el destino en el sistema...</option>
+        @for (g of opcionesDestino; track g.grupo) {
+        <optgroup [label]="g.grupo">
+          @for (item of g.items; track item.valor) {
+          <option [value]="item.valor">{{ item.etiqueta }}</option>
+          }
+        </optgroup>
+        }
+        <optgroup label="Otro / Avanzado">
+          <option value="__custom__">Otro (especificar columna técnica personalizada)</option>
+        </optgroup>
+      </select>
+      <small class="field-help-text"
+        >Elemento o propiedad del sistema donde se registrará la respuesta</small
+      >
+
+      @if (destinoPersonalizado()) {
+      <div class="form-field" style="margin-top: 0.5rem">
+        <label for="vinc-custom" class="field-label"
+          >Nombre de columna o identificador técnico *</label
+        >
+        <input
+          pInputText
+          id="vinc-custom"
+          type="text"
+          [formControl]="columnaPersonalizadaControl"
+          placeholder="ej. inspeccion_dato_tecnico.mi_columna"
+        />
+      </div>
+      } @if (vinculoForm.controls.columnaDestino.value; as destVal) { @if (destVal !== '__custom__')
+      {
+      <div class="vinculo-preview-helper">
+        <i class="pi pi-info-circle" aria-hidden="true"></i>
+        <span>Destino: <strong>{{ formatearDestinoHumano(destVal) }}</strong></span>
+      </div>
+      } }
+    </div>
+
+    <div class="form-row-2">
+      <div class="form-field">
+        <label for="vinc-tipo" class="field-label">
+          {{ 'formulario.bindingScope' | transloco }}
+        </label>
+        <select id="vinc-tipo" class="sgp-select" formControlName="tipo">
+          @for (tv of tiposVinculo; track tv.value) {
+          <option [value]="tv.value">{{ tv.label }}</option>
+          }
+        </select>
+      </div>
+
+      <div class="form-field">
+        <label for="vinc-desc" class="field-label">
+          {{ 'formulario.bindingNote' | transloco }}
+        </label>
+        <input
+          pInputText
+          id="vinc-desc"
+          type="text"
+          formControlName="descripcion"
+          placeholder="Opcional: nota técnica"
+        />
+      </div>
+    </div>
+
+    <div class="dialog-actions">
+      <button
+        pButton
+        type="button"
+        severity="secondary"
+        [outlined]="true"
+        (click)="dialogoVinculo.set(false)"
+      >
+        <span>{{ 'formulario.cancel' | transloco }}</span>
+      </button>
+      <button
+        pButton
+        type="submit"
+        [disabled]="vinculoForm.invalid || (destinoPersonalizado() && !columnaPersonalizadaControl.value.trim())"
+      >
+        <span>{{ modoVinculo() === 'crear' ? 'Agregar vínculo' : 'Guardar cambios' }}</span>
+      </button>
+    </div>
+  </form>
+</p-dialog>

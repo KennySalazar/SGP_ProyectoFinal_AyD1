@@ -16,6 +16,16 @@
     "caracteristicas_cauce",
     "otros"
   ],
+  "x-sgp-orden": [
+    "identificacion",
+    "datos_generales",
+    "tramos",
+    "subestructura",
+    "superestructura",
+    "elementos_no_estructurales",
+    "caracteristicas_cauce",
+    "otros"
+  ],
   "properties": {
     "identificacion": {
       "title": "1. Identificación del puente",
@@ -35,6 +45,22 @@
         "nombre_inspector",
         "fecha_inspeccion"
       ],
+      "x-sgp-orden": [
+        "nombre_puente",
+        "codigo",
+        "ruta",
+        "kilometraje",
+        "departamento",
+        "municipio",
+        "ruta_pavimentada",
+        "alineamiento_horizontal",
+        "esviaje",
+        "coordenadas_utm",
+        "poblacion_antes",
+        "poblacion_despues",
+        "nombre_inspector",
+        "fecha_inspeccion"
+      ],
       "properties": {
         "nombre_puente": { "title": "Nombre puente", "type": "string", "minLength": 1, "maxLength": 200, "readOnly": true },
         "codigo": { "title": "Código", "type": "string", "minLength": 1, "maxLength": 40, "readOnly": true },
@@ -50,6 +76,7 @@
           "type": "object",
           "additionalProperties": false,
           "required": ["norte", "este"],
+          "x-sgp-orden": ["zona", "norte", "este"],
           "properties": {
             "zona": { "title": "Zona UTM", "description": "Agregado por SGP: el manual no pide la zona, pero sin ella la coordenada es ambigua. Guatemala abarca las zonas 15 y 16.", "type": "integer", "enum": [15, 16] },
             "norte": { "title": "Norte (m)", "type": "number", "minimum": 0, "maximum": 10000000 },
@@ -79,6 +106,26 @@
         "numero_vias_por_sentido",
         "material_superestructura",
         "material_subestructura"
+      ],
+      "x-sgp-orden": [
+        "longitud_m",
+        "numero_tramos",
+        "ancho_rodadura_m",
+        "ancho_acera_derecha_m",
+        "ancho_acera_izquierda_m",
+        "tipologia_puente",
+        "altura_libre_superior_m",
+        "altura_libre_sobre_cauce_m",
+        "tipo_cruce",
+        "tipo_cruce_otro",
+        "numero_vias_por_sentido",
+        "material_superestructura",
+        "material_subestructura",
+        "carga_diseno",
+        "anio_construccion",
+        "trafico_vehiculos_dia",
+        "porcentaje_camiones_buses",
+        "fecha_ultima_evaluacion"
       ],
       "properties": {
         "longitud_m": { "title": "Longitud (m)", "type": "number", "exclusiveMinimum": 0, "maximum": 5000 },
@@ -111,9 +158,16 @@
       "minItems": 1,
       "maxItems": 100,
       "items": {
+        "title": "Tramo",
         "type": "object",
         "additionalProperties": false,
         "required": ["instancia_id", "orden", "longitud_m", "tipo_seccion"],
+        "x-sgp-orden": [
+          "instancia_id",
+          "orden",
+          "longitud_m",
+          "tipo_seccion"
+        ],
         "properties": {
           "instancia_id": { "$ref": "#/$defs/instanciaId" },
           "orden": { "title": "Número de tramo", "type": "integer", "minimum": 1 },
@@ -128,6 +182,7 @@
       "type": "object",
       "additionalProperties": false,
       "required": ["estribo_entrada", "estribo_salida", "pilas"],
+      "x-sgp-orden": ["estribo_entrada", "estribo_salida", "pilas"],
       "properties": {
         "estribo_entrada": { "title": "Estribo de entrada", "$ref": "#/$defs/estribo" },
         "estribo_salida": { "title": "Estribo de salida", "$ref": "#/$defs/estribo" },
@@ -154,6 +209,16 @@
         "estructura_tipo_cercha",
         "drenaje"
       ],
+      "x-sgp-orden": [
+        "losa_rodamiento",
+        "elemento_portante_concreto",
+        "elemento_portante_acero",
+        "diafragmas_concreto",
+        "diafragmas_acero",
+        "estructura_tipo_cercha",
+        "drenaje",
+        "observaciones"
+      ],
       "properties": {
         "losa_rodamiento": { "title": "Losa de rodamiento", "$ref": "#/$defs/losaRodamiento" },
         "elemento_portante_concreto": { "title": "Elemento portante de concreto", "$ref": "#/$defs/elementoSuperConcreto" },
@@ -167,12 +232,14 @@
           "type": "object",
           "additionalProperties": false,
           "required": ["existencia"],
+          "x-sgp-orden": ["existencia", "estado"],
           "properties": {
             "existencia": { "$ref": "#/$defs/existencia" },
-            "estado": { "title": "Estado", "type": "string", "enum": ["LIMPIOS", "OBSTRUIDOS"] }
+            "estado": { "title": "Estado", "type": "string", "enum": ["LIMPIOS", "OBSTRUIDOS"], "x-sgp-sin-danos": "LIMPIOS" }
           },
           "if": { "$ref": "#/$defs/siPresente" },
-          "then": { "required": ["estado"] }
+          "then": { "required": ["estado"] },
+          "else": { "maxProperties": 1 }
         },
         "observaciones": { "title": "Observaciones (hoja 3)", "type": "string", "maxLength": 4000 }
       }
@@ -193,6 +260,18 @@
         "losa_acceso_salida",
         "obras_proteccion"
       ],
+      "x-sgp-orden": [
+        "pasamanos_barandal",
+        "postes_barandal",
+        "barreras",
+        "junta_entrada",
+        "junta_salida",
+        "juntas_intermedias",
+        "losa_acceso_entrada",
+        "losa_acceso_salida",
+        "obras_proteccion",
+        "observaciones"
+      ],
       "properties": {
         "pasamanos_barandal": {
           "title": "Pasamanos barandal (especificar lado)",
@@ -200,18 +279,29 @@
           "type": "object",
           "additionalProperties": false,
           "required": ["existencia"],
+          "x-sgp-orden": [
+            "existencia",
+            "lado",
+            "material",
+            "ausencia_seccion",
+            "deformacion_elemento",
+            "golpeado_longitud_m",
+            "pintura",
+            "otros"
+          ],
           "properties": {
             "existencia": { "$ref": "#/$defs/existencia" },
             "lado": { "$ref": "#/$defs/lado" },
             "material": { "$ref": "#/$defs/material" },
             "ausencia_seccion": { "title": "Ausencia de sección", "$ref": "#/$defs/severidad" },
             "deformacion_elemento": { "title": "Deformación de elemento", "$ref": "#/$defs/severidad" },
-            "golpeado_longitud_m": { "title": "Golpeado (longitud, m)", "description": "0 si no hay tramos golpeados.", "type": "number", "minimum": 0, "maximum": 5000 },
+            "golpeado_longitud_m": { "title": "Golpeado (longitud, m)", "description": "0 si no hay tramos golpeados.", "type": "number", "minimum": 0, "maximum": 5000, "x-sgp-sin-danos": 0 },
             "pintura": { "title": "Pintura", "$ref": "#/$defs/severidad" },
             "otros": { "$ref": "#/$defs/otroDano" }
           },
           "if": { "$ref": "#/$defs/siPresente" },
-          "then": { "required": ["lado", "material", "ausencia_seccion", "deformacion_elemento", "golpeado_longitud_m", "pintura"] }
+          "then": { "required": ["lado", "material", "ausencia_seccion", "deformacion_elemento", "golpeado_longitud_m", "pintura"] },
+          "else": { "maxProperties": 1 }
         },
         "postes_barandal": {
           "title": "Postes barandal (especificar lado)",
@@ -219,18 +309,29 @@
           "type": "object",
           "additionalProperties": false,
           "required": ["existencia"],
+          "x-sgp-orden": [
+            "existencia",
+            "lado",
+            "material",
+            "ausencia_seccion",
+            "deformacion_elemento",
+            "golpeados_cantidad",
+            "pintura",
+            "otros"
+          ],
           "properties": {
             "existencia": { "$ref": "#/$defs/existencia" },
             "lado": { "$ref": "#/$defs/lado" },
             "material": { "$ref": "#/$defs/material" },
             "ausencia_seccion": { "title": "Ausencia de sección", "$ref": "#/$defs/severidad" },
             "deformacion_elemento": { "title": "Deformación de elemento", "$ref": "#/$defs/severidad" },
-            "golpeados_cantidad": { "title": "Golpeados (cuántos)", "type": "integer", "minimum": 0, "maximum": 10000 },
+            "golpeados_cantidad": { "title": "Golpeados (cuántos)", "type": "integer", "minimum": 0, "maximum": 10000, "x-sgp-sin-danos": 0 },
             "pintura": { "title": "Pintura", "$ref": "#/$defs/severidad" },
             "otros": { "$ref": "#/$defs/otroDano" }
           },
           "if": { "$ref": "#/$defs/siPresente" },
-          "then": { "required": ["lado", "material", "ausencia_seccion", "deformacion_elemento", "golpeados_cantidad", "pintura"] }
+          "then": { "required": ["lado", "material", "ausencia_seccion", "deformacion_elemento", "golpeados_cantidad", "pintura"] },
+          "else": { "maxProperties": 1 }
         },
         "barreras": {
           "title": "Barreras",
@@ -238,17 +339,27 @@
           "type": "object",
           "additionalProperties": false,
           "required": ["existencia"],
+          "x-sgp-orden": [
+            "existencia",
+            "material",
+            "grietas_una_direccion",
+            "grietas_dos_direcciones",
+            "golpeado_longitud_m",
+            "pintura",
+            "otros"
+          ],
           "properties": {
             "existencia": { "$ref": "#/$defs/existencia" },
             "material": { "$ref": "#/$defs/material" },
             "grietas_una_direccion": { "title": "Grietas en una dirección", "$ref": "#/$defs/severidad" },
             "grietas_dos_direcciones": { "title": "Grietas en dos direcciones", "$ref": "#/$defs/severidad" },
-            "golpeado_longitud_m": { "title": "Golpeado (longitud, m)", "type": "number", "minimum": 0, "maximum": 5000 },
+            "golpeado_longitud_m": { "title": "Golpeado (longitud, m)", "type": "number", "minimum": 0, "maximum": 5000, "x-sgp-sin-danos": 0 },
             "pintura": { "title": "Pintura", "$ref": "#/$defs/severidad" },
             "otros": { "$ref": "#/$defs/otroDano" }
           },
           "if": { "$ref": "#/$defs/siPresente" },
-          "then": { "required": ["material", "grietas_una_direccion", "grietas_dos_direcciones", "golpeado_longitud_m", "pintura"] }
+          "then": { "required": ["material", "grietas_una_direccion", "grietas_dos_direcciones", "golpeado_longitud_m", "pintura"] },
+          "else": { "maxProperties": 1 }
         },
         "junta_entrada": { "title": "Junta (entrada)", "$ref": "#/$defs/junta" },
         "junta_salida": { "title": "Junta (salida)", "$ref": "#/$defs/junta" },
@@ -261,6 +372,7 @@
           "type": "object",
           "additionalProperties": false,
           "required": ["aguas_arriba", "aguas_abajo"],
+          "x-sgp-orden": ["aguas_arriba", "aguas_abajo", "observaciones"],
           "properties": {
             "aguas_arriba": { "title": "Obras protección (aguas arriba)", "$ref": "#/$defs/obraProteccion" },
             "aguas_abajo": { "title": "Obras protección (aguas abajo)", "$ref": "#/$defs/obraProteccion" },
@@ -276,6 +388,16 @@
       "type": "object",
       "additionalProperties": false,
       "required": ["aplica"],
+      "x-sgp-orden": [
+        "aplica",
+        "tipo_cuerpo_agua",
+        "tipo_cuerpo_agua_otro",
+        "nombre_rio",
+        "estado_cauce",
+        "estado_zona_adyacente_estribos",
+        "encauzamiento",
+        "desbordamiento"
+      ],
       "properties": {
         "aplica": { "title": "El puente cruza un cuerpo de agua", "description": "Agregado por SGP: permite omitir la sección en pasos sobre carretera o línea férrea.", "type": "boolean" },
         "tipo_cuerpo_agua": { "title": "Tipo de cuerpo de agua existente adyacente al puente", "type": "string", "enum": ["RIO", "QUEBRADA", "OTRO"] },
@@ -287,6 +409,7 @@
           "type": "object",
           "additionalProperties": false,
           "required": ["condiciones"],
+          "x-sgp-orden": ["condiciones", "otro_descripcion"],
           "properties": {
             "condiciones": { "$ref": "#/$defs/condicionesCauce" },
             "otro_descripcion": { "title": "Otros (especificar)", "type": "string", "minLength": 1, "maxLength": 500 }
@@ -313,6 +436,7 @@
           "type": "object",
           "additionalProperties": false,
           "required": ["ha_presentado"],
+          "x-sgp-orden": ["ha_presentado", "frecuencia_anios", "fecha_ultimo"],
           "properties": {
             "ha_presentado": { "title": "Ha presentado desbordamiento", "type": "boolean" },
             "frecuencia_anios": { "title": "Frecuencia (años)", "type": "number", "exclusiveMinimum": 0, "maximum": 500 },
@@ -342,12 +466,24 @@
       "type": "object",
       "additionalProperties": false,
       "required": ["senalizacion", "alumbrado_artificial_existe", "drenajes_aledanos", "recomendaciones"],
+      "x-sgp-orden": [
+        "senalizacion",
+        "alumbrado_artificial_existe",
+        "drenajes_aledanos",
+        "recomendaciones"
+      ],
       "properties": {
         "senalizacion": {
           "title": "Señalización",
           "type": "object",
           "additionalProperties": false,
           "required": ["informativa", "preventiva", "reglamentaria", "horizontal"],
+          "x-sgp-orden": [
+            "informativa",
+            "preventiva",
+            "reglamentaria",
+            "horizontal"
+          ],
           "properties": {
             "informativa": { "title": "Informativa", "$ref": "#/$defs/senal" },
             "preventiva": { "title": "Preventiva", "$ref": "#/$defs/senal" },
@@ -362,9 +498,10 @@
           "type": "object",
           "additionalProperties": false,
           "required": ["existe"],
+          "x-sgp-orden": ["existe", "estado"],
           "properties": {
             "existe": { "title": "Existe", "type": "boolean" },
-            "estado": { "title": "Estado", "type": "string", "enum": ["BUENO", "MALO"] }
+            "estado": { "title": "Estado", "type": "string", "enum": ["BUENO", "MALO"], "x-sgp-sin-danos": "BUENO" }
           },
           "if": { "properties": { "existe": { "const": true } } },
           "then": { "required": ["estado"] },
@@ -375,6 +512,7 @@
           "x-sgp-fuente": "Hoja 5",
           "type": "object",
           "additionalProperties": false,
+          "x-sgp-orden": ["mantenimiento", "reparacion"],
           "properties": {
             "mantenimiento": { "title": "Mantenimiento", "type": "string", "maxLength": 4000 },
             "reparacion": { "title": "Reparación", "type": "string", "maxLength": 4000 }
@@ -406,13 +544,15 @@
       "title": "Severidad del daño",
       "description": "Escala PROPUESTA por el equipo (el manual solo deja la celda en blanco). Pendiente de validación en el acta de calibración HU-017.",
       "type": "string",
-      "enum": ["NO_PRESENTA", "LEVE", "MODERADO", "SEVERO"]
+      "enum": ["NO_PRESENTA", "LEVE", "MODERADO", "SEVERO"],
+      "x-sgp-sin-danos": "NO_PRESENTA"
     },
     "otroDano": {
       "title": "Otros (especificar)",
       "type": "object",
       "additionalProperties": false,
       "required": ["descripcion", "severidad"],
+      "x-sgp-orden": ["descripcion", "severidad"],
       "properties": {
         "descripcion": { "title": "Descripción", "type": "string", "minLength": 1, "maxLength": 500 },
         "severidad": { "$ref": "#/$defs/severidad" }
@@ -446,6 +586,7 @@
       "type": "object",
       "additionalProperties": false,
       "required": ["aguas_arriba", "aguas_abajo"],
+      "x-sgp-orden": ["aguas_arriba", "aguas_abajo"],
       "properties": {
         "aguas_arriba": { "title": "Aguas arriba", "$ref": "#/$defs/nivelSocavacion" },
         "aguas_abajo": { "title": "Aguas abajo", "$ref": "#/$defs/nivelSocavacion" }
@@ -453,7 +594,8 @@
     },
     "nivelSocavacion": {
       "type": "string",
-      "enum": ["NO_HAY", "SIN_EXPOSICION", "CON_EXPOSICION", "ASENTAMIENTO_ESTRUCTURA"]
+      "enum": ["NO_HAY", "SIN_EXPOSICION", "CON_EXPOSICION", "ASENTAMIENTO_ESTRUCTURA"],
+      "x-sgp-sin-danos": "NO_HAY"
     },
     "elementoConcreto": {
       "title": "Elemento de sub-estructura",
@@ -462,6 +604,17 @@
       "type": "object",
       "additionalProperties": false,
       "required": ["existencia"],
+      "x-sgp-orden": [
+        "existencia",
+        "material",
+        "altura_m",
+        "ancho_m",
+        "grietas_una_direccion",
+        "grietas_dos_direcciones",
+        "perdida_petreos_golpe",
+        "exposicion_acero",
+        "otros"
+      ],
       "properties": {
         "existencia": { "$ref": "#/$defs/existencia" },
         "material": { "$ref": "#/$defs/material" },
@@ -474,7 +627,8 @@
         "otros": { "$ref": "#/$defs/otroDano" }
       },
       "if": { "$ref": "#/$defs/siPresente" },
-      "then": { "required": ["material", "grietas_una_direccion", "grietas_dos_direcciones", "perdida_petreos_golpe", "exposicion_acero"] }
+      "then": { "required": ["material", "grietas_una_direccion", "grietas_dos_direcciones", "perdida_petreos_golpe", "exposicion_acero"] },
+      "else": { "maxProperties": 1 }
     },
     "muroGravedad": {
       "title": "Cuerpo (muro de gravedad)",
@@ -483,6 +637,16 @@
       "type": "object",
       "additionalProperties": false,
       "required": ["existencia"],
+      "x-sgp-orden": [
+        "existencia",
+        "material",
+        "altura_m",
+        "ancho_m",
+        "grietas_una_direccion",
+        "grietas_dos_direcciones",
+        "perdida_petreos_golpe",
+        "otros"
+      ],
       "properties": {
         "existencia": { "$ref": "#/$defs/existencia" },
         "material": { "$ref": "#/$defs/material" },
@@ -494,7 +658,8 @@
         "otros": { "$ref": "#/$defs/otroDano" }
       },
       "if": { "$ref": "#/$defs/siPresente" },
-      "then": { "required": ["material", "grietas_una_direccion", "grietas_dos_direcciones", "perdida_petreos_golpe"] }
+      "then": { "required": ["material", "grietas_una_direccion", "grietas_dos_direcciones", "perdida_petreos_golpe"] },
+      "else": { "maxProperties": 1 }
     },
     "aleton": {
       "title": "Aletón",
@@ -503,6 +668,17 @@
       "type": "object",
       "additionalProperties": false,
       "required": ["existencia"],
+      "x-sgp-orden": [
+        "existencia",
+        "material",
+        "largo_m",
+        "ancho_m",
+        "grietas_una_direccion",
+        "grietas_dos_direcciones",
+        "perdida_petreos_golpe",
+        "exposicion_acero",
+        "otros"
+      ],
       "properties": {
         "existencia": { "$ref": "#/$defs/existencia" },
         "material": { "$ref": "#/$defs/material" },
@@ -515,7 +691,8 @@
         "otros": { "$ref": "#/$defs/otroDano" }
       },
       "if": { "$ref": "#/$defs/siPresente" },
-      "then": { "required": ["material", "grietas_una_direccion", "grietas_dos_direcciones", "perdida_petreos_golpe", "exposicion_acero"] }
+      "then": { "required": ["material", "grietas_una_direccion", "grietas_dos_direcciones", "perdida_petreos_golpe", "exposicion_acero"] },
+      "else": { "maxProperties": 1 }
     },
     "apoyos": {
       "title": "Apoyos",
@@ -524,6 +701,16 @@
       "type": "object",
       "additionalProperties": false,
       "required": ["existencia"],
+      "x-sgp-orden": [
+        "existencia",
+        "material",
+        "neopreno_aplastado",
+        "fuera_de_lugar",
+        "oxidado",
+        "falta_perno",
+        "perno_roto",
+        "otros"
+      ],
       "properties": {
         "existencia": { "$ref": "#/$defs/existencia" },
         "material": {
@@ -540,13 +727,24 @@
         "otros": { "$ref": "#/$defs/otroDano" }
       },
       "if": { "$ref": "#/$defs/siPresente" },
-      "then": { "required": ["material", "neopreno_aplastado", "fuera_de_lugar", "oxidado", "falta_perno", "perno_roto"] }
+      "then": { "required": ["material", "neopreno_aplastado", "fuera_de_lugar", "oxidado", "falta_perno", "perno_roto"] },
+      "else": { "maxProperties": 1 }
     },
     "estribo": {
       "title": "Estribo",
       "type": "object",
       "additionalProperties": false,
       "required": [
+        "cortina_superior",
+        "cortina_inferior",
+        "viga_apoyo",
+        "apoyos",
+        "columnas",
+        "cuerpo_muro_gravedad",
+        "aletones",
+        "socavacion"
+      ],
+      "x-sgp-orden": [
         "cortina_superior",
         "cortina_inferior",
         "viga_apoyo",
@@ -568,6 +766,7 @@
           "type": "object",
           "additionalProperties": false,
           "required": ["aguas_arriba", "aguas_abajo"],
+          "x-sgp-orden": ["aguas_arriba", "aguas_abajo"],
           "properties": {
             "aguas_arriba": { "title": "Aletón aguas arriba", "$ref": "#/$defs/aleton" },
             "aguas_abajo": { "title": "Aletón aguas abajo", "$ref": "#/$defs/aleton" }
@@ -582,6 +781,15 @@
       "type": "object",
       "additionalProperties": false,
       "required": ["instancia_id", "orden", "viga_cabezal", "columnas", "cuerpo_muro_gravedad", "apoyos", "socavacion"],
+      "x-sgp-orden": [
+        "instancia_id",
+        "orden",
+        "viga_cabezal",
+        "columnas",
+        "cuerpo_muro_gravedad",
+        "apoyos",
+        "socavacion"
+      ],
       "properties": {
         "instancia_id": { "$ref": "#/$defs/instanciaId" },
         "orden": { "title": "Número de pila (desde la entrada)", "type": "integer", "minimum": 1 },
@@ -598,6 +806,16 @@
       "type": "object",
       "additionalProperties": false,
       "required": ["existencia"],
+      "x-sgp-orden": [
+        "existencia",
+        "material",
+        "grietas_una_direccion",
+        "grietas_dos_direcciones",
+        "desprendimiento_agregados",
+        "baches",
+        "exposicion_acero",
+        "otros"
+      ],
       "properties": {
         "existencia": { "$ref": "#/$defs/existencia" },
         "material": { "$ref": "#/$defs/material" },
@@ -609,7 +827,8 @@
         "otros": { "$ref": "#/$defs/otroDano" }
       },
       "if": { "$ref": "#/$defs/siPresente" },
-      "then": { "required": ["material", "grietas_una_direccion", "grietas_dos_direcciones", "desprendimiento_agregados", "baches", "exposicion_acero"] }
+      "then": { "required": ["material", "grietas_una_direccion", "grietas_dos_direcciones", "desprendimiento_agregados", "baches", "exposicion_acero"] },
+      "else": { "maxProperties": 1 }
     },
     "elementoSuperConcreto": {
       "title": "Elemento de concreto de super-estructura",
@@ -618,6 +837,14 @@
       "type": "object",
       "additionalProperties": false,
       "required": ["existencia"],
+      "x-sgp-orden": [
+        "existencia",
+        "grietas_diagonal",
+        "grietas_verticales",
+        "perdida_petreos_golpe",
+        "exposicion_acero",
+        "otros"
+      ],
       "properties": {
         "existencia": { "$ref": "#/$defs/existencia" },
         "grietas_diagonal": { "title": "Grietas en diagonal", "$ref": "#/$defs/severidad" },
@@ -627,7 +854,8 @@
         "otros": { "$ref": "#/$defs/otroDano" }
       },
       "if": { "$ref": "#/$defs/siPresente" },
-      "then": { "required": ["grietas_diagonal", "grietas_verticales", "perdida_petreos_golpe", "exposicion_acero"] }
+      "then": { "required": ["grietas_diagonal", "grietas_verticales", "perdida_petreos_golpe", "exposicion_acero"] },
+      "else": { "maxProperties": 1 }
     },
     "elementoSuperAcero": {
       "title": "Elemento de acero de super-estructura",
@@ -636,6 +864,15 @@
       "type": "object",
       "additionalProperties": false,
       "required": ["existencia"],
+      "x-sgp-orden": [
+        "existencia",
+        "oxido",
+        "faltan_pernos",
+        "elemento_golpeado",
+        "elemento_cortado",
+        "pintura",
+        "otros"
+      ],
       "properties": {
         "existencia": { "$ref": "#/$defs/existencia" },
         "oxido": { "title": "Óxido", "$ref": "#/$defs/severidad" },
@@ -646,7 +883,8 @@
         "otros": { "$ref": "#/$defs/otroDano" }
       },
       "if": { "$ref": "#/$defs/siPresente" },
-      "then": { "required": ["oxido", "faltan_pernos", "elemento_golpeado", "elemento_cortado", "pintura"] }
+      "then": { "required": ["oxido", "faltan_pernos", "elemento_golpeado", "elemento_cortado", "pintura"] },
+      "else": { "maxProperties": 1 }
     },
     "junta": {
       "title": "Junta",
@@ -655,15 +893,23 @@
       "type": "object",
       "additionalProperties": false,
       "required": ["existencia"],
+      "x-sgp-orden": [
+        "existencia",
+        "material",
+        "falta_elemento",
+        "junta_limpia",
+        "danos"
+      ],
       "properties": {
         "existencia": { "$ref": "#/$defs/existencia" },
         "material": { "$ref": "#/$defs/material" },
-        "falta_elemento": { "title": "Falta elemento", "type": "boolean" },
-        "junta_limpia": { "title": "Junta limpia", "type": "boolean" },
+        "falta_elemento": { "title": "Falta elemento", "type": "boolean", "x-sgp-sin-danos": false },
+        "junta_limpia": { "title": "Junta limpia", "type": "boolean", "x-sgp-sin-danos": true },
         "danos": { "title": "Daños", "$ref": "#/$defs/otroDano" }
       },
       "if": { "$ref": "#/$defs/siPresente" },
-      "then": { "required": ["material", "falta_elemento", "junta_limpia"] }
+      "then": { "required": ["material", "falta_elemento", "junta_limpia"] },
+      "else": { "maxProperties": 1 }
     },
     "losaAcceso": {
       "title": "Losa de acceso",
@@ -672,10 +918,18 @@
       "type": "object",
       "additionalProperties": false,
       "required": ["existencia"],
+      "x-sgp-orden": [
+        "existencia",
+        "material",
+        "buen_estado",
+        "asentado",
+        "fisurado",
+        "bache"
+      ],
       "properties": {
         "existencia": { "$ref": "#/$defs/existencia" },
         "material": { "$ref": "#/$defs/material" },
-        "buen_estado": { "title": "Buen estado", "type": "boolean" },
+        "buen_estado": { "title": "Buen estado", "type": "boolean", "x-sgp-sin-danos": true },
         "asentado": { "title": "Daño: asentado", "$ref": "#/$defs/severidad" },
         "fisurado": { "title": "Daño: fisurado", "$ref": "#/$defs/severidad" },
         "bache": { "title": "Daño: bache", "$ref": "#/$defs/severidad" }
@@ -683,7 +937,8 @@
       "allOf": [
         {
           "if": { "$ref": "#/$defs/siPresente" },
-          "then": { "required": ["material", "buen_estado"] }
+          "then": { "required": ["material", "buen_estado"] },
+          "else": { "maxProperties": 1 }
         },
         {
           "if": { "properties": { "buen_estado": { "const": false } }, "required": ["buen_estado"] },
@@ -697,6 +952,14 @@
       "type": "object",
       "additionalProperties": false,
       "required": ["existencia"],
+      "x-sgp-orden": [
+        "existencia",
+        "material",
+        "tipo",
+        "largo_m",
+        "ancho_m",
+        "altura_m"
+      ],
       "properties": {
         "existencia": { "$ref": "#/$defs/existencia" },
         "material": { "$ref": "#/$defs/material" },
@@ -706,7 +969,8 @@
         "altura_m": { "title": "Altura (m)", "type": "number", "exclusiveMinimum": 0, "maximum": 100 }
       },
       "if": { "$ref": "#/$defs/siPresente" },
-      "then": { "required": ["material", "tipo"] }
+      "then": { "required": ["material", "tipo"] },
+      "else": { "maxProperties": 1 }
     },
     "condicionesCauce": {
       "title": "Condiciones",
@@ -715,6 +979,7 @@
       "minItems": 1,
       "uniqueItems": true,
       "items": { "type": "string", "enum": ["LIMPIO", "ASOLVADO_SEDIMENTADO", "EROSIONADO", "OTRO"] },
+      "x-sgp-sin-danos": ["LIMPIO"],
       "if": { "contains": { "const": "LIMPIO" } },
       "then": { "maxItems": 1 }
     },
@@ -725,9 +990,10 @@
       "type": "object",
       "additionalProperties": false,
       "required": ["existe"],
+      "x-sgp-orden": ["existe", "estado"],
       "properties": {
         "existe": { "title": "Hay", "type": "boolean" },
-        "estado": { "title": "Estado", "type": "string", "enum": ["BUENO", "MALO"] }
+        "estado": { "title": "Estado", "type": "string", "enum": ["BUENO", "MALO"], "x-sgp-sin-danos": "BUENO" }
       },
       "if": { "properties": { "existe": { "const": true } } },
       "then": { "required": ["estado"] },

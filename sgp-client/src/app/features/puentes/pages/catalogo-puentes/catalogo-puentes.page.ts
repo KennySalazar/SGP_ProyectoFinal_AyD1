@@ -11,7 +11,8 @@ import { SelectModule } from 'primeng/select';
 import { TableModule } from 'primeng/table';
 import { TagModule } from 'primeng/tag';
 import { TextareaModule } from 'primeng/textarea';
-import { finalize } from 'rxjs';
+import { EMPTY, expand, finalize, reduce } from 'rxjs';
+import { MapaPuentesComponent } from './mapa-puentes/mapa-puentes.component';
 import {
   ConsultaCatalogoPuentes,
   DepartamentoResponse,
@@ -39,6 +40,7 @@ import { AppShellComponent } from '../../../../layouts/app-shell/app-shell.compo
     TextareaModule,
     RouterLink,
     ReactiveFormsModule,
+    MapaPuentesComponent,
   ],
   templateUrl: './catalogo-puentes.page.html',
   styleUrl: './catalogo-puentes.page.scss',
@@ -50,6 +52,9 @@ export class CatalogoPuentesPage {
   private readonly destroyRef = inject(DestroyRef);
   private readonly fb = inject(FormBuilder);
   private consultaAplicada: ConsultaCatalogoPuentes = {};
+  private listaPendiente = false;
+  private mapaCompleto = false;
+  readonly puentesMapa = signal<PuenteCatalogoResponse[]>([]);
 
   readonly filtros = this.fb.group({
     departamentoId: this.fb.control<string | null>(null),
@@ -157,6 +162,7 @@ export class CatalogoPuentesPage {
     this.hayFiltrosAplicados.set(
       !!(departamentoId || estado || (esAdmin && actividad !== 'activos')),
     );
+    this.invalidarMapa();
     this.cargarCatalogo();
   }
 
@@ -166,6 +172,7 @@ export class CatalogoPuentesPage {
     this.filtroActividad.setValue('activos');
     this.consultaAplicada = { pagina: 0, tamanio: this.tamanioPagina() };
     this.hayFiltrosAplicados.set(false);
+    this.invalidarMapa();
     this.cargarCatalogo();
   }
 
@@ -206,6 +213,7 @@ export class CatalogoPuentesPage {
           this.formBaja.reset({ motivo: '' });
           this.nombrePuenteAccion.set(puente.nombre);
           this.accionExitosa.set('baja');
+          this.invalidarMapa();
           this.cargarCatalogo();
         },
         error: () => {
@@ -247,6 +255,7 @@ export class CatalogoPuentesPage {
           this.puenteParaAccion.set(null);
           this.nombrePuenteAccion.set(puente.nombre);
           this.accionExitosa.set('reactivar');
+          this.invalidarMapa();
           this.cargarCatalogo();
         },
         error: () => {
@@ -285,6 +294,10 @@ export class CatalogoPuentesPage {
 
   cargarCatalogo(): void {
     if (this.cargando()) return;
+    if (this.vista() === 'mapa') {
+      this.cargarMapa();
+      return;
+    }
     this.puenteSeleccionado.set(null);
     this.cargando.set(true);
     this.errorConsulta.set(false);
@@ -298,6 +311,75 @@ export class CatalogoPuentesPage {
         next: (pagina) => {
           this.selectorTamanio.setValue(pagina.size, { emitEvent: false });
           this.pagina.set(pagina);
+          this.listaPendiente = false;
+          // Una página que contiene todo el catálogo también sirve para el mapa.
+          if (pagina.content.length === pagina.totalElements) {
+            this.puentesMapa.set(pagina.content);
+            this.mapaCompleto = true;
+          }
+        },
+        error: () => this.errorConsulta.set(true),
+      });
+  }
+
+  cambiarVista(vista: 'lista' | 'mapa'): void {
+    if (this.cargando() || this.vista() === vista) return;
+    this.vista.set(vista);
+    this.errorConsulta.set(false);
+    if (vista === 'mapa') this.cargarMapa();
+    else if (this.listaPendiente) {
+      if (!this.mapaCompleto) {
+        this.cargarCatalogo();
+        return;
+      }
+      const puentes = this.puentesMapa();
+      const number = this.consultaAplicada.pagina ?? 0;
+      const size = this.tamanioPagina();
+      const content = puentes.slice(number * size, (number + 1) * size);
+      const totalPages = Math.ceil(puentes.length / size);
+      this.pagina.set({
+        content,
+        number,
+        size,
+        totalPages,
+        totalElements: puentes.length,
+        first: number === 0,
+        last: number + 1 >= totalPages,
+        empty: content.length === 0,
+      });
+      this.selectorTamanio.setValue(size, { emitEvent: false });
+      this.puenteSeleccionado.set(null);
+      this.listaPendiente = false;
+    }
+  }
+
+  private invalidarMapa(): void {
+    this.mapaCompleto = false;
+    this.puentesMapa.set([]);
+    this.listaPendiente = true;
+  }
+
+  private cargarMapa(): void {
+    if (this.mapaCompleto || this.cargando()) return;
+    const consulta = { ...this.consultaAplicada, pagina: 0, tamanio: 100 };
+    this.cargando.set(true);
+    this.errorConsulta.set(false);
+    this.api
+      .listarCatalogo(consulta)
+      .pipe(
+        expand((pagina) =>
+          pagina.number + 1 < pagina.totalPages
+            ? this.api.listarCatalogo({ ...consulta, pagina: pagina.number + 1 })
+            : EMPTY,
+        ),
+        reduce((puentes, pagina) => puentes.concat(pagina.content), [] as PuenteCatalogoResponse[]),
+        takeUntilDestroyed(this.destroyRef),
+        finalize(() => this.cargando.set(false)),
+      )
+      .subscribe({
+        next: (puentes) => {
+          this.puentesMapa.set(puentes);
+          this.mapaCompleto = true;
         },
         error: () => this.errorConsulta.set(true),
       });

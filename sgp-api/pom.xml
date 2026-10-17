@@ -141,6 +141,11 @@
             <scope>test</scope>
         </dependency>
         <dependency>
+            <groupId>net.bytebuddy</groupId>
+            <artifactId>byte-buddy-agent</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
             <groupId>org.springframework.security</groupId>
             <artifactId>spring-security-test</artifactId>
             <scope>test</scope>
@@ -177,6 +182,13 @@
                 </configuration>
             </plugin>
             <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <configuration>
+                    <argLine>@{argLine} -javaagent:${settings.localRepository}/net/bytebuddy/byte-buddy-agent/${byte-buddy.version}/byte-buddy-agent-${byte-buddy.version}.jar</argLine>
+                </configuration>
+            </plugin>
+            <plugin>
                 <groupId>com.diffplug.spotless</groupId>
                 <artifactId>spotless-maven-plugin</artifactId>
                 <version>${spotless.version}</version>
@@ -203,6 +215,47 @@
                         <goals>
                             <goal>report</goal>
                         </goals>
+                    </execution>
+                    <execution>
+                        <id>hu018-coverage-check</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>check</goal>
+                        </goals>
+                        <configuration>
+                            <rules>
+                                <rule>
+                                    <element>CLASS</element>
+                                    <includes>
+                                        <include>gt.usac.cunoc.sgp.inspeccion.service.CalculoIndiceCondicionService</include>
+                                        <include>gt.usac.cunoc.sgp.inspeccion.service.MotorPonderacionIc</include>
+                                        <include>gt.usac.cunoc.sgp.inspeccion.service.AgregadorCalificacionesIc</include>
+                                        <include>gt.usac.cunoc.sgp.inspeccion.service.ResolverElementosIc</include>
+                                        <include>gt.usac.cunoc.sgp.inspeccion.service.ConversorIndicadoresIc</include>
+                                        <include>gt.usac.cunoc.sgp.inspeccion.service.ConversorMedicionesIc</include>
+                                        <include>gt.usac.cunoc.sgp.inspeccion.service.EvaluadorCondicionesCriticasIc</include>
+                                        <include>gt.usac.cunoc.sgp.inspeccion.service.HuellaEntradaIc</include>
+                                    </includes>
+                                    <limits>
+                                        <limit>
+                                            <counter>LINE</counter>
+                                            <value>COVEREDRATIO</value>
+                                            <minimum>1.00</minimum>
+                                        </limit>
+                                        <limit>
+                                            <counter>BRANCH</counter>
+                                            <value>COVEREDRATIO</value>
+                                            <minimum>1.00</minimum>
+                                        </limit>
+                                        <limit>
+                                            <counter>INSTRUCTION</counter>
+                                            <value>COVEREDRATIO</value>
+                                            <minimum>1.00</minimum>
+                                        </limit>
+                                    </limits>
+                                </rule>
+                            </rules>
+                        </configuration>
                     </execution>
                 </executions>
             </plugin>

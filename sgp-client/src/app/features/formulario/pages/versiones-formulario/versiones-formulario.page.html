@@ -1,0 +1,188 @@
+<header class="page-heading">
+  <p class="page-kicker">{{ 'admin.kicker' | transloco }}</p>
+  <h1 class="page-title">{{ 'formulario.title' | transloco }}</h1>
+  <p class="page-description">{{ 'formulario.description' | transloco }}</p>
+</header>
+
+<nav class="accesos" [attr.aria-label]="'usuarios.otherTools' | transloco">
+  <a pButton severity="secondary" [outlined]="true" routerLink="/admin">
+    <i class="pi pi-users" aria-hidden="true"></i>
+    <span>{{ 'usuarios.title' | transloco }}</span>
+  </a>
+  <a pButton severity="secondary" [outlined]="true" routerLink="/admin/invitaciones">
+    <i class="pi pi-send" aria-hidden="true"></i>
+    <span>{{ 'invitaciones.open' | transloco }}</span>
+  </a>
+  <a pButton severity="secondary" [outlined]="true" routerLink="/admin/profesionales">
+    <i class="pi pi-id-card" aria-hidden="true"></i>
+    <span>{{ 'profesionales.open' | transloco }}</span>
+  </a>
+  <a pButton severity="secondary" [outlined]="true" routerLink="/admin/bitacora">
+    <i class="pi pi-history" aria-hidden="true"></i>
+    <span>{{ 'auditoria.open' | transloco }}</span>
+  </a>
+</nav>
+
+<section class="surface-card lista-card" aria-live="polite">
+  <div class="card-header">
+    <div>
+      <h2 class="card-title">{{ 'formulario.listTitle' | transloco }}</h2>
+      <p class="card-subtitle">{{ 'formulario.tipDraft' | transloco }}</p>
+    </div>
+    <div class="acciones-toolbar">
+      <button
+        pButton
+        type="button"
+        severity="secondary"
+        [outlined]="true"
+        [disabled]="cargandoPlantilla() || cargando()"
+        (click)="cargarPlantillaInicial()"
+      >
+        <i class="pi pi-cloud-download" aria-hidden="true"></i>
+        <span
+          >{{ (cargandoPlantilla() ? 'formulario.loadingTemplate' : 'formulario.loadTemplate') |
+          transloco }}</span
+        >
+      </button>
+      <button pButton type="button" [disabled]="cargando()" (click)="abrirDialogoNueva()">
+        <i class="pi pi-plus" aria-hidden="true"></i>
+        <span>{{ 'formulario.newVersion' | transloco }}</span>
+      </button>
+    </div>
+  </div>
+
+  @if (mensajeExito(); as exito) {
+  <div class="aviso-exito" role="status">
+    <i class="pi pi-check-circle" aria-hidden="true"></i>
+    <span>{{ exito }}</span>
+  </div>
+  } @if (errorCarga(); as err) {
+  <div class="aviso-error" role="alert">
+    <i class="pi pi-exclamation-triangle" aria-hidden="true"></i>
+    <span>{{ err }}</span>
+    <button pButton size="small" [outlined]="true" (click)="cargar()">
+      <span>{{ 'usuarios.retry' | transloco }}</span>
+    </button>
+  </div>
+  }
+
+  <p-table
+    [value]="versiones()"
+    [loading]="cargando()"
+    responsiveLayout="scroll"
+    styleClass="p-datatable-sm"
+  >
+    <ng-template #header>
+      <tr>
+        <th scope="col">{{ 'formulario.code' | transloco }}</th>
+        <th scope="col">{{ 'formulario.status' | transloco }}</th>
+        <th scope="col">{{ 'formulario.active' | transloco }}</th>
+        <th scope="col">{{ 'formulario.algorithm' | transloco }}</th>
+        <th scope="col">{{ 'formulario.created' | transloco }}</th>
+        <th scope="col">{{ 'formulario.published' | transloco }}</th>
+        <th scope="col">{{ 'formulario.actions' | transloco }}</th>
+      </tr>
+    </ng-template>
+
+    <ng-template #body let-ver>
+      <tr>
+        <td>
+          <strong>{{ ver.codigo }}</strong>
+          @if (ver.versionAnteriorCodigo) {
+          <small class="version-base-info"> (Base: {{ ver.versionAnteriorCodigo }})</small>
+          }
+        </td>
+        <td>
+          <p-tag
+            [value]="ver.estado"
+            [severity]="ver.estado === 'PUBLICADA' ? 'success' : 'warn'"
+          ></p-tag>
+        </td>
+        <td>
+          @if (ver.activa) {
+          <p-tag value="Activa" severity="success" icon="pi pi-check"></p-tag>
+          } @else {
+          <span class="texto-inactiva">—</span>
+          }
+        </td>
+        <td>{{ ver.versionAlgoritmoIc || 'IC-SIECA-v1' }}</td>
+        <td>{{ fechaLegible(ver.creadoEn) }}</td>
+        <td>{{ fechaLegible(ver.publicadoEn) }}</td>
+        <td>
+          <a
+            pButton
+            size="small"
+            severity="secondary"
+            [outlined]="true"
+            [routerLink]="['/admin/formularios', ver.id]"
+          >
+            <i class="pi pi-pencil" aria-hidden="true"></i>
+            <span>{{ 'formulario.viewEdit' | transloco }}</span>
+          </a>
+        </td>
+      </tr>
+    </ng-template>
+
+    <ng-template #emptymessage>
+      <tr>
+        <td colspan="7" class="tabla-vacia">
+          @if (!cargando()) {
+          <i class="pi pi-inbox" aria-hidden="true"></i>
+          <p>{{ 'formulario.empty' | transloco }}</p>
+          }
+        </td>
+      </tr>
+    </ng-template>
+  </p-table>
+</section>
+
+<p-dialog
+  [header]="'formulario.createTitle' | transloco"
+  [visible]="dialogoNuevaVisible()"
+  [modal]="true"
+  [style]="{ width: '480px' }"
+  (onHide)="cerrarDialogoNueva()"
+>
+  <form [formGroup]="nuevoForm" (ngSubmit)="crearVersion()" class="dialog-form">
+    <div class="form-field">
+      <label for="nuevo-codigo" class="field-label">{{ 'formulario.code' | transloco }} *</label>
+      <input
+        pInputText
+        id="nuevo-codigo"
+        type="text"
+        formControlName="codigo"
+        [placeholder]="'formulario.codePlaceholder' | transloco"
+        maxlength="50"
+      />
+    </div>
+
+    <div class="form-field">
+      <label for="nueva-version-base" class="field-label"
+        >{{ 'formulario.baseVersion' | transloco }}</label
+      >
+      <select id="nueva-version-base" class="sgp-select" formControlName="versionBaseId">
+        @for (opt of obtenerOpcionesBase(); track opt.value) {
+        <option [ngValue]="opt.value">{{ opt.label }}</option>
+        }
+      </select>
+    </div>
+
+    <div class="dialog-actions">
+      <button
+        pButton
+        type="button"
+        severity="secondary"
+        [outlined]="true"
+        [disabled]="creandoVersion()"
+        (click)="cerrarDialogoNueva()"
+      >
+        <span>{{ 'formulario.cancel' | transloco }}</span>
+      </button>
+      <button pButton type="submit" [disabled]="nuevoForm.invalid || creandoVersion()">
+        <span
+          >{{ (creandoVersion() ? 'formulario.creating' : 'formulario.create') | transloco }}</span
+        >
+      </button>
+    </div>
+  </form>
+</p-dialog>

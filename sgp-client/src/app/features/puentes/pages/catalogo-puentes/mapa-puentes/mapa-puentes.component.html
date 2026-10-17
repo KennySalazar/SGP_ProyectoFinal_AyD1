@@ -1,0 +1,23 @@
+<div class="mapa-puentes">
+  <div class="mapa-leyenda" role="group" [attr.aria-label]="'puentes.catalogo.legend' | transloco">
+    @for (estado of estados(); track estado) {
+      <span [attr.data-estado]="estado"
+        ><i class="pi" [class]="'pi ' + iconos[estado]" aria-hidden="true"></i>{{ estado }}</span
+      >
+    }
+  </div>
+  @if (errorMapa()) {
+    <p role="alert">{{ 'puentes.catalogo.mapFailed' | transloco }}</p>
+  } @else if (errorTeselas()) {
+    <p role="alert">{{ 'puentes.catalogo.tilesFailed' | transloco }}</p>
+  }
+  <div
+    #contenedor
+    class="mapa-contenedor"
+    role="region"
+    [attr.aria-label]="'puentes.catalogo.mapLabel' | transloco"
+  ></div>
+  @if (!errorMapa() && cantidadMarcadores() === 0 && puentes().length > 0) {
+    <p role="status">{{ 'puentes.catalogo.noCoordinates' | transloco }}</p>
+  }
+</div>

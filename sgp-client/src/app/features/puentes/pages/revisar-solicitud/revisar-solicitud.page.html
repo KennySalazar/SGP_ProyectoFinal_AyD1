@@ -52,27 +52,11 @@
   [cercanos]="puntosCercanos()"
 >
   @if (hayCercanos()) {
-  <section class="proximity" role="alert">
-    <h3>{{ 'puentes.proximityTitle' | transloco }}</h3>
-    <p>{{ 'puentes.revision.proximityNote' | transloco }}</p>
-    <p>{{ 'puentes.proximityTotal' | transloco: { total: datos.totalPuentesCercanos } }}</p>
-
-    <ul>
-      @for (cercano of datos.puentesCercanos; track cercano.id) {
-      <li>
-        <strong>{{ cercano.codigo }} — {{ cercano.nombre }}</strong>
-        <span>
-          {{ 'puentes.distance' | transloco }}: {{ cercano.distanciaMetros | number: '1.1-1' }} m ·
-          {{ (cercano.activo ? 'puentes.active' : 'puentes.inactive') | transloco }}
-        </span>
-      </li>
-      }
-    </ul>
-
-    @if (datos.totalPuentesCercanos > datos.puentesCercanos.length) {
-    <p>{{ 'puentes.proximityLimit' | transloco: { cantidad: datos.puentesCercanos.length } }}</p>
-    }
-  </section>
+  <app-aviso-cercania
+    [cercanos]="datos.puentesCercanos"
+    [total]="datos.totalPuentesCercanos"
+    modo="revision"
+  />
   } @if (errorDecision(); as mensaje) {
   <p class="feedback error" role="alert">{{ mensaje }}</p>
   } @if (pendiente()) { @if (rechazando()) {

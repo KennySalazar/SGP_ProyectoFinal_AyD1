@@ -56,6 +56,14 @@ export const puentesRoutes: Routes = [
             (m) => m.AsignacionesPuentesPage,
           ),
       },
+    ],
+  },
+  {
+    path: '',
+    canActivate: [authGuard, roleGuard('CATEDRATICO')],
+    loadComponent: () =>
+      import('../../layouts/app-shell/app-shell.component').then((m) => m.AppShellComponent),
+    children: [
       {
         path: 'solicitudes',
         loadComponent: () =>

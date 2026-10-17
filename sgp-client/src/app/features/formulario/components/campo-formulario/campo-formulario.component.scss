@@ -1,0 +1,457 @@
+:host {
+  display: block;
+  min-width: 0;
+}
+
+.campo {
+  display: grid;
+  gap: 0.4rem;
+  min-width: 0;
+  /* Permite que los botones de opciones se acomoden según el ancho del campo, no el de la ventana. */
+  container-type: inline-size;
+}
+
+label,
+legend {
+  color: var(--sgp-navy-900);
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+fieldset.opciones {
+  display: grid;
+  gap: 0.5rem;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+legend {
+  padding: 0;
+}
+
+.marca-obligatorio {
+  margin-left: 0.15rem;
+  color: #b91c1c;
+}
+
+.marca-opcional {
+  margin-left: 0.35rem;
+  color: var(--sgp-steel-500);
+  font-size: 0.85rem;
+  font-weight: 400;
+}
+
+.icono-precargado {
+  margin-left: 0.4rem;
+  color: var(--sgp-steel-500);
+  font-size: 0.8rem;
+}
+
+input,
+textarea,
+p-select {
+  width: 100%;
+  min-width: 0;
+}
+
+/* Controles táctiles de al menos 44 px (DT-FE-09). */
+input[type='text'],
+input[type='number'],
+input[type='date'] {
+  min-height: 46px;
+}
+
+/* Opciones como botones: un solo toque, objetivos de al menos 44 px y salto de línea si no caben. */
+.segmentos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.segmento {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 1 auto;
+  min-width: 4.5rem;
+  min-height: 44px;
+  padding: 0 0.9rem;
+  border: 1px solid var(--sgp-border);
+  border-radius: 10px;
+  background: var(--sgp-surface);
+  color: var(--sgp-navy-900);
+  font-weight: 600;
+  text-align: center;
+  white-space: nowrap;
+  cursor: pointer;
+  user-select: none;
+
+  input {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    opacity: 0;
+    cursor: inherit;
+  }
+
+  &:hover:not(.marcado):not(.deshabilitado) {
+    background: var(--sgp-surface-soft);
+    border-color: var(--sgp-steel-500);
+  }
+
+  &:has(input:focus-visible) {
+    outline: 3px solid var(--sgp-cyan-500);
+    outline-offset: 2px;
+  }
+
+  &.marcado {
+    border-color: var(--sgp-blue-600);
+    background: var(--sgp-blue-600);
+    color: #ffffff;
+  }
+
+  &.deshabilitado {
+    cursor: not-allowed;
+    opacity: 0.65;
+  }
+}
+
+/* Los enumerados reparten el ancho entre sus opciones. */
+.amplios .segmento {
+  flex: 1 1 auto;
+}
+
+/* Cuatro opciones (la severidad): 2 × 2 en un campo angosto y todas en una fila si hay lugar. */
+.amplios.cuatro .segmento {
+  flex: 1 1 calc(50% - 0.4rem);
+}
+
+@container (min-width: 26rem) {
+  .amplios.cuatro .segmento {
+    flex: 1 1 0;
+  }
+}
+
+.quitar {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  width: fit-content;
+  /* Área táctil de 44 px (DT-FE-09) sin añadir altura a la tarjeta. */
+  min-height: 44px;
+  margin-block: -0.6rem;
+  padding: 0.2rem 0.5rem 0.2rem 0;
+  border: 0;
+  background: none;
+  color: var(--sgp-steel-700);
+  font: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+
+  i {
+    font-size: 0.7rem;
+  }
+
+  &:hover {
+    color: var(--sgp-navy-900);
+    text-decoration: underline;
+  }
+
+  &:focus-visible {
+    outline: 3px solid var(--sgp-cyan-500);
+    outline-offset: 2px;
+    border-radius: 6px;
+  }
+}
+
+.casillas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.casilla {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  min-height: 44px;
+  padding: 0 0.9rem 0 0.75rem;
+  border: 1px solid var(--sgp-border);
+  border-radius: 10px;
+  background: var(--sgp-surface);
+  font-weight: 500;
+  cursor: pointer;
+
+  input {
+    width: 1.25rem;
+    height: 1.25rem;
+    margin: 0;
+    accent-color: var(--sgp-blue-600);
+    cursor: inherit;
+  }
+
+  &:has(input:checked) {
+    border-color: var(--sgp-blue-600);
+    background: var(--sgp-surface-soft);
+  }
+
+  &:has(input:focus-visible) {
+    outline: 3px solid var(--sgp-cyan-500);
+    outline-offset: 2px;
+  }
+
+  &.deshabilitado {
+    cursor: not-allowed;
+    opacity: 0.65;
+  }
+}
+
+.error {
+  color: #b91c1c;
+}
+
+.invalido input,
+.invalido textarea {
+  border-color: #b91c1c;
+}
+
+.solo-lectores {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+}
+
+/* Ayuda plegable de las opciones: un ícono junto al título y una lista que se despliega debajo. */
+.ayuda-boton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  /* Área táctil de 44 px sin agrandar la línea del título. */
+  min-width: 44px;
+  min-height: 44px;
+  margin: -0.7rem -0.5rem -0.7rem -0.3rem;
+  border: 0;
+  background: none;
+  color: var(--sgp-steel-500);
+  font-size: 1.05rem;
+  vertical-align: middle;
+  cursor: pointer;
+
+  &:hover,
+  &[aria-expanded='true'] {
+    color: var(--sgp-blue-600);
+  }
+
+  &:focus-visible {
+    outline: 3px solid var(--sgp-cyan-500);
+    outline-offset: -6px;
+    border-radius: 10px;
+  }
+}
+
+.ayuda {
+  display: grid;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0.6rem 0.8rem;
+  border-left: 3px solid var(--sgp-blue-600);
+  border-radius: 0 8px 8px 0;
+  background: var(--sgp-surface-soft);
+  font-size: 0.85rem;
+  line-height: 1.45;
+
+  &[hidden] {
+    display: none;
+  }
+
+  dt {
+    color: var(--sgp-navy-900);
+    font-weight: 700;
+  }
+
+  dd {
+    margin: 0;
+    color: var(--sgp-steel-700);
+  }
+}
+
+/* Indicadores de daño (HU-034): el color acompaña al nombre y la opción elegida lleva una marca. */
+.marca-eleccion {
+  margin-right: 0.4rem;
+  font-size: 0.8rem;
+}
+
+.segmento.marcado[data-gravedad='g0'] {
+  border-color: #166534;
+  background: #166534;
+  color: #ffffff;
+}
+
+.segmento.marcado[data-gravedad='g1'] {
+  border-color: #a16207;
+  background: #facc15;
+  color: #422006;
+}
+
+.segmento.marcado[data-gravedad='g2'] {
+  border-color: #c2410c;
+  background: #c2410c;
+  color: #ffffff;
+}
+
+.segmento.marcado[data-gravedad='g3'] {
+  border-color: #991b1b;
+  background: #b91c1c;
+  color: #ffffff;
+}
+
+/* Dentro de la grilla de un elemento: título compacto, botones de al menos 44 × 44 px. */
+.en-grilla {
+  legend,
+  label {
+    font-size: 0.95rem;
+  }
+
+  /* La ✕ de «Limpiar» va dentro del título, a la derecha. Su zona táctil mide 44 × 44 px sin
+     invadir a las opciones: la fila del título solo crece cuando hay algo que limpiar. */
+  legend {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    width: 100%;
+  }
+
+  legend:has(.quitar) {
+    min-height: 44px;
+  }
+
+  .quitar {
+    justify-content: center;
+    width: 44px;
+    margin: 0 -0.5rem 0 auto;
+    padding: 0;
+    font-size: 0.9rem;
+
+    .texto-quitar {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+    }
+  }
+
+  .segmento {
+    min-width: 44px;
+    min-height: 44px;
+    padding: 0.45rem 0.7rem;
+    font-size: 0.95rem;
+    white-space: normal;
+    line-height: 1.25;
+    /* Un nombre largo se parte en lugar de salirse del botón. */
+    overflow-wrap: anywhere;
+    hyphens: auto;
+    text-align: center;
+  }
+
+  /* Hasta tres opciones (la existencia): siempre en una sola fila, a partes iguales. */
+  .amplios .segmento {
+    flex: 1 1 0;
+  }
+
+  .amplios.cuatro .segmento {
+    flex: 1 1 calc(50% - 0.4rem);
+  }
+
+  :host ::ng-deep .p-select {
+    min-height: 44px;
+  }
+}
+
+/* Cuatro severidades en una fila cuando el campo mide al menos 20 rem; si no, 2 × 2. */
+@container (min-width: 20rem) {
+  .en-grilla .amplios.cuatro .segmento {
+    flex: 1 1 0;
+  }
+}
+
+/* Con nombres largos («Asentamiento de la estructura») cuatro en una fila no caben: 2 × 2, y una
+   sola fila únicamente cuando el campo es muy ancho. Menos relleno lateral para que la palabra
+   más larga quepa entera en lugar de partirse a la mitad. */
+.en-grilla .amplios.cuatro.largas .segmento {
+  flex: 1 1 calc(50% - 0.4rem);
+  padding-inline: 0.35rem;
+  font-size: 0.9rem;
+}
+
+@container (min-width: 44rem) {
+  .en-grilla .amplios.cuatro.largas .segmento {
+    flex: 1 1 0;
+  }
+}
+
+/* Existencia del elemento: cada opción con su color, para distinguirlas de un vistazo. */
+.segmento.marcado[data-valor='NO_APLICA'] {
+  border-color: #475569;
+  background: #475569;
+  color: #ffffff;
+}
+
+.segmento.marcado[data-valor='AUSENTE'] {
+  border-color: #6b21a8;
+  background: #7e22ce;
+  color: #ffffff;
+}
+
+:host ::ng-deep .p-select {
+  min-height: 44px;
+}
+
+/* Indicador como fila de celdas: una columna por opción, todas del mismo ancho que el encabezado. */
+.segmentos.celdas {
+  display: grid;
+  grid-template-columns: repeat(var(--columnas, 4), minmax(0, 1fr));
+  gap: 0.3rem;
+
+  .segmento {
+    min-width: 0;
+    padding: 0;
+    /* Una franja del color de la gravedad en cada celda: ayuda, pero no es lo único (hay texto). */
+    border-top-width: 4px;
+  }
+
+  .segmento[data-gravedad='g0'] {
+    border-top-color: #166534;
+  }
+
+  .segmento[data-gravedad='g1'] {
+    border-top-color: #facc15;
+  }
+
+  .segmento[data-gravedad='g2'] {
+    border-top-color: #c2410c;
+  }
+
+  .segmento[data-gravedad='g3'] {
+    border-top-color: #b91c1c;
+  }
+
+  .segmento.marcado {
+    border-top-color: transparent;
+  }
+}
+
+.celda-vacia {
+  color: var(--sgp-steel-500);
+  font-size: 0.8rem;
+  opacity: 0.7;
+}

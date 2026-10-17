@@ -1,0 +1,179 @@
+@if (error(); as detalle) {
+  <p class="aviso-error" role="alert">
+    {{ 'formulario.dinamico.invalidSchema' | transloco: { detalle: detalle } }}
+  </p>
+} @else if (construido(); as c) {
+  @if (soloLectura()) {
+    <p class="aviso-solo-lectura" role="note">
+      <i class="pi pi-lock" aria-hidden="true"></i>
+      {{ 'formulario.dinamico.readOnlyNotice' | transloco }}
+    </p>
+  }
+
+  <div class="formulario-dinamico">
+    <nav class="secciones" [attr.aria-label]="'formulario.dinamico.sections' | transloco">
+      <p class="avance-total" aria-live="polite">
+        {{
+          'formulario.dinamico.progress'
+            | transloco
+              : { completos: avanceTotal().completos, obligatorios: avanceTotal().obligatorios }
+        }}
+      </p>
+      <ol>
+        @for (seccion of entradas(); track seccion.ruta; let i = $index) {
+          <li>
+            <button
+              type="button"
+              class="seccion"
+              [class.activa]="i === indiceActivo()"
+              [class.errores]="
+                seccion.tipo === 'esquema' &&
+                (seccion.estado === 'errores' || seccion.estado === 'faltantes')
+              "
+              [class.completa]="seccion.tipo === 'esquema' && seccion.estado === 'completa'"
+              [attr.aria-current]="i === indiceActivo() ? 'step' : null"
+              (click)="irA(i)"
+            >
+              <span class="seccion-icono" aria-hidden="true">
+                @if (seccion.tipo === 'apoyo') {
+                  <i class="pi pi-paperclip"></i>
+                } @else {
+                  @switch (seccion.estado) {
+                    @case ('completa') {
+                      <i class="pi pi-check-circle"></i>
+                    }
+                    @case ('errores') {
+                      <i class="pi pi-exclamation-circle"></i>
+                    }
+                    @case ('faltantes') {
+                      <i class="pi pi-exclamation-circle"></i>
+                    }
+                    @default {
+                      <i class="pi pi-circle"></i>
+                    }
+                  }
+                }
+              </span>
+              <span class="seccion-texto">
+                <span class="seccion-titulo">{{ seccion.titulo }}</span>
+                <span class="seccion-estado">
+                  @if (seccion.tipo === 'apoyo') {
+                    {{ 'formulario.dinamico.supportSection' | transloco }}
+                  } @else {
+                    @switch (seccion.estado) {
+                      @case ('completa') {
+                        {{ 'formulario.dinamico.sectionComplete' | transloco }}
+                      }
+                      @case ('errores') {
+                        {{ 'formulario.dinamico.sectionErrors' | transloco }}
+                      }
+                      @case ('faltantes') {
+                        {{ 'formulario.dinamico.sectionMissing' | transloco }}
+                      }
+                      @default {
+                        {{ 'formulario.dinamico.sectionPending' | transloco }}
+                      }
+                    }
+                    @if (seccion.avance.obligatorios > 0) {
+                      ·
+                      {{
+                        'formulario.dinamico.progress'
+                          | transloco
+                            : {
+                                completos: seccion.avance.completos,
+                                obligatorios: seccion.avance.obligatorios,
+                              }
+                      }}
+                    }
+                  }
+                </span>
+                @if (seccion.tipo === 'esquema' && seccion.elementos.total > 0) {
+                  <span class="seccion-elementos">
+                    {{
+                      'formulario.dinamico.elemento.revisados'
+                        | transloco
+                          : {
+                              revisados: seccion.elementos.revisados,
+                              total: seccion.elementos.total,
+                            }
+                    }}
+                  </span>
+                }
+                @if (seccion.tipo === 'esquema' && seccion.avance.obligatorios > 0) {
+                  <progress
+                    class="barra"
+                    [max]="seccion.avance.obligatorios"
+                    [value]="seccion.avance.completos"
+                    [attr.aria-label]="'formulario.dinamico.sectionProgressLabel' | transloco"
+                  ></progress>
+                }
+              </span>
+            </button>
+          </li>
+        }
+      </ol>
+    </nav>
+
+    <div class="contenido">
+      @if (seccionActiva(); as activa) {
+        <header class="cabecera">
+          <p class="posicion">
+            {{
+              'formulario.dinamico.sectionOf'
+                | transloco: { actual: indiceActivo() + 1, total: entradas().length }
+            }}
+          </p>
+          <h2 #encabezado tabindex="-1">{{ activa.titulo }}</h2>
+          @if (activa.descripcion) {
+            <p class="descripcion">{{ activa.descripcion }}</p>
+          }
+        </header>
+
+        @if (!soloLectura() && activa.tipo === 'esquema') {
+          <p class="leyenda">
+            <span class="marca-obligatorio" aria-hidden="true">*</span>
+            {{ 'formulario.dinamico.legend' | transloco }}
+          </p>
+        }
+
+        @for (entrada of seccionesAMostrar(); track entrada.ruta) {
+          @if (entrada.tipo === 'esquema') {
+            <app-nodo-formulario
+              [nodo]="entrada.nodo"
+              [control]="c.form.controls[entrada.nodo.clave]"
+              [construido]="c"
+            />
+          } @else {
+            <ng-container
+              [appRenderizadorNodo]="entrada.apoyo.componente"
+              [appRenderizadorNodoEntradas]="entrada.apoyo.entradas ?? {}"
+            />
+          }
+        }
+
+        <footer class="navegacion">
+          <button
+            pButton
+            type="button"
+            severity="secondary"
+            [outlined]="true"
+            [disabled]="indiceActivo() === 0"
+            (click)="irA(indiceActivo() - 1)"
+          >
+            <i class="pi pi-arrow-left" aria-hidden="true"></i>
+            {{ 'formulario.dinamico.previous' | transloco }}
+          </button>
+          <button
+            pButton
+            type="button"
+            [disabled]="indiceActivo() === entradas().length - 1"
+            (click)="irA(indiceActivo() + 1)"
+          >
+            {{ 'formulario.dinamico.next' | transloco }}
+            <i class="pi pi-arrow-right" aria-hidden="true"></i>
+          </button>
+        </footer>
+      }
+    </div>
+  </div>
+}
