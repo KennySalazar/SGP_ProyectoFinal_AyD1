@@ -2,42 +2,45 @@
 
 ## Estado
 
-Servicio de integracion implementado y probado con PostgreSQL.
-Pendiente conectar y verificar el flujo real de publicacion de HU-026.
+Integracion backend implementada y verificada con el flujo real de HU-026,
+el calculador real del IC y PostgreSQL.
 
-## Contrato
+## Contrato implementado
 
-HU-026 debe ejecutar en una misma transaccion:
+La publicacion ejecuta en una misma transaccion:
 
 1. Bloquear primero el puente y despues la inspeccion.
 2. Validar autorizacion, revision y transicion de estado.
 3. Establecer PUBLICADA y publicado_en, y guardar el historial.
-4. Invocar PublicacionIndiceCondicionService.integrarPublicacion(
-   inspeccionId, usuarioId).
+4. Invocar PublicacionIndiceCondicionService.integrarPublicacion
+   con la inspeccion y el usuario responsable de publicar.
 
-El usuarioId debe obtenerse de la sesion autenticada.
-Las excepciones deben propagarse para revertir toda la operacion.
-
-El servicio exige una transaccion existente mediante MANDATORY.
-No debe invocarse despues del commit ni de forma asincrona.
+La integracion exige una transaccion existente mediante MANDATORY.
+Cualquier error se propaga y revierte la operacion.
+No se ejecuta despues del commit ni de forma asincrona.
 
 La publicacion vigente se ordena por publicado_en DESC, id DESC.
 La fecha mostrada corresponde a fecha_inspeccion.
 
-## Verificacion pendiente
+## Verificacion
 
-- Flujo real autorizado de HU-026 utilizando el calculador real.
-- Reversion conjunta de estado, historial, IC, puente y auditoria.
-- Publicaciones concurrentes respetando el orden de bloqueos.
+PublicacionInspeccionIntegrationTest y PublicacionRealIcIntegrationTest
+verifican:
 
-HU-020 no debe marcarse como completada hasta verificar esta integracion.
+- Publicacion directa autorizada y publicacion mediante revision.
+- Calculo definitivo con el motor real y conservacion de su desglose.
+- Actualizacion del estado, IC y fecha del puente.
+- Conservacion del IC numerico ante una condicion critica.
+- Incorporacion del estado confirmado por el evaluador.
+- Reversion de la publicacion, historial, resultado y auditoria
+  cuando falla el calculo o la confirmacion queda desactualizada.
+- Dos solicitudes concurrentes sobre la misma inspeccion:
+  una publica, la otra recibe 409 y no se duplican los resultados.
 
-## Verificacion realizada en HU-026
+La prueba de concurrencia cubre la misma inspeccion; no representa
+una prueba de carga ni de publicaciones de inspecciones distintas.
 
-`TransicionInspeccionService` cumple este contrato en `publicar` (Catedratico o
-Profesional externo verificado) y en `aprobar` (revision). Verificado con el
-calculador real en `PublicacionInspeccionIntegrationTest`:
+## Validacion registrada
 
-- Flujo autorizado completo: historial, resultado IC, estado vigente del puente y auditoria.
-- Reversion conjunta de estado, historial, IC, puente y auditoria ante un fallo del calculo.
-- Dos publicaciones simultaneas: solo una publica y la otra recibe 409.
+mvn verify: 908 pruebas, sin fallos, errores ni pruebas omitidas.
+Verificacion de cobertura exigida por HU-018 aprobada.
