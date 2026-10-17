@@ -1,0 +1,23 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "SubirYLeerRespaldos",
+      "Effect": "Allow",
+      "Action": ["s3:PutObject", "s3:GetObject"],
+      "Resource": [
+        "arn:aws:s3:::sgp-prod-respaldos-ayd1-2026-gt01/diarios/*",
+        "arn:aws:s3:::sgp-prod-respaldos-ayd1-2026-gt01/mensuales/*"
+      ]
+    },
+    {
+      "Sid": "ListarRespaldos",
+      "Effect": "Allow",
+      "Action": "s3:ListBucket",
+      "Resource": "arn:aws:s3:::sgp-prod-respaldos-ayd1-2026-gt01",
+      "Condition": {
+        "StringLike": { "s3:prefix": ["diarios/*", "mensuales/*"] }
+      }
+    }
+  ]
+}

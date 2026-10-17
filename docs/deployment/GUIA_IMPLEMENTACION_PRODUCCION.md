@@ -29,6 +29,11 @@ responsable de producción debe conservar o coordinar antes de modificarlos.
 
 ### Flujo de promoción acordado
 
+> **Actualización:** este flujo manual fue reemplazado por el despliegue
+> automático en cada `push` a `main`
+> ([ADR-0004](../adr/0004-despliegue-automatico-produccion-desde-main.md)). La
+> operación vigente está en [`PRODUCCION_AWS.md`](PRODUCCION_AWS.md).
+
 ```text
 feature/*
     |
