@@ -1165,42 +1165,6 @@ public class InspeccionService {
     return inspeccionMapper.toResumenResponse(inspeccion);
   }
 
-  @Transactional
-  public InspeccionResumenResponse enviarInspeccion(UUID inspeccionId, UUID usuarioId) {
-    Inspeccion inspeccion = obtenerInspeccionActiva(inspeccionId);
-
-    if (!inspeccion.getAutorId().equals(usuarioId)) {
-      throw new ApiException(
-          HttpStatus.FORBIDDEN,
-          "acceso_denegado",
-          "Acceso denegado",
-          "Solo el autor puede enviar esta inspección.");
-    }
-
-    if (!"BORRADOR".equalsIgnoreCase(inspeccion.getEstado())
-        && !"CAMBIOS_SOLICITADOS".equalsIgnoreCase(inspeccion.getEstado())) {
-      throw new ApiException(
-          HttpStatus.CONFLICT,
-          "estado_invalido",
-          "Estado inválido",
-          "Solo se pueden enviar inspecciones en borrador o con cambios solicitados");
-    }
-
-    // Enviar exige todos los campos obligatorios del esquema de su versión
-    VersionFormulario version = inspeccion.getVersionFormulario();
-    jsonSchemaValidatorService.validarRespuestas(
-        version.getEsquema(), inspeccion.getDatos(), false);
-
-    inspeccion.setEstado("ENVIADA");
-    Instant ahora = clock.instant();
-    inspeccion.setEnviadoDispositivoEn(ahora);
-    inspeccion.setUltimaActividadEn(ahora);
-    inspeccion.setActualizadoEn(ahora);
-
-    inspeccion = inspeccionRepository.save(inspeccion);
-    return inspeccionMapper.toResumenResponse(inspeccion);
-  }
-
   @Transactional(readOnly = true)
   public InspeccionResumenResponse consultarPorId(UUID inspeccionId, UUID usuarioId) {
     Inspeccion inspeccion = obtenerInspeccionActiva(inspeccionId);

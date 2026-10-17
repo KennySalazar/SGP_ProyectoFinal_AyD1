@@ -3,6 +3,7 @@ package gt.usac.cunoc.sgp.inspeccion.entity;
 import com.fasterxml.jackson.databind.JsonNode;
 import gt.usac.cunoc.sgp.common.util.UuidV7Generator;
 import gt.usac.cunoc.sgp.formulario.entity.VersionFormulario;
+import gt.usac.cunoc.sgp.inspeccion.model.EstadoInspeccion;
 import gt.usac.cunoc.sgp.puente.entity.Puente;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
@@ -323,8 +324,23 @@ public class Inspeccion {
     return estado;
   }
 
-  public void setEstado(String estado) {
-    this.estado = estado;
+  /**
+   * Cambia el estado. Solo debe invocarlo {@code TransicionInspeccionService}, la única puerta de
+   * entrada que valida la transición y registra el historial (DT-BE-07).
+   */
+  public void aplicarEstado(EstadoInspeccion nuevo, Instant ahora) {
+    this.estado = nuevo.name();
+    if (nuevo == EstadoInspeccion.ENVIADA) {
+      this.enviadoDispositivoEn = ahora;
+    } else if (nuevo == EstadoInspeccion.PUBLICADA) {
+      this.publicadoEn = ahora;
+    }
+    this.ultimaActividadEn = ahora;
+    this.actualizadoEn = ahora;
+  }
+
+  public EstadoInspeccion estadoActual() {
+    return EstadoInspeccion.valueOf(estado);
   }
 
   public LocalDate getFechaInspeccion() {
@@ -417,10 +433,6 @@ public class Inspeccion {
 
   public Instant getPublicadoEn() {
     return publicadoEn;
-  }
-
-  public void setPublicadoEn(Instant publicadoEn) {
-    this.publicadoEn = publicadoEn;
   }
 
   public Instant getUltimaActividadEn() {

@@ -1121,6 +1121,32 @@
         "PUBLICADA": "Publicada",
         "RECHAZADA": "Rechazada"
       }
+    },
+    "transicion": {
+      "enviar": "Enviar a revisión",
+      "publicar": "Publicar inspección",
+      "enviarTitulo": "Enviar a revisión",
+      "publicarTitulo": "Publicar inspección",
+      "enviarTexto": "La inspección pasará a revisión de tu Catedrático y ya no podrás editarla mientras esté enviada. Se verificarán los campos obligatorios y las fotografías mínimas.",
+      "publicarTexto": "La inspección quedará publicada con su Índice de Condición definitivo y actualizará el estado del puente. Una inspección publicada no se puede modificar ni eliminar.",
+      "puente": "Puente",
+      "guardaPrimero": "Espera a que se guarden tus cambios para poder enviar o publicar.",
+      "colegiadoPendiente": "Tu número de colegiado está pendiente de verificación. Podrás publicar cuando el Administrador lo verifique.",
+      "camposFaltantes": "Campos obligatorios pendientes",
+      "fotosFaltantes": "Fotografías obligatorias faltantes",
+      "categorias": {
+        "ACCESO": "Accesos",
+        "SUPERESTRUCTURA": "Superestructura",
+        "SUBESTRUCTURA": "Subestructura",
+        "CAUCE": "Cauce"
+      },
+      "cancelar": "Cancelar",
+      "procesando": "Procesando...",
+      "publicada": "Inspección publicada",
+      "publicadaNota": "Se calculó su Índice de Condición definitivo y se actualizó el estado del puente.",
+      "enviada": "Inspección enviada a revisión",
+      "enviadaNota": "Tu Catedrático la revisará. Recibirás sus observaciones si solicita cambios.",
+      "verMisInspecciones": "Ver mis inspecciones"
     }
   }
 }

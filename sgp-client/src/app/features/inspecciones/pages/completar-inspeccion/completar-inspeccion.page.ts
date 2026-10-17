@@ -17,13 +17,28 @@ import { debounceTime, Subject } from 'rxjs';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { ButtonModule } from 'primeng/button';
 import { TagModule } from 'primeng/tag';
+import { DialogModule } from 'primeng/dialog';
 import { ProgressBarModule } from 'primeng/progressbar';
 import { InputTextModule } from 'primeng/inputtext';
 import { FormularioDinamicoComponent } from '../../../formulario/components/formulario-dinamico/formulario-dinamico.component';
 import { EsquemaJson } from '../../../formulario/motor/esquema/modelos';
 import { FormularioApiService } from '../../../formulario/services/formulario-api.service';
-import { GuardarBorradorRequest, InspeccionBorradorResponse } from '../../models/inspeccion.models';
+import {
+  GuardarBorradorRequest,
+  InspeccionBorradorResponse,
+  InspeccionResumenResponse,
+} from '../../models/inspeccion.models';
+import { ApiErrorService } from '../../../../core/services/api-error.service';
+import { AuthStore } from '../../../../core/services/auth.store';
 import { InspeccionApiService } from '../../services/inspeccion-api.service';
+
+type AccionFinal = 'enviar' | 'publicar';
+
+interface ErrorAccion {
+  mensaje: string;
+  campos: { campo: string; mensaje: string }[];
+  fotografias: string[];
+}
 
 @Component({
   selector: 'app-completar-inspeccion-page',
@@ -35,6 +50,7 @@ import { InspeccionApiService } from '../../services/inspeccion-api.service';
     TranslocoPipe,
     ButtonModule,
     TagModule,
+    DialogModule,
     ProgressBarModule,
     InputTextModule,
     FormularioDinamicoComponent,
@@ -48,6 +64,8 @@ export class CompletarInspeccionPage implements OnInit {
   private readonly router = inject(Router);
   private readonly inspeccionApi = inject(InspeccionApiService);
   private readonly formularioApi = inject(FormularioApiService);
+  private readonly auth = inject(AuthStore);
+  private readonly apiErrors = inject(ApiErrorService);
   private readonly destroyRef = inject(DestroyRef);
   private readonly cambios = new Subject<void>();
   private revisionDatos = 0;
@@ -67,6 +85,30 @@ export class CompletarInspeccionPage implements OnInit {
   readonly esquema = signal<EsquemaJson | null>(null);
   readonly fechaInspeccion = signal<string>('');
   readonly hoy = new Date().toISOString().slice(0, 10);
+
+  // Envío o publicación (HU-026)
+  readonly confirmandoAccion = signal(false);
+  readonly ejecutandoAccion = signal(false);
+  readonly errorAccion = signal<ErrorAccion | null>(null);
+  readonly resultadoAccion = signal<InspeccionResumenResponse | null>(null);
+
+  /** Acción final según el rol con que se creó la inspección (RN-REV-01, RN-REV-02). */
+  readonly accionFinal = computed<AccionFinal | null>(() => {
+    const b = this.borrador();
+    if (!b || b.estado !== 'BORRADOR') return null;
+    if (b.rolAutor === 'CATEDRATICO' || b.rolAutor === 'PROFESIONAL_EXTERNO') return 'publicar';
+    return b.rolAutor === 'ESTUDIANTE' ? 'enviar' : null;
+  });
+
+  /** El Profesional externo sin colegiado verificado no puede publicar (RN-USR-04). */
+  readonly colegiadoPendiente = computed(
+    () => this.accionFinal() === 'publicar' && this.auth.colegiadoPendiente(),
+  );
+
+  /** El servidor valida lo guardado; la acción espera a que no haya cambios pendientes. */
+  readonly cambiosSinGuardar = computed(
+    () => this.guardando() || this.estadoAutoguardado() === 'pendiente',
+  );
 
   private readonly datosEnMemoria = signal<Record<string, unknown>>({});
   private readonly datosIniciales = signal<InspeccionBorradorResponse | null>(null);
@@ -296,6 +338,60 @@ export class CompletarInspeccionPage implements OnInit {
         this.procesarErrorGuardado(err);
       },
     });
+  }
+
+  abrirConfirmacion(): void {
+    if (!this.accionFinal() || this.cambiosSinGuardar() || this.colegiadoPendiente()) return;
+    this.errorAccion.set(null);
+    this.confirmandoAccion.set(true);
+  }
+
+  cancelarConfirmacion(): void {
+    if (this.ejecutandoAccion()) return;
+    this.confirmandoAccion.set(false);
+  }
+
+  confirmarAccion(): void {
+    const b = this.borrador();
+    const accion = this.accionFinal();
+    if (!b || !accion || this.ejecutandoAccion()) return;
+
+    this.ejecutandoAccion.set(true);
+    this.errorAccion.set(null);
+    this.apiErrors.clear();
+    const peticion =
+      accion === 'publicar' ? this.inspeccionApi.publicar(b.id) : this.inspeccionApi.enviar(b.id);
+
+    peticion.pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+      next: (resultado) => {
+        this.ejecutandoAccion.set(false);
+        this.confirmandoAccion.set(false);
+        this.resultadoAccion.set(resultado);
+      },
+      error: (err: HttpErrorResponse) => {
+        this.ejecutandoAccion.set(false);
+        this.errorAccion.set(this.errorDeAccion(err));
+        this.apiErrors.clear();
+      },
+    });
+  }
+
+  /** Separa los campos y las categorías de fotografía faltantes del 422 (RN-INS-06). */
+  private errorDeAccion(err: HttpErrorResponse): ErrorAccion {
+    const problema = err.error as {
+      detail?: string;
+      errores?: { campo?: string; mensaje?: string }[];
+    } | null;
+    const errores = problema?.errores ?? [];
+    return {
+      mensaje: problema?.detail ?? 'No fue posible completar la acción sobre la inspección.',
+      campos: errores
+        .filter((e) => e.campo && !e.campo.startsWith('fotografias.'))
+        .map((e) => ({ campo: e.campo ?? '', mensaje: e.mensaje ?? '' })),
+      fotografias: errores
+        .filter((e) => e.campo?.startsWith('fotografias.'))
+        .map((e) => (e.campo ?? '').replace('fotografias.', '')),
+    };
   }
 
   severidadIc(estado: string | null | undefined): 'success' | 'warn' | 'danger' | 'secondary' {

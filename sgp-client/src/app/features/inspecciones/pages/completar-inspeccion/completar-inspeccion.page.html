@@ -13,6 +13,28 @@
       <span>{{ 'inspecciones.borrador.volverPuente' | transloco }}</span>
     </a>
   </div>
+  } @else if (resultadoAccion(); as r) {
+  <div class="estado-mensaje resultado-accion surface-card" role="status">
+    <i class="pi pi-check-circle" aria-hidden="true"></i>
+    <h2>
+      {{ (r.estado === 'PUBLICADA' ? 'inspecciones.transicion.publicada' :
+      'inspecciones.transicion.enviada') | transloco }}
+    </h2>
+    <p>
+      {{ (r.estado === 'PUBLICADA' ? 'inspecciones.transicion.publicadaNota' :
+      'inspecciones.transicion.enviadaNota') | transloco }}
+    </p>
+    <div class="acciones-resultado">
+      <a pButton routerLink="/inspecciones">
+        <i class="pi pi-list" aria-hidden="true"></i>
+        <span>{{ 'inspecciones.transicion.verMisInspecciones' | transloco }}</span>
+      </a>
+      <a pButton severity="secondary" [outlined]="true" [routerLink]="['/puentes', r.puenteId]">
+        <i class="pi pi-arrow-left" aria-hidden="true"></i>
+        <span>{{ 'inspecciones.borrador.volverPuente' | transloco }}</span>
+      </a>
+    </div>
+  </div>
   } @else if (borrador(); as b) {
   <!-- Encabezado de la página -->
   <header class="page-heading encabezado-inspeccion">
@@ -79,8 +101,32 @@
           transloco }}</span
         >
       </button>
+
+      @if (accionFinal(); as accion) {
+      <button
+        pButton
+        type="button"
+        severity="success"
+        class="btn-accion-final"
+        [disabled]="cambiosSinGuardar() || colegiadoPendiente()"
+        [attr.title]="cambiosSinGuardar() ? ('inspecciones.transicion.guardaPrimero' | transloco) : null"
+        (click)="abrirConfirmacion()"
+      >
+        <i [class]="accion === 'publicar' ? 'pi pi-verified' : 'pi pi-send'" aria-hidden="true"></i>
+        <span>{{ 'inspecciones.transicion.' + accion | transloco }}</span>
+      </button>
+      }
     </div>
   </header>
+
+  @if (colegiadoPendiente()) {
+  <div class="alerta-autoguardado surface-card" role="status">
+    <i class="pi pi-id-card" aria-hidden="true"></i>
+    <span>{{ 'inspecciones.transicion.colegiadoPendiente' | transloco }}</span>
+  </div>
+  } @else if (accionFinal() && cambiosSinGuardar()) {
+  <p class="nota-accion">{{ 'inspecciones.transicion.guardaPrimero' | transloco }}</p>
+  }
 
   <!-- Avisos de resultado de guardado -->
   @if (estadoAutoguardado(); as estado) {
@@ -186,5 +232,80 @@
       (seccionCambiando)="onSeccionCambiando()"
     />
   </div>
-  } }
+  }
+
+  <p-dialog
+    [header]="'inspecciones.transicion.' + (accionFinal() ?? 'publicar') + 'Titulo' | transloco"
+    [visible]="confirmandoAccion()"
+    (visibleChange)="!$event && cancelarConfirmacion()"
+    [modal]="true"
+    [style]="{ width: 'min(620px, 95vw)' }"
+    [draggable]="false"
+    [resizable]="false"
+  >
+    <p class="dialogo-texto">
+      {{ 'inspecciones.transicion.' + (accionFinal() ?? 'publicar') + 'Texto' | transloco }}
+    </p>
+    <dl class="dialogo-datos">
+      <div>
+        <dt>{{ 'inspecciones.transicion.puente' | transloco }}</dt>
+        <dd>{{ b.nombrePuente }} ({{ b.codigoPuente }})</dd>
+      </div>
+      <div>
+        <dt>{{ 'inspecciones.borrador.fechaInspeccion' | transloco }}</dt>
+        <dd>{{ b.fechaInspeccion | date: 'dd/MM/yyyy' }}</dd>
+      </div>
+    </dl>
+
+    @if (errorAccion(); as error) {
+    <div class="error-accion" role="alert">
+      <p>{{ error.mensaje }}</p>
+      @if (error.campos.length > 0) {
+      <h3>{{ 'inspecciones.transicion.camposFaltantes' | transloco }}</h3>
+      <ul>
+        @for (campo of error.campos; track campo.campo) {
+        <li>{{ campo.mensaje || campo.campo }}</li>
+        }
+      </ul>
+      } @if (error.fotografias.length > 0) {
+      <h3>{{ 'inspecciones.transicion.fotosFaltantes' | transloco }}</h3>
+      <ul>
+        @for (categoria of error.fotografias; track categoria) {
+        <li>{{ 'inspecciones.transicion.categorias.' + categoria | transloco }}</li>
+        }
+      </ul>
+      }
+    </div>
+    }
+
+    <div class="dialogo-acciones">
+      <button
+        pButton
+        type="button"
+        severity="secondary"
+        [outlined]="true"
+        [disabled]="ejecutandoAccion()"
+        (click)="cancelarConfirmacion()"
+      >
+        {{ 'inspecciones.transicion.cancelar' | transloco }}
+      </button>
+      <button
+        pButton
+        type="button"
+        severity="success"
+        [disabled]="ejecutandoAccion()"
+        (click)="confirmarAccion()"
+      >
+        <i
+          [class]="accionFinal() === 'publicar' ? 'pi pi-verified' : 'pi pi-send'"
+          aria-hidden="true"
+        ></i>
+        <span
+          >{{ (ejecutandoAccion() ? 'inspecciones.transicion.procesando' :
+          'inspecciones.transicion.' + (accionFinal() ?? 'publicar')) | transloco }}</span
+        >
+      </button>
+    </div>
+  </p-dialog>
+  }
 </section>
