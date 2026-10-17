@@ -258,6 +258,11 @@ describe('esquema-visual utility', () => {
     const subestructura = resolverEsquema(resultado.esquema).secciones.find(
       (seccion) => seccion.clave === 'subestructura',
     )!;
+    expect(subestructura.clase).toBe('objeto');
+    if (subestructura.clase !== 'objeto') {
+      throw new Error('La seccion subestructura debe ser un objeto');
+    }
+
     expect(subestructura.hijos.find((hijo) => hijo.clave === 'estribo_entrada')?.clase).toBe(
       'objeto',
     );

@@ -18,6 +18,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('maplibre-gl', () => ({
+  getVersion: () => '5.24.0',
   Map: class {
     remove = vi.fn();
     resize = vi.fn();
@@ -166,6 +167,25 @@ describe('Mapa público de puentes', () => {
     expect(popup.querySelector('img')).toBeNull();
     expect(popup.textContent).not.toContain('privada.jpg');
     expect(popup.textContent).not.toContain('Daño privado');
+  });
+
+  it.each([0, 80])('conserva el estado Malo del servidor con IC %s', async (indice) => {
+    await abrir([
+      { ...puente('Malo'), indiceCondicionActual: indice, fechaUltimaInspeccion: '2026-10-16' },
+    ]);
+    const popup = mocks.popups[0].contenido;
+    expect(popup.textContent).toContain(`puentes.ficha.conditionIndex: ${indice}`);
+    expect(popup.textContent).toContain('2026-10-16');
+    expect(mocks.marcadores[0].elemento.getAttribute('aria-label')).toContain('Malo');
+  });
+
+  it('muestra ausencia de IC y fecha sin inventar una evaluacion', async () => {
+    await abrir([
+      { ...puente('Sin evaluar'), indiceCondicionActual: null, fechaUltimaInspeccion: null },
+    ]);
+    expect(mocks.popups[0].contenido.textContent).toContain('puentes.ficha.notAvailable');
+    expect(mocks.popups[0].contenido.textContent).toContain('puentes.ficha.noInspections');
+    expect(mocks.popups[0].contenido.textContent).toContain('Sin evaluar');
   });
 
   it('limpia marcadores y popups al actualizar y libera mapa y observador al salir', async () => {

@@ -8,10 +8,11 @@ import {
   signal,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { ActivatedRoute, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { ButtonModule } from 'primeng/button';
 import { TagModule } from 'primeng/tag';
+import { DialogModule } from 'primeng/dialog';
 import { finalize } from 'rxjs';
 import { ApiErrorService } from '../../../../core/services/api-error.service';
 import { PuntoMapa } from '../../../../shared/utils/ubicacion-guatemala';
@@ -34,19 +35,22 @@ const CODIGOS_UBICACION_RECHAZADA = [
 @Component({
   selector: 'app-editar-puente-page',
   standalone: true,
-  imports: [TranslocoPipe, ButtonModule, TagModule, RouterLink, PuenteFormComponent],
+  imports: [TranslocoPipe, ButtonModule, TagModule, DialogModule, RouterLink, PuenteFormComponent],
   templateUrl: './editar-puente.page.html',
   styleUrl: './editar-puente.page.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class EditarPuentePage {
   private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
   private readonly api = inject(PuenteApiService);
   private readonly destroyRef = inject(DestroyRef);
   private readonly apiErrors = inject(ApiErrorService);
   private readonly transloco = inject(TranslocoService);
 
   private solicitudPendiente: ActualizarPuenteRequest | null = null;
+  private edicionPendiente: ActualizarPuenteRequest | null = null;
+  readonly mostrarConfirmacionEdicion = signal(false);
 
   readonly puenteId = signal<string | null>(null);
   readonly cargandoPuente = signal(true);
@@ -114,14 +118,28 @@ export class EditarPuentePage {
   actualizar(valores: PuenteFormValores): void {
     if (this.guardando() || !this.puente()) return;
 
-    this.enviar({
+    this.edicionPendiente = {
       ...valores,
       confirmarCercania: false,
       codigo: this.puente()?.codigo,
-    });
+    };
+    this.mostrarConfirmacionEdicion.set(true);
+  }
+
+  confirmarEdicion(): void {
+    const request = this.edicionPendiente;
+    if (!request || this.guardando() || !this.mostrarConfirmacionEdicion()) return;
+    this.cancelarEdicion();
+    this.enviar(request);
+  }
+
+  cancelarEdicion(): void {
+    this.mostrarConfirmacionEdicion.set(false);
+    this.edicionPendiente = null;
   }
 
   alCambiarFormulario(): void {
+    this.cancelarEdicion();
     this.cancelarConfirmacion();
     this.erroresCampos.set({});
     this.errorRegistro.set(null);
@@ -181,6 +199,7 @@ export class EditarPuentePage {
         next: (respuesta) => {
           this.puente.set(respuesta);
           this.puenteActualizado.set(respuesta);
+          void this.router.navigate(['/puentes']);
         },
         error: (error: HttpErrorResponse) => {
           const problem = error.error as PuenteProblemDetails | null;
