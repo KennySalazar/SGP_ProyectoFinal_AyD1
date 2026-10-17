@@ -81,6 +81,14 @@ export class InspeccionApiService {
     );
   }
 
+  /** Crea una corrección en borrador de una inspección publicada (HU-027). */
+  crearCorreccion(id: string, motivo: string): Observable<InspeccionResumenResponse> {
+    return this.http.post<InspeccionResumenResponse>(
+      `/api/v1/inspecciones/${encodeURIComponent(id)}/correcciones`,
+      { motivo },
+    );
+  }
+
   eliminarBorrador(id: string): Observable<void> {
     return this.http.delete<void>(`/api/v1/inspecciones/${encodeURIComponent(id)}`);
   }

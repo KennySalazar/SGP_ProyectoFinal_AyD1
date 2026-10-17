@@ -33,4 +33,13 @@ describe('InspeccionApiService', () => {
     expect(request.request.method).toBe('DELETE');
     request.flush(null);
   });
+
+  it('crea una corrección de una inspección publicada con su motivo', () => {
+    service.crearCorreccion('inspeccion/1', 'Ajuste de fecha').subscribe();
+
+    const request = http.expectOne('/api/v1/inspecciones/inspeccion%2F1/correcciones');
+    expect(request.request.method).toBe('POST');
+    expect(request.request.body).toEqual({ motivo: 'Ajuste de fecha' });
+    request.flush({ id: 'correccion-1' });
+  });
 });
