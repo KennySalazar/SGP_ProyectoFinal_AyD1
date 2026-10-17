@@ -119,6 +119,7 @@ public class TransicionInspeccionService {
     }
     exigirColegiadoVerificado(inspeccion);
     MaquinaEstadosInspeccion.destino(inspeccion.estadoActual(), EventoInspeccion.ENVIAR);
+    exigirSinCorreccionPublicada(inspeccion);
     exigirCompleta(inspeccion);
 
     aplicar(inspeccion, EventoInspeccion.ENVIAR, usuarioId, null);
@@ -142,6 +143,8 @@ public class TransicionInspeccionService {
   public InspeccionResumenResponse aprobar(UUID inspeccionId, UUID revisorId) {
     Inspeccion inspeccion = bloquearParaPublicar(inspeccionId);
     exigirRevisorDistintoDelAutor(inspeccion, revisorId);
+    MaquinaEstadosInspeccion.destino(inspeccion.estadoActual(), EventoInspeccion.APROBAR);
+    exigirSinCorreccionPublicada(inspeccion);
     aplicar(inspeccion, EventoInspeccion.APROBAR, revisorId, null);
     return publicarConIndice(inspeccion, revisorId);
   }
@@ -266,6 +269,21 @@ public class TransicionInspeccionService {
               + (faltantes.size() - campos)
               + " categorias de fotografia.",
           faltantes);
+    }
+  }
+
+  /**
+   * Una inspección original solo admite una corrección publicada (RN-INS-08). La base de datos lo
+   * garantiza también con el índice uq_inspeccion_sucesora_publicada.
+   */
+  private void exigirSinCorreccionPublicada(Inspeccion inspeccion) {
+    if (inspeccion.getSupersedeAId() != null
+        && inspecciones.findCorreccionPublicadaId(inspeccion.getSupersedeAId()).isPresent()) {
+      throw new ApiException(
+          HttpStatus.CONFLICT,
+          "correccion_ya_publicada",
+          "Correccion ya publicada",
+          "La inspeccion original ya tiene una correccion publicada; corrija esa correccion.");
     }
   }
 

@@ -200,6 +200,44 @@ public class Inspeccion {
         Instant.now());
   }
 
+  /**
+   * Nueva inspección de tipo CORRECCION en BORRADOR, relacionada con la original publicada mediante
+   * supersede_a (RN-INS-08). Parte de los datos de la original porque corrige la misma visita; la
+   * original no se modifica.
+   */
+  public static Inspeccion correccionDe(
+      Inspeccion original,
+      UUID autorId,
+      String rolAutor,
+      String nombreAutor,
+      String motivo,
+      Instant ahora) {
+    Inspeccion correccion =
+        new Inspeccion(
+            UuidV7Generator.generate(),
+            original.getPuente(),
+            original.getVersionFormulario(),
+            autorId,
+            rolAutor,
+            nombreAutor,
+            original.getFechaInspeccion(),
+            "web",
+            null,
+            null,
+            null,
+            null,
+            original.getDatos() == null ? null : original.getDatos().deepCopy(),
+            ahora);
+    correccion.tipo = "CORRECCION";
+    correccion.supersedeAId = original.getId();
+    correccion.motivoCorreccion = motivo;
+    correccion.identificacionCapturada =
+        original.getIdentificacionCapturada() == null
+            ? null
+            : original.getIdentificacionCapturada().deepCopy();
+    return correccion;
+  }
+
   @PrePersist
   public void alPersistir() {
     if (this.id == null) {
