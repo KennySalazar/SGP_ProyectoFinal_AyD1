@@ -122,6 +122,8 @@ export interface PuenteCatalogoResponse {
   longitud: number | null;
   activo: boolean;
   estadoActual: EstadoPuente;
+  indiceCondicionActual?: number | null;
+  fechaUltimaInspeccion?: string | null;
 }
 
 export interface ConsultaCatalogoPuentes {

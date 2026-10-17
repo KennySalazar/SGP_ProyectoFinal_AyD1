@@ -250,6 +250,13 @@
     "empty": "No tienes puentes asignados actualmente."
   },
   "puentes": {
+    "editConfirmation": {
+      "title": "Confirmar edicion del puente",
+      "message": "¿Seguro que deseas guardar los cambios del puente {{nombre}}?",
+      "note": "Al guardar correctamente volveras al catalogo de puentes.",
+      "cancel": "Seguir editando",
+      "confirm": "Si, guardar cambios"
+    },
     "revision": {
       "title": "Revisión de solicitudes de alta",
       "description": "Revisa las solicitudes de los Catedráticos y decide si el puente entra al catálogo.",

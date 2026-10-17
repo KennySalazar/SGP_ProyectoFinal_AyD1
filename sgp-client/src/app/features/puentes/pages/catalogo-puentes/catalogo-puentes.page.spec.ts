@@ -338,6 +338,36 @@ describe('Base compartida del catálogo HU014', () => {
     http.expectOne((req) => req.url === '/api/v1/puentes').flush({ content: [] });
   });
 
+  it('muestra IC cero, fecha y estado del servidor sin recalcularlo', () => {
+    const content = [0, 80].map((indiceCondicionActual, index) => ({
+      id: `hu033-${index}`,
+      codigo: `GT-${index}`,
+      nombre: `Puente ${index}`,
+      departamento: { id: 'd', codigoIne: '01', nombre: 'Guatemala' },
+      municipio: { id: 'm', departamentoId: 'd', codigoIne: '0114', nombre: 'Amatitlan' },
+      activo: true,
+      estadoActual: 'Malo',
+      indiceCondicionActual,
+      fechaUltimaInspeccion: '2026-10-16',
+    }));
+    http.expectOne((req) => req.url === '/api/v1/puentes').flush({ content, totalElements: 2 });
+    fixture.detectChanges();
+    const valores: NodeListOf<HTMLElement> = fixture.nativeElement.querySelectorAll(
+      '[data-testid="catalogo-ic"]',
+    );
+    expect(Array.from(valores, (el) => el.textContent?.trim())).toEqual(['0', '80']);
+    const fechas: NodeListOf<HTMLElement> = fixture.nativeElement.querySelectorAll(
+      '[data-testid="catalogo-fecha"]',
+    );
+    expect(Array.from(fechas, (el) => el.textContent?.trim())).toEqual([
+      '2026-10-16',
+      '2026-10-16',
+    ]);
+    expect(
+      fixture.nativeElement.querySelectorAll('.estado-puente[data-estado="Malo"]'),
+    ).toHaveLength(2);
+  });
+
   it('muestra datos públicos y cada estado con texto y severidad visual', () => {
     const estados: EstadoPuente[] = ['Bueno', 'Regular', 'Malo', 'Sin evaluar'];
     const severidades = ['success', 'warn', 'danger', 'secondary'];
