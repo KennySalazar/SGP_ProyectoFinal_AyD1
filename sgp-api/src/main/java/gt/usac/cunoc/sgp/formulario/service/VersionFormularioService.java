@@ -1016,4 +1016,21 @@ public class VersionFormularioService {
           "Falta configurar los siguientes niveles: " + String.join(", ", pendientes));
     }
   }
+
+  @Transactional(readOnly = true)
+  public void validarRespuestas(UUID versionId, JsonNode datos, Boolean esBorrador) {
+    VersionFormulario version =
+        versiones
+            .findById(versionId)
+            .orElseThrow(
+                () ->
+                    new ApiException(
+                        HttpStatus.NOT_FOUND,
+                        "version_no_encontrada",
+                        "Version no encontrada",
+                        "No existe una version con identificador " + versionId));
+
+    boolean modoBorrador = esBorrador == null || esBorrador;
+    schemaValidator.validarRespuestas(version.getEsquema(), datos, modoBorrador);
+  }
 }

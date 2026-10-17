@@ -72,6 +72,7 @@ export class FormularioDinamicoComponent {
   readonly seccionesApoyo = input<SeccionApoyo[]>([]);
 
   readonly valorChange = output<Record<string, unknown>>();
+  readonly seccionCambiando = output<void>();
   /** `false` mientras algún campo visible incumple una regla del esquema. */
   readonly validoChange = output<boolean>();
 
@@ -182,6 +183,7 @@ export class FormularioDinamicoComponent {
   protected irA(indice: number): void {
     const total = this.entradas().length;
     if (indice < 0 || indice >= total || indice === this.indiceActivo()) return;
+    this.seccionCambiando.emit();
     this.indiceActivo.set(indice);
     this.encabezado()?.nativeElement.focus({ preventScroll: false });
     // En pantallas angostas la lista de secciones se desplaza: la activa debe quedar a la vista.

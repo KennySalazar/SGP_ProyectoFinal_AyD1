@@ -1,0 +1,311 @@
+<section class="pagina-borrador">
+  @if (cargando()) {
+  <div class="estado-cargando surface-card" role="status">
+    <i class="pi pi-spin pi-spinner" aria-hidden="true"></i>
+    <p>{{ 'inspecciones.borrador.cargando' | transloco }}</p>
+  </div>
+  } @else if (errorCarga(); as errCarga) {
+  <div class="estado-mensaje estado-error surface-card" role="alert">
+    <i class="pi pi-exclamation-circle" aria-hidden="true"></i>
+    <h2>{{ errCarga }}</h2>
+    <a pButton routerLink="/puentes" class="btn-volver">
+      <i class="pi pi-arrow-left" aria-hidden="true"></i>
+      <span>{{ 'inspecciones.borrador.volverPuente' | transloco }}</span>
+    </a>
+  </div>
+  } @else if (resultadoAccion(); as r) {
+  <div class="estado-mensaje resultado-accion surface-card" role="status">
+    <i class="pi pi-check-circle" aria-hidden="true"></i>
+    <h2>
+      {{ (r.estado === 'PUBLICADA' ? 'inspecciones.transicion.publicada' :
+      'inspecciones.transicion.enviada') | transloco }}
+    </h2>
+    <p>
+      {{ (r.estado === 'PUBLICADA' ? 'inspecciones.transicion.publicadaNota' :
+      'inspecciones.transicion.enviadaNota') | transloco }}
+    </p>
+    <div class="acciones-resultado">
+      <a pButton routerLink="/inspecciones">
+        <i class="pi pi-list" aria-hidden="true"></i>
+        <span>{{ 'inspecciones.transicion.verMisInspecciones' | transloco }}</span>
+      </a>
+      <a pButton severity="secondary" [outlined]="true" [routerLink]="['/puentes', r.puenteId]">
+        <i class="pi pi-arrow-left" aria-hidden="true"></i>
+        <span>{{ 'inspecciones.borrador.volverPuente' | transloco }}</span>
+      </a>
+    </div>
+  </div>
+  } @else if (borrador(); as b) {
+  <!-- Encabezado de la página -->
+  <header class="page-heading encabezado-inspeccion">
+    <div>
+      <p class="page-kicker">{{ 'inspecciones.borrador.kicker' | transloco }}</p>
+      <h1 class="page-title">{{ b.nombrePuente }} ({{ b.codigoPuente }})</h1>
+      <div class="meta-inspeccion">
+        <p-tag [value]="b.estado" severity="warn" />
+        <span class="meta-item">
+          <strong>{{ 'inspecciones.borrador.formulario' | transloco }}:</strong>
+          {{ b.codigoVersionFormulario }}
+        </span>
+        <span class="meta-item">
+          <strong>{{ 'inspecciones.borrador.inspector' | transloco }}:</strong>
+          {{ b.nombreAutor }} ({{ b.rolAutor }})
+        </span>
+        @if (b.ultimaActividadEn) {
+        <span class="meta-item meta-tiempo">
+          <strong>{{ 'inspecciones.borrador.ultimaActividad' | transloco }}:</strong>
+          {{ b.ultimaActividadEn | date: 'dd/MM/yyyy HH:mm' }}
+        </span>
+        }
+      </div>
+    </div>
+
+    <div class="acciones-encabezado">
+      <div class="campo-fecha">
+        <label for="fechaInspeccionInput" class="etiqueta-fecha">
+          {{ 'inspecciones.borrador.fechaInspeccion' | transloco }}:
+        </label>
+        <input
+          id="fechaInspeccionInput"
+          pInputText
+          type="date"
+          [max]="hoy"
+          [ngModel]="fechaInspeccion()"
+          (ngModelChange)="onFechaInspeccionChange($event)"
+          class="input-fecha"
+        />
+      </div>
+
+      <a
+        pButton
+        severity="secondary"
+        [outlined]="true"
+        [routerLink]="['/puentes', b.puenteId]"
+        class="btn-volver"
+      >
+        <i class="pi pi-arrow-left" aria-hidden="true"></i>
+        <span>{{ 'inspecciones.borrador.volverPuente' | transloco }}</span>
+      </a>
+
+      <button
+        pButton
+        type="button"
+        (click)="guardarBorrador()"
+        [disabled]="guardando()"
+        [loading]="guardando()"
+        class="btn-guardar"
+      >
+        <i class="pi pi-save" aria-hidden="true"></i>
+        <span
+          >{{ (guardando() ? 'inspecciones.borrador.guardando' : 'inspecciones.borrador.guardar' ) |
+          transloco }}</span
+        >
+      </button>
+
+      @if (accionFinal(); as accion) {
+      <button
+        pButton
+        type="button"
+        severity="success"
+        class="btn-accion-final"
+        [disabled]="cambiosSinGuardar() || colegiadoPendiente()"
+        [attr.title]="cambiosSinGuardar() ? ('inspecciones.transicion.guardaPrimero' | transloco) : null"
+        (click)="abrirConfirmacion()"
+      >
+        <i [class]="accion === 'publicar' ? 'pi pi-verified' : 'pi pi-send'" aria-hidden="true"></i>
+        <span>{{ 'inspecciones.transicion.' + accion | transloco }}</span>
+      </button>
+      }
+    </div>
+  </header>
+
+  @if (colegiadoPendiente()) {
+  <div class="alerta-autoguardado surface-card" role="status">
+    <i class="pi pi-id-card" aria-hidden="true"></i>
+    <span>{{ 'inspecciones.transicion.colegiadoPendiente' | transloco }}</span>
+  </div>
+  } @else if (accionFinal() && cambiosSinGuardar()) {
+  <p class="nota-accion">{{ 'inspecciones.transicion.guardaPrimero' | transloco }}</p>
+  }
+
+  <!-- Avisos de resultado de guardado -->
+  @if (estadoAutoguardado(); as estado) {
+  <div
+    class="surface-card"
+    [class.alerta-exito]="estado === 'guardado'"
+    [class.alerta-autoguardado]="estado !== 'guardado'"
+    role="status"
+  >
+    <i
+      [class]="estado === 'guardando' ? 'pi pi-spin pi-spinner' : estado === 'guardado' ? 'pi pi-check-circle' : 'pi pi-clock'"
+      aria-hidden="true"
+    ></i>
+    <span>
+      {{ (estado === 'guardando' ? 'inspecciones.borrador.autoguardando' : estado === 'guardado' ?
+      'inspecciones.borrador.guardadoExitoso' : 'inspecciones.borrador.cambiosPendientes') |
+      transloco }}
+    </span>
+  </div>
+  } @if (errorGuardado(); as errGuardado) {
+  <div class="alerta-error surface-card" role="alert">
+    <i class="pi pi-exclamation-triangle" aria-hidden="true"></i>
+    <span>{{ errGuardado }}</span>
+  </div>
+  }
+
+  <!-- Panel de Avance y Condición Preliminar -->
+  <div class="resumen-panel surface-card">
+    <div class="avance-general">
+      <div class="avance-cabecera">
+        <h3>
+          <i class="pi pi-chart-line" aria-hidden="true"></i>
+          {{ 'inspecciones.borrador.progresoTitulo' | transloco }}
+        </h3>
+        <span class="avance-badge">
+          {{ 'inspecciones.borrador.progresoResumen' | transloco : { completados:
+          b.progreso.totalCamposCompletados, total: b.progreso.totalCamposRequeridos, porcentaje:
+          b.progreso.porcentajeTotal } }}
+        </span>
+      </div>
+      <p-progressBar [value]="b.progreso.porcentajeTotal" [showValue]="false" />
+    </div>
+
+    <!-- Índice de Condición Preliminar (cuando backend lo proporcione) -->
+    @if (b.icPreliminar; as ic) {
+    <div class="ic-preliminar-card">
+      <div class="ic-cabecera">
+        <span class="ic-titulo"
+          >{{ 'inspecciones.borrador.indicePreliminarTitulo' | transloco }}</span
+        >
+        <p-tag
+          [value]="ic.etiqueta || ('inspecciones.borrador.etiquetaPreliminar' | transloco)"
+          severity="info"
+        />
+      </div>
+      <div class="ic-valores">
+        <span class="ic-numero">{{ ic.indice | number: '1.2-2' }}</span>
+        <p-tag [value]="ic.estado" [severity]="severidadIc(ic.estado)" class="ic-tag-estado" />
+      </div>
+      <p class="ic-nota">{{ 'inspecciones.borrador.indicePreliminarNota' | transloco }}</p>
+    </div>
+    }
+
+    <!-- Avance por las 8 secciones -->
+    @if (b.progreso.secciones && b.progreso.secciones.length > 0) {
+    <div class="secciones-progreso">
+      <h4>{{ 'inspecciones.borrador.seccionesTitulo' | transloco }}</h4>
+      <div class="secciones-grid">
+        @for (sec of b.progreso.secciones; track sec.seccion) {
+        <div class="seccion-item" [class.completa]="sec.completada">
+          <div class="seccion-item-cabecera">
+            <span class="seccion-item-titulo">{{ sec.titulo }}</span>
+            <p-tag
+              [value]="
+                      (sec.completada
+                        ? 'inspecciones.borrador.seccionCompleta'
+                        : 'inspecciones.borrador.seccionPendiente'
+                      ) | transloco
+                    "
+              [severity]="sec.completada ? 'success' : 'warn'"
+            />
+          </div>
+          <div class="seccion-item-datos">
+            <span class="seccion-item-contador">
+              {{ sec.camposCompletados }}/{{ sec.camposRequeridos }} campos
+            </span>
+            <span class="seccion-item-porcentaje">{{ sec.porcentaje }}%</span>
+          </div>
+        </div>
+        }
+      </div>
+    </div>
+    }
+  </div>
+
+  <!-- Formulario Dinámico -->
+  @if (esquema(); as esq) {
+  <div class="formulario-contenedor">
+    <app-formulario-dinamico
+      [esquema]="esq"
+      [valoresIniciales]="valoresIniciales()"
+      (valorChange)="onValorChange($event)"
+      (seccionCambiando)="onSeccionCambiando()"
+    />
+  </div>
+  }
+
+  <p-dialog
+    [header]="'inspecciones.transicion.' + (accionFinal() ?? 'publicar') + 'Titulo' | transloco"
+    [visible]="confirmandoAccion()"
+    (visibleChange)="!$event && cancelarConfirmacion()"
+    [modal]="true"
+    [style]="{ width: 'min(620px, 95vw)' }"
+    [draggable]="false"
+    [resizable]="false"
+  >
+    <p class="dialogo-texto">
+      {{ 'inspecciones.transicion.' + (accionFinal() ?? 'publicar') + 'Texto' | transloco }}
+    </p>
+    <dl class="dialogo-datos">
+      <div>
+        <dt>{{ 'inspecciones.transicion.puente' | transloco }}</dt>
+        <dd>{{ b.nombrePuente }} ({{ b.codigoPuente }})</dd>
+      </div>
+      <div>
+        <dt>{{ 'inspecciones.borrador.fechaInspeccion' | transloco }}</dt>
+        <dd>{{ b.fechaInspeccion | date: 'dd/MM/yyyy' }}</dd>
+      </div>
+    </dl>
+
+    @if (errorAccion(); as error) {
+    <div class="error-accion" role="alert">
+      <p>{{ error.mensaje }}</p>
+      @if (error.campos.length > 0) {
+      <h3>{{ 'inspecciones.transicion.camposFaltantes' | transloco }}</h3>
+      <ul>
+        @for (campo of error.campos; track campo.campo) {
+        <li>{{ campo.mensaje || campo.campo }}</li>
+        }
+      </ul>
+      } @if (error.fotografias.length > 0) {
+      <h3>{{ 'inspecciones.transicion.fotosFaltantes' | transloco }}</h3>
+      <ul>
+        @for (categoria of error.fotografias; track categoria) {
+        <li>{{ 'inspecciones.transicion.categorias.' + categoria | transloco }}</li>
+        }
+      </ul>
+      }
+    </div>
+    }
+
+    <div class="dialogo-acciones">
+      <button
+        pButton
+        type="button"
+        severity="secondary"
+        [outlined]="true"
+        [disabled]="ejecutandoAccion()"
+        (click)="cancelarConfirmacion()"
+      >
+        {{ 'inspecciones.transicion.cancelar' | transloco }}
+      </button>
+      <button
+        pButton
+        type="button"
+        severity="success"
+        [disabled]="ejecutandoAccion()"
+        (click)="confirmarAccion()"
+      >
+        <i
+          [class]="accionFinal() === 'publicar' ? 'pi pi-verified' : 'pi pi-send'"
+          aria-hidden="true"
+        ></i>
+        <span
+          >{{ (ejecutandoAccion() ? 'inspecciones.transicion.procesando' :
+          'inspecciones.transicion.' + (accionFinal() ?? 'publicar')) | transloco }}</span
+        >
+      </button>
+    </div>
+  </p-dialog>
+  }
+</section>

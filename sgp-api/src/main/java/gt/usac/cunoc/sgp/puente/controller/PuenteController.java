@@ -50,6 +50,7 @@ public class PuenteController {
       @RequestParam(required = false) String estado,
       @RequestParam(required = false) Boolean activo,
       @RequestParam(required = false, defaultValue = "false") boolean todos,
+      @RequestParam(required = false) String busqueda,
       @RequestParam(defaultValue = "0") int pagina,
       @RequestParam(defaultValue = "20") int tamanio,
       Authentication authentication) {
@@ -57,6 +58,14 @@ public class PuenteController {
         authentication != null
             && authentication.getAuthorities().stream()
                 .anyMatch(a -> "ROLE_ADMINISTRADOR".equals(a.getAuthority()));
+    if (busqueda != null && !busqueda.isBlank()) {
+      if (esAdmin && (activo != null || todos)) {
+        return puenteService.listarCatalogo(
+            departamentoId, estado, todos ? null : activo, busqueda, pagina, tamanio);
+      }
+      return puenteService.listarCatalogo(
+          departamentoId, estado, Boolean.TRUE, busqueda, pagina, tamanio);
+    }
     if (esAdmin && (activo != null || todos)) {
       return puenteService.listarCatalogo(
           departamentoId, estado, todos ? null : activo, pagina, tamanio);

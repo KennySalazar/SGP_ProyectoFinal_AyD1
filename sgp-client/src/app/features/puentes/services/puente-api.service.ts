@@ -47,6 +47,7 @@ export class PuenteApiService {
       );
     }
     const params: Record<string, string | number | boolean> = { pagina, tamanio };
+    if (consulta.busqueda?.trim()) params['busqueda'] = consulta.busqueda.trim();
     if (consulta.departamentoId) params['departamentoId'] = consulta.departamentoId;
     if (consulta.estado) params['estado'] = consulta.estado;
     if (consulta.activo !== undefined) params['activo'] = consulta.activo;

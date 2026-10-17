@@ -15,6 +15,7 @@ import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import type { Map, Marker, Popup } from 'maplibre-gl';
 // La configuración Angular limita los tipos globales; MapLibre requiere este namespace.
 import type {} from 'geojson';
+import { cargarEstilosMaplibre, resolverMaplibre } from '../../../../../shared/utils/maplibre';
 import { EstadoPuente, PuenteCatalogoResponse } from '../../../models/puente.models';
 
 @Component({
@@ -50,9 +51,10 @@ export class MapaPuentesComponent implements AfterViewInit, OnChanges, OnDestroy
 
   async ngAfterViewInit(): Promise<void> {
     try {
-      const libreria = await import('maplibre-gl');
+      const libreria = resolverMaplibre(await import('maplibre-gl'));
       if (this.destruido) return;
       this.libreria = libreria;
+      cargarEstilosMaplibre(libreria.getVersion(), () => this.mapa?.resize());
       this.mapa = new libreria.Map({
         container: this.contenedor.nativeElement,
         center: [-90.3, 15.7],
