@@ -40,7 +40,12 @@ public record InspeccionResumenResponse(
     String mensajeAdvertenciaGps,
     boolean datosPermanentesConfirmados,
     DatosPermanentesResponse datosPermanentes,
-    List<AcompananteResponse> acompanantes) {
+    List<AcompananteResponse> acompanantes,
+    /** Inspección publicada que esta corrección reemplaza (RN-INS-08). */
+    UUID supersedeAId,
+    String motivoCorreccion,
+    /** Corrección publicada que supera a esta inspección; nulo si sigue vigente. */
+    UUID superadaPorId) {
 
   public InspeccionResumenResponse(
       UUID id,
@@ -94,6 +99,50 @@ public record InspeccionResumenResponse(
         null,
         false,
         null,
-        List.of());
+        List.of(),
+        null,
+        null,
+        null);
+  }
+
+  /** La misma respuesta marcada como superada por la corrección publicada indicada. */
+  public InspeccionResumenResponse conSuperadaPor(UUID correccionPublicadaId) {
+    return new InspeccionResumenResponse(
+        id,
+        puenteId,
+        puenteNombre,
+        versionFormularioId,
+        versionFormularioCodigo,
+        autorId,
+        rolAutorCreacion,
+        nombreAutorCapturado,
+        tipo,
+        estado,
+        fechaInspeccion,
+        dispositivoId,
+        datos,
+        creadoEn,
+        actualizadoEn,
+        codigoPuente,
+        departamentoNombre,
+        municipioNombre,
+        codigoVersionFormulario,
+        porcentajeAvance,
+        ultimaActividadEn,
+        nombrePuente,
+        rolAutor,
+        nombreAutor,
+        latitudInicio,
+        longitudInicio,
+        precisionGpsM,
+        distanciaAlPuenteM,
+        advertenciaGps,
+        mensajeAdvertenciaGps,
+        datosPermanentesConfirmados,
+        datosPermanentes,
+        acompanantes,
+        supersedeAId,
+        motivoCorreccion,
+        correccionPublicadaId);
   }
 }

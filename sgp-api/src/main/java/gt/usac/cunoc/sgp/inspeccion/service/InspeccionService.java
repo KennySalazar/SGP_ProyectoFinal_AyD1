@@ -51,8 +51,10 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HexFormat;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
@@ -528,9 +530,31 @@ public class InspeccionService {
             tamanio,
             Sort.by(Sort.Order.desc("ultimaActividadEn"), Sort.Order.desc("creadoEn")));
 
-    return inspeccionRepository
-        .findMisInspecciones(usuarioId, estadoFiltro, pageable)
-        .map(this::aResumenResponse);
+    Page<Inspeccion> resultado =
+        inspeccionRepository.findMisInspecciones(usuarioId, estadoFiltro, pageable);
+    Map<UUID, UUID> superadas = correccionesPublicadasDe(resultado.getContent());
+    return resultado.map(
+        i -> {
+          InspeccionResumenResponse resumen = aResumenResponse(i);
+          UUID correccion = superadas.get(i.getId());
+          return correccion == null ? resumen : resumen.conSuperadaPor(correccion);
+        });
+  }
+
+  /** Correcciones publicadas que superan a las inspecciones indicadas, en una sola consulta. */
+  private Map<UUID, UUID> correccionesPublicadasDe(List<Inspeccion> inspecciones) {
+    List<UUID> publicadas =
+        inspecciones.stream()
+            .filter(i -> "PUBLICADA".equals(i.getEstado()))
+            .map(Inspeccion::getId)
+            .toList();
+    Map<UUID, UUID> superadas = new HashMap<>();
+    if (!publicadas.isEmpty()) {
+      for (Object[] fila : inspeccionRepository.findCorreccionesPublicadas(publicadas)) {
+        superadas.put((UUID) fila[0], (UUID) fila[1]);
+      }
+    }
+    return superadas;
   }
 
   @Transactional
@@ -1176,7 +1200,14 @@ public class InspeccionService {
           "Inspección no encontrada",
           "No existe la inspección solicitada.");
     }
-    return inspeccionMapper.toResumenResponse(inspeccion);
+    InspeccionResumenResponse resumen = inspeccionMapper.toResumenResponse(inspeccion);
+    // Una inspección publicada superada por una corrección enlaza hacia ella (RN-INS-08).
+    return "PUBLICADA".equals(inspeccion.getEstado())
+        ? inspeccionRepository
+            .findCorreccionPublicadaId(inspeccion.getId())
+            .map(resumen::conSuperadaPor)
+            .orElse(resumen)
+        : resumen;
   }
 
   @Transactional(readOnly = true)

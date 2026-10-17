@@ -80,12 +80,24 @@
           [value]="etiquetaEstado(inspeccion.estado) | transloco"
           [severity]="severidad(inspeccion.estado)"
         />
+        @if (inspeccion.tipo === 'CORRECCION') {
+        <p-tag [value]="'inspecciones.correccion.tagCorreccion' | transloco" severity="info" />
+        } @if (inspeccion.superadaPorId) {
+        <p-tag [value]="'inspecciones.correccion.tagSuperada' | transloco" severity="secondary" />
+        }
       </div>
       <p>
         {{ inspeccion.departamentoNombre }}{{ inspeccion.municipioNombre ? ', ' +
         inspeccion.municipioNombre : '' }} · {{ inspeccion.fechaInspeccion }}
       </p>
-      @if (inspeccion.estado === 'BORRADOR' && inspeccion.porcentajeAvance !== null) {
+      @if (inspeccion.tipo === 'CORRECCION' && inspeccion.motivoCorreccion) {
+      <small class="motivo-correccion"
+        >{{ 'inspecciones.correccion.motivoListado' | transloco: { motivo:
+        inspeccion.motivoCorreccion } }}</small
+      >
+      } @if (inspeccion.superadaPorId) {
+      <small>{{ 'inspecciones.correccion.superadaNota' | transloco }}</small>
+      } @if (inspeccion.estado === 'BORRADOR' && inspeccion.porcentajeAvance !== null) {
       <small
         >{{ 'inspecciones.mis.progress' | transloco: { avance: inspeccion.porcentajeAvance }
         }}</small
@@ -112,6 +124,17 @@
       >
         <i class="pi pi-trash" aria-hidden="true"></i
         ><span>{{ 'inspecciones.mis.delete' | transloco }}</span>
+      </button>
+      } @else if (puedeCorregir(inspeccion)) {
+      <button
+        pButton
+        type="button"
+        severity="secondary"
+        [outlined]="true"
+        (click)="abrirCorreccion(inspeccion)"
+      >
+        <i class="pi pi-file-edit" aria-hidden="true"></i
+        ><span>{{ 'inspecciones.correccion.corregir' | transloco }}</span>
       </button>
       } @else { <span class="sin-acciones">{{ 'inspecciones.mis.noActions' | transloco }}</span> }
     </div>
@@ -162,6 +185,60 @@
       ><span
         >{{ eliminando() ? ('inspecciones.mis.deleting' | transloco) : ('inspecciones.mis.delete' |
         transloco) }}</span
+      >
+    </button>
+  </div>
+</p-dialog>
+
+<p-dialog
+  [visible]="!!inspeccionCorregir()"
+  (visibleChange)="!$event && cerrarCorreccion()"
+  [modal]="true"
+  [style]="{ width: 'min(36rem, 94vw)' }"
+  [draggable]="false"
+  [resizable]="false"
+  [header]="'inspecciones.correccion.titulo' | transloco"
+>
+  <p>
+    {{ 'inspecciones.correccion.texto' | transloco: { puente: inspeccionCorregir()?.nombrePuente }
+    }}
+  </p>
+  <label class="campo-motivo" for="motivoCorreccion">
+    <span>{{ 'inspecciones.correccion.motivo' | transloco }}</span>
+    <textarea
+      id="motivoCorreccion"
+      pTextarea
+      rows="4"
+      maxlength="2000"
+      [ngModel]="motivoCorreccion()"
+      (ngModelChange)="motivoCorreccion.set($event)"
+      [placeholder]="'inspecciones.correccion.motivoPlaceholder' | transloco"
+      [disabled]="corrigiendo()"
+    ></textarea>
+  </label>
+  @if (errorCorreccion(); as error) {
+  <p class="mensaje error" role="alert">{{ error }}</p>
+  }
+  <div class="dialog-acciones">
+    <button
+      pButton
+      type="button"
+      severity="secondary"
+      [outlined]="true"
+      (click)="cerrarCorreccion()"
+      [disabled]="corrigiendo()"
+    >
+      <span>{{ 'common.cancel' | transloco }}</span></button
+    ><button
+      pButton
+      type="button"
+      (click)="crearCorreccion()"
+      [disabled]="corrigiendo() || !motivoCorreccion().trim()"
+    >
+      <i class="pi pi-file-edit" aria-hidden="true"></i
+      ><span
+        >{{ corrigiendo() ? ('inspecciones.correccion.creando' | transloco) :
+        ('inspecciones.correccion.crear' | transloco) }}</span
       >
     </button>
   </div>

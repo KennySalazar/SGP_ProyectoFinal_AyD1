@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, DestroyRef, inject, signal } from '@angular/core';
+import { HttpErrorResponse } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
@@ -9,6 +10,7 @@ import { InputTextModule } from 'primeng/inputtext';
 import { PaginatorModule, PaginatorState } from 'primeng/paginator';
 import { SelectModule } from 'primeng/select';
 import { TagModule } from 'primeng/tag';
+import { TextareaModule } from 'primeng/textarea';
 import { finalize } from 'rxjs';
 import {
   PaginaResponse,
@@ -19,6 +21,7 @@ import { PuenteApiService } from '../../../puentes/services/puente-api.service';
 import { IniciarInspeccionDialogComponent } from '../../components/iniciar-inspeccion-dialog/iniciar-inspeccion-dialog.component';
 import { EstadoInspeccion, InspeccionResumenResponse } from '../../models/inspeccion.models';
 import { InspeccionApiService } from '../../services/inspeccion-api.service';
+import { ApiErrorService } from '../../../../core/services/api-error.service';
 import { AuthStore } from '../../../../core/services/auth.store';
 
 @Component({
@@ -33,6 +36,7 @@ import { AuthStore } from '../../../../core/services/auth.store';
     PaginatorModule,
     SelectModule,
     TagModule,
+    TextareaModule,
     IniciarInspeccionDialogComponent,
   ],
   templateUrl: './mis-inspecciones.page.html',
@@ -45,6 +49,7 @@ export class MisInspeccionesPage {
   private readonly puentesApi = inject(PuenteApiService);
   private readonly router = inject(Router);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly apiErrors = inject(ApiErrorService);
 
   readonly pagina = signal<PaginaResponse<InspeccionResumenResponse> | null>(null);
   readonly cargando = signal(false);
@@ -60,6 +65,10 @@ export class MisInspeccionesPage {
   readonly inspeccionEliminar = signal<InspeccionResumenResponse | null>(null);
   readonly eliminando = signal(false);
   readonly errorEliminar = signal<string | null>(null);
+  readonly inspeccionCorregir = signal<InspeccionResumenResponse | null>(null);
+  readonly motivoCorreccion = signal('');
+  readonly corrigiendo = signal(false);
+  readonly errorCorreccion = signal<string | null>(null);
 
   readonly estados: { label: string; value: EstadoInspeccion | null }[] = [
     { label: 'Todas', value: null },
@@ -170,6 +179,50 @@ export class MisInspeccionesPage {
           this.cargar(this.pagina()?.number ?? 0);
         },
         error: () => this.errorEliminar.set('delete'),
+      });
+  }
+
+  /** Solo una inspección publicada y vigente admite corrección (HU-027). */
+  puedeCorregir(inspeccion: InspeccionResumenResponse): boolean {
+    return inspeccion.estado === 'PUBLICADA' && !inspeccion.superadaPorId;
+  }
+
+  abrirCorreccion(inspeccion: InspeccionResumenResponse): void {
+    this.motivoCorreccion.set('');
+    this.errorCorreccion.set(null);
+    this.inspeccionCorregir.set(inspeccion);
+  }
+
+  cerrarCorreccion(): void {
+    if (this.corrigiendo()) return;
+    this.inspeccionCorregir.set(null);
+  }
+
+  crearCorreccion(): void {
+    const inspeccion = this.inspeccionCorregir();
+    const motivo = this.motivoCorreccion().trim();
+    if (!inspeccion || !motivo || this.corrigiendo()) return;
+    this.corrigiendo.set(true);
+    this.errorCorreccion.set(null);
+    this.inspeccionesApi
+      .crearCorreccion(inspeccion.id, motivo)
+      .pipe(
+        takeUntilDestroyed(this.destroyRef),
+        finalize(() => this.corrigiendo.set(false)),
+      )
+      .subscribe({
+        next: (correccion) => {
+          this.inspeccionCorregir.set(null);
+          void this.router.navigate(['/inspecciones', correccion.id, 'borrador']);
+        },
+        error: (err: HttpErrorResponse) => {
+          // El error se muestra dentro del diálogo; se evita duplicarlo en el aviso global.
+          this.apiErrors.clear();
+          const problema = err.error as { detail?: string } | null;
+          this.errorCorreccion.set(
+            problema?.detail ?? 'No fue posible crear la corrección. Intenta nuevamente.',
+          );
+        },
       });
   }
 
