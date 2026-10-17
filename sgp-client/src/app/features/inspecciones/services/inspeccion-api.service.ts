@@ -65,6 +65,22 @@ export class InspeccionApiService {
     });
   }
 
+  /** El Estudiante envía su inspección completa a revisión (HU-026). */
+  enviar(id: string): Observable<InspeccionResumenResponse> {
+    return this.http.post<InspeccionResumenResponse>(
+      `/api/v1/inspecciones/${encodeURIComponent(id)}/enviar`,
+      null,
+    );
+  }
+
+  /** El Catedrático o Profesional externo verificado publica sin revisión previa (HU-026). */
+  publicar(id: string): Observable<InspeccionResumenResponse> {
+    return this.http.post<InspeccionResumenResponse>(
+      `/api/v1/inspecciones/${encodeURIComponent(id)}/publicar`,
+      null,
+    );
+  }
+
   eliminarBorrador(id: string): Observable<void> {
     return this.http.delete<void>(`/api/v1/inspecciones/${encodeURIComponent(id)}`);
   }

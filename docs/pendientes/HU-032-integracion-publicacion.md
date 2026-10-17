@@ -43,3 +43,12 @@ publicacion concurrente y reversion del historial ante un fallo.
 
 Las pruebas actuales simulan la transicion a PUBLICADA y el motor de
 calculo. No sustituyen la prueba del flujo real completo de HU-026.
+
+## Verificacion realizada en HU-026
+
+Probado con el flujo real de publicacion y el calculador real en
+`PublicacionInspeccionIntegrationTest`:
+
+- Ajuste justificado (MALO a REGULAR) incorporado al resultado definitivo y al puente.
+- Confirmacion desactualizada: la publicacion responde 409
+  (`confirmacion_ic_desactualizada`) y no queda nada publicado ni en el historial.

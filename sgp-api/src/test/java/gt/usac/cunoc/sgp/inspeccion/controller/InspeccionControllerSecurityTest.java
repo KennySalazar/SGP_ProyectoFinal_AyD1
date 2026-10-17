@@ -190,39 +190,6 @@ class InspeccionControllerSecurityTest {
   }
 
   @Test
-  void enviarInspeccion_conCamposObligatoriosFaltantes_retorna422ConListaCompleta()
-      throws Exception {
-    var auth = autenticar(RoleName.ESTUDIANTE);
-    UUID inspeccionId = UUID.randomUUID();
-
-    when(service.enviarInspeccion(eq(inspeccionId), eq(USUARIO_ID)))
-        .thenThrow(
-            new ApiException(
-                HttpStatus.UNPROCESSABLE_ENTITY,
-                "datos_formulario_invalidos",
-                "Respuestas de inspección inválidas",
-                "Faltan campos obligatorios para enviar la inspección",
-                List.of(
-                    Map.of(
-                        "campo",
-                        "identificacion.fecha_inspeccion",
-                        "mensaje",
-                        "El campo 'identificacion.fecha_inspeccion' es obligatorio"),
-                    Map.of(
-                        "campo",
-                        "subestructura",
-                        "mensaje",
-                        "El campo 'subestructura' es obligatorio"))));
-
-    mockMvc
-        .perform(post("/api/v1/inspecciones/" + inspeccionId + "/enviar").principal(auth))
-        .andExpect(status().isUnprocessableEntity())
-        .andExpect(jsonPath("$.code").value("datos_formulario_invalidos"))
-        .andExpect(jsonPath("$.errores[0].campo").value("identificacion.fecha_inspeccion"))
-        .andExpect(jsonPath("$.errores[1].campo").value("subestructura"));
-  }
-
-  @Test
   void validarRespuestas_conRespuestasValidas_retornaOk() throws Exception {
     var auth = autenticar(RoleName.ESTUDIANTE);
     UUID inspeccionId = UUID.randomUUID();

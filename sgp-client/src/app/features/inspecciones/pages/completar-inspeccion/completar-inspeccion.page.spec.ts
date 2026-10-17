@@ -1,9 +1,13 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { Pipe, PipeTransform } from '@angular/core';
+import { Pipe, PipeTransform, signal } from '@angular/core';
 import { ActivatedRoute, convertToParamMap } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
 import { of, throwError } from 'rxjs';
+import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { describe, beforeEach, it, expect, vi } from 'vitest';
+import { ApiErrorService } from '../../../../core/services/api-error.service';
+import { AuthStore } from '../../../../core/services/auth.store';
+import { FormularioDinamicoComponent } from '../../../formulario/components/formulario-dinamico/formulario-dinamico.component';
 import { FormularioApiService } from '../../../formulario/services/formulario-api.service';
 import { GuardarBorradorRequest, InspeccionBorradorResponse } from '../../models/inspeccion.models';
 import { InspeccionApiService } from '../../services/inspeccion-api.service';
@@ -127,7 +131,12 @@ describe('CompletarInspeccionPage', () => {
   const mockInspeccionApi = {
     obtenerBorrador: vi.fn(),
     guardarBorrador: vi.fn(),
+    enviar: vi.fn(),
+    publicar: vi.fn(),
   };
+
+  const colegiadoPendiente = signal(false);
+  const mockApiErrors = { lastMessage: signal<string | null>(null), clear: vi.fn() };
 
   const mockFormularioApi = {
     obtenerEsquemaPublicado: vi.fn(),
@@ -143,6 +152,10 @@ describe('CompletarInspeccionPage', () => {
   beforeEach(() => {
     mockInspeccionApi.obtenerBorrador.mockReset();
     mockInspeccionApi.guardarBorrador.mockReset();
+    mockInspeccionApi.enviar.mockReset();
+    mockInspeccionApi.publicar.mockReset();
+    mockApiErrors.clear.mockReset();
+    colegiadoPendiente.set(false);
     mockFormularioApi.obtenerEsquemaPublicado.mockReset();
     mockFormularioApi.obtenerActiva.mockReset();
 
@@ -168,13 +181,18 @@ describe('CompletarInspeccionPage', () => {
         { provide: InspeccionApiService, useValue: mockInspeccionApi },
         { provide: FormularioApiService, useValue: mockFormularioApi },
         { provide: ActivatedRoute, useValue: mockActivatedRoute },
+        { provide: AuthStore, useValue: { colegiadoPendiente } },
+        { provide: ApiErrorService, useValue: mockApiErrors },
+        { provide: TranslocoService, useValue: { translate: (key: string) => key } },
       ],
     });
 
     TestBed.overrideComponent(CompletarInspeccionPage, {
-      remove: { imports: [] },
+      remove: { imports: [TranslocoPipe] },
       add: { imports: [MockTranslocoPipe] },
     });
+    // El formulario dinámico tiene sus propias pruebas; aquí solo importa la pantalla.
+    TestBed.overrideComponent(FormularioDinamicoComponent, { set: { template: '' } });
 
     fixture = TestBed.createComponent(CompletarInspeccionPage);
     component = fixture.componentInstance;
@@ -232,6 +250,9 @@ describe('CompletarInspeccionPage', () => {
 
   it('guarda automáticamente los cambios después de la pausa de escritura', () => {
     vi.useFakeTimers();
+    fixture.detectChanges();
+    // Sin formulario en pantalla se guardan los datos recibidos en memoria.
+    component.esquema.set(null);
     fixture.detectChanges();
     mockInspeccionApi.guardarBorrador.mockReturnValue(of(mockBorrador));
 
@@ -306,5 +327,119 @@ describe('CompletarInspeccionPage', () => {
 
     expect(component.errorGuardado()).toContain('posterior a la fecha actual');
     expect(mockInspeccionApi.guardarBorrador).not.toHaveBeenCalled();
+  });
+
+  describe('HU-026: enviar o publicar la inspección', () => {
+    function boton(): HTMLButtonElement | null {
+      return fixture.nativeElement.querySelector('.btn-accion-final');
+    }
+
+    it('el Catedrático publica tras confirmar y ve el resultado', () => {
+      mockInspeccionApi.publicar.mockReturnValue(
+        of({ id: 'inspeccion-123', puenteId: 'puente-456', estado: 'PUBLICADA' }),
+      );
+      fixture.detectChanges();
+
+      expect(component.accionFinal()).toBe('publicar');
+      expect(boton()?.textContent).toContain('inspecciones.transicion.publicar');
+
+      component.abrirConfirmacion();
+      expect(component.confirmandoAccion()).toBe(true);
+      expect(mockInspeccionApi.publicar).not.toHaveBeenCalled();
+
+      component.confirmarAccion();
+      fixture.detectChanges();
+
+      expect(mockInspeccionApi.publicar).toHaveBeenCalledWith('inspeccion-123');
+      expect(mockInspeccionApi.enviar).not.toHaveBeenCalled();
+      expect(component.confirmandoAccion()).toBe(false);
+      expect(fixture.nativeElement.textContent).toContain('inspecciones.transicion.publicada');
+    });
+
+    it('el Estudiante envía a revisión', () => {
+      mockInspeccionApi.obtenerBorrador.mockReturnValue(
+        of({ ...mockBorrador, rolAutor: 'ESTUDIANTE' }),
+      );
+      mockInspeccionApi.enviar.mockReturnValue(
+        of({ id: 'inspeccion-123', puenteId: 'puente-456', estado: 'ENVIADA' }),
+      );
+      fixture.detectChanges();
+
+      expect(component.accionFinal()).toBe('enviar');
+      component.abrirConfirmacion();
+      component.confirmarAccion();
+      fixture.detectChanges();
+
+      expect(mockInspeccionApi.enviar).toHaveBeenCalledWith('inspeccion-123');
+      expect(fixture.nativeElement.textContent).toContain('inspecciones.transicion.enviada');
+    });
+
+    it('un 422 detalla por separado los campos y las fotografías que faltan', () => {
+      mockInspeccionApi.publicar.mockReturnValue(
+        throwError(
+          () =>
+            new HttpErrorResponse({
+              status: 422,
+              error: {
+                code: 'inspeccion_incompleta',
+                detail: 'Faltan 1 campos obligatorios y 2 categorias de fotografia.',
+                errores: [
+                  { campo: 'subestructura', mensaje: 'El campo subestructura es obligatorio' },
+                  { campo: 'fotografias.ACCESO', mensaje: 'Falta foto' },
+                  { campo: 'fotografias.CAUCE', mensaje: 'Falta foto' },
+                ],
+              },
+            }),
+        ),
+      );
+      fixture.detectChanges();
+
+      component.abrirConfirmacion();
+      component.confirmarAccion();
+      fixture.detectChanges();
+
+      expect(component.errorAccion()).toEqual({
+        mensaje: 'Faltan 1 campos obligatorios y 2 categorias de fotografia.',
+        campos: [{ campo: 'subestructura', mensaje: 'El campo subestructura es obligatorio' }],
+        fotografias: ['ACCESO', 'CAUCE'],
+      });
+      expect(component.confirmandoAccion()).toBe(true);
+      expect(component.resultadoAccion()).toBeNull();
+      expect(mockApiErrors.clear).toHaveBeenCalled();
+    });
+
+    it('no permite la acción mientras hay cambios sin guardar', () => {
+      fixture.detectChanges();
+      component.estadoAutoguardado.set('pendiente');
+      fixture.detectChanges();
+
+      expect(boton()?.disabled).toBe(true);
+      component.abrirConfirmacion();
+      expect(component.confirmandoAccion()).toBe(false);
+    });
+
+    it('el Profesional externo con colegiado pendiente no puede publicar', () => {
+      mockInspeccionApi.obtenerBorrador.mockReturnValue(
+        of({ ...mockBorrador, rolAutor: 'PROFESIONAL_EXTERNO' }),
+      );
+      colegiadoPendiente.set(true);
+      fixture.detectChanges();
+
+      expect(component.colegiadoPendiente()).toBe(true);
+      expect(boton()?.disabled).toBe(true);
+      expect(fixture.nativeElement.textContent).toContain(
+        'inspecciones.transicion.colegiadoPendiente',
+      );
+      component.abrirConfirmacion();
+      expect(component.confirmandoAccion()).toBe(false);
+    });
+
+    it('una inspección que ya no está en borrador no ofrece la acción', () => {
+      mockInspeccionApi.obtenerBorrador.mockReturnValue(of({ ...mockBorrador, estado: 'ENVIADA' }));
+      fixture.detectChanges();
+
+      expect(component.accionFinal()).toBeNull();
+      expect(boton()).toBeNull();
+    });
   });
 });

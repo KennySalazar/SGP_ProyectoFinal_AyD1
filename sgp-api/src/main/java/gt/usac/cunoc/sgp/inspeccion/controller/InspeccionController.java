@@ -181,13 +181,6 @@ public class InspeccionController {
         inspeccionService.guardarRespuestas(id, request, usuarioId(authentication)));
   }
 
-  @PostMapping("/{id}/enviar")
-  @PreAuthorize("isAuthenticated()")
-  public ResponseEntity<InspeccionResumenResponse> enviar(
-      @PathVariable UUID id, Authentication authentication) {
-    return ResponseEntity.ok(inspeccionService.enviarInspeccion(id, usuarioId(authentication)));
-  }
-
   @PostMapping("/{id}/validar")
   @PreAuthorize("isAuthenticated()")
   public ResponseEntity<Map<String, Object>> validar(

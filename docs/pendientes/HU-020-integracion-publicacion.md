@@ -31,3 +31,13 @@ La fecha mostrada corresponde a fecha_inspeccion.
 - Publicaciones concurrentes respetando el orden de bloqueos.
 
 HU-020 no debe marcarse como completada hasta verificar esta integracion.
+
+## Verificacion realizada en HU-026
+
+`TransicionInspeccionService` cumple este contrato en `publicar` (Catedratico o
+Profesional externo verificado) y en `aprobar` (revision). Verificado con el
+calculador real en `PublicacionInspeccionIntegrationTest`:
+
+- Flujo autorizado completo: historial, resultado IC, estado vigente del puente y auditoria.
+- Reversion conjunta de estado, historial, IC, puente y auditoria ante un fallo del calculo.
+- Dos publicaciones simultaneas: solo una publica y la otra recibe 409.
