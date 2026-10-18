@@ -11,6 +11,10 @@ import org.springframework.data.repository.query.Param;
 
 public interface VersionFormularioRepository extends JpaRepository<VersionFormulario, UUID> {
 
+  @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+  @Query("SELECT v FROM VersionFormulario v WHERE v.id = :id")
+  Optional<VersionFormulario> findByIdForUpdate(@Param("id") UUID id);
+
   Optional<VersionFormulario> findByActivaTrue();
 
   Optional<VersionFormulario> findByCodigo(String codigo);
