@@ -1020,6 +1020,37 @@
     }
   },
   "inspecciones": {
+    "consulta": {
+      "titulo": "Consulta de inspección",
+      "cargando": "Cargando inspección publicada…",
+      "error": "No fue posible consultar la inspección",
+      "soloLectura": "Registro publicado en modo de solo lectura.",
+      "publicada": "Publicada",
+      "superada": "SUPERADA",
+      "verCorreccion": "Consultar corrección publicada",
+      "metadatos": "Datos del registro",
+      "autor": "Autor",
+      "version": "Versión del formulario",
+      "creada": "Creación",
+      "enviada": "Envío",
+      "publicacion": "Publicación",
+      "dispositivo": "Dispositivo",
+      "fechaInspeccion": "Fecha de inspección",
+      "sinDato": "No registrado",
+      "acompanantes": "Acompañantes",
+      "sinAcompanantes": "Sin acompañantes registrados",
+      "icDefinitivo": "Índice de condición definitivo",
+      "calculado": "Estado calculado",
+      "confirmado": "Estado confirmado",
+      "justificacion": "Justificación del ajuste",
+      "sinIc": "No hay un IC definitivo registrado para esta inspección.",
+      "sinEsquema": "El esquema histórico de esta inspección no está disponible. No es posible mostrar su formulario.",
+      "estados": {
+        "BUENO": "Bueno",
+        "REGULAR": "Regular",
+        "MALO": "Malo"
+      }
+    },
     "iniciar": {
       "boton": "Iniciar inspección",
       "titulo": "Iniciar inspección técnica",

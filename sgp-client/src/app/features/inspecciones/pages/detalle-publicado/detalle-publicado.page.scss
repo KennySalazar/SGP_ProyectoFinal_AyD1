@@ -1,0 +1,50 @@
+:host {
+  display: grid;
+  gap: 1.25rem;
+}
+.surface-card {
+  padding: 1.5rem;
+}
+.superada {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+dl {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+dt {
+  color: var(--sgp-steel-700);
+  font-weight: 700;
+}
+dd {
+  margin: 0.35rem 0 0;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+h2,
+h3 {
+  color: var(--sgp-navy-900);
+}
+.indice {
+  font-size: 2rem;
+  font-weight: 800;
+  color: var(--sgp-navy-900);
+}
+.mensaje-error {
+  border-left: 4px solid var(--p-red-600);
+}
+a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  color: var(--sgp-blue-600);
+}
+@media (max-width: 700px) {
+  dl {
+    grid-template-columns: 1fr;
+  }
+}

@@ -9,6 +9,7 @@ import {
   IniciarInspeccionResponse,
   InspeccionBorradorResponse,
   InspeccionResumenResponse,
+  InspeccionPublicadaDetalleResponse,
   EstadoInspeccion,
 } from '../models/inspeccion.models';
 import { PaginaResponse } from '../../puentes/models/puente.models';
@@ -65,6 +66,12 @@ export class InspeccionApiService {
     return this.http.get(
       `/api/v1/inspecciones/${inspeccionId}/fotografias/${fotoId}/${miniatura ? 'miniatura' : 'contenido'}`,
       { responseType: 'blob' },
+    );
+  }
+
+  obtenerPublicada(id: string): Observable<InspeccionPublicadaDetalleResponse> {
+    return this.http.get<InspeccionPublicadaDetalleResponse>(
+      `/api/v1/inspecciones/${encodeURIComponent(id)}/publicada`,
     );
   }
 

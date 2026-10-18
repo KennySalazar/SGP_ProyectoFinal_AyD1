@@ -18,6 +18,14 @@ describe('InspeccionApiService', () => {
 
   afterEach(() => http.verify());
 
+  it('consulta el detalle publicado mediante GET y conserva el identificador codificado', () => {
+    service.obtenerPublicada('inspeccion/1').subscribe();
+    const request = http.expectOne('/api/v1/inspecciones/inspeccion%2F1/publicada');
+    expect(request.request.method).toBe('GET');
+    expect(request.request.body).toBeNull();
+    request.flush({ id: 'inspeccion/1', estado: 'PUBLICADA' });
+  });
+
   it('retira una fotografía mediante DELETE sin cuerpo ni eliminación de inspección', () => {
     service.retirarFotografia('inspeccion/1', 'foto/1').subscribe();
     const request = http.expectOne('/api/v1/inspecciones/inspeccion%2F1/fotografias/foto%2F1');
