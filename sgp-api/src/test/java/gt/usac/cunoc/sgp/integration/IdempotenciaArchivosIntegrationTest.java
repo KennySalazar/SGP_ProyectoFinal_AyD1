@@ -36,6 +36,18 @@ import org.testcontainers.utility.DockerImageName;
 @Import({
   OperacionIdempotenteService.class,
   InspeccionService.class,
+  gt.usac.cunoc.sgp.inspeccion.service.CalculadorProgresoBorrador.class,
+  gt.usac.cunoc.sgp.inspeccion.service.PreparadorEntradaIcService.class,
+  gt.usac.cunoc.sgp.inspeccion.service.CalculoIndiceCondicionService.class,
+  gt.usac.cunoc.sgp.inspeccion.service.ResolverElementosIc.class,
+  gt.usac.cunoc.sgp.inspeccion.service.ConversorIndicadoresIc.class,
+  gt.usac.cunoc.sgp.inspeccion.service.ConversorMedicionesIc.class,
+  gt.usac.cunoc.sgp.inspeccion.service.AgregadorCalificacionesIc.class,
+  gt.usac.cunoc.sgp.inspeccion.service.EvaluadorCondicionesCriticasIc.class,
+  gt.usac.cunoc.sgp.inspeccion.service.HuellaEntradaIc.class,
+  gt.usac.cunoc.sgp.inspeccion.service.MotorPonderacionIc.class,
+  gt.usac.cunoc.sgp.formulario.validation.JsonSchemaValidatorService.class,
+  gt.usac.cunoc.sgp.inspeccion.mapper.InspeccionMapperImpl.class,
   AuditoriaWriter.class,
   IdempotenciaArchivosIntegrationTest.Config.class
 })

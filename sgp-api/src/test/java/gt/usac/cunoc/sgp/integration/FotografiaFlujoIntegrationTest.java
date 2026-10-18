@@ -34,6 +34,18 @@ import org.testcontainers.utility.DockerImageName;
 @Import({
   OperacionIdempotenteService.class,
   InspeccionService.class,
+  gt.usac.cunoc.sgp.inspeccion.service.CalculadorProgresoBorrador.class,
+  gt.usac.cunoc.sgp.inspeccion.service.PreparadorEntradaIcService.class,
+  gt.usac.cunoc.sgp.inspeccion.service.CalculoIndiceCondicionService.class,
+  gt.usac.cunoc.sgp.inspeccion.service.ResolverElementosIc.class,
+  gt.usac.cunoc.sgp.inspeccion.service.ConversorIndicadoresIc.class,
+  gt.usac.cunoc.sgp.inspeccion.service.ConversorMedicionesIc.class,
+  gt.usac.cunoc.sgp.inspeccion.service.AgregadorCalificacionesIc.class,
+  gt.usac.cunoc.sgp.inspeccion.service.EvaluadorCondicionesCriticasIc.class,
+  gt.usac.cunoc.sgp.inspeccion.service.HuellaEntradaIc.class,
+  gt.usac.cunoc.sgp.inspeccion.service.MotorPonderacionIc.class,
+  gt.usac.cunoc.sgp.formulario.validation.JsonSchemaValidatorService.class,
+  gt.usac.cunoc.sgp.inspeccion.mapper.InspeccionMapperImpl.class,
   AuditoriaWriter.class,
   gt.usac.cunoc.sgp.inspeccion.service.FotografiaService.class,
   gt.usac.cunoc.sgp.inspeccion.validation.ValidadorAnclajeFotografico.class,
@@ -122,6 +134,7 @@ class FotografiaFlujoIntegrationTest {
   @Autowired Storage storage;
   UUID inspeccion;
   @Autowired InspeccionService inspecciones;
+  @Autowired gt.usac.cunoc.sgp.inspeccion.repository.InspeccionRepository inspeccionRepository;
   @Autowired JdbcTemplate jdbc;
   @Autowired ObjectMapper json;
   @Autowired PlatformTransactionManager tm;
@@ -212,6 +225,7 @@ class FotografiaFlujoIntegrationTest {
     assertThat(dto.anchoPx()).isEqualTo(1600);
     assertThat(dto.altoPx()).isEqualTo(800);
     assertThat(fotos.listar(id, usuario)).containsExactly(dto);
+    assertThat(inspeccionRepository.findCategoriasFotoDisponibles(id)).containsExactly("ACCESO");
     try (var in = fotos.contenido(id, r.id(), usuario, false)) {
       assertThat(javax.imageio.ImageIO.read(in).getWidth()).isEqualTo(1600);
     }

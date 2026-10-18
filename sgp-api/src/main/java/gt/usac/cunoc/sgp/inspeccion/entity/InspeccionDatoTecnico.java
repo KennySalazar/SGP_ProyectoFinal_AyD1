@@ -70,7 +70,7 @@ public class InspeccionDatoTecnico {
 
   @JdbcTypeCode(SqlTypes.SMALLINT)
   @Column(name = "anio_construccion")
-  private Integer anioConstruccion;
+  private Short anioConstruccion;
 
   @Column(name = "trafico_vehiculos_dia")
   private Integer traficoVehiculosDia;
@@ -247,11 +247,11 @@ public class InspeccionDatoTecnico {
     this.cargaDiseno = cargaDiseno;
   }
 
-  public Integer getAnioConstruccion() {
+  public Short getAnioConstruccion() {
     return anioConstruccion;
   }
 
-  public void setAnioConstruccion(Integer anioConstruccion) {
+  public void setAnioConstruccion(Short anioConstruccion) {
     this.anioConstruccion = anioConstruccion;
   }
 

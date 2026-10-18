@@ -14,6 +14,7 @@ import {
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
+import { Router } from '@angular/router';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { ButtonModule } from 'primeng/button';
 import { DialogModule } from 'primeng/dialog';
@@ -58,6 +59,7 @@ export class IniciarInspeccionDialogComponent implements OnChanges {
   private readonly fb = inject(FormBuilder);
   private readonly auth = inject(AuthStore);
   private readonly api = inject(InspeccionApiService);
+  private readonly router = inject(Router);
 
   readonly form: FormGroup = this.fb.group({
     fechaInspeccion: ['', [Validators.required]],
@@ -176,6 +178,11 @@ export class IniciarInspeccionDialogComponent implements OnChanges {
   cerrar(): void {
     this.visible = false;
     this.visibleChange.emit(false);
+  }
+
+  irAFormulario(inspeccionId: string): void {
+    this.cerrar();
+    this.router.navigate(['/inspecciones', inspeccionId]);
   }
 
   onVisibleChange(val: boolean): void {

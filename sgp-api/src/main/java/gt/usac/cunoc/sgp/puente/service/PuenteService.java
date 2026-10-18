@@ -357,12 +357,23 @@ public class PuenteService {
   @Transactional(readOnly = true)
   public Page<PuenteCatalogoResponse> listarCatalogo(
       UUID departamentoId, String estado, int pagina, int tamanio) {
-    return listarCatalogo(departamentoId, estado, Boolean.TRUE, pagina, tamanio);
+    return listarCatalogo(departamentoId, estado, Boolean.TRUE, null, pagina, tamanio);
   }
 
   @Transactional(readOnly = true)
   public Page<PuenteCatalogoResponse> listarCatalogo(
       UUID departamentoId, String estado, Boolean activo, int pagina, int tamanio) {
+    return listarCatalogo(departamentoId, estado, activo, null, pagina, tamanio);
+  }
+
+  @Transactional(readOnly = true)
+  public Page<PuenteCatalogoResponse> listarCatalogo(
+      UUID departamentoId,
+      String estado,
+      Boolean activo,
+      String busqueda,
+      int pagina,
+      int tamanio) {
     if (pagina < 0 || tamanio < 1 || tamanio > 100) {
       throw validacion(
           "paginacion_invalida",
@@ -372,13 +383,20 @@ public class PuenteService {
       throw validacion("estado_invalido", "El estado debe ser Bueno, Regular, Malo o Sin evaluar.");
     }
 
+    String busquedaLimpia = (busqueda != null && !busqueda.isBlank()) ? busqueda.trim() : null;
+
     var pageable =
         PageRequest.of(pagina, tamanio, Sort.by(Sort.Order.asc("nombre"), Sort.Order.asc("id")));
 
     Page<Puente> resultado =
         estado == null
-            ? puentes.findCatalogo(departamentoId, activo, pageable)
-            : puentes.findCatalogoPorEstado(departamentoId, activo, estado, pageable);
+            ? busquedaLimpia == null
+                ? puentes.findCatalogo(departamentoId, activo, pageable)
+                : puentes.findCatalogoConBusqueda(departamentoId, activo, busquedaLimpia, pageable)
+            : busquedaLimpia == null
+                ? puentes.findCatalogoPorEstado(departamentoId, activo, estado, pageable)
+                : puentes.findCatalogoPorEstadoConBusqueda(
+                    departamentoId, activo, estado, busquedaLimpia, pageable);
     return resultado.map(mapper::toCatalogoResponse);
   }
 

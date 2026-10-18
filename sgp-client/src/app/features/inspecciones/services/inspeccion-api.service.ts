@@ -4,9 +4,14 @@ import { inject, Injectable } from '@angular/core';
 import { map, Observable } from 'rxjs';
 import {
   DatosPermanentesResponse,
+  GuardarBorradorRequest,
   IniciarInspeccionRequest,
   IniciarInspeccionResponse,
+  InspeccionBorradorResponse,
+  InspeccionResumenResponse,
+  EstadoInspeccion,
 } from '../models/inspeccion.models';
+import { PaginaResponse } from '../../puentes/models/puente.models';
 
 @Injectable({ providedIn: 'root' })
 export class InspeccionApiService {
@@ -56,5 +61,61 @@ export class InspeccionApiService {
       `/api/v1/inspecciones/${inspeccionId}/fotografias/${fotoId}/${miniatura ? 'miniatura' : 'contenido'}`,
       { responseType: 'blob' },
     );
+  }
+
+  obtenerBorrador(id: string): Observable<InspeccionBorradorResponse> {
+    return this.http.get<InspeccionBorradorResponse>(
+      `/api/v1/inspecciones/${encodeURIComponent(id)}/borrador`,
+    );
+  }
+
+  guardarBorrador(
+    id: string,
+    request: GuardarBorradorRequest,
+  ): Observable<InspeccionBorradorResponse> {
+    return this.http.put<InspeccionBorradorResponse>(
+      `/api/v1/inspecciones/${encodeURIComponent(id)}/borrador`,
+      request,
+    );
+  }
+
+  listarMisInspecciones(
+    pagina = 0,
+    tamanio = 20,
+    estado?: EstadoInspeccion,
+  ): Observable<PaginaResponse<InspeccionResumenResponse>> {
+    const params: Record<string, string | number> = { pagina, tamanio };
+    if (estado) params['estado'] = estado;
+    return this.http.get<PaginaResponse<InspeccionResumenResponse>>('/api/v1/inspecciones', {
+      params,
+    });
+  }
+
+  /** El Estudiante envía su inspección completa a revisión (HU-026). */
+  enviar(id: string): Observable<InspeccionResumenResponse> {
+    return this.http.post<InspeccionResumenResponse>(
+      `/api/v1/inspecciones/${encodeURIComponent(id)}/enviar`,
+      null,
+    );
+  }
+
+  /** El Catedrático o Profesional externo verificado publica sin revisión previa (HU-026). */
+  publicar(id: string): Observable<InspeccionResumenResponse> {
+    return this.http.post<InspeccionResumenResponse>(
+      `/api/v1/inspecciones/${encodeURIComponent(id)}/publicar`,
+      null,
+    );
+  }
+
+  /** Crea una corrección en borrador de una inspección publicada (HU-027). */
+  crearCorreccion(id: string, motivo: string): Observable<InspeccionResumenResponse> {
+    return this.http.post<InspeccionResumenResponse>(
+      `/api/v1/inspecciones/${encodeURIComponent(id)}/correcciones`,
+      { motivo },
+    );
+  }
+
+  eliminarBorrador(id: string): Observable<void> {
+    return this.http.delete<void>(`/api/v1/inspecciones/${encodeURIComponent(id)}`);
   }
 }

@@ -10,8 +10,10 @@ saludable durante el primer despliegue automático. La publicación
 multi-arquitectura, la descarga ARM64, la asunción OIDC y Systems Manager también
 fueron validados para la revisión
 `488dae1ea7278eefc5f39e557eaadde4c07d00f9`.
-La terminación HTTPS sobre IP quedó preparada en el repositorio, pero aún no se
-ha instalado ni probado en EC2.
+La terminación HTTPS sobre IP se integró a `develop` mediante `e006c19`, se
+instaló en EC2 y respondió correctamente desde un navegador y mediante las rutas
+de salud, frontend y API. El temporizador de renovación está habilitado y su
+servicio se ejecutó sin error; aún falta observar una renovación efectiva.
 La configuración y el despliegue de producción permanecen fuera del alcance de
 esta historia.
 
@@ -158,8 +160,9 @@ claves AWS estáticas ni compilar Java o Angular en EC2.
 15. No comprar un dominio ni crear una zona DNS pública. Staging se administrará
     mediante SSM y ofrecerá HTTPS válido directamente sobre su IPv4. Se usará el
     perfil `shortlived` de Let's Encrypt con Certbot 5.8.0 en Docker y un
-    temporizador systemd de comprobación dos veces al día. Su instalación real
-    continúa pendiente de autorización y validación.
+    temporizador systemd de comprobación dos veces al día. La instalación real
+    y la ejecución del servicio de comprobación quedaron validadas el 15 de
+    octubre de 2026; todavía no se ha observado una renovación efectiva.
 16. Conservar para staging la IPv4 pública dinámica observada y no asignar una
     Elastic IP, dado el plazo académico hasta el 28 de octubre de 2026. Se acepta
     que detener e iniciar EC2 puede cambiar la IP y obligar a actualizar URLs y
@@ -214,6 +217,15 @@ rol de instancia y su asunción quedó validada después de corregir el sujeto d
 confianza al identificador inmutable. `sgp_staging` está operativa; no se creó
 `sgp_prod`. Sigue pendiente una comprobación administrativa independiente de
 TLS `verify-full` y extensiones.
+
+El Nginx `1.30.5` del host atiende TCP 80/443 y reenvía al contenedor ligado a
+`127.0.0.1:8088`; backend 8090 y PostgreSQL 5432 no están publicados. Certbot
+5.8.0, fijado por digest, emitió para `3.235.197.36` un certificado válido desde
+el 15 hasta el 22 de octubre de 2026. HTTP redirigió con 301 y `/`, `/healthz` y
+`/api/v1/puentes?size=1` respondieron 200 mediante HTTPS. El temporizador
+`sgp-certbot-renew.timer` está habilitado dos veces al día. Su prueba manual
+procesó la configuración y conservó Nginx saludable, pero no renovó porque el
+certificado todavía no estaba dentro de la ventana de renovación.
 
 ### Excepción operativa de respaldos
 
@@ -286,21 +298,22 @@ promover los mismos digests entre ambientes sin reconstruir artefactos.
   pero no las pruebas funcionales completas ni los flujos dependientes de SMTP.
 - RDS está operativa para el backend y Flyway; falta una prueba administrativa
   de `verify-full` y una consulta directa de extensiones.
-- El host EC2, OIDC y Systems Manager están validados; todavía falta HTTPS
-  público real. Los scripts y plantillas están preparados, pero no se han
-  aplicado. La compra de dominio, una zona DNS pública y Elastic IP se
-  descartaron para staging.
+- El host EC2, OIDC, Systems Manager y HTTPS público están validados. La compra
+  de dominio, una zona DNS pública y Elastic IP se descartaron para staging.
 - No incluye Compose ni despliegue de producción.
 - Solo existe una retención automática solicitada de 1 día en RDS. La política
   requerida de respaldos, restauración y la retención centralizada de logs no
   están implementadas.
 - S3 está decidido como servicio, pero su integración de aplicación permanece
   pendiente de la funcionalidad de archivos.
-- Brotli no está implementado. HTTPS sobre IP está implementado en el
-  repositorio, pero sigue pendiente de instalación y prueba en AWS.
+- Brotli no está implementado. HSTS tampoco está habilitado por la dependencia
+  de una IP dinámica y certificados de corta duración; DT-SEC-10 requiere una
+  excepción aceptada o una solución operativa estable.
 - El bucket S3 existe, pero la aplicación todavía no lo consume.
 - La publicación multi-arquitectura, descarga ARM64, GHCR, OIDC, SSM y el primer
   despliegue ya cuentan con validación real.
+- La renovación automática está programada y su servicio se ejecutó con éxito,
+  pero todavía no existe evidencia de una renovación efectiva.
 
 ## Relación con el enunciado
 
@@ -313,7 +326,9 @@ residan en EC2.
 
 S3 mantiene una API de almacenamiento de objetos compatible con la intención de
 DT-ALM. MinIO continúa en desarrollo local. La interfaz intercambiable de
-DT-ALM-03 sigue pendiente en el backend y no se declara implementada.
+DT-ALM-03 sigue pendiente en el backend y no se declara implementada. El estado
+y el traspaso de esa futura HU se documentan en
+[`GUIA_INTEGRACION_S3.md`](../deployment/GUIA_INTEGRACION_S3.md).
 
 ## Referencias
 

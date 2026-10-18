@@ -630,6 +630,7 @@ public class VersionFormularioService {
   @Auditable(accion = AccionAuditoria.CAMBIAR_ESTADO, entidad = "version_formulario")
   public VersionFormularioResponse publicar(
       UUID id, PublicarVersionRequest request, UUID usuarioId) {
+
     VersionFormulario version =
         versiones
             .findById(id)
@@ -672,8 +673,8 @@ public class VersionFormularioService {
 
     // 4. Validar pesos completos
     validarPesosParaPublicacion(version);
-    validarPesosParaPublicacion(version);
     validarEscalaParaPublicacion(version);
+    validarReglasParaPublicacion(version);
 
     Instant ahora = clock.instant();
 
@@ -691,6 +692,11 @@ public class VersionFormularioService {
     }
 
     String versionAlgoritmo = algoritmoNode.asText();
+
+    validarPesosParaPublicacion(version);
+    validarEscalaParaPublicacion(version);
+    validarReglasParaPublicacion(version);
+    validarConversionesParaPublicacion(version);
 
     // 5. Desactivar versión activa anterior asegurando que solo exista una activa (RN-FRM-04)
     versiones.desactivarTodas();
@@ -1014,6 +1020,226 @@ public class VersionFormularioService {
           "escala_incompleta",
           "Escala incompleta",
           "Falta configurar los siguientes niveles: " + String.join(", ", pendientes));
+    }
+  }
+
+  @Transactional(readOnly = true)
+  public void validarRespuestas(UUID versionId, JsonNode datos, Boolean esBorrador) {
+    VersionFormulario version =
+        versiones
+            .findById(versionId)
+            .orElseThrow(
+                () ->
+                    new ApiException(
+                        HttpStatus.NOT_FOUND,
+                        "version_no_encontrada",
+                        "Version no encontrada",
+                        "No existe una version con identificador " + versionId));
+
+    boolean modoBorrador = esBorrador == null || esBorrador;
+    schemaValidator.validarRespuestas(version.getEsquema(), datos, modoBorrador);
+  }
+
+  private void validarReglasParaPublicacion(VersionFormulario version) {
+    JsonNode configuracion = version.getReglasEvaluacionIc();
+    JsonNode reglas =
+        configuracion == null
+            ? com.fasterxml.jackson.databind.node.MissingNode.getInstance()
+            : configuracion.path("reglas_evaluacion_ic");
+
+    List<String> pendientes = new ArrayList<>();
+    List<String> invalidas = new ArrayList<>();
+
+    for (String campo : List.of("indicadores_de_un_elemento", "instancias_repetibles")) {
+      JsonNode valor = reglas.path("agregacion").path(campo);
+      String referencia = "agregacion." + campo;
+
+      if (valor.isMissingNode()
+          || valor.isNull()
+          || (valor.isTextual() && valor.asText().isBlank())) {
+        pendientes.add(referencia);
+      } else if (!valor.isTextual() || !Set.of("MAXIMO", "PROMEDIO").contains(valor.asText())) {
+        invalidas.add(referencia + ": debe ser MAXIMO o PROMEDIO");
+      }
+    }
+
+    for (String campo :
+        List.of("elementos_ausentes_portantes", "elementos_ausentes_no_portantes")) {
+      validarCalificacionConfigurada(
+          reglas.path("agregacion").path(campo), "agregacion." + campo, pendientes, invalidas);
+    }
+
+    JsonNode rangos = reglas.path("rangos_estado");
+
+    for (String estado : List.of("BUENO", "REGULAR", "MALO")) {
+      JsonNode valor = rangos.path(estado);
+
+      if (valor.isMissingNode() || valor.isNull()) {
+        pendientes.add("rangos_estado." + estado);
+      } else if (!valor.isNumber()) {
+        invalidas.add("rangos_estado." + estado + ": debe ser numerico");
+      }
+    }
+
+    if (rangos.path("BUENO").isNumber()
+        && rangos.path("REGULAR").isNumber()
+        && rangos.path("MALO").isNumber()) {
+      java.math.BigDecimal bueno = rangos.path("BUENO").decimalValue();
+      java.math.BigDecimal regular = rangos.path("REGULAR").decimalValue();
+      java.math.BigDecimal malo = rangos.path("MALO").decimalValue();
+
+      if (malo.signum() != 0
+          || regular.compareTo(malo) <= 0
+          || bueno.compareTo(regular) <= 0
+          || bueno.compareTo(java.math.BigDecimal.valueOf(100)) > 0) {
+        invalidas.add("rangos_estado: debe cumplir MALO = 0 < REGULAR < BUENO <= 100");
+      }
+    }
+
+    if (!pendientes.isEmpty() || !invalidas.isEmpty()) {
+      List<String> detalles = new ArrayList<>();
+
+      if (!pendientes.isEmpty()) {
+        detalles.add("Falta configurar: " + String.join(", ", pendientes));
+      }
+
+      if (!invalidas.isEmpty()) {
+        detalles.add("Configuracion invalida: " + String.join("; ", invalidas));
+      }
+
+      throw new ApiException(
+          HttpStatus.UNPROCESSABLE_ENTITY,
+          "reglas_ic_invalidas",
+          "Reglas del IC incompletas o invalidas",
+          String.join(". ", detalles));
+    }
+  }
+
+  private void validarCalificacionConfigurada(
+      JsonNode valor, String referencia, List<String> pendientes, List<String> invalidas) {
+    if (valor.isMissingNode() || valor.isNull()) {
+      pendientes.add(referencia);
+      return;
+    }
+
+    if (!valor.isNumber()
+        || valor.decimalValue().signum() < 0
+        || valor.decimalValue().compareTo(java.math.BigDecimal.valueOf(4)) > 0) {
+      invalidas.add(referencia + ": requiere una calificacion numerica entre 0 y 4");
+    }
+  }
+
+  private void validarConversionesParaPublicacion(VersionFormulario version) {
+    JsonNode configuracion = version.getReglasEvaluacionIc();
+    JsonNode conversiones =
+        configuracion.path("reglas_evaluacion_ic").path("conversion_indicadores");
+
+    Set<String> booleanos = new java.util.TreeSet<>();
+    Set<String> numericos = new java.util.TreeSet<>();
+    Set<String> enumerados = new java.util.TreeSet<>();
+    List<String> errores = new ArrayList<>();
+
+    for (JsonNode elemento : configuracion.path("elementos")) {
+      String referencia = elemento.path("elemento_ref").asText();
+
+      for (JsonNode indicador : elemento.path("indicadores")) {
+        String nombre = indicador.asText();
+
+        if ("falta_elemento".equals(nombre) || "junta_limpia".equals(nombre)) {
+          booleanos.add("junta." + nombre);
+        } else if ("buen_estado".equals(nombre)) {
+          booleanos.add("losa.buen_estado");
+        } else if ("existe".equals(nombre)) {
+          if (referencia.startsWith("/otros/senalizacion/")) {
+            booleanos.add("senal.existe");
+          } else if ("/otros/drenajes_aledanos".equals(referencia)) {
+            booleanos.add("drenaje_aledano.existe");
+          }
+        } else if ("golpeado_longitud_m".equals(nombre) || "golpeados_cantidad".equals(nombre)) {
+          numericos.add(nombre);
+        } else if ("aguas_arriba".equals(nombre) || "aguas_abajo".equals(nombre)) {
+          enumerados.add("socavacion.nivel");
+        } else if ("condiciones".equals(nombre)) {
+          enumerados.add("condicionesCauce");
+        } else if ("estado".equals(nombre)) {
+          enumerados.add(
+              referencia.startsWith("/superestructura/drenaje")
+                  ? "drenaje.estado"
+                  : "estado_bueno_malo");
+        }
+      }
+    }
+
+    for (String clave : booleanos) {
+      for (String valor : List.of("true", "false")) {
+        String equivalencia = clave + "=" + valor;
+        validarEquivalenciaParaPublicacion(
+            conversiones.path("booleanos").path(equivalencia),
+            "conversion_indicadores.booleanos." + equivalencia,
+            errores);
+      }
+    }
+
+    for (String familia : enumerados) {
+      List<String> categorias =
+          switch (familia) {
+            case "socavacion.nivel" ->
+                List.of("NO_HAY", "SIN_EXPOSICION", "CON_EXPOSICION", "ASENTAMIENTO_ESTRUCTURA");
+            case "condicionesCauce" ->
+                List.of("LIMPIO", "ASOLVADO_SEDIMENTADO", "EROSIONADO", "OTRO");
+            case "drenaje.estado" -> List.of("LIMPIOS", "OBSTRUIDOS");
+            case "estado_bueno_malo" -> List.of("BUENO", "MALO");
+            default -> List.of();
+          };
+
+      for (String categoria : categorias) {
+        validarEquivalenciaParaPublicacion(
+            conversiones.path("enumerados").path(familia).path(categoria),
+            "conversion_indicadores.enumerados." + familia + "." + categoria,
+            errores);
+      }
+    }
+
+    for (String indicador : numericos) {
+      String campo = "golpeado_longitud_m".equals(indicador) ? "umbrales_m" : "umbrales";
+      String ruta = "conversion_indicadores.numericos." + indicador + "." + campo;
+      JsonNode umbrales = conversiones.path("numericos").path(indicador).path(campo);
+
+      List<java.math.BigDecimal> valores = new ArrayList<>();
+
+      for (String nivel : List.of("LEVE", "MODERADO", "SEVERO")) {
+        JsonNode valor = umbrales.path(nivel);
+
+        if (!valor.isNumber()) {
+          errores.add(ruta + "." + nivel + " requiere un valor numerico");
+        } else {
+          valores.add(valor.decimalValue());
+        }
+      }
+
+      if (valores.size() == 3
+          && (valores.get(0).signum() <= 0
+              || valores.get(1).compareTo(valores.get(0)) <= 0
+              || valores.get(2).compareTo(valores.get(1)) <= 0)) {
+        errores.add(ruta + " debe cumplir 0 < LEVE < MODERADO < SEVERO");
+      }
+    }
+
+    if (!errores.isEmpty()) {
+      throw new ApiException(
+          HttpStatus.UNPROCESSABLE_ENTITY,
+          "conversiones_ic_invalidas",
+          "Conversiones del IC incompletas o invalidas",
+          String.join("; ", errores));
+    }
+  }
+
+  private void validarEquivalenciaParaPublicacion(
+      JsonNode valor, String referencia, List<String> errores) {
+    if (!valor.isNumber()
+        || valor.decimalValue().signum() < 0
+        || valor.decimalValue().compareTo(java.math.BigDecimal.valueOf(4)) > 0) {
+      errores.add(referencia + " requiere una calificacion numerica entre 0 y 4");
     }
   }
 }

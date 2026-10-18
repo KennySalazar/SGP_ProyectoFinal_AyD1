@@ -33,7 +33,8 @@
     "formularioSieca": "Formulario SIECA",
     "courses": "Cursos",
     "logout": "Cerrar sesion",
-    "inspectionForm": "Formulario de inspección"
+    "inspectionForm": "Formulario de inspección",
+    "myInspections": "Mis inspecciones"
   },
   "connectivity": {
     "online": "En linea",
@@ -59,7 +60,9 @@
     "closeMessage": "Cerrar mensaje",
     "operationFailed": "No fue posible completar la operacion.",
     "save": "Guardar",
-    "saveChanges": "Guardar cambios"
+    "saveChanges": "Guardar cambios",
+    "cancel": "Cancelar",
+    "close": "Cerrar"
   },
   "auth": {
     "login": {
@@ -497,7 +500,14 @@
       "back": "Volver al catalogo"
     },
     "proximityOnlyInactiveNote": "Solo hay puentes inactivos a menos de 100 metros. Si es el mismo puente, reactívalo desde el catálogo en lugar de registrar uno nuevo; si es otro (por ejemplo, uno reconstruido), puedes confirmar el registro.",
-    "proximityInactiveNote": "Entre los resultados hay puentes inactivos. Si alguno es el mismo puente, reactívalo desde el catálogo en lugar de registrar uno nuevo."
+    "proximityInactiveNote": "Entre los resultados hay puentes inactivos. Si alguno es el mismo puente, reactívalo desde el catálogo en lugar de registrar uno nuevo.",
+    "editConfirmation": {
+      "title": "Confirmar edicion del puente",
+      "message": "¿Seguro que deseas guardar los cambios del puente {{nombre}}?",
+      "note": "Al guardar correctamente volveras al catalogo de puentes.",
+      "cancel": "Seguir editando",
+      "confirm": "Si, guardar cambios"
+    }
   },
   "auditoria": {
     "title": "Bitácora de auditoría",
@@ -1034,7 +1044,7 @@
       "gpsObtenido": "Lat: {{lat}}, Long: {{lng}} (±{{acc}} m)",
       "gpsNoDisponible": "GPS no disponible o no permitido (se registrará sin ubicación)",
       "fechaInspeccion": "Fecha de inspección",
-      "nombreInspector": "Nombre del inspector responsable",
+      "nombreInspector": "Inspector responsable",
       "nombreInspectorPlaceholder": "Nombre o firma del inspector",
       "datosPermanentesTitulo": "Datos técnicos permanentes del puente",
       "cargandoPermanentes": "Consultando datos de la última inspección publicada...",
@@ -1054,7 +1064,8 @@
       "agregarAcompanante": "Agregar",
       "quitarAcompanante": "Quitar acompañante",
       "iniciando": "Iniciando inspección...",
-      "botonIniciar": "Iniciar inspección"
+      "botonIniciar": "Iniciar inspección",
+      "irAFormulario": "Ir al formulario"
     },
     "fotos": {
       "titulo": "Fotografías de la inspección",
@@ -1094,6 +1105,107 @@
       },
       "continuar": "Continuar fotografías pendientes",
       "continuarNota": "Hay fotografías pendientes de una inspección de este puente guardadas para su usuario en este dispositivo."
+    },
+    "borrador": {
+      "kicker": "INSPECCIÓN TÉCNICA · BORRADOR",
+      "titulo": "Completar inspección técnica",
+      "subtitulo": "Captura y edición incremental de borrador de inspección de puente",
+      "volverPuente": "Volver a ficha del puente",
+      "guardar": "Guardar borrador",
+      "guardando": "Guardando...",
+      "autoguardando": "Guardando cambios...",
+      "cambiosPendientes": "Cambios pendientes; se guardarán automáticamente.",
+      "guardadoExitoso": "Avance de borrador guardado exitosamente.",
+      "cargando": "Cargando inspección y esquema del formulario...",
+      "notFound": "Inspección no encontrada o no tiene permisos para acceder a este borrador.",
+      "forbidden": "Acceso denegado: Solo el autor de la inspección puede modificar este borrador.",
+      "conflictStale": "Conflicto de concurrencia: El borrador fue modificado concurrentemente por otra sesión o dispositivo.",
+      "conflictNonDraft": "La inspección no es editable porque ya no se encuentra en estado Borrador.",
+      "generalError": "Ocurrió un error al procesar la solicitud.",
+      "fechaInspeccion": "Fecha de inspección",
+      "inspector": "Inspector",
+      "formulario": "Versión del formulario",
+      "ultimaActividad": "Última actividad",
+      "progresoTitulo": "Progreso general de la inspección",
+      "progresoResumen": "{{completados}} de {{total}} campos obligatorios completados ({{porcentaje}}%)",
+      "seccionesTitulo": "Progreso por sección (8 secciones)",
+      "seccionCompleta": "Completa",
+      "seccionPendiente": "Pendiente",
+      "indicePreliminarTitulo": "Índice de Condición Preliminar",
+      "etiquetaPreliminar": "Preliminar",
+      "indicePreliminarNota": "Este cálculo es preliminar con base en los elementos evaluados hasta el momento. No altera el estado oficial del puente."
+    },
+    "mis": {
+      "kicker": "INSPECCIONES TÉCNICAS",
+      "title": "Mis inspecciones",
+      "description": "Consulta el estado de tus inspecciones, continúa los borradores y comienza una nueva visita de campo.",
+      "startTitle": "Iniciar una inspección",
+      "startDescription": "Busca un puente activo por nombre, código o departamento y selecciónalo para iniciar la inspección.",
+      "searchBridge": "Buscar puente",
+      "searchPlaceholder": "Nombre, código o departamento",
+      "search": "Buscar",
+      "searching": "Buscando...",
+      "listTitle": "Historial propio",
+      "listDescription": "Solo se muestran tus inspecciones no eliminadas.",
+      "filterState": "Filtrar por estado",
+      "loading": "Cargando inspecciones...",
+      "loadError": "No fue posible cargar tus inspecciones. Intenta nuevamente.",
+      "empty": "No hay inspecciones que coincidan con el filtro seleccionado.",
+      "progress": "Avance guardado: {{avance}}%",
+      "resume": "Reanudar",
+      "delete": "Eliminar borrador",
+      "deleting": "Eliminando...",
+      "noActions": "Sin acciones disponibles",
+      "deleteTitle": "Eliminar borrador",
+      "deleteConfirmation": "Eliminarás de forma lógica el borrador de {{puente}}. Esta acción no se puede deshacer desde la aplicación.",
+      "deleteError": "No fue posible eliminar el borrador. Es posible que ya no esté disponible.",
+      "estados": {
+        "BORRADOR": "Borrador",
+        "ENVIADA": "Enviada",
+        "EN_REVISION": "En revisión",
+        "CAMBIOS_SOLICITADOS": "Cambios solicitados",
+        "PUBLICADA": "Publicada",
+        "RECHAZADA": "Rechazada"
+      }
+    },
+    "correccion": {
+      "corregir": "Corregir",
+      "titulo": "Corregir inspección publicada",
+      "texto": "Se creará una corrección en borrador de la inspección de {{puente}} con sus datos actuales. La inspección original seguirá vigente hasta que la corrección se publique.",
+      "motivo": "Motivo de la corrección",
+      "motivoPlaceholder": "Describe qué se corrige y por qué",
+      "crear": "Crear corrección",
+      "creando": "Creando...",
+      "tagCorreccion": "Corrección",
+      "tagSuperada": "Superada",
+      "motivoListado": "Motivo: {{motivo}}",
+      "superadaNota": "Reemplazada por una corrección publicada."
+    },
+    "transicion": {
+      "enviar": "Enviar a revisión",
+      "publicar": "Publicar inspección",
+      "enviarTitulo": "Enviar a revisión",
+      "publicarTitulo": "Publicar inspección",
+      "enviarTexto": "La inspección pasará a revisión de tu Catedrático y ya no podrás editarla mientras esté enviada. Se verificarán los campos obligatorios y las fotografías mínimas.",
+      "publicarTexto": "La inspección quedará publicada con su Índice de Condición definitivo y actualizará el estado del puente. Una inspección publicada no se puede modificar ni eliminar.",
+      "puente": "Puente",
+      "guardaPrimero": "Espera a que se guarden tus cambios para poder enviar o publicar.",
+      "colegiadoPendiente": "Tu número de colegiado está pendiente de verificación. Podrás publicar cuando el Administrador lo verifique.",
+      "camposFaltantes": "Campos obligatorios pendientes",
+      "fotosFaltantes": "Fotografías obligatorias faltantes",
+      "categorias": {
+        "ACCESO": "Accesos",
+        "SUPERESTRUCTURA": "Superestructura",
+        "SUBESTRUCTURA": "Subestructura",
+        "CAUCE": "Cauce"
+      },
+      "cancelar": "Cancelar",
+      "procesando": "Procesando...",
+      "publicada": "Inspección publicada",
+      "publicadaNota": "Se calculó su Índice de Condición definitivo y se actualizó el estado del puente.",
+      "enviada": "Inspección enviada a revisión",
+      "enviadaNota": "Tu Catedrático la revisará. Recibirás sus observaciones si solicita cambios.",
+      "verMisInspecciones": "Ver mis inspecciones"
     }
   }
 }

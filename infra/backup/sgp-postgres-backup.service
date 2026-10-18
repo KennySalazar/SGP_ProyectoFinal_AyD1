@@ -1,0 +1,12 @@
+[Unit]
+Description=Daily pg_dump of the SGP database to S3
+Wants=network-online.target
+After=network-online.target
+ConditionPathExists=/etc/sgp/backup/backup.env
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/bash /opt/sgp/backup/backup-postgres.sh
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=full

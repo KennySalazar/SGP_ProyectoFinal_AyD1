@@ -129,6 +129,34 @@ describe('resolverEsquema: esquema real sieca-v1', () => {
     expect(pilas.maximoElementos).toBe(99);
   });
 
+  it('recupera objetos y arreglos cuando la forma estructural contradice el tipo escalar', () => {
+    const esquemaDanado = JSON.parse(JSON.stringify(ESQUEMA_SIECA)) as typeof ESQUEMA_SIECA;
+    const propiedades = esquemaDanado['properties'] as Record<string, Record<string, unknown>>;
+    const subestructura = propiedades['subestructura'];
+    const elementos = subestructura['properties'] as Record<string, Record<string, unknown>>;
+    elementos['estribo_entrada']['type'] = 'string';
+    elementos['pilas']['type'] = 'string';
+
+    const resuelto = resolverEsquema(esquemaDanado);
+    const nodoSubestructura = resuelto.secciones.find(
+      (seccion) => seccion.clave === 'subestructura',
+    )!;
+    expect(nodoSubestructura.clase).toBe('objeto');
+    if (nodoSubestructura.clase !== 'objeto') {
+      throw new Error('La seccion subestructura debe ser un objeto');
+    }
+
+    const estriboEntrada = nodoSubestructura.hijos.find((hijo) => hijo.clave === 'estribo_entrada');
+    const pilas = nodoSubestructura.hijos.find((hijo) => hijo.clave === 'pilas');
+
+    expect(estriboEntrada?.clase).toBe('objeto');
+    expect(estriboEntrada?.clase === 'objeto' && estriboEntrada.hijos.length).toBeGreaterThan(0);
+    expect(pilas?.clase).toBe('arreglo');
+    expect(pilas?.clase === 'arreglo' && pilas.elemento.hijos.map((hijo) => hijo.clave)).toContain(
+      'viga_cabezal',
+    );
+  });
+
   it('resuelve la selección múltiple con su regla de exclusión de LIMPIO', () => {
     const condiciones = campo(esquema.raiz, 'caracteristicas_cauce/estado_cauce/condiciones');
     expect(condiciones.tipo).toBe('seleccionMultiple');
