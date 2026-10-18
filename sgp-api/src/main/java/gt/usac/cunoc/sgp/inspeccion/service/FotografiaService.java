@@ -31,6 +31,7 @@ public class FotografiaService {
   private final ArchivoInspeccionRepository vinculos;
   private final FotografiaMapper mapper;
   private final ValidadorAnclajeFotografico anclajes;
+  private final ReglasEvidenciaFotografica reglasEvidencia;
   private final ProcesadorImagenes procesador;
   private final CargasImagenService cargas;
   private final ObjetosImagenService objetos;
@@ -46,6 +47,7 @@ public class FotografiaService {
       ArchivoInspeccionRepository vinculos,
       FotografiaMapper mapper,
       ValidadorAnclajeFotografico anclajes,
+      ReglasEvidenciaFotografica reglasEvidencia,
       ProcesadorImagenes procesador,
       CargasImagenService cargas,
       ObjetosImagenService objetos,
@@ -59,6 +61,7 @@ public class FotografiaService {
     this.vinculos = vinculos;
     this.mapper = mapper;
     this.anclajes = anclajes;
+    this.reglasEvidencia = reglasEvidencia;
     this.procesador = procesador;
     this.cargas = cargas;
     this.objetos = objetos;
@@ -116,6 +119,7 @@ public class FotografiaService {
             var i = autorizar(inspeccionId, actor, false);
             borrador(i);
             anclajes.validar(i, request.elementoRef(), request.instanciaElementoId());
+            validarCapacidad(inspeccionId);
           });
       var imagen = procesador.procesar(temporal);
       preparada = cargas.preparar(solicitud, imagen);
@@ -128,6 +132,7 @@ public class FotografiaService {
                 var inspeccion = autorizar(inspeccionId, actor, true);
                 borrador(inspeccion);
                 anclajes.validar(inspeccion, request.elementoRef(), request.instanciaElementoId());
+                validarCapacidad(inspeccionId);
                 operaciones.bloquearEntidad("archivo", request.id());
                 if (archivos.existsById(request.id()))
                   throw error(
@@ -199,6 +204,12 @@ public class FotografiaService {
           temporal.toFile().deleteOnExit();
         }
     }
+  }
+
+  private void validarCapacidad(UUID inspeccionId) {
+    reglasEvidencia.validarCapacidadParaNuevaFotografia(
+        vinculos.countByInspeccionIdAndTipoUsoAndArchivo_Estado(
+            inspeccionId, TipoUsoArchivo.FOTO_INSPECCION, EstadoArchivo.DISPONIBLE));
   }
 
   private CategoriaFoto validar(AdjuntarFotografiaRequest r, String clave) {

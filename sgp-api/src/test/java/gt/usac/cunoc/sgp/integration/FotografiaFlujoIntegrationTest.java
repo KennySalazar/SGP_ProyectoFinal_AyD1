@@ -48,6 +48,7 @@ import org.testcontainers.utility.DockerImageName;
   gt.usac.cunoc.sgp.inspeccion.mapper.InspeccionMapperImpl.class,
   AuditoriaWriter.class,
   gt.usac.cunoc.sgp.inspeccion.service.FotografiaService.class,
+  gt.usac.cunoc.sgp.inspeccion.service.ReglasEvidenciaFotografica.class,
   gt.usac.cunoc.sgp.inspeccion.validation.ValidadorAnclajeFotografico.class,
   gt.usac.cunoc.sgp.archivo.mapper.FotografiaMapperImpl.class,
   InspectorImagenesImageIo.class,
@@ -62,13 +63,15 @@ class FotografiaFlujoIntegrationTest {
   static final Instant AHORA = Instant.parse("2026-10-15T12:00:00Z");
 
   static class Storage implements AlmacenamientoArchivos {
+    final Path directorio;
     final AlmacenamientoLocal real;
     boolean fallarMiniatura;
     Runnable despuesOriginal;
+    volatile Runnable despuesMiniatura;
 
     Storage() throws java.io.IOException {
-      real =
-          new AlmacenamientoLocal(java.nio.file.Files.createTempDirectory("sgp-api-fotos-test-"));
+      directorio = Files.createTempDirectory("sgp-api-fotos-test-");
+      real = new AlmacenamientoLocal(directorio);
     }
 
     public void guardar(String k, java.io.InputStream in, long n, String mime)
@@ -81,6 +84,7 @@ class FotografiaFlujoIntegrationTest {
         despuesOriginal = null;
         accion.run();
       }
+      if (k.endsWith("-mini.jpg") && despuesMiniatura != null) despuesMiniatura.run();
     }
 
     public java.io.InputStream abrir(String k) throws java.io.IOException {
@@ -93,6 +97,14 @@ class FotografiaFlujoIntegrationTest {
 
     public void eliminar(String k) throws java.io.IOException {
       real.eliminar(k);
+    }
+
+    Set<String> claves() throws java.io.IOException {
+      try (var rutas = Files.list(directorio)) {
+        return rutas
+            .map(p -> p.getFileName().toString())
+            .collect(java.util.stream.Collectors.toSet());
+      }
     }
   }
 
@@ -145,6 +157,7 @@ class FotografiaFlujoIntegrationTest {
   void preparar() {
     storage.fallarMiniatura = false;
     storage.despuesOriginal = null;
+    storage.despuesMiniatura = null;
     usuario = UUID.randomUUID();
     version = UUID.randomUUID();
     puente = UUID.randomUUID();
@@ -214,6 +227,197 @@ class FotografiaFlujoIntegrationTest {
     return inspecciones
         .iniciarInspeccion(inicio(UUID.randomUUID()), usuario, UUID.randomUUID().toString())
         .id();
+  }
+
+  void agregarArchivos(UUID id, int cantidad, String tipo, String categoria, String estado) {
+    jdbc.update(
+        """
+        WITH nuevos AS (
+          SELECT uuid_generate_v4() AS id FROM generate_series(1, ?)
+        ), archivos AS (
+          INSERT INTO archivo (
+            id, tipo_uso, categoria_foto, nombre_almacenado, clave_objeto_original,
+            clave_objeto_miniatura, mime_real, tamano_bytes, checksum_sha256,
+            ancho_px, alto_px, ubicacion_captura, capturado_en, subido_por_id,
+            confirmado_en, estado
+          )
+          SELECT id, ?, ?, id::text, id::text || '.jpg', id::text || '-mini.jpg',
+            ?, 100, repeat('a', 64), 100, 50,
+            ST_SetSRID(ST_MakePoint(-90, 14), 4326)::geography,
+            CURRENT_TIMESTAMP, ?, CURRENT_TIMESTAMP, ?
+          FROM nuevos
+          RETURNING id, tipo_uso
+        )
+        INSERT INTO archivo_inspeccion (archivo_id, tipo_uso, inspeccion_id)
+        SELECT id, tipo_uso, ? FROM archivos
+        """,
+        cantidad,
+        tipo,
+        categoria,
+        "DOCUMENTO_INSPECCION".equals(tipo) ? "application/pdf" : "image/jpeg",
+        usuario,
+        estado,
+        id);
+  }
+
+  void exigirLimite(Runnable accion) {
+    assertThatThrownBy(accion::run)
+        .isInstanceOfSatisfying(
+            ApiException.class,
+            e -> {
+              assertThat(e.getStatus().value()).isEqualTo(422);
+              assertThat(e.getCode()).isEqualTo("limite_fotografias_excedido");
+            });
+  }
+
+  @Test
+  void aceptaLaFotografiaNumero60() throws Exception {
+    var id = iniciar();
+    agregarArchivos(id, 59, "FOTO_INSPECCION", "ACCESO", "DISPONIBLE");
+
+    var r = metadatos();
+    assertThat(fotos.adjuntar(id, usuario, r, imagen("jpeg"), "numero-60").id()).isEqualTo(r.id());
+    assertThat(fotos.listar(id, usuario)).hasSize(60);
+  }
+
+  @Test
+  void rechazaLaFotografia61AntesDeProcesarSinGuardarRegistrosNiObjetos() throws Exception {
+    var id = iniciar();
+    agregarArchivos(id, 60, "FOTO_INSPECCION", "ACCESO", "DISPONIBLE");
+    var r = metadatos();
+    var clavesAntes = storage.claves();
+    // Si se alcanzara el procesador, este contenido produciría otro error de validación.
+    var fichero = new org.springframework.mock.web.MockMultipartFile("archivo", new byte[] {1});
+
+    exigirLimite(() -> fotos.adjuntar(id, usuario, r, fichero, "numero-61"));
+
+    assertThat(fotos.listar(id, usuario)).hasSize(60);
+    assertThat(jdbc.queryForObject("select count(*) from archivo where id=?", Long.class, r.id()))
+        .isZero();
+    assertThat(
+            jdbc.queryForObject(
+                "select count(*) from archivo_inspeccion where archivo_id=?", Long.class, r.id()))
+        .isZero();
+    assertThat(
+            jdbc.queryForObject(
+                "select count(*) from operacion_idempotente where usuario_id=? and clave=?",
+                Long.class,
+                usuario,
+                "numero-61"))
+        .isZero();
+    assertThat(storage.claves()).isEqualTo(clavesAntes);
+  }
+
+  @Test
+  void fotografiasRetiradasPurgadasDocumentosYOtrasInspeccionesNoConsumenCapacidad()
+      throws Exception {
+    var id = iniciar();
+    agregarArchivos(id, 59, "FOTO_INSPECCION", "ACCESO", "DISPONIBLE");
+    agregarArchivos(id, 1, "FOTO_INSPECCION", "ACCESO", "RETIRADO");
+    agregarArchivos(id, 1, "FOTO_INSPECCION", "ACCESO", "PURGADO");
+    agregarArchivos(id, 1, "DOCUMENTO_INSPECCION", null, "DISPONIBLE");
+    agregarArchivos(iniciar(), 60, "FOTO_INSPECCION", "ACCESO", "DISPONIBLE");
+
+    fotos.adjuntar(id, usuario, metadatos(), imagen("jpeg"), "solo-disponibles");
+
+    assertThat(fotos.listar(id, usuario)).hasSize(60);
+  }
+
+  @Test
+  void laCategoriaOtraCuentaParaElLimite() throws Exception {
+    var id = iniciar();
+    agregarArchivos(id, 59, "FOTO_INSPECCION", "ACCESO", "DISPONIBLE");
+    agregarArchivos(id, 1, "FOTO_INSPECCION", "OTRA", "DISPONIBLE");
+    var fichero = imagen("jpeg");
+
+    exigirLimite(() -> fotos.adjuntar(id, usuario, metadatos(), fichero, "otra-cuenta"));
+
+    assertThat(fotos.listar(id, usuario)).hasSize(60);
+  }
+
+  @Test
+  void reproduceReintentoIdempotenteCon60FotografiasSinCrearObjetos() throws Exception {
+    var id = iniciar();
+    agregarArchivos(id, 59, "FOTO_INSPECCION", "ACCESO", "DISPONIBLE");
+    var r = metadatos();
+    var fichero = imagen("jpeg");
+    var primera = fotos.adjuntar(id, usuario, r, fichero, "reintento-60");
+    var clavesAntes = storage.claves();
+
+    assertThat(fotos.adjuntar(id, usuario, r, fichero, "reintento-60")).isEqualTo(primera);
+    assertThat(fotos.listar(id, usuario)).hasSize(60);
+    assertThat(storage.claves()).isEqualTo(clavesAntes);
+  }
+
+  @Test
+  void dosCargasDesde59ConfirmanSoloUnaYCompensanLosObjetosRechazados() throws Exception {
+    var id = iniciar();
+    agregarArchivos(id, 59, "FOTO_INSPECCION", "ACCESO", "DISPONIBLE");
+    var primera = metadatos();
+    var segunda = metadatos();
+    var fichero = imagen("jpeg");
+    var clavesAntes = storage.claves();
+    var preparadas = new CyclicBarrier(2);
+    // Ambas cargas pasan el control previo y escriben sus objetos antes de competir por el bloqueo.
+    storage.despuesMiniatura =
+        () -> {
+          try {
+            preparadas.await(15, TimeUnit.SECONDS);
+          } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException(e);
+          } catch (BrokenBarrierException | TimeoutException e) {
+            throw new IllegalStateException(e);
+          }
+        };
+    var respuestas = new ArrayList<Integer>();
+    try (var pool = Executors.newFixedThreadPool(2)) {
+      var cargas =
+          List.of(
+              pool.submit(() -> fotos.adjuntar(id, usuario, primera, fichero, "carrera-1")),
+              pool.submit(() -> fotos.adjuntar(id, usuario, segunda, fichero, "carrera-2")));
+      for (var carga : cargas) {
+        try {
+          carga.get(30, TimeUnit.SECONDS);
+          respuestas.add(201);
+        } catch (ExecutionException e) {
+          assertThat(e.getCause())
+              .isInstanceOfSatisfying(
+                  ApiException.class,
+                  error -> {
+                    assertThat(error.getStatus().value()).isEqualTo(422);
+                    assertThat(error.getCode()).isEqualTo("limite_fotografias_excedido");
+                  });
+          respuestas.add(422);
+        }
+      }
+    } finally {
+      storage.despuesMiniatura = null;
+    }
+
+    assertThat(respuestas).containsExactlyInAnyOrder(201, 422);
+    assertThat(fotos.listar(id, usuario)).hasSize(60);
+    assertThat(
+            jdbc.queryForObject(
+                "select count(*) from archivo_inspeccion where inspeccion_id=?", Long.class, id))
+        .isEqualTo(60);
+    assertThat(
+            jdbc.queryForObject(
+                "select count(*) from archivo where id in (?, ?)",
+                Long.class,
+                primera.id(),
+                segunda.id()))
+        .isEqualTo(1);
+    var nuevasClaves = new HashSet<>(storage.claves());
+    assertThat(nuevasClaves).containsAll(clavesAntes);
+    nuevasClaves.removeAll(clavesAntes);
+    var confirmadas =
+        jdbc.queryForObject(
+            "select clave_objeto_original, clave_objeto_miniatura from archivo where id in (?, ?)",
+            (rs, fila) -> Set.of(rs.getString(1), rs.getString(2)),
+            primera.id(),
+            segunda.id());
+    assertThat(nuevasClaves).isEqualTo(confirmadas);
   }
 
   @Test

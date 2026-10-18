@@ -102,6 +102,43 @@ class FotografiaControllerSecurityTest {
   }
 
   @Test
+  void limiteDeFotografiasResponde422ConElContratoExistente() throws Exception {
+    UUID usuario = UUID.randomUUID(), inspeccion = UUID.randomUUID();
+    var metadatos =
+        new AdjuntarFotografiaRequest(
+            gt.usac.cunoc.sgp.common.util.UuidV7Generator.generate(),
+            "OTRA",
+            14.0,
+            -90.0,
+            Instant.parse("2026-10-15T12:00:00Z"),
+            null,
+            null);
+    var limite =
+        org.junit.jupiter.api.Assertions.assertThrows(
+            gt.usac.cunoc.sgp.common.exception.ApiException.class,
+            () ->
+                new gt.usac.cunoc.sgp.inspeccion.service.ReglasEvidenciaFotografica()
+                    .validarCapacidadParaNuevaFotografia(60));
+    when(servicio.adjuntar(eq(inspeccion), eq(usuario), eq(metadatos), any(), eq("limite")))
+        .thenThrow(limite);
+
+    mvc.perform(
+            multipart("/api/v1/inspecciones/" + inspeccion + "/fotografias")
+                .file(new MockMultipartFile("archivo", "foto.jpg", "image/jpeg", new byte[] {1}))
+                .file(
+                    new MockMultipartFile(
+                        "metadatos",
+                        "m.json",
+                        "application/json",
+                        json.writeValueAsBytes(metadatos)))
+                .header("Idempotency-Key", "limite")
+                .with(authentication(sesion(usuario))))
+        .andExpect(status().isUnprocessableEntity())
+        .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON))
+        .andExpect(jsonPath("$.code").value("limite_fotografias_excedido"));
+  }
+
+  @Test
   void lecturaPrivadaYPartesInvalidasTienenContratoExplicito() throws Exception {
     UUID usuario = UUID.randomUUID(), id = UUID.randomUUID(), foto = UUID.randomUUID();
     String base = "/api/v1/inspecciones/" + id + "/fotografias";
