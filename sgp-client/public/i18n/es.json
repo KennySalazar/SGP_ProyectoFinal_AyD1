@@ -1098,13 +1098,23 @@
         "persistencia": "No se pudo guardar la fotografía en este dispositivo. Revise el espacio disponible antes de reintentar.",
         "carga": "La carga no se confirmó. La fotografía conserva sus datos para reintentar cuando haya conexión.",
         "lectura": "No se pudieron recuperar las fotografías o su contenido.",
-        "estado": "La inspección ya no admite fotografías. No se volverá a crear la inspección.",
+        "estado": "La inspección ya no es editable. No se pueden cargar ni retirar fotografías; los pendientes locales se conservan.",
         "conflicto": "La operación entra en conflicto con una solicitud anterior. Conserve los datos pendientes y consulte al responsable.",
         "panel": "No se pudo abrir el panel de fotografías. Revise la conexión y vuelva a intentarlo.",
-        "anclaje": "El elemento o su instancia ya no están disponibles en esta inspección. Conserve el pendiente y consulte al responsable."
+        "anclaje": "El elemento o su instancia ya no están disponibles en esta inspección. Conserve el pendiente y consulte al responsable.",
+        "limite": "La inspección admite como máximo 60 fotografías confirmadas. Retire alguna de un borrador propio antes de adjuntar otra. Los pendientes se conservan para reintentar.",
+        "retirada": "No se pudo retirar la fotografía. La galería conserva su estado; compruebe la conexión y vuelva a intentarlo."
       },
       "continuar": "Continuar fotografías pendientes",
-      "continuarNota": "Hay fotografías pendientes de una inspección de este puente guardadas para su usuario en este dispositivo."
+      "continuarNota": "Hay fotografías pendientes de una inspección de este puente guardadas para su usuario en este dispositivo.",
+      "soloLectura": "Solo puede consultar las fotografías de esta inspección.",
+      "contador": "Fotografías confirmadas: {{cantidad}} de {{maximo}}.",
+      "faltantes": "Falta al menos una fotografía confirmada en cada una de estas categorías:",
+      "retirar": "Retirar fotografía",
+      "retirada": "Fotografía retirada. La galería y los contadores se actualizaron.",
+      "pendientesLocales": "Pendientes en este dispositivo",
+      "confirmadasServidor": "Confirmadas por el servidor",
+      "confirmarRetirada": "¿Retirar esta fotografía de la inspección? Dejará de estar disponible y de contar como evidencia. Esta acción no se puede deshacer desde la galería."
     },
     "borrador": {
       "kicker": "INSPECCIÓN TÉCNICA · BORRADOR",

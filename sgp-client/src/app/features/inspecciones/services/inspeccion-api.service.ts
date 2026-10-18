@@ -56,6 +56,11 @@ export class InspeccionApiService {
   listarFotografias(inspeccionId: string): Observable<FotografiaResponse[]> {
     return this.http.get<FotografiaResponse[]>(`/api/v1/inspecciones/${inspeccionId}/fotografias`);
   }
+  retirarFotografia(inspeccionId: string, fotoId: string): Observable<void> {
+    return this.http.delete<void>(
+      `/api/v1/inspecciones/${encodeURIComponent(inspeccionId)}/fotografias/${encodeURIComponent(fotoId)}`,
+    );
+  }
   contenidoFotografia(inspeccionId: string, fotoId: string, miniatura = false): Observable<Blob> {
     return this.http.get(
       `/api/v1/inspecciones/${inspeccionId}/fotografias/${fotoId}/${miniatura ? 'miniatura' : 'contenido'}`,

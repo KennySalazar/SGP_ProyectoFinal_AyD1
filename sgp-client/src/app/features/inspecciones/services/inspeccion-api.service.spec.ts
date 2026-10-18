@@ -18,6 +18,14 @@ describe('InspeccionApiService', () => {
 
   afterEach(() => http.verify());
 
+  it('retira una fotografía mediante DELETE sin cuerpo ni eliminación de inspección', () => {
+    service.retirarFotografia('inspeccion/1', 'foto/1').subscribe();
+    const request = http.expectOne('/api/v1/inspecciones/inspeccion%2F1/fotografias/foto%2F1');
+    expect(request.request.method).toBe('DELETE');
+    expect(request.request.body).toBeNull();
+    request.flush(null, { status: 204, statusText: 'No Content' });
+  });
+
   it('lista las inspecciones propias con filtro y paginación', () => {
     service.listarMisInspecciones(2, 50, 'BORRADOR').subscribe();
 

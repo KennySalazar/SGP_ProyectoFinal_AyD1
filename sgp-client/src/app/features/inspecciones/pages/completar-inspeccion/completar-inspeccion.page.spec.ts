@@ -11,6 +11,10 @@ import { FormularioDinamicoComponent } from '../../../formulario/components/form
 import { FormularioApiService } from '../../../formulario/services/formulario-api.service';
 import { GuardarBorradorRequest, InspeccionBorradorResponse } from '../../models/inspeccion.models';
 import { InspeccionApiService } from '../../services/inspeccion-api.service';
+import { ReporteFotograficoComponent } from '../../components/reporte-fotografico/reporte-fotografico.component';
+import { FotografiasLocalesService } from '../../../../offline/services/fotografias-locales.service';
+import { ProcesadorFotografiasService } from '../../services/procesador-fotografias.service';
+import { By } from '@angular/platform-browser';
 import { CompletarInspeccionPage } from './completar-inspeccion.page';
 
 @Pipe({ name: 'transloco', standalone: true })
@@ -133,6 +137,7 @@ describe('CompletarInspeccionPage', () => {
     guardarBorrador: vi.fn(),
     enviar: vi.fn(),
     publicar: vi.fn(),
+    listarFotografias: vi.fn(),
   };
 
   const colegiadoPendiente = signal(false);
@@ -155,6 +160,7 @@ describe('CompletarInspeccionPage', () => {
     mockInspeccionApi.enviar.mockReset();
     mockInspeccionApi.publicar.mockReset();
     mockApiErrors.clear.mockReset();
+    mockInspeccionApi.listarFotografias.mockReturnValue(of([]));
     colegiadoPendiente.set(false);
     mockFormularioApi.obtenerEsquemaPublicado.mockReset();
     mockFormularioApi.obtenerActiva.mockReset();
@@ -181,8 +187,16 @@ describe('CompletarInspeccionPage', () => {
         { provide: InspeccionApiService, useValue: mockInspeccionApi },
         { provide: FormularioApiService, useValue: mockFormularioApi },
         { provide: ActivatedRoute, useValue: mockActivatedRoute },
-        { provide: AuthStore, useValue: { colegiadoPendiente } },
+        { provide: AuthStore, useValue: { colegiadoPendiente, user: signal({ id: 'usr-1' }) } },
         { provide: ApiErrorService, useValue: mockApiErrors },
+        {
+          provide: FotografiasLocalesService,
+          useValue: {
+            guardarContexto: vi.fn().mockResolvedValue(undefined),
+            pendientes: vi.fn().mockResolvedValue([]),
+          },
+        },
+        { provide: ProcesadorFotografiasService, useValue: {} },
         { provide: TranslocoService, useValue: { translate: (key: string) => key } },
       ],
     });
@@ -193,6 +207,7 @@ describe('CompletarInspeccionPage', () => {
     });
     // El formulario dinámico tiene sus propias pruebas; aquí solo importa la pantalla.
     TestBed.overrideComponent(FormularioDinamicoComponent, { set: { template: '' } });
+    TestBed.overrideComponent(ReporteFotograficoComponent, { set: { template: '' } });
 
     fixture = TestBed.createComponent(CompletarInspeccionPage);
     component = fixture.componentInstance;
@@ -214,6 +229,24 @@ describe('CompletarInspeccionPage', () => {
     // IC preliminar presente
     expect(component.borrador()?.icPreliminar?.etiqueta).toBe('Preliminar');
     expect(component.borrador()?.icPreliminar?.indice).toBe(82.5);
+  });
+
+  it('integra el reporte del borrador reanudado y bloquea la transición durante cargas', async () => {
+    fixture.detectChanges();
+    await fixture.whenStable();
+    const reporte = fixture.debugElement.query(By.directive(ReporteFotograficoComponent))
+      .componentInstance as ReporteFotograficoComponent;
+    expect(reporte.inspeccion().id).toBe('inspeccion-123');
+    expect(mockInspeccionApi.listarFotografias).toHaveBeenCalledWith('inspeccion-123');
+    reporte.ocupado.set(true);
+    fixture.detectChanges();
+    component.abrirConfirmacion();
+    expect(component.confirmandoAccion()).toBe(false);
+    reporte.ocupado.set(false);
+    fixture.detectChanges();
+    component.abrirConfirmacion();
+    fixture.detectChanges();
+    expect(reporte.soloLectura()).toBe(true);
   });
 
   it('guarda parcialmente el borrador y actualiza versión y última actividad', () => {

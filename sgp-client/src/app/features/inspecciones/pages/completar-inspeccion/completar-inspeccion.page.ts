@@ -32,6 +32,8 @@ import { ApiErrorService } from '../../../../core/services/api-error.service';
 import { AuthStore } from '../../../../core/services/auth.store';
 import { InspeccionApiService } from '../../services/inspeccion-api.service';
 
+import { ReporteFotograficoComponent } from '../../components/reporte-fotografico/reporte-fotografico.component';
+
 type AccionFinal = 'enviar' | 'publicar';
 
 interface ErrorAccion {
@@ -54,6 +56,7 @@ interface ErrorAccion {
     ProgressBarModule,
     InputTextModule,
     FormularioDinamicoComponent,
+    ReporteFotograficoComponent,
   ],
   templateUrl: './completar-inspeccion.page.html',
   styleUrl: './completar-inspeccion.page.scss',
@@ -73,6 +76,8 @@ export class CompletarInspeccionPage implements OnInit {
   private ultimaHuellaDatos: string | null = null;
   private guardadoForzadoDuranteSolicitud = false;
 
+  protected readonly reporteFotos = viewChild(ReporteFotograficoComponent);
+  readonly fotografiasOcupadas = computed(() => this.reporteFotos()?.ocupado() ?? false);
   protected readonly formulario = viewChild(FormularioDinamicoComponent);
 
   readonly cargando = signal(true);
@@ -341,7 +346,13 @@ export class CompletarInspeccionPage implements OnInit {
   }
 
   abrirConfirmacion(): void {
-    if (!this.accionFinal() || this.cambiosSinGuardar() || this.colegiadoPendiente()) return;
+    if (
+      !this.accionFinal() ||
+      this.cambiosSinGuardar() ||
+      this.colegiadoPendiente() ||
+      this.fotografiasOcupadas()
+    )
+      return;
     this.errorAccion.set(null);
     this.confirmandoAccion.set(true);
   }
@@ -354,7 +365,7 @@ export class CompletarInspeccionPage implements OnInit {
   confirmarAccion(): void {
     const b = this.borrador();
     const accion = this.accionFinal();
-    if (!b || !accion || this.ejecutandoAccion()) return;
+    if (!b || !accion || this.ejecutandoAccion() || this.fotografiasOcupadas()) return;
 
     this.ejecutandoAccion.set(true);
     this.errorAccion.set(null);
