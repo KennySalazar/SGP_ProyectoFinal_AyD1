@@ -1,4 +1,27 @@
 {
+  "observaciones": {
+    "cerrar": "Cerrar observaciones",
+    "lista": "Lista de observaciones",
+    "una": "1 observación",
+    "cantidad": "{{cantidad}} observaciones",
+    "crear": "Agregar observación",
+    "editar": "Editar observación",
+    "eliminar": "Eliminar observación",
+    "general": "Observación general",
+    "texto": "Texto de la observación",
+    "caracteres": "{{cantidad}} / {{maximo}} caracteres",
+    "textoObligatorio": "Escribe una observación; no puede contener solo espacios.",
+    "textoLargo": "La observación admite como máximo 2000 caracteres.",
+    "guardar": "Guardar",
+    "cancelar": "Cancelar",
+    "panel": "Observaciones",
+    "resumen": "Total: {{total}} · Pendientes: {{pendientes}}",
+    "ir": "Ir al elemento",
+    "irA": "Ir al elemento: {{elemento}}",
+    "vacio": "Sin observaciones.",
+    "sinEstadoGeneral": "General del ciclo, sin estado de pendiente",
+    "estados": { "PENDIENTE": "Pendiente", "RESUELTA": "Resuelta" }
+  },
   "app": {
     "title": "Sistema de Gestion de Puentes",
     "shortTitle": "Gestion de Puentes",
