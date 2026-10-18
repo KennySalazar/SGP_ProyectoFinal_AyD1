@@ -141,6 +141,11 @@ describe('resolverEsquema: esquema real sieca-v1', () => {
     const nodoSubestructura = resuelto.secciones.find(
       (seccion) => seccion.clave === 'subestructura',
     )!;
+    expect(nodoSubestructura.clase).toBe('objeto');
+    if (nodoSubestructura.clase !== 'objeto') {
+      throw new Error('La seccion subestructura debe ser un objeto');
+    }
+
     const estriboEntrada = nodoSubestructura.hijos.find((hijo) => hijo.clave === 'estribo_entrada');
     const pilas = nodoSubestructura.hijos.find((hijo) => hijo.clave === 'pilas');
 

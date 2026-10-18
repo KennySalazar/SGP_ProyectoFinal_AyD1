@@ -113,6 +113,23 @@
   color: var(--sgp-steel-500);
   font-size: 0.84rem;
 }
+.campo-motivo {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin-top: 1rem;
+  font-weight: 600;
+  color: var(--sgp-steel-700);
+}
+.campo-motivo textarea {
+  width: 100%;
+  resize: vertical;
+  font-weight: 400;
+}
+.motivo-correccion {
+  display: block;
+  white-space: pre-line;
+}
 .mensaje {
   padding: 1rem 0;
   color: var(--sgp-steel-700);

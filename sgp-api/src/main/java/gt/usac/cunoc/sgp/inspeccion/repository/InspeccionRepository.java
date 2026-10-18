@@ -2,6 +2,7 @@ package gt.usac.cunoc.sgp.inspeccion.repository;
 
 import gt.usac.cunoc.sgp.inspeccion.entity.Inspeccion;
 import jakarta.persistence.LockModeType;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -72,4 +73,15 @@ public interface InspeccionRepository extends JpaRepository<Inspeccion, UUID> {
           """,
       nativeQuery = true)
   List<String> findCategoriasFotoDisponibles(@Param("id") UUID id);
+
+  /** Corrección publicada que supera a la inspección indicada, si existe (RN-INS-08). */
+  @Query(
+      "SELECT i.id FROM Inspeccion i WHERE i.supersedeAId = :id AND i.estado = 'PUBLICADA'"
+          + " AND i.eliminadoEn IS NULL")
+  Optional<UUID> findCorreccionPublicadaId(@Param("id") UUID id);
+
+  @Query(
+      "SELECT i.supersedeAId, i.id FROM Inspeccion i WHERE i.supersedeAId IN :ids"
+          + " AND i.estado = 'PUBLICADA' AND i.eliminadoEn IS NULL")
+  List<Object[]> findCorreccionesPublicadas(@Param("ids") Collection<UUID> ids);
 }

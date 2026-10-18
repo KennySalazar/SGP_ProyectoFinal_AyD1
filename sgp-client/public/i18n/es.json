@@ -250,6 +250,13 @@
     "empty": "No tienes puentes asignados actualmente."
   },
   "puentes": {
+    "editConfirmation": {
+      "title": "Confirmar edicion del puente",
+      "message": "¿Seguro que deseas guardar los cambios del puente {{nombre}}?",
+      "note": "Al guardar correctamente volveras al catalogo de puentes.",
+      "cancel": "Seguir editando",
+      "confirm": "Si, guardar cambios"
+    },
     "revision": {
       "title": "Revisión de solicitudes de alta",
       "description": "Revisa las solicitudes de los Catedráticos y decide si el puente entra al catálogo.",
@@ -1121,6 +1128,19 @@
         "PUBLICADA": "Publicada",
         "RECHAZADA": "Rechazada"
       }
+    },
+    "correccion": {
+      "corregir": "Corregir",
+      "titulo": "Corregir inspección publicada",
+      "texto": "Se creará una corrección en borrador de la inspección de {{puente}} con sus datos actuales. La inspección original seguirá vigente hasta que la corrección se publique.",
+      "motivo": "Motivo de la corrección",
+      "motivoPlaceholder": "Describe qué se corrige y por qué",
+      "crear": "Crear corrección",
+      "creando": "Creando...",
+      "tagCorreccion": "Corrección",
+      "tagSuperada": "Superada",
+      "motivoListado": "Motivo: {{motivo}}",
+      "superadaNota": "Reemplazada por una corrección publicada."
     },
     "transicion": {
       "enviar": "Enviar a revisión",

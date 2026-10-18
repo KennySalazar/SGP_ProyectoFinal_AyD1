@@ -21,6 +21,7 @@ import gt.usac.cunoc.sgp.inspeccion.service.CalculoIndiceCondicionService;
 import gt.usac.cunoc.sgp.inspeccion.service.ConfirmacionEstadoIcService;
 import gt.usac.cunoc.sgp.inspeccion.service.ConversorIndicadoresIc;
 import gt.usac.cunoc.sgp.inspeccion.service.ConversorMedicionesIc;
+import gt.usac.cunoc.sgp.inspeccion.service.CorreccionInspeccionService;
 import gt.usac.cunoc.sgp.inspeccion.service.EvaluadorCondicionesCriticasIc;
 import gt.usac.cunoc.sgp.inspeccion.service.HuellaEntradaIc;
 import gt.usac.cunoc.sgp.inspeccion.service.InspeccionService;
@@ -29,14 +30,13 @@ import gt.usac.cunoc.sgp.inspeccion.service.PreparadorEntradaIcService;
 import gt.usac.cunoc.sgp.inspeccion.service.PublicacionIndiceCondicionService;
 import gt.usac.cunoc.sgp.inspeccion.service.ResolverElementosIc;
 import gt.usac.cunoc.sgp.inspeccion.service.TransicionInspeccionService;
+import gt.usac.cunoc.sgp.integration.InvitacionCatedraticoIntegrationTest.RelojAjustable;
 import gt.usac.cunoc.sgp.usuario.model.RoleName;
 import java.io.IOException;
 import java.io.InputStream;
 import java.math.BigDecimal;
-import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
-import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -86,6 +86,7 @@ import org.testcontainers.utility.DockerImageName;
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @Import({
   TransicionInspeccionService.class,
+  CorreccionInspeccionService.class,
   InspeccionService.class,
   PublicacionIndiceCondicionService.class,
   ConfirmacionEstadoIcService.class,
@@ -139,6 +140,8 @@ class PublicacionInspeccionIntegrationTest {
   @Autowired private TransicionInspeccionService transiciones;
   @Autowired private InspeccionService inspeccionService;
   @Autowired private ConfirmacionEstadoIcService confirmaciones;
+  @Autowired private CorreccionInspeccionService correcciones;
+  @Autowired private RelojAjustable reloj;
   @Autowired private JdbcTemplate jdbc;
   @Autowired private ObjectMapper json;
 
@@ -148,6 +151,7 @@ class PublicacionInspeccionIntegrationTest {
 
   @BeforeEach
   void preparar() throws IOException {
+    reloj.ajustar(AHORA);
     insertarUsuario(CATEDRATICO_ID, "CATEDRATICO");
     insertarUsuario(ESTUDIANTE_ID, "ESTUDIANTE");
     insertarUsuario(PROFESIONAL_VERIFICADO_ID, "PROFESIONAL_EXTERNO");
@@ -573,6 +577,187 @@ class PublicacionInspeccionIntegrationTest {
         .isTrue();
   }
 
+  // ----- HU-027: corrección de una inspección publicada -----
+
+  @Test
+  @DisplayName("HU-027 Escenario: crear una corrección deja la original intacta y queda auditada")
+  void crearUnaCorreccionRelacionadaYAuditadaSinTocarLaOriginal() {
+    UUID original = publicada(CATEDRATICO_ID, "CATEDRATICO");
+    Map<String, Object> antes = jdbc.queryForMap("SELECT * FROM inspeccion WHERE id = ?", original);
+
+    var correccion =
+        correcciones.crear(
+            original, "  Error en la socavación  ", CATEDRATICO_ID, RoleName.CATEDRATICO);
+
+    assertThat(correccion.tipo()).isEqualTo("CORRECCION");
+    assertThat(correccion.estado()).isEqualTo("BORRADOR");
+    assertThat(correccion.supersedeAId()).isEqualTo(original);
+    assertThat(correccion.motivoCorreccion()).isEqualTo("Error en la socavación");
+    assertThat(correccion.versionFormularioId()).isEqualTo(versionId);
+    assertThat(correccion.fechaInspeccion()).isEqualTo(LocalDate.of(2026, 10, 10));
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT datos = (SELECT datos FROM inspeccion WHERE id = ?)"
+                    + " FROM inspeccion WHERE id = ?",
+                Boolean.class,
+                original,
+                correccion.id()))
+        .isTrue();
+
+    // La original sigue PUBLICADA y sin ningún cambio.
+    assertThat(jdbc.queryForMap("SELECT * FROM inspeccion WHERE id = ?", original))
+        .isEqualTo(antes);
+    assertThat(inspeccionService.consultarPorId(original, CATEDRATICO_ID).superadaPorId()).isNull();
+
+    // Auditoría con usuario, fecha, motivo e inspección original.
+    Map<String, Object> auditoria =
+        jdbc.queryForMap(
+            "SELECT usuario_id, accion, creado_en,"
+                + " valores_posteriores->>'motivoCorreccion' AS motivo,"
+                + " valores_posteriores->>'supersedeAId' AS original"
+                + " FROM auditoria WHERE entidad = 'inspeccion' AND entidad_id = ?",
+            correccion.id());
+    assertThat(auditoria.get("usuario_id")).isEqualTo(CATEDRATICO_ID);
+    assertThat(auditoria.get("accion")).isEqualTo("CREAR");
+    assertThat(auditoria.get("creado_en")).isNotNull();
+    assertThat(auditoria.get("motivo")).isEqualTo("Error en la socavación");
+    assertThat(auditoria.get("original")).isEqualTo(original.toString());
+  }
+
+  @Test
+  @DisplayName("HU-027 Escenarios: motivo obligatorio, usuario no autorizado y borrador")
+  void rechazaSinMotivoAUsuarioNoAutorizadoYABorradores() {
+    UUID original = publicada(PROFESIONAL_VERIFICADO_ID, "PROFESIONAL_EXTERNO");
+
+    assertThatThrownBy(
+            () ->
+                correcciones.crear(
+                    original, "   ", PROFESIONAL_VERIFICADO_ID, RoleName.PROFESIONAL_EXTERNO))
+        .isInstanceOfSatisfying(
+            ApiException.class,
+            e -> {
+              assertThat(e.getStatus()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+              assertThat(e.getCode()).isEqualTo("motivo_requerido");
+            });
+    assertThatThrownBy(
+            () -> correcciones.crear(original, "Motivo", ESTUDIANTE_ID, RoleName.ESTUDIANTE))
+        .isInstanceOfSatisfying(
+            ApiException.class,
+            e -> {
+              assertThat(e.getStatus()).isEqualTo(HttpStatus.FORBIDDEN);
+              assertThat(e.getCode()).isEqualTo("correccion_no_autorizada");
+            });
+    // Un Catedrático que no es el autor sí puede corregir.
+    assertThat(
+            correcciones
+                .crear(original, "Revisión del curso", OTRO_CATEDRATICO_ID, RoleName.CATEDRATICO)
+                .autorId())
+        .isEqualTo(OTRO_CATEDRATICO_ID);
+
+    UUID borrador = crearInspeccionCompleta(CATEDRATICO_ID, "CATEDRATICO");
+    assertThatThrownBy(
+            () -> correcciones.crear(borrador, "Motivo", CATEDRATICO_ID, RoleName.CATEDRATICO))
+        .isInstanceOfSatisfying(
+            ApiException.class,
+            e -> {
+              assertThat(e.getStatus()).isEqualTo(HttpStatus.CONFLICT);
+              assertThat(e.getCode()).isEqualTo("inspeccion_no_publicada");
+            });
+    assertThat(numero("SELECT count(*) FROM inspeccion WHERE supersede_a_id = ?", borrador))
+        .isZero();
+  }
+
+  @Test
+  @DisplayName("HU-027 Escenarios: flujo normal, original superada y estado vigente del puente")
+  void laCorreccionPublicadaSuperaALaOriginalYActualizaElPuente() {
+    UUID original = publicada(CATEDRATICO_ID, "CATEDRATICO");
+    UUID correccion =
+        correcciones
+            .crear(original, "Socavación mal registrada", CATEDRATICO_ID, RoleName.CATEDRATICO)
+            .id();
+
+    // Sigue las mismas validaciones: sin fotografías propias no se publica.
+    assertThatThrownBy(() -> transiciones.publicar(correccion, CATEDRATICO_ID))
+        .isInstanceOfSatisfying(
+            ApiException.class,
+            e -> {
+              assertThat(e.getStatus()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+              assertThat(e.getErrores())
+                  .extracting(error -> error.get("campo"))
+                  .contains("fotografias.ACCESO", "fotografias.CAUCE");
+            });
+    assertThat(estado(correccion)).isEqualTo("BORRADOR");
+
+    jdbc.update(
+        "UPDATE inspeccion SET datos = jsonb_set(datos,"
+            + " '{otros,senalizacion,reglamentaria,estado}', '\"BUENO\"') WHERE id = ?",
+        correccion);
+    agregarFotosObligatorias(correccion);
+    reloj.ajustar(AHORA.plusSeconds(3600));
+    assertThat(transiciones.publicar(correccion, CATEDRATICO_ID).estado()).isEqualTo("PUBLICADA");
+
+    // La original sigue publicada y enlaza a la corrección que la supera.
+    var consultaOriginal = inspeccionService.consultarPorId(original, OTRO_CATEDRATICO_ID);
+    assertThat(consultaOriginal.estado()).isEqualTo("PUBLICADA");
+    assertThat(consultaOriginal.superadaPorId()).isEqualTo(correccion);
+    assertThat(
+            inspeccionService
+                .listarMisInspecciones(CATEDRATICO_ID, "PUBLICADA", 0, 20)
+                .getContent())
+        .anySatisfy(
+            resumen -> {
+              assertThat(resumen.id()).isEqualTo(original);
+              assertThat(resumen.superadaPorId()).isEqualTo(correccion);
+            });
+
+    // El puente toma su estado vigente de la publicación más reciente: la corrección.
+    Map<String, Object> puente =
+        jdbc.queryForMap(
+            "SELECT inspeccion_vigente_id, resultado_ic_vigente_id FROM puente WHERE id = ?",
+            puenteId);
+    assertThat(puente.get("inspeccion_vigente_id")).isEqualTo(correccion);
+    assertThat(puente.get("resultado_ic_vigente_id"))
+        .isEqualTo(
+            jdbc.queryForObject(
+                "SELECT id FROM resultado_ic WHERE inspeccion_id = ? AND tipo = 'PUBLICACION'",
+                UUID.class,
+                correccion));
+  }
+
+  @Test
+  @DisplayName("HU-027 Escenario: una sola corrección publicada")
+  void unaInspeccionSoloAdmiteUnaCorreccionPublicada() {
+    UUID original = publicada(CATEDRATICO_ID, "CATEDRATICO");
+    UUID primera =
+        correcciones.crear(original, "Primera", CATEDRATICO_ID, RoleName.CATEDRATICO).id();
+    UUID segunda =
+        correcciones.crear(original, "Segunda", OTRO_CATEDRATICO_ID, RoleName.CATEDRATICO).id();
+    agregarFotosObligatorias(primera);
+    agregarFotosObligatorias(segunda);
+
+    reloj.ajustar(AHORA.plusSeconds(60));
+    transiciones.publicar(primera, CATEDRATICO_ID);
+
+    assertThatThrownBy(() -> transiciones.publicar(segunda, OTRO_CATEDRATICO_ID))
+        .isInstanceOfSatisfying(
+            ApiException.class,
+            e -> {
+              assertThat(e.getStatus()).isEqualTo(HttpStatus.CONFLICT);
+              assertThat(e.getCode()).isEqualTo("correccion_ya_publicada");
+            });
+    assertThat(estado(segunda)).isEqualTo("BORRADOR");
+    assertThatThrownBy(
+            () -> correcciones.crear(original, "Tercera", CATEDRATICO_ID, RoleName.CATEDRATICO))
+        .isInstanceOfSatisfying(
+            ApiException.class, e -> assertThat(e.getCode()).isEqualTo("inspeccion_superada"));
+  }
+
+  private UUID publicada(UUID autorId, String rol) {
+    UUID inspeccion = crearInspeccionCompleta(autorId, rol);
+    transiciones.publicar(inspeccion, autorId);
+    return inspeccion;
+  }
+
   // ----- Datos de prueba -----
 
   private UUID enRevision() {
@@ -775,8 +960,8 @@ class PublicacionInspeccionIntegrationTest {
   static class Config {
 
     @Bean
-    Clock clock() {
-      return Clock.fixed(AHORA, ZoneOffset.UTC);
+    RelojAjustable clock() {
+      return new RelojAjustable();
     }
 
     @Bean

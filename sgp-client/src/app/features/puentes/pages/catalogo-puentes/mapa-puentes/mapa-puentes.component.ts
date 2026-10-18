@@ -140,18 +140,31 @@ export class MapaPuentesComponent implements AfterViewInit, OnChanges, OnDestroy
   private contenidoPopup(puente: PuenteCatalogoResponse): HTMLElement {
     const contenido = document.createElement('div');
     contenido.className = 'mapa-popup';
+
     const nombre = document.createElement('h3');
     nombre.textContent = puente.nombre;
     contenido.append(nombre);
-    for (const [clave, valor] of [
+
+    const filas: [string, string | number][] = [
       ['puentes.department', puente.departamento.nombre],
       ['puentes.municipality', puente.municipio.nombre],
       ['puentes.state', puente.estadoActual],
-    ]) {
+      [
+        'puentes.ficha.conditionIndex',
+        puente.indiceCondicionActual ?? this.traducciones.translate('puentes.ficha.notAvailable'),
+      ],
+      [
+        'puentes.ficha.lastInspection',
+        puente.fechaUltimaInspeccion ?? this.traducciones.translate('puentes.ficha.noInspections'),
+      ],
+    ];
+
+    for (const [clave, valor] of filas) {
       const fila = document.createElement('p');
       fila.textContent = `${this.traducciones.translate(clave)}: ${valor}`;
       contenido.append(fila);
     }
+
     return contenido;
   }
 

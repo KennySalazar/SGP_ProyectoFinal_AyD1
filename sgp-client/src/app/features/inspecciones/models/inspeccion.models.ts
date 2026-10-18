@@ -154,4 +154,9 @@ export interface InspeccionResumenResponse {
   ultimaActividadEn?: string | null;
   creadoEn: string;
   actualizadoEn?: string | null;
+  /** En una corrección: la inspección publicada que corrige y el motivo (HU-027). */
+  supersedeAId?: string | null;
+  motivoCorreccion?: string | null;
+  /** Corrección publicada que supera a esta inspección; nulo si sigue vigente. */
+  superadaPorId?: string | null;
 }
