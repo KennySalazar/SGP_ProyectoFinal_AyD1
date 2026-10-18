@@ -40,6 +40,7 @@ class InspeccionServiceVersionadaTest {
   @Mock private InspeccionRepository inspeccionRepository;
   @Mock private VersionFormularioRepository versionFormularioRepository;
   @Mock private PuenteRepository puenteRepository;
+  @Mock private gt.usac.cunoc.sgp.puente.repository.AsignacionPuenteRepository asignaciones;
 
   private JsonSchemaValidatorService jsonSchemaValidatorService;
   private InspeccionMapper inspeccionMapper;
@@ -149,7 +150,8 @@ class InspeccionServiceVersionadaTest {
             puenteRepository,
             jsonSchemaValidatorService,
             inspeccionMapper,
-            objectMapper);
+            objectMapper,
+            asignaciones);
 
     UUID puenteId = UUID.randomUUID();
     puenteActivo =

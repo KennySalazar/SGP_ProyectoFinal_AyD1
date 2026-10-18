@@ -116,6 +116,30 @@ class InspeccionControllerSecurityTest {
   }
 
   @Test
+  void inicioAcademicoTransmiteAsignacionExplicitaEIdentidadAutenticada() throws Exception {
+    var auth = autenticar(RoleName.ESTUDIANTE);
+    var request =
+        new IniciarInspeccionVersionadaRequest(
+            UUID.randomUUID(),
+            UUID.randomUUID(),
+            null,
+            "web",
+            "Estudiante",
+            OBJECT_MAPPER.createObjectNode(),
+            UUID.randomUUID());
+
+    mockMvc
+        .perform(
+            post("/api/v1/inspecciones/iniciar")
+                .principal(auth)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(OBJECT_MAPPER.writeValueAsString(request)))
+        .andExpect(status().isCreated());
+
+    org.mockito.Mockito.verify(service).iniciarInspeccion(request, USUARIO_ID, "ESTUDIANTE");
+  }
+
+  @Test
   void iniciarInspeccion_conVersionNoUtilizable_retorna422Rfc7807() throws Exception {
     var auth = autenticar(RoleName.ESTUDIANTE);
     IniciarInspeccionVersionadaRequest request =

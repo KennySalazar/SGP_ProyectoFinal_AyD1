@@ -108,7 +108,7 @@
         type="button"
         severity="success"
         class="btn-accion-final"
-        [disabled]="cambiosSinGuardar() || colegiadoPendiente()"
+        [disabled]="cambiosSinGuardar() || colegiadoPendiente() || fotografiasOcupadas()"
         [attr.title]="cambiosSinGuardar() ? ('inspecciones.transicion.guardaPrimero' | transloco) : null"
         (click)="abrirConfirmacion()"
       >
@@ -233,6 +233,11 @@
     />
   </div>
   }
+
+  <app-reporte-fotografico
+    [inspeccion]="b"
+    [soloLectura]="confirmandoAccion() || ejecutandoAccion()"
+  />
 
   <p-dialog
     [header]="'inspecciones.transicion.' + (accionFinal() ?? 'publicar') + 'Titulo' | transloco"

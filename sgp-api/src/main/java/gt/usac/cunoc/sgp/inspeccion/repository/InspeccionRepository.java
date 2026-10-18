@@ -78,6 +78,27 @@ public interface InspeccionRepository extends JpaRepository<Inspeccion, UUID> {
       nativeQuery = true)
   List<String> findCategoriasFotoDisponibles(@Param("id") UUID id);
 
+  interface ConteoFotoCategoria {
+    String getCategoria();
+
+    long getCantidad();
+  }
+
+  /** Conteos para evaluar evidencia bajo el bloqueo de la inspección. */
+  @Query(
+      value =
+          """
+          SELECT a.categoria_foto AS categoria, count(*) AS cantidad
+          FROM archivo_inspeccion ai
+          JOIN archivo a ON a.id = ai.archivo_id
+          WHERE ai.inspeccion_id = :id
+            AND a.tipo_uso = 'FOTO_INSPECCION'
+            AND a.estado = 'DISPONIBLE'
+          GROUP BY a.categoria_foto
+          """,
+      nativeQuery = true)
+  List<ConteoFotoCategoria> findConteosFotoDisponibles(@Param("id") UUID id);
+
   /** Corrección publicada que supera a la inspección indicada, si existe (RN-INS-08). */
   @Query(
       "SELECT i.id FROM Inspeccion i WHERE i.supersedeAId = :id AND i.estado = 'PUBLICADA'"
