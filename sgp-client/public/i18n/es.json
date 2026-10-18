@@ -1020,6 +1020,14 @@
     }
   },
   "inspecciones": {
+    "historial": {
+      "titulo": "Historial de inspecciones publicadas",
+      "cargando": "Cargando inspecciones publicadas…",
+      "vacio": "Este puente no tiene inspecciones publicadas.",
+      "error": "No fue posible consultar las inspecciones publicadas.",
+      "reintentar": "Reintentar consulta",
+      "verDetalle": "Consultar inspección"
+    },
     "consulta": {
       "titulo": "Consulta de inspección",
       "cargando": "Cargando inspección publicada…",

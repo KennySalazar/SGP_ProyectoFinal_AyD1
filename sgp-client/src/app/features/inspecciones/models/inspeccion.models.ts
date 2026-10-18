@@ -192,3 +192,15 @@ export interface InspeccionPublicadaDetalleResponse {
   superadaPorId: string | null;
   vigencia: 'VIGENTE' | 'SUPERADA';
 }
+
+export interface InspeccionPublicadaResumenResponse {
+  id: string;
+  puenteId: string;
+  autorId: string;
+  nombreAutor: string;
+  fechaInspeccion: string;
+  publicadoEn: string;
+  estado: 'PUBLICADA';
+  superadaPorId?: string | null;
+  vigencia?: 'VIGENTE' | 'SUPERADA';
+}
