@@ -49,12 +49,31 @@ export interface SyncQueueItem {
   ultimoError?: string;
 }
 
+export interface LocalNotificacion {
+  id: string;
+  tipo: string;
+  titulo: string;
+  mensaje: string;
+  entidad?: string;
+  entidadId?: string;
+  claveEvento: string;
+  leidoEn?: string;
+  creadoEn: string;
+}
+
+export interface LocalNotificacionMeta {
+  key: string;
+  valor: number | string;
+}
+
 export class SgpDatabase extends Dexie {
   puentes!: Table<LocalBridge, string>;
   inspecciones!: Table<LocalInspection, string>;
   fotos!: Table<LocalPhoto, string>;
   esquemas_formulario!: Table<LocalFormSchema, string>;
   cola_sync!: Table<SyncQueueItem, string>;
+  notificaciones!: Table<LocalNotificacion, string>;
+  notificaciones_meta!: Table<LocalNotificacionMeta, string>;
 
   constructor() {
     super('sgp_offline');
@@ -64,6 +83,10 @@ export class SgpDatabase extends Dexie {
       fotos: 'id,inspeccionId,sincronizado',
       esquemas_formulario: 'id,version,activo',
       cola_sync: 'id,tipo,entityId,creadoEn,intentos',
+    });
+    this.version(2).stores({
+      notificaciones: 'id,leidoEn,creadoEn',
+      notificaciones_meta: 'key',
     });
   }
 }

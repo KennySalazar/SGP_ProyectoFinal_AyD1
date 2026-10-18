@@ -17,6 +17,11 @@ export const routes: Routes = [
     children: [
       ...usuarioProtectedRoutes,
       {
+        path: 'avisos',
+        loadComponent: () =>
+          import('./features/notificaciones/pages/avisos/avisos.page').then((m) => m.AvisosPage),
+      },
+      {
         path: 'offline',
         loadComponent: () =>
           import('./offline/pages/diagnostics/diagnostics.page').then((m) => m.DiagnosticsPage),

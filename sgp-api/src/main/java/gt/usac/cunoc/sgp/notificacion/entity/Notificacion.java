@@ -102,4 +102,14 @@ public class Notificacion {
   public Instant getCreadoEn() {
     return creadoEn;
   }
+
+  public void marcarLeida(Instant ahora) {
+    if (this.leidoEn == null) {
+      this.leidoEn = ahora;
+    }
+  }
+
+  public boolean isLeida() {
+    return this.leidoEn != null;
+  }
 }
