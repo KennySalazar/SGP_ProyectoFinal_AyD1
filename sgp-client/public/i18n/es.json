@@ -1,5 +1,7 @@
 {
   "observaciones": {
+    "cerrar": "Cerrar observaciones",
+    "lista": "Lista de observaciones",
     "una": "1 observación",
     "cantidad": "{{cantidad}} observaciones",
     "crear": "Agregar observación",

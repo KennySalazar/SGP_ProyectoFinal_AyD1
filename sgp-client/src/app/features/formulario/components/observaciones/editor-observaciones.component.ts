@@ -91,6 +91,8 @@ let secuenciaEditor = 0;
     .editor {
       padding: 1rem;
       color: var(--sgp-navy-900);
+      box-sizing: border-box;
+      max-width: 100%;
     }
     h3 {
       margin-top: 0;
@@ -99,10 +101,14 @@ let secuenciaEditor = 0;
     label {
       display: grid;
       gap: 0.5rem;
+      min-width: 0;
     }
     textarea {
       width: 100%;
+      max-width: 100%;
+      min-width: 44px;
       min-height: 120px;
+      box-sizing: border-box;
       resize: vertical;
     }
     textarea[aria-invalid='true'] {
@@ -123,6 +129,13 @@ let secuenciaEditor = 0;
     button {
       min-width: 44px;
       min-height: 44px;
+      max-width: 100%;
+      white-space: normal;
+    }
+    button:focus-visible,
+    textarea:focus-visible {
+      outline: 3px solid var(--sgp-blue-600);
+      outline-offset: 2px;
     }
     p {
       overflow-wrap: anywhere;

@@ -1,6 +1,8 @@
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { By } from '@angular/platform-browser';
+import { Dialog } from 'primeng/dialog';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   ContextoEditorObservacion,
@@ -372,5 +374,170 @@ describe('ElementoEvaluableComponent: integración opcional', () => {
     raiz(fixture).querySelector<HTMLButtonElement>('app-marcador-observaciones button')!.click();
     expect(abrir).toHaveBeenCalledOnce();
     expect(JSON.stringify(construido.valor())).toBe(antes);
+  });
+});
+
+describe('PanelObservacionesComponent: presentación responsive y foco', () => {
+  const descriptor = Object.getOwnPropertyDescriptor(window, 'matchMedia');
+  let ancho: number;
+  let cambios: Set<() => void>;
+  let apertura: HTMLButtonElement;
+
+  beforeEach(() => {
+    ancho = 1280;
+    cambios = new Set();
+    Object.defineProperty(window, 'matchMedia', {
+      configurable: true,
+      value: () => ({
+        get matches() {
+          return ancho <= 640;
+        },
+        addEventListener: (_tipo: string, listener: () => void) => cambios.add(listener),
+        removeEventListener: (_tipo: string, listener: () => void) => cambios.delete(listener),
+      }),
+    });
+    apertura = document.createElement('button');
+    apertura.textContent = 'Abrir observaciones';
+    document.body.append(apertura);
+    apertura.focus();
+  });
+
+  afterEach(() => {
+    apertura.remove();
+    if (descriptor) Object.defineProperty(window, 'matchMedia', descriptor);
+    else Reflect.deleteProperty(window, 'matchMedia');
+  });
+
+  async function crear(desplegable = true) {
+    const fixture = TestBed.createComponent(PanelObservacionesComponent);
+    fixture.componentRef.setInput('desplegable', desplegable);
+    fixture.componentRef.setInput('observaciones', observaciones);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    return fixture;
+  }
+
+  async function abrir(fixture: ComponentFixture<PanelObservacionesComponent>) {
+    fixture.componentRef.setInput('abierto', true);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+  }
+
+  it('mantiene el modo integrado pasivo sin diálogo ni captura de foco', async () => {
+    ancho = 375;
+    const fixture = await crear(false);
+    expect(raiz(fixture).querySelector('aside')).not.toBeNull();
+    expect(fixture.debugElement.query(By.directive(Dialog))).toBeNull();
+    expect(document.activeElement).toBe(apertura);
+    expect(botones(fixture, 'Cerrar observaciones')).toHaveLength(0);
+  });
+
+  it('abre un lateral no modal en escritorio y restaura foco al cerrar', async () => {
+    const fixture = await crear();
+    expect(raiz(fixture).querySelector('aside')).toBeNull();
+    await abrir(fixture);
+    expect(raiz(fixture).classList.contains('lateral')).toBe(true);
+    expect(fixture.debugElement.query(By.directive(Dialog))).toBeNull();
+    const cerrar = botones(fixture, 'Cerrar observaciones')[0];
+    expect(document.activeElement).toBe(cerrar);
+    const cambiar = vi.fn();
+    fixture.componentInstance.abierto.subscribe(cambiar);
+    cerrar.click();
+    fixture.detectChanges();
+    await fixture.whenStable();
+    expect(cambiar).toHaveBeenCalledExactlyOnceWith(false);
+    expect(document.activeElement).toBe(apertura);
+  });
+
+  it('cierra el lateral con Escape y permite enfocar el formulario fuera de él', async () => {
+    const fixture = await crear();
+    await abrir(fixture);
+    apertura.focus();
+    expect(document.activeElement).toBe(apertura);
+    botones(fixture, 'Cerrar observaciones')[0].focus();
+    document.activeElement!.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }),
+    );
+    fixture.detectChanges();
+    await fixture.whenStable();
+    expect(fixture.componentInstance.abierto()).toBe(false);
+    expect(document.activeElement).toBe(apertura);
+  });
+
+  it('a 375 px configura una hoja modal con contención de foco y cierre por Escape', async () => {
+    ancho = 375;
+    const fixture = await crear();
+    await abrir(fixture);
+    const dialogo = fixture.debugElement.query(By.directive(Dialog)).componentInstance as Dialog;
+    expect(dialogo.modal).toBe(true);
+    expect(dialogo.focusTrap).toBe(true);
+    expect(dialogo.closeOnEscape).toBe(true);
+    expect(dialogo.position).toBe('bottom');
+    expect(dialogo.style).toMatchObject({ width: '100%', maxWidth: '100vw', maxHeight: '85dvh' });
+    dialogo.onShow.emit({});
+    const cerrar = document.activeElement as HTMLElement;
+    expect(cerrar.textContent).toContain('Cerrar observaciones');
+    const dialogoDom = cerrar.closest('[role="dialog"]')!;
+    expect(dialogoDom.getAttribute('aria-modal')).toBe('true');
+    const titulo = document.getElementById(dialogoDom.getAttribute('aria-labelledby')!);
+    expect(titulo?.textContent).toContain('Observaciones');
+    document.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }),
+    );
+    fixture.detectChanges();
+    expect(fixture.componentInstance.abierto()).toBe(false);
+    dialogo.onHide.emit({});
+    expect(document.activeElement).toBe(apertura);
+  });
+
+  it('restaura foco tras el cierre externo de la hoja, sin cambiar observaciones', async () => {
+    ancho = 375;
+    const fixture = await crear();
+    await abrir(fixture);
+    const dialogo = fixture.debugElement.query(By.directive(Dialog)).componentInstance as Dialog;
+    dialogo.onShow.emit({});
+    const antes = JSON.stringify(observaciones);
+    fixture.componentRef.setInput('abierto', false);
+    fixture.detectChanges();
+    dialogo.onHide.emit({});
+    expect(document.activeElement).toBe(apertura);
+    expect(JSON.stringify(observaciones)).toBe(antes);
+  });
+
+  it('se adapta al cambiar de ancho sin duplicar contenido ni perder contadores', async () => {
+    const fixture = await crear();
+    await abrir(fixture);
+    ancho = 375;
+    cambios.forEach((listener) => listener());
+    fixture.detectChanges();
+    await fixture.whenStable();
+    expect(fixture.debugElement.query(By.directive(Dialog))).not.toBeNull();
+    expect(raiz(fixture).querySelector('aside')).toBeNull();
+    ancho = 1280;
+    cambios.forEach((listener) => listener());
+    fixture.detectChanges();
+    await fixture.whenStable();
+    expect(fixture.debugElement.query(By.directive(Dialog))).toBeNull();
+    expect(raiz(fixture).querySelectorAll('li')).toHaveLength(4);
+    expect(raiz(fixture).textContent).toContain('Total: 4 · Pendientes: 2');
+  });
+
+  it('expone una región desplazable y alcanzable por teclado', async () => {
+    const fixture = await crear();
+    await abrir(fixture);
+    const region = raiz(fixture).querySelector<HTMLElement>('[role="region"]')!;
+    expect(region.tabIndex).toBe(0);
+    expect(region.getAttribute('aria-label')).toBe('Lista de observaciones');
+    region.focus();
+    expect(document.activeElement).toBe(region);
+  });
+
+  it('devuelve el foco y libera el listener responsive al destruir el panel abierto', async () => {
+    const fixture = await crear();
+    await abrir(fixture);
+    fixture.destroy();
+    expect(document.activeElement).toBe(apertura);
+    expect(cambios.size).toBe(0);
   });
 });

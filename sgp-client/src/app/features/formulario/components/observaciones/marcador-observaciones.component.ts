@@ -28,6 +28,7 @@ import { TranslocoPipe } from '@jsverse/transloco';
   styles: `
     :host {
       display: inline-block;
+      max-width: 100%;
     }
     .marcador {
       display: inline-flex;
@@ -35,6 +36,9 @@ import { TranslocoPipe } from '@jsverse/transloco';
       gap: 0.5rem;
       min-width: 44px;
       min-height: 44px;
+      max-width: 100%;
+      box-sizing: border-box;
+      overflow-wrap: anywhere;
       padding: 0.35rem 0.65rem;
       border: 1px solid var(--sgp-border);
       border-radius: 12px;
