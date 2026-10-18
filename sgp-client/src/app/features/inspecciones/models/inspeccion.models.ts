@@ -160,3 +160,58 @@ export interface InspeccionResumenResponse {
   /** Corrección publicada que supera a esta inspección; nulo si sigue vigente. */
   superadaPorId?: string | null;
 }
+
+export type EstadoCondicionIc = 'BUENO' | 'REGULAR' | 'MALO';
+
+export interface ResultadoCalculoIc {
+  versionFormularioId: string;
+  codigoFormulario: string;
+  versionAlgoritmo: string;
+  hashEntrada: string;
+  indiceCalculado: number;
+  estadoPorRango: EstadoCondicionIc;
+  estadoCalculado: EstadoCondicionIc;
+  sumaPesos: number;
+  sumaCalificacionesPonderadas: number;
+  desglose: {
+    elementoRef: string;
+    peso: number;
+    calificacionAgregada: number;
+    aportePonderado: number;
+    reglaAgregacion: string;
+    instancias: {
+      instanciaId: string | null;
+      rutaDatos: string;
+      existencia: string;
+      incluida: boolean;
+      calificacion: number | null;
+      indicadores: { indicador: string; valorOriginal: string; calificacion: number }[];
+    }[];
+  }[];
+  condicionesAnulacion: {
+    reglaId: string;
+    descripcion: string;
+    elementoRef: string;
+    instanciaId: string | null;
+    rutaDatos: string;
+    indicador: string;
+    valorDetectado: string;
+    estadoResultante: EstadoCondicionIc;
+  }[];
+}
+
+export interface ConfirmacionEstadoIcResponse {
+  inspeccionId: string;
+  calculo: ResultadoCalculoIc;
+  estadoConfirmado: EstadoCondicionIc | null;
+  justificacion: string | null;
+  realizadoPorId: string | null;
+  realizadoEn: string | null;
+  confirmacionVigente: boolean;
+}
+
+export interface ConfirmarEstadoIcRequest {
+  estadoConfirmado: EstadoCondicionIc;
+  hashEntrada: string;
+  justificacion: string | null;
+}

@@ -1,0 +1,93 @@
+.confirmacion-ic {
+  padding: 1.5rem;
+  margin-block: 1rem;
+  color: var(--sgp-navy-900);
+}
+h2 {
+  margin-top: 0;
+}
+p,
+small {
+  line-height: 1.5;
+}
+form {
+  display: grid;
+  gap: 0.75rem;
+  max-width: 40rem;
+  margin-block: 1rem;
+}
+label {
+  font-weight: 700;
+}
+textarea {
+  width: 100%;
+}
+dl {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 0.75rem;
+}
+dt,
+th {
+  font-weight: 700;
+}
+dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.estado {
+  width: fit-content;
+  padding: 0.25rem 0.75rem;
+  border-radius: 0.5rem;
+  font-weight: 700;
+}
+.estado[data-estado='BUENO'] {
+  background: #dcfce7;
+  color: #166534;
+}
+.estado[data-estado='REGULAR'] {
+  background: #fef3c7;
+  color: #92400e;
+}
+.estado[data-estado='MALO'],
+.error,
+.criticas {
+  background: #fee2e2;
+  color: #991b1b;
+}
+.error,
+.criticas,
+.exito {
+  padding: 0.75rem;
+  border-radius: 0.5rem;
+}
+.exito {
+  background: #dcfce7;
+  color: #166534;
+}
+summary {
+  cursor: pointer;
+  padding-block: 0.75rem;
+  font-weight: 700;
+}
+.tabla {
+  overflow-x: auto;
+}
+table {
+  border-collapse: collapse;
+  width: 100%;
+}
+th,
+td {
+  padding: 0.75rem;
+  text-align: left;
+  border-bottom: 1px solid var(--sgp-border);
+}
+@media (max-width: 650px) {
+  dl {
+    grid-template-columns: 1fr;
+  }
+  .confirmacion-ic {
+    padding: 1rem;
+  }
+}

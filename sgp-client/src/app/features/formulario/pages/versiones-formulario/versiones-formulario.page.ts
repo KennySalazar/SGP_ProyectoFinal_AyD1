@@ -126,6 +126,7 @@ export class VersionesFormularioPage implements OnInit {
   }
 
   crearVersion(): void {
+    if (this.creandoVersion()) return;
     if (this.nuevoForm.invalid) {
       this.nuevoForm.markAllAsTouched();
       return;
@@ -138,6 +139,7 @@ export class VersionesFormularioPage implements OnInit {
       .crear({
         codigo: codigo.trim(),
         versionBaseId: versionBaseId || null,
+        ...(!versionBaseId ? { cargarPlantillaInicial: true } : {}),
       })
       .pipe(
         takeUntilDestroyed(this.destroyRef),
