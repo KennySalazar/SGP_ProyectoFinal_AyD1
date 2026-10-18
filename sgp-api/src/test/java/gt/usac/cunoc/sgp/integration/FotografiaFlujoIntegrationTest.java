@@ -10,12 +10,16 @@ import gt.usac.cunoc.sgp.inspeccion.dto.*;
 import gt.usac.cunoc.sgp.inspeccion.service.InspeccionService;
 import gt.usac.cunoc.sgp.sync.model.*;
 import gt.usac.cunoc.sgp.sync.service.*;
+import gt.usac.cunoc.sgp.usuario.model.RoleName;
 import java.nio.file.*;
 import java.time.*;
 import java.util.*;
 import java.util.concurrent.*;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
@@ -228,6 +232,258 @@ class FotografiaFlujoIntegrationTest {
     return inspecciones
         .iniciarInspeccion(inicio(UUID.randomUUID()), usuario, UUID.randomUUID().toString())
         .id();
+  }
+
+  record EvidenciaAcademica(UUID inspeccion, UUID autor, UUID asignacion, UUID foto) {}
+
+  UUID crearUsuario(RoleName rol) {
+    UUID id = UUID.randomUUID();
+    jdbc.update(
+        "INSERT INTO usuario(id,email,password_hash,rol_id,verificado,activado,activo) SELECT ?,?,'test',id,true,true,true FROM rol WHERE nombre=?",
+        id,
+        id + "@test.com",
+        rol.name());
+    return id;
+  }
+
+  UUID crearAsignacion(UUID estudiante, UUID puenteAsignado, UUID catedratico) {
+    UUID asignatura = UUID.randomUUID(),
+        curso = UUID.randomUUID(),
+        inscripcion = UUID.randomUUID(),
+        asignacion = UUID.randomUUID();
+    jdbc.update(
+        "INSERT INTO asignatura(id,codigo,nombre) VALUES (?,?,'Asignatura prueba')",
+        asignatura,
+        asignatura.toString());
+    jdbc.update(
+        "INSERT INTO curso(id,asignatura_id,periodo,catedratico_id,fecha_inicio,fecha_fin) VALUES (?,?,'2026',?,'2026-01-01','2026-12-31')",
+        curso,
+        asignatura,
+        catedratico);
+    jdbc.update(
+        "INSERT INTO curso_estudiante(id,curso_id,estudiante_id,seccion,inscrito_por_id) VALUES (?,?,?,'A',?)",
+        inscripcion,
+        curso,
+        estudiante,
+        catedratico);
+    jdbc.update(
+        "INSERT INTO asignacion_puente(id,curso_estudiante_id,puente_id,asignado_por_id) VALUES (?,?,?,?)",
+        asignacion,
+        inscripcion,
+        puenteAsignado,
+        catedratico);
+    return asignacion;
+  }
+
+  UUID iniciarVersionada(UUID autor, RoleName rol, UUID asignacion) {
+    return inspecciones
+        .iniciarInspeccion(
+            new IniciarInspeccionVersionadaRequest(
+                puente, version, LocalDate.of(2026, 10, 15), "web", "Autor", null, asignacion),
+            autor,
+            rol.name())
+        .id();
+  }
+
+  EvidenciaAcademica evidenciaAcademica() throws Exception {
+    UUID autor = crearUsuario(RoleName.ESTUDIANTE);
+    UUID asignacion = crearAsignacion(autor, puente, usuario);
+    UUID id = iniciarVersionada(autor, RoleName.ESTUDIANTE, asignacion);
+    var r = metadatos();
+    fotos.adjuntar(id, autor, r, imagen("jpeg"), "academica");
+    assertThat(inspeccionRepository.findById(id).orElseThrow().getAsignacionPuenteId())
+        .isEqualTo(asignacion);
+    return new EvidenciaAcademica(id, autor, asignacion, r.id());
+  }
+
+  void exigirLecturas(EvidenciaAcademica evidencia, UUID actor, RoleName rol, int estado)
+      throws Exception {
+    var mvc =
+        org.springframework.test.web.servlet.setup.MockMvcBuilders.standaloneSetup(
+                new gt.usac.cunoc.sgp.inspeccion.controller.FotografiaController(fotos))
+            .setControllerAdvice(new gt.usac.cunoc.sgp.common.exception.ApiExceptionHandler())
+            .build();
+    org.springframework.security.authentication.UsernamePasswordAuthenticationToken auth = null;
+    if (actor != null) {
+      auth =
+          new org.springframework.security.authentication.UsernamePasswordAuthenticationToken(
+              "usuario",
+              null,
+              List.of(
+                  new org.springframework.security.core.authority.SimpleGrantedAuthority(
+                      "ROLE_" + rol.name())));
+      auth.setDetails(
+          new gt.usac.cunoc.sgp.common.security.JwtData("test@example.com", actor, rol, 0));
+    }
+    String base = "/api/v1/inspecciones/" + evidencia.inspeccion() + "/fotografias";
+    for (String sufijo :
+        List.of("", "/" + evidencia.foto() + "/contenido", "/" + evidencia.foto() + "/miniatura")) {
+      var solicitud =
+          org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get(base + sufijo);
+      if (auth != null) solicitud.principal(auth);
+      var resultado =
+          mvc.perform(solicitud)
+              .andExpect(
+                  org.springframework.test.web.servlet.result.MockMvcResultMatchers.status()
+                      .is(estado));
+      if (estado == 404)
+        resultado.andExpect(
+            org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.code")
+                .value("inspeccion_no_encontrada"));
+      if (estado == 200 && sufijo.isEmpty())
+        resultado.andExpect(
+            org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$[0].id")
+                .value(evidencia.foto().toString()));
+      if (estado == 200 && !sufijo.isEmpty())
+        resultado.andExpect(
+            org.springframework.test.web.servlet.result.MockMvcResultMatchers.content()
+                .contentType("image/jpeg"));
+    }
+  }
+
+  @Test
+  void autorYCatedraticoDelCursoConsultanLasTresRutasDeUnBorrador() throws Exception {
+    var evidencia = evidenciaAcademica();
+    exigirLecturas(evidencia, evidencia.autor(), RoleName.ESTUDIANTE, 200);
+    exigirLecturas(evidencia, usuario, RoleName.CATEDRATICO, 200);
+    exigirLecturas(evidencia, null, null, 401);
+  }
+
+  @ParameterizedTest
+  @EnumSource(RoleName.class)
+  void usuariosAjenosNoConsultanFotografiasPrivadas(RoleName rol) throws Exception {
+    exigirLecturas(evidenciaAcademica(), crearUsuario(rol), rol, 404);
+  }
+
+  @Test
+  void rolDistintoDeCatedraticoNoAdquiereLecturaPorLaRelacionAcademica() throws Exception {
+    var evidencia = evidenciaAcademica();
+    exigirLecturas(evidencia, usuario, RoleName.ADMINISTRADOR, 404);
+  }
+
+  @ParameterizedTest
+  @ValueSource(
+      strings = {"ENVIADA", "EN_REVISION", "CAMBIOS_SOLICITADOS", "PUBLICADA", "RECHAZADA"})
+  void permisoAcademicoNoSeExtiendeFueraDeBorrador(String estado) throws Exception {
+    var evidencia = evidenciaAcademica();
+    jdbc.update(
+        "UPDATE inspeccion SET estado=?, publicado_en=CURRENT_TIMESTAMP WHERE id=?",
+        estado,
+        evidencia.inspeccion());
+    exigirLecturas(evidencia, usuario, RoleName.CATEDRATICO, 404);
+    exigirLecturas(evidencia, evidencia.autor(), RoleName.ESTUDIANTE, 200);
+  }
+
+  @Test
+  void revocacionRetiraLaLecturaAcademicaSinAfectarAlAutor() throws Exception {
+    var evidencia = evidenciaAcademica();
+    jdbc.update(
+        "UPDATE asignacion_puente SET revocado_en=now(), motivo_revocacion='Prueba' WHERE id=?",
+        evidencia.asignacion());
+    exigirLecturas(evidencia, usuario, RoleName.CATEDRATICO, 404);
+    exigirLecturas(evidencia, evidencia.autor(), RoleName.ESTUDIANTE, 200);
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void asignacionDeOtroEstudianteOPuenteNoConcedeLectura(boolean otroPuente) throws Exception {
+    var evidencia = evidenciaAcademica();
+    UUID otro = iniciar();
+    // Se simula una vinculación histórica incoherente para comprobar la autorización defensiva.
+    if (otroPuente) {
+      UUID puenteDistinto = UUID.randomUUID();
+      jdbc.update(
+          "INSERT INTO puente(id,codigo,correlativo_municipal,municipio_id,nombre,ruta,ubicacion,creado_por_id) SELECT ?,?,(SELECT max(correlativo_municipal)+1 FROM puente),municipio_id,'otro','otro',ubicacion,creado_por_id FROM puente WHERE id=?",
+          puenteDistinto,
+          "T-" + puenteDistinto,
+          puente);
+      jdbc.update(
+          "UPDATE inspeccion SET puente_id=? WHERE id=?", puenteDistinto, evidencia.inspeccion());
+    } else {
+      jdbc.update(
+          "UPDATE inspeccion SET autor_id=? WHERE id=?",
+          crearUsuario(RoleName.ESTUDIANTE),
+          evidencia.inspeccion());
+    }
+    exigirLecturas(evidencia, usuario, RoleName.CATEDRATICO, 404);
+    exigirNoEncontrada(
+        () -> fotos.contenido(otro, evidencia.foto(), usuario, RoleName.CATEDRATICO, false));
+    exigirNoEncontrada(
+        () -> fotos.contenido(otro, evidencia.foto(), usuario, RoleName.CATEDRATICO, true));
+  }
+
+  @Test
+  void catedraticoAsignadoNoPuedeCargarNiRetirar() throws Exception {
+    var evidencia = evidenciaAcademica();
+    var clavesAntes = storage.claves();
+    var nueva = imagen("jpeg");
+    exigirNoEncontrada(
+        () -> fotos.adjuntar(evidencia.inspeccion(), usuario, metadatos(), nueva, "prohibida"));
+    exigirNoEncontrada(() -> fotos.retirar(evidencia.inspeccion(), evidencia.foto(), usuario));
+    assertThat(storage.claves()).isEqualTo(clavesAntes);
+    exigirLecturas(evidencia, usuario, RoleName.CATEDRATICO, 200);
+  }
+
+  @Test
+  void inspeccionIndependienteNoObtienePermisosDeAsignacionesNoVinculadas() throws Exception {
+    var evidencia = evidenciaAcademica();
+    jdbc.update(
+        "UPDATE inspeccion SET asignacion_puente_id=NULL WHERE id=?", evidencia.inspeccion());
+    exigirLecturas(evidencia, usuario, RoleName.CATEDRATICO, 404);
+    exigirLecturas(evidencia, evidencia.autor(), RoleName.ESTUDIANTE, 200);
+  }
+
+  @Test
+  void creacionExplicitaEligeAsignacionSinInferirEntreVariosCursos() {
+    UUID autor = crearUsuario(RoleName.ESTUDIANTE);
+    UUID primera = crearAsignacion(autor, puente, usuario);
+    UUID segunda = crearAsignacion(autor, puente, crearUsuario(RoleName.CATEDRATICO));
+    UUID id = iniciarVersionada(autor, RoleName.ESTUDIANTE, segunda);
+    assertThat(inspeccionRepository.findById(id).orElseThrow().getAsignacionPuenteId())
+        .isEqualTo(segunda)
+        .isNotEqualTo(primera);
+    UUID independiente = iniciarVersionada(autor, RoleName.ESTUDIANTE, null);
+    assertThat(inspeccionRepository.findById(independiente).orElseThrow().getAsignacionPuenteId())
+        .isNull();
+    UUID profesional = crearUsuario(RoleName.PROFESIONAL_EXTERNO);
+    assertThat(
+            inspeccionRepository
+                .findById(iniciarVersionada(profesional, RoleName.PROFESIONAL_EXTERNO, null))
+                .orElseThrow()
+                .getAsignacionPuenteId())
+        .isNull();
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"INEXISTENTE", "OTRO_AUTOR", "OTRO_PUENTE", "REVOCADA"})
+  void creacionRechazaAsignacionesInvalidasSinGuardarLaInspeccion(String caso) {
+    UUID autor = crearUsuario(RoleName.ESTUDIANTE);
+    UUID asignacion =
+        caso.equals("INEXISTENTE") ? UUID.randomUUID() : crearAsignacion(autor, puente, usuario);
+    if (caso.equals("OTRO_AUTOR")) {
+      UUID otroAutor = crearUsuario(RoleName.ESTUDIANTE);
+      jdbc.update(
+          "UPDATE curso_estudiante SET estudiante_id=? WHERE id=(SELECT curso_estudiante_id FROM asignacion_puente WHERE id=?)",
+          otroAutor,
+          asignacion);
+    }
+    if (caso.equals("OTRO_PUENTE")) {
+      // El puente solicitado existe y es distinto del que posee la asignación.
+      UUID otroPuente = UUID.randomUUID();
+      jdbc.update(
+          "INSERT INTO puente(id,codigo,correlativo_municipal,municipio_id,nombre,ruta,ubicacion,creado_por_id) SELECT ?,?,(SELECT max(correlativo_municipal)+1 FROM puente),municipio_id,'otro','otro',ubicacion,creado_por_id FROM puente WHERE id=?",
+          otroPuente,
+          "T-" + otroPuente,
+          puente);
+      jdbc.update("UPDATE asignacion_puente SET puente_id=? WHERE id=?", otroPuente, asignacion);
+    }
+    if (caso.equals("REVOCADA"))
+      jdbc.update(
+          "UPDATE asignacion_puente SET revocado_en=now(), motivo_revocacion='Prueba' WHERE id=?",
+          asignacion);
+    long antes = inspeccionRepository.count();
+    exigirNoEncontrada(() -> iniciarVersionada(autor, RoleName.ESTUDIANTE, asignacion));
+    assertThat(inspeccionRepository.count()).isEqualTo(antes);
   }
 
   @Test

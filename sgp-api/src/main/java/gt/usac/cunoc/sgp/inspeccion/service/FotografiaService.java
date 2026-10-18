@@ -11,8 +11,10 @@ import gt.usac.cunoc.sgp.inspeccion.dto.*;
 import gt.usac.cunoc.sgp.inspeccion.entity.Inspeccion;
 import gt.usac.cunoc.sgp.inspeccion.repository.InspeccionRepository;
 import gt.usac.cunoc.sgp.inspeccion.validation.ValidadorAnclajeFotografico;
+import gt.usac.cunoc.sgp.puente.repository.AsignacionPuenteRepository;
 import gt.usac.cunoc.sgp.sync.model.SolicitudOperacion;
 import gt.usac.cunoc.sgp.sync.service.*;
+import gt.usac.cunoc.sgp.usuario.model.RoleName;
 import java.io.*;
 import java.nio.file.*;
 import java.time.*;
@@ -27,6 +29,7 @@ import org.springframework.web.multipart.MultipartFile;
 @Service
 public class FotografiaService {
   private final InspeccionRepository inspecciones;
+  private final AsignacionPuenteRepository asignaciones;
   private final ArchivoRepository archivos;
   private final ArchivoInspeccionRepository vinculos;
   private final RegistroFotografiasInspeccion registroFotografias;
@@ -57,8 +60,10 @@ public class FotografiaService {
       OperacionIdempotenteService operaciones,
       ObjectMapper json,
       Clock clock,
+      AsignacionPuenteRepository asignaciones,
       PlatformTransactionManager tm) {
     this.inspecciones = inspecciones;
+    this.asignaciones = asignaciones;
     this.archivos = archivos;
     this.vinculos = vinculos;
     this.registroFotografias = registroFotografias;
@@ -81,7 +86,6 @@ public class FotografiaService {
       AdjuntarFotografiaRequest request,
       MultipartFile fichero,
       String clave) {
-    // Estos controles básicos HU-028 se conectarán con la política HU-029 al integrar ambas ramas.
     tx.executeWithoutResult(t -> autorizar(inspeccionId, actor, false));
     CategoriaFoto categoria = validar(request, clave);
     if (fichero.isEmpty())
@@ -286,9 +290,13 @@ public class FotografiaService {
   }
 
   public List<FotografiaResponse> listar(UUID id, UUID actor) {
+    return listar(id, actor, null);
+  }
+
+  public List<FotografiaResponse> listar(UUID id, UUID actor, RoleName rol) {
     return tx.execute(
         t -> {
-          autorizar(id, actor, false);
+          autorizarLectura(id, actor, rol);
           return vinculos
               .findByInspeccionIdAndTipoUsoOrderByCreadoEnAsc(id, TipoUsoArchivo.FOTO_INSPECCION)
               .stream()
@@ -299,10 +307,14 @@ public class FotografiaService {
   }
 
   public InputStream contenido(UUID id, UUID fotoId, UUID actor, boolean miniatura) {
+    return contenido(id, fotoId, actor, null, miniatura);
+  }
+
+  public InputStream contenido(UUID id, UUID fotoId, UUID actor, RoleName rol, boolean miniatura) {
     String clave =
         tx.execute(
             t -> {
-              autorizar(id, actor, false);
+              autorizarLectura(id, actor, rol);
               var v =
                   vinculos
                       .findByInspeccionIdAndArchivoIdAndTipoUso(
@@ -330,5 +342,27 @@ public class FotografiaService {
 
   private ApiException error(HttpStatus status, String code, String detail) {
     return new ApiException(status, code, "Fotografía de inspección", detail);
+  }
+
+  private void autorizarLectura(UUID id, UUID actor, RoleName rol) {
+    if (actor == null)
+      throw error(
+          HttpStatus.UNAUTHORIZED, "autenticacion_requerida", "Se requiere una sesión válida.");
+    var i =
+        inspecciones
+            .findByIdAndEliminadoEnIsNull(id)
+            .orElseThrow(
+                () ->
+                    error(
+                        HttpStatus.NOT_FOUND,
+                        "inspeccion_no_encontrada",
+                        "Inspección no encontrada."));
+    if (i.getAutorId().equals(actor)) return;
+    if (rol == RoleName.CATEDRATICO
+        && "BORRADOR".equals(i.getEstado())
+        && i.getAsignacionPuenteId() != null
+        && asignaciones.existsVigenteParaLecturaFotografica(
+            i.getAsignacionPuenteId(), i.getAutorId(), i.getPuente().getId(), actor)) return;
+    throw error(HttpStatus.NOT_FOUND, "inspeccion_no_encontrada", "Inspección no encontrada.");
   }
 }

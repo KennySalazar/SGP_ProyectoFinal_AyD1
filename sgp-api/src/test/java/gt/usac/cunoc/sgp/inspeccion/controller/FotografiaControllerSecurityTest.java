@@ -117,6 +117,24 @@ class FotografiaControllerSecurityTest {
     verifyNoInteractions(servicio);
   }
 
+  @ParameterizedTest
+  @EnumSource(RoleName.class)
+  void lecturasUsanIdentidadYRolDeLaSesion(RoleName rol) throws Exception {
+    UUID usuario = UUID.randomUUID(), id = UUID.randomUUID(), foto = UUID.randomUUID();
+    when(servicio.contenido(eq(id), eq(foto), eq(usuario), eq(rol), anyBoolean()))
+        .thenAnswer(invocacion -> new java.io.ByteArrayInputStream(new byte[] {1, 2}));
+    String base = "/api/v1/inspecciones/" + id + "/fotografias";
+
+    for (String sufijo : List.of("", "/" + foto + "/contenido", "/" + foto + "/miniatura")) {
+      mvc.perform(get(base + sufijo).with(authentication(sesion(usuario, rol))))
+          .andExpect(status().isOk());
+    }
+
+    verify(servicio).listar(id, usuario, rol);
+    verify(servicio).contenido(id, foto, usuario, rol, false);
+    verify(servicio).contenido(id, foto, usuario, rol, true);
+  }
+
   @Test
   void multipartUsaIdentidadDeSesionYRespuestaNoContieneClaves() throws Exception {
     UUID usuario = UUID.randomUUID(),
@@ -197,7 +215,7 @@ class FotografiaControllerSecurityTest {
   void lecturaPrivadaYPartesInvalidasTienenContratoExplicito() throws Exception {
     UUID usuario = UUID.randomUUID(), id = UUID.randomUUID(), foto = UUID.randomUUID();
     String base = "/api/v1/inspecciones/" + id + "/fotografias";
-    when(servicio.contenido(id, foto, usuario, true))
+    when(servicio.contenido(id, foto, usuario, RoleName.CATEDRATICO, true))
         .thenReturn(new java.io.ByteArrayInputStream(new byte[] {1, 2}));
     mvc.perform(get(base + "/" + foto + "/miniatura").with(authentication(sesion(usuario))))
         .andExpect(status().isOk())

@@ -33,6 +33,7 @@ import gt.usac.cunoc.sgp.inspeccion.model.ResultadoCalculoIc;
 import gt.usac.cunoc.sgp.inspeccion.repository.InspeccionDatoTecnicoRepository;
 import gt.usac.cunoc.sgp.inspeccion.repository.InspeccionRepository;
 import gt.usac.cunoc.sgp.puente.entity.Puente;
+import gt.usac.cunoc.sgp.puente.repository.AsignacionPuenteRepository;
 import gt.usac.cunoc.sgp.puente.repository.PuenteRepository;
 import gt.usac.cunoc.sgp.sync.model.SolicitudOperacion;
 import gt.usac.cunoc.sgp.sync.service.OperacionIdempotenteService;
@@ -95,6 +96,7 @@ public class InspeccionService {
   private final CalculoIndiceCondicionService calculoIndiceCondicionService;
   private final JsonSchemaValidatorService jsonSchemaValidatorService;
   private final InspeccionMapper inspeccionMapper;
+  private final AsignacionPuenteRepository asignaciones;
 
   public InspeccionService(
       InspeccionRepository inspeccionRepository,
@@ -102,7 +104,8 @@ public class InspeccionService {
       PuenteRepository puenteRepository,
       JsonSchemaValidatorService jsonSchemaValidatorService,
       InspeccionMapper inspeccionMapper,
-      ObjectMapper objectMapper) {
+      ObjectMapper objectMapper,
+      AsignacionPuenteRepository asignaciones) {
     this(
         inspeccionRepository,
         null,
@@ -118,7 +121,8 @@ public class InspeccionService {
         null,
         null,
         jsonSchemaValidatorService,
-        inspeccionMapper);
+        inspeccionMapper,
+        asignaciones);
   }
 
   public InspeccionService(
@@ -143,6 +147,7 @@ public class InspeccionService {
         auditoriaWriter,
         objectMapper,
         clock,
+        null,
         null,
         null,
         null,
@@ -179,6 +184,7 @@ public class InspeccionService {
         preparadorEntradaIcService,
         calculoIndiceCondicionService,
         null,
+        null,
         null);
   }
 
@@ -198,7 +204,8 @@ public class InspeccionService {
       PreparadorEntradaIcService preparadorEntradaIcService,
       CalculoIndiceCondicionService calculoIndiceCondicionService,
       JsonSchemaValidatorService jsonSchemaValidatorService,
-      InspeccionMapper inspeccionMapper) {
+      InspeccionMapper inspeccionMapper,
+      AsignacionPuenteRepository asignaciones) {
     this.inspeccionRepository = inspeccionRepository;
     this.datoTecnicoRepository = datoTecnicoRepository;
     this.puenteRepository = puenteRepository;
@@ -215,6 +222,7 @@ public class InspeccionService {
     this.calculoIndiceCondicionService = calculoIndiceCondicionService;
     this.jsonSchemaValidatorService = jsonSchemaValidatorService;
     this.inspeccionMapper = inspeccionMapper;
+    this.asignaciones = asignaciones;
   }
 
   /** Conserva el contrato de HU-024 utilizado por los consumidores de HU-028. */
@@ -350,6 +358,17 @@ public class InspeccionService {
 
     Inspeccion inspeccion =
         new Inspeccion(puente, version, usuarioId, rolUsuario, nombre, fecha, dispositivo, datos);
+    if (request.asignacionPuenteId() != null) {
+      if (!asignaciones.existsVigenteParaInspeccion(
+          request.asignacionPuenteId(), usuarioId, puente.getId())) {
+        throw new ApiException(
+            HttpStatus.NOT_FOUND,
+            "asignacion_no_encontrada",
+            "Asignación no encontrada",
+            "No existe una asignación vigente del autor para este puente.");
+      }
+      inspeccion.setAsignacionPuenteId(request.asignacionPuenteId());
+    }
     InspeccionResumenResponse response =
         inspeccionMapper.toResumenResponse(inspeccionRepository.save(inspeccion));
     return new IniciarInspeccionVersionadaResponse(

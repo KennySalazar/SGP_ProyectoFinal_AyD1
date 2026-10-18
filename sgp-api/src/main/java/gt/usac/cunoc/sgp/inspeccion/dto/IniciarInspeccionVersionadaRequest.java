@@ -11,4 +11,23 @@ public record IniciarInspeccionVersionadaRequest(
     LocalDate fechaInspeccion,
     String dispositivoId,
     String nombreAutorCapturado,
-    JsonNode datos) {}
+    JsonNode datos,
+    UUID asignacionPuenteId) {
+
+  public IniciarInspeccionVersionadaRequest(
+      UUID puenteId,
+      UUID versionFormularioId,
+      LocalDate fechaInspeccion,
+      String dispositivoId,
+      String nombreAutorCapturado,
+      JsonNode datos) {
+    this(
+        puenteId,
+        versionFormularioId,
+        fechaInspeccion,
+        dispositivoId,
+        nombreAutorCapturado,
+        datos,
+        null);
+  }
+}

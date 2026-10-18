@@ -35,7 +35,8 @@ public class FotografiaController {
 
   @GetMapping
   public List<FotografiaResponse> listar(@PathVariable UUID id, Authentication auth) {
-    return servicio.listar(id, actor(auth));
+    var identidad = identidad(auth);
+    return servicio.listar(id, identidad.userId(), identidad.role());
   }
 
   @DeleteMapping("/{fotoId}")
@@ -59,6 +60,7 @@ public class FotografiaController {
 
   private ResponseEntity<InputStreamResource> leer(
       UUID id, UUID foto, Authentication auth, boolean mini) {
+    var identidad = identidad(auth);
     return ResponseEntity.ok()
         .contentType(MediaType.IMAGE_JPEG)
         .cacheControl(CacheControl.noStore().cachePrivate())
@@ -69,16 +71,22 @@ public class FotografiaController {
                 .filename(foto + (mini ? "-mini" : "") + ".jpg")
                 .build()
                 .toString())
-        .body(new InputStreamResource(servicio.contenido(id, foto, actor(auth), mini)));
+        .body(
+            new InputStreamResource(
+                servicio.contenido(id, foto, identidad.userId(), identidad.role(), mini)));
   }
 
   private UUID actor(Authentication auth) {
+    return identidad(auth).userId();
+  }
+
+  private JwtData identidad(Authentication auth) {
     if (auth == null || !(auth.getDetails() instanceof JwtData jwt))
       throw new ApiException(
           HttpStatus.UNAUTHORIZED,
           "autenticacion_requerida",
           "Autenticación requerida",
           "Se requiere una sesión válida.");
-    return jwt.userId();
+    return jwt;
   }
 }
