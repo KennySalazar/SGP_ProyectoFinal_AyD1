@@ -19,11 +19,35 @@ import org.springframework.http.HttpStatus;
 
 class ReglasEvidenciaFotograficaTest {
 
-  // Propuesta académica suministrada explícitamente; no es configuración de producción.
+  // Política explícita para probar también el evaluador parametrizado.
   private static final Map<String, Integer> MINIMOS_PROPUESTOS =
       Map.of("ACCESO", 1, "SUPERESTRUCTURA", 1, "SUBESTRUCTURA", 1, "CAUCE", 1);
 
   private final ReglasEvidenciaFotografica reglas = new ReglasEvidenciaFotografica();
+
+  @Test
+  void minimosObligatoriosConservanLasCuatroCategoriasYElOrdenDelContrato() {
+    assertEquals(
+        List.of(
+            new FaltanteEvidenciaResponse("ACCESO", 1, 0),
+            new FaltanteEvidenciaResponse("SUPERESTRUCTURA", 1, 0),
+            new FaltanteEvidenciaResponse("SUBESTRUCTURA", 1, 0),
+            new FaltanteEvidenciaResponse("CAUCE", 1, 0)),
+        reglas.faltantesObligatorios(Map.of("OTRA", 10L)));
+    assertTrue(reglas.faltantesObligatorios(evidenciaCompleta()).isEmpty());
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"ACCESO", "SUPERESTRUCTURA", "SUBESTRUCTURA", "CAUCE"})
+  void minimosObligatoriosIdentificanExactamenteLaCategoriaFaltante(String categoria) {
+    var conteos = new HashMap<>(evidenciaCompleta());
+    conteos.put(categoria, 0L);
+    conteos.put("OTRA", 20L);
+
+    assertEquals(
+        List.of(new FaltanteEvidenciaResponse(categoria, 1, 0)),
+        reglas.faltantesObligatorios(conteos));
+  }
 
   @Test
   void sinFotografiasInformaTodasLasCategoriasFaltantes() {

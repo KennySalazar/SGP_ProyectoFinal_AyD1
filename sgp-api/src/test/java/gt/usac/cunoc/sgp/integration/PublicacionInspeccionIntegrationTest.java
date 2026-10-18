@@ -61,12 +61,15 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
@@ -326,6 +329,136 @@ class PublicacionInspeccionIntegrationTest {
                   .containsExactly("fotografias.SUPERESTRUCTURA", "fotografias.SUBESTRUCTURA");
             });
     assertThat(estado(inspeccion)).isEqualTo("BORRADOR");
+  }
+
+  @ParameterizedTest(name = "{0}: {1} {2}, OTRA no sustituye y no hay cambios parciales")
+  @MethodSource("evidenciasIncompletas")
+  void transicionesRechazanExactamenteLaCategoriaSinEvidenciaDisponible(
+      String accion, String categoria, String estadoArchivo) throws Exception {
+    UUID inspeccion = prepararTransicion(accion);
+    UUID foto = fotoDeCategoria(inspeccion, categoria);
+    if (estadoArchivo.equals("AUSENTE")) {
+      jdbc.update("DELETE FROM archivo_inspeccion WHERE archivo_id = ?", foto);
+    } else {
+      jdbc.update("UPDATE archivo SET estado = ? WHERE id = ?", estadoArchivo, foto);
+    }
+    agregarFoto(inspeccion, "OTRA");
+    var antes = instantaneaPersistida(inspeccion);
+
+    ApiException error;
+    if (accion.equals("aprobar")) {
+      // El endpoint de revisión pertenece a HU-030; aquí se verifica su servicio existente.
+      error =
+          org.junit.jupiter.api.Assertions.assertThrows(
+              ApiException.class, () -> ejecutarTransicion(accion, inspeccion));
+    } else {
+      UUID autor = accion.equals("publicar") ? CATEDRATICO_ID : ESTUDIANTE_ID;
+      autenticar(autor, accion.equals("publicar") ? RoleName.CATEDRATICO : RoleName.ESTUDIANTE);
+      var mvc =
+          org.springframework.test.web.servlet.setup.MockMvcBuilders.standaloneSetup(
+                  new TransicionInspeccionController(transiciones))
+              .setControllerAdvice(new ApiExceptionHandler())
+              .build();
+      var resultado =
+          mvc.perform(
+                  org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post(
+                          "/api/v1/inspecciones/{id}/{accion}", inspeccion, accion)
+                      .principal(SecurityContextHolder.getContext().getAuthentication()))
+              .andExpect(
+                  org.springframework.test.web.servlet.result.MockMvcResultMatchers.status()
+                      .isUnprocessableEntity())
+              .andExpect(
+                  org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath(
+                          "$.code")
+                      .value("inspeccion_incompleta"))
+              .andExpect(
+                  org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath(
+                          "$.errores.length()")
+                      .value(1))
+              .andExpect(
+                  org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath(
+                          "$.errores[0].campo")
+                      .value("fotografias." + categoria))
+              .andReturn();
+      error = (ApiException) resultado.getResolvedException();
+    }
+
+    assertThat(error.getStatus()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+    assertThat(error.getCode()).isEqualTo("inspeccion_incompleta");
+    assertThat(error.getErrores())
+        .extracting(e -> e.get("campo"))
+        .containsExactly("fotografias." + categoria);
+    assertThat(instantaneaPersistida(inspeccion)).isEqualTo(antes);
+    org.mockito.Mockito.verifyNoInteractions(almacenamiento);
+  }
+
+  static Stream<Arguments> evidenciasIncompletas() {
+    return Stream.of("enviar", "publicar", "aprobar")
+        .flatMap(
+            accion ->
+                Stream.of("ACCESO", "SUPERESTRUCTURA", "SUBESTRUCTURA", "CAUCE")
+                    .flatMap(
+                        categoria ->
+                            Stream.of("AUSENTE", "RETIRADO", "PURGADO")
+                                .map(estado -> Arguments.of(accion, categoria, estado))));
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"enviar", "publicar", "aprobar"})
+  void transicionesAceptanEvidenciaCompletaAunqueHayaFotosNoDisponibles(String accion) {
+    UUID inspeccion = prepararTransicion(accion);
+    // Otra foto retirada de la misma categoría no invalida la que sigue disponible.
+    UUID disponible = fotoDeCategoria(inspeccion, "ACCESO");
+    agregarFoto(inspeccion, "ACCESO");
+    jdbc.update("UPDATE archivo SET estado = 'RETIRADO' WHERE id = ?", disponible);
+
+    ejecutarTransicion(accion, inspeccion);
+
+    assertThat(estado(inspeccion)).isEqualTo(accion.equals("enviar") ? "ENVIADA" : "PUBLICADA");
+    assertThat(numero("SELECT count(*) FROM resultado_ic WHERE inspeccion_id = ?", inspeccion))
+        .isEqualTo(accion.equals("enviar") ? 0 : 1);
+  }
+
+  private UUID prepararTransicion(String accion) {
+    return switch (accion) {
+      case "enviar" -> crearInspeccionCompleta(ESTUDIANTE_ID, "ESTUDIANTE");
+      case "publicar" -> crearInspeccionCompleta(CATEDRATICO_ID, "CATEDRATICO");
+      case "aprobar" -> enRevision();
+      default -> throw new IllegalArgumentException(accion);
+    };
+  }
+
+  private void ejecutarTransicion(String accion, UUID inspeccion) {
+    switch (accion) {
+      case "enviar" -> transiciones.enviar(inspeccion, ESTUDIANTE_ID);
+      case "publicar" -> transiciones.publicar(inspeccion, CATEDRATICO_ID);
+      case "aprobar" -> transiciones.aprobar(inspeccion, REVISOR_ID);
+      default -> throw new IllegalArgumentException(accion);
+    }
+  }
+
+  private Map<String, Object> instantaneaPersistida(UUID inspeccion) {
+    return Map.of(
+        "inspeccion",
+            jdbc.queryForObject(
+                "SELECT to_jsonb(i)::text FROM inspeccion i WHERE id = ?",
+                String.class,
+                inspeccion),
+        "puente",
+            jdbc.queryForObject(
+                "SELECT to_jsonb(p)::text FROM puente p WHERE id = ?", String.class, puenteId),
+        "historial", historial(inspeccion),
+        "auditoria",
+            jdbc.queryForList(
+                "SELECT to_jsonb(a)::text FROM auditoria a WHERE entidad_id IN (?, ?) ORDER BY id",
+                String.class,
+                inspeccion,
+                puenteId),
+        "publicacion",
+            jdbc.queryForList(
+                "SELECT to_jsonb(r)::text FROM resultado_ic r WHERE inspeccion_id = ? ORDER BY id",
+                String.class,
+                inspeccion));
   }
 
   @ParameterizedTest

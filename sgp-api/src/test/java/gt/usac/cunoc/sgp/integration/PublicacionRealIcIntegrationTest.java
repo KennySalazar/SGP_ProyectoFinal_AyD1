@@ -57,6 +57,7 @@ import org.testcontainers.utility.DockerImageName;
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @Import({
   TransicionInspeccionService.class,
+  ReglasEvidenciaFotografica.class,
   PublicacionIndiceCondicionService.class,
   ConfirmacionEstadoIcService.class,
   PreparadorEntradaIcService.class,

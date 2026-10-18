@@ -3,8 +3,11 @@ package gt.usac.cunoc.sgp.inspeccion.service;
 import gt.usac.cunoc.sgp.common.exception.ApiException;
 import gt.usac.cunoc.sgp.inspeccion.dto.FaltanteEvidenciaResponse;
 import gt.usac.cunoc.sgp.inspeccion.dto.ValidacionEvidenciaResponse;
+import java.util.Comparator;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.stream.Collectors;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 
@@ -13,20 +16,29 @@ import org.springframework.stereotype.Service;
 public class ReglasEvidenciaFotografica {
 
   private static final int MAXIMO_FOTOGRAFIAS = 60;
+  private static final List<String> CATEGORIAS_OBLIGATORIAS =
+      List.of("ACCESO", "SUPERESTRUCTURA", "SUBESTRUCTURA", "CAUCE");
+  private static final Map<String, Integer> MINIMOS_OBLIGATORIOS =
+      CATEGORIAS_OBLIGATORIAS.stream()
+          .collect(Collectors.toUnmodifiableMap(categoria -> categoria, categoria -> 1));
+
+  /** Mínimos de HU-029, conservando el orden del contrato de errores de las transiciones. */
+  public List<FaltanteEvidenciaResponse> faltantesObligatorios(
+      Map<String, Long> disponiblesPorCategoria) {
+    return evaluar(disponiblesPorCategoria, MINIMOS_OBLIGATORIOS).faltantes().stream()
+        .sorted(Comparator.comparingInt(f -> CATEGORIAS_OBLIGATORIAS.indexOf(f.categoria())))
+        .toList();
+  }
 
   /**
    * Evalúa conteos calculados por el servidor sobre una sola inspección. El llamador debe contar
    * únicamente fotografías confirmadas DISPONIBLE, excluyendo documentos, intentos de carga,
    * retiradas y purgadas. Los códigos deben proceder del catálogo compartido de HU-028.
    *
-   * <p>Los mínimos son una política del servidor, nunca entrada HTTP. Mientras siga pendiente la
-   * decisión académica, el llamador suministrará la propuesta de una foto en ACCESO,
-   * SUPERESTRUCTURA, SUBESTRUCTURA y CAUCE. OTRA se cuenta en el total y no requiere mínimo en esa
-   * propuesta. Este método conserva los mínimos parametrizados y no presupone su aprobación
-   * definitiva.
-   *
-   * <p>La obtención y el filtrado del inventario pertenecen a la integración pendiente con HU-028;
-   * este evaluador no acredita esos pasos ni autoriza una transición de estado.
+   * <p>Los mínimos son una política del servidor, nunca entrada HTTP. Las transiciones utilizan
+   * {@link #faltantesObligatorios(Map)} para aplicar los mínimos de HU-029. OTRA cuenta en el
+   * total, pero no sustituye ninguna categoría obligatoria. Este evaluador no consulta el
+   * inventario ni autoriza una transición de estado.
    */
   public ValidacionEvidenciaResponse evaluar(
       Map<String, Long> disponiblesPorCategoria, Map<String, Integer> minimosPorCategoria) {
