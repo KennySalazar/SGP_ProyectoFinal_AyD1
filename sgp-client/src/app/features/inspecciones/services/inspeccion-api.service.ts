@@ -11,6 +11,8 @@ import {
   IniciarInspeccionResponse,
   InspeccionBorradorResponse,
   InspeccionResumenResponse,
+  InspeccionPublicadaDetalleResponse,
+  InspeccionPublicadaResumenResponse,
   EstadoInspeccion,
 } from '../models/inspeccion.models';
 import { PuenteResponse, PaginaResponse } from '../../puentes/models/puente.models';
@@ -185,6 +187,23 @@ export class InspeccionApiService {
     return this.http.get(
       `/api/v1/inspecciones/${inspeccionId}/fotografias/${fotoId}/${miniatura ? 'miniatura' : 'contenido'}`,
       { responseType: 'blob' },
+    );
+  }
+
+  listarPublicadasPorPuente(
+    puenteId: string,
+    pagina = 0,
+    tamanio = 20,
+  ): Observable<PaginaResponse<InspeccionPublicadaResumenResponse>> {
+    return this.http.get<PaginaResponse<InspeccionPublicadaResumenResponse>>(
+      `/api/v1/inspecciones/puentes/${encodeURIComponent(puenteId)}/publicadas`,
+      { params: { pagina, tamanio } },
+    );
+  }
+
+  obtenerPublicada(id: string): Observable<InspeccionPublicadaDetalleResponse> {
+    return this.http.get<InspeccionPublicadaDetalleResponse>(
+      `/api/v1/inspecciones/${encodeURIComponent(id)}/publicada`,
     );
   }
 }

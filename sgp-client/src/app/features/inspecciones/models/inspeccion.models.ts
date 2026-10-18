@@ -154,10 +154,8 @@ export interface InspeccionResumenResponse {
   ultimaActividadEn?: string | null;
   creadoEn: string;
   actualizadoEn?: string | null;
-  /** En una corrección: la inspección publicada que corrige y el motivo (HU-027). */
   supersedeAId?: string | null;
   motivoCorreccion?: string | null;
-  /** Corrección publicada que supera a esta inspección; nulo si sigue vigente. */
   superadaPorId?: string | null;
 }
 
@@ -214,4 +212,48 @@ export interface ConfirmarEstadoIcRequest {
   estadoConfirmado: EstadoCondicionIc;
   hashEntrada: string;
   justificacion: string | null;
+}
+
+export interface InspeccionPublicadaDetalleResponse {
+  id: string;
+  puenteId: string;
+  puenteNombre: string;
+  versionFormularioId: string;
+  versionFormularioCodigo: string;
+  esquemaFormulario: Record<string, unknown> | null;
+  autorId: string;
+  nombreAutor: string;
+  rolAutor: string;
+  acompanantes: AcompananteResponse[];
+  estado: 'PUBLICADA';
+  fechaInspeccion: string;
+  dispositivoId: string;
+  identificacionCapturada: Record<string, unknown> | null;
+  datos: Record<string, unknown> | null;
+  datosPermanentes: DatosPermanentesResponse | null;
+  creadoEn: string;
+  enviadoEn: string | null;
+  publicadoEn: string;
+  ic: {
+    indiceCalculado: number;
+    estadoCalculado: 'BUENO' | 'REGULAR' | 'MALO';
+    estadoConfirmado: 'BUENO' | 'REGULAR' | 'MALO';
+    justificacionAjuste: string | null;
+  } | null;
+  supersedeAId: string | null;
+  motivoCorreccion: string | null;
+  superadaPorId: string | null;
+  vigencia: 'VIGENTE' | 'SUPERADA';
+}
+
+export interface InspeccionPublicadaResumenResponse {
+  id: string;
+  puenteId: string;
+  autorId: string;
+  nombreAutor: string;
+  fechaInspeccion: string;
+  publicadoEn: string;
+  estado: 'PUBLICADA';
+  superadaPorId?: string | null;
+  vigencia?: 'VIGENTE' | 'SUPERADA';
 }

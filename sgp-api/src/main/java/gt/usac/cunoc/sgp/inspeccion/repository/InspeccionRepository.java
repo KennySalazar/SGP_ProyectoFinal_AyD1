@@ -1,5 +1,6 @@
 package gt.usac.cunoc.sgp.inspeccion.repository;
 
+import gt.usac.cunoc.sgp.inspeccion.dto.InspeccionPublicadaResumenResponse;
 import gt.usac.cunoc.sgp.inspeccion.entity.Inspeccion;
 import jakarta.persistence.LockModeType;
 import java.util.Collection;
@@ -43,6 +44,29 @@ public interface InspeccionRepository extends JpaRepository<Inspeccion, UUID> {
           """)
   Page<Inspeccion> findMisInspecciones(
       @Param("autorId") UUID autorId, @Param("estado") String estado, Pageable pageable);
+
+  @Query(
+      value =
+          """
+          SELECT new gt.usac.cunoc.sgp.inspeccion.dto.InspeccionPublicadaResumenResponse(
+            i.id, i.puente.id, i.autorId, i.nombreAutorCapturado,
+            i.fechaInspeccion, i.publicadoEn, i.estado)
+          FROM Inspeccion i
+          WHERE i.puente.id = :puenteId AND i.estado = 'PUBLICADA' AND i.eliminadoEn IS NULL
+          """,
+      countQuery =
+          """
+          SELECT count(i) FROM Inspeccion i
+          WHERE i.puente.id = :puenteId AND i.estado = 'PUBLICADA' AND i.eliminadoEn IS NULL
+          """)
+  Page<InspeccionPublicadaResumenResponse> findPublicadasByPuenteId(
+      @Param("puenteId") UUID puenteId, Pageable pageable);
+
+  @EntityGraph(attributePaths = {"puente", "versionFormulario", "acompanantes", "datoTecnico"})
+  @Query(
+      "SELECT i FROM Inspeccion i WHERE i.id = :id AND i.estado = 'PUBLICADA'"
+          + " AND i.eliminadoEn IS NULL")
+  Optional<Inspeccion> findPublicadaConDetallesById(@Param("id") UUID id);
 
   List<Inspeccion> findByPuenteIdOrderByFechaInspeccionDesc(UUID puenteId);
 

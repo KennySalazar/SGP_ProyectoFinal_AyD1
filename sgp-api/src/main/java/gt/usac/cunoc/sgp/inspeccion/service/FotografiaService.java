@@ -357,7 +357,7 @@ public class FotografiaService {
                         HttpStatus.NOT_FOUND,
                         "inspeccion_no_encontrada",
                         "Inspección no encontrada."));
-    if (i.getAutorId().equals(actor)) return;
+    if ("PUBLICADA".equals(i.getEstado()) || i.getAutorId().equals(actor)) return;
     if (rol == RoleName.CATEDRATICO
         && "BORRADOR".equals(i.getEstado())
         && i.getAsignacionPuenteId() != null
