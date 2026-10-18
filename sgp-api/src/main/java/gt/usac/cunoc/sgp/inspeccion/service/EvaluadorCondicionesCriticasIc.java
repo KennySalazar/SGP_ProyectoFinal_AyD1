@@ -28,18 +28,18 @@ public class EvaluadorCondicionesCriticasIc {
           for (String indicador : condicion.indicadores()) {
             JsonNode valor = elemento.datos().get(indicador);
             if (valor != null
-                    && valor.isTextual()
-                    && condicion.valores().contains(valor.textValue())) {
+                && valor.isTextual()
+                && condicion.valores().contains(valor.textValue())) {
               resultados.add(
-                      new CondicionAnulacion(
-                              condicion.id(),
-                              condicion.descripcion(),
-                              referencia,
-                              elemento.instanciaId(),
-                              elemento.rutaDatos(),
-                              indicador,
-                              valor.textValue(),
-                              EstadoCondicion.MALO));
+                  new CondicionAnulacion(
+                      condicion.id(),
+                      condicion.descripcion(),
+                      referencia,
+                      elemento.instanciaId(),
+                      elemento.rutaDatos(),
+                      indicador,
+                      valor.textValue(),
+                      EstadoCondicion.MALO));
             }
           }
         }

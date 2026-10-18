@@ -71,23 +71,23 @@ class VersionFormularioServiceTest {
     clock = Clock.fixed(fija, ZoneOffset.UTC);
 
     service =
-            new VersionFormularioService(
-                    versiones,
-                    mapeos,
-                    configuracionesIc,
-                    mapper,
-                    schemaValidator,
-                    campoExtractor,
-                    objectMapper,
-                    clock);
+        new VersionFormularioService(
+            versiones,
+            mapeos,
+            configuracionesIc,
+            mapper,
+            schemaValidator,
+            campoExtractor,
+            objectMapper,
+            clock);
   }
 
   @Test
   void listarVersionesRetornaResumen() {
     VersionFormulario v1 =
-            crearEntidad(UUID.randomUUID(), "v1", EstadoVersionFormulario.PUBLICADA, true);
+        crearEntidad(UUID.randomUUID(), "v1", EstadoVersionFormulario.PUBLICADA, true);
     VersionFormulario v2 =
-            crearEntidad(UUID.randomUUID(), "v2", EstadoVersionFormulario.BORRADOR, false);
+        crearEntidad(UUID.randomUUID(), "v2", EstadoVersionFormulario.BORRADOR, false);
     when(versiones.findAllByOrderByCreadoEnDesc()).thenReturn(List.of(v2, v1));
 
     List<VersionFormularioResumenResponse> lista = service.listarVersiones();
@@ -103,19 +103,19 @@ class VersionFormularioServiceTest {
     when(versiones.findById(id)).thenReturn(Optional.empty());
 
     assertThatThrownBy(() -> service.obtenerPorId(id))
-            .isInstanceOf(ApiException.class)
-            .satisfies(
-                    ex -> {
-                      ApiException apiEx = (ApiException) ex;
-                      assertThat(apiEx.getStatus()).isEqualTo(HttpStatus.NOT_FOUND);
-                      assertThat(apiEx.getCode()).isEqualTo("version_no_encontrada");
-                    });
+        .isInstanceOf(ApiException.class)
+        .satisfies(
+            ex -> {
+              ApiException apiEx = (ApiException) ex;
+              assertThat(apiEx.getStatus()).isEqualTo(HttpStatus.NOT_FOUND);
+              assertThat(apiEx.getCode()).isEqualTo("version_no_encontrada");
+            });
   }
 
   @Test
   void obtenerActivaRetornaVersionActiva() throws Exception {
     VersionFormulario v =
-            crearEntidad(UUID.randomUUID(), "SIECA-v1", EstadoVersionFormulario.PUBLICADA, true);
+        crearEntidad(UUID.randomUUID(), "SIECA-v1", EstadoVersionFormulario.PUBLICADA, true);
     when(versiones.findByActivaTrue()).thenReturn(Optional.of(v));
 
     FormularioActivoResponse res = service.obtenerActiva();
@@ -128,7 +128,7 @@ class VersionFormularioServiceTest {
   void obtenerPublicadaPorIdRetornaLaVersionAnteriorNoActiva() throws Exception {
     UUID id = UUID.randomUUID();
     VersionFormulario anterior =
-            crearEntidad(id, "SIECA-v1", EstadoVersionFormulario.PUBLICADA, false);
+        crearEntidad(id, "SIECA-v1", EstadoVersionFormulario.PUBLICADA, false);
     when(versiones.findById(id)).thenReturn(Optional.of(anterior));
 
     FormularioActivoResponse res = service.obtenerPublicadaPorId(id);
@@ -142,16 +142,16 @@ class VersionFormularioServiceTest {
   void obtenerPublicadaPorIdNoExponeBorradores() throws Exception {
     UUID id = UUID.randomUUID();
     VersionFormulario borrador =
-            crearEntidad(id, "SIECA-v2", EstadoVersionFormulario.BORRADOR, false);
+        crearEntidad(id, "SIECA-v2", EstadoVersionFormulario.BORRADOR, false);
     when(versiones.findById(id)).thenReturn(Optional.of(borrador));
 
     assertThatThrownBy(() -> service.obtenerPublicadaPorId(id))
-            .isInstanceOfSatisfying(
-                    ApiException.class,
-                    ex -> {
-                      assertThat(ex.getStatus()).isEqualTo(HttpStatus.NOT_FOUND);
-                      assertThat(ex.getCode()).isEqualTo("version_no_encontrada");
-                    });
+        .isInstanceOfSatisfying(
+            ApiException.class,
+            ex -> {
+              assertThat(ex.getStatus()).isEqualTo(HttpStatus.NOT_FOUND);
+              assertThat(ex.getCode()).isEqualTo("version_no_encontrada");
+            });
   }
 
   @Test
@@ -160,15 +160,15 @@ class VersionFormularioServiceTest {
     when(versiones.findById(id)).thenReturn(Optional.empty());
 
     assertThatThrownBy(() -> service.obtenerPublicadaPorId(id))
-            .isInstanceOfSatisfying(
-                    ApiException.class, ex -> assertThat(ex.getStatus()).isEqualTo(HttpStatus.NOT_FOUND));
+        .isInstanceOfSatisfying(
+            ApiException.class, ex -> assertThat(ex.getStatus()).isEqualTo(HttpStatus.NOT_FOUND));
   }
 
   @Test
   void cargarPlantillaSiecaInicialDejaLosPesosPendientesDeCalibracion() {
     when(versiones.existsByCodigo("SIECA-v1")).thenReturn(false);
     when(versiones.save(any(VersionFormulario.class)))
-            .thenAnswer(invocation -> invocation.getArgument(0));
+        .thenAnswer(invocation -> invocation.getArgument(0));
 
     VersionFormularioResponse response = service.cargarPlantillaSiecaInicial("SIECA-v1", usuarioId);
 
@@ -195,33 +195,33 @@ class VersionFormularioServiceTest {
     when(versiones.existsByCodigo("SIECA-v1")).thenReturn(true);
 
     assertThatThrownBy(() -> service.cargarPlantillaSiecaInicial("SIECA-v1", usuarioId))
-            .isInstanceOf(ApiException.class)
-            .satisfies(
-                    ex -> {
-                      ApiException apiEx = (ApiException) ex;
-                      assertThat(apiEx.getStatus()).isEqualTo(HttpStatus.CONFLICT);
-                      assertThat(apiEx.getCode()).isEqualTo("codigo_duplicado");
-                    });
+        .isInstanceOf(ApiException.class)
+        .satisfies(
+            ex -> {
+              ApiException apiEx = (ApiException) ex;
+              assertThat(apiEx.getStatus()).isEqualTo(HttpStatus.CONFLICT);
+              assertThat(apiEx.getCode()).isEqualTo("codigo_duplicado");
+            });
   }
 
   @Test
   void crearNuevaVersionDesdeBaseCopiaConfiguraciones() throws Exception {
     UUID baseId = UUID.randomUUID();
     VersionFormulario base =
-            crearEntidad(baseId, "SIECA-v1", EstadoVersionFormulario.PUBLICADA, true);
+        crearEntidad(baseId, "SIECA-v1", EstadoVersionFormulario.PUBLICADA, true);
     ConfiguracionIcElemento pesoBase =
-            new ConfiguracionIcElemento(
-                    UUID.randomUUID(), base, "/vigas", BigDecimal.valueOf(1.5), "Vigas", fija);
+        new ConfiguracionIcElemento(
+            UUID.randomUUID(), base, "/vigas", BigDecimal.valueOf(1.5), "Vigas", fija);
 
     when(versiones.existsByCodigo("SIECA-v2")).thenReturn(false);
     when(versiones.findById(baseId)).thenReturn(Optional.of(base));
     when(configuracionesIc.findAllByVersionFormularioId(baseId)).thenReturn(List.of(pesoBase));
     when(versiones.save(any(VersionFormulario.class)))
-            .thenAnswer(invocation -> invocation.getArgument(0));
+        .thenAnswer(invocation -> invocation.getArgument(0));
 
     JsonNode nuevoEsquema = objectMapper.readTree("{\"type\":\"object\"}");
     CrearVersionRequest req =
-            new CrearVersionRequest("SIECA-v2", baseId, false, nuevoEsquema, null, null);
+        new CrearVersionRequest("SIECA-v2", baseId, false, nuevoEsquema, null, null);
 
     VersionFormularioResponse res = service.crear(req, usuarioId);
 
@@ -240,13 +240,13 @@ class VersionFormularioServiceTest {
 
     assertThatThrownBy(
             () -> service.actualizarBorrador(id, nuevoEsquema, null, null, "v1-nuevo", usuarioId))
-            .isInstanceOf(ApiException.class)
-            .satisfies(
-                    ex -> {
-                      ApiException apiEx = (ApiException) ex;
-                      assertThat(apiEx.getStatus()).isEqualTo(HttpStatus.CONFLICT);
-                      assertThat(apiEx.getCode()).isEqualTo("version_inmutable");
-                    });
+        .isInstanceOf(ApiException.class)
+        .satisfies(
+            ex -> {
+              ApiException apiEx = (ApiException) ex;
+              assertThat(apiEx.getStatus()).isEqualTo(HttpStatus.CONFLICT);
+              assertThat(apiEx.getCode()).isEqualTo("version_inmutable");
+            });
   }
 
   @Test
@@ -256,16 +256,16 @@ class VersionFormularioServiceTest {
     when(versiones.findById(id)).thenReturn(Optional.of(borrador));
 
     List<ConfiguracionIcElementoRequest> request =
-            List.of(new ConfiguracionIcElementoRequest("/vigas", BigDecimal.ZERO, "desc"));
+        List.of(new ConfiguracionIcElementoRequest("/vigas", BigDecimal.ZERO, "desc"));
 
     assertThatThrownBy(() -> service.calibrarPesos(id, request, usuarioId))
-            .isInstanceOf(ApiException.class)
-            .satisfies(
-                    ex -> {
-                      ApiException apiEx = (ApiException) ex;
-                      assertThat(apiEx.getStatus()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
-                      assertThat(apiEx.getCode()).isEqualTo("peso_invalido");
-                    });
+        .isInstanceOf(ApiException.class)
+        .satisfies(
+            ex -> {
+              ApiException apiEx = (ApiException) ex;
+              assertThat(apiEx.getStatus()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+              assertThat(apiEx.getCode()).isEqualTo("peso_invalido");
+            });
   }
 
   @Test
@@ -275,16 +275,16 @@ class VersionFormularioServiceTest {
     when(versiones.findById(id)).thenReturn(Optional.of(publicada));
 
     List<ConfiguracionIcElementoRequest> request =
-            List.of(new ConfiguracionIcElementoRequest("/vigas", BigDecimal.ONE, "desc"));
+        List.of(new ConfiguracionIcElementoRequest("/vigas", BigDecimal.ONE, "desc"));
 
     assertThatThrownBy(() -> service.calibrarPesos(id, request, usuarioId))
-            .isInstanceOf(ApiException.class)
-            .satisfies(
-                    ex -> {
-                      ApiException apiEx = (ApiException) ex;
-                      assertThat(apiEx.getStatus()).isEqualTo(HttpStatus.CONFLICT);
-                      assertThat(apiEx.getCode()).isEqualTo("version_inmutable");
-                    });
+        .isInstanceOf(ApiException.class)
+        .satisfies(
+            ex -> {
+              ApiException apiEx = (ApiException) ex;
+              assertThat(apiEx.getStatus()).isEqualTo(HttpStatus.CONFLICT);
+              assertThat(apiEx.getCode()).isEqualTo("version_inmutable");
+            });
   }
 
   @Test
@@ -298,17 +298,17 @@ class VersionFormularioServiceTest {
     when(versiones.findById(v2Id)).thenReturn(Optional.of(v2));
 
     List<DeclaracionMapeoRequest> decs =
-            List.of(
-                    new DeclaracionMapeoRequest("/campo_orig", "/campo_dest", TipoMapeoCampo.NUEVO, "obs"));
+        List.of(
+            new DeclaracionMapeoRequest("/campo_orig", "/campo_dest", TipoMapeoCampo.NUEVO, "obs"));
 
     assertThatThrownBy(() -> service.guardarMapeos(v2Id, decs, usuarioId))
-            .isInstanceOf(ApiException.class)
-            .satisfies(
-                    ex -> {
-                      ApiException apiEx = (ApiException) ex;
-                      assertThat(apiEx.getStatus()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
-                      assertThat(apiEx.getCode()).isEqualTo("mapeo_incoherente");
-                    });
+        .isInstanceOf(ApiException.class)
+        .satisfies(
+            ex -> {
+              ApiException apiEx = (ApiException) ex;
+              assertThat(apiEx.getStatus()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+              assertThat(apiEx.getCode()).isEqualTo("mapeo_incoherente");
+            });
   }
 
   @Test
@@ -317,8 +317,8 @@ class VersionFormularioServiceTest {
     UUID v2Id = UUID.randomUUID();
 
     JsonNode esquemaV1 =
-            objectMapper.readTree(
-                    """
+        objectMapper.readTree(
+            """
                             {
                               "type": "object",
                               "properties": {
@@ -329,8 +329,8 @@ class VersionFormularioServiceTest {
                             """);
 
     JsonNode esquemaV2 =
-            objectMapper.readTree(
-                    """
+        objectMapper.readTree(
+            """
                             {
                               "type": "object",
                               "properties": {
@@ -348,16 +348,16 @@ class VersionFormularioServiceTest {
 
     when(versiones.findById(v2Id)).thenReturn(Optional.of(v2));
     MapeoCampoFormulario m1 =
-            new MapeoCampoFormulario(
-                    UUID.randomUUID(),
-                    v1,
-                    v2,
-                    "/campo1",
-                    "/campo1",
-                    TipoMapeoCampo.EQUIVALENTE,
-                    null,
-                    usuarioId,
-                    fija);
+        new MapeoCampoFormulario(
+            UUID.randomUUID(),
+            v1,
+            v2,
+            "/campo1",
+            "/campo1",
+            TipoMapeoCampo.EQUIVALENTE,
+            null,
+            usuarioId,
+            fija);
     when(mapeos.findAllByVersionOrigenIdAndVersionDestinoId(v1Id, v2Id)).thenReturn(List.of(m1));
 
     AnalisisMapeoResponse analisis = service.analizarMapeo(v2Id);
@@ -372,8 +372,8 @@ class VersionFormularioServiceTest {
     UUID v2Id = UUID.randomUUID();
 
     JsonNode esquemaV1 =
-            objectMapper.readTree(
-                    """
+        objectMapper.readTree(
+            """
                             {
                               "type": "object",
                               "properties": {
@@ -391,16 +391,16 @@ class VersionFormularioServiceTest {
 
     when(versiones.findById(v2Id)).thenReturn(Optional.of(v2));
     when(mapeos.findAllByVersionOrigenIdAndVersionDestinoId(v1Id, v2Id))
-            .thenReturn(Collections.emptyList());
+        .thenReturn(Collections.emptyList());
 
     assertThatThrownBy(() -> service.publicar(v2Id, null, usuarioId))
-            .isInstanceOf(ApiException.class)
-            .satisfies(
-                    ex -> {
-                      ApiException apiEx = (ApiException) ex;
-                      assertThat(apiEx.getStatus()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
-                      assertThat(apiEx.getCode()).isEqualTo("mapeo_incompleto");
-                    });
+        .isInstanceOf(ApiException.class)
+        .satisfies(
+            ex -> {
+              ApiException apiEx = (ApiException) ex;
+              assertThat(apiEx.getStatus()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+              assertThat(apiEx.getCode()).isEqualTo("mapeo_incompleto");
+            });
   }
 
   @Test
@@ -411,13 +411,13 @@ class VersionFormularioServiceTest {
     when(configuracionesIc.findAllByVersionFormularioId(v1Id)).thenReturn(Collections.emptyList());
 
     assertThatThrownBy(() -> service.publicar(v1Id, null, usuarioId))
-            .isInstanceOf(ApiException.class)
-            .satisfies(
-                    ex -> {
-                      ApiException apiEx = (ApiException) ex;
-                      assertThat(apiEx.getStatus()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
-                      assertThat(apiEx.getCode()).isEqualTo("pesos_incompletos");
-                    });
+        .isInstanceOf(ApiException.class)
+        .satisfies(
+            ex -> {
+              ApiException apiEx = (ApiException) ex;
+              assertThat(apiEx.getStatus()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+              assertThat(apiEx.getCode()).isEqualTo("pesos_incompletos");
+            });
   }
 
   @Test
@@ -425,13 +425,13 @@ class VersionFormularioServiceTest {
     UUID id = UUID.randomUUID();
     VersionFormulario borrador = crearEntidad(id, "v1", EstadoVersionFormulario.BORRADOR, false);
     ConfiguracionIcElemento peso =
-            new ConfiguracionIcElemento(
-                    UUID.randomUUID(), borrador, "/vigas", BigDecimal.ONE, "desc", fija);
+        new ConfiguracionIcElemento(
+            UUID.randomUUID(), borrador, "/vigas", BigDecimal.ONE, "desc", fija);
 
     when(versiones.findById(id)).thenReturn(Optional.of(borrador));
     when(configuracionesIc.findAllByVersionFormularioId(id)).thenReturn(List.of(peso));
     when(versiones.saveAndFlush(any(VersionFormulario.class)))
-            .thenAnswer(invocation -> invocation.getArgument(0));
+        .thenAnswer(invocation -> invocation.getArgument(0));
 
     VersionFormularioResponse response = service.publicar(id, null, usuarioId);
 
@@ -449,13 +449,13 @@ class VersionFormularioServiceTest {
     when(versiones.findById(id)).thenReturn(Optional.of(borrador));
 
     var request =
-            List.of(
-                    new ConfiguracionIcElementoRequest("/vigas", BigDecimal.ONE, "Vigas"),
-                    new ConfiguracionIcElementoRequest("/apoyos", BigDecimal.ZERO, "Apoyos"));
+        List.of(
+            new ConfiguracionIcElementoRequest("/vigas", BigDecimal.ONE, "Vigas"),
+            new ConfiguracionIcElementoRequest("/apoyos", BigDecimal.ZERO, "Apoyos"));
 
     assertThatThrownBy(() -> service.calibrarPesos(id, request, usuarioId))
-            .isInstanceOf(ApiException.class)
-            .satisfies(ex -> assertThat(((ApiException) ex).getCode()).isEqualTo("peso_invalido"));
+        .isInstanceOf(ApiException.class)
+        .satisfies(ex -> assertThat(((ApiException) ex).getCode()).isEqualTo("peso_invalido"));
 
     org.mockito.Mockito.verifyNoInteractions(configuracionesIc);
     verify(versiones, org.mockito.Mockito.never()).save(any(VersionFormulario.class));
@@ -468,27 +468,27 @@ class VersionFormularioServiceTest {
     when(versiones.findById(id)).thenReturn(Optional.of(borrador));
 
     var request =
-            List.of(
-                    new ConfiguracionIcElementoRequest("/vigas", BigDecimal.ONE, "Vigas"),
-                    new ConfiguracionIcElementoRequest("/vigas", BigDecimal.TEN, "Vigas"));
+        List.of(
+            new ConfiguracionIcElementoRequest("/vigas", BigDecimal.ONE, "Vigas"),
+            new ConfiguracionIcElementoRequest("/vigas", BigDecimal.TEN, "Vigas"));
 
     assertThatThrownBy(() -> service.calibrarPesos(id, request, usuarioId))
-            .isInstanceOf(ApiException.class)
-            .satisfies(
-                    ex -> assertThat(((ApiException) ex).getCode()).isEqualTo("elemento_ic_duplicado"));
+        .isInstanceOf(ApiException.class)
+        .satisfies(
+            ex -> assertThat(((ApiException) ex).getCode()).isEqualTo("elemento_ic_duplicado"));
 
     org.mockito.Mockito.verifyNoInteractions(configuracionesIc);
   }
 
   private VersionFormulario crearEntidad(
-          UUID id, String codigo, EstadoVersionFormulario estado, boolean activa) {
+      UUID id, String codigo, EstadoVersionFormulario estado, boolean activa) {
     try {
       JsonNode esquema = objectMapper.readTree("{\"type\":\"object\"}");
       JsonNode vinculos = objectMapper.readTree("{}");
 
       JsonNode reglas =
-              objectMapper.readTree(
-                      """
+          objectMapper.readTree(
+              """
                               {
                                 "elementos": [
                                   {
@@ -522,7 +522,7 @@ class VersionFormularioServiceTest {
                               """);
 
       return new VersionFormulario(
-              id, codigo, estado, activa, esquema, vinculos, reglas, null, usuarioId, fija, fija);
+          id, codigo, estado, activa, esquema, vinculos, reglas, null, usuarioId, fija, fija);
     } catch (Exception e) {
       throw new IllegalStateException("No fue posible construir la version de prueba", e);
     }
@@ -534,8 +534,8 @@ class VersionFormularioServiceTest {
     VersionFormulario borrador = crearEntidad(id, "v1", EstadoVersionFormulario.BORRADOR, false);
 
     borrador.setReglasEvaluacionIc(
-            objectMapper.readTree(
-                    """
+        objectMapper.readTree(
+            """
                                     {
                                       "elementos": [
                                         {"elemento_ref": "/vigas"},
@@ -545,21 +545,21 @@ class VersionFormularioServiceTest {
                                     """));
 
     ConfiguracionIcElemento peso =
-            new ConfiguracionIcElemento(
-                    UUID.randomUUID(), borrador, "/vigas", BigDecimal.ONE, "Vigas", fija);
+        new ConfiguracionIcElemento(
+            UUID.randomUUID(), borrador, "/vigas", BigDecimal.ONE, "Vigas", fija);
 
     when(versiones.findById(id)).thenReturn(Optional.of(borrador));
     when(configuracionesIc.findAllByVersionFormularioId(id)).thenReturn(List.of(peso));
 
     assertThatThrownBy(() -> service.publicar(id, null, usuarioId))
-            .isInstanceOf(ApiException.class)
-            .hasMessageContaining("/apoyos")
-            .satisfies(
-                    ex -> {
-                      ApiException error = (ApiException) ex;
-                      assertThat(error.getCode()).isEqualTo("pesos_incompletos");
-                      assertThat(error.getStatus()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
-                    });
+        .isInstanceOf(ApiException.class)
+        .hasMessageContaining("/apoyos")
+        .satisfies(
+            ex -> {
+              ApiException error = (ApiException) ex;
+              assertThat(error.getCode()).isEqualTo("pesos_incompletos");
+              assertThat(error.getStatus()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+            });
 
     verify(versiones, org.mockito.Mockito.never()).desactivarTodas();
     verify(versiones, org.mockito.Mockito.never()).saveAndFlush(any(VersionFormulario.class));
@@ -573,8 +573,8 @@ class VersionFormularioServiceTest {
     UUID id = UUID.randomUUID();
     VersionFormulario borrador = crearEntidad(id, "v1", EstadoVersionFormulario.BORRADOR, false);
     JsonNode original =
-            objectMapper.readTree(
-                    """
+        objectMapper.readTree(
+            """
                 {
                   "elementos": [{"elemento_ref": "/vigas"}],
                   "reglas_evaluacion_ic": {
@@ -586,21 +586,21 @@ class VersionFormularioServiceTest {
     borrador.setReglasEvaluacionIc(original);
     when(versiones.findById(id)).thenReturn(Optional.of(borrador));
     when(versiones.save(any(VersionFormulario.class)))
-            .thenAnswer(invocation -> invocation.getArgument(0));
+        .thenAnswer(invocation -> invocation.getArgument(0));
     service.configurarEscala(id, escalaValida(), usuarioId);
     JsonNode guardada = borrador.getReglasEvaluacionIc();
     assertThat(guardada.get("elementos")).isEqualTo(original.get("elementos"));
     assertThat(guardada.at("/reglas_evaluacion_ic/agregacion/instancias_repetibles").asText())
-            .isEqualTo("MAX");
+        .isEqualTo("MAX");
     assertThat(guardada.at("/reglas_evaluacion_ic/escala_severidad/SEVERO").decimalValue())
-            .isEqualByComparingTo("4");
+        .isEqualByComparingTo("4");
     assertThat(original.at("/reglas_evaluacion_ic/escala_severidad/SEVERO").isNull()).isTrue();
     assertThat(borrador.getCalibradoPorId()).isEqualTo(usuarioId);
     assertThat(borrador.getCalibradoEn()).isEqualTo(fija);
     verify(versiones).save(borrador);
     verify(configuracionesIc).findAllByVersionFormularioId(id);
     verify(configuracionesIc, org.mockito.Mockito.never())
-            .deleteAllByVersionFormularioId(any(UUID.class));
+        .deleteAllByVersionFormularioId(any(UUID.class));
     verify(configuracionesIc, org.mockito.Mockito.never()).save(any(ConfiguracionIcElemento.class));
     verify(configuracionesIc, org.mockito.Mockito.never()).saveAll(any());
     org.mockito.Mockito.verifyNoMoreInteractions(configuracionesIc);
@@ -612,13 +612,13 @@ class VersionFormularioServiceTest {
     VersionFormulario publicada = crearEntidad(id, "v1", EstadoVersionFormulario.PUBLICADA, true);
     when(versiones.findById(id)).thenReturn(Optional.of(publicada));
     assertThatThrownBy(() -> service.configurarEscala(id, escalaValida(), usuarioId))
-            .isInstanceOf(ApiException.class)
-            .satisfies(
-                    ex -> {
-                      ApiException error = (ApiException) ex;
-                      assertThat(error.getStatus()).isEqualTo(HttpStatus.CONFLICT);
-                      assertThat(error.getCode()).isEqualTo("version_inmutable");
-                    });
+        .isInstanceOf(ApiException.class)
+        .satisfies(
+            ex -> {
+              ApiException error = (ApiException) ex;
+              assertThat(error.getStatus()).isEqualTo(HttpStatus.CONFLICT);
+              assertThat(error.getCode()).isEqualTo("version_inmutable");
+            });
     verify(versiones, org.mockito.Mockito.never()).save(any(VersionFormulario.class));
   }
 
@@ -628,11 +628,11 @@ class VersionFormularioServiceTest {
     VersionFormulario borrador = crearEntidad(id, "v1", EstadoVersionFormulario.BORRADOR, false);
     when(versiones.findById(id)).thenReturn(Optional.of(borrador));
     var request =
-            new gt.usac.cunoc.sgp.formulario.dto.ConfigurarEscalaIcRequest(
-                    java.util.Map.of("NO_PRESENTA", BigDecimal.ZERO));
+        new gt.usac.cunoc.sgp.formulario.dto.ConfigurarEscalaIcRequest(
+            java.util.Map.of("NO_PRESENTA", BigDecimal.ZERO));
     assertThatThrownBy(() -> service.configurarEscala(id, request, usuarioId))
-            .isInstanceOf(ApiException.class)
-            .satisfies(ex -> assertThat(((ApiException) ex).getCode()).isEqualTo("escala_incompleta"));
+        .isInstanceOf(ApiException.class)
+        .satisfies(ex -> assertThat(((ApiException) ex).getCode()).isEqualTo("escala_incompleta"));
     verify(versiones, org.mockito.Mockito.never()).save(any(VersionFormulario.class));
   }
 
@@ -647,9 +647,9 @@ class VersionFormularioServiceTest {
       valores.put("SEVERO", new BigDecimal(valor));
       var request = new gt.usac.cunoc.sgp.formulario.dto.ConfigurarEscalaIcRequest(valores);
       assertThatThrownBy(() -> service.configurarEscala(id, request, usuarioId))
-              .isInstanceOf(ApiException.class)
-              .satisfies(
-                      ex -> assertThat(((ApiException) ex).getCode()).isEqualTo("severidad_invalida"));
+          .isInstanceOf(ApiException.class)
+          .satisfies(
+              ex -> assertThat(((ApiException) ex).getCode()).isEqualTo("severidad_invalida"));
     }
     assertThat(borrador.getReglasEvaluacionIc()).isEqualTo(anterior);
     verify(versiones, org.mockito.Mockito.never()).save(any(VersionFormulario.class));
@@ -664,22 +664,22 @@ class VersionFormularioServiceTest {
     valores.put("NO_PRESENTA", BigDecimal.ONE);
     var request = new gt.usac.cunoc.sgp.formulario.dto.ConfigurarEscalaIcRequest(valores);
     assertThatThrownBy(() -> service.configurarEscala(id, request, usuarioId))
-            .isInstanceOf(ApiException.class)
-            .satisfies(ex -> assertThat(((ApiException) ex).getCode()).isEqualTo("severidad_invalida"));
+        .isInstanceOf(ApiException.class)
+        .satisfies(ex -> assertThat(((ApiException) ex).getCode()).isEqualTo("severidad_invalida"));
     verify(versiones, org.mockito.Mockito.never()).save(any(VersionFormulario.class));
   }
 
   private gt.usac.cunoc.sgp.formulario.dto.ConfigurarEscalaIcRequest escalaValida() {
     return new gt.usac.cunoc.sgp.formulario.dto.ConfigurarEscalaIcRequest(
-            java.util.Map.of(
-                    "NO_PRESENTA",
-                    BigDecimal.ZERO,
-                    "LEVE",
-                    BigDecimal.ONE,
-                    "MODERADO",
-                    BigDecimal.valueOf(2),
-                    "SEVERO",
-                    BigDecimal.valueOf(4)));
+        java.util.Map.of(
+            "NO_PRESENTA",
+            BigDecimal.ZERO,
+            "LEVE",
+            BigDecimal.ONE,
+            "MODERADO",
+            BigDecimal.valueOf(2),
+            "SEVERO",
+            BigDecimal.valueOf(4)));
   }
 
   @Test
@@ -688,27 +688,27 @@ class VersionFormularioServiceTest {
     VersionFormulario borrador = crearEntidad(id, "v1", EstadoVersionFormulario.BORRADOR, false);
 
     com.fasterxml.jackson.databind.node.ObjectNode reglas =
-            (com.fasterxml.jackson.databind.node.ObjectNode)
-                    borrador.getReglasEvaluacionIc().get("reglas_evaluacion_ic");
+        (com.fasterxml.jackson.databind.node.ObjectNode)
+            borrador.getReglasEvaluacionIc().get("reglas_evaluacion_ic");
 
     ((com.fasterxml.jackson.databind.node.ObjectNode) reglas.get("agregacion"))
-            .putNull("indicadores_de_un_elemento");
+        .putNull("indicadores_de_un_elemento");
 
     ConfiguracionIcElemento peso =
-            new ConfiguracionIcElemento(
-                    UUID.randomUUID(), borrador, "/vigas", BigDecimal.ONE, "Vigas", fija);
+        new ConfiguracionIcElemento(
+            UUID.randomUUID(), borrador, "/vigas", BigDecimal.ONE, "Vigas", fija);
 
     when(versiones.findById(id)).thenReturn(Optional.of(borrador));
     when(configuracionesIc.findAllByVersionFormularioId(id)).thenReturn(List.of(peso));
 
     assertThatThrownBy(() -> service.publicar(id, null, usuarioId))
-            .isInstanceOfSatisfying(
-                    ApiException.class,
-                    error -> {
-                      assertThat(error.getStatus()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
-                      assertThat(error.getCode()).isEqualTo("reglas_ic_invalidas");
-                      assertThat(error.getMessage()).contains("agregacion.indicadores_de_un_elemento");
-                    });
+        .isInstanceOfSatisfying(
+            ApiException.class,
+            error -> {
+              assertThat(error.getStatus()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+              assertThat(error.getCode()).isEqualTo("reglas_ic_invalidas");
+              assertThat(error.getMessage()).contains("agregacion.indicadores_de_un_elemento");
+            });
 
     verify(versiones, org.mockito.Mockito.never()).desactivarTodas();
     verify(versiones, org.mockito.Mockito.never()).saveAndFlush(any(VersionFormulario.class));
@@ -723,12 +723,12 @@ class VersionFormularioServiceTest {
     VersionFormulario borrador = crearEntidad(id, "v1", EstadoVersionFormulario.BORRADOR, false);
 
     com.fasterxml.jackson.databind.node.ObjectNode configuracion =
-            (com.fasterxml.jackson.databind.node.ObjectNode) borrador.getReglasEvaluacionIc();
+        (com.fasterxml.jackson.databind.node.ObjectNode) borrador.getReglasEvaluacionIc();
 
     configuracion.set(
-            "elementos",
-            objectMapper.readTree(
-                    """
+        "elementos",
+        objectMapper.readTree(
+            """
                             [
                               {
                                 "elemento_ref": "/otros/senalizacion/informativa",
@@ -738,12 +738,12 @@ class VersionFormularioServiceTest {
                             """));
 
     com.fasterxml.jackson.databind.node.ObjectNode reglas =
-            (com.fasterxml.jackson.databind.node.ObjectNode) configuracion.get("reglas_evaluacion_ic");
+        (com.fasterxml.jackson.databind.node.ObjectNode) configuracion.get("reglas_evaluacion_ic");
 
     reglas.set(
-            "conversion_indicadores",
-            objectMapper.readTree(
-                    """
+        "conversion_indicadores",
+        objectMapper.readTree(
+            """
                             {
                               "booleanos": {
                                 "senal.existe=false": 4
@@ -752,25 +752,25 @@ class VersionFormularioServiceTest {
                             """));
 
     ConfiguracionIcElemento peso =
-            new ConfiguracionIcElemento(
-                    UUID.randomUUID(),
-                    borrador,
-                    "/otros/senalizacion/informativa",
-                    BigDecimal.ONE,
-                    "Senalizacion informativa",
-                    fija);
+        new ConfiguracionIcElemento(
+            UUID.randomUUID(),
+            borrador,
+            "/otros/senalizacion/informativa",
+            BigDecimal.ONE,
+            "Senalizacion informativa",
+            fija);
 
     when(versiones.findById(id)).thenReturn(Optional.of(borrador));
     when(configuracionesIc.findAllByVersionFormularioId(id)).thenReturn(List.of(peso));
 
     assertThatThrownBy(() -> service.publicar(id, null, usuarioId))
-            .isInstanceOfSatisfying(
-                    ApiException.class,
-                    error -> {
-                      assertThat(error.getStatus()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
-                      assertThat(error.getCode()).isEqualTo("conversiones_ic_invalidas");
-                      assertThat(error.getMessage()).contains("senal.existe=true");
-                    });
+        .isInstanceOfSatisfying(
+            ApiException.class,
+            error -> {
+              assertThat(error.getStatus()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+              assertThat(error.getCode()).isEqualTo("conversiones_ic_invalidas");
+              assertThat(error.getMessage()).contains("senal.existe=true");
+            });
 
     verify(versiones, org.mockito.Mockito.never()).desactivarTodas();
     verify(versiones, org.mockito.Mockito.never()).saveAndFlush(any(VersionFormulario.class));
@@ -783,12 +783,12 @@ class VersionFormularioServiceTest {
     VersionFormulario borrador = crearEntidad(id, "v1", EstadoVersionFormulario.BORRADOR, false);
 
     com.fasterxml.jackson.databind.node.ObjectNode configuracion =
-            (com.fasterxml.jackson.databind.node.ObjectNode) borrador.getReglasEvaluacionIc();
+        (com.fasterxml.jackson.databind.node.ObjectNode) borrador.getReglasEvaluacionIc();
 
     configuracion.set(
-            "elementos",
-            objectMapper.readTree(
-                    """
+        "elementos",
+        objectMapper.readTree(
+            """
                             [
                               {
                                 "elemento_ref": "/elementos_no_estructurales/pasamanos_barandal",
@@ -798,12 +798,12 @@ class VersionFormularioServiceTest {
                             """));
 
     com.fasterxml.jackson.databind.node.ObjectNode reglas =
-            (com.fasterxml.jackson.databind.node.ObjectNode) configuracion.get("reglas_evaluacion_ic");
+        (com.fasterxml.jackson.databind.node.ObjectNode) configuracion.get("reglas_evaluacion_ic");
 
     reglas.set(
-            "conversion_indicadores",
-            objectMapper.readTree(
-                    """
+        "conversion_indicadores",
+        objectMapper.readTree(
+            """
                             {
                               "numericos": {
                                 "golpeado_longitud_m": {
@@ -818,27 +818,27 @@ class VersionFormularioServiceTest {
                             """));
 
     ConfiguracionIcElemento peso =
-            new ConfiguracionIcElemento(
-                    UUID.randomUUID(),
-                    borrador,
-                    "/elementos_no_estructurales/pasamanos_barandal",
-                    BigDecimal.ONE,
-                    "Pasamanos",
-                    fija);
+        new ConfiguracionIcElemento(
+            UUID.randomUUID(),
+            borrador,
+            "/elementos_no_estructurales/pasamanos_barandal",
+            BigDecimal.ONE,
+            "Pasamanos",
+            fija);
 
     when(versiones.findById(id)).thenReturn(Optional.of(borrador));
     when(configuracionesIc.findAllByVersionFormularioId(id)).thenReturn(List.of(peso));
 
     assertThatThrownBy(() -> service.publicar(id, null, usuarioId))
-            .isInstanceOfSatisfying(
-                    ApiException.class,
-                    error -> {
-                      assertThat(error.getStatus()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
-                      assertThat(error.getCode()).isEqualTo("conversiones_ic_invalidas");
-                      assertThat(error.getMessage())
-                              .contains("golpeado_longitud_m.umbrales_m")
-                              .contains("0 < LEVE < MODERADO < SEVERO");
-                    });
+        .isInstanceOfSatisfying(
+            ApiException.class,
+            error -> {
+              assertThat(error.getStatus()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+              assertThat(error.getCode()).isEqualTo("conversiones_ic_invalidas");
+              assertThat(error.getMessage())
+                  .contains("golpeado_longitud_m.umbrales_m")
+                  .contains("0 < LEVE < MODERADO < SEVERO");
+            });
 
     verify(versiones, org.mockito.Mockito.never()).desactivarTodas();
     verify(versiones, org.mockito.Mockito.never()).saveAndFlush(any(VersionFormulario.class));
@@ -852,12 +852,12 @@ class VersionFormularioServiceTest {
     VersionFormulario borrador = crearEntidad(id, "v1", EstadoVersionFormulario.BORRADOR, false);
 
     com.fasterxml.jackson.databind.node.ObjectNode configuracion =
-            (com.fasterxml.jackson.databind.node.ObjectNode) borrador.getReglasEvaluacionIc();
+        (com.fasterxml.jackson.databind.node.ObjectNode) borrador.getReglasEvaluacionIc();
 
     configuracion.set(
-            "elementos",
-            objectMapper.readTree(
-                    """
+        "elementos",
+        objectMapper.readTree(
+            """
                             [
                               {
                                 "elemento_ref": "/otros/senalizacion/informativa",
@@ -871,12 +871,12 @@ class VersionFormularioServiceTest {
                             """));
 
     com.fasterxml.jackson.databind.node.ObjectNode reglas =
-            (com.fasterxml.jackson.databind.node.ObjectNode) configuracion.get("reglas_evaluacion_ic");
+        (com.fasterxml.jackson.databind.node.ObjectNode) configuracion.get("reglas_evaluacion_ic");
 
     reglas.set(
-            "conversion_indicadores",
-            objectMapper.readTree(
-                    """
+        "conversion_indicadores",
+        objectMapper.readTree(
+            """
                             {
                               "booleanos": {
                                 "senal.existe=true": 0,
@@ -901,26 +901,26 @@ class VersionFormularioServiceTest {
                             """));
 
     List<ConfiguracionIcElemento> pesos =
-            List.of(
-                    new ConfiguracionIcElemento(
-                            UUID.randomUUID(),
-                            borrador,
-                            "/otros/senalizacion/informativa",
-                            BigDecimal.ONE,
-                            "Senalizacion informativa",
-                            fija),
-                    new ConfiguracionIcElemento(
-                            UUID.randomUUID(),
-                            borrador,
-                            "/elementos_no_estructurales/pasamanos_barandal",
-                            BigDecimal.ONE,
-                            "Pasamanos",
-                            fija));
+        List.of(
+            new ConfiguracionIcElemento(
+                UUID.randomUUID(),
+                borrador,
+                "/otros/senalizacion/informativa",
+                BigDecimal.ONE,
+                "Senalizacion informativa",
+                fija),
+            new ConfiguracionIcElemento(
+                UUID.randomUUID(),
+                borrador,
+                "/elementos_no_estructurales/pasamanos_barandal",
+                BigDecimal.ONE,
+                "Pasamanos",
+                fija));
 
     when(versiones.findById(id)).thenReturn(Optional.of(borrador));
     when(configuracionesIc.findAllByVersionFormularioId(id)).thenReturn(pesos);
     when(versiones.saveAndFlush(any(VersionFormulario.class)))
-            .thenAnswer(invocation -> invocation.getArgument(0));
+        .thenAnswer(invocation -> invocation.getArgument(0));
 
     VersionFormularioResponse respuesta = service.publicar(id, null, usuarioId);
 
@@ -934,33 +934,33 @@ class VersionFormularioServiceTest {
   @org.junit.jupiter.params.ParameterizedTest
   @org.junit.jupiter.params.provider.ValueSource(strings = {"RN-IC-05a", "RN-IC-05c"})
   void publicarRechazaReglasCriticasPendientesAntesDeDesactivarLaVersionActual(String reglaId)
-          throws Exception {
+      throws Exception {
     UUID id = UUID.randomUUID();
     VersionFormulario borrador = crearEntidad(id, "v1", EstadoVersionFormulario.BORRADOR, false);
     var reglas =
-            (com.fasterxml.jackson.databind.node.ObjectNode)
-                    borrador.getReglasEvaluacionIc().get("reglas_evaluacion_ic");
+        (com.fasterxml.jackson.databind.node.ObjectNode)
+            borrador.getReglasEvaluacionIc().get("reglas_evaluacion_ic");
     var regla = reglas.putArray("reglas_anulacion").addObject();
     regla
-            .put("id", reglaId)
-            .put("descripcion", "Decision academica pendiente")
-            .put("estado_resultante", "MALO")
-            .put("pendiente", "Confirmar");
+        .put("id", reglaId)
+        .put("descripcion", "Decision academica pendiente")
+        .put("estado_resultante", "MALO")
+        .put("pendiente", "Confirmar");
     regla.putArray("elementos").add("/vigas");
     regla.putObject("condicion").put("campo", "existencia").put("igual_a", "AUSENTE");
     when(versiones.findById(id)).thenReturn(Optional.of(borrador));
     when(configuracionesIc.findAllByVersionFormularioId(id))
-            .thenReturn(
-                    List.of(
-                            new ConfiguracionIcElemento(
-                                    UUID.randomUUID(), borrador, "/vigas", BigDecimal.ONE, "Vigas", fija)));
+        .thenReturn(
+            List.of(
+                new ConfiguracionIcElemento(
+                    UUID.randomUUID(), borrador, "/vigas", BigDecimal.ONE, "Vigas", fija)));
     assertThatThrownBy(() -> service.publicar(id, null, usuarioId))
-            .isInstanceOfSatisfying(
-                    ApiException.class,
-                    error -> {
-                      assertThat(error.getCode()).isEqualTo("reglas_anulacion_ic_invalidas");
-                      assertThat(error.getMessage()).contains(reglaId);
-                    });
+        .isInstanceOfSatisfying(
+            ApiException.class,
+            error -> {
+              assertThat(error.getCode()).isEqualTo("reglas_anulacion_ic_invalidas");
+              assertThat(error.getMessage()).contains(reglaId);
+            });
     verify(versiones, org.mockito.Mockito.never()).desactivarTodas();
     verify(versiones, org.mockito.Mockito.never()).saveAndFlush(any(VersionFormulario.class));
     assertThat(borrador.getEstado()).isEqualTo(EstadoVersionFormulario.BORRADOR);
@@ -972,24 +972,24 @@ class VersionFormularioServiceTest {
     VersionFormulario borrador = crearEntidad(id, "v1", EstadoVersionFormulario.BORRADOR, false);
     JsonNode anterior = borrador.getReglasEvaluacionIc().deepCopy();
     JsonNode reglas =
-            objectMapper.readTree(
-                    """
+        objectMapper.readTree(
+            """
                 [{"id":"ausencia","descripcion":"Ausencia de viga","estado_resultante":"MALO",
                   "pendiente":null,"elementos":["/vigas"],"condicion":{"campo":"existencia","igual_a":"AUSENTE"}}]
                 """);
     when(versiones.findById(id)).thenReturn(Optional.of(borrador));
     when(versiones.save(any(VersionFormulario.class)))
-            .thenAnswer(invocacion -> invocacion.getArgument(0));
+        .thenAnswer(invocacion -> invocacion.getArgument(0));
     service.configurarReglasCriticas(
-            id,
-            new gt.usac.cunoc.sgp.formulario.dto.ConfigurarReglasCriticasIcRequest(reglas),
-            usuarioId);
+        id,
+        new gt.usac.cunoc.sgp.formulario.dto.ConfigurarReglasCriticasIcRequest(reglas),
+        usuarioId);
     assertThat(borrador.getReglasEvaluacionIc().get("elementos"))
-            .isEqualTo(anterior.get("elementos"));
+        .isEqualTo(anterior.get("elementos"));
     assertThat(borrador.getReglasEvaluacionIc().at("/reglas_evaluacion_ic/escala_severidad"))
-            .isEqualTo(anterior.at("/reglas_evaluacion_ic/escala_severidad"));
+        .isEqualTo(anterior.at("/reglas_evaluacion_ic/escala_severidad"));
     assertThat(borrador.getReglasEvaluacionIc().at("/reglas_evaluacion_ic/reglas_anulacion"))
-            .isEqualTo(reglas);
+        .isEqualTo(reglas);
     assertThat(borrador.getCalibradoPorId()).isEqualTo(usuarioId);
     assertThat(anterior.at("/reglas_evaluacion_ic/reglas_anulacion")).isEmpty();
   }
@@ -998,17 +998,17 @@ class VersionFormularioServiceTest {
   void configurarReglasCriticasRechazaVersionPublicada() {
     UUID id = UUID.randomUUID();
     when(versiones.findById(id))
-            .thenReturn(Optional.of(crearEntidad(id, "v1", EstadoVersionFormulario.PUBLICADA, true)));
+        .thenReturn(Optional.of(crearEntidad(id, "v1", EstadoVersionFormulario.PUBLICADA, true)));
     assertThatThrownBy(
             () ->
-                    service.configurarReglasCriticas(
-                            id,
-                            new gt.usac.cunoc.sgp.formulario.dto.ConfigurarReglasCriticasIcRequest(
-                                    objectMapper.createArrayNode()),
-                            usuarioId))
-            .isInstanceOfSatisfying(
-                    ApiException.class,
-                    error -> assertThat(error.getStatus()).isEqualTo(HttpStatus.CONFLICT));
+                service.configurarReglasCriticas(
+                    id,
+                    new gt.usac.cunoc.sgp.formulario.dto.ConfigurarReglasCriticasIcRequest(
+                        objectMapper.createArrayNode()),
+                    usuarioId))
+        .isInstanceOfSatisfying(
+            ApiException.class,
+            error -> assertThat(error.getStatus()).isEqualTo(HttpStatus.CONFLICT));
     verify(versiones, org.mockito.Mockito.never()).save(any(VersionFormulario.class));
   }
 }

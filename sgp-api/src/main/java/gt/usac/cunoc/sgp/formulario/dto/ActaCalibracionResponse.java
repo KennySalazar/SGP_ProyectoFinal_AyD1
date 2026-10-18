@@ -4,10 +4,10 @@ import java.time.Instant;
 import java.util.UUID;
 
 public record ActaCalibracionResponse(
-        UUID archivoId,
-        String nombreOriginal,
-        String mimeReal,
-        long tamanoBytes,
-        String checksumSha256,
-        UUID subidoPorId,
-        Instant subidoEn) {}
+    UUID archivoId,
+    String nombreOriginal,
+    String mimeReal,
+    long tamanoBytes,
+    String checksumSha256,
+    UUID subidoPorId,
+    Instant subidoEn) {}

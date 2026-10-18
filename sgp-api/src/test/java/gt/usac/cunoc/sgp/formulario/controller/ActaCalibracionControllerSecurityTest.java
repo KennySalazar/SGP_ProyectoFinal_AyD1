@@ -30,89 +30,89 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 @ExtendWith(SpringExtension.class)
 @ContextConfiguration(classes = ActaCalibracionControllerSecurityTest.Config.class)
 class ActaCalibracionControllerSecurityTest {
-    @Autowired private ActaCalibracionService service;
-    @Autowired private ActaCalibracionController controller;
-    private final UUID id = UUID.randomUUID();
-    private MockMvc mvc;
+  @Autowired private ActaCalibracionService service;
+  @Autowired private ActaCalibracionController controller;
+  private final UUID id = UUID.randomUUID();
+  private MockMvc mvc;
 
-    @BeforeEach
-    void preparar() {
-        reset(service);
-        mvc =
-                MockMvcBuilders.standaloneSetup(controller)
-                        .setControllerAdvice(new ApiExceptionHandler())
-                        .build();
+  @BeforeEach
+  void preparar() {
+    reset(service);
+    mvc =
+        MockMvcBuilders.standaloneSetup(controller)
+            .setControllerAdvice(new ApiExceptionHandler())
+            .build();
+  }
+
+  @AfterEach
+  void limpiar() {
+    SecurityContextHolder.clearContext();
+  }
+
+  private UsernamePasswordAuthenticationToken autenticar(String rol) {
+    var auth =
+        new UsernamePasswordAuthenticationToken(
+            "usuario", null, List.of(new SimpleGrantedAuthority("ROLE_" + rol)));
+    auth.setDetails(new JwtData("usuario@ejemplo.com", id, RoleName.valueOf(rol), 0));
+    SecurityContextHolder.getContext().setAuthentication(auth);
+    return auth;
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"ESTUDIANTE", "CATEDRATICO", "PROFESIONAL_EXTERNO"})
+  void rechazaConsultaDescargaYCargaSinRolAdministrador(String rol) throws Exception {
+    var auth = autenticar(rol);
+    String ruta = "/api/v1/formularios/" + id + "/acta-calibracion";
+    mvc.perform(get(ruta).principal(auth)).andExpect(status().isForbidden());
+    mvc.perform(get(ruta + "/contenido").principal(auth)).andExpect(status().isForbidden());
+    mvc.perform(
+            multipart(ruta)
+                .file(
+                    new MockMultipartFile("archivo", "acta.pdf", "application/pdf", new byte[] {1}))
+                .with(
+                    solicitud -> {
+                      solicitud.setMethod("PUT");
+                      return solicitud;
+                    })
+                .principal(auth))
+        .andExpect(status().isForbidden());
+    verifyNoInteractions(service);
+  }
+
+  @Test
+  void administradorConsultaSinActa() throws Exception {
+    var auth = autenticar("ADMINISTRADOR");
+    when(service.consultar(id))
+        .thenReturn(
+            new EstadoActaCalibracionResponse(id, "SIN_ACTA", "Sin acta de calibracion", null));
+    mvc.perform(get("/api/v1/formularios/" + id + "/acta-calibracion").principal(auth))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.estado").value("SIN_ACTA"));
+  }
+
+  @Test
+  void administradorDescargaSinUrlPublicaYConCacheDesactivada() throws Exception {
+    var auth = autenticar("ADMINISTRADOR");
+    when(service.descargar(id)).thenReturn(new byte[] {1, 2, 3});
+    mvc.perform(get("/api/v1/formularios/" + id + "/acta-calibracion/contenido").principal(auth))
+        .andExpect(status().isOk())
+        .andExpect(content().contentType("application/pdf"))
+        .andExpect(header().string("X-Content-Type-Options", "nosniff"))
+        .andExpect(
+            header().string("Cache-Control", org.hamcrest.Matchers.containsString("no-store")));
+  }
+
+  @Configuration
+  @EnableMethodSecurity
+  static class Config {
+    @Bean
+    ActaCalibracionService service() {
+      return mock(ActaCalibracionService.class);
     }
 
-    @AfterEach
-    void limpiar() {
-        SecurityContextHolder.clearContext();
+    @Bean
+    ActaCalibracionController controller(ActaCalibracionService service) {
+      return new ActaCalibracionController(service);
     }
-
-    private UsernamePasswordAuthenticationToken autenticar(String rol) {
-        var auth =
-                new UsernamePasswordAuthenticationToken(
-                        "usuario", null, List.of(new SimpleGrantedAuthority("ROLE_" + rol)));
-        auth.setDetails(new JwtData("usuario@ejemplo.com", id, RoleName.valueOf(rol), 0));
-        SecurityContextHolder.getContext().setAuthentication(auth);
-        return auth;
-    }
-
-    @ParameterizedTest
-    @ValueSource(strings = {"ESTUDIANTE", "CATEDRATICO", "PROFESIONAL_EXTERNO"})
-    void rechazaConsultaDescargaYCargaSinRolAdministrador(String rol) throws Exception {
-        var auth = autenticar(rol);
-        String ruta = "/api/v1/formularios/" + id + "/acta-calibracion";
-        mvc.perform(get(ruta).principal(auth)).andExpect(status().isForbidden());
-        mvc.perform(get(ruta + "/contenido").principal(auth)).andExpect(status().isForbidden());
-        mvc.perform(
-                        multipart(ruta)
-                                .file(
-                                        new MockMultipartFile("archivo", "acta.pdf", "application/pdf", new byte[] {1}))
-                                .with(
-                                        solicitud -> {
-                                            solicitud.setMethod("PUT");
-                                            return solicitud;
-                                        })
-                                .principal(auth))
-                .andExpect(status().isForbidden());
-        verifyNoInteractions(service);
-    }
-
-    @Test
-    void administradorConsultaSinActa() throws Exception {
-        var auth = autenticar("ADMINISTRADOR");
-        when(service.consultar(id))
-                .thenReturn(
-                        new EstadoActaCalibracionResponse(id, "SIN_ACTA", "Sin acta de calibracion", null));
-        mvc.perform(get("/api/v1/formularios/" + id + "/acta-calibracion").principal(auth))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.estado").value("SIN_ACTA"));
-    }
-
-    @Test
-    void administradorDescargaSinUrlPublicaYConCacheDesactivada() throws Exception {
-        var auth = autenticar("ADMINISTRADOR");
-        when(service.descargar(id)).thenReturn(new byte[] {1, 2, 3});
-        mvc.perform(get("/api/v1/formularios/" + id + "/acta-calibracion/contenido").principal(auth))
-                .andExpect(status().isOk())
-                .andExpect(content().contentType("application/pdf"))
-                .andExpect(header().string("X-Content-Type-Options", "nosniff"))
-                .andExpect(
-                        header().string("Cache-Control", org.hamcrest.Matchers.containsString("no-store")));
-    }
-
-    @Configuration
-    @EnableMethodSecurity
-    static class Config {
-        @Bean
-        ActaCalibracionService service() {
-            return mock(ActaCalibracionService.class);
-        }
-
-        @Bean
-        ActaCalibracionController controller(ActaCalibracionService service) {
-            return new ActaCalibracionController(service);
-        }
-    }
+  }
 }

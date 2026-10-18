@@ -19,43 +19,43 @@ import org.springframework.web.multipart.MultipartFile;
 @RequestMapping("/api/v1/formularios/{id}/acta-calibracion")
 @PreAuthorize("hasRole('ADMINISTRADOR')")
 public class ActaCalibracionController {
-    private final ActaCalibracionService service;
+  private final ActaCalibracionService service;
 
-    public ActaCalibracionController(ActaCalibracionService service) {
-        this.service = service;
-    }
+  public ActaCalibracionController(ActaCalibracionService service) {
+    this.service = service;
+  }
 
-    @GetMapping
-    public EstadoActaCalibracionResponse consultar(@PathVariable UUID id) {
-        return service.consultar(id);
-    }
+  @GetMapping
+  public EstadoActaCalibracionResponse consultar(@PathVariable UUID id) {
+    return service.consultar(id);
+  }
 
-    @PutMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public EstadoActaCalibracionResponse adjuntar(
-            @PathVariable UUID id,
-            @RequestPart("archivo") MultipartFile archivo,
-            Authentication authentication) {
-        if (authentication == null || !(authentication.getDetails() instanceof JwtData datos)) {
-            throw new ApiException(
-                    HttpStatus.UNAUTHORIZED,
-                    "authentication_required",
-                    "Autenticacion requerida",
-                    "Se requiere una sesion valida.");
-        }
-        return service.adjuntar(id, archivo, datos.userId());
+  @PutMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+  public EstadoActaCalibracionResponse adjuntar(
+      @PathVariable UUID id,
+      @RequestPart("archivo") MultipartFile archivo,
+      Authentication authentication) {
+    if (authentication == null || !(authentication.getDetails() instanceof JwtData datos)) {
+      throw new ApiException(
+          HttpStatus.UNAUTHORIZED,
+          "authentication_required",
+          "Autenticacion requerida",
+          "Se requiere una sesion valida.");
     }
+    return service.adjuntar(id, archivo, datos.userId());
+  }
 
-    @GetMapping("/contenido")
-    public ResponseEntity<byte[]> descargar(@PathVariable UUID id) {
-        byte[] contenido = service.descargar(id);
-        return ResponseEntity.ok()
-                .contentType(MediaType.APPLICATION_PDF)
-                .contentLength(contenido.length)
-                .cacheControl(CacheControl.noStore().cachePrivate())
-                .header("X-Content-Type-Options", "nosniff")
-                .header(
-                        "Content-Disposition",
-                        ContentDisposition.attachment().filename("acta-" + id + ".pdf").build().toString())
-                .body(contenido);
-    }
+  @GetMapping("/contenido")
+  public ResponseEntity<byte[]> descargar(@PathVariable UUID id) {
+    byte[] contenido = service.descargar(id);
+    return ResponseEntity.ok()
+        .contentType(MediaType.APPLICATION_PDF)
+        .contentLength(contenido.length)
+        .cacheControl(CacheControl.noStore().cachePrivate())
+        .header("X-Content-Type-Options", "nosniff")
+        .header(
+            "Content-Disposition",
+            ContentDisposition.attachment().filename("acta-" + id + ".pdf").build().toString())
+        .body(contenido);
+  }
 }
