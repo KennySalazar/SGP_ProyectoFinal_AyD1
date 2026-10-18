@@ -38,6 +38,13 @@ public class FotografiaController {
     return servicio.listar(id, actor(auth));
   }
 
+  @DeleteMapping("/{fotoId}")
+  public ResponseEntity<Void> retirar(
+      @PathVariable UUID id, @PathVariable UUID fotoId, Authentication auth) {
+    servicio.retirar(id, fotoId, actor(auth));
+    return ResponseEntity.noContent().build();
+  }
+
   @GetMapping("/{fotoId}/contenido")
   public ResponseEntity<InputStreamResource> contenido(
       @PathVariable UUID id, @PathVariable UUID fotoId, Authentication auth) {

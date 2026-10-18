@@ -55,6 +55,7 @@ import org.testcontainers.utility.DockerImageName;
   ProcesadorImagenes.class,
   CargasImagenService.class,
   ObjetosImagenService.class,
+  RegistroFotografiasInspeccionJpa.class,
   FotografiaFlujoIntegrationTest.Config.class
 })
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
@@ -227,6 +228,137 @@ class FotografiaFlujoIntegrationTest {
     return inspecciones
         .iniciarInspeccion(inicio(UUID.randomUUID()), usuario, UUID.randomUUID().toString())
         .id();
+  }
+
+  @Test
+  void autorRetiraFotografiaSinBorrarObjetosYNoPuedeListarlaNiDescargarla() throws Exception {
+    var id = iniciar();
+    var r = metadatos();
+    fotos.adjuntar(id, usuario, r, imagen("jpeg"), "retirada");
+    var clavesAntes = storage.claves();
+
+    fotos.retirar(id, r.id(), usuario);
+
+    assertThat(jdbc.queryForObject("select estado from archivo where id=?", String.class, r.id()))
+        .isEqualTo("RETIRADO");
+    Instant retiradoEn =
+        jdbc.queryForObject(
+            "select retirado_en from archivo where id=?",
+            (rs, fila) -> rs.getTimestamp(1).toInstant(),
+            r.id());
+    assertThat(retiradoEn).isEqualTo(AHORA);
+    assertThat(fotos.listar(id, usuario)).isEmpty();
+    for (boolean miniatura : new boolean[] {false, true}) {
+      exigirNoEncontrada(() -> fotos.contenido(id, r.id(), usuario, miniatura));
+    }
+    assertThat(inspeccionRepository.findCategoriasFotoDisponibles(id)).isEmpty();
+    assertThat(storage.claves()).isEqualTo(clavesAntes);
+    // Repetir DELETE conserva la retirada y no toca los objetos.
+    fotos.retirar(id, r.id(), usuario);
+    assertThat(storage.claves()).isEqualTo(clavesAntes);
+    assertThat(
+            jdbc.queryForObject(
+                "select count(*) from archivo_inspeccion where archivo_id=?", Long.class, r.id()))
+        .isEqualTo(1);
+  }
+
+  @Test
+  void retiradaRechazaUsuarioAjenoAntesDeRevelarElEstadoDeLaInspeccion() throws Exception {
+    var id = iniciar();
+    var r = metadatos();
+    fotos.adjuntar(id, usuario, r, imagen("jpeg"), "privada");
+
+    for (String estado : List.of("BORRADOR", "PUBLICADA")) {
+      jdbc.update(
+          "update inspeccion set estado=?, publicado_en=CURRENT_TIMESTAMP where id=?", estado, id);
+      exigirNoEncontrada(() -> fotos.retirar(id, r.id(), UUID.randomUUID()));
+    }
+
+    assertThat(jdbc.queryForObject("select estado from archivo where id=?", String.class, r.id()))
+        .isEqualTo("DISPONIBLE");
+  }
+
+  @Test
+  void retiradaDelAutorRechazaTodosLosEstadosDistintosDeBorrador() throws Exception {
+    var id = iniciar();
+    var r = metadatos();
+    fotos.adjuntar(id, usuario, r, imagen("jpeg"), "no-editable");
+    var clavesAntes = storage.claves();
+
+    for (String estado :
+        List.of("ENVIADA", "EN_REVISION", "CAMBIOS_SOLICITADOS", "PUBLICADA", "RECHAZADA")) {
+      jdbc.update(
+          "update inspeccion set estado=?, publicado_en=CURRENT_TIMESTAMP where id=?", estado, id);
+      conflicto(() -> fotos.retirar(id, r.id(), usuario));
+    }
+
+    assertThat(jdbc.queryForObject("select estado from archivo where id=?", String.class, r.id()))
+        .isEqualTo("DISPONIBLE");
+    assertThat(storage.claves()).isEqualTo(clavesAntes);
+  }
+
+  @Test
+  void retiradaNoEncuentraFotoInexistenteAjenaDocumentoOPurgada() throws Exception {
+    var id = iniciar();
+    exigirNoEncontrada(() -> fotos.retirar(id, UUID.randomUUID(), usuario));
+
+    var otra = iniciar();
+    var r = metadatos();
+    fotos.adjuntar(otra, usuario, r, imagen("jpeg"), "otra-inspeccion");
+    exigirNoEncontrada(() -> fotos.retirar(id, r.id(), usuario));
+
+    agregarArchivos(id, 1, "DOCUMENTO_INSPECCION", null, "DISPONIBLE");
+    agregarArchivos(id, 1, "FOTO_INSPECCION", "OTRA", "PURGADO");
+    var ids =
+        jdbc.queryForList(
+            "select archivo_id from archivo_inspeccion where inspeccion_id=?", UUID.class, id);
+    for (var foto : ids) exigirNoEncontrada(() -> fotos.retirar(id, foto, usuario));
+    assertThat(fotos.listar(otra, usuario)).hasSize(1);
+  }
+
+  @Test
+  void retirarFotografiaLiberaUnaPlazaDelLimiteDe60() throws Exception {
+    var id = iniciar();
+    agregarArchivos(id, 59, "FOTO_INSPECCION", "ACCESO", "DISPONIBLE");
+    var r = metadatos();
+    var fichero = imagen("jpeg");
+    fotos.adjuntar(id, usuario, r, fichero, "plaza-original");
+    exigirLimite(() -> fotos.adjuntar(id, usuario, metadatos(), fichero, "sin-plaza"));
+
+    fotos.retirar(id, r.id(), usuario);
+    fotos.adjuntar(id, usuario, metadatos(), fichero, "plaza-liberada");
+
+    assertThat(fotos.listar(id, usuario)).hasSize(60);
+  }
+
+  @Test
+  void retiradaSeRevierteSiFallaLaTransaccion() throws Exception {
+    var id = iniciar();
+    var r = metadatos();
+    fotos.adjuntar(id, usuario, r, imagen("jpeg"), "rollback-retirada");
+    var clavesAntes = storage.claves();
+    var tx = new org.springframework.transaction.support.TransactionTemplate(tm);
+
+    assertThatThrownBy(
+            () ->
+                tx.executeWithoutResult(
+                    t -> {
+                      fotos.retirar(id, r.id(), usuario);
+                      throw new IllegalStateException("fallo de prueba");
+                    }))
+        .isInstanceOf(IllegalStateException.class);
+
+    assertThat(fotos.listar(id, usuario)).hasSize(1);
+    assertThat(
+            jdbc.queryForObject("select retirado_en from archivo where id=?", Object.class, r.id()))
+        .isNull();
+    assertThat(storage.claves()).isEqualTo(clavesAntes);
+  }
+
+  void exigirNoEncontrada(Runnable accion) {
+    assertThatThrownBy(accion::run)
+        .isInstanceOfSatisfying(
+            ApiException.class, e -> assertThat(e.getStatus().value()).isEqualTo(404));
   }
 
   void agregarArchivos(UUID id, int cantidad, String tipo, String categoria, String estado) {

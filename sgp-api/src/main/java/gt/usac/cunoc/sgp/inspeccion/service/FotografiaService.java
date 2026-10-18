@@ -29,6 +29,7 @@ public class FotografiaService {
   private final InspeccionRepository inspecciones;
   private final ArchivoRepository archivos;
   private final ArchivoInspeccionRepository vinculos;
+  private final RegistroFotografiasInspeccion registroFotografias;
   private final FotografiaMapper mapper;
   private final ValidadorAnclajeFotografico anclajes;
   private final ReglasEvidenciaFotografica reglasEvidencia;
@@ -45,6 +46,7 @@ public class FotografiaService {
       InspeccionRepository inspecciones,
       ArchivoRepository archivos,
       ArchivoInspeccionRepository vinculos,
+      RegistroFotografiasInspeccion registroFotografias,
       FotografiaMapper mapper,
       ValidadorAnclajeFotografico anclajes,
       ReglasEvidenciaFotografica reglasEvidencia,
@@ -59,6 +61,7 @@ public class FotografiaService {
     this.inspecciones = inspecciones;
     this.archivos = archivos;
     this.vinculos = vinculos;
+    this.registroFotografias = registroFotografias;
     this.mapper = mapper;
     this.anclajes = anclajes;
     this.reglasEvidencia = reglasEvidencia;
@@ -270,7 +273,16 @@ public class FotografiaService {
       throw error(
           HttpStatus.CONFLICT,
           "estado_inspeccion_no_permite_archivos",
-          "Solo se pueden adjuntar fotografías a un borrador propio.");
+          "Solo se pueden modificar fotografías de un borrador propio.");
+  }
+
+  public void retirar(UUID id, UUID fotoId, UUID actor) {
+    tx.executeWithoutResult(
+        t -> {
+          var inspeccion = autorizar(id, actor, true);
+          borrador(inspeccion);
+          registroFotografias.retirar(id, fotoId, clock.instant());
+        });
   }
 
   public List<FotografiaResponse> listar(UUID id, UUID actor) {

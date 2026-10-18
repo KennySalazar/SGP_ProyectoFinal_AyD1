@@ -6,10 +6,19 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import gt.usac.cunoc.sgp.archivo.mapper.FotografiaMapperImpl;
+import gt.usac.cunoc.sgp.archivo.service.AlmacenamientoArchivos;
+import gt.usac.cunoc.sgp.archivo.service.CargasImagenService;
+import gt.usac.cunoc.sgp.archivo.service.InspectorImagenesImageIo;
+import gt.usac.cunoc.sgp.archivo.service.ObjetosImagenService;
+import gt.usac.cunoc.sgp.archivo.service.ProcesadorImagenes;
+import gt.usac.cunoc.sgp.archivo.service.RegistroFotografiasInspeccionJpa;
 import gt.usac.cunoc.sgp.common.audit.service.AuditoriaWriter;
 import gt.usac.cunoc.sgp.common.exception.ApiException;
+import gt.usac.cunoc.sgp.common.exception.ApiExceptionHandler;
 import gt.usac.cunoc.sgp.common.security.JwtData;
 import gt.usac.cunoc.sgp.formulario.validation.JsonSchemaValidatorService;
+import gt.usac.cunoc.sgp.inspeccion.controller.TransicionInspeccionController;
 import gt.usac.cunoc.sgp.inspeccion.dto.ConfirmarEstadoIcRequest;
 import gt.usac.cunoc.sgp.inspeccion.dto.GuardarBorradorRequest;
 import gt.usac.cunoc.sgp.inspeccion.dto.GuardarRespuestasRequest;
@@ -23,18 +32,22 @@ import gt.usac.cunoc.sgp.inspeccion.service.ConversorIndicadoresIc;
 import gt.usac.cunoc.sgp.inspeccion.service.ConversorMedicionesIc;
 import gt.usac.cunoc.sgp.inspeccion.service.CorreccionInspeccionService;
 import gt.usac.cunoc.sgp.inspeccion.service.EvaluadorCondicionesCriticasIc;
+import gt.usac.cunoc.sgp.inspeccion.service.FotografiaService;
 import gt.usac.cunoc.sgp.inspeccion.service.HuellaEntradaIc;
 import gt.usac.cunoc.sgp.inspeccion.service.InspeccionService;
 import gt.usac.cunoc.sgp.inspeccion.service.MotorPonderacionIc;
 import gt.usac.cunoc.sgp.inspeccion.service.PreparadorEntradaIcService;
 import gt.usac.cunoc.sgp.inspeccion.service.PublicacionIndiceCondicionService;
+import gt.usac.cunoc.sgp.inspeccion.service.ReglasEvidenciaFotografica;
 import gt.usac.cunoc.sgp.inspeccion.service.ResolverElementosIc;
 import gt.usac.cunoc.sgp.inspeccion.service.TransicionInspeccionService;
+import gt.usac.cunoc.sgp.inspeccion.validation.ValidadorAnclajeFotografico;
 import gt.usac.cunoc.sgp.integration.InvitacionCatedraticoIntegrationTest.RelojAjustable;
 import gt.usac.cunoc.sgp.usuario.model.RoleName;
 import java.io.IOException;
 import java.io.InputStream;
 import java.math.BigDecimal;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -42,6 +55,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.Callable;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -51,10 +65,14 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpStatus;
@@ -66,8 +84,10 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.validation.beanvalidation.LocalValidatorFactoryBean;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
@@ -104,6 +124,15 @@ import org.testcontainers.utility.DockerImageName;
   JsonSchemaValidatorService.class,
   InspeccionMapperImpl.class,
   AuditoriaWriter.class,
+  FotografiaService.class,
+  RegistroFotografiasInspeccionJpa.class,
+  FotografiaMapperImpl.class,
+  ReglasEvidenciaFotografica.class,
+  ValidadorAnclajeFotografico.class,
+  ProcesadorImagenes.class,
+  InspectorImagenesImageIo.class,
+  CargasImagenService.class,
+  ObjetosImagenService.class,
   PublicacionInspeccionIntegrationTest.Config.class
 })
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
@@ -145,6 +174,9 @@ class PublicacionInspeccionIntegrationTest {
   @Autowired private RelojAjustable reloj;
   @Autowired private JdbcTemplate jdbc;
   @Autowired private ObjectMapper json;
+  @Autowired private FotografiaService fotografias;
+  @Autowired private PlatformTransactionManager tm;
+  @MockBean private AlmacenamientoArchivos almacenamiento;
 
   private UUID versionId;
   private UUID puenteId;
@@ -294,6 +326,135 @@ class PublicacionInspeccionIntegrationTest {
                   .containsExactly("fotografias.SUPERESTRUCTURA", "fotografias.SUBESTRUCTURA");
             });
     assertThat(estado(inspeccion)).isEqualTo("BORRADOR");
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void retirarLaUnicaFotoDeCategoriaImpideElSiguienteEnvioOPublicacion(boolean publicar)
+      throws Exception {
+    UUID autor = publicar ? CATEDRATICO_ID : ESTUDIANTE_ID;
+    UUID inspeccion = crearInspeccionCompleta(autor, publicar ? "CATEDRATICO" : "ESTUDIANTE");
+    UUID foto = fotoDeCategoria(inspeccion, "CAUCE");
+
+    fotografias.retirar(inspeccion, foto, autor);
+
+    var mvc =
+        org.springframework.test.web.servlet.setup.MockMvcBuilders.standaloneSetup(
+                new TransicionInspeccionController(transiciones))
+            .setControllerAdvice(new ApiExceptionHandler())
+            .build();
+    autenticar(autor, publicar ? RoleName.CATEDRATICO : RoleName.ESTUDIANTE);
+    mvc.perform(
+            org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post(
+                    "/api/v1/inspecciones/{id}/{accion}",
+                    inspeccion,
+                    publicar ? "publicar" : "enviar")
+                .principal(SecurityContextHolder.getContext().getAuthentication()))
+        .andExpect(
+            org.springframework.test.web.servlet.result.MockMvcResultMatchers.status()
+                .isUnprocessableEntity())
+        .andExpect(
+            org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.code")
+                .value("inspeccion_incompleta"))
+        .andExpect(
+            org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath(
+                    "$.errores[0].campo")
+                .value("fotografias.CAUCE"));
+
+    assertThat(estado(inspeccion)).isEqualTo("BORRADOR");
+    assertThat(historial(inspeccion)).isEmpty();
+    org.mockito.Mockito.verifyNoInteractions(almacenamiento);
+  }
+
+  @ParameterizedTest
+  @CsvSource({"false,true", "true,true", "false,false", "true,false"})
+  void retiradaYEnvioOPublicacionSeSerializanSinInvalidarEvidencia(
+      boolean publicar, boolean retirarPrimero) throws Exception {
+    UUID autor = publicar ? CATEDRATICO_ID : ESTUDIANTE_ID;
+    UUID inspeccion = crearInspeccionCompleta(autor, publicar ? "CATEDRATICO" : "ESTUDIANTE");
+    UUID foto = fotoDeCategoria(inspeccion, "CAUCE");
+    var tx = new TransactionTemplate(tm);
+    var pidCompetidor = new CompletableFuture<Integer>();
+
+    try (var hilos = Executors.newSingleThreadExecutor()) {
+      Future<String> competidor =
+          tx.execute(
+              t -> {
+                // La publicación conserva el orden puente -> inspección.
+                if (publicar && !retirarPrimero) {
+                  jdbc.queryForObject(
+                      "SELECT id FROM puente WHERE id=? FOR UPDATE", UUID.class, puenteId);
+                }
+                jdbc.queryForObject(
+                    "SELECT id FROM inspeccion WHERE id=? FOR UPDATE", UUID.class, inspeccion);
+                var pendiente =
+                    hilos.submit(
+                        () -> {
+                          try {
+                            return tx.execute(
+                                otro -> {
+                                  pidCompetidor.complete(
+                                      jdbc.queryForObject(
+                                          "SELECT pg_backend_pid()", Integer.class));
+                                  if (retirarPrimero)
+                                    return transicionar(inspeccion, autor, publicar);
+                                  fotografias.retirar(inspeccion, foto, autor);
+                                  return "RETIRADA";
+                                });
+                          } catch (ApiException e) {
+                            return e.getStatus().value() + ":" + e.getCode();
+                          }
+                        });
+                org.awaitility.Awaitility.await()
+                    .atMost(Duration.ofSeconds(10))
+                    .until(pidCompetidor::isDone);
+                int pid = pidCompetidor.join();
+                org.awaitility.Awaitility.await()
+                    .atMost(Duration.ofSeconds(10))
+                    .until(
+                        () ->
+                            Boolean.TRUE.equals(
+                                jdbc.queryForObject(
+                                    "SELECT EXISTS (SELECT 1 FROM pg_locks WHERE pid=? AND NOT granted)",
+                                    Boolean.class,
+                                    pid)));
+                // El competidor ya está esperando un bloqueo real de PostgreSQL.
+                if (retirarPrimero) fotografias.retirar(inspeccion, foto, autor);
+                else transicionar(inspeccion, autor, publicar);
+                return pendiente;
+              });
+
+      assertThat(competidor.get(30, TimeUnit.SECONDS))
+          .isEqualTo(
+              retirarPrimero
+                  ? "422:inspeccion_incompleta"
+                  : "409:estado_inspeccion_no_permite_archivos");
+    }
+
+    assertThat(estado(inspeccion))
+        .isEqualTo(retirarPrimero ? "BORRADOR" : publicar ? "PUBLICADA" : "ENVIADA");
+    assertThat(jdbc.queryForObject("SELECT estado FROM archivo WHERE id=?", String.class, foto))
+        .isEqualTo(retirarPrimero ? "RETIRADO" : "DISPONIBLE");
+    assertThat(historial(inspeccion)).hasSize(retirarPrimero ? 0 : publicar ? 2 : 1);
+    assertThat(numero("SELECT count(*) FROM resultado_ic WHERE inspeccion_id=?", inspeccion))
+        .isEqualTo(!retirarPrimero && publicar ? 1 : 0);
+    org.mockito.Mockito.verifyNoInteractions(almacenamiento);
+  }
+
+  private UUID fotoDeCategoria(UUID inspeccion, String categoria) {
+    return jdbc.queryForObject(
+        "SELECT ai.archivo_id FROM archivo_inspeccion ai JOIN archivo a ON a.id=ai.archivo_id"
+            + " WHERE ai.inspeccion_id=? AND a.categoria_foto=?",
+        UUID.class,
+        inspeccion,
+        categoria);
+  }
+
+  private String transicionar(UUID inspeccion, UUID autor, boolean publicar) {
+    return (publicar
+            ? transiciones.publicar(inspeccion, autor)
+            : transiciones.enviar(inspeccion, autor))
+        .estado();
   }
 
   @Test

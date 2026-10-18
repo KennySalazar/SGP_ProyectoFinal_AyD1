@@ -17,6 +17,9 @@ import gt.usac.cunoc.sgp.usuario.repository.UserAccountRepository;
 import java.time.*;
 import java.util.*;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
@@ -46,11 +49,63 @@ class FotografiaControllerSecurityTest {
   @MockBean Clock clock;
 
   private UsernamePasswordAuthenticationToken sesion(UUID usuario) {
+    return sesion(usuario, RoleName.CATEDRATICO);
+  }
+
+  private UsernamePasswordAuthenticationToken sesion(UUID usuario, RoleName rol) {
     var a =
         new UsernamePasswordAuthenticationToken(
-            "inspector", null, List.of(new SimpleGrantedAuthority("ROLE_CATEDRATICO")));
-    a.setDetails(new JwtData("test@example.com", usuario, RoleName.CATEDRATICO, 0));
+            "inspector", null, List.of(new SimpleGrantedAuthority("ROLE_" + rol.name())));
+    a.setDetails(new JwtData("test@example.com", usuario, rol, 0));
     return a;
+  }
+
+  @Test
+  void retiradaSinAutenticacionResponde401SinInvocarServicio() throws Exception {
+    mvc.perform(
+            delete(
+                "/api/v1/inspecciones/{id}/fotografias/{fotoId}",
+                UUID.randomUUID(),
+                UUID.randomUUID()))
+        .andExpect(status().isUnauthorized());
+    verifyNoInteractions(servicio);
+  }
+
+  @ParameterizedTest
+  @EnumSource(RoleName.class)
+  void retiradaUsaIdentidadDeSesionYDevuelve204(RoleName rol) throws Exception {
+    UUID usuario = UUID.randomUUID(), id = UUID.randomUUID(), foto = UUID.randomUUID();
+
+    mvc.perform(
+            delete("/api/v1/inspecciones/{id}/fotografias/{fotoId}", id, foto)
+                .with(authentication(sesion(usuario, rol))))
+        .andExpect(status().isNoContent())
+        .andExpect(content().string(""));
+
+    verify(servicio).retirar(id, foto, usuario);
+  }
+
+  @ParameterizedTest
+  @ValueSource(ints = {404, 409})
+  void retiradaConservaContratoDeError(int estado) throws Exception {
+    UUID usuario = UUID.randomUUID(), id = UUID.randomUUID(), foto = UUID.randomUUID();
+    String codigo =
+        estado == 404 ? "inspeccion_no_encontrada" : "estado_inspeccion_no_permite_archivos";
+    doThrow(
+            new gt.usac.cunoc.sgp.common.exception.ApiException(
+                org.springframework.http.HttpStatus.valueOf(estado),
+                codigo,
+                "Fotografía",
+                "Denegado"))
+        .when(servicio)
+        .retirar(id, foto, usuario);
+
+    mvc.perform(
+            delete("/api/v1/inspecciones/{id}/fotografias/{fotoId}", id, foto)
+                .with(authentication(sesion(usuario))))
+        .andExpect(status().is(estado))
+        .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON))
+        .andExpect(jsonPath("$.code").value(codigo));
   }
 
   @Test
