@@ -412,7 +412,8 @@
       "deactivate": "Dar de baja",
       "reactivate": "Reactivar",
       "viewDetails": "Ver ficha",
-      "inactiveStatus": "Inactivo"
+      "inactiveStatus": "Inactivo",
+      "backToCatalog": "Volver al catalogo"
     },
     "baja": {
       "title": "Dar de baja puente",
@@ -1178,8 +1179,10 @@
         "drenaje_estado_OBSTRUIDOS": "Drenajes obstruidos",
         "estado_bueno_malo_BUENO": "Estado bueno",
         "estado_bueno_malo_MALO": "Estado malo"
-      }
-    }
+      },
+      "pendientes": "Complete y guarde las reglas de calculo del IC antes de publicar esta version."
+    },
+    "crearSinBaseNota": "Si no selecciona una version base, se cargara la plantilla inicial SIECA. Configure y calibre sus reglas antes de publicarla."
   },
   "inspecciones": {
     "historial": {
