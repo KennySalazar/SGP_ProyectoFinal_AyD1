@@ -104,6 +104,20 @@ public class ApiExceptionHandler {
     return response(problem, HttpStatus.CONFLICT);
   }
 
+  @ExceptionHandler(org.springframework.security.core.AuthenticationException.class)
+  ResponseEntity<ProblemDetail> handleAuthentication(
+      org.springframework.security.core.AuthenticationException exception,
+      HttpServletRequest request) {
+    ProblemDetail problem =
+        ProblemDetails.create(
+            401,
+            "Autenticacion requerida",
+            "Se requiere una sesion valida para realizar esta operacion",
+            "authentication_required",
+            request);
+    return response(problem, HttpStatus.UNAUTHORIZED);
+  }
+
   @ExceptionHandler(AccessDeniedException.class)
   ResponseEntity<ProblemDetail> handleAccessDenied(
       AccessDeniedException exception, HttpServletRequest request) {

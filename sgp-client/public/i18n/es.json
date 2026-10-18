@@ -57,7 +57,20 @@
     "courses": "Cursos",
     "logout": "Cerrar sesion",
     "inspectionForm": "Formulario de inspección",
-    "myInspections": "Mis inspecciones"
+    "myInspections": "Mis inspecciones",
+    "avisos": "Avisos"
+  },
+  "avisos": {
+    "title": "Avisos",
+    "kicker": "Notificaciones",
+    "description": "Avisos y novedades dentro de la aplicación que requieren tu atención.",
+    "unreadAriaLabel": "{{count}} avisos sin leer",
+    "bellAriaLabel": "Avisos dentro de la aplicación",
+    "onlyUnread": "Solo no leídos",
+    "markAllAsRead": "Marcar todos como leídos",
+    "emptyState": "No tienes avisos",
+    "offlineNotice": "Sin conexión. Mostrando el último contador conocido. No se pudo actualizar.",
+    "viewAll": "Ver todos los avisos"
   },
   "connectivity": {
     "online": "En linea",

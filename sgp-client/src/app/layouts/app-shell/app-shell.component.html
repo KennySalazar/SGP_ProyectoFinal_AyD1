@@ -6,6 +6,7 @@
         <strong>{{ 'app.title' | transloco }}</strong>
       </div>
       <div class="workspace-meta">
+        <app-campana-avisos />
         <span class="environment">{{ 'app.development' | transloco }}</span>
         <span class="connectivity" [class.offline]="!connectivity.online()">
           <span class="dot"></span>

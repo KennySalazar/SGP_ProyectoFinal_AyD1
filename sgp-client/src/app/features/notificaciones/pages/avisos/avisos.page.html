@@ -1,0 +1,96 @@
+<div class="avisos-page">
+  <header class="page-heading">
+    <span class="page-kicker">{{ 'avisos.kicker' | transloco }}</span>
+    <div class="heading-row">
+      <h1 class="page-title">{{ 'avisos.title' | transloco }}</h1>
+      @if (store.unreadCount() > 0) {
+      <span class="badge-count" aria-live="polite">
+        {{ 'avisos.unreadAriaLabel' | transloco: { count: store.unreadCount() } }}
+      </span>
+      }
+    </div>
+    <p class="page-description">{{ 'avisos.description' | transloco }}</p>
+  </header>
+
+  @if (store.sinConexionAviso()) {
+  <div class="offline-alert" role="status">
+    <i class="pi pi-wifi" aria-hidden="true"></i>
+    <span>{{ 'avisos.offlineNotice' | transloco }}</span>
+  </div>
+  }
+
+  <section class="surface-card avisos-card">
+    <div class="card-toolbar">
+      <label class="filtro-check">
+        <input
+          type="checkbox"
+          [ngModel]="store.soloNoLeidos()"
+          (ngModelChange)="onFiltroChange($event)"
+        />
+        <span>{{ 'avisos.onlyUnread' | transloco }}</span>
+      </label>
+
+      @if (store.unreadCount() > 0) {
+      <button type="button" class="btn-marcar-todas" (click)="onMarcarTodas()">
+        <i class="pi pi-check-circle" aria-hidden="true"></i>
+        <span>{{ 'avisos.markAllAsRead' | transloco }}</span>
+      </button>
+      }
+    </div>
+
+    <div class="avisos-container">
+      @if (store.loading()) {
+      <div class="state-box">
+        <i class="pi pi-spin pi-spinner" aria-hidden="true"></i>
+        <span>{{ 'common.pending' | transloco }}...</span>
+      </div>
+      } @else if (store.avisos().length === 0) {
+      <div class="state-box empty">
+        <i class="pi pi-inbox empty-icon" aria-hidden="true"></i>
+        <p class="empty-text">{{ 'avisos.emptyState' | transloco }}</p>
+      </div>
+      } @else {
+      <div class="avisos-list" role="list">
+        @for (aviso of store.avisos(); track aviso.id) {
+        <button
+          type="button"
+          class="aviso-row"
+          [class.no-leido]="!aviso.leido"
+          role="listitem"
+          (click)="onAvisoClick(aviso)"
+        >
+          <div class="row-indicator" aria-hidden="true">
+            @if (!aviso.leido) {
+            <span class="blue-dot"></span>
+            }
+          </div>
+          <div class="row-content">
+            <div class="row-meta">
+              <span class="row-title">{{ aviso.titulo }}</span>
+              @if (aviso.entidad) {
+              <span class="row-entidad">{{ aviso.entidad }}</span>
+              }
+              <span class="row-time">{{ aviso.creadoEn | date: 'dd/MM/yyyy HH:mm' }}</span>
+            </div>
+            <p class="row-message">{{ aviso.mensaje }}</p>
+          </div>
+          <div class="row-action" aria-hidden="true">
+            <i class="pi pi-chevron-right"></i>
+          </div>
+        </button>
+        }
+      </div>
+
+      @if (store.totalElements() > store.tamanio()) {
+      <div class="pagination-wrapper">
+        <p-paginator
+          [rows]="store.tamanio()"
+          [totalRecords]="store.totalElements()"
+          [first]="store.pagina() * store.tamanio()"
+          (onPageChange)="onPageChange($event)"
+        />
+      </div>
+      } }
+    </div>
+  </section>
+</div>
