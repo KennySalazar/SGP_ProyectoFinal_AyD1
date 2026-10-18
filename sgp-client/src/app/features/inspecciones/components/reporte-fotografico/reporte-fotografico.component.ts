@@ -26,6 +26,7 @@ import { uuidV7 } from '../../../../offline/services/uuid-v7';
 import {
   IniciarInspeccionResponse,
   InspeccionBorradorResponse,
+  InspeccionPublicadaDetalleResponse,
 } from '../../models/inspeccion.models';
 import {
   CATEGORIAS_FOTO,
@@ -45,7 +46,9 @@ import { ProcesadorFotografiasService } from '../../services/procesador-fotograf
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class ReporteFotograficoComponent implements OnDestroy {
-  readonly inspeccion = input.required<IniciarInspeccionResponse | InspeccionBorradorResponse>();
+  readonly inspeccion = input.required<
+    IniciarInspeccionResponse | InspeccionBorradorResponse | InspeccionPublicadaDetalleResponse
+  >();
   readonly soloLectura = input(false);
   readonly contextoElemento = input<{ elementoRef: string; instanciaElementoId?: string } | null>(
     null,
@@ -117,7 +120,7 @@ export class ReporteFotograficoComponent implements OnDestroy {
     const carga = ++this.generacionCarga;
     const vigente = () => this.vigente(usuario, id, revision) && carga === this.generacionCarga;
     const contexto = this.inspeccion();
-    if (usuario === contexto.autorId) {
+    if (usuario === contexto.autorId && contexto.estado !== 'PUBLICADA') {
       try {
         await this.locales.guardarContexto(
           usuario,

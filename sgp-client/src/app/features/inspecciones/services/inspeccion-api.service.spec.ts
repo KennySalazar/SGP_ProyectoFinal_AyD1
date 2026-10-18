@@ -18,6 +18,32 @@ describe('InspeccionApiService', () => {
 
   afterEach(() => http.verify());
 
+  it('consulta historial publicado por puente con página inicial 0 y tamaño 20', () => {
+    service.listarPublicadasPorPuente('puente/1').subscribe();
+    const request = http.expectOne(
+      '/api/v1/inspecciones/puentes/puente%2F1/publicadas?pagina=0&tamanio=20',
+    );
+    expect(request.request.method).toBe('GET');
+    request.flush({ content: [] });
+  });
+
+  it('transmite la página solicitada al historial publicado sin consultar inspecciones propias', () => {
+    service.listarPublicadasPorPuente('puente-1', 2, 20).subscribe();
+    const request = http.expectOne(
+      '/api/v1/inspecciones/puentes/puente-1/publicadas?pagina=2&tamanio=20',
+    );
+    expect(request.request.method).toBe('GET');
+    request.flush({ content: [] });
+  });
+
+  it('consulta el detalle publicado mediante GET y conserva el identificador codificado', () => {
+    service.obtenerPublicada('inspeccion/1').subscribe();
+    const request = http.expectOne('/api/v1/inspecciones/inspeccion%2F1/publicada');
+    expect(request.request.method).toBe('GET');
+    expect(request.request.body).toBeNull();
+    request.flush({ id: 'inspeccion/1', estado: 'PUBLICADA' });
+  });
+
   it('retira una fotografía mediante DELETE sin cuerpo ni eliminación de inspección', () => {
     service.retirarFotografia('inspeccion/1', 'foto/1').subscribe();
     const request = http.expectOne('/api/v1/inspecciones/inspeccion%2F1/fotografias/foto%2F1');

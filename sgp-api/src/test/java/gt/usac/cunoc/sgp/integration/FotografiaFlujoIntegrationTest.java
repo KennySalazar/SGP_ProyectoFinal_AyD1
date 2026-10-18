@@ -362,8 +362,7 @@ class FotografiaFlujoIntegrationTest {
   }
 
   @ParameterizedTest
-  @ValueSource(
-      strings = {"ENVIADA", "EN_REVISION", "CAMBIOS_SOLICITADOS", "PUBLICADA", "RECHAZADA"})
+  @ValueSource(strings = {"ENVIADA", "EN_REVISION", "CAMBIOS_SOLICITADOS", "RECHAZADA"})
   void permisoAcademicoNoSeExtiendeFueraDeBorrador(String estado) throws Exception {
     var evidencia = evidenciaAcademica();
     jdbc.update(
@@ -372,6 +371,132 @@ class FotografiaFlujoIntegrationTest {
         evidencia.inspeccion());
     exigirLecturas(evidencia, usuario, RoleName.CATEDRATICO, 404);
     exigirLecturas(evidencia, evidencia.autor(), RoleName.ESTUDIANTE, 200);
+  }
+
+  @ParameterizedTest
+  @EnumSource(RoleName.class)
+  void cualquierRolAutenticadoConsultaLasTresRutasDePublicada(RoleName rol) throws Exception {
+    var evidencia = evidenciaAcademica();
+    jdbc.update(
+        "UPDATE inspeccion SET estado='PUBLICADA', publicado_en=CURRENT_TIMESTAMP WHERE id=?",
+        evidencia.inspeccion());
+    exigirLecturas(evidencia, crearUsuario(rol), rol, 200);
+    // La lectura pública autenticada no depende de conservar el vínculo académico.
+    jdbc.update(
+        "UPDATE asignacion_puente SET revocado_en=now(), motivo_revocacion='Prueba' WHERE id=?",
+        evidencia.asignacion());
+    exigirLecturas(evidencia, usuario, RoleName.CATEDRATICO, 200);
+  }
+
+  @Test
+  void publicadaNoAdmiteLecturaAnonima() throws Exception {
+    var evidencia = evidenciaAcademica();
+    jdbc.update(
+        "UPDATE inspeccion SET estado='PUBLICADA', publicado_en=CURRENT_TIMESTAMP WHERE id=?",
+        evidencia.inspeccion());
+    exigirLecturas(evidencia, null, null, 401);
+    assertThatThrownBy(() -> fotos.listar(evidencia.inspeccion(), null, null))
+        .isInstanceOfSatisfying(
+            ApiException.class, e -> assertThat(e.getStatus().value()).isEqualTo(401));
+    for (boolean miniatura : new boolean[] {false, true}) {
+      assertThatThrownBy(
+              () ->
+                  fotos.contenido(evidencia.inspeccion(), evidencia.foto(), null, null, miniatura))
+          .isInstanceOfSatisfying(
+              ApiException.class, e -> assertThat(e.getStatus().value()).isEqualTo(401));
+    }
+  }
+
+  @ParameterizedTest
+  @EnumSource(RoleName.class)
+  void usuariosAjenosNoConsultanOtrosEstadosPrivados(RoleName rol) throws Exception {
+    var evidencia = evidenciaAcademica();
+    UUID lector = crearUsuario(rol);
+    for (String estado : List.of("ENVIADA", "EN_REVISION", "CAMBIOS_SOLICITADOS", "RECHAZADA")) {
+      jdbc.update("UPDATE inspeccion SET estado=? WHERE id=?", estado, evidencia.inspeccion());
+      exigirLecturas(evidencia, lector, rol, 404);
+    }
+  }
+
+  @Test
+  void lecturaPublicadaNoExponeFotosPrivadasDeOtraInspeccion() throws Exception {
+    var privada = evidenciaAcademica();
+    UUID publicada = iniciar();
+    var fotoPublica = metadatos();
+    fotos.adjuntar(publicada, usuario, fotoPublica, imagen("jpeg"), "publica");
+    jdbc.update(
+        "UPDATE inspeccion SET estado='PUBLICADA', publicado_en=CURRENT_TIMESTAMP WHERE id=?",
+        publicada);
+    UUID lector = crearUsuario(RoleName.ADMINISTRADOR);
+    assertThat(fotos.listar(publicada, lector, RoleName.ADMINISTRADOR))
+        .extracting(FotografiaResponse::id)
+        .containsExactly(fotoPublica.id());
+    exigirLecturas(privada, lector, RoleName.ADMINISTRADOR, 404);
+    for (boolean miniatura : new boolean[] {false, true}) {
+      exigirNoEncontrada(
+          () ->
+              fotos.contenido(
+                  publicada, privada.foto(), lector, RoleName.ADMINISTRADOR, miniatura));
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"RETIRADO", "PURGADO", "DOCUMENTO_INSPECCION"})
+  void publicadaOcultaArchivosNoDisponiblesODistintosDeFotografia(String caso) throws Exception {
+    UUID publicada = iniciar();
+    var visible = metadatos();
+    fotos.adjuntar(publicada, usuario, visible, imagen("jpeg"), "visible");
+    boolean documento = "DOCUMENTO_INSPECCION".equals(caso);
+    agregarArchivos(
+        publicada,
+        1,
+        documento ? caso : "FOTO_INSPECCION",
+        documento ? null : "OTRA",
+        documento ? "DISPONIBLE" : caso);
+    UUID oculta =
+        jdbc.queryForObject(
+            "SELECT archivo_id FROM archivo_inspeccion WHERE inspeccion_id=? AND archivo_id<>?",
+            UUID.class,
+            publicada,
+            visible.id());
+    jdbc.update(
+        "UPDATE inspeccion SET estado='PUBLICADA', publicado_en=CURRENT_TIMESTAMP WHERE id=?",
+        publicada);
+    UUID lector = crearUsuario(RoleName.PROFESIONAL_EXTERNO);
+    assertThat(fotos.listar(publicada, lector, RoleName.PROFESIONAL_EXTERNO))
+        .extracting(FotografiaResponse::id)
+        .containsExactly(visible.id());
+    for (boolean miniatura : new boolean[] {false, true}) {
+      exigirNoEncontrada(
+          () ->
+              fotos.contenido(publicada, oculta, lector, RoleName.PROFESIONAL_EXTERNO, miniatura));
+    }
+  }
+
+  @ParameterizedTest
+  @EnumSource(RoleName.class)
+  void lecturaPublicadaNoConcedeCargaNiRetirada(RoleName rol) throws Exception {
+    var evidencia = evidenciaAcademica();
+    jdbc.update(
+        "UPDATE inspeccion SET estado='PUBLICADA', publicado_en=CURRENT_TIMESTAMP WHERE id=?",
+        evidencia.inspeccion());
+    UUID lector = crearUsuario(rol);
+    var clavesAntes = storage.claves();
+    var archivo = imagen("jpeg");
+    exigirNoEncontrada(
+        () -> fotos.adjuntar(evidencia.inspeccion(), lector, metadatos(), archivo, "denegada"));
+    exigirNoEncontrada(() -> fotos.retirar(evidencia.inspeccion(), evidencia.foto(), lector));
+    conflicto(
+        () ->
+            fotos.adjuntar(
+                evidencia.inspeccion(), evidencia.autor(), metadatos(), archivo, "autor-denegada"));
+    conflicto(() -> fotos.retirar(evidencia.inspeccion(), evidencia.foto(), evidencia.autor()));
+    assertThat(storage.claves()).isEqualTo(clavesAntes);
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT estado FROM archivo WHERE id=?", String.class, evidencia.foto()))
+        .isEqualTo("DISPONIBLE");
+    assertThat(fotos.listar(evidencia.inspeccion(), lector, rol)).hasSize(1);
   }
 
   @Test

@@ -10,6 +10,8 @@ import gt.usac.cunoc.sgp.inspeccion.dto.IniciarInspeccionResponse;
 import gt.usac.cunoc.sgp.inspeccion.dto.IniciarInspeccionVersionadaRequest;
 import gt.usac.cunoc.sgp.inspeccion.dto.IniciarInspeccionVersionadaResponse;
 import gt.usac.cunoc.sgp.inspeccion.dto.InspeccionBorradorResponse;
+import gt.usac.cunoc.sgp.inspeccion.dto.InspeccionPublicadaDetalleResponse;
+import gt.usac.cunoc.sgp.inspeccion.dto.InspeccionPublicadaResumenResponse;
 import gt.usac.cunoc.sgp.inspeccion.dto.InspeccionResumenResponse;
 import gt.usac.cunoc.sgp.inspeccion.dto.ValidarRespuestasRequest;
 import gt.usac.cunoc.sgp.inspeccion.service.InspeccionService;
@@ -162,6 +164,25 @@ public class InspeccionController {
     UUID usuarioId = usuarioId(authentication);
     inspeccionService.eliminarBorrador(id, usuarioId);
     return ResponseEntity.noContent().build();
+  }
+
+  @GetMapping("/puentes/{puenteId}/publicadas")
+  @PreAuthorize("isAuthenticated()")
+  @Operation(summary = "Consultar historial paginado de inspecciones publicadas de un puente")
+  public ResponseEntity<Page<InspeccionPublicadaResumenResponse>> listarPublicadas(
+      @PathVariable UUID puenteId,
+      @RequestParam(defaultValue = "0") int pagina,
+      @RequestParam(defaultValue = "20") int tamanio) {
+    return ResponseEntity.ok(
+        inspeccionService.listarPublicadasPorPuente(puenteId, pagina, tamanio));
+  }
+
+  @GetMapping("/{id}/publicada")
+  @PreAuthorize("isAuthenticated()")
+  @Operation(summary = "Consultar detalle publicado con versión original e IC persistido")
+  public ResponseEntity<InspeccionPublicadaDetalleResponse> consultarPublicada(
+      @PathVariable UUID id) {
+    return ResponseEntity.ok(inspeccionService.consultarPublicada(id));
   }
 
   @GetMapping("/{id}")

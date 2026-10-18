@@ -22,6 +22,8 @@ import gt.usac.cunoc.sgp.inspeccion.dto.IniciarInspeccionResponse;
 import gt.usac.cunoc.sgp.inspeccion.dto.IniciarInspeccionVersionadaRequest;
 import gt.usac.cunoc.sgp.inspeccion.dto.IniciarInspeccionVersionadaResponse;
 import gt.usac.cunoc.sgp.inspeccion.dto.InspeccionBorradorResponse;
+import gt.usac.cunoc.sgp.inspeccion.dto.InspeccionPublicadaDetalleResponse;
+import gt.usac.cunoc.sgp.inspeccion.dto.InspeccionPublicadaResumenResponse;
 import gt.usac.cunoc.sgp.inspeccion.dto.InspeccionResumenResponse;
 import gt.usac.cunoc.sgp.inspeccion.dto.ProgresoBorradorResponse;
 import gt.usac.cunoc.sgp.inspeccion.entity.Inspeccion;
@@ -32,6 +34,7 @@ import gt.usac.cunoc.sgp.inspeccion.model.EntradaCalculoIc;
 import gt.usac.cunoc.sgp.inspeccion.model.ResultadoCalculoIc;
 import gt.usac.cunoc.sgp.inspeccion.repository.InspeccionDatoTecnicoRepository;
 import gt.usac.cunoc.sgp.inspeccion.repository.InspeccionRepository;
+import gt.usac.cunoc.sgp.inspeccion.repository.ResultadoIcRepository;
 import gt.usac.cunoc.sgp.puente.entity.Puente;
 import gt.usac.cunoc.sgp.puente.repository.AsignacionPuenteRepository;
 import gt.usac.cunoc.sgp.puente.repository.PuenteRepository;
@@ -97,6 +100,7 @@ public class InspeccionService {
   private final JsonSchemaValidatorService jsonSchemaValidatorService;
   private final InspeccionMapper inspeccionMapper;
   private final AsignacionPuenteRepository asignaciones;
+  private final ResultadoIcRepository resultadoIcRepository;
 
   public InspeccionService(
       InspeccionRepository inspeccionRepository,
@@ -188,7 +192,6 @@ public class InspeccionService {
         null);
   }
 
-  @Autowired
   public InspeccionService(
       InspeccionRepository inspeccionRepository,
       InspeccionDatoTecnicoRepository datoTecnicoRepository,
@@ -206,6 +209,45 @@ public class InspeccionService {
       JsonSchemaValidatorService jsonSchemaValidatorService,
       InspeccionMapper inspeccionMapper,
       AsignacionPuenteRepository asignaciones) {
+    this(
+        inspeccionRepository,
+        datoTecnicoRepository,
+        puenteRepository,
+        versionFormularioRepository,
+        userAccountRepository,
+        profesionalRepository,
+        operaciones,
+        auditoriaWriter,
+        objectMapper,
+        clock,
+        calculadorProgreso,
+        preparadorEntradaIcService,
+        calculoIndiceCondicionService,
+        jsonSchemaValidatorService,
+        inspeccionMapper,
+        asignaciones,
+        null);
+  }
+
+  @Autowired
+  public InspeccionService(
+      InspeccionRepository inspeccionRepository,
+      InspeccionDatoTecnicoRepository datoTecnicoRepository,
+      PuenteRepository puenteRepository,
+      VersionFormularioRepository versionFormularioRepository,
+      UserAccountRepository userAccountRepository,
+      UsuarioProfesionalRepository profesionalRepository,
+      OperacionIdempotenteService operaciones,
+      AuditoriaWriter auditoriaWriter,
+      ObjectMapper objectMapper,
+      Clock clock,
+      CalculadorProgresoBorrador calculadorProgreso,
+      PreparadorEntradaIcService preparadorEntradaIcService,
+      CalculoIndiceCondicionService calculoIndiceCondicionService,
+      JsonSchemaValidatorService jsonSchemaValidatorService,
+      InspeccionMapper inspeccionMapper,
+      AsignacionPuenteRepository asignaciones,
+      ResultadoIcRepository resultadoIcRepository) {
     this.inspeccionRepository = inspeccionRepository;
     this.datoTecnicoRepository = datoTecnicoRepository;
     this.puenteRepository = puenteRepository;
@@ -223,6 +265,7 @@ public class InspeccionService {
     this.jsonSchemaValidatorService = jsonSchemaValidatorService;
     this.inspeccionMapper = inspeccionMapper;
     this.asignaciones = asignaciones;
+    this.resultadoIcRepository = resultadoIcRepository;
   }
 
   /** Conserva el contrato de HU-024 utilizado por los consumidores de HU-028. */
@@ -1222,6 +1265,44 @@ public class InspeccionService {
 
     inspeccion = inspeccionRepository.saveAndFlush(inspeccion);
     return inspeccionMapper.toResumenResponse(inspeccion);
+  }
+
+  @Transactional(readOnly = true)
+  public Page<InspeccionPublicadaResumenResponse> listarPublicadasPorPuente(
+      UUID puenteId, int pagina, int tamanio) {
+    if (pagina < 0 || tamanio < 1 || tamanio > 100) {
+      throw new ApiException(
+          HttpStatus.UNPROCESSABLE_ENTITY,
+          "paginacion_invalida",
+          "Paginación inválida",
+          "La página debe ser mayor o igual a 0 y el tamaño debe estar entre 1 y 100.");
+    }
+    return inspeccionRepository.findPublicadasByPuenteId(
+        puenteId,
+        PageRequest.of(
+            pagina, tamanio, Sort.by(Sort.Order.desc("publicadoEn"), Sort.Order.desc("id"))));
+  }
+
+  @Transactional(readOnly = true)
+  public InspeccionPublicadaDetalleResponse consultarPublicada(UUID id) {
+    Inspeccion inspeccion =
+        inspeccionRepository
+            .findPublicadaConDetallesById(id)
+            .orElseThrow(
+                () ->
+                    new ApiException(
+                        HttpStatus.NOT_FOUND,
+                        "inspeccion_no_encontrada",
+                        "Inspección no encontrada",
+                        "No existe la inspección publicada solicitada."));
+    // Leer el resultado de ESTA publicación, nunca el vigente del puente ni un cálculo nuevo.
+    var resultado = resultadoIcRepository.findPublicacionByInspeccionId(id).orElse(null);
+    UUID correccionId = inspeccionRepository.findCorreccionPublicadaId(id).orElse(null);
+    DatosPermanentesResponse permanentes =
+        inspeccion.getDatoTecnico() == null
+            ? null
+            : aDatosPermanentesResponse(inspeccion.getDatoTecnico());
+    return inspeccionMapper.toPublicadaDetalle(inspeccion, resultado, permanentes, correccionId);
   }
 
   @Transactional(readOnly = true)
