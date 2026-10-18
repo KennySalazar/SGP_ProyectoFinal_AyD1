@@ -54,7 +54,7 @@ public class InspeccionController {
       summary = "Iniciar una inspección técnica de puente",
       description =
           "Crea una inspección en estado BORRADOR para un puente activo usando la versión activa de formulario. "
-              + "Disponible únicamente para Catedráticos y Profesionales externos verificados. "
+              + "Los Estudiantes requieren una asignación académica vigente; también está disponible para Catedráticos y Profesionales externos verificados. "
               + "Soporta idempotencia mediante el encabezado Idempotency-Key y el UUID de cliente.",
       security = @SecurityRequirement(name = "bearerAuth"))
   public ResponseEntity<IniciarInspeccionResponse> iniciarInspeccion(
@@ -69,7 +69,7 @@ public class InspeccionController {
   }
 
   @PostMapping("/iniciar")
-  @PreAuthorize("isAuthenticated()")
+  @PreAuthorize("hasAnyRole('CATEDRATICO','PROFESIONAL_EXTERNO')")
   @Operation(
       summary = "Iniciar una inspección con una versión publicada específica",
       description =
