@@ -115,3 +115,9 @@ dd {
 .grupo-detalle caption {
   padding: 0 0.75rem;
 }
+
+.accesos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}

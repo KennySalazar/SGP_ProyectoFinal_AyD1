@@ -1,3 +1,4 @@
+import { provideRouter } from '@angular/router';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { Pipe, PipeTransform } from '@angular/core';
@@ -42,6 +43,7 @@ describe('Característica: consulta de bitácora HU007', () => {
     );
     TestBed.configureTestingModule({
       providers: [
+        provideRouter([]),
         provideHttpClient(),
         provideHttpClientTesting(),
         { provide: TranslocoService, useValue: { translate: (key: string) => key } },
@@ -84,12 +86,12 @@ describe('Característica: consulta de bitácora HU007', () => {
   it('Escenario: abrir la bitácora muestra la primera página y fechas de Guatemala', () => {
     // Dado el acceso a la bitácora
     const request = http.expectOne((req) => req.url === '/api/v1/auditoria');
-    // Cuando se consulta la página inicial
+
     expect(request.request.params.get('pagina')).toBe('0');
     expect(request.request.params.get('tamanio')).toBe('20');
     request.flush({ content: [registro], number: 0, size: 20, totalElements: 1, totalPages: 1 });
     fixture.detectChanges();
-    // Entonces se muestran usuario, acción y hora local
+
     expect(fixture.nativeElement.textContent).toContain('admin@ejemplo.com');
     expect(fixture.nativeElement.textContent).toContain('06/10/2026');
     expect(fixture.nativeElement.textContent).toContain('14:00:00');
@@ -105,7 +107,7 @@ describe('Característica: consulta de bitácora HU007', () => {
       hasta: '2026-10-06',
     });
     http.expectNone((req) => req.url === '/api/v1/auditoria');
-    // Cuando aplica filtros y luego pasa a la siguiente página
+
     page.aplicarFiltros();
     let request = http.expectOne((req) => req.url === '/api/v1/auditoria');
     expect(request.request.params.get('usuarioEmail')).toBe('admin@ejemplo.com');
@@ -115,7 +117,7 @@ describe('Característica: consulta de bitácora HU007', () => {
     page.filtros.controls.usuarioEmail.setValue('otro@ejemplo.com');
     page.cambiarPagina({ page: 1 });
     request = http.expectOne((req) => req.url === '/api/v1/auditoria');
-    // Entonces se conserva la consulta aplicada, sin incorporar filtros aún no enviados
+
     expect(request.request.params.get('pagina')).toBe('1');
     expect(request.request.params.get('usuarioEmail')).toBe('admin@ejemplo.com');
     expect(request.request.params.get('desde')).toBe('2026-10-01T00:00:00-06:00');
@@ -123,24 +125,22 @@ describe('Característica: consulta de bitácora HU007', () => {
   });
 
   it('Escenario: cambiar tamaño reinicia la página y no ofrece más de 100 registros', () => {
-    // Dado un listado y un tamaño de 100
     responderPagina();
     expect(Math.max(...page.tamanios)).toBe(100);
     page.tamanio.setValue(100);
-    // Cuando cambia el tamaño
+
     page.cambiarTamanio();
     const request = http.expectOne((req) => req.url === '/api/v1/auditoria');
-    // Entonces consulta desde la primera página con el tamaño indicado
+
     expect(request.request.params.get('pagina')).toBe('0');
     expect(request.request.params.get('tamanio')).toBe('100');
     request.flush({ content: [], number: 0, size: 100, totalElements: 0, totalPages: 0 });
   });
 
   it('Escenario: validar rango invertido y correo antes de consultar', () => {
-    // Dado un rango invertido
     responderPagina();
     page.filtros.patchValue({ desde: '2026-10-07', hasta: '2026-10-06' });
-    // Cuando se aplica, entonces no se envía la petición
+
     page.aplicarFiltros();
     expect(page.filtros.hasError('rangoFechas')).toBe(true);
     http.expectNone((req) => req.url === '/api/v1/auditoria');
@@ -151,10 +151,9 @@ describe('Característica: consulta de bitácora HU007', () => {
   });
 
   it('Escenario: limpiar filtros elimina correo y fechas de la consulta', () => {
-    // Dado filtros en el formulario
     responderPagina();
     page.filtros.patchValue({ usuarioEmail: 'admin@ejemplo.com', desde: '2026-10-01' });
-    // Cuando los limpia, entonces vuelve al listado sin filtros
+
     page.limpiarFiltros();
     const request = http.expectOne((req) => req.url === '/api/v1/auditoria');
     expect(request.request.params.has('usuarioEmail')).toBe(false);
@@ -164,10 +163,9 @@ describe('Característica: consulta de bitácora HU007', () => {
   });
 
   it('Escenario: mostrar valores anteriores y posteriores en una tabla de texto segura', async () => {
-    // Dado un registro seleccionado
     responderPagina();
     page.abrirDetalle(registro);
-    // Cuando se obtiene el detalle
+
     http.expectOne('/api/v1/auditoria/registro-1').flush({
       ...registro,
       cambios: [
@@ -177,7 +175,7 @@ describe('Característica: consulta de bitácora HU007', () => {
     });
     fixture.detectChanges();
     await fixture.whenStable();
-    // Entonces se muestran las columnas legibles y los valores como texto, sin ejecutar HTML
+
     const tabla = document.querySelector('.cambios');
     expect(tabla?.textContent).toContain('auditoria.before');
     expect(tabla?.textContent).toContain('auditoria.after');
@@ -189,7 +187,6 @@ describe('Característica: consulta de bitácora HU007', () => {
   });
 
   it('Escenario: agrupar una creación y conservar los datos técnicos en una sección cerrada', async () => {
-    // Dado una creación con datos generales, ubicación, estado y campos técnicos
     responderPagina();
     page.abrirDetalle(registro);
     const cambios = [
@@ -203,11 +200,11 @@ describe('Característica: consulta de bitácora HU007', () => {
       'creadoEn',
       'campoNuevo',
     ].map((campo) => ({ campo, anterior: null, posterior: `valor-${campo}` }));
-    // Cuando se muestra el detalle
+
     http.expectOne('/api/v1/auditoria/registro-1').flush({ ...registro, accion: 'CREAR', cambios });
     fixture.detectChanges();
     await fixture.whenStable();
-    // Entonces se ocultan los identificadores territoriales sin alterar el detalle recibido
+
     expect(page.gruposDetalle().flatMap((grupo) => grupo.cambios)).toHaveLength(cambios.length - 3);
     expect(page.detalle()?.cambios).toEqual(cambios);
     const tecnico = document.querySelector<HTMLDetailsElement>('[data-grupo="tecnicos"]');
@@ -219,7 +216,7 @@ describe('Característica: consulta de bitácora HU007', () => {
     expect(document.querySelector('[data-grupo="otros"]')?.textContent).toContain(
       'valor-campoNuevo',
     );
-    // Cuando se despliega la sección, entonces sus valores permanecen disponibles
+
     tecnico!.open = true;
     expect(tecnico?.textContent).toContain('valor-creadoEn');
     expect(page.nombreCampo('municipio.nombre')).toBe(
@@ -228,8 +225,6 @@ describe('Característica: consulta de bitácora HU007', () => {
   });
 
   it('Escenario: identificar acciones ejecutadas por un proceso automático', () => {
-    // Dado un registro sin usuario y con la marca del proceso
-    // Cuando se muestra el listado, entonces se identifica al proceso
     responderPagina([
       { ...registro, usuarioId: null, usuarioEmail: null, procesoAutomatico: 'provision-admin' },
     ]);
@@ -238,24 +233,22 @@ describe('Característica: consulta de bitácora HU007', () => {
   });
 
   it('Escenario: una respuesta 403 muestra el acceso restringido y elimina el listado', () => {
-    // Dado una consulta con acceso revocado
     http
       .expectOne((req) => req.url === '/api/v1/auditoria')
       .flush({}, { status: 403, statusText: 'Forbidden' });
     fixture.detectChanges();
-    // Entonces la interfaz muestra la restricción sin conservar registros
+
     expect(page.pagina()).toBeNull();
     expect(fixture.nativeElement.textContent).toContain('auditoria.forbidden');
     expect(fixture.nativeElement.textContent).not.toContain('auditoria.retry');
   });
 
   it('Escenario: un fallo temporal permite reintentar el listado', () => {
-    // Dado una consulta que falla
     http
       .expectOne((req) => req.url === '/api/v1/auditoria')
       .flush({}, { status: 503, statusText: 'Unavailable' });
     expect(page.errorConsulta()).toBe('consulta');
-    // Cuando reintenta, entonces muestra la página obtenida
+
     page.cargarPagina();
     responderPagina();
     expect(page.errorConsulta()).toBeNull();
@@ -267,10 +260,10 @@ describe('Característica: consulta de bitácora HU007', () => {
     responderPagina();
     page.abrirDetalle(registro);
     const request = http.expectOne('/api/v1/auditoria/registro-1');
-    // Cuando se cierra antes de la respuesta
+
     page.cerrarDetalle();
     request.flush({ ...registro, cambios: [] });
-    // Entonces el detalle permanece cerrado y vacío
+
     expect(page.mostrarDetalle()).toBe(false);
     expect(page.detalle()).toBeNull();
   });
