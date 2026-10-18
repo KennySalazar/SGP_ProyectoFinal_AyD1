@@ -164,6 +164,7 @@ class VersionFormularioIntegrationTest {
         assertThrows(ApiException.class, () -> service.publicar(v1.id(), null, ADMINISTRADOR_ID));
     assertThat(sinEscala.getCode()).isEqualTo("escala_incompleta");
     service.configurarEscala(v1.id(), escalaDePrueba(4), ADMINISTRADOR_ID);
+    configurarReglasDePrueba(v1.id());
     assertThat(service.obtenerPorId(v1.id()).pesos()).hasSize(45);
 
     VersionFormularioResponse v1Publicada = service.publicar(v1.id(), null, ADMINISTRADOR_ID);
@@ -256,6 +257,110 @@ class VersionFormularioIntegrationTest {
 
     var activoResp = service.obtenerActiva();
     assertThat(activoResp.codigo()).isEqualTo("SIECA-v2");
+  }
+
+  private void configurarReglasDePrueba(UUID versionId) throws Exception {
+    VersionFormularioResponse version = service.obtenerPorId(versionId);
+
+    com.fasterxml.jackson.databind.node.ObjectNode configuracion =
+            versiones
+                    .findById(versionId)
+                    .orElseThrow()
+                    .getReglasEvaluacionIc()
+                    .deepCopy();
+
+    com.fasterxml.jackson.databind.node.ObjectNode reglas =
+            (com.fasterxml.jackson.databind.node.ObjectNode)
+                    configuracion.get("reglas_evaluacion_ic");
+
+    reglas.set(
+            "agregacion",
+            objectMapper.readTree(
+                    """
+                    {
+                      "indicadores_de_un_elemento": "MAXIMO",
+                      "instancias_repetibles": "MAXIMO",
+                      "elementos_ausentes_portantes": 4,
+                      "elementos_ausentes_no_portantes": 4
+                    }
+                    """));
+
+    reglas.set(
+            "rangos_estado",
+            objectMapper.readTree(
+                    """
+                    {
+                      "BUENO": 75,
+                      "REGULAR": 50,
+                      "MALO": 0
+                    }
+                    """));
+
+    reglas.set(
+            "conversion_indicadores",
+            objectMapper.readTree(
+                    """
+                    {
+                      "booleanos": {
+                        "junta.falta_elemento=true": 4,
+                        "junta.falta_elemento=false": 0,
+                        "junta.junta_limpia=true": 0,
+                        "junta.junta_limpia=false": 4,
+                        "losa.buen_estado=true": 0,
+                        "losa.buen_estado=false": 4,
+                        "senal.existe=true": 0,
+                        "senal.existe=false": 4,
+                        "drenaje_aledano.existe=true": 0,
+                        "drenaje_aledano.existe=false": 4
+                      },
+                      "enumerados": {
+                        "drenaje.estado": {
+                          "LIMPIOS": 0,
+                          "OBSTRUIDOS": 4
+                        },
+                        "socavacion.nivel": {
+                          "NO_HAY": 0,
+                          "SIN_EXPOSICION": 1,
+                          "CON_EXPOSICION": 2,
+                          "ASENTAMIENTO_ESTRUCTURA": 4
+                        },
+                        "condicionesCauce": {
+                          "LIMPIO": 0,
+                          "ASOLVADO_SEDIMENTADO": 1,
+                          "EROSIONADO": 2,
+                          "OTRO": 4
+                        },
+                        "estado_bueno_malo": {
+                          "BUENO": 0,
+                          "MALO": 4
+                        }
+                      },
+                      "numericos": {
+                        "golpeado_longitud_m": {
+                          "umbrales_m": {
+                            "LEVE": 1,
+                            "MODERADO": 2,
+                            "SEVERO": 3
+                          }
+                        },
+                        "golpeados_cantidad": {
+                          "umbrales": {
+                            "LEVE": 1,
+                            "MODERADO": 2,
+                            "SEVERO": 3
+                          }
+                        }
+                      }
+                    }
+                    """));
+
+    service.actualizarBorrador(
+            versionId,
+            version.esquema(),
+            null,
+            configuracion,
+            null,
+            ADMINISTRADOR_ID);
   }
 
   private void configurarPesosDePrueba(UUID versionId, BigDecimal peso) {

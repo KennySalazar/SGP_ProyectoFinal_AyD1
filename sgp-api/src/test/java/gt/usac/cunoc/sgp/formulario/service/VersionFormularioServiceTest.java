@@ -481,13 +481,14 @@ class VersionFormularioServiceTest {
   }
 
   private VersionFormulario crearEntidad(
-      UUID id, String codigo, EstadoVersionFormulario estado, boolean activa) {
+          UUID id, String codigo, EstadoVersionFormulario estado, boolean activa) {
     try {
       JsonNode esquema = objectMapper.readTree("{\"type\":\"object\"}");
       JsonNode vinculos = objectMapper.readTree("{}");
+
       JsonNode reglas =
-          objectMapper.readTree(
-              """
+              objectMapper.readTree(
+                      """
                       {
                         "elementos": [
                           {
@@ -503,15 +504,26 @@ class VersionFormularioServiceTest {
                             "LEVE": 1,
                             "MODERADO": 2,
                             "SEVERO": 4
+                          },
+                          "agregacion": {
+                            "indicadores_de_un_elemento": "MAXIMO",
+                            "instancias_repetibles": "MAXIMO",
+                            "elementos_ausentes_portantes": 4,
+                            "elementos_ausentes_no_portantes": 4
+                          },
+                          "rangos_estado": {
+                            "BUENO": 75,
+                            "REGULAR": 50,
+                            "MALO": 0
                           }
                         }
                       }
                       """);
 
       return new VersionFormulario(
-          id, codigo, estado, activa, esquema, vinculos, reglas, null, usuarioId, fija, fija);
+              id, codigo, estado, activa, esquema, vinculos, reglas, null, usuarioId, fija, fija);
     } catch (Exception e) {
-      throw new RuntimeException(e);
+      throw new IllegalStateException("No fue posible construir la version de prueba", e);
     }
   }
 
@@ -667,5 +679,261 @@ class VersionFormularioServiceTest {
             BigDecimal.valueOf(2),
             "SEVERO",
             BigDecimal.valueOf(4)));
+  }
+
+  @Test
+  void publicarRechazaReglasPendientesSinDesactivarLaVersionActiva() {
+    UUID id = UUID.randomUUID();
+    VersionFormulario borrador = crearEntidad(id, "v1", EstadoVersionFormulario.BORRADOR, false);
+
+    com.fasterxml.jackson.databind.node.ObjectNode reglas =
+        (com.fasterxml.jackson.databind.node.ObjectNode)
+            borrador.getReglasEvaluacionIc().get("reglas_evaluacion_ic");
+
+    ((com.fasterxml.jackson.databind.node.ObjectNode) reglas.get("agregacion"))
+        .putNull("indicadores_de_un_elemento");
+
+    ConfiguracionIcElemento peso =
+        new ConfiguracionIcElemento(
+            UUID.randomUUID(), borrador, "/vigas", BigDecimal.ONE, "Vigas", fija);
+
+    when(versiones.findById(id)).thenReturn(Optional.of(borrador));
+    when(configuracionesIc.findAllByVersionFormularioId(id)).thenReturn(List.of(peso));
+
+    assertThatThrownBy(() -> service.publicar(id, null, usuarioId))
+        .isInstanceOfSatisfying(
+            ApiException.class,
+            error -> {
+              assertThat(error.getStatus()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+              assertThat(error.getCode()).isEqualTo("reglas_ic_invalidas");
+              assertThat(error.getMessage()).contains("agregacion.indicadores_de_un_elemento");
+            });
+
+    verify(versiones, org.mockito.Mockito.never()).desactivarTodas();
+    verify(versiones, org.mockito.Mockito.never()).saveAndFlush(any(VersionFormulario.class));
+
+    assertThat(borrador.getEstado()).isEqualTo(EstadoVersionFormulario.BORRADOR);
+    assertThat(borrador.isActiva()).isFalse();
+  }
+
+  @Test
+  void publicarRechazaConversionBooleanaIncompletaSinDesactivarLaVersionActiva()
+          throws Exception {
+    UUID id = UUID.randomUUID();
+    VersionFormulario borrador =
+            crearEntidad(id, "v1", EstadoVersionFormulario.BORRADOR, false);
+
+    com.fasterxml.jackson.databind.node.ObjectNode configuracion =
+            (com.fasterxml.jackson.databind.node.ObjectNode) borrador.getReglasEvaluacionIc();
+
+    configuracion.set(
+            "elementos",
+            objectMapper.readTree(
+                    """
+                    [
+                      {
+                        "elemento_ref": "/otros/senalizacion/informativa",
+                        "indicadores": ["existe"]
+                      }
+                    ]
+                    """));
+
+    com.fasterxml.jackson.databind.node.ObjectNode reglas =
+            (com.fasterxml.jackson.databind.node.ObjectNode)
+                    configuracion.get("reglas_evaluacion_ic");
+
+    reglas.set(
+            "conversion_indicadores",
+            objectMapper.readTree(
+                    """
+                    {
+                      "booleanos": {
+                        "senal.existe=false": 4
+                      }
+                    }
+                    """));
+
+    ConfiguracionIcElemento peso =
+            new ConfiguracionIcElemento(
+                    UUID.randomUUID(),
+                    borrador,
+                    "/otros/senalizacion/informativa",
+                    BigDecimal.ONE,
+                    "Senalizacion informativa",
+                    fija);
+
+    when(versiones.findById(id)).thenReturn(Optional.of(borrador));
+    when(configuracionesIc.findAllByVersionFormularioId(id)).thenReturn(List.of(peso));
+
+    assertThatThrownBy(() -> service.publicar(id, null, usuarioId))
+            .isInstanceOfSatisfying(
+                    ApiException.class,
+                    error -> {
+                      assertThat(error.getStatus()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+                      assertThat(error.getCode()).isEqualTo("conversiones_ic_invalidas");
+                      assertThat(error.getMessage()).contains("senal.existe=true");
+                    });
+
+    verify(versiones, org.mockito.Mockito.never()).desactivarTodas();
+    verify(versiones, org.mockito.Mockito.never()).saveAndFlush(any(VersionFormulario.class));
+    assertThat(borrador.getEstado()).isEqualTo(EstadoVersionFormulario.BORRADOR);
+  }
+  @Test
+  void publicarRechazaUmbralesDesordenadosSinDesactivarLaVersionActiva()
+          throws Exception {
+    UUID id = UUID.randomUUID();
+    VersionFormulario borrador =
+            crearEntidad(id, "v1", EstadoVersionFormulario.BORRADOR, false);
+
+    com.fasterxml.jackson.databind.node.ObjectNode configuracion =
+            (com.fasterxml.jackson.databind.node.ObjectNode) borrador.getReglasEvaluacionIc();
+
+    configuracion.set(
+            "elementos",
+            objectMapper.readTree(
+                    """
+                    [
+                      {
+                        "elemento_ref": "/elementos_no_estructurales/pasamanos_barandal",
+                        "indicadores": ["golpeado_longitud_m"]
+                      }
+                    ]
+                    """));
+
+    com.fasterxml.jackson.databind.node.ObjectNode reglas =
+            (com.fasterxml.jackson.databind.node.ObjectNode)
+                    configuracion.get("reglas_evaluacion_ic");
+
+    reglas.set(
+            "conversion_indicadores",
+            objectMapper.readTree(
+                    """
+                    {
+                      "numericos": {
+                        "golpeado_longitud_m": {
+                          "umbrales_m": {
+                            "LEVE": 2,
+                            "MODERADO": 1,
+                            "SEVERO": 3
+                          }
+                        }
+                      }
+                    }
+                    """));
+
+    ConfiguracionIcElemento peso =
+            new ConfiguracionIcElemento(
+                    UUID.randomUUID(),
+                    borrador,
+                    "/elementos_no_estructurales/pasamanos_barandal",
+                    BigDecimal.ONE,
+                    "Pasamanos",
+                    fija);
+
+    when(versiones.findById(id)).thenReturn(Optional.of(borrador));
+    when(configuracionesIc.findAllByVersionFormularioId(id)).thenReturn(List.of(peso));
+
+    assertThatThrownBy(() -> service.publicar(id, null, usuarioId))
+            .isInstanceOfSatisfying(
+                    ApiException.class,
+                    error -> {
+                      assertThat(error.getStatus()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+                      assertThat(error.getCode()).isEqualTo("conversiones_ic_invalidas");
+                      assertThat(error.getMessage())
+                              .contains("golpeado_longitud_m.umbrales_m")
+                              .contains("0 < LEVE < MODERADO < SEVERO");
+                    });
+
+    verify(versiones, org.mockito.Mockito.never()).desactivarTodas();
+    verify(versiones, org.mockito.Mockito.never()).saveAndFlush(any(VersionFormulario.class));
+    assertThat(borrador.getEstado()).isEqualTo(EstadoVersionFormulario.BORRADOR);
+    assertThat(borrador.isActiva()).isFalse();
+  }
+  @Test
+  void publicarPermiteConversionesCompletasParaLosIndicadoresDelCatalogo()
+          throws Exception {
+    UUID id = UUID.randomUUID();
+    VersionFormulario borrador =
+            crearEntidad(id, "v1", EstadoVersionFormulario.BORRADOR, false);
+
+    com.fasterxml.jackson.databind.node.ObjectNode configuracion =
+            (com.fasterxml.jackson.databind.node.ObjectNode) borrador.getReglasEvaluacionIc();
+
+    configuracion.set(
+            "elementos",
+            objectMapper.readTree(
+                    """
+                    [
+                      {
+                        "elemento_ref": "/otros/senalizacion/informativa",
+                        "indicadores": ["existe", "estado"]
+                      },
+                      {
+                        "elemento_ref": "/elementos_no_estructurales/pasamanos_barandal",
+                        "indicadores": ["golpeado_longitud_m"]
+                      }
+                    ]
+                    """));
+
+    com.fasterxml.jackson.databind.node.ObjectNode reglas =
+            (com.fasterxml.jackson.databind.node.ObjectNode)
+                    configuracion.get("reglas_evaluacion_ic");
+
+    reglas.set(
+            "conversion_indicadores",
+            objectMapper.readTree(
+                    """
+                    {
+                      "booleanos": {
+                        "senal.existe=true": 0,
+                        "senal.existe=false": 4
+                      },
+                      "enumerados": {
+                        "estado_bueno_malo": {
+                          "BUENO": 0,
+                          "MALO": 4
+                        }
+                      },
+                      "numericos": {
+                        "golpeado_longitud_m": {
+                          "umbrales_m": {
+                            "LEVE": 1,
+                            "MODERADO": 2,
+                            "SEVERO": 3
+                          }
+                        }
+                      }
+                    }
+                    """));
+
+    List<ConfiguracionIcElemento> pesos =
+            List.of(
+                    new ConfiguracionIcElemento(
+                            UUID.randomUUID(),
+                            borrador,
+                            "/otros/senalizacion/informativa",
+                            BigDecimal.ONE,
+                            "Senalizacion informativa",
+                            fija),
+                    new ConfiguracionIcElemento(
+                            UUID.randomUUID(),
+                            borrador,
+                            "/elementos_no_estructurales/pasamanos_barandal",
+                            BigDecimal.ONE,
+                            "Pasamanos",
+                            fija));
+
+    when(versiones.findById(id)).thenReturn(Optional.of(borrador));
+    when(configuracionesIc.findAllByVersionFormularioId(id)).thenReturn(pesos);
+    when(versiones.saveAndFlush(any(VersionFormulario.class)))
+            .thenAnswer(invocation -> invocation.getArgument(0));
+
+    VersionFormularioResponse respuesta = service.publicar(id, null, usuarioId);
+
+    verify(versiones).desactivarTodas();
+    verify(versiones).saveAndFlush(borrador);
+    assertThat(respuesta.estado()).isEqualTo(EstadoVersionFormulario.PUBLICADA);
+    assertThat(respuesta.activa()).isTrue();
+    assertThat(respuesta.publicadoPorId()).isEqualTo(usuarioId);
   }
 }
