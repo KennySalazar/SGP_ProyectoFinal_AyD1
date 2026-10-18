@@ -105,7 +105,18 @@
       }
     </div>
     <div class="acciones">
-      @if (inspeccion.estado === 'BORRADOR') {
+      @if (inspeccion.autorId === auth.user()?.id && inspeccion.estado !== 'PUBLICADA' &&
+      inspeccion.estado !== 'RECHAZADA') {
+      <button
+        pButton
+        type="button"
+        severity="secondary"
+        [outlined]="true"
+        (click)="inspeccionIc.set(inspeccion)"
+      >
+        {{ 'inspecciones.confirmacionIc.titulo' | transloco }}
+      </button>
+      } @if (inspeccion.estado === 'BORRADOR') {
       <button
         pButton
         type="button"
@@ -249,3 +260,19 @@
   [puente]="puenteSeleccionado()"
   (inspeccionIniciada)="cargar()"
 />
+
+<p-dialog
+  [visible]="!!inspeccionIc()"
+  (visibleChange)="!$event && !operandoIc() && inspeccionIc.set(null)"
+  [modal]="true"
+  [closable]="!operandoIc()"
+  [closeOnEscape]="!operandoIc()"
+  [draggable]="false"
+  [style]="{ width: '94vw', maxWidth: '48rem' }"
+  [header]="'inspecciones.confirmacionIc.titulo' | transloco"
+>
+  @if (inspeccionIc(); as inspeccion) {
+  <p>{{ inspeccion.nombrePuente }} ({{ inspeccion.codigoPuente }})</p>
+  <app-confirmacion-estado-ic [inspeccionId]="inspeccion.id" (ocupado)="operandoIc.set($event)" />
+  }
+</p-dialog>

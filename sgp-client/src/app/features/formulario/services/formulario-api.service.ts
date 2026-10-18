@@ -31,7 +31,6 @@ export class FormularioApiService {
     return this.http.get<FormularioActivo>('/api/v1/formularios/activo');
   }
 
-  /** Esquema de una versión ya publicada, para mostrar inspecciones hechas con versiones anteriores. */
   obtenerEsquemaPublicado(id: string): Observable<FormularioActivo> {
     return this.http.get<FormularioActivo>(`/api/v1/formularios/${encodeURIComponent(id)}/esquema`);
   }
@@ -87,6 +86,23 @@ export class FormularioApiService {
     return this.http.post<VersionFormulario>(
       `/api/v1/formularios/${encodeURIComponent(id)}/publicar`,
       request ?? {},
+    );
+  }
+
+  configurarEscala(
+    id: string,
+    request: {
+      valores: {
+        NO_PRESENTA: number;
+        LEVE: number;
+        MODERADO: number;
+        SEVERO: number;
+      };
+    },
+  ): Observable<VersionFormulario> {
+    return this.http.put<VersionFormulario>(
+      `/api/v1/formularios/${encodeURIComponent(id)}/escala`,
+      request,
     );
   }
 }

@@ -1,6 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { Pipe, PipeTransform, signal } from '@angular/core';
-import { ActivatedRoute, convertToParamMap } from '@angular/router';
+import { ActivatedRoute, Router, convertToParamMap } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
 import { of, throwError } from 'rxjs';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
@@ -15,8 +15,8 @@ import { ReporteFotograficoComponent } from '../../components/reporte-fotografic
 import { FotografiasLocalesService } from '../../../../offline/services/fotografias-locales.service';
 import { ProcesadorFotografiasService } from '../../services/procesador-fotografias.service';
 import { By } from '@angular/platform-browser';
+import { ConfirmacionEstadoIcComponent } from '../../components/confirmacion-estado-ic/confirmacion-estado-ic.component';
 import { CompletarInspeccionPage } from './completar-inspeccion.page';
-
 @Pipe({ name: 'transloco', standalone: true })
 class MockTranslocoPipe implements PipeTransform {
   transform(key: string, params?: Record<string, unknown>): string {
@@ -26,11 +26,9 @@ class MockTranslocoPipe implements PipeTransform {
     return key;
   }
 }
-
 describe('CompletarInspeccionPage', () => {
   let fixture: ComponentFixture<CompletarInspeccionPage>;
   let component: CompletarInspeccionPage;
-
   const mockBorrador: InspeccionBorradorResponse = {
     id: 'inspeccion-123',
     puenteId: 'puente-456',
@@ -131,7 +129,6 @@ describe('CompletarInspeccionPage', () => {
       etiqueta: 'Preliminar',
     },
   };
-
   const mockInspeccionApi = {
     obtenerBorrador: vi.fn(),
     guardarBorrador: vi.fn(),
@@ -139,21 +136,17 @@ describe('CompletarInspeccionPage', () => {
     publicar: vi.fn(),
     listarFotografias: vi.fn(),
   };
-
   const colegiadoPendiente = signal(false);
   const mockApiErrors = { lastMessage: signal<string | null>(null), clear: vi.fn() };
-
   const mockFormularioApi = {
     obtenerEsquemaPublicado: vi.fn(),
     obtenerActiva: vi.fn(),
   };
-
   const mockActivatedRoute = {
     snapshot: {
       paramMap: convertToParamMap({ id: 'inspeccion-123' }),
     },
   };
-
   beforeEach(() => {
     mockInspeccionApi.obtenerBorrador.mockReset();
     mockInspeccionApi.guardarBorrador.mockReset();
@@ -164,7 +157,6 @@ describe('CompletarInspeccionPage', () => {
     colegiadoPendiente.set(false);
     mockFormularioApi.obtenerEsquemaPublicado.mockReset();
     mockFormularioApi.obtenerActiva.mockReset();
-
     mockInspeccionApi.obtenerBorrador.mockReturnValue(of(mockBorrador));
     mockFormularioApi.obtenerEsquemaPublicado.mockReturnValue(
       of({
@@ -180,7 +172,6 @@ describe('CompletarInspeccionPage', () => {
         publicadoEn: '2026-01-01T00:00:00Z',
       }),
     );
-
     TestBed.configureTestingModule({
       imports: [CompletarInspeccionPage],
       providers: [
@@ -200,33 +191,27 @@ describe('CompletarInspeccionPage', () => {
         { provide: TranslocoService, useValue: { translate: (key: string) => key } },
       ],
     });
-
     TestBed.overrideComponent(CompletarInspeccionPage, {
       remove: { imports: [TranslocoPipe] },
       add: { imports: [MockTranslocoPipe] },
     });
-    // El formulario dinámico tiene sus propias pruebas; aquí solo importa la pantalla.
     TestBed.overrideComponent(FormularioDinamicoComponent, { set: { template: '' } });
     TestBed.overrideComponent(ReporteFotograficoComponent, { set: { template: '' } });
+    TestBed.overrideComponent(ConfirmacionEstadoIcComponent, { set: { template: '' } });
 
+    vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
     fixture = TestBed.createComponent(CompletarInspeccionPage);
     component = fixture.componentInstance;
   });
-
   it('carga la información del borrador y restaura datos previamente guardados', () => {
     fixture.detectChanges();
-
-    expect(mockInspeccionApi.obtenerBorrador).toHaveBeenCalledWith('inspeccion-123');
+    expect(mockInspeccionApi.obtenerBorrador).toHaveBeenCalledWith('inspeccion-123', true);
     expect(component.borrador()).toEqual(mockBorrador);
     expect(component.cargando()).toBe(false);
-
-    // Progreso de 8 secciones presente
     const progreso = component.borrador()?.progreso;
     expect(progreso?.secciones).toHaveLength(8);
     expect(progreso?.totalCamposRequeridos).toBe(79);
     expect(progreso?.totalCamposCompletados).toBe(15);
-
-    // IC preliminar presente
     expect(component.borrador()?.icPreliminar?.etiqueta).toBe('Preliminar');
     expect(component.borrador()?.icPreliminar?.indice).toBe(82.5);
   });
@@ -251,7 +236,6 @@ describe('CompletarInspeccionPage', () => {
 
   it('guarda parcialmente el borrador y actualiza versión y última actividad', () => {
     fixture.detectChanges();
-
     const borradorActualizado: InspeccionBorradorResponse = {
       ...mockBorrador,
       version: 2,
@@ -262,11 +246,8 @@ describe('CompletarInspeccionPage', () => {
         porcentajeTotal: 22.78,
       },
     };
-
     mockInspeccionApi.guardarBorrador.mockReturnValue(of(borradorActualizado));
-
     component.guardarBorrador();
-
     expect(mockInspeccionApi.guardarBorrador).toHaveBeenCalledWith(
       'inspeccion-123',
       expect.objectContaining<Partial<GuardarBorradorRequest>>({
@@ -274,63 +255,52 @@ describe('CompletarInspeccionPage', () => {
         fechaInspeccion: '2026-10-15',
       }),
     );
-
     expect(component.borrador()?.version).toBe(2);
     expect(component.borrador()?.progreso.totalCamposCompletados).toBe(18);
     expect(component.mensajeExito()).toContain('guardado exitosamente');
     expect(component.errorGuardado()).toBeNull();
   });
-
   it('guarda automáticamente los cambios después de la pausa de escritura', () => {
     vi.useFakeTimers();
     fixture.detectChanges();
-    // Sin formulario en pantalla se guardan los datos recibidos en memoria.
     component.esquema.set(null);
     fixture.detectChanges();
     mockInspeccionApi.guardarBorrador.mockReturnValue(of(mockBorrador));
-
     component.onValorChange(mockBorrador.datos!);
     component.onValorChange({ identificacion: { nombre_puente: 'Puente actualizado' } });
     vi.advanceTimersByTime(1199);
     expect(mockInspeccionApi.guardarBorrador).not.toHaveBeenCalled();
-
     vi.advanceTimersByTime(1);
     expect(mockInspeccionApi.guardarBorrador).toHaveBeenCalledWith(
       'inspeccion-123',
       expect.objectContaining({
         version: 1,
-        datos: { identificacion: { nombre_puente: 'Puente actualizado' } },
+        datos: {
+          identificacion: { nombre_puente: 'Puente actualizado', fecha_inspeccion: '2026-10-15' },
+        },
       }),
     );
     expect(component.estadoAutoguardado()).toBe('guardado');
     vi.useRealTimers();
   });
-
   it('maneja error 404 al cargar si el borrador no existe o no tiene permisos', () => {
     mockInspeccionApi.obtenerBorrador.mockReturnValue(
       throwError(() => new HttpErrorResponse({ status: 404 })),
     );
-
     fixture.detectChanges();
-
     expect(component.cargando()).toBe(false);
     expect(component.errorCarga()).toContain('no tiene permisos para acceder');
   });
-
   it('maneja error 403 si el usuario no es el autor del borrador', () => {
     mockInspeccionApi.obtenerBorrador.mockReturnValue(
       throwError(() => new HttpErrorResponse({ status: 403 })),
     );
-
     fixture.detectChanges();
-
     expect(component.cargando()).toBe(false);
     expect(component.errorCarga()).toContain('Solo el autor');
   });
-
   it('maneja conflicto 409 de concurrencia al guardar y preserva datos locales', () => {
     fixture.detectChanges();
-
     mockInspeccionApi.guardarBorrador.mockReturnValue(
       throwError(
         () =>
@@ -343,52 +313,42 @@ describe('CompletarInspeccionPage', () => {
           }),
       ),
     );
-
     component.guardarBorrador();
-
     expect(component.guardando()).toBe(false);
     expect(component.errorGuardado()).toContain('Conflicto de concurrencia');
-    // Mantiene los datos en memoria intactos
     expect(component.borrador()?.version).toBe(1);
   });
-
   it('maneja error 422 de fecha futura', () => {
     fixture.detectChanges();
-
     component.fechaInspeccion.set('2099-01-01');
     component.guardarBorrador();
-
     expect(component.errorGuardado()).toContain('posterior a la fecha actual');
     expect(mockInspeccionApi.guardarBorrador).not.toHaveBeenCalled();
   });
-
   describe('HU-026: enviar o publicar la inspección', () => {
     function boton(): HTMLButtonElement | null {
       return fixture.nativeElement.querySelector('.btn-accion-final');
     }
-
     it('el Catedrático publica tras confirmar y ve el resultado', () => {
       mockInspeccionApi.publicar.mockReturnValue(
         of({ id: 'inspeccion-123', puenteId: 'puente-456', estado: 'PUBLICADA' }),
       );
       fixture.detectChanges();
-
       expect(component.accionFinal()).toBe('publicar');
       expect(boton()?.textContent).toContain('inspecciones.transicion.publicar');
-
       component.abrirConfirmacion();
       expect(component.confirmandoAccion()).toBe(true);
       expect(mockInspeccionApi.publicar).not.toHaveBeenCalled();
-
       component.confirmarAccion();
       fixture.detectChanges();
-
       expect(mockInspeccionApi.publicar).toHaveBeenCalledWith('inspeccion-123');
+      expect(TestBed.inject(Router).navigate).toHaveBeenCalledWith(['/puentes', 'puente-456'], {
+        replaceUrl: true,
+      });
       expect(mockInspeccionApi.enviar).not.toHaveBeenCalled();
       expect(component.confirmandoAccion()).toBe(false);
       expect(fixture.nativeElement.textContent).toContain('inspecciones.transicion.publicada');
     });
-
     it('el Estudiante envía a revisión', () => {
       mockInspeccionApi.obtenerBorrador.mockReturnValue(
         of({ ...mockBorrador, rolAutor: 'ESTUDIANTE' }),
@@ -397,16 +357,13 @@ describe('CompletarInspeccionPage', () => {
         of({ id: 'inspeccion-123', puenteId: 'puente-456', estado: 'ENVIADA' }),
       );
       fixture.detectChanges();
-
       expect(component.accionFinal()).toBe('enviar');
       component.abrirConfirmacion();
       component.confirmarAccion();
       fixture.detectChanges();
-
       expect(mockInspeccionApi.enviar).toHaveBeenCalledWith('inspeccion-123');
       expect(fixture.nativeElement.textContent).toContain('inspecciones.transicion.enviada');
     });
-
     it('un 422 detalla por separado los campos y las fotografías que faltan', () => {
       mockInspeccionApi.publicar.mockReturnValue(
         throwError(
@@ -426,11 +383,9 @@ describe('CompletarInspeccionPage', () => {
         ),
       );
       fixture.detectChanges();
-
       component.abrirConfirmacion();
       component.confirmarAccion();
       fixture.detectChanges();
-
       expect(component.errorAccion()).toEqual({
         mensaje: 'Faltan 1 campos obligatorios y 2 categorias de fotografia.',
         campos: [{ campo: 'subestructura', mensaje: 'El campo subestructura es obligatorio' }],
@@ -440,24 +395,20 @@ describe('CompletarInspeccionPage', () => {
       expect(component.resultadoAccion()).toBeNull();
       expect(mockApiErrors.clear).toHaveBeenCalled();
     });
-
     it('no permite la acción mientras hay cambios sin guardar', () => {
       fixture.detectChanges();
       component.estadoAutoguardado.set('pendiente');
       fixture.detectChanges();
-
       expect(boton()?.disabled).toBe(true);
       component.abrirConfirmacion();
       expect(component.confirmandoAccion()).toBe(false);
     });
-
     it('el Profesional externo con colegiado pendiente no puede publicar', () => {
       mockInspeccionApi.obtenerBorrador.mockReturnValue(
         of({ ...mockBorrador, rolAutor: 'PROFESIONAL_EXTERNO' }),
       );
       colegiadoPendiente.set(true);
       fixture.detectChanges();
-
       expect(component.colegiadoPendiente()).toBe(true);
       expect(boton()?.disabled).toBe(true);
       expect(fixture.nativeElement.textContent).toContain(
@@ -466,13 +417,138 @@ describe('CompletarInspeccionPage', () => {
       component.abrirConfirmacion();
       expect(component.confirmandoAccion()).toBe(false);
     });
-
     it('una inspección que ya no está en borrador no ofrece la acción', () => {
       mockInspeccionApi.obtenerBorrador.mockReturnValue(of({ ...mockBorrador, estado: 'ENVIADA' }));
       fixture.detectChanges();
-
       expect(component.accionFinal()).toBeNull();
       expect(boton()).toBeNull();
     });
+  });
+  it('bloquea publicacion mientras se confirma el IC', () => {
+    fixture.detectChanges();
+    component.operandoIc.set(true);
+    component.abrirConfirmacion();
+    component.confirmarAccion();
+    expect(component.confirmandoAccion()).toBe(false);
+    expect(mockInspeccionApi.publicar).not.toHaveBeenCalled();
+  });
+  it('vuelve a comprobar cambios pendientes despues de abrir el dialogo', () => {
+    fixture.detectChanges();
+    component.abrirConfirmacion();
+    component.estadoAutoguardado.set('pendiente');
+    component.confirmarAccion();
+    expect(mockInspeccionApi.publicar).not.toHaveBeenCalled();
+  });
+  it('invalida la confirmacion ante conflicto de calculo durante publicacion', () => {
+    fixture.detectChanges();
+    component.abrirConfirmacion();
+    mockInspeccionApi.publicar.mockReturnValue(
+      throwError(
+        () =>
+          new HttpErrorResponse({
+            status: 409,
+            error: {
+              code: 'confirmacion_ic_desactualizada',
+              detail: 'Revisa el calculo actualizado',
+            },
+          }),
+      ),
+    );
+    component.confirmarAccion();
+    expect(component.revisionIc()).toBe(1);
+    expect(component.confirmandoAccion()).toBe(false);
+    expect(component.resultadoAccion()).toBeNull();
+    expect(component.borrador()?.estado).toBe('BORRADOR');
+  });
+  it('no guarda el borrador despues de una publicacion correcta', () => {
+    fixture.detectChanges();
+    component.abrirConfirmacion();
+    mockInspeccionApi.publicar.mockReturnValue(
+      of({ id: 'inspeccion-123', puenteId: 'puente-456', estado: 'PUBLICADA' }),
+    );
+    component.confirmarAccion();
+    component.guardarBorrador();
+    expect(component.borrador()?.estado).toBe('PUBLICADA');
+    expect(mockInspeccionApi.guardarBorrador).not.toHaveBeenCalled();
+  });
+  it('conserva la fecha principal al cargar una identificacion con fecha distinta', () => {
+    mockInspeccionApi.obtenerBorrador.mockReturnValue(
+      of({
+        ...mockBorrador,
+        datos: { identificacion: { fecha_inspeccion: '2026-10-18', ruta: 'P01' } },
+      }),
+    );
+    fixture.detectChanges();
+    expect(component.valoresIniciales()?.['identificacion']).toEqual(
+      expect.objectContaining({
+        fecha_inspeccion: '2026-10-15',
+        ruta: 'P01',
+      }),
+    );
+  });
+  it('guarda la misma fecha en datos, identificacion y encabezado', () => {
+    fixture.detectChanges();
+    component.esquema.set(null);
+    fixture.detectChanges();
+    mockInspeccionApi.guardarBorrador.mockReturnValue(of(mockBorrador));
+    component.onValorChange({ identificacion: { fecha_inspeccion: '2026-10-14', ruta: 'P01' } });
+    component.guardarBorrador();
+    expect(mockInspeccionApi.guardarBorrador).toHaveBeenCalledWith(
+      'inspeccion-123',
+      expect.objectContaining({
+        fechaInspeccion: '2026-10-14',
+        identificacionCapturada: expect.objectContaining({
+          fecha_inspeccion: '2026-10-14',
+          ruta: 'P01',
+        }),
+        datos: expect.objectContaining({
+          identificacion: expect.objectContaining({ fecha_inspeccion: '2026-10-14' }),
+        }),
+      }),
+    );
+  });
+  it('integra la confirmacion del IC y el reporte fotografico para el autor', async () => {
+    fixture.detectChanges();
+    await fixture.whenStable();
+    const confirmacion = fixture.debugElement.query(By.directive(ConfirmacionEstadoIcComponent))
+      .componentInstance as ConfirmacionEstadoIcComponent;
+    const reporte = fixture.debugElement.query(By.directive(ReporteFotograficoComponent))
+      .componentInstance as ReporteFotograficoComponent;
+    expect(confirmacion.inspeccionId()).toBe(mockBorrador.id);
+    expect(reporte.inspeccion().id).toBe(mockBorrador.id);
+    confirmacion.ocupado.emit(true);
+    fixture.detectChanges();
+    expect(component.operandoIc()).toBe(true);
+    const boton = fixture.nativeElement.querySelector('.btn-accion-final') as HTMLButtonElement;
+    expect(boton.disabled).toBe(true);
+    component.abrirConfirmacion();
+    expect(component.confirmandoAccion()).toBe(false);
+    confirmacion.ocupado.emit(false);
+    fixture.detectChanges();
+    expect(boton.disabled).toBe(false);
+  });
+
+  it('vuelve a comprobar cargas fotograficas antes de ejecutar la publicacion', async () => {
+    fixture.detectChanges();
+    await fixture.whenStable();
+    component.abrirConfirmacion();
+    expect(component.confirmandoAccion()).toBe(true);
+    const reporte = fixture.debugElement.query(By.directive(ReporteFotograficoComponent))
+      .componentInstance as ReporteFotograficoComponent;
+    reporte.ocupado.set(true);
+    component.confirmarAccion();
+    expect(mockInspeccionApi.publicar).not.toHaveBeenCalled();
+    expect(mockInspeccionApi.enviar).not.toHaveBeenCalled();
+  });
+  it('conserva el editor si la publicacion es rechazada', () => {
+    mockInspeccionApi.publicar.mockReturnValue(
+      throwError(() => new HttpErrorResponse({ status: 422, error: { detail: 'Faltan datos' } })),
+    );
+    fixture.detectChanges();
+    component.abrirConfirmacion();
+    component.confirmarAccion();
+    expect(TestBed.inject(Router).navigate).not.toHaveBeenCalled();
+    expect(component.borrador()?.estado).toBe('BORRADOR');
+    expect(component.errorAccion()?.mensaje).toBe('Faltan datos');
   });
 });

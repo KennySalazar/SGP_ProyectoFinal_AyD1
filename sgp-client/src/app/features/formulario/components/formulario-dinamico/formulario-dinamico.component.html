@@ -163,15 +163,12 @@
             <i class="pi pi-arrow-left" aria-hidden="true"></i>
             {{ 'formulario.dinamico.previous' | transloco }}
           </button>
-          <button
-            pButton
-            type="button"
-            [disabled]="indiceActivo() === entradas().length - 1"
-            (click)="irA(indiceActivo() + 1)"
-          >
-            {{ 'formulario.dinamico.next' | transloco }}
-            <i class="pi pi-arrow-right" aria-hidden="true"></i>
-          </button>
+          @if (indiceActivo() < entradas().length - 1) {
+            <button pButton type="button" (click)="irA(indiceActivo() + 1)">
+              {{ 'formulario.dinamico.next' | transloco }}
+              <i class="pi pi-arrow-right" aria-hidden="true"></i>
+            </button>
+          }
         </footer>
       }
     </div>

@@ -1,0 +1,129 @@
+<section class="surface-card confirmacion-ic" aria-labelledby="confirmacion-ic-titulo">
+  <h2 id="confirmacion-ic-titulo">{{ 'inspecciones.confirmacionIc.titulo' | transloco }}</h2>
+  <p>{{ 'inspecciones.confirmacionIc.nota' | transloco }}</p>
+  @if (bloqueado()) {
+    <p role="status">{{ 'inspecciones.confirmacionIc.guardarPrimero' | transloco }}</p>
+  }
+  <button
+    pButton
+    type="button"
+    severity="secondary"
+    [outlined]="true"
+    (click)="consultar()"
+    [disabled]="bloqueado() || procesando() || restringido()"
+  >
+    {{
+      (procesando()
+        ? 'inspecciones.confirmacionIc.procesando'
+        : 'inspecciones.confirmacionIc.consultar'
+      ) | transloco
+    }}
+  </button>
+  @if (error(); as mensaje) {
+    <p class="error" role="alert">{{ mensaje | transloco }}</p>
+  }
+  @if (calculo(); as c) {
+    <dl>
+      <dt>{{ 'inspecciones.confirmacionIc.indice' | transloco }}</dt>
+      <dd>{{ c.indiceCalculado }}</dd>
+      <dt>{{ 'inspecciones.confirmacionIc.calculado' | transloco }}</dt>
+      <dd class="estado" [attr.data-estado]="c.estadoCalculado">
+        {{ 'inspecciones.confirmacionIc.estados.' + c.estadoCalculado | transloco }}
+      </dd>
+      <dt>{{ 'inspecciones.confirmacionIc.version' | transloco }}</dt>
+      <dd>{{ c.codigoFormulario }} / {{ c.versionAlgoritmo }}</dd>
+    </dl>
+    @if (c.condicionesAnulacion.length) {
+      <div class="criticas" role="note">
+        <strong>{{ 'inspecciones.confirmacionIc.critica' | transloco }}</strong>
+        <ul>
+          @for (condicion of c.condicionesAnulacion; track $index) {
+            <li>{{ condicion.descripcion }} ({{ condicion.elementoRef }})</li>
+          }
+        </ul>
+      </div>
+    }
+    <form [formGroup]="form" (ngSubmit)="guardar()">
+      <label for="ic-estado">{{ 'inspecciones.confirmacionIc.confirmado' | transloco }}</label>
+      <p-select
+        inputId="ic-estado"
+        formControlName="estado"
+        [options]="estados"
+        optionLabel="label"
+        optionValue="value"
+      />
+      <label for="ic-justificacion">{{
+        'inspecciones.confirmacionIc.justificacion' | transloco
+      }}</label>
+      <textarea
+        pTextarea
+        id="ic-justificacion"
+        formControlName="justificacion"
+        rows="4"
+        maxlength="10000"
+        aria-describedby="ic-justificacion-nota"
+      ></textarea>
+      <small id="ic-justificacion-nota">{{
+        (requiereJustificacion()
+          ? 'inspecciones.confirmacionIc.justificacionRequerida'
+          : 'inspecciones.confirmacionIc.justificacionOpcional'
+        ) | transloco
+      }}</small>
+      <button
+        pButton
+        type="submit"
+        [disabled]="
+          bloqueado() ||
+          procesando() ||
+          restringido() ||
+          form.invalid ||
+          (requiereJustificacion() && !form.controls.justificacion.value.trim())
+        "
+      >
+        {{ 'inspecciones.confirmacionIc.guardar' | transloco }}
+      </button>
+    </form>
+    @if (respuesta()?.confirmacionVigente) {
+      <p role="status">
+        {{
+          'inspecciones.confirmacionIc.registro'
+            | transloco
+              : {
+                  autor: respuesta()?.realizadoPorId,
+                  fecha: (respuesta()?.realizadoEn | date: 'dd/MM/yyyy HH:mm'),
+                }
+        }}
+      </p>
+    } @else {
+      <p role="status">{{ 'inspecciones.confirmacionIc.sinConfirmar' | transloco }}</p>
+    }
+    @if (exito()) {
+      <p class="exito" role="status">{{ 'inspecciones.confirmacionIc.exito' | transloco }}</p>
+    }
+    <details>
+      <summary>{{ 'inspecciones.confirmacionIc.desglose' | transloco }}</summary>
+      <div class="tabla">
+        <table>
+          <thead>
+            <tr>
+              <th>{{ 'inspecciones.confirmacionIc.elemento' | transloco }}</th>
+              <th>{{ 'inspecciones.confirmacionIc.peso' | transloco }}</th>
+              <th>{{ 'inspecciones.confirmacionIc.calificacion' | transloco }}</th>
+              <th>{{ 'inspecciones.confirmacionIc.aporte' | transloco }}</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (elemento of c.desglose; track elemento.elementoRef) {
+              <tr>
+                <td>{{ elemento.elementoRef }}</td>
+                <td>{{ elemento.peso }}</td>
+                <td>{{ elemento.calificacionAgregada }}</td>
+                <td>{{ elemento.aportePonderado }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    </details>
+  }
+</section>
