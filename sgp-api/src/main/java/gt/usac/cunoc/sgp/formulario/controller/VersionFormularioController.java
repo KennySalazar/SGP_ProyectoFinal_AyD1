@@ -208,6 +208,17 @@ public class VersionFormularioController {
     return ResponseEntity.ok(service.configurarEscala(id, request, usuarioId(authentication)));
   }
 
+  @PutMapping("/{id}/reglas-criticas")
+  @PreAuthorize("hasRole('ADMINISTRADOR')")
+  public ResponseEntity<VersionFormularioResponse> configurarReglasCriticas(
+      @PathVariable UUID id,
+      @Valid @RequestBody
+          gt.usac.cunoc.sgp.formulario.dto.ConfigurarReglasCriticasIcRequest request,
+      Authentication authentication) {
+    return ResponseEntity.ok(
+        service.configurarReglasCriticas(id, request, usuarioId(authentication)));
+  }
+
   @PostMapping("/{id}/validar-respuestas")
   @PreAuthorize("isAuthenticated()")
   @Operation(

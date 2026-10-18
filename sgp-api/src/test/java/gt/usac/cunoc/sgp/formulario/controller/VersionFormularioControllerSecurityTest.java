@@ -210,11 +210,11 @@ class VersionFormularioControllerSecurityTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(
                     """
-                    {
-                      "codigo": "v1",
-                      "esquema": {"type": "object"}
-                    }
-                    """))
+                                    {
+                                      "codigo": "v1",
+                                      "esquema": {"type": "object"}
+                                    }
+                                    """))
         .andExpect(status().isCreated());
 
     verify(service).crear(any(CrearVersionRequest.class), eq(USUARIO_ID));
@@ -234,11 +234,11 @@ class VersionFormularioControllerSecurityTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(
                     """
-                    {
-                      "codigo": "v1",
-                      "esquema": {"type": "object"}
-                    }
-                    """))
+                                    {
+                                      "codigo": "v1",
+                                      "esquema": {"type": "object"}
+                                    }
+                                    """))
         .andExpect(status().isForbidden())
         .andExpect(jsonPath("$.code").value("access_denied"));
 
@@ -275,14 +275,14 @@ class VersionFormularioControllerSecurityTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(
                     """
-                                    [
-                                      {
-                                        "elementoRef": "/vigas",
-                                        "peso": 1,
-                                        "descripcion": "Vigas"
-                                      }
-                                    ]
-                                    """))
+                                                    [
+                                                      {
+                                                        "elementoRef": "/vigas",
+                                                        "peso": 1,
+                                                        "descripcion": "Vigas"
+                                                      }
+                                                    ]
+                                                    """))
         .andExpect(status().isOk());
 
     verify(service).calibrarPesos(eq(id), any(), eq(USUARIO_ID));
@@ -303,14 +303,14 @@ class VersionFormularioControllerSecurityTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(
                     """
-                                    [
-                                      {
-                                        "elementoRef": "/vigas",
-                                        "peso": 1,
-                                        "descripcion": "Vigas"
-                                      }
-                                    ]
-                                    """))
+                                                    [
+                                                      {
+                                                        "elementoRef": "/vigas",
+                                                        "peso": 1,
+                                                        "descripcion": "Vigas"
+                                                      }
+                                                    ]
+                                                    """))
         .andExpect(status().isForbidden())
         .andExpect(jsonPath("$.code").value("access_denied"));
 
@@ -329,15 +329,15 @@ class VersionFormularioControllerSecurityTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(
                     """
-                                    {
-                                      "valores": {
-                                        "NO_PRESENTA": 0,
-                                        "LEVE": 1,
-                                        "MODERADO": 2,
-                                        "SEVERO": 4
-                                      }
-                                    }
-                                    """))
+                                                    {
+                                                      "valores": {
+                                                        "NO_PRESENTA": 0,
+                                                        "LEVE": 1,
+                                                        "MODERADO": 2,
+                                                        "SEVERO": 4
+                                                      }
+                                                    }
+                                                    """))
         .andExpect(status().isOk());
 
     verify(service).configurarEscala(eq(id), any(), eq(USUARIO_ID));
@@ -358,15 +358,15 @@ class VersionFormularioControllerSecurityTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(
                     """
-                                    {
-                                      "valores": {
-                                        "NO_PRESENTA": 0,
-                                        "LEVE": 1,
-                                        "MODERADO": 2,
-                                        "SEVERO": 4
-                                      }
-                                    }
-                                    """))
+                                                    {
+                                                      "valores": {
+                                                        "NO_PRESENTA": 0,
+                                                        "LEVE": 1,
+                                                        "MODERADO": 2,
+                                                        "SEVERO": 4
+                                                      }
+                                                    }
+                                                    """))
         .andExpect(status().isForbidden())
         .andExpect(jsonPath("$.code").value("access_denied"));
 
@@ -381,6 +381,36 @@ class VersionFormularioControllerSecurityTest {
     authentication.setDetails(new JwtData("admin@cunoc.edu.gt", USUARIO_ID, rol, 0));
     SecurityContextHolder.getContext().setAuthentication(authentication);
     return authentication;
+  }
+
+  @Test
+  void permiteAdministradorConfigurarReglasCriticas() throws Exception {
+    var auth = autenticar(RoleName.ADMINISTRADOR);
+    UUID id = UUID.randomUUID();
+    mockMvc
+        .perform(
+            put("/api/v1/formularios/" + id + "/reglas-criticas")
+                .principal(auth)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"reglasAnulacion\":[]}"))
+        .andExpect(status().isOk());
+    verify(service).configurarReglasCriticas(eq(id), any(), eq(USUARIO_ID));
+  }
+
+  @ParameterizedTest
+  @EnumSource(
+      value = RoleName.class,
+      names = {"CATEDRATICO", "ESTUDIANTE", "PROFESIONAL_EXTERNO"})
+  void rechazaNoAdministradoresConfigurarReglasCriticas(RoleName rol) throws Exception {
+    var auth = autenticar(rol);
+    mockMvc
+        .perform(
+            put("/api/v1/formularios/" + UUID.randomUUID() + "/reglas-criticas")
+                .principal(auth)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"reglasAnulacion\":[]}"))
+        .andExpect(status().isForbidden());
+    verifyNoInteractions(service);
   }
 
   @Configuration

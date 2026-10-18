@@ -75,6 +75,8 @@ import org.testcontainers.utility.DockerImageName;
   AuditoriaMapperImpl.class,
   VersionFormularioAuditoriaSnapshotProvider.class,
   VersionFormularioService.class,
+  gt.usac.cunoc.sgp.formulario.service.ActaCalibracionService.class,
+  gt.usac.cunoc.sgp.formulario.validation.ValidadorActaPdf.class,
   VersionFormularioMapperImpl.class,
   JsonSchemaValidatorService.class,
   CampoSchemaExtractor.class,
@@ -110,6 +112,11 @@ class VersionFormularioIntegrationTest {
   }
 
   @Autowired private VersionFormularioService service;
+  @Autowired private gt.usac.cunoc.sgp.formulario.service.ActaCalibracionService actas;
+
+  @Autowired
+  private gt.usac.cunoc.sgp.archivo.repository.ArchivoActaCalibracionRepository actasRepository;
+
   @Autowired private VersionFormularioRepository versiones;
   @Autowired private MapeoCampoFormularioRepository mapeos;
   @Autowired private ConfiguracionIcElementoRepository configuracionesIc;
@@ -120,6 +127,8 @@ class VersionFormularioIntegrationTest {
   @BeforeEach
   void preparar() {
     autenticarAdministrador();
+    jdbc.update("DELETE FROM archivo_acta_calibracion");
+    jdbc.update("DELETE FROM archivo WHERE tipo_uso = 'ACTA_CALIBRACION'");
     jdbc.update("DELETE FROM mapeo_campo_formulario");
     jdbc.update("DELETE FROM configuracion_ic_elemento");
     jdbc.update("DELETE FROM version_formulario");
@@ -127,16 +136,16 @@ class VersionFormularioIntegrationTest {
 
     jdbc.update(
         """
-            INSERT INTO usuario (
-              id, email, password_hash, rol_id,
-              verificado, activado, activo, nombre_completo
-            )
-            SELECT ?, 'admin@cunoc.edu.gt', 'hash-de-prueba', id,
-                   true, true, true, 'Administrador de prueba'
-            FROM rol
-            WHERE nombre = 'ADMINISTRADOR'
-            ON CONFLICT (id) DO NOTHING
-            """,
+                INSERT INTO usuario (
+                  id, email, password_hash, rol_id,
+                  verificado, activado, activo, nombre_completo
+                )
+                SELECT ?, 'admin@cunoc.edu.gt', 'hash-de-prueba', id,
+                       true, true, true, 'Administrador de prueba'
+                FROM rol
+                WHERE nombre = 'ADMINISTRADOR'
+                ON CONFLICT (id) DO NOTHING
+                """,
         ADMINISTRADOR_ID);
   }
 
@@ -189,19 +198,19 @@ class VersionFormularioIntegrationTest {
     JsonNode esquemaV2 =
         objectMapper.readTree(
             """
-                    {
-                      "$schema": "https://json-schema.org/draft/2020-12/schema",
-                      "type": "object",
-                      "properties": {
-                        "datos_generales": {
-                          "type": "object",
-                          "properties": {
-                            "nombre": { "type": "string" }
-                          }
-                        }
-                      }
-                    }
-                    """);
+                            {
+                              "$schema": "https://json-schema.org/draft/2020-12/schema",
+                              "type": "object",
+                              "properties": {
+                                "datos_generales": {
+                                  "type": "object",
+                                  "properties": {
+                                    "nombre": { "type": "string" }
+                                  }
+                                }
+                              }
+                            }
+                            """);
 
     CrearVersionRequest crearV2Req =
         new CrearVersionRequest("SIECA-v2", v1.id(), false, esquemaV2, null, null);
@@ -259,6 +268,68 @@ class VersionFormularioIntegrationTest {
     assertThat(activoResp.codigo()).isEqualTo("SIECA-v2");
   }
 
+  @Test
+  void actaPdfSeAsociaAuditaConsultaYConservaAlPublicar() throws Exception {
+    var version = service.cargarPlantillaSiecaInicial("SIECA-acta", ADMINISTRADOR_ID);
+    assertThat(actas.consultar(version.id()).estado()).isEqualTo("SIN_ACTA");
+    configurarPesosDePrueba(version.id(), BigDecimal.ONE);
+    byte[] contenido;
+    try (var documento = new org.apache.pdfbox.pdmodel.PDDocument();
+        var salida = new java.io.ByteArrayOutputStream()) {
+      documento.addPage(new org.apache.pdfbox.pdmodel.PDPage());
+      documento.save(salida);
+      contenido = salida.toByteArray();
+    }
+    var fichero =
+        new org.springframework.mock.web.MockMultipartFile(
+            "archivo", "acta.pdf", "application/pdf", contenido);
+    var primera = actas.adjuntar(version.id(), fichero, ADMINISTRADOR_ID);
+    assertThat(primera.estado()).isEqualTo("CON_ACTA");
+    assertThat(actas.descargar(version.id())).isEqualTo(contenido);
+    var segunda = actas.adjuntar(version.id(), fichero, ADMINISTRADOR_ID);
+    assertThat(segunda.acta().archivoId()).isNotEqualTo(primera.acta().archivoId());
+    assertThat(actasRepository.count()).isEqualTo(2);
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT estado FROM archivo WHERE id = ?",
+                String.class,
+                primera.acta().archivoId()))
+        .isEqualTo("RETIRADO");
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT count(*) FROM auditoria WHERE entidad_id = ? AND proceso_automatico = 'HU-019: acta de calibracion'",
+                Integer.class,
+                version.id()))
+        .isEqualTo(2);
+    service.configurarEscala(version.id(), escalaDePrueba(4), ADMINISTRADOR_ID);
+    configurarReglasDePrueba(version.id());
+    service.publicar(version.id(), null, ADMINISTRADOR_ID);
+    assertThat(actas.descargar(version.id())).isEqualTo(contenido);
+    var publicadaConActa = actas.adjuntar(version.id(), fichero, ADMINISTRADOR_ID);
+    assertThat(publicadaConActa.estado()).isEqualTo("CON_ACTA");
+    assertThat(service.obtenerPorId(version.id()).estado())
+        .isEqualTo(EstadoVersionFormulario.PUBLICADA);
+    assertThat(actasRepository.count()).isEqualTo(3);
+  }
+
+  @Test
+  void pdfFalsoNoCreaArchivosNiVinculos() {
+    var version = service.cargarPlantillaSiecaInicial("SIECA-pdf-falso", ADMINISTRADOR_ID);
+    configurarPesosDePrueba(version.id(), BigDecimal.ONE);
+    var fichero =
+        new org.springframework.mock.web.MockMultipartFile(
+            "archivo",
+            "acta.pdf",
+            "application/pdf",
+            "contenido de texto".getBytes(java.nio.charset.StandardCharsets.UTF_8));
+    ApiException error =
+        assertThrows(
+            ApiException.class, () -> actas.adjuntar(version.id(), fichero, ADMINISTRADOR_ID));
+    assertThat(error.getCode()).isEqualTo("acta_pdf_invalida");
+    assertThat(actasRepository.count()).isZero();
+    assertThat(actas.consultar(version.id()).estado()).isEqualTo("SIN_ACTA");
+  }
+
   private void configurarReglasDePrueba(UUID versionId) throws Exception {
     VersionFormularioResponse version = service.obtenerPorId(versionId);
 
@@ -268,86 +339,90 @@ class VersionFormularioIntegrationTest {
     com.fasterxml.jackson.databind.node.ObjectNode reglas =
         (com.fasterxml.jackson.databind.node.ObjectNode) configuracion.get("reglas_evaluacion_ic");
 
+    for (JsonNode regla : reglas.path("reglas_anulacion")) {
+      ((com.fasterxml.jackson.databind.node.ObjectNode) regla).putNull("pendiente");
+    }
+
     reglas.set(
         "agregacion",
         objectMapper.readTree(
             """
-                    {
-                      "indicadores_de_un_elemento": "MAXIMO",
-                      "instancias_repetibles": "MAXIMO",
-                      "elementos_ausentes_portantes": 4,
-                      "elementos_ausentes_no_portantes": 4
-                    }
-                    """));
+                            {
+                              "indicadores_de_un_elemento": "MAXIMO",
+                              "instancias_repetibles": "MAXIMO",
+                              "elementos_ausentes_portantes": 4,
+                              "elementos_ausentes_no_portantes": 4
+                            }
+                            """));
 
     reglas.set(
         "rangos_estado",
         objectMapper.readTree(
             """
-                    {
-                      "BUENO": 75,
-                      "REGULAR": 50,
-                      "MALO": 0
-                    }
-                    """));
+                            {
+                              "BUENO": 75,
+                              "REGULAR": 50,
+                              "MALO": 0
+                            }
+                            """));
 
     reglas.set(
         "conversion_indicadores",
         objectMapper.readTree(
             """
-                    {
-                      "booleanos": {
-                        "junta.falta_elemento=true": 4,
-                        "junta.falta_elemento=false": 0,
-                        "junta.junta_limpia=true": 0,
-                        "junta.junta_limpia=false": 4,
-                        "losa.buen_estado=true": 0,
-                        "losa.buen_estado=false": 4,
-                        "senal.existe=true": 0,
-                        "senal.existe=false": 4,
-                        "drenaje_aledano.existe=true": 0,
-                        "drenaje_aledano.existe=false": 4
-                      },
-                      "enumerados": {
-                        "drenaje.estado": {
-                          "LIMPIOS": 0,
-                          "OBSTRUIDOS": 4
-                        },
-                        "socavacion.nivel": {
-                          "NO_HAY": 0,
-                          "SIN_EXPOSICION": 1,
-                          "CON_EXPOSICION": 2,
-                          "ASENTAMIENTO_ESTRUCTURA": 4
-                        },
-                        "condicionesCauce": {
-                          "LIMPIO": 0,
-                          "ASOLVADO_SEDIMENTADO": 1,
-                          "EROSIONADO": 2,
-                          "OTRO": 4
-                        },
-                        "estado_bueno_malo": {
-                          "BUENO": 0,
-                          "MALO": 4
-                        }
-                      },
-                      "numericos": {
-                        "golpeado_longitud_m": {
-                          "umbrales_m": {
-                            "LEVE": 1,
-                            "MODERADO": 2,
-                            "SEVERO": 3
-                          }
-                        },
-                        "golpeados_cantidad": {
-                          "umbrales": {
-                            "LEVE": 1,
-                            "MODERADO": 2,
-                            "SEVERO": 3
-                          }
-                        }
-                      }
-                    }
-                    """));
+                            {
+                              "booleanos": {
+                                "junta.falta_elemento=true": 4,
+                                "junta.falta_elemento=false": 0,
+                                "junta.junta_limpia=true": 0,
+                                "junta.junta_limpia=false": 4,
+                                "losa.buen_estado=true": 0,
+                                "losa.buen_estado=false": 4,
+                                "senal.existe=true": 0,
+                                "senal.existe=false": 4,
+                                "drenaje_aledano.existe=true": 0,
+                                "drenaje_aledano.existe=false": 4
+                              },
+                              "enumerados": {
+                                "drenaje.estado": {
+                                  "LIMPIOS": 0,
+                                  "OBSTRUIDOS": 4
+                                },
+                                "socavacion.nivel": {
+                                  "NO_HAY": 0,
+                                  "SIN_EXPOSICION": 1,
+                                  "CON_EXPOSICION": 2,
+                                  "ASENTAMIENTO_ESTRUCTURA": 4
+                                },
+                                "condicionesCauce": {
+                                  "LIMPIO": 0,
+                                  "ASOLVADO_SEDIMENTADO": 1,
+                                  "EROSIONADO": 2,
+                                  "OTRO": 4
+                                },
+                                "estado_bueno_malo": {
+                                  "BUENO": 0,
+                                  "MALO": 4
+                                }
+                              },
+                              "numericos": {
+                                "golpeado_longitud_m": {
+                                  "umbrales_m": {
+                                    "LEVE": 1,
+                                    "MODERADO": 2,
+                                    "SEVERO": 3
+                                  }
+                                },
+                                "golpeados_cantidad": {
+                                  "umbrales": {
+                                    "LEVE": 1,
+                                    "MODERADO": 2,
+                                    "SEVERO": 3
+                                  }
+                                }
+                              }
+                            }
+                            """));
 
     service.actualizarBorrador(
         versionId, version.esquema(), null, configuracion, null, ADMINISTRADOR_ID);
@@ -395,6 +470,37 @@ class VersionFormularioIntegrationTest {
   @EnableMethodSecurity
   @EnableAspectJAutoProxy
   static class Config {
+
+    @Bean
+    gt.usac.cunoc.sgp.archivo.service.AlmacenamientoArchivos almacenamientoActas() {
+      return new gt.usac.cunoc.sgp.archivo.service.AlmacenamientoArchivos() {
+        private final java.util.Map<String, byte[]> objetos =
+            new java.util.concurrent.ConcurrentHashMap<>();
+
+        public void guardar(String clave, java.io.InputStream contenido, long tamano, String mime)
+            throws java.io.IOException {
+          if (objetos.putIfAbsent(clave, contenido.readAllBytes()) != null) {
+            throw new java.io.IOException("El objeto ya existe");
+          }
+        }
+
+        public java.io.InputStream abrir(String clave) throws java.io.IOException {
+          byte[] contenido = objetos.get(clave);
+          if (contenido == null) {
+            throw new java.io.FileNotFoundException(clave);
+          }
+          return new java.io.ByteArrayInputStream(contenido);
+        }
+
+        public boolean existe(String clave) {
+          return objetos.containsKey(clave);
+        }
+
+        public void eliminar(String clave) {
+          objetos.remove(clave);
+        }
+      };
+    }
 
     @Bean
     Clock clock() {

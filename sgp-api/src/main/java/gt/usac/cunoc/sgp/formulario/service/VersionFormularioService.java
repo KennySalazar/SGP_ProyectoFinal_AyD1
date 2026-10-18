@@ -26,6 +26,7 @@ import gt.usac.cunoc.sgp.formulario.repository.MapeoCampoFormularioRepository;
 import gt.usac.cunoc.sgp.formulario.repository.VersionFormularioRepository;
 import gt.usac.cunoc.sgp.formulario.validation.CampoSchemaExtractor;
 import gt.usac.cunoc.sgp.formulario.validation.JsonSchemaValidatorService;
+import gt.usac.cunoc.sgp.formulario.validation.ValidadorReglasCriticasIc;
 import java.io.InputStream;
 import java.security.MessageDigest;
 import java.time.Clock;
@@ -671,10 +672,13 @@ public class VersionFormularioService {
       }
     }
 
-    // 4. Validar pesos completos
     validarPesosParaPublicacion(version);
     validarEscalaParaPublicacion(version);
     validarReglasParaPublicacion(version);
+    validarConversionesParaPublicacion(version);
+    ValidadorReglasCriticasIc.validarCatalogo(
+        version.getReglasEvaluacionIc().get("reglas_evaluacion_ic"),
+        version.getReglasEvaluacionIc());
 
     Instant ahora = clock.instant();
 
@@ -692,11 +696,6 @@ public class VersionFormularioService {
     }
 
     String versionAlgoritmo = algoritmoNode.asText();
-
-    validarPesosParaPublicacion(version);
-    validarEscalaParaPublicacion(version);
-    validarReglasParaPublicacion(version);
-    validarConversionesParaPublicacion(version);
 
     // 5. Desactivar versión activa anterior asegurando que solo exista una activa (RN-FRM-04)
     versiones.desactivarTodas();
@@ -1021,6 +1020,62 @@ public class VersionFormularioService {
           "Escala incompleta",
           "Falta configurar los siguientes niveles: " + String.join(", ", pendientes));
     }
+  }
+
+  @Transactional
+  @PreAuthorize("hasRole('ADMINISTRADOR')")
+  @Auditable(
+      accion = AccionAuditoria.MODIFICAR,
+      entidad = "version_formulario",
+      idArg = "id",
+      tipo = VersionFormulario.class,
+      recargarPosteriores = true)
+  public VersionFormularioResponse configurarReglasCriticas(
+      UUID id,
+      gt.usac.cunoc.sgp.formulario.dto.ConfigurarReglasCriticasIcRequest request,
+      UUID usuarioId) {
+    VersionFormulario version =
+        versiones
+            .findById(id)
+            .orElseThrow(
+                () ->
+                    new ApiException(
+                        HttpStatus.NOT_FOUND,
+                        "version_no_encontrada",
+                        "Version no encontrada",
+                        "No existe la version de formulario solicitada."));
+    if (version.getEstado() != EstadoVersionFormulario.BORRADOR) {
+      throw new ApiException(
+          HttpStatus.CONFLICT,
+          "version_inmutable",
+          "Version inmutable",
+          "Las reglas de una version publicada no pueden modificarse. Cree una nueva version.");
+    }
+    if (request == null || request.reglasAnulacion() == null) {
+      throw new ApiException(
+          HttpStatus.UNPROCESSABLE_ENTITY,
+          "reglas_anulacion_ic_invalidas",
+          "Reglas de anulacion del IC invalidas",
+          "Debe indicar las reglas criticas completas.");
+    }
+    JsonNode actual = version.getReglasEvaluacionIc();
+    if (actual == null || !actual.isObject() || !actual.path("reglas_evaluacion_ic").isObject()) {
+      throw new ApiException(
+          HttpStatus.UNPROCESSABLE_ENTITY,
+          "configuracion_ic_invalida",
+          "Configuracion IC invalida",
+          "La version no contiene reglas de evaluacion IC.");
+    }
+    com.fasterxml.jackson.databind.node.ObjectNode copia = actual.deepCopy();
+    com.fasterxml.jackson.databind.node.ObjectNode reglas =
+        (com.fasterxml.jackson.databind.node.ObjectNode) copia.get("reglas_evaluacion_ic");
+    reglas.set("reglas_anulacion", request.reglasAnulacion().deepCopy());
+    ValidadorReglasCriticasIc.validarCatalogo(reglas, copia);
+    version.setReglasEvaluacionIc(copia);
+    version.setCalibradoPorId(usuarioId);
+    version.setCalibradoEn(clock.instant());
+    version.setActualizadoEn(clock.instant());
+    return construirRespuestaDetallada(versiones.save(version));
   }
 
   @Transactional(readOnly = true)
