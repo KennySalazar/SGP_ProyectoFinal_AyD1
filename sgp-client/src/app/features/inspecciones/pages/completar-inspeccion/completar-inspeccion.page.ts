@@ -72,6 +72,7 @@ export class CompletarInspeccionPage implements OnInit {
   private revisionGuardada = 0;
   private ultimaHuellaDatos: string | null = null;
   private guardadoForzadoDuranteSolicitud = false;
+  private readonly claveIdempotenciaEnvio = crypto.randomUUID();
 
   protected readonly formulario = viewChild(FormularioDinamicoComponent);
 
@@ -85,6 +86,10 @@ export class CompletarInspeccionPage implements OnInit {
   readonly esquema = signal<EsquemaJson | null>(null);
   readonly fechaInspeccion = signal<string>('');
   readonly hoy = new Date().toISOString().slice(0, 10);
+  readonly soloLectura = computed(() => {
+    const borrador = this.borrador();
+    return !!borrador && borrador.autorId !== this.auth.user()?.id;
+  });
 
   // Envío o publicación (HU-026)
   readonly confirmandoAccion = signal(false);
@@ -95,7 +100,7 @@ export class CompletarInspeccionPage implements OnInit {
   /** Acción final según el rol con que se creó la inspección (RN-REV-01, RN-REV-02). */
   readonly accionFinal = computed<AccionFinal | null>(() => {
     const b = this.borrador();
-    if (!b || b.estado !== 'BORRADOR') return null;
+    if (!b || b.estado !== 'BORRADOR' || this.soloLectura()) return null;
     if (b.rolAutor === 'CATEDRATICO' || b.rolAutor === 'PROFESIONAL_EXTERNO') return 'publicar';
     return b.rolAutor === 'ESTUDIANTE' ? 'enviar' : null;
   });
@@ -157,7 +162,8 @@ export class CompletarInspeccionPage implements OnInit {
       this.guardarBorrador(false);
     });
     this.destroyRef.onDestroy(() => {
-      if (this.revisionDatos > this.revisionGuardada) this.guardarBorrador(false);
+      if (!this.soloLectura() && this.revisionDatos > this.revisionGuardada)
+        this.guardarBorrador(false);
     });
   }
 
@@ -233,20 +239,21 @@ export class CompletarInspeccionPage implements OnInit {
       this.ultimaHuellaDatos = huella;
       return;
     }
-    if (huella !== this.ultimaHuellaDatos) {
+    if (!this.soloLectura() && huella !== this.ultimaHuellaDatos) {
       this.ultimaHuellaDatos = huella;
       this.marcarCambio();
     }
   }
 
   onFechaInspeccionChange(fecha: string): void {
+    if (this.soloLectura()) return;
     if (fecha === this.fechaInspeccion()) return;
     this.fechaInspeccion.set(fecha);
     this.marcarCambio();
   }
 
   onSeccionCambiando(): void {
-    this.guardarBorrador(false);
+    if (!this.soloLectura()) this.guardarBorrador(false);
   }
 
   private marcarCambio(): void {
@@ -259,7 +266,8 @@ export class CompletarInspeccionPage implements OnInit {
 
   guardarBorrador(forzar = true): void {
     const b = this.borrador();
-    if (!b || (!forzar && this.revisionDatos <= this.revisionGuardada)) return;
+    if (!b || this.soloLectura() || (!forzar && this.revisionDatos <= this.revisionGuardada))
+      return;
     if (this.guardando()) {
       this.guardadoForzadoDuranteSolicitud = true;
       return;
@@ -360,7 +368,9 @@ export class CompletarInspeccionPage implements OnInit {
     this.errorAccion.set(null);
     this.apiErrors.clear();
     const peticion =
-      accion === 'publicar' ? this.inspeccionApi.publicar(b.id) : this.inspeccionApi.enviar(b.id);
+      accion === 'publicar'
+        ? this.inspeccionApi.publicar(b.id)
+        : this.inspeccionApi.enviar(b.id, this.claveIdempotenciaEnvio);
 
     peticion.pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: (resultado) => {

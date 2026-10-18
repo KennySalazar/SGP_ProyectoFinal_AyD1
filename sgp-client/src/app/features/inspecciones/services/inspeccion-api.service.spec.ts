@@ -42,4 +42,13 @@ describe('InspeccionApiService', () => {
     expect(request.request.body).toEqual({ motivo: 'Ajuste de fecha' });
     request.flush({ id: 'correccion-1' });
   });
+
+  it('envía una inspección con clave de idempotencia', () => {
+    service.enviar('inspeccion-1', 'envio-1').subscribe();
+
+    const request = http.expectOne('/api/v1/inspecciones/inspeccion-1/enviar');
+    expect(request.request.method).toBe('POST');
+    expect(request.request.headers.get('Idempotency-Key')).toBe('envio-1');
+    request.flush({ id: 'inspeccion-1', estado: 'ENVIADA' });
+  });
 });

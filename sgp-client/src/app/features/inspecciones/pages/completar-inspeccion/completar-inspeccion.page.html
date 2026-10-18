@@ -71,6 +71,7 @@
           type="date"
           [max]="hoy"
           [ngModel]="fechaInspeccion()"
+          [disabled]="soloLectura()"
           (ngModelChange)="onFechaInspeccionChange($event)"
           class="input-fecha"
         />
@@ -87,6 +88,7 @@
         <span>{{ 'inspecciones.borrador.volverPuente' | transloco }}</span>
       </a>
 
+      @if (!soloLectura()) {
       <button
         pButton
         type="button"
@@ -101,8 +103,7 @@
           transloco }}</span
         >
       </button>
-
-      @if (accionFinal(); as accion) {
+      } @if (accionFinal(); as accion) {
       <button
         pButton
         type="button"
@@ -119,7 +120,12 @@
     </div>
   </header>
 
-  @if (colegiadoPendiente()) {
+  @if (soloLectura()) {
+  <div class="alerta-autoguardado surface-card" role="status">
+    <i class="pi pi-eye" aria-hidden="true"></i>
+    <span>{{ 'inspecciones.borrador.soloLectura' | transloco }}</span>
+  </div>
+  } @if (colegiadoPendiente()) {
   <div class="alerta-autoguardado surface-card" role="status">
     <i class="pi pi-id-card" aria-hidden="true"></i>
     <span>{{ 'inspecciones.transicion.colegiadoPendiente' | transloco }}</span>
@@ -228,6 +234,7 @@
     <app-formulario-dinamico
       [esquema]="esq"
       [valoresIniciales]="valoresIniciales()"
+      [soloLectura]="soloLectura()"
       (valorChange)="onValorChange($event)"
       (seccionCambiando)="onSeccionCambiando()"
     />

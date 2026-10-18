@@ -51,7 +51,11 @@
           <i class="pi pi-clipboard" aria-hidden="true"></i
           ><span>{{ 'nav.inspectionForm' | transloco }}</span>
         </a>
-        @if (auth.user()?.role === 'CATEDRATICO' || auth.user()?.role === 'PROFESIONAL_EXTERNO') {
+        @if (
+          auth.user()?.role === 'CATEDRATICO' ||
+          auth.user()?.role === 'PROFESIONAL_EXTERNO' ||
+          auth.user()?.role === 'ESTUDIANTE'
+        ) {
           <a
             routerLink="/inspecciones"
             [routerLinkActiveOptions]="{ exact: true }"
@@ -89,6 +93,20 @@
           </a>
         }
         @if (auth.user()?.role === 'CATEDRATICO') {
+          <a routerLink="/revisiones" routerLinkActive="active">
+            <i class="pi pi-inbox" aria-hidden="true"></i>
+            <span>{{ 'nav.reviewInbox' | transloco }}</span>
+            @if (revisiones.pendientes() > 0) {
+              <span
+                class="nav-count"
+                [attr.aria-label]="
+                  'nav.pendingReviewsCount' | transloco: { count: revisiones.pendientes() }
+                "
+              >
+                {{ revisiones.pendientes() }}
+              </span>
+            }
+          </a>
           <a routerLink="/puentes/solicitudes" routerLinkActive="active">
             <i class="pi pi-send" aria-hidden="true"></i>
             <span>{{ 'nav.myBridgeRequests' | transloco }}</span>
