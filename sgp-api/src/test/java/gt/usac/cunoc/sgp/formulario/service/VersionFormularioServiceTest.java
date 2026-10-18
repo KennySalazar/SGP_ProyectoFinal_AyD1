@@ -481,14 +481,14 @@ class VersionFormularioServiceTest {
   }
 
   private VersionFormulario crearEntidad(
-          UUID id, String codigo, EstadoVersionFormulario estado, boolean activa) {
+      UUID id, String codigo, EstadoVersionFormulario estado, boolean activa) {
     try {
       JsonNode esquema = objectMapper.readTree("{\"type\":\"object\"}");
       JsonNode vinculos = objectMapper.readTree("{}");
 
       JsonNode reglas =
-              objectMapper.readTree(
-                      """
+          objectMapper.readTree(
+              """
                       {
                         "elementos": [
                           {
@@ -521,7 +521,7 @@ class VersionFormularioServiceTest {
                       """);
 
       return new VersionFormulario(
-              id, codigo, estado, activa, esquema, vinculos, reglas, null, usuarioId, fija, fija);
+          id, codigo, estado, activa, esquema, vinculos, reglas, null, usuarioId, fija, fija);
     } catch (Exception e) {
       throw new IllegalStateException("No fue posible construir la version de prueba", e);
     }
@@ -717,19 +717,17 @@ class VersionFormularioServiceTest {
   }
 
   @Test
-  void publicarRechazaConversionBooleanaIncompletaSinDesactivarLaVersionActiva()
-          throws Exception {
+  void publicarRechazaConversionBooleanaIncompletaSinDesactivarLaVersionActiva() throws Exception {
     UUID id = UUID.randomUUID();
-    VersionFormulario borrador =
-            crearEntidad(id, "v1", EstadoVersionFormulario.BORRADOR, false);
+    VersionFormulario borrador = crearEntidad(id, "v1", EstadoVersionFormulario.BORRADOR, false);
 
     com.fasterxml.jackson.databind.node.ObjectNode configuracion =
-            (com.fasterxml.jackson.databind.node.ObjectNode) borrador.getReglasEvaluacionIc();
+        (com.fasterxml.jackson.databind.node.ObjectNode) borrador.getReglasEvaluacionIc();
 
     configuracion.set(
-            "elementos",
-            objectMapper.readTree(
-                    """
+        "elementos",
+        objectMapper.readTree(
+            """
                     [
                       {
                         "elemento_ref": "/otros/senalizacion/informativa",
@@ -739,13 +737,12 @@ class VersionFormularioServiceTest {
                     """));
 
     com.fasterxml.jackson.databind.node.ObjectNode reglas =
-            (com.fasterxml.jackson.databind.node.ObjectNode)
-                    configuracion.get("reglas_evaluacion_ic");
+        (com.fasterxml.jackson.databind.node.ObjectNode) configuracion.get("reglas_evaluacion_ic");
 
     reglas.set(
-            "conversion_indicadores",
-            objectMapper.readTree(
-                    """
+        "conversion_indicadores",
+        objectMapper.readTree(
+            """
                     {
                       "booleanos": {
                         "senal.existe=false": 4
@@ -754,44 +751,43 @@ class VersionFormularioServiceTest {
                     """));
 
     ConfiguracionIcElemento peso =
-            new ConfiguracionIcElemento(
-                    UUID.randomUUID(),
-                    borrador,
-                    "/otros/senalizacion/informativa",
-                    BigDecimal.ONE,
-                    "Senalizacion informativa",
-                    fija);
+        new ConfiguracionIcElemento(
+            UUID.randomUUID(),
+            borrador,
+            "/otros/senalizacion/informativa",
+            BigDecimal.ONE,
+            "Senalizacion informativa",
+            fija);
 
     when(versiones.findById(id)).thenReturn(Optional.of(borrador));
     when(configuracionesIc.findAllByVersionFormularioId(id)).thenReturn(List.of(peso));
 
     assertThatThrownBy(() -> service.publicar(id, null, usuarioId))
-            .isInstanceOfSatisfying(
-                    ApiException.class,
-                    error -> {
-                      assertThat(error.getStatus()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
-                      assertThat(error.getCode()).isEqualTo("conversiones_ic_invalidas");
-                      assertThat(error.getMessage()).contains("senal.existe=true");
-                    });
+        .isInstanceOfSatisfying(
+            ApiException.class,
+            error -> {
+              assertThat(error.getStatus()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+              assertThat(error.getCode()).isEqualTo("conversiones_ic_invalidas");
+              assertThat(error.getMessage()).contains("senal.existe=true");
+            });
 
     verify(versiones, org.mockito.Mockito.never()).desactivarTodas();
     verify(versiones, org.mockito.Mockito.never()).saveAndFlush(any(VersionFormulario.class));
     assertThat(borrador.getEstado()).isEqualTo(EstadoVersionFormulario.BORRADOR);
   }
+
   @Test
-  void publicarRechazaUmbralesDesordenadosSinDesactivarLaVersionActiva()
-          throws Exception {
+  void publicarRechazaUmbralesDesordenadosSinDesactivarLaVersionActiva() throws Exception {
     UUID id = UUID.randomUUID();
-    VersionFormulario borrador =
-            crearEntidad(id, "v1", EstadoVersionFormulario.BORRADOR, false);
+    VersionFormulario borrador = crearEntidad(id, "v1", EstadoVersionFormulario.BORRADOR, false);
 
     com.fasterxml.jackson.databind.node.ObjectNode configuracion =
-            (com.fasterxml.jackson.databind.node.ObjectNode) borrador.getReglasEvaluacionIc();
+        (com.fasterxml.jackson.databind.node.ObjectNode) borrador.getReglasEvaluacionIc();
 
     configuracion.set(
-            "elementos",
-            objectMapper.readTree(
-                    """
+        "elementos",
+        objectMapper.readTree(
+            """
                     [
                       {
                         "elemento_ref": "/elementos_no_estructurales/pasamanos_barandal",
@@ -801,13 +797,12 @@ class VersionFormularioServiceTest {
                     """));
 
     com.fasterxml.jackson.databind.node.ObjectNode reglas =
-            (com.fasterxml.jackson.databind.node.ObjectNode)
-                    configuracion.get("reglas_evaluacion_ic");
+        (com.fasterxml.jackson.databind.node.ObjectNode) configuracion.get("reglas_evaluacion_ic");
 
     reglas.set(
-            "conversion_indicadores",
-            objectMapper.readTree(
-                    """
+        "conversion_indicadores",
+        objectMapper.readTree(
+            """
                     {
                       "numericos": {
                         "golpeado_longitud_m": {
@@ -822,47 +817,46 @@ class VersionFormularioServiceTest {
                     """));
 
     ConfiguracionIcElemento peso =
-            new ConfiguracionIcElemento(
-                    UUID.randomUUID(),
-                    borrador,
-                    "/elementos_no_estructurales/pasamanos_barandal",
-                    BigDecimal.ONE,
-                    "Pasamanos",
-                    fija);
+        new ConfiguracionIcElemento(
+            UUID.randomUUID(),
+            borrador,
+            "/elementos_no_estructurales/pasamanos_barandal",
+            BigDecimal.ONE,
+            "Pasamanos",
+            fija);
 
     when(versiones.findById(id)).thenReturn(Optional.of(borrador));
     when(configuracionesIc.findAllByVersionFormularioId(id)).thenReturn(List.of(peso));
 
     assertThatThrownBy(() -> service.publicar(id, null, usuarioId))
-            .isInstanceOfSatisfying(
-                    ApiException.class,
-                    error -> {
-                      assertThat(error.getStatus()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
-                      assertThat(error.getCode()).isEqualTo("conversiones_ic_invalidas");
-                      assertThat(error.getMessage())
-                              .contains("golpeado_longitud_m.umbrales_m")
-                              .contains("0 < LEVE < MODERADO < SEVERO");
-                    });
+        .isInstanceOfSatisfying(
+            ApiException.class,
+            error -> {
+              assertThat(error.getStatus()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+              assertThat(error.getCode()).isEqualTo("conversiones_ic_invalidas");
+              assertThat(error.getMessage())
+                  .contains("golpeado_longitud_m.umbrales_m")
+                  .contains("0 < LEVE < MODERADO < SEVERO");
+            });
 
     verify(versiones, org.mockito.Mockito.never()).desactivarTodas();
     verify(versiones, org.mockito.Mockito.never()).saveAndFlush(any(VersionFormulario.class));
     assertThat(borrador.getEstado()).isEqualTo(EstadoVersionFormulario.BORRADOR);
     assertThat(borrador.isActiva()).isFalse();
   }
+
   @Test
-  void publicarPermiteConversionesCompletasParaLosIndicadoresDelCatalogo()
-          throws Exception {
+  void publicarPermiteConversionesCompletasParaLosIndicadoresDelCatalogo() throws Exception {
     UUID id = UUID.randomUUID();
-    VersionFormulario borrador =
-            crearEntidad(id, "v1", EstadoVersionFormulario.BORRADOR, false);
+    VersionFormulario borrador = crearEntidad(id, "v1", EstadoVersionFormulario.BORRADOR, false);
 
     com.fasterxml.jackson.databind.node.ObjectNode configuracion =
-            (com.fasterxml.jackson.databind.node.ObjectNode) borrador.getReglasEvaluacionIc();
+        (com.fasterxml.jackson.databind.node.ObjectNode) borrador.getReglasEvaluacionIc();
 
     configuracion.set(
-            "elementos",
-            objectMapper.readTree(
-                    """
+        "elementos",
+        objectMapper.readTree(
+            """
                     [
                       {
                         "elemento_ref": "/otros/senalizacion/informativa",
@@ -876,13 +870,12 @@ class VersionFormularioServiceTest {
                     """));
 
     com.fasterxml.jackson.databind.node.ObjectNode reglas =
-            (com.fasterxml.jackson.databind.node.ObjectNode)
-                    configuracion.get("reglas_evaluacion_ic");
+        (com.fasterxml.jackson.databind.node.ObjectNode) configuracion.get("reglas_evaluacion_ic");
 
     reglas.set(
-            "conversion_indicadores",
-            objectMapper.readTree(
-                    """
+        "conversion_indicadores",
+        objectMapper.readTree(
+            """
                     {
                       "booleanos": {
                         "senal.existe=true": 0,
@@ -907,26 +900,26 @@ class VersionFormularioServiceTest {
                     """));
 
     List<ConfiguracionIcElemento> pesos =
-            List.of(
-                    new ConfiguracionIcElemento(
-                            UUID.randomUUID(),
-                            borrador,
-                            "/otros/senalizacion/informativa",
-                            BigDecimal.ONE,
-                            "Senalizacion informativa",
-                            fija),
-                    new ConfiguracionIcElemento(
-                            UUID.randomUUID(),
-                            borrador,
-                            "/elementos_no_estructurales/pasamanos_barandal",
-                            BigDecimal.ONE,
-                            "Pasamanos",
-                            fija));
+        List.of(
+            new ConfiguracionIcElemento(
+                UUID.randomUUID(),
+                borrador,
+                "/otros/senalizacion/informativa",
+                BigDecimal.ONE,
+                "Senalizacion informativa",
+                fija),
+            new ConfiguracionIcElemento(
+                UUID.randomUUID(),
+                borrador,
+                "/elementos_no_estructurales/pasamanos_barandal",
+                BigDecimal.ONE,
+                "Pasamanos",
+                fija));
 
     when(versiones.findById(id)).thenReturn(Optional.of(borrador));
     when(configuracionesIc.findAllByVersionFormularioId(id)).thenReturn(pesos);
     when(versiones.saveAndFlush(any(VersionFormulario.class)))
-            .thenAnswer(invocation -> invocation.getArgument(0));
+        .thenAnswer(invocation -> invocation.getArgument(0));
 
     VersionFormularioResponse respuesta = service.publicar(id, null, usuarioId);
 

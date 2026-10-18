@@ -263,20 +263,15 @@ class VersionFormularioIntegrationTest {
     VersionFormularioResponse version = service.obtenerPorId(versionId);
 
     com.fasterxml.jackson.databind.node.ObjectNode configuracion =
-            versiones
-                    .findById(versionId)
-                    .orElseThrow()
-                    .getReglasEvaluacionIc()
-                    .deepCopy();
+        versiones.findById(versionId).orElseThrow().getReglasEvaluacionIc().deepCopy();
 
     com.fasterxml.jackson.databind.node.ObjectNode reglas =
-            (com.fasterxml.jackson.databind.node.ObjectNode)
-                    configuracion.get("reglas_evaluacion_ic");
+        (com.fasterxml.jackson.databind.node.ObjectNode) configuracion.get("reglas_evaluacion_ic");
 
     reglas.set(
-            "agregacion",
-            objectMapper.readTree(
-                    """
+        "agregacion",
+        objectMapper.readTree(
+            """
                     {
                       "indicadores_de_un_elemento": "MAXIMO",
                       "instancias_repetibles": "MAXIMO",
@@ -286,9 +281,9 @@ class VersionFormularioIntegrationTest {
                     """));
 
     reglas.set(
-            "rangos_estado",
-            objectMapper.readTree(
-                    """
+        "rangos_estado",
+        objectMapper.readTree(
+            """
                     {
                       "BUENO": 75,
                       "REGULAR": 50,
@@ -297,9 +292,9 @@ class VersionFormularioIntegrationTest {
                     """));
 
     reglas.set(
-            "conversion_indicadores",
-            objectMapper.readTree(
-                    """
+        "conversion_indicadores",
+        objectMapper.readTree(
+            """
                     {
                       "booleanos": {
                         "junta.falta_elemento=true": 4,
@@ -355,12 +350,7 @@ class VersionFormularioIntegrationTest {
                     """));
 
     service.actualizarBorrador(
-            versionId,
-            version.esquema(),
-            null,
-            configuracion,
-            null,
-            ADMINISTRADOR_ID);
+        versionId, version.esquema(), null, configuracion, null, ADMINISTRADOR_ID);
   }
 
   private void configurarPesosDePrueba(UUID versionId, BigDecimal peso) {
