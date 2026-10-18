@@ -17,6 +17,13 @@
       }
     </p>
     <div class="acciones">
+      @if (cantidadObservaciones() > 0) {
+        <app-marcador-observaciones
+          [cantidad]="cantidadObservaciones()"
+          [interactivo]="observacionesInteractivas()"
+          (abrir)="abrirObservaciones.emit()"
+        />
+      }
       @if (puedeMarcarSinDanos()) {
         <button
           type="button"
