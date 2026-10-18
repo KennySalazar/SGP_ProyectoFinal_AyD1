@@ -100,7 +100,9 @@ class InspeccionControllerSecurityTest {
             Instant.now(),
             Instant.now());
 
-    when(service.iniciarInspeccion(any(), eq(USUARIO_ID), eq("ESTUDIANTE"))).thenReturn(dummy);
+    when(service.iniciarInspeccion(
+            any(IniciarInspeccionVersionadaRequest.class), eq(USUARIO_ID), eq("ESTUDIANTE")))
+        .thenReturn(dummy);
 
     mockMvc
         .perform(
@@ -120,7 +122,8 @@ class InspeccionControllerSecurityTest {
         new IniciarInspeccionVersionadaRequest(
             UUID.randomUUID(), UUID.randomUUID(), LocalDate.now(), "web", "Inspector", null);
 
-    when(service.iniciarInspeccion(any(), eq(USUARIO_ID), any()))
+    when(service.iniciarInspeccion(
+            any(IniciarInspeccionVersionadaRequest.class), eq(USUARIO_ID), any()))
         .thenThrow(
             new ApiException(
                 HttpStatus.UNPROCESSABLE_ENTITY,

@@ -103,6 +103,15 @@
           }
         </div>
 
+        @if (errorReporte()) {
+          <p role="alert">{{ 'inspecciones.fotos.errores.panel' | transloco }}</p>
+          <button pButton type="button" (click)="cargarReporte()">
+            {{ 'inspecciones.fotos.reintentar' | transloco }}
+          </button>
+        }
+        @if (visible && reporteFotografico(); as componente) {
+          <ng-container *ngComponentOutlet="componente; inputs: { inspeccion: res }" />
+        }
         <div class="dialog-acciones">
           <button pButton type="button" severity="secondary" [outlined]="true" (click)="cerrar()">
             <i class="pi pi-check" aria-hidden="true"></i>
@@ -115,6 +124,14 @@
         </div>
       </div>
     } @else {
+      @if (pendienteAnterior()) {
+        <div class="surface-card">
+          <p>{{ 'inspecciones.fotos.continuarNota' | transloco }}</p>
+          <button pButton type="button" [disabled]="guardando()" (click)="continuarPendiente()">
+            {{ 'inspecciones.fotos.continuar' | transloco }}
+          </button>
+        </div>
+      }
       <!-- Formulario para iniciar inspección -->
       <form [formGroup]="form" (ngSubmit)="iniciarInspeccion()" class="formulario-iniciar">
         @if (puente) {

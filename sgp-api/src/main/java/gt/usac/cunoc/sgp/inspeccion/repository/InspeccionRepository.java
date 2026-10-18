@@ -21,6 +21,10 @@ public interface InspeccionRepository extends JpaRepository<Inspeccion, UUID> {
 
   Optional<Inspeccion> findByIdAndEliminadoEnIsNull(UUID id);
 
+  @Lock(LockModeType.PESSIMISTIC_WRITE)
+  @Query("select i from Inspeccion i where i.id = :id and i.eliminadoEn is null")
+  Optional<Inspeccion> findByIdAndEliminadoEnIsNullForUpdate(@Param("id") UUID id);
+
   @EntityGraph(attributePaths = {"puente", "puente.municipio.departamento", "versionFormulario"})
   @Query(
       value =

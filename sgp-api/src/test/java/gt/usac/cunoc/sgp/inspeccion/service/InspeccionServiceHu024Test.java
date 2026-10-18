@@ -77,7 +77,7 @@ class InspeccionServiceHu024Test {
   @Mock private PreparadorEntradaIcService preparadorEntradaIcService;
   @Mock private CalculoIndiceCondicionService calculoIndiceCondicionService;
 
-  private final ObjectMapper objectMapper = new ObjectMapper();
+  private final ObjectMapper objectMapper = new ObjectMapper().findAndRegisterModules();
   private InspeccionService inspeccionService;
 
   private UserAccount catedratico;
@@ -88,6 +88,9 @@ class InspeccionServiceHu024Test {
 
   @BeforeEach
   void setUp() {
+    org.mockito.Mockito.lenient()
+        .when(operacionIdempotenteRepository.saveAndFlush(any(OperacionIdempotente.class)))
+        .thenAnswer(invocacion -> invocacion.getArgument(0));
     inspeccionService =
         new InspeccionService(
             inspeccionRepository,
@@ -96,7 +99,11 @@ class InspeccionServiceHu024Test {
             versionFormularioRepository,
             userAccountRepository,
             profesionalRepository,
-            operacionIdempotenteRepository,
+            new gt.usac.cunoc.sgp.sync.service.OperacionIdempotenteService(
+                operacionIdempotenteRepository,
+                org.mockito.Mockito.mock(org.springframework.jdbc.core.JdbcTemplate.class),
+                objectMapper,
+                CLOCK),
             auditoriaWriter,
             objectMapper,
             CLOCK,
@@ -567,10 +574,10 @@ class InspeccionServiceHu024Test {
             key,
             "POST",
             "/api/v1/inspecciones",
-            "hash",
+            hashSolicitudInicio(),
             "COMPLETADA",
             201,
-            objectMapper.createObjectNode(),
+            objectMapper.createObjectNode().put("id", inspeccionPrevia.getId().toString()),
             "inspeccion",
             inspeccionPrevia.getId(),
             AHORA,
@@ -1102,5 +1109,28 @@ class InspeccionServiceHu024Test {
     assertThatThrownBy(() -> inspeccionService.obtenerBorrador(inspeccionId, otroUsuarioId))
         .isInstanceOf(ApiException.class)
         .matches(e -> ((ApiException) e).getStatus() == HttpStatus.NOT_FOUND);
+  }
+
+  private String hashSolicitudInicio() {
+    var r =
+        new IniciarInspeccionRequest(
+            null,
+            puenteActivo.getId(),
+            LocalDate.of(2026, 10, 15),
+            "disp-1",
+            null,
+            null,
+            null,
+            null,
+            false,
+            null);
+    try {
+      return java.util.HexFormat.of()
+          .formatHex(
+              java.security.MessageDigest.getInstance("SHA-256")
+                  .digest(r.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+    } catch (Exception e) {
+      throw new AssertionError(e);
+    }
   }
 }

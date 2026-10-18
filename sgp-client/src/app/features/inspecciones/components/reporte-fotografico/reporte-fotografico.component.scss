@@ -1,0 +1,51 @@
+.reporte {
+  padding: 1rem;
+  margin-top: 1rem;
+  color: var(--sgp-steel-700);
+}
+h3 {
+  color: var(--sgp-navy-900);
+}
+.acciones,
+.pendiente {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.8rem;
+  margin: 1rem 0;
+}
+label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin: 1rem 0;
+}
+input {
+  min-height: 46px;
+  max-width: 100%;
+}
+img,
+video {
+  display: block;
+  width: 100%;
+  max-height: 320px;
+  object-fit: contain;
+  border-radius: 12px;
+}
+.fotografias {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(180px, 100%), 1fr));
+  gap: 1rem;
+}
+figure {
+  margin: 0;
+  padding: 0.75rem;
+  border: 1px solid var(--sgp-border);
+  border-radius: 12px;
+}
+figcaption {
+  margin: 0.5rem 0;
+}
+.mensaje-error {
+  color: #b91c1c;
+}

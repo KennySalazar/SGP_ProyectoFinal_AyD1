@@ -34,8 +34,8 @@ import gt.usac.cunoc.sgp.inspeccion.repository.InspeccionDatoTecnicoRepository;
 import gt.usac.cunoc.sgp.inspeccion.repository.InspeccionRepository;
 import gt.usac.cunoc.sgp.puente.entity.Puente;
 import gt.usac.cunoc.sgp.puente.repository.PuenteRepository;
-import gt.usac.cunoc.sgp.sync.entity.OperacionIdempotente;
-import gt.usac.cunoc.sgp.sync.repository.OperacionIdempotenteRepository;
+import gt.usac.cunoc.sgp.sync.model.SolicitudOperacion;
+import gt.usac.cunoc.sgp.sync.service.OperacionIdempotenteService;
 import gt.usac.cunoc.sgp.usuario.entity.UserAccount;
 import gt.usac.cunoc.sgp.usuario.model.RoleName;
 import gt.usac.cunoc.sgp.usuario.repository.UserAccountRepository;
@@ -46,7 +46,6 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.Clock;
-import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
@@ -87,7 +86,7 @@ public class InspeccionService {
   private final VersionFormularioRepository versionFormularioRepository;
   private final UserAccountRepository userAccountRepository;
   private final UsuarioProfesionalRepository profesionalRepository;
-  private final OperacionIdempotenteRepository operacionIdempotenteRepository;
+  private final OperacionIdempotenteService operaciones;
   private final AuditoriaWriter auditoriaWriter;
   private final ObjectMapper objectMapper;
   private final Clock clock;
@@ -129,7 +128,7 @@ public class InspeccionService {
       VersionFormularioRepository versionFormularioRepository,
       UserAccountRepository userAccountRepository,
       UsuarioProfesionalRepository profesionalRepository,
-      OperacionIdempotenteRepository operacionIdempotenteRepository,
+      OperacionIdempotenteService operaciones,
       AuditoriaWriter auditoriaWriter,
       ObjectMapper objectMapper,
       Clock clock) {
@@ -140,7 +139,7 @@ public class InspeccionService {
         versionFormularioRepository,
         userAccountRepository,
         profesionalRepository,
-        operacionIdempotenteRepository,
+        operaciones,
         auditoriaWriter,
         objectMapper,
         clock,
@@ -158,7 +157,7 @@ public class InspeccionService {
       VersionFormularioRepository versionFormularioRepository,
       UserAccountRepository userAccountRepository,
       UsuarioProfesionalRepository profesionalRepository,
-      OperacionIdempotenteRepository operacionIdempotenteRepository,
+      OperacionIdempotenteService operaciones,
       AuditoriaWriter auditoriaWriter,
       ObjectMapper objectMapper,
       Clock clock,
@@ -172,7 +171,7 @@ public class InspeccionService {
         versionFormularioRepository,
         userAccountRepository,
         profesionalRepository,
-        operacionIdempotenteRepository,
+        operaciones,
         auditoriaWriter,
         objectMapper,
         clock,
@@ -191,7 +190,7 @@ public class InspeccionService {
       VersionFormularioRepository versionFormularioRepository,
       UserAccountRepository userAccountRepository,
       UsuarioProfesionalRepository profesionalRepository,
-      OperacionIdempotenteRepository operacionIdempotenteRepository,
+      OperacionIdempotenteService operaciones,
       AuditoriaWriter auditoriaWriter,
       ObjectMapper objectMapper,
       Clock clock,
@@ -206,7 +205,7 @@ public class InspeccionService {
     this.versionFormularioRepository = versionFormularioRepository;
     this.userAccountRepository = userAccountRepository;
     this.profesionalRepository = profesionalRepository;
-    this.operacionIdempotenteRepository = operacionIdempotenteRepository;
+    this.operaciones = operaciones;
     this.auditoriaWriter = auditoriaWriter;
     this.objectMapper = objectMapper;
     this.clock = clock;
@@ -218,34 +217,73 @@ public class InspeccionService {
     this.inspeccionMapper = inspeccionMapper;
   }
 
+  /** Conserva el contrato de HU-024 utilizado por los consumidores de HU-028. */
+  @Transactional
+  public IniciarInspeccionResponse iniciarInspeccion(
+      IniciarInspeccionRequest request, UUID usuarioId, String idempotencyKey) {
+    return iniciarInspeccionHu024(request, usuarioId, idempotencyKey);
+  }
+
   @Transactional
   public IniciarInspeccionResponse iniciarInspeccionHu024(
       IniciarInspeccionRequest request, UUID usuarioId, String idempotencyKey) {
     // 1. Autorización de rol y verificación
     UserAccount user = validarInspector(usuarioId);
 
-    // 2. Idempotencia
     if (idempotencyKey != null && !idempotencyKey.isBlank()) {
-      Optional<OperacionIdempotente> opExistente =
-          operacionIdempotenteRepository.findByUsuarioIdAndClave(usuarioId, idempotencyKey);
-      if (opExistente.isPresent()
-          && "COMPLETADA".equals(opExistente.get().getEstado())
-          && opExistente.get().getEntidadId() != null) {
-        return inspeccionRepository
-            .findConDetallesById(opExistente.get().getEntidadId())
-            .map(this::aResponse)
-            .orElseGet(() -> crearNuevaInspeccion(request, user, idempotencyKey));
-      }
+      var solicitud =
+          new SolicitudOperacion(
+              usuarioId,
+              idempotencyKey,
+              "POST",
+              "/api/v1/inspecciones",
+              calcularHash(request.toString()),
+              "inspeccion",
+              request.id());
+      return operaciones.ejecutar(
+          solicitud,
+          201,
+          () -> crearORecuperar(request, user),
+          IniciarInspeccionResponse::id,
+          nodo -> {
+            if (nodo.has("rolAutor"))
+              return objectMapper.convertValue(nodo, IniciarInspeccionResponse.class);
+            // Compatibilidad con snapshots de HU-024 guardados antes del coordinador común.
+            UUID id = UUID.fromString(nodo.path("id").asText());
+            return inspeccionRepository
+                .findConDetallesById(id)
+                .filter(i -> i.getAutorId().equals(usuarioId) && i.getEliminadoEn() == null)
+                .map(this::aResponse)
+                .orElseThrow(() -> conflictoIdentidad());
+          });
     }
+    return crearORecuperar(request, user);
+  }
 
+  private IniciarInspeccionResponse crearORecuperar(
+      IniciarInspeccionRequest request, UserAccount user) {
     if (request.id() != null) {
-      Optional<Inspeccion> existente = inspeccionRepository.findConDetallesById(request.id());
-      if (existente.isPresent() && existente.get().getAutorId().equals(usuarioId)) {
-        return aResponse(existente.get());
+      operaciones.bloquearEntidad("inspeccion", request.id());
+      var existente = inspeccionRepository.findConDetallesById(request.id());
+      if (existente.isPresent()) {
+        var i = existente.get();
+        if (!i.getAutorId().equals(user.getId())
+            || i.getEliminadoEn() != null
+            || !i.getPuente().getId().equals(request.puenteId())
+            || !i.getFechaInspeccion().equals(request.fechaInspeccion())
+            || !i.getDispositivoId().equals(request.dispositivoId())) throw conflictoIdentidad();
+        return aResponse(i);
       }
     }
+    return crearNuevaInspeccion(request, user);
+  }
 
-    return crearNuevaInspeccion(request, user, idempotencyKey);
+  private ApiException conflictoIdentidad() {
+    return new ApiException(
+        HttpStatus.CONFLICT,
+        "inspeccion_identidad_conflictiva",
+        "Conflicto de inspección",
+        "El identificador de inspección ya corresponde a otra solicitud o no está disponible.");
   }
 
   @Transactional
@@ -661,7 +699,7 @@ public class InspeccionService {
   }
 
   private IniciarInspeccionResponse crearNuevaInspeccion(
-      IniciarInspeccionRequest request, UserAccount user, String idempotencyKey) {
+      IniciarInspeccionRequest request, UserAccount user) {
     // 3. Validar puente
     Puente puente =
         puenteRepository
@@ -853,28 +891,6 @@ public class InspeccionService {
         null,
         snapshot,
         "HU-024");
-
-    // 10. Registro de idempotencia si aplica
-    if (idempotencyKey != null && !idempotencyKey.isBlank()) {
-      String hashSolicitud = calcularHash(request.toString());
-      OperacionIdempotente op =
-          new OperacionIdempotente(
-              UuidV7Generator.generate(),
-              user.getId(),
-              idempotencyKey,
-              "POST",
-              "/api/v1/inspecciones",
-              hashSolicitud,
-              "COMPLETADA",
-              201,
-              snapshot,
-              "inspeccion",
-              inspeccion.getId(),
-              ahora,
-              ahora.plus(Duration.ofDays(7)),
-              ahora);
-      operacionIdempotenteRepository.save(op);
-    }
 
     IniciarInspeccionResponse response = aResponse(inspeccion);
     if (advertenciaGps) {

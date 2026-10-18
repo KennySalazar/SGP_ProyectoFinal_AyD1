@@ -88,6 +88,7 @@ import org.testcontainers.utility.DockerImageName;
   TransicionInspeccionService.class,
   CorreccionInspeccionService.class,
   InspeccionService.class,
+  gt.usac.cunoc.sgp.sync.service.OperacionIdempotenteService.class,
   PublicacionIndiceCondicionService.class,
   ConfirmacionEstadoIcService.class,
   PreparadorEntradaIcService.class,
