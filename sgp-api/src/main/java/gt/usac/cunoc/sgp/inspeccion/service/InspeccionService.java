@@ -404,14 +404,10 @@ public class InspeccionService {
             ? request.nombreAutorCapturado()
             : "Inspector";
 
-    if (RoleName.ESTUDIANTE.name().equals(rolUsuario)) {
-      if (request.asignacionPuenteId() == null
-          || asignaciones == null
+    if (RoleName.ESTUDIANTE.name().equals(rolUsuario) && request.asignacionPuenteId() != null) {
+      if (asignaciones == null
           || !asignaciones.existsVigenteParaInspeccion(
-              request.asignacionPuenteId(), usuarioId, puente.getId())
-          || asignaciones
-              .findVigentePorId(request.asignacionPuenteId(), usuarioId, fecha)
-              .isEmpty()) {
+              request.asignacionPuenteId(), usuarioId, puente.getId())) {
         throw new ApiException(
             HttpStatus.NOT_FOUND,
             "asignacion_no_encontrada",
@@ -811,10 +807,10 @@ public class InspeccionService {
     if (user.getRole().getName() == RoleName.ESTUDIANTE) {
       if (asignaciones == null) {
         throw new ApiException(
-            HttpStatus.NOT_FOUND,
-            "asignacion_no_encontrada",
-            "Asignación no encontrada",
-            "No existe una asignación vigente del estudiante para este puente.");
+            HttpStatus.FORBIDDEN,
+            "puente_no_asignado",
+            "Puente no asignado",
+            "El estudiante no tiene una asignación vigente para este puente.");
       }
       asignacionPuenteId =
           asignaciones
@@ -823,10 +819,10 @@ public class InspeccionService {
               .orElseThrow(
                   () ->
                       new ApiException(
-                          HttpStatus.NOT_FOUND,
-                          "asignacion_no_encontrada",
-                          "Asignación no encontrada",
-                          "No existe una asignación vigente del estudiante para este puente."));
+                          HttpStatus.FORBIDDEN,
+                          "puente_no_asignado",
+                          "Puente no asignado",
+                          "El estudiante no tiene una asignación vigente para este puente."));
     }
 
     // 4. Versión activa de formulario (fijada para la inspección)
