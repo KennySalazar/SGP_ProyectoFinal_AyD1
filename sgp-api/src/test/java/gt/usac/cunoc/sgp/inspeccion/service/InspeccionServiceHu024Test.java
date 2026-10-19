@@ -28,6 +28,7 @@ import gt.usac.cunoc.sgp.inspeccion.model.ResultadoCalculoIc;
 import gt.usac.cunoc.sgp.inspeccion.repository.InspeccionDatoTecnicoRepository;
 import gt.usac.cunoc.sgp.inspeccion.repository.InspeccionRepository;
 import gt.usac.cunoc.sgp.puente.entity.Puente;
+import gt.usac.cunoc.sgp.puente.repository.AsignacionPuenteRepository;
 import gt.usac.cunoc.sgp.puente.repository.PuenteRepository;
 import gt.usac.cunoc.sgp.sync.entity.OperacionIdempotente;
 import gt.usac.cunoc.sgp.sync.repository.OperacionIdempotenteRepository;
@@ -69,6 +70,7 @@ class InspeccionServiceHu024Test {
   @Mock private InspeccionRepository inspeccionRepository;
   @Mock private InspeccionDatoTecnicoRepository datoTecnicoRepository;
   @Mock private PuenteRepository puenteRepository;
+  @Mock private AsignacionPuenteRepository asignacionPuenteRepository;
   @Mock private VersionFormularioRepository versionFormularioRepository;
   @Mock private UserAccountRepository userAccountRepository;
   @Mock private UsuarioProfesionalRepository profesionalRepository;
@@ -110,6 +112,7 @@ class InspeccionServiceHu024Test {
             new CalculadorProgresoBorrador(),
             preparadorEntradaIcService,
             calculoIndiceCondicionService);
+    inspeccionService.setAsignacionPuenteRepository(asignacionPuenteRepository);
 
     Role rolCatedratico = crearRol(RoleName.CATEDRATICO);
     Role rolProfesional = crearRol(RoleName.PROFESIONAL_EXTERNO);
@@ -288,10 +291,11 @@ class InspeccionServiceHu024Test {
   }
 
   @Test
-  @DisplayName("Estudiante o Administrador recibe 403 Forbidden")
-  void iniciarInspeccion_falla_estudiante_lanza403() {
+  @DisplayName("Estudiante sin asignación vigente recibe 403 Forbidden")
+  void iniciarInspeccion_falla_estudianteSinAsignacion_lanza403() {
     UUID usuarioId = estudiante.getId();
     when(userAccountRepository.findWithRoleById(usuarioId)).thenReturn(Optional.of(estudiante));
+    when(puenteRepository.findById(puenteActivo.getId())).thenReturn(Optional.of(puenteActivo));
 
     IniciarInspeccionRequest request =
         new IniciarInspeccionRequest(
@@ -309,6 +313,52 @@ class InspeccionServiceHu024Test {
     assertThatThrownBy(() -> inspeccionService.iniciarInspeccionHu024(request, usuarioId, null))
         .isInstanceOf(ApiException.class)
         .matches(e -> ((ApiException) e).getStatus() == HttpStatus.FORBIDDEN);
+  }
+
+  @Test
+  @DisplayName("Estudiante con asignación vigente inicia un borrador vinculado")
+  void iniciarInspeccion_exitoso_estudianteAsignado() {
+    UUID usuarioId = estudiante.getId();
+    UUID asignacionId = UUID.randomUUID();
+    var asignacion =
+        org.mockito.Mockito.mock(AsignacionPuenteRepository.AsignacionInspeccionProjection.class);
+    when(asignacion.getId()).thenReturn(asignacionId);
+    when(userAccountRepository.findWithRoleById(usuarioId)).thenReturn(Optional.of(estudiante));
+    when(puenteRepository.findById(puenteActivo.getId())).thenReturn(Optional.of(puenteActivo));
+    when(asignacionPuenteRepository.findVigenteParaInspeccion(
+            usuarioId, puenteActivo.getId(), LocalDate.of(2026, 10, 15)))
+        .thenReturn(Optional.of(asignacion));
+    when(versionFormularioRepository.findByActivaTrue()).thenReturn(Optional.of(versionActiva));
+
+    IniciarInspeccionRequest request =
+        new IniciarInspeccionRequest(
+            null,
+            puenteActivo.getId(),
+            LocalDate.of(2026, 10, 15),
+            "disp-estudiante",
+            null,
+            null,
+            null,
+            null,
+            false,
+            null);
+
+    IniciarInspeccionResponse response =
+        inspeccionService.iniciarInspeccionHu024(request, usuarioId, null);
+
+    assertThat(response.rolAutor()).isEqualTo("ESTUDIANTE");
+    ArgumentCaptor<Inspeccion> inspeccion = ArgumentCaptor.forClass(Inspeccion.class);
+    verify(inspeccionRepository).save(inspeccion.capture());
+    assertThat(inspeccion.getValue().getAsignacionPuenteId()).isEqualTo(asignacionId);
+    verify(auditoriaWriter)
+        .registrarEnTransaccion(
+            eq(usuarioId),
+            eq(AccionAuditoria.CREAR),
+            eq("inspeccion"),
+            eq(response.id()),
+            eq(null),
+            any(),
+            eq("HU-035"));
   }
 
   @Test
@@ -814,8 +864,8 @@ class InspeccionServiceHu024Test {
   }
 
   @Test
-  @DisplayName("HU-025: Rechaza edición por usuario diferente al autor con 403 Forbidden")
-  void guardarBorrador_otroUsuario_lanza403() {
+  @DisplayName("HU-035: Oculta el borrador a un usuario diferente al autor con 404 Not Found")
+  void guardarBorrador_otroUsuario_lanza404() {
     UUID autorId = catedratico.getId();
     UUID otroUsuarioId = profesionalExterno.getId();
     UUID inspeccionId = UUID.randomUUID();
@@ -846,8 +896,8 @@ class InspeccionServiceHu024Test {
     assertThatThrownBy(
             () -> inspeccionService.guardarBorrador(inspeccionId, request, otroUsuarioId))
         .isInstanceOf(ApiException.class)
-        .matches(e -> ((ApiException) e).getStatus() == HttpStatus.FORBIDDEN)
-        .hasMessageContaining("Solo el autor puede modificar esta inspección");
+        .matches(e -> ((ApiException) e).getStatus() == HttpStatus.NOT_FOUND)
+        .hasMessageContaining("no tiene acceso");
   }
 
   @Test
@@ -1109,6 +1159,44 @@ class InspeccionServiceHu024Test {
     assertThatThrownBy(() -> inspeccionService.obtenerBorrador(inspeccionId, otroUsuarioId))
         .isInstanceOf(ApiException.class)
         .matches(e -> ((ApiException) e).getStatus() == HttpStatus.NOT_FOUND);
+  }
+
+  @Test
+  @DisplayName("HU-035: El Catedrático asignado consulta el borrador estudiantil")
+  void obtenerBorrador_catedraticoAsignado_retornaSoloLosDatos() {
+    UUID autorId = estudiante.getId();
+    UUID catedraticoId = catedratico.getId();
+    UUID inspeccionId = UUID.randomUUID();
+    UUID asignacionId = UUID.randomUUID();
+    Inspeccion inspeccion =
+        new Inspeccion(
+            inspeccionId,
+            puenteActivo,
+            versionActiva,
+            autorId,
+            "ESTUDIANTE",
+            "Alumno",
+            LocalDate.of(2026, 10, 15),
+            "disp-1",
+            null,
+            null,
+            null,
+            null,
+            objectMapper.createObjectNode(),
+            AHORA);
+    inspeccion.setAsignacionPuenteId(asignacionId);
+    ReflectionTestUtils.setField(inspeccion, "version", 0L);
+    when(inspeccionRepository.findConDetallesById(inspeccionId))
+        .thenReturn(Optional.of(inspeccion));
+    when(asignacionPuenteRepository.perteneceACatedratico(asignacionId, catedraticoId))
+        .thenReturn(true);
+
+    InspeccionBorradorResponse response =
+        inspeccionService.obtenerBorrador(inspeccionId, catedraticoId);
+
+    assertThat(response.id()).isEqualTo(inspeccionId);
+    assertThat(response.autorId()).isEqualTo(autorId);
+    assertThat(response.rolAutor()).isEqualTo("ESTUDIANTE");
   }
 
   private String hashSolicitudInicio() {

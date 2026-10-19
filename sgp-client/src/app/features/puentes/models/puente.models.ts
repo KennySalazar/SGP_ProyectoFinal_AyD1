@@ -171,6 +171,8 @@ export interface AsignacionPuenteResponse {
   puenteCodigo: string;
   puenteNombre: string;
   asignadoEn: string;
+  inspeccionId?: string | null;
+  estadoInspeccion?: string | null;
 }
 
 export interface PuenteProblemDetails extends ProblemDetails {

@@ -241,6 +241,14 @@
   margin-top: 0.5rem;
 }
 
+.boton-iniciar-inspeccion {
+  color: #fff;
+
+  i {
+    color: inherit;
+  }
+}
+
 /* Vista de resultado exitoso */
 .resultado-exito {
   display: flex;

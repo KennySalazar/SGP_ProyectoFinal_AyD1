@@ -2,6 +2,7 @@ package gt.usac.cunoc.sgp.puente.repository;
 
 import gt.usac.cunoc.sgp.puente.entity.AsignacionPuente;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -103,6 +104,78 @@ public interface AsignacionPuenteRepository extends JpaRepository<AsignacionPuen
   List<AsignacionPuenteProjection> findActivasByEstudianteId(
       @Param("estudianteId") UUID estudianteId);
 
+  @Query(
+      """
+      SELECT ap.id AS id, ce.id AS cursoEstudianteId, u.email AS estudianteEmail,
+             a.nombre AS cursoNombre, c.periodo AS periodo, p.id AS puenteId,
+             p.codigo AS puenteCodigo, p.nombre AS puenteNombre, ap.asignadoEn AS asignadoEn
+      FROM AsignacionPuente ap
+      JOIN ap.cursoEstudiante ce
+      JOIN ce.curso c
+      JOIN c.asignatura a
+      JOIN ce.estudiante u
+      JOIN ap.puente p
+      WHERE u.id = :estudianteId
+        AND ap.revocadoEn IS NULL
+        AND ce.estado = 'ACTIVO'
+        AND c.activo = true
+        AND c.fechaInicio <= :fecha
+        AND c.fechaFin >= :fecha
+        AND p.activo = true
+      ORDER BY ap.asignadoEn DESC
+      """)
+  List<AsignacionPuenteProjection> findVigentesByEstudianteId(
+      @Param("estudianteId") UUID estudianteId, @Param("fecha") LocalDate fecha);
+
+  @Query(
+      """
+      SELECT ap.id AS id, c.catedratico.id AS catedraticoId
+      FROM AsignacionPuente ap
+      JOIN ap.cursoEstudiante ce
+      JOIN ce.curso c
+      JOIN ap.puente p
+      WHERE ce.estudiante.id = :estudianteId
+        AND p.id = :puenteId
+        AND ap.revocadoEn IS NULL
+        AND ce.estado = 'ACTIVO'
+        AND c.activo = true
+        AND c.fechaInicio <= :fecha
+        AND c.fechaFin >= :fecha
+      """)
+  Optional<AsignacionInspeccionProjection> findVigenteParaInspeccion(
+      @Param("estudianteId") UUID estudianteId,
+      @Param("puenteId") UUID puenteId,
+      @Param("fecha") LocalDate fecha);
+
+  @Query(
+      """
+      SELECT ap.id AS id, c.catedratico.id AS catedraticoId
+      FROM AsignacionPuente ap
+      JOIN ap.cursoEstudiante ce
+      JOIN ce.curso c
+      WHERE ap.id = :asignacionId
+        AND ce.estudiante.id = :estudianteId
+        AND ap.revocadoEn IS NULL
+        AND ce.estado = 'ACTIVO'
+        AND c.activo = true
+        AND c.fechaInicio <= :fecha
+        AND c.fechaFin >= :fecha
+      """)
+  Optional<AsignacionInspeccionProjection> findVigentePorId(
+      @Param("asignacionId") UUID asignacionId,
+      @Param("estudianteId") UUID estudianteId,
+      @Param("fecha") LocalDate fecha);
+
+  @Query(
+      """
+      SELECT CASE WHEN count(ap) > 0 THEN true ELSE false END
+      FROM AsignacionPuente ap
+      WHERE ap.id = :asignacionId
+        AND ap.cursoEstudiante.curso.catedratico.id = :catedraticoId
+      """)
+  boolean perteneceACatedratico(
+      @Param("asignacionId") UUID asignacionId, @Param("catedraticoId") UUID catedraticoId);
+
   interface AsignacionPuenteProjection {
     UUID getId();
 
@@ -149,5 +222,11 @@ public interface AsignacionPuenteRepository extends JpaRepository<AsignacionPuen
     String getCursoNombre();
 
     String getPeriodo();
+  }
+
+  interface AsignacionInspeccionProjection {
+    UUID getId();
+
+    UUID getCatedraticoId();
   }
 }

@@ -56,7 +56,7 @@ public class InspeccionController {
       summary = "Iniciar una inspección técnica de puente",
       description =
           "Crea una inspección en estado BORRADOR para un puente activo usando la versión activa de formulario. "
-              + "Disponible únicamente para Catedráticos y Profesionales externos verificados. "
+              + "Los Estudiantes requieren una asignación académica vigente; también está disponible para Catedráticos y Profesionales externos verificados. "
               + "Soporta idempotencia mediante el encabezado Idempotency-Key y el UUID de cliente.",
       security = @SecurityRequirement(name = "bearerAuth"))
   public ResponseEntity<IniciarInspeccionResponse> iniciarInspeccion(
@@ -75,13 +75,21 @@ public class InspeccionController {
   @Operation(
       summary = "Iniciar una inspección con una versión publicada específica",
       description =
-          "Crea una inspección en BORRADOR con la versión publicada indicada y valida las respuestas iniciales contra su esquema. No sustituye la versión solicitada por la versión activa.",
+          "Crea una inspección en BORRADOR con la versión publicada indicada y valida las respuestas iniciales contra su esquema. Los Estudiantes requieren una asignación académica vigente. No sustituye la versión solicitada por la versión activa.",
       security = @SecurityRequirement(name = "bearerAuth"))
   public ResponseEntity<IniciarInspeccionVersionadaResponse> iniciarConVersion(
       @Valid @RequestBody IniciarInspeccionVersionadaRequest request,
       Authentication authentication) {
     UUID usuarioId = usuarioId(authentication);
-    var response = inspeccionService.iniciarInspeccion(request, usuarioId, rol(authentication));
+    String rolUsuario = rol(authentication);
+    if ("ESTUDIANTE".equals(rolUsuario) && request.asignacionPuenteId() == null) {
+      throw new ApiException(
+          HttpStatus.FORBIDDEN,
+          "puente_no_asignado",
+          "Puente no asignado",
+          "El estudiante debe indicar una asignación vigente para iniciar la inspección.");
+    }
+    var response = inspeccionService.iniciarInspeccion(request, usuarioId, rolUsuario);
     return ResponseEntity.status(HttpStatus.CREATED).body(response);
   }
 

@@ -1,0 +1,235 @@
+<header class="page-heading">
+  <p class="page-kicker">{{ 'revision.bandeja.kicker' | transloco }}</p>
+  <h1 class="page-title">{{ 'revision.bandeja.title' | transloco }}</h1>
+  <p class="page-description">{{ 'revision.bandeja.description' | transloco }}</p>
+</header>
+
+<nav class="view-tabs" [attr.aria-label]="'revision.bandeja.viewSelector' | transloco">
+  <button
+    type="button"
+    [class.active]="vista() === 'pendientes'"
+    [attr.aria-pressed]="vista() === 'pendientes'"
+    (click)="cambiarVista('pendientes')"
+  >
+    {{ 'revision.bandeja.pendingTab' | transloco }}
+  </button>
+  <button
+    type="button"
+    [class.active]="vista() === 'borradores'"
+    [attr.aria-pressed]="vista() === 'borradores'"
+    (click)="cambiarVista('borradores')"
+  >
+    {{ 'revision.bandeja.draftsTab' | transloco }}
+  </button>
+</nav>
+
+@if (vista() === 'pendientes') {
+<section class="surface-card filtros" aria-labelledby="titulo-filtros">
+  <div class="section-head">
+    <div>
+      <h2 id="titulo-filtros">{{ 'revision.bandeja.filtersTitle' | transloco }}</h2>
+      <p>{{ 'revision.bandeja.filtersNote' | transloco }}</p>
+    </div>
+  </div>
+  <form class="filter-grid" (ngSubmit)="cargar()">
+    <label for="estadoRevision">
+      <span>{{ 'revision.bandeja.state' | transloco }}</span>
+      <p-select
+        inputId="estadoRevision"
+        [options]="estados"
+        optionLabel="label"
+        optionValue="value"
+        [ngModel]="estado()"
+        (ngModelChange)="estado.set($event)"
+        name="estado"
+      />
+    </label>
+    <label>
+      <span>{{ 'revision.bandeja.bridge' | transloco }}</span>
+      <input pInputText [ngModel]="puente()" (ngModelChange)="puente.set($event)" name="puente" />
+    </label>
+    <label>
+      <span>{{ 'revision.bandeja.student' | transloco }}</span>
+      <input
+        pInputText
+        [ngModel]="estudiante()"
+        (ngModelChange)="estudiante.set($event)"
+        name="estudiante"
+      />
+    </label>
+    <label>
+      <span>{{ 'revision.bandeja.course' | transloco }}</span>
+      <input pInputText [ngModel]="curso()" (ngModelChange)="curso.set($event)" name="curso" />
+    </label>
+    <label>
+      <span>{{ 'revision.bandeja.from' | transloco }}</span>
+      <input
+        pInputText
+        type="date"
+        [ngModel]="fechaDesde()"
+        (ngModelChange)="fechaDesde.set($event)"
+        name="fechaDesde"
+      />
+    </label>
+    <label>
+      <span>{{ 'revision.bandeja.to' | transloco }}</span>
+      <input
+        pInputText
+        type="date"
+        [ngModel]="fechaHasta()"
+        (ngModelChange)="fechaHasta.set($event)"
+        name="fechaHasta"
+      />
+    </label>
+    <div class="filter-actions">
+      <button pButton type="button" severity="secondary" [outlined]="true" (click)="limpiar()">
+        <span>{{ 'revision.bandeja.clear' | transloco }}</span>
+      </button>
+      <button pButton type="submit" [disabled]="cargando()">
+        <i class="pi pi-filter" aria-hidden="true"></i>
+        <span>{{ 'revision.bandeja.apply' | transloco }}</span>
+      </button>
+    </div>
+  </form>
+</section>
+
+<section class="surface-card bandeja" aria-labelledby="titulo-bandeja">
+  <div class="section-head">
+    <div>
+      <h2 id="titulo-bandeja">{{ 'revision.bandeja.listTitle' | transloco }}</h2>
+      <p>{{ 'revision.bandeja.listNote' | transloco }}</p>
+    </div>
+    @if (pagina(); as resultado) {
+    <strong class="total"
+      >{{ resultado.totalElements }} {{ 'revision.bandeja.total' | transloco }}</strong
+    >
+    }
+  </div>
+
+  @if (mensaje()) {
+  <p class="success" role="status">
+    <i class="pi pi-check-circle" aria-hidden="true"></i>
+    {{ (mensaje() === 'iniciada' ? 'revision.bandeja.started' : 'revision.bandeja.resumed') |
+    transloco }}
+  </p>
+  } @if (cargando()) {
+  <p class="empty" role="status">{{ 'revision.bandeja.loading' | transloco }}</p>
+  } @else if (pagina()?.empty) {
+  <p class="empty" role="status">{{ 'revision.bandeja.empty' | transloco }}</p>
+  } @else {
+  <div class="review-list">
+    @for (revision of pagina()?.content ?? []; track revision.revisionId) {
+    <article class="review-row" [class.delayed]="revision.esperaProlongada">
+      <div class="review-main">
+        <div class="review-title">
+          <h3>{{ revision.puenteCodigo }} · {{ revision.puenteNombre }}</h3>
+          <p-tag
+            [value]="('revision.bandeja.states.' + revision.estadoInspeccion) | transloco"
+            [severity]="severidad(revision.estadoInspeccion)"
+          />
+        </div>
+        <p class="student">
+          <strong>{{ revision.estudianteNombre }}</strong> · {{ revision.estudianteEmail }}
+        </p>
+        <p class="course">
+          {{ revision.cursoNombre }} · {{ revision.periodo }} · {{ 'revision.bandeja.section' |
+          transloco }} {{ revision.seccion }}
+        </p>
+        <div class="metadata">
+          <span>{{ 'revision.bandeja.cycle' | transloco }} {{ revision.numeroCiclo }}</span>
+          <span
+            >{{ 'revision.bandeja.sent' | transloco }} {{ revision.enviadaEn | date: 'dd/MM/yyyy
+            HH:mm' }}</span
+          >
+          <span>{{ revision.diasEnEspera }} {{ 'revision.bandeja.days' | transloco }}</span>
+        </div>
+        @if (revision.esperaProlongada) {
+        <p class="delay-warning">
+          <i class="pi pi-exclamation-triangle" aria-hidden="true"></i>
+          {{ 'revision.bandeja.delayed' | transloco }}
+        </p>
+        }
+      </div>
+      <button pButton type="button" (click)="iniciar(revision)" [disabled]="!!iniciando()">
+        <i
+          [class]="revision.estadoRevision === 'PENDIENTE' ? 'pi pi-play' : 'pi pi-folder-open'"
+          aria-hidden="true"
+        ></i>
+        <span>
+          {{ (iniciando() === revision.revisionId ? 'revision.bandeja.starting' :
+          revision.estadoRevision === 'PENDIENTE' ? 'revision.bandeja.start' :
+          'revision.bandeja.resume' ) | transloco }}
+        </span>
+      </button>
+    </article>
+    }
+  </div>
+  } @if (pagina() && !pagina()!.empty) {
+  <p-paginator
+    [first]="pagina()!.number * pagina()!.size"
+    [rows]="pagina()!.size"
+    [totalRecords]="pagina()!.totalElements"
+    [rowsPerPageOptions]="[10, 20, 50, 100]"
+    (onPageChange)="cambiarPagina($event)"
+  />
+  }
+</section>
+} @else {
+<section class="surface-card bandeja" aria-labelledby="titulo-borradores">
+  <div class="section-head">
+    <div>
+      <h2 id="titulo-borradores">{{ 'revision.bandeja.draftsTitle' | transloco }}</h2>
+      <p>{{ 'revision.bandeja.draftsNote' | transloco }}</p>
+    </div>
+    @if (borradores(); as resultado) {
+    <strong class="total"
+      >{{ resultado.totalElements }} {{ 'revision.bandeja.draftsTotal' | transloco }}</strong
+    >
+    }
+  </div>
+
+  @if (cargando()) {
+  <p class="empty" role="status">{{ 'revision.bandeja.loadingDrafts' | transloco }}</p>
+  } @else if (borradores()?.empty) {
+  <p class="empty" role="status">{{ 'revision.bandeja.emptyDrafts' | transloco }}</p>
+  } @else {
+  <div class="review-list">
+    @for (borrador of borradores()?.content ?? []; track borrador.inspeccionId) {
+    <article class="review-row">
+      <div class="review-main">
+        <div class="review-title">
+          <h3>{{ borrador.puenteCodigo }} · {{ borrador.puenteNombre }}</h3>
+          <p-tag [value]="'revision.bandeja.draftState' | transloco" severity="secondary" />
+        </div>
+        <p class="student">
+          <strong>{{ borrador.estudianteNombre }}</strong> · {{ borrador.estudianteEmail }}
+        </p>
+        <p class="course">
+          {{ borrador.cursoNombre }} · {{ borrador.periodo }} · {{ 'revision.bandeja.section' |
+          transloco }} {{ borrador.seccion }}
+        </p>
+        <div class="metadata">
+          <span
+            >{{ 'revision.bandeja.lastActivity' | transloco }} {{ borrador.ultimaActividadEn | date:
+            'dd/MM/yyyy HH:mm' }}</span
+          >
+        </div>
+      </div>
+      <a pButton [routerLink]="['/inspecciones', borrador.inspeccionId, 'borrador']">
+        <i class="pi pi-eye" aria-hidden="true"></i>
+        <span>{{ 'revision.bandeja.viewReadOnly' | transloco }}</span>
+      </a>
+    </article>
+    }
+  </div>
+  } @if (borradores() && !borradores()!.empty) {
+  <p-paginator
+    [first]="borradores()!.number * borradores()!.size"
+    [rows]="borradores()!.size"
+    [totalRecords]="borradores()!.totalElements"
+    [rowsPerPageOptions]="[10, 20, 50, 100]"
+    (onPageChange)="cambiarPagina($event)"
+  />
+  }
+</section>
+}

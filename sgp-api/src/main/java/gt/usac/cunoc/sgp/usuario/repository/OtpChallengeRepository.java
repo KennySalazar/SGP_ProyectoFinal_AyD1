@@ -28,11 +28,6 @@ public interface OtpChallengeRepository extends JpaRepository<OtpChallenge, UUID
   Optional<OtpChallenge> findForUpdate(@Param("id") UUID id);
 
   @Lock(LockModeType.PESSIMISTIC_WRITE)
-  @Query(
-      "select c from OtpChallenge c join fetch c.user u join fetch u.role where c.user = :user and c.purpose = :purpose and c.consumedAt is null order by c.createdAt desc")
-  Optional<OtpChallenge> findLatestActiveForUpdate(
-      @Param("user") UserAccount user, @Param("purpose") OtpPurpose purpose);
-
   Optional<OtpChallenge> findTopByUserAndPurposeAndConsumedAtIsNullOrderByCreatedAtDesc(
       UserAccount user, OtpPurpose purpose);
 }

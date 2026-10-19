@@ -3,6 +3,7 @@ import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/rou
 import { AuthStore } from '../../core/services/auth.store';
 import { ConnectivityService } from '../../offline/services/connectivity.service';
 import { TranslocoPipe } from '@jsverse/transloco';
+import { RevisionApiService } from '../../features/revision/services/revision-api.service';
 import { CampanaAvisosComponent } from '../../features/notificaciones/components/campana-avisos/campana-avisos.component';
 
 @Component({
@@ -16,7 +17,9 @@ import { CampanaAvisosComponent } from '../../features/notificaciones/components
 export class AppShellComponent {
   readonly auth = inject(AuthStore);
   readonly connectivity = inject(ConnectivityService);
+  readonly revisiones = inject(RevisionApiService);
   private readonly router = inject(Router);
+
   logout(): void {
     this.auth
       .logout()

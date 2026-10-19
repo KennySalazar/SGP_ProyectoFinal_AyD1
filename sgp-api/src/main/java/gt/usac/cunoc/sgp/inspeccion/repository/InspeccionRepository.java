@@ -72,6 +72,9 @@ public interface InspeccionRepository extends JpaRepository<Inspeccion, UUID> {
 
   List<Inspeccion> findByAutorIdOrderByFechaInspeccionDesc(UUID autorId);
 
+  Optional<Inspeccion> findTopByAsignacionPuenteIdAndEliminadoEnIsNullOrderByCreadoEnDesc(
+      UUID asignacionPuenteId);
+
   @Query("SELECT i FROM Inspeccion i WHERE i.id = :id AND i.eliminadoEn IS NULL")
   Optional<Inspeccion> findActiveById(@Param("id") UUID id);
 

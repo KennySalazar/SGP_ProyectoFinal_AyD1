@@ -99,7 +99,7 @@ public class InspeccionService {
   private final CalculoIndiceCondicionService calculoIndiceCondicionService;
   private final JsonSchemaValidatorService jsonSchemaValidatorService;
   private final InspeccionMapper inspeccionMapper;
-  private final AsignacionPuenteRepository asignaciones;
+  private AsignacionPuenteRepository asignaciones;
   private final ResultadoIcRepository resultadoIcRepository;
 
   public InspeccionService(
@@ -268,6 +268,11 @@ public class InspeccionService {
     this.resultadoIcRepository = resultadoIcRepository;
   }
 
+  @Autowired(required = false)
+  void setAsignacionPuenteRepository(AsignacionPuenteRepository asignaciones) {
+    this.asignaciones = asignaciones;
+  }
+
   /** Conserva el contrato de HU-024 utilizado por los consumidores de HU-028. */
   @Transactional
   public IniciarInspeccionResponse iniciarInspeccion(
@@ -399,11 +404,24 @@ public class InspeccionService {
             ? request.nombreAutorCapturado()
             : "Inspector";
 
+    if (RoleName.ESTUDIANTE.name().equals(rolUsuario) && request.asignacionPuenteId() != null) {
+      if (asignaciones == null
+          || !asignaciones.existsVigenteParaInspeccion(
+              request.asignacionPuenteId(), usuarioId, puente.getId())) {
+        throw new ApiException(
+            HttpStatus.NOT_FOUND,
+            "asignacion_no_encontrada",
+            "Asignación no encontrada",
+            "No existe una asignación vigente del estudiante para este puente.");
+      }
+    }
+
     Inspeccion inspeccion =
         new Inspeccion(puente, version, usuarioId, rolUsuario, nombre, fecha, dispositivo, datos);
     if (request.asignacionPuenteId() != null) {
-      if (!asignaciones.existsVigenteParaInspeccion(
-          request.asignacionPuenteId(), usuarioId, puente.getId())) {
+      if (!RoleName.ESTUDIANTE.name().equals(rolUsuario)
+          && !asignaciones.existsVigenteParaInspeccion(
+              request.asignacionPuenteId(), usuarioId, puente.getId())) {
         throw new ApiException(
             HttpStatus.NOT_FOUND,
             "asignacion_no_encontrada",
@@ -479,10 +497,10 @@ public class InspeccionService {
     // 7. Solo el autor puede editar
     if (!inspeccion.getAutorId().equals(usuarioId)) {
       throw new ApiException(
-          HttpStatus.FORBIDDEN,
-          "acceso_denegado",
-          "Acceso denegado",
-          "Solo el autor puede modificar esta inspección en borrador.");
+          HttpStatus.NOT_FOUND,
+          "inspeccion_no_encontrada",
+          "Inspección no encontrada",
+          "No se encontró la inspección especificada o no tiene acceso a ella.");
     }
 
     // 6. Solo BORRADOR puede editarse
@@ -585,9 +603,11 @@ public class InspeccionService {
                         "Inspección no encontrada",
                         "No se encontró la inspección especificada o no tiene acceso a ella."));
 
-    // Privacidad y edición: 404 para usuarios no autorizados, eliminadas o no editables.
+    boolean autor = inspeccion.getAutorId().equals(usuarioId);
+    boolean catedraticoAsignado = esCatedraticoAsignado(inspeccion, usuarioId);
+    // El autor edita; el Catedrático asignado puede consultar el borrador en solo lectura.
     if (inspeccion.getEliminadoEn() != null
-        || !inspeccion.getAutorId().equals(usuarioId)
+        || (!autor && !catedraticoAsignado)
         || !"BORRADOR".equals(inspeccion.getEstado())) {
       throw new ApiException(
           HttpStatus.NOT_FOUND,
@@ -782,6 +802,29 @@ public class InspeccionService {
           "El puente está inactivo y no admite nuevas inspecciones.");
     }
 
+    LocalDate hoyGuatemala = LocalDate.now(clock.withZone(ZONA_GUATEMALA));
+    UUID asignacionPuenteId = null;
+    if (user.getRole().getName() == RoleName.ESTUDIANTE) {
+      if (asignaciones == null) {
+        throw new ApiException(
+            HttpStatus.FORBIDDEN,
+            "puente_no_asignado",
+            "Puente no asignado",
+            "El estudiante no tiene una asignación vigente para este puente.");
+      }
+      asignacionPuenteId =
+          asignaciones
+              .findVigenteParaInspeccion(user.getId(), puente.getId(), hoyGuatemala)
+              .map(AsignacionPuenteRepository.AsignacionInspeccionProjection::getId)
+              .orElseThrow(
+                  () ->
+                      new ApiException(
+                          HttpStatus.FORBIDDEN,
+                          "puente_no_asignado",
+                          "Puente no asignado",
+                          "El estudiante no tiene una asignación vigente para este puente."));
+    }
+
     // 4. Versión activa de formulario (fijada para la inspección)
     VersionFormulario versionActiva =
         versionFormularioRepository
@@ -808,7 +851,6 @@ public class InspeccionService {
     }
 
     // 5. Validar fechas de inspección
-    LocalDate hoyGuatemala = LocalDate.now(clock.withZone(ZONA_GUATEMALA));
     LocalDate fechaInspeccion =
         request.fechaInspeccion() != null ? request.fechaInspeccion() : hoyGuatemala;
     if (fechaInspeccion.isAfter(hoyGuatemala)) {
@@ -904,6 +946,7 @@ public class InspeccionService {
             datosPermanentesConfirmadosEn,
             datosIniciales,
             ahora);
+    inspeccion.setAsignacionPuenteId(asignacionPuenteId);
 
     if (request.confirmarDatosPermanentes() && tecnicoVigente != null) {
       datoTecnico = new InspeccionDatoTecnico(inspeccion, ahora);
@@ -952,7 +995,7 @@ public class InspeccionService {
         inspeccion.getId(),
         null,
         snapshot,
-        "HU-024");
+        user.getRole().getName() == RoleName.ESTUDIANTE ? "HU-035" : "HU-024");
 
     IniciarInspeccionResponse response = aResponse(inspeccion);
     if (advertenciaGps) {
@@ -1025,12 +1068,12 @@ public class InspeccionService {
             "Colegiado no verificado",
             "Tu número de colegiado aún no ha sido verificado por el Administrador.");
       }
-    } else if (role != RoleName.CATEDRATICO) {
+    } else if (role != RoleName.CATEDRATICO && role != RoleName.ESTUDIANTE) {
       throw new ApiException(
           HttpStatus.FORBIDDEN,
           "rol_no_autorizado",
           "Acceso denegado",
-          "Solo Catedráticos y Profesionales externos verificados pueden iniciar inspecciones.");
+          "Solo Estudiantes asignados, Catedráticos y Profesionales externos verificados pueden iniciar inspecciones.");
     }
 
     return user;
@@ -1232,10 +1275,10 @@ public class InspeccionService {
 
     if (!inspeccion.getAutorId().equals(usuarioId)) {
       throw new ApiException(
-          HttpStatus.FORBIDDEN,
-          "acceso_denegado",
-          "Acceso denegado",
-          "Solo el autor puede modificar esta inspección.");
+          HttpStatus.NOT_FOUND,
+          "inspeccion_no_encontrada",
+          "Inspección no encontrada",
+          "No existe la inspección solicitada.");
     }
     if (!"BORRADOR".equalsIgnoreCase(inspeccion.getEstado())) {
       throw new ApiException(
@@ -1308,8 +1351,16 @@ public class InspeccionService {
   @Transactional(readOnly = true)
   public InspeccionResumenResponse consultarPorId(UUID inspeccionId, UUID usuarioId) {
     Inspeccion inspeccion = obtenerInspeccionActiva(inspeccionId);
-    if ("BORRADOR".equalsIgnoreCase(inspeccion.getEstado())
-        && !inspeccion.getAutorId().equals(usuarioId)) {
+    boolean academica = RoleName.ESTUDIANTE.name().equals(inspeccion.getRolAutorCreacion());
+    boolean autorizado =
+        inspeccion.getAutorId().equals(usuarioId) || esCatedraticoAsignado(inspeccion, usuarioId);
+    boolean borradorPrivadoNoAcademico =
+        !academica
+            && "BORRADOR".equalsIgnoreCase(inspeccion.getEstado())
+            && !inspeccion.getAutorId().equals(usuarioId);
+    boolean inspeccionAcademicaPrivada =
+        academica && !"PUBLICADA".equalsIgnoreCase(inspeccion.getEstado()) && !autorizado;
+    if (borradorPrivadoNoAcademico || inspeccionAcademicaPrivada) {
       throw new ApiException(
           HttpStatus.NOT_FOUND,
           "inspeccion_no_encontrada",
@@ -1324,6 +1375,12 @@ public class InspeccionService {
             .map(resumen::conSuperadaPor)
             .orElse(resumen)
         : resumen;
+  }
+
+  private boolean esCatedraticoAsignado(Inspeccion inspeccion, UUID usuarioId) {
+    return inspeccion.getAsignacionPuenteId() != null
+        && asignaciones != null
+        && asignaciones.perteneceACatedratico(inspeccion.getAsignacionPuenteId(), usuarioId);
   }
 
   @Transactional(readOnly = true)

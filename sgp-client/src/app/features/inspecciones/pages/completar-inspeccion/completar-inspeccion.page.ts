@@ -78,6 +78,7 @@ export class CompletarInspeccionPage implements OnInit {
   private revisionGuardada = 0;
   private ultimaHuellaDatos: string | null = null;
   private guardadoForzadoDuranteSolicitud = false;
+  private readonly claveIdempotenciaEnvio = crypto.randomUUID();
 
   protected readonly reporteFotos = viewChild(ReporteFotograficoComponent);
   readonly fotografiasOcupadas = computed(() => this.reporteFotos()?.ocupado() ?? false);
@@ -95,13 +96,18 @@ export class CompletarInspeccionPage implements OnInit {
   readonly esquema = signal<EsquemaJson | null>(null);
   readonly fechaInspeccion = signal<string>('');
   readonly hoy = new Date().toISOString().slice(0, 10);
+  readonly soloLectura = computed(() => {
+    const borrador = this.borrador();
+    return !!borrador && borrador.autorId !== this.auth.user()?.id;
+  });
+
   readonly confirmandoAccion = signal(false);
   readonly ejecutandoAccion = signal(false);
   readonly errorAccion = signal<ErrorAccion | null>(null);
   readonly resultadoAccion = signal<InspeccionResumenResponse | null>(null);
   readonly accionFinal = computed<AccionFinal | null>(() => {
     const b = this.borrador();
-    if (!b || b.estado !== 'BORRADOR') return null;
+    if (!b || b.estado !== 'BORRADOR' || this.soloLectura()) return null;
     if (b.rolAutor === 'CATEDRATICO' || b.rolAutor === 'PROFESIONAL_EXTERNO') return 'publicar';
     return b.rolAutor === 'ESTUDIANTE' ? 'enviar' : null;
   });
@@ -152,7 +158,8 @@ export class CompletarInspeccionPage implements OnInit {
       this.guardarBorrador(false);
     });
     this.destroyRef.onDestroy(() => {
-      if (this.revisionDatos > this.revisionGuardada) this.guardarBorrador(false);
+      if (!this.soloLectura() && this.revisionDatos > this.revisionGuardada)
+        this.guardarBorrador(false);
     });
   }
   ngOnInit(): void {
@@ -227,12 +234,13 @@ export class CompletarInspeccionPage implements OnInit {
       this.ultimaHuellaDatos = huella;
       return;
     }
-    if (huella !== this.ultimaHuellaDatos) {
+    if (!this.soloLectura() && huella !== this.ultimaHuellaDatos) {
       this.ultimaHuellaDatos = huella;
       this.marcarCambio();
     }
   }
   onFechaInspeccionChange(fecha: string): void {
+    if (this.soloLectura()) return;
     if (fecha === this.fechaInspeccion()) return;
     this.fechaInspeccion.set(fecha);
     this.formulario()
@@ -242,7 +250,7 @@ export class CompletarInspeccionPage implements OnInit {
     this.marcarCambio();
   }
   onSeccionCambiando(): void {
-    this.guardarBorrador(false);
+    if (!this.soloLectura()) this.guardarBorrador(false);
   }
   private marcarCambio(): void {
     this.revisionDatos++;
@@ -255,7 +263,8 @@ export class CompletarInspeccionPage implements OnInit {
   guardarBorrador(forzar = true): void {
     const b = this.borrador();
     if (this.ejecutandoAccion() || this.resultadoAccion()) return;
-    if (!b || (!forzar && this.revisionDatos <= this.revisionGuardada)) return;
+    if (!b || this.soloLectura() || (!forzar && this.revisionDatos <= this.revisionGuardada))
+      return;
     if (this.guardando()) {
       this.guardadoForzadoDuranteSolicitud = true;
       return;
@@ -371,7 +380,9 @@ export class CompletarInspeccionPage implements OnInit {
     this.errorAccion.set(null);
     this.apiErrors.clear();
     const peticion =
-      accion === 'publicar' ? this.inspeccionApi.publicar(b.id) : this.inspeccionApi.enviar(b.id);
+      accion === 'publicar'
+        ? this.inspeccionApi.publicar(b.id)
+        : this.inspeccionApi.enviar(b.id, this.claveIdempotenciaEnvio);
     peticion.pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: (resultado) => {
         this.ejecutandoAccion.set(false);
