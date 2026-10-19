@@ -46,6 +46,9 @@ public class Inspeccion {
   @Column(name = "autor_id", nullable = false)
   private UUID autorId;
 
+  @Column(name = "huella_solicitud_inicio", length = 64, updatable = false)
+  private String huellaSolicitudInicio;
+
   @Column(name = "rol_autor_creacion", nullable = false, length = 40)
   private String rolAutorCreacion;
 
@@ -136,6 +139,17 @@ public class Inspeccion {
 
   @OneToOne(mappedBy = "inspeccion", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
   private InspeccionDatoTecnico datoTecnico;
+
+  public String getHuellaSolicitudInicio() {
+    return huellaSolicitudInicio;
+  }
+
+  public void setHuellaSolicitudInicio(String huella) {
+    if (huellaSolicitudInicio != null && !huellaSolicitudInicio.equals(huella)) {
+      throw new IllegalStateException("La huella de inicio es inmutable");
+    }
+    huellaSolicitudInicio = huella;
+  }
 
   public Inspeccion() {}
 

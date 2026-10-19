@@ -1,0 +1,1 @@
+ALTER TABLE inspeccion ADD COLUMN huella_solicitud_inicio VARCHAR(64);

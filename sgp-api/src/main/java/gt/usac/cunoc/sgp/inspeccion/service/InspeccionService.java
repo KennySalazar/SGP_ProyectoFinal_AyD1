@@ -39,6 +39,7 @@ import gt.usac.cunoc.sgp.puente.entity.Puente;
 import gt.usac.cunoc.sgp.puente.repository.AsignacionPuenteRepository;
 import gt.usac.cunoc.sgp.puente.repository.PuenteRepository;
 import gt.usac.cunoc.sgp.sync.model.SolicitudOperacion;
+import gt.usac.cunoc.sgp.sync.service.HuellaSolicitud;
 import gt.usac.cunoc.sgp.sync.service.OperacionIdempotenteService;
 import gt.usac.cunoc.sgp.usuario.entity.UserAccount;
 import gt.usac.cunoc.sgp.usuario.model.RoleName;
@@ -323,7 +324,10 @@ public class InspeccionService {
       var existente = inspeccionRepository.findConDetallesById(request.id());
       if (existente.isPresent()) {
         var i = existente.get();
-        if (!i.getAutorId().equals(user.getId())
+        if ((i.getHuellaSolicitudInicio() != null
+                && !i.getHuellaSolicitudInicio()
+                    .equals(HuellaSolicitud.calcular(objectMapper.valueToTree(request))))
+            || !i.getAutorId().equals(user.getId())
             || i.getEliminadoEn() != null
             || !i.getPuente().getId().equals(request.puenteId())
             || !i.getFechaInspeccion().equals(request.fechaInspeccion())
@@ -946,6 +950,8 @@ public class InspeccionService {
             datosPermanentesConfirmadosEn,
             datosIniciales,
             ahora);
+    inspeccion.setHuellaSolicitudInicio(
+        HuellaSolicitud.calcular(objectMapper.valueToTree(request)));
     inspeccion.setAsignacionPuenteId(asignacionPuenteId);
 
     if (request.confirmarDatosPermanentes() && tecnicoVigente != null) {

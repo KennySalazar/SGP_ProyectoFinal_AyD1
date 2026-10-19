@@ -159,6 +159,48 @@ class IdempotenciaArchivosIntegrationTest {
   }
 
   @Test
+  void uuidV7PropioNoDuplicaYRechazaCambiosDeLaSolicitudSinClave() {
+    UUID id = gt.usac.cunoc.sgp.common.util.UuidV7Generator.generate();
+    var request = inicio(id);
+    var primera = inspecciones.iniciarInspeccion(request, usuario, null);
+    assertThat(inspecciones.iniciarInspeccion(request, usuario, null).id()).isEqualTo(primera.id());
+    var cambiada =
+        new IniciarInspeccionRequest(
+            id,
+            puente,
+            request.fechaInspeccion(),
+            "dispositivo",
+            "Otro nombre",
+            null,
+            null,
+            null,
+            false,
+            null);
+    conflicto(() -> inspecciones.iniciarInspeccion(cambiada, usuario, null));
+    assertThat(jdbc.queryForObject("SELECT count(*) FROM inspeccion WHERE id=?", Integer.class, id))
+        .isEqualTo(1);
+  }
+
+  @Test
+  void uuidAjenoDevuelve409SinRevelarLaInspeccion() {
+    UUID id = gt.usac.cunoc.sgp.common.util.UuidV7Generator.generate();
+    var request = inicio(id);
+    inspecciones.iniciarInspeccion(request, usuario, null);
+    UUID otro = UUID.randomUUID();
+    jdbc.update(
+        "INSERT INTO usuario(id,email,password_hash,rol_id,verificado,activado,activo) SELECT ?,?,'test',id,true,true,true FROM rol WHERE nombre='CATEDRATICO'",
+        otro,
+        otro + "@test.com");
+    assertThatThrownBy(() -> inspecciones.iniciarInspeccion(request, otro, null))
+        .isInstanceOfSatisfying(
+            ApiException.class,
+            e -> {
+              assertThat(e.getStatus().value()).isEqualTo(409);
+              assertThat(e.getMessage()).doesNotContain(usuario.toString(), puente.toString());
+            });
+  }
+
+  @Test
   void fotografiaEInicioNoPuedenConfundirseEnNingunaDireccion() {
     var f = foto("compartida", UUID.randomUUID());
     var reserva = operaciones.reservar(f, json.createObjectNode());

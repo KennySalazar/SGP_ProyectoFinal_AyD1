@@ -33,7 +33,7 @@ public class TransicionInspeccionController {
     this.transiciones = transiciones;
   }
 
-  @PostMapping("/{id}/enviar")
+  @PostMapping({"/{id}/enviar", "/{id}/reenviar"})
   @PreAuthorize("hasRole('ESTUDIANTE')")
   @Operation(
       summary = "Enviar una inspección a revisión",
