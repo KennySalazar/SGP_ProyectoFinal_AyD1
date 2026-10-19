@@ -359,7 +359,7 @@ public class FotografiaService {
                         "Inspección no encontrada."));
     if ("PUBLICADA".equals(i.getEstado()) || i.getAutorId().equals(actor)) return;
     if (rol == RoleName.CATEDRATICO
-        && "BORRADOR".equals(i.getEstado())
+        && Set.of("BORRADOR", "ENVIADA", "EN_REVISION").contains(i.getEstado())
         && i.getAsignacionPuenteId() != null
         && asignaciones.existsVigenteParaLecturaFotografica(
             i.getAsignacionPuenteId(), i.getAutorId(), i.getPuente().getId(), actor)) return;
