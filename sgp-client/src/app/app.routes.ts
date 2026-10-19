@@ -52,6 +52,14 @@ export const routes: Routes = [
         loadChildren: () => import('./features/admin/admin.routes').then((m) => m.adminRoutes),
       },
       {
+        path: 'mantenimiento',
+        canActivate: [roleGuard('ADMINISTRADOR', 'CATEDRATICO')],
+        loadChildren: () =>
+          import('./features/mantenimiento/mantenimiento.routes').then(
+            (m) => m.mantenimientoRoutes,
+          ),
+      },
+      {
         path: '',
         pathMatch: 'full',
         loadChildren: () =>

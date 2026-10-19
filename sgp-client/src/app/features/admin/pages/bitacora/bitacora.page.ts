@@ -1,3 +1,4 @@
+import { RouterLink } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
 import {
   ChangeDetectionStrategy,
@@ -40,6 +41,7 @@ function rangoFechasValido(control: AbstractControl): ValidationErrors | null {
   selector: 'app-bitacora-page',
   standalone: true,
   imports: [
+    RouterLink,
     TranslocoPipe,
     ReactiveFormsModule,
     ButtonModule,

@@ -69,6 +69,11 @@
         <a routerLink="/seguridad" routerLinkActive="active">
           <i class="pi pi-shield"></i><span>{{ 'nav.security' | transloco }}</span>
         </a>
+        @if (auth.user()?.role === 'ADMINISTRADOR' || auth.user()?.role === 'CATEDRATICO') {
+          <a routerLink="/mantenimiento/reglas" routerLinkActive="active">
+            <i class="pi pi-wrench"></i><span>{{ 'nav.maintenanceRules' | transloco }}</span>
+          </a>
+        }
         @if (auth.user()?.role === 'ADMINISTRADOR') {
           <a
             routerLink="/admin"

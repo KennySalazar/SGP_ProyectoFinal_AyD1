@@ -60,7 +60,61 @@
     "myInspections": "Mis inspecciones",
     "reviewInbox": "Bandeja de revisión",
     "pendingReviewsCount": "{{count}} inspecciones por revisar",
-    "avisos": "Avisos"
+    "avisos": "Avisos",
+    "maintenanceRules": "Reglas de mantenimiento"
+  },
+  "mantenimiento": {
+    "kicker": "Mantenimiento",
+    "titulo": "Catálogo de Reglas Daño → Intervención",
+    "descripcion": "Catálogo versionado de reglas que asocian indicadores de daño del formulario con intervenciones técnicas sugeridas.",
+    "advertenciaTitulo": "Atención: Sin reglas activas",
+    "sembrarCatalogo": "Sembrar catálogo provisional (18 reglas)",
+    "totalReglas": "Total de Reglas",
+    "reglasActivas": "Activas",
+    "reglasProvisionales": "Provisionales",
+    "reglasValidadas": "Validadas",
+    "versionFormulario": "Versión del Formulario",
+    "tipoMantenimiento": "Tipo de Mantenimiento",
+    "filtrarElemento": "Filtrar por Elemento",
+    "filtroEstado": "Estado Operativo",
+    "limpiarFiltros": "Limpiar filtros",
+    "nuevaRegla": "Nueva regla",
+    "tituloTabla": "Reglas de Mantenimiento",
+    "subtituloTabla": "Reglas que vinculan deterioros del formulario con órdenes de trabajo propuestas.",
+    "versionActivaLabel": "Versión activa",
+    "thNumero": "N.°",
+    "thCodigo": "Código / Rev.",
+    "thElemento": "Elemento Ref",
+    "thCondicion": "Condición",
+    "thTipo": "Tipo",
+    "thIntervencion": "Intervención Sugerida",
+    "thPrioridad": "Prioridad Base",
+    "thValidacion": "Validación",
+    "thEstado": "Estado",
+    "thAcciones": "Acciones",
+    "verDetalle": "Ver detalle",
+    "ver": "Ver",
+    "validar": "Validar regla",
+    "editar": "Editar (nueva revisión)",
+    "activar": "Activar",
+    "desactivar": "Desactivar",
+    "sinReglas": "No se encontraron reglas de mantenimiento registradas para los filtros seleccionados.",
+    "dialogCrearTitulo": "Crear Nueva Regla de Mantenimiento",
+    "dialogEditarTitulo": "Editar Regla de Mantenimiento (Nueva Revisión)",
+    "dialogValidarTitulo": "Confirmar Validación de Regla",
+    "dialogEstadoTitulo": "Cambiar Estado de Regla",
+    "formCodigo": "Código de la regla",
+    "formElemento": "Elemento Ref (Ruta en el esquema)",
+    "formIndicador": "Indicador de daño",
+    "formOperador": "Operador",
+    "formUmbral": "Umbral / Valor",
+    "formTipo": "Tipo de mantenimiento",
+    "formPrioridad": "Prioridad base",
+    "formIntervencion": "Intervención sugerida",
+    "cancelar": "Cancelar",
+    "guardar": "Guardar regla",
+    "crearRevision": "Crear nueva revisión",
+    "confirmarValidacion": "Marcar como validada"
   },
   "avisos": {
     "title": "Avisos",
@@ -475,7 +529,8 @@
       "deactivate": "Dar de baja",
       "reactivate": "Reactivar",
       "viewDetails": "Ver ficha",
-      "inactiveStatus": "Inactivo"
+      "inactiveStatus": "Inactivo",
+      "backToCatalog": "Volver al catalogo"
     },
     "baja": {
       "title": "Dar de baja puente",
@@ -1241,8 +1296,10 @@
         "drenaje_estado_OBSTRUIDOS": "Drenajes obstruidos",
         "estado_bueno_malo_BUENO": "Estado bueno",
         "estado_bueno_malo_MALO": "Estado malo"
-      }
-    }
+      },
+      "pendientes": "Complete y guarde las reglas de calculo del IC antes de publicar esta version."
+    },
+    "crearSinBaseNota": "Si no selecciona una version base, se cargara la plantilla inicial SIECA. Configure y calibre sus reglas antes de publicarla."
   },
   "inspecciones": {
     "historial": {

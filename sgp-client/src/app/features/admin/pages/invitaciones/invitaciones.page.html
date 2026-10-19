@@ -4,6 +4,29 @@
   <p class="page-description">{{ 'invitaciones.description' | transloco }}</p>
 </header>
 
+<nav class="accesos" [attr.aria-label]="'usuarios.otherTools' | transloco">
+  <a pButton severity="secondary" [outlined]="true" routerLink="/admin">
+    <i class="pi pi-users" aria-hidden="true"></i>
+    <span>{{ 'usuarios.title' | transloco }}</span>
+  </a>
+  <a pButton severity="secondary" [outlined]="true" routerLink="/admin/invitaciones">
+    <i class="pi pi-send" aria-hidden="true"></i>
+    <span>{{ 'invitaciones.open' | transloco }}</span>
+  </a>
+  <a pButton severity="secondary" [outlined]="true" routerLink="/admin/profesionales">
+    <i class="pi pi-id-card" aria-hidden="true"></i>
+    <span>{{ 'profesionales.open' | transloco }}</span>
+  </a>
+  <a pButton severity="secondary" [outlined]="true" routerLink="/admin/bitacora">
+    <i class="pi pi-history" aria-hidden="true"></i>
+    <span>{{ 'auditoria.open' | transloco }}</span>
+  </a>
+  <a pButton severity="secondary" [outlined]="true" routerLink="/admin/formularios">
+    <i class="pi pi-file-edit" aria-hidden="true"></i>
+    <span>{{ 'formulario.open' | transloco }}</span>
+  </a>
+</nav>
+
 <section class="surface-card invitar-card" aria-labelledby="invitar-titulo">
   <h2 id="invitar-titulo">{{ 'invitaciones.formTitle' | transloco }}</h2>
   <form

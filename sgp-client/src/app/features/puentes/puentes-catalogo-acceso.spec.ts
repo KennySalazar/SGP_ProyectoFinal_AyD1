@@ -12,6 +12,7 @@ import { ApiErrorService } from '../../core/services/api-error.service';
 import { AuthStore } from '../../core/services/auth.store';
 import { authInterceptor } from '../../core/interceptors/auth.interceptor';
 import { TokenRefreshService } from '../../core/services/token-refresh.service';
+import { CampanaAvisosComponent } from '../notificaciones/components/campana-avisos/campana-avisos.component';
 import { AppShellComponent } from '../../layouts/app-shell/app-shell.component';
 import { ConnectivityService } from '../../offline/services/connectivity.service';
 import { CatalogoPuentesPage } from './pages/catalogo-puentes/catalogo-puentes.page';
@@ -22,6 +23,9 @@ import { MapaPuentesComponent } from './pages/catalogo-puentes/mapa-puentes/mapa
 
 @Component({ selector: 'app-destino-test', template: '' })
 class DestinoTest {}
+
+@Component({ selector: 'app-campana-avisos', template: '' })
+class CampanaAvisosTest {}
 
 @Pipe({ name: 'transloco' })
 class TraduccionTestPipe implements PipeTransform {
@@ -145,8 +149,8 @@ describe('Lista integrada en el catálogo público sin sesión', () => {
       add: { imports: [TraduccionTestPipe] },
     });
     TestBed.overrideComponent(AppShellComponent, {
-      remove: { imports: [TranslocoPipe] },
-      add: { imports: [TraduccionTestPipe] },
+      remove: { imports: [TranslocoPipe, CampanaAvisosComponent] },
+      add: { imports: [TraduccionTestPipe, CampanaAvisosTest] },
     });
     TestBed.overrideComponent(MapaPuentesComponent, {
       set: {

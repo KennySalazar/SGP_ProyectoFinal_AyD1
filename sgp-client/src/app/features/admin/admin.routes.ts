@@ -25,6 +25,10 @@ export const adminRoutes: Routes = [
     loadChildren: () => import('../formulario/formulario.routes').then((m) => m.formularioRoutes),
   },
   {
+    path: 'reglas-mantenimiento',
+    redirectTo: '/mantenimiento/reglas',
+  },
+  {
     path: '',
     pathMatch: 'full',
     loadComponent: () => import('./pages/usuarios/usuarios.page').then((m) => m.UsuariosPage),
