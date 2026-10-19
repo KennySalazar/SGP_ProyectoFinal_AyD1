@@ -208,8 +208,13 @@ export class NotificacionesStore implements OnDestroy {
       return null;
     }
     const entidadUpper = entidad.toUpperCase();
-    if (entidadUpper === 'INSPECCION' || entidadUpper === 'REVISION') {
+    if (entidadUpper === 'INSPECCION') {
       return ['/inspecciones', entidadId];
+    }
+    // Las notificaciones anteriores de revisión conservan el identificador del ciclo, no el de
+    // la inspección. La bandeja permite iniciar o reanudar ese ciclo sin construir una ruta inválida.
+    if (entidadUpper === 'REVISION') {
+      return ['/revisiones'];
     }
     if (entidadUpper === 'ORDEN' || entidadUpper === 'MANTENIMIENTO') {
       return ['/mantenimiento', 'ordenes', entidadId];

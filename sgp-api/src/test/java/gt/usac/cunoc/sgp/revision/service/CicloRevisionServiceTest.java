@@ -89,8 +89,8 @@ class CicloRevisionServiceTest {
             eq("INSPECCION_ENVIADA"),
             eq("Inspección enviada para revisión"),
             eq("Un estudiante envió la inspección del puente GT-001."),
-            eq("revision"),
-            eq(creada.getId()),
+            eq("inspeccion"),
+            eq(inspeccionId),
             clave.capture());
     assertThat(clave.getValue()).isEqualTo("revision-enviada:" + creada.getId());
   }
