@@ -1384,8 +1384,7 @@ public class InspeccionService {
   private boolean esCatedraticoAsignado(Inspeccion inspeccion, UUID usuarioId) {
     return inspeccion.getAsignacionPuenteId() != null
         && asignaciones != null
-        && asignaciones.perteneceACatedratico(
-            inspeccion.getAsignacionPuenteId(), usuarioId);
+        && asignaciones.perteneceACatedratico(inspeccion.getAsignacionPuenteId(), usuarioId);
   }
 
   @Transactional(readOnly = true)
