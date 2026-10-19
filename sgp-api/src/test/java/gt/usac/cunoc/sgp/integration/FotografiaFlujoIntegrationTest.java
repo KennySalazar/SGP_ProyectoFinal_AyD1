@@ -362,8 +362,30 @@ class FotografiaFlujoIntegrationTest {
   }
 
   @ParameterizedTest
-  @ValueSource(strings = {"ENVIADA", "EN_REVISION", "CAMBIOS_SOLICITADOS", "RECHAZADA"})
-  void permisoAcademicoNoSeExtiendeFueraDeBorrador(String estado) throws Exception {
+  @ValueSource(strings = {"ENVIADA", "EN_REVISION"})
+  void catedraticoRevisorConsultaLasFotografiasDuranteLaRevision(String estado) throws Exception {
+    var evidencia = evidenciaAcademica();
+    jdbc.update(
+        "UPDATE inspeccion SET estado=?, publicado_en=CURRENT_TIMESTAMP WHERE id=?",
+        estado,
+        evidencia.inspeccion());
+    exigirLecturas(evidencia, usuario, RoleName.CATEDRATICO, 200);
+    exigirLecturas(evidencia, evidencia.autor(), RoleName.ESTUDIANTE, 200);
+  }
+
+  @Test
+  void catedraticoRevisorRecibeListadoVacioCuandoLaInspeccionNoTieneFotografias() {
+    UUID autor = crearUsuario(RoleName.ESTUDIANTE);
+    UUID asignacion = crearAsignacion(autor, puente, usuario);
+    UUID inspeccion = iniciarVersionada(autor, RoleName.ESTUDIANTE, asignacion);
+    jdbc.update("UPDATE inspeccion SET estado='EN_REVISION' WHERE id=?", inspeccion);
+
+    assertThat(fotos.listar(inspeccion, usuario, RoleName.CATEDRATICO)).isEmpty();
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"CAMBIOS_SOLICITADOS", "RECHAZADA"})
+  void permisoAcademicoNoSeExtiendeAFueraDelCicloDeRevision(String estado) throws Exception {
     var evidencia = evidenciaAcademica();
     jdbc.update(
         "UPDATE inspeccion SET estado=?, publicado_en=CURRENT_TIMESTAMP WHERE id=?",
