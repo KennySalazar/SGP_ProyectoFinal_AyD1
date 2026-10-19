@@ -9,7 +9,7 @@ import gt.usac.cunoc.sgp.mantenimiento.dto.CrearReglaMantenimientoRequest;
 import gt.usac.cunoc.sgp.mantenimiento.dto.EditarReglaMantenimientoRequest;
 import gt.usac.cunoc.sgp.mantenimiento.dto.ReglaMantenimientoResponse;
 import gt.usac.cunoc.sgp.mantenimiento.dto.ResumenReglasVersionResponse;
-import gt.usac.cunoc.sgp.mantenimiento.model.TipoMantenimiento;
+import gt.usac.cunoc.sgp.mantenimiento.model.TipoOrden;
 import gt.usac.cunoc.sgp.mantenimiento.service.ReglaMantenimientoService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -59,7 +59,7 @@ public class ReglaMantenimientoController {
           "Lista paginada de reglas con filtros por tipo, elemento, versión del formulario y estado activo.")
   public ResponseEntity<Page<ReglaMantenimientoResponse>> listar(
       @RequestParam(name = "versionId", required = false) UUID versionId,
-      @RequestParam(name = "tipo", required = false) TipoMantenimiento tipo,
+      @RequestParam(name = "tipo", required = false) TipoOrden tipo,
       @RequestParam(name = "elemento", required = false) String elemento,
       @RequestParam(name = "activa", required = false) Boolean activa,
       Pageable pageable) {

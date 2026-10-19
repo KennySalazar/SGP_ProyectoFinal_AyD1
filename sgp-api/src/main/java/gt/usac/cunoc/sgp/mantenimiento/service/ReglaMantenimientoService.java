@@ -13,7 +13,7 @@ import gt.usac.cunoc.sgp.mantenimiento.dto.ReglaMantenimientoResponse;
 import gt.usac.cunoc.sgp.mantenimiento.dto.ResumenReglasVersionResponse;
 import gt.usac.cunoc.sgp.mantenimiento.entity.ReglaMantenimiento;
 import gt.usac.cunoc.sgp.mantenimiento.mapper.ReglaMantenimientoMapper;
-import gt.usac.cunoc.sgp.mantenimiento.model.TipoMantenimiento;
+import gt.usac.cunoc.sgp.mantenimiento.model.TipoOrden;
 import gt.usac.cunoc.sgp.mantenimiento.repository.ReglaMantenimientoRepository;
 import gt.usac.cunoc.sgp.usuario.entity.UserAccount;
 import gt.usac.cunoc.sgp.usuario.model.RoleName;
@@ -113,7 +113,7 @@ public class ReglaMantenimientoService {
       String codigo = nodo.path("codigo").asText();
       String elementoRef = nodo.path("elemento_ref").asText();
       JsonNode condicion = nodo.path("condicion");
-      TipoMantenimiento tipo = TipoMantenimiento.valueOf(nodo.path("tipo_mantenimiento").asText());
+      TipoOrden tipo = TipoOrden.valueOf(nodo.path("tipo_mantenimiento").asText());
       String intervencion = nodo.path("intervencion_sugerida").asText();
       JsonNode reglaPrioridad = nodo.path("regla_prioridad");
 
@@ -151,7 +151,7 @@ public class ReglaMantenimientoService {
   @Transactional(readOnly = true)
   public Page<ReglaMantenimientoResponse> listar(
       UUID versionFormularioId,
-      TipoMantenimiento tipo,
+      TipoOrden tipo,
       String elemento,
       Boolean activa,
       Pageable pageable) {

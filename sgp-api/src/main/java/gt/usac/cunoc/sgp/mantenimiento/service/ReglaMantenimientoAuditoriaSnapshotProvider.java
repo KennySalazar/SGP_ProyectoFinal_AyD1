@@ -3,8 +3,8 @@ package gt.usac.cunoc.sgp.mantenimiento.service;
 import com.fasterxml.jackson.databind.JsonNode;
 import gt.usac.cunoc.sgp.common.audit.service.AuditoriaSnapshotProvider;
 import gt.usac.cunoc.sgp.mantenimiento.entity.ReglaMantenimiento;
-import gt.usac.cunoc.sgp.mantenimiento.model.PrioridadMantenimiento;
-import gt.usac.cunoc.sgp.mantenimiento.model.TipoMantenimiento;
+import gt.usac.cunoc.sgp.mantenimiento.model.PrioridadOrden;
+import gt.usac.cunoc.sgp.mantenimiento.model.TipoOrden;
 import gt.usac.cunoc.sgp.mantenimiento.repository.ReglaMantenimientoRepository;
 import java.time.Instant;
 import java.util.UUID;
@@ -53,10 +53,10 @@ public class ReglaMantenimientoAuditoriaSnapshotProvider implements AuditoriaSna
       UUID versionFormularioId,
       String elementoRef,
       JsonNode condicion,
-      TipoMantenimiento tipoMantenimiento,
+      TipoOrden tipoMantenimiento,
       String intervencionSugerida,
       JsonNode reglaPrioridad,
-      PrioridadMantenimiento prioridadBase,
+      PrioridadOrden prioridadBase,
       boolean activa,
       UUID validadoPorId,
       Instant validadoEn) {}
