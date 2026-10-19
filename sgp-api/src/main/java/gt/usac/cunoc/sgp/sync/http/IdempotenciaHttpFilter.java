@@ -134,9 +134,15 @@ public class IdempotenciaHttpFilter extends OncePerRequestFilter {
 
   private RespuestaIdempotente capturar(ContentCachingResponseWrapper response) {
     var encabezados = new LinkedHashMap<String, String>();
-    for (String nombre : List.of("Content-Type", "Location", "Retry-After", "ETag")) {
+    String tipoContenido = response.getContentType();
+    if (tipoContenido != null) {
+      encabezados.put("Content-Type", tipoContenido);
+    }
+    for (String nombre : List.of("Location", "Retry-After", "ETag")) {
       String valor = response.getHeader(nombre);
-      if (valor != null) encabezados.put(nombre, valor);
+      if (valor != null) {
+        encabezados.put(nombre, valor);
+      }
     }
     return new RespuestaIdempotente(
         response.getStatus(), response.getContentAsByteArray(), encabezados);
@@ -145,7 +151,16 @@ public class IdempotenciaHttpFilter extends OncePerRequestFilter {
   private void escribir(HttpServletResponse response, RespuestaIdempotente resultado)
       throws IOException {
     response.setStatus(resultado.codigo());
-    resultado.encabezados().forEach(response::setHeader);
+    resultado
+        .encabezados()
+        .forEach(
+            (nombre, valor) -> {
+              if ("Content-Type".equalsIgnoreCase(nombre)) {
+                response.setContentType(valor);
+              } else {
+                response.setHeader(nombre, valor);
+              }
+            });
     response.getOutputStream().write(resultado.cuerpo());
   }
 

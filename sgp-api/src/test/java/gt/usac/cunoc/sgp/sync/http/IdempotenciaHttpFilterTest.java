@@ -72,6 +72,7 @@ class IdempotenciaHttpFilterTest {
               .contains("puente");
           var http = (jakarta.servlet.http.HttpServletResponse) s;
           http.setStatus(201);
+          http.setContentType("application/json");
           http.setHeader("Location", "/api/v1/inspecciones/1");
           http.getWriter().write("{\"id\":1}");
         });
@@ -80,6 +81,7 @@ class IdempotenciaHttpFilterTest {
     assertThat(guardada.getValue().codigo()).isEqualTo(201);
     assertThat(guardada.getValue().encabezados())
         .containsEntry("Location", "/api/v1/inspecciones/1");
+    assertThat(guardada.getValue().encabezados()).containsEntry("Content-Type", "application/json");
     assertThat(salida.getContentAsString()).isEqualTo("{\"id\":1}");
   }
 
@@ -97,6 +99,7 @@ class IdempotenciaHttpFilterTest {
     assertThat(salida.getStatus()).isEqualTo(422);
     assertThat(salida.getHeader("Idempotent-Replay")).isEqualTo("true");
     assertThat(salida.getContentAsByteArray()).isEqualTo(respuesta.cuerpo());
+    assertThat(salida.getContentType()).isEqualTo("application/problem+json");
   }
 
   @Test
