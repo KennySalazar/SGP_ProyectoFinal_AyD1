@@ -69,3 +69,61 @@ describe('RevisionApiService', () => {
     request.flush({ estado: 'EN_REVISION' });
   });
 });
+
+describe('RevisionApiService: contratos de HU-037', () => {
+  let api: RevisionApiService;
+  let http: HttpTestingController;
+  beforeEach(() => {
+    TestBed.configureTestingModule({
+      providers: [provideHttpClient(), provideHttpClientTesting()],
+    });
+    api = TestBed.inject(RevisionApiService);
+    http = TestBed.inject(HttpTestingController);
+  });
+  afterEach(() => http.verify());
+  it('consulta detalle, lista, observación, contadores y general sin usar endpoints vivos', () => {
+    api.detalle('r/1').subscribe();
+    api.observaciones('r/1').subscribe();
+    api.observacion('r/1', 'o/2').subscribe();
+    api.contadorObservaciones('r/1').subscribe();
+    api.observacionGeneral('r/1').subscribe();
+    for (const sufijo of [
+      '',
+      '/observaciones',
+      '/observaciones/o%2F2',
+      '/observaciones/contador',
+      '/observaciones/general',
+    ]) {
+      const req = http.expectOne('/api/v1/revisiones/r%2F1' + sufijo);
+      expect(req.request.method).toBe('GET');
+      req.flush({});
+    }
+  });
+  it('envía solo destino y texto al crear, solo texto al editar y conserva el UUID', () => {
+    const destino = {
+      tipo: 'ELEMENTO' as const,
+      elementoRef: '/tramos/longitud',
+      instanciaElementoId: '019abc00-0000-7000-8000-000000000001',
+      categoriaFotografica: null,
+    };
+    api.crearObservacion('r', { destino, texto: 'Revisar' }).subscribe();
+    const crear = http.expectOne('/api/v1/revisiones/r/observaciones');
+    expect(crear.request.method).toBe('POST');
+    expect(crear.request.body).toEqual({ destino, texto: 'Revisar' });
+    crear.flush({});
+    api.editarObservacion('r', 'o', 'Cambio').subscribe();
+    const editar = http.expectOne('/api/v1/revisiones/r/observaciones/o');
+    expect(editar.request.method).toBe('PUT');
+    expect(editar.request.body).toEqual({ texto: 'Cambio' });
+    editar.flush({});
+    api.eliminarObservacion('r', 'o').subscribe();
+    const borrar = http.expectOne('/api/v1/revisiones/r/observaciones/o');
+    expect(borrar.request.method).toBe('DELETE');
+    borrar.flush(null);
+    api.guardarGeneral('r', null).subscribe();
+    const general = http.expectOne('/api/v1/revisiones/r/observaciones/general');
+    expect(general.request.body).toEqual({ texto: null });
+    expect(general.request.method).toBe('PUT');
+    general.flush({ revisionId: 'r', texto: null });
+  });
+});

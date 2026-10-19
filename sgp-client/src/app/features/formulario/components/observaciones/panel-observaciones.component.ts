@@ -18,7 +18,7 @@ import { TranslocoPipe } from '@jsverse/transloco';
 import { ButtonModule } from 'primeng/button';
 import { DialogModule } from 'primeng/dialog';
 import {
-  DestinoElementoObservacion,
+  DestinoNavegableObservacion,
   ObservacionPresentacion,
 } from '../../models/observacion.models';
 
@@ -108,7 +108,7 @@ let secuenciaPanel = 0;
                 @let destino = observacion.destino;
                 <h4>
                   {{
-                    destino.tipo === 'ELEMENTO'
+                    destino.tipo !== 'GENERAL'
                       ? destino.etiqueta
                       : ('observaciones.general' | transloco)
                   }}
@@ -130,7 +130,7 @@ let secuenciaPanel = 0;
                   }}</span>
                 </p>
                 <div class="acciones">
-                  @if (destino.tipo === 'ELEMENTO') {
+                  @if (destino.tipo === 'ELEMENTO' || destino.tipo === 'CATEGORIA_FOTOGRAFICA') {
                     <button
                       pButton
                       type="button"
@@ -295,7 +295,8 @@ export class PanelObservacionesComponent {
   /** Solo controla la presentación; no sustituye la futura autorización del servidor. */
   readonly permitirEdicion = input(false);
   readonly permitirEliminacion = input(false);
-  readonly navegar = output<DestinoElementoObservacion>();
+  readonly navegar = output<DestinoNavegableObservacion>();
+  readonly cerrado = output<void>();
   readonly editar = output<ObservacionPresentacion>();
   readonly eliminar = output<ObservacionPresentacion>();
   protected readonly pendientes = computed(
@@ -350,7 +351,10 @@ export class PanelObservacionesComponent {
   }
 
   protected restaurarFoco(): void {
-    if (!this.desplegable() || !this.abierto()) this.devolverFoco();
+    if (!this.desplegable() || !this.abierto()) {
+      this.devolverFoco();
+      this.cerrado.emit();
+    }
   }
 
   private devolverFoco(): void {

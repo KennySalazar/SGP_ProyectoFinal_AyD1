@@ -1,3 +1,6 @@
+@if (nodo().clase !== 'campo') {
+  <app-anclaje-observaciones [nodo]="nodo()" [control]="control()" />
+}
 @let r = renderizador();
 @if (r) {
   <ng-container

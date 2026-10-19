@@ -1,3 +1,4 @@
+import { AnclajeObservacionesComponent } from '../observaciones/anclaje-observaciones.component';
 import { ChangeDetectionStrategy, Component, computed, inject, input, signal } from '@angular/core';
 import { AbstractControl, FormControl, ReactiveFormsModule } from '@angular/forms';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
@@ -23,7 +24,14 @@ let secuencia = 0;
 @Component({
   selector: 'app-campo-formulario',
   standalone: true,
-  imports: [ReactiveFormsModule, TranslocoPipe, InputTextModule, SelectModule, TextareaModule],
+  imports: [
+    AnclajeObservacionesComponent,
+    ReactiveFormsModule,
+    TranslocoPipe,
+    InputTextModule,
+    SelectModule,
+    TextareaModule,
+  ],
   templateUrl: './campo-formulario.component.html',
   styleUrl: './campo-formulario.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,

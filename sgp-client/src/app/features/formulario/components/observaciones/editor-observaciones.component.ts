@@ -33,7 +33,7 @@ let secuenciaEditor = 0;
       @let seleccionado = destino();
       <p>
         {{
-          seleccionado.tipo === 'ELEMENTO'
+          seleccionado.tipo !== 'GENERAL'
             ? seleccionado.etiqueta
             : ('observaciones.general' | transloco)
         }}
@@ -47,8 +47,14 @@ let secuenciaEditor = 0;
             [maxlength]="2000"
             rows="5"
             required
-            [attr.aria-invalid]="texto.invalid"
-            [attr.aria-describedby]="id + '-contador' + (mostrarError() ? ' ' + id + '-error' : '')"
+            [readOnly]="ocupado()"
+            [attr.aria-invalid]="texto.invalid || errorServidor() !== null"
+            [attr.aria-describedby]="
+              id +
+              '-contador' +
+              (mostrarError() ? ' ' + id + '-error' : '') +
+              (errorServidor() ? ' ' + id + '-servidor' : '')
+            "
           ></textarea>
         </label>
         <p [id]="id + '-contador'" class="contador" aria-live="polite">
@@ -66,8 +72,11 @@ let secuenciaEditor = 0;
             }}
           </p>
         }
+        @if (errorServidor()) {
+          <p [id]="id + '-servidor'" class="validation" role="alert">{{ errorServidor() }}</p>
+        }
         <div class="acciones">
-          <button pButton type="submit" [disabled]="texto.invalid">
+          <button pButton type="submit" [disabled]="texto.invalid || ocupado()">
             {{ 'observaciones.guardar' | transloco }}
           </button>
           <button
@@ -75,6 +84,7 @@ let secuenciaEditor = 0;
             type="button"
             severity="secondary"
             [outlined]="true"
+            [disabled]="ocupado()"
             (click)="cancelar.emit()"
           >
             {{ 'observaciones.cancelar' | transloco }}
@@ -144,6 +154,8 @@ let secuenciaEditor = 0;
 })
 export class EditorObservacionesComponent {
   readonly contexto = input.required<ContextoEditorObservacion>();
+  readonly ocupado = input(false);
+  readonly errorServidor = input<string | null>(null);
   readonly guardar = output<PreparacionObservacion>();
   readonly cancelar = output<void>();
   protected readonly id = `editor-observacion-${++secuenciaEditor}`;
@@ -178,11 +190,11 @@ export class EditorObservacionesComponent {
 
   prepararGuardado(): void {
     this.texto.markAsTouched();
-    if (this.texto.invalid) return;
+    if (this.texto.invalid || this.ocupado()) return;
     const contexto = this.contexto();
     const seleccionado = this.destino();
     const destino =
-      seleccionado.tipo === 'GENERAL'
+      seleccionado.tipo !== 'ELEMENTO'
         ? seleccionado
         : {
             ...seleccionado,

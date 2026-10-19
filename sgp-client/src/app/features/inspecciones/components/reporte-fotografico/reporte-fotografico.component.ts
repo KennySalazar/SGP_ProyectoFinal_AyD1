@@ -7,6 +7,7 @@ import {
   computed,
   inject,
   input,
+  output,
   signal,
   viewChild,
   untracked,
@@ -17,6 +18,7 @@ import { ButtonModule } from 'primeng/button';
 import { DialogModule } from 'primeng/dialog';
 import { SelectModule } from 'primeng/select';
 import { firstValueFrom } from 'rxjs';
+import { MarcadorObservacionesComponent } from '../../../formulario/components/observaciones/marcador-observaciones.component';
 import { AuthStore } from '../../../../core/services/auth.store';
 import {
   FotografiasLocalesService,
@@ -40,14 +42,41 @@ import { ProcesadorFotografiasService } from '../../services/procesador-fotograf
 @Component({
   selector: 'app-reporte-fotografico',
   standalone: true,
-  imports: [ReactiveFormsModule, TranslocoPipe, ButtonModule, SelectModule, DialogModule],
+  imports: [
+    MarcadorObservacionesComponent,
+    ReactiveFormsModule,
+    TranslocoPipe,
+    ButtonModule,
+    SelectModule,
+    DialogModule,
+  ],
   templateUrl: './reporte-fotografico.component.html',
   styleUrl: './reporte-fotografico.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class ReporteFotograficoComponent implements OnDestroy {
-  readonly inspeccion = input.required<
-    IniciarInspeccionResponse | InspeccionBorradorResponse | InspeccionPublicadaDetalleResponse
+  readonly revisionSoloLectura = input<{ id: string; autorId: string; puenteId: string } | null>(
+    null,
+  );
+  readonly observacionesCategoria = input<Partial<Record<CategoriaFoto, number>>>({});
+  readonly permitirObservarCategoria = input(false);
+  readonly observarCategoria = output<CategoriaFoto>();
+  readonly abrirObservacionesCategoria = output<void>();
+  readonly contexto = computed<{ id: string; autorId: string; puenteId: string; estado?: string }>(
+    () => {
+      const contexto = this.revisionSoloLectura() ?? this.inspeccion();
+      if (!contexto)
+        throw new Error(
+          'El reporte requiere una inspección o un contexto de revisión de solo lectura',
+        );
+      return contexto;
+    },
+  );
+  readonly inspeccion = input<
+    | IniciarInspeccionResponse
+    | InspeccionBorradorResponse
+    | InspeccionPublicadaDetalleResponse
+    | undefined
   >();
   readonly soloLectura = input(false);
   readonly contextoElemento = input<{ elementoRef: string; instanciaElementoId?: string } | null>(
@@ -79,11 +108,15 @@ export class ReporteFotograficoComponent implements OnDestroy {
   readonly fotoARetirar = signal<FotografiaResponse | null>(null);
   readonly editable = computed(
     () =>
-      this.auth.user()?.id === this.inspeccion().autorId &&
-      this.inspeccion().estado === 'BORRADOR' &&
+      this.auth.user()?.id === this.contexto().autorId &&
+      this.contexto().estado === 'BORRADOR' &&
       !this.soloLectura() &&
+      !this.revisionSoloLectura() &&
       !this.bloqueada(),
   );
+  confirmadasPorCategoria(categoria: CategoriaFoto) {
+    return this.confirmadas().filter((foto) => foto.categoria === categoria);
+  }
   readonly limiteAlcanzado = computed(() => this.confirmadas().length >= 60);
   readonly conteos = computed(() =>
     CATEGORIAS_FOTO.map((categoria) => ({
@@ -98,7 +131,7 @@ export class ReporteFotograficoComponent implements OnDestroy {
   );
   constructor() {
     effect(() => {
-      const inspeccion = this.inspeccion();
+      const inspeccion = this.contexto();
       const usuario = this.auth.user();
       untracked(() => {
         const contexto = `${usuario?.id}:${usuario?.role}:${inspeccion.id}:${inspeccion.autorId}:${inspeccion.estado}`;
@@ -112,15 +145,20 @@ export class ReporteFotograficoComponent implements OnDestroy {
   private vigente(usuario: string, inspeccion: string, revision: number) {
     return (
       this.auth.user()?.id === usuario &&
-      this.inspeccion().id === inspeccion &&
+      this.contexto().id === inspeccion &&
       this.revision === revision
     );
   }
   private async recargar(usuario: string, id: string, revision: number) {
     const carga = ++this.generacionCarga;
     const vigente = () => this.vigente(usuario, id, revision) && carga === this.generacionCarga;
-    const contexto = this.inspeccion();
-    if (usuario === contexto.autorId && contexto.estado !== 'PUBLICADA') {
+    const contexto = this.contexto();
+    if (
+      !this.revisionSoloLectura() &&
+      usuario === contexto.autorId &&
+      contexto.estado !== undefined &&
+      contexto.estado !== 'PUBLICADA'
+    ) {
       try {
         await this.locales.guardarContexto(
           usuario,
@@ -236,14 +274,14 @@ export class ReporteFotograficoComponent implements OnDestroy {
     const imagen = this.borrador(),
       categoria = this.categoria.value,
       propietarioId = this.auth.user()?.id,
-      inspeccionId = this.inspeccion().id;
+      inspeccionId = this.contexto().id;
     if (
       !this.editable() ||
       this.limiteAlcanzado() ||
       !imagen ||
       !categoria ||
       !propietarioId ||
-      propietarioId !== this.inspeccion().autorId ||
+      propietarioId !== this.contexto().autorId ||
       this.ocupado()
     )
       return;
@@ -288,7 +326,7 @@ export class ReporteFotograficoComponent implements OnDestroy {
       !this.editable() ||
       this.ocupado() ||
       this.auth.user()?.id !== foto.propietarioId ||
-      foto.inspeccionId !== this.inspeccion().id
+      foto.inspeccionId !== this.contexto().id
     )
       return;
     const revision = this.revision;
@@ -338,7 +376,7 @@ export class ReporteFotograficoComponent implements OnDestroy {
     if (
       !this.editable() ||
       this.ocupado() ||
-      foto.inspeccionId !== this.inspeccion().id ||
+      foto.inspeccionId !== this.contexto().id ||
       !this.confirmadas().some((confirmada) => confirmada.id === foto.id)
     )
       return;
@@ -350,7 +388,7 @@ export class ReporteFotograficoComponent implements OnDestroy {
   }
   async retirar(foto: FotografiaResponse) {
     const usuario = this.auth.user()?.id;
-    const id = this.inspeccion().id;
+    const id = this.contexto().id;
     if (
       !usuario ||
       !this.editable() ||

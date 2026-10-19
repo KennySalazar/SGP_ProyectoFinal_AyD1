@@ -1,3 +1,4 @@
+import { CategoriaFoto } from '../../inspecciones/models/fotografia.models';
 import { AnclajeFormulario } from '../utils/anclaje-formulario';
 
 /** Estados de observacion_revision definidos en V9; no representa el estado de un ciclo. */
@@ -13,7 +14,19 @@ export interface DestinoGeneralObservacion {
   readonly tipo: 'GENERAL';
 }
 
-export type DestinoObservacion = DestinoElementoObservacion | DestinoGeneralObservacion;
+export interface DestinoCategoriaObservacion {
+  readonly tipo: 'CATEGORIA_FOTOGRAFICA';
+  readonly categoriaFotografica: CategoriaFoto;
+  readonly etiqueta: string;
+}
+/** Filas antiguas sin destino: visibles, sin atribuirles una ruta o convertirlas en generales. */
+export interface DestinoSinAnclajeObservacion {
+  readonly tipo: 'SIN_ANCLAJE';
+  readonly etiqueta: string;
+}
+export type DestinoNavegableObservacion = DestinoElementoObservacion | DestinoCategoriaObservacion;
+export type DestinoObservacion =
+  DestinoNavegableObservacion | DestinoGeneralObservacion | DestinoSinAnclajeObservacion;
 
 interface DatosObservacion {
   /** Identificador estable suministrado por el consumidor; el componente no genera identidades. */
@@ -24,7 +37,10 @@ interface DatosObservacion {
 /** Modelo de presentación, no entidad ni contrato HTTP. La observación general no es un pendiente. */
 export type ObservacionPresentacion = DatosObservacion &
   (
-    | { readonly destino: DestinoElementoObservacion; readonly estado: EstadoObservacion }
+    | {
+        readonly destino: DestinoNavegableObservacion | DestinoSinAnclajeObservacion;
+        readonly estado: EstadoObservacion;
+      }
     | { readonly destino: DestinoGeneralObservacion; readonly estado: null }
   );
 

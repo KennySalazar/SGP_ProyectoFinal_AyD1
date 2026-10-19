@@ -1,3 +1,4 @@
+import { AnclajeObservacionesComponent } from '../observaciones/anclaje-observaciones.component';
 import { ChangeDetectionStrategy, Component, computed, inject, input } from '@angular/core';
 import { AbstractControl, FormArray, FormGroup } from '@angular/forms';
 import { TranslocoPipe } from '@jsverse/transloco';
@@ -21,7 +22,13 @@ function esTextoLargo(nodo: NodoCampo): boolean {
 @Component({
   selector: 'app-nodo-formulario',
   standalone: true,
-  imports: [TranslocoPipe, ButtonModule, CampoFormularioComponent, RenderizadorNodoDirective],
+  imports: [
+    AnclajeObservacionesComponent,
+    TranslocoPipe,
+    ButtonModule,
+    CampoFormularioComponent,
+    RenderizadorNodoDirective,
+  ],
   templateUrl: './nodo-formulario.component.html',
   styleUrl: './nodo-formulario.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,

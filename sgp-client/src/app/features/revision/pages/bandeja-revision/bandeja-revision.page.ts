@@ -2,7 +2,7 @@ import { DatePipe } from '@angular/common';
 import { ChangeDetectionStrategy, Component, DestroyRef, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
-import { RouterLink } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { ButtonModule } from 'primeng/button';
 import { InputTextModule } from 'primeng/inputtext';
@@ -37,6 +37,7 @@ import { RevisionApiService } from '../../services/revision-api.service';
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class BandejaRevisionPage {
+  private readonly router = inject(Router);
   private readonly api = inject(RevisionApiService);
   private readonly apiErrors = inject(ApiErrorService);
   private readonly destroyRef = inject(DestroyRef);
@@ -129,6 +130,10 @@ export class BandejaRevisionPage {
 
   iniciar(revision: RevisionBandejaResponse): void {
     if (this.iniciando()) return;
+    if (revision.estadoRevision === 'EN_CURSO') {
+      void this.router.navigate(['/revisiones', revision.revisionId]);
+      return;
+    }
     this.iniciando.set(revision.revisionId);
     this.mensaje.set(null);
     this.api
@@ -142,6 +147,7 @@ export class BandejaRevisionPage {
           this.mensaje.set(revision.estadoRevision === 'PENDIENTE' ? 'iniciada' : 'reanudada');
           this.api.cargarContador().pipe(takeUntilDestroyed(this.destroyRef)).subscribe();
           this.cargar(this.pagina()?.number ?? 0);
+          void this.router.navigate(['/revisiones', revision.revisionId]);
         },
         error: (error) => this.apiErrors.normalize(error),
       });

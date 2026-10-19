@@ -4,7 +4,7 @@
   @if (!editable()) {
     <p role="status">
       {{
-        (inspeccion().estado !== 'BORRADOR' || bloqueada()
+        (contexto().estado !== 'BORRADOR' || bloqueada()
           ? 'inspecciones.fotos.errores.estado'
           : 'inspecciones.fotos.soloLectura'
         ) | transloco
@@ -126,30 +126,48 @@
   }
   <h4>{{ 'inspecciones.fotos.confirmadasServidor' | transloco }}</h4>
   <div class="fotografias">
-    @for (foto of confirmadas(); track foto.id) {
-      <figure>
-        @if (foto.miniatura) {
-          <img [src]="foto.miniatura" [alt]="etiqueta(foto.categoria)" />
+    @for (categoria of categorias; track categoria) {
+      <section class="categoria" tabindex="-1" [attr.data-categoria-fotografica]="categoria">
+        <h5>{{ etiqueta(categoria) }}</h5>
+        @if (observacionesCategoria()[categoria]; as cantidad) {
+          <app-marcador-observaciones
+            [cantidad]="cantidad"
+            [interactivo]="true"
+            (abrir)="abrirObservacionesCategoria.emit()"
+          />
         }
-        <figcaption>
-          {{ etiqueta(foto.categoria) }} · {{ 'inspecciones.fotos.confirmada' | transloco }}
-        </figcaption>
-        <button pButton type="button" (click)="abrirOriginal(foto)">
-          {{ 'inspecciones.fotos.original' | transloco }}
-        </button>
-        @if (editable()) {
-          <button
-            pButton
-            type="button"
-            severity="danger"
-            [outlined]="true"
-            [disabled]="ocupado()"
-            (click)="solicitarRetirada(foto)"
-          >
-            {{ 'inspecciones.fotos.retirar' | transloco }}
+        @if (permitirObservarCategoria()) {
+          <button pButton type="button" (click)="observarCategoria.emit(categoria)">
+            <i class="pi pi-comment" aria-hidden="true"></i
+            >{{ 'revision.detalle.observarCategoria' | transloco }} · {{ etiqueta(categoria) }}
           </button>
         }
-      </figure>
+        @for (foto of confirmadasPorCategoria(categoria); track foto.id) {
+          <figure>
+            @if (foto.miniatura) {
+              <img [src]="foto.miniatura" [alt]="etiqueta(foto.categoria)" />
+            }
+            <figcaption>
+              {{ etiqueta(foto.categoria) }} · {{ 'inspecciones.fotos.confirmada' | transloco }}
+            </figcaption>
+            <button pButton type="button" (click)="abrirOriginal(foto)">
+              {{ 'inspecciones.fotos.original' | transloco }}
+            </button>
+            @if (editable()) {
+              <button
+                pButton
+                type="button"
+                severity="danger"
+                [outlined]="true"
+                [disabled]="ocupado()"
+                (click)="solicitarRetirada(foto)"
+              >
+                {{ 'inspecciones.fotos.retirar' | transloco }}
+              </button>
+            }
+          </figure>
+        }
+      </section>
     }
   </div>
   <p-dialog
