@@ -7,6 +7,7 @@ export interface CampoReglaIc {
   etiqueta: string;
   tipo: 'numero' | 'agregacion' | 'texto';
   maximo?: number;
+  valorFijo?: number;
 }
 export type ValoresReglasIc = Record<string, number | string | null>;
 
@@ -36,6 +37,8 @@ export function camposReglasIc(version: VersionFormulario): CampoReglaIc[] {
     agregar(['agregacion', nombre], 'agregacion', nombre, 'numero', 4);
   for (const estado of ['BUENO', 'REGULAR', 'MALO'])
     agregar(['rangos_estado', estado], 'rangos', estado, 'numero', 100);
+  const rangos: Record<string, number> = { BUENO: 75, REGULAR: 50, MALO: 0 };
+  for (const campo of campos) if (campo.grupo === 'rangos') campo.valorFijo = rangos[campo.ruta[1]];
   const elementos = version.reglasEvaluacionIc['elementos'];
   if (!Array.isArray(elementos)) return campos;
   const booleano = (familia: string, nombre: string) => {
@@ -133,15 +136,7 @@ export function erroresReglasIc(campos: CampoReglaIc[], valores: ValoresReglasIc
   const bueno = valor(['rangos_estado', 'BUENO']);
   const regular = valor(['rangos_estado', 'REGULAR']);
   const malo = valor(['rangos_estado', 'MALO']);
-  if (
-    typeof bueno !== 'number' ||
-    typeof regular !== 'number' ||
-    malo !== 0 ||
-    regular <= 0 ||
-    bueno <= regular ||
-    bueno > 100
-  )
-    errores.add('rangosInvalidos');
+  if (bueno !== 75 || regular !== 50 || malo !== 0) errores.add('rangosInvalidos');
   for (const grupo of ['golpeado_longitud_m', 'golpeados_cantidad']) {
     const lista = campos.filter((c) => c.grupo === grupo).map((c) => valores[c.clave]);
     if (

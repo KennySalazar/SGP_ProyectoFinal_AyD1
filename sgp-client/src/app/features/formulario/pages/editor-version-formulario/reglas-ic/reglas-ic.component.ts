@@ -98,7 +98,12 @@ export class ReglasIcComponent {
       }
       this.formulario.addControl(
         campo.clave,
-        new FormControl(this.iniciales[campo.clave], validadores),
+        new FormControl(
+          version.estado === 'BORRADOR' && campo.valorFijo !== undefined
+            ? campo.valorFijo
+            : this.iniciales[campo.clave],
+          validadores,
+        ),
         { emitEvent: false },
       );
     }
@@ -124,7 +129,11 @@ export class ReglasIcComponent {
 
   actualizarEstado(): void {
     const valores = this.formulario.getRawValue();
-    this.errores.set(erroresReglasIc(camposReglasIc(this.version()), valores));
+    this.errores.set(
+      this.version().estado === 'BORRADOR'
+        ? erroresReglasIc(camposReglasIc(this.version()), valores)
+        : [],
+    );
     this.estado.emit({
       pendiente: JSON.stringify(valores) !== JSON.stringify(this.iniciales),
       guardando: this.guardando(),
