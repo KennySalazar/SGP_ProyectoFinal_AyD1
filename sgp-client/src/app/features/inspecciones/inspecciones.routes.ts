@@ -11,22 +11,22 @@ export const inspeccionesRoutes: Routes = [
   },
   {
     path: '',
-    canActivate: [roleGuard('CATEDRATICO', 'PROFESIONAL_EXTERNO')],
+    canActivate: [roleGuard('CATEDRATICO', 'PROFESIONAL_EXTERNO', 'ESTUDIANTE')],
     pathMatch: 'full',
     loadComponent: () =>
       import('./pages/mis-inspecciones/mis-inspecciones.page').then((m) => m.MisInspeccionesPage),
   },
   {
-    path: ':id',
-    canActivate: [roleGuard('CATEDRATICO', 'PROFESIONAL_EXTERNO')],
+    path: ':id/borrador',
+    canActivate: [roleGuard('CATEDRATICO', 'PROFESIONAL_EXTERNO', 'ESTUDIANTE')],
     loadComponent: () =>
       import('./pages/completar-inspeccion/completar-inspeccion.page').then(
         (m) => m.CompletarInspeccionPage,
       ),
   },
   {
-    path: ':id/borrador',
-    canActivate: [roleGuard('CATEDRATICO', 'PROFESIONAL_EXTERNO')],
+    path: ':id',
+    canActivate: [roleGuard('CATEDRATICO', 'PROFESIONAL_EXTERNO', 'ESTUDIANTE')],
     loadComponent: () =>
       import('./pages/completar-inspeccion/completar-inspeccion.page').then(
         (m) => m.CompletarInspeccionPage,

@@ -609,10 +609,13 @@ public class InspeccionService {
 
     boolean autor = inspeccion.getAutorId().equals(usuarioId);
     boolean catedraticoAsignado = esCatedraticoAsignado(inspeccion, usuarioId);
-    // El autor edita; el Catedrático asignado puede consultar el borrador en solo lectura.
+    // El autor solo puede editar su borrador. El catedrático asignado puede consultar la
+    // inspección del estudiante durante el ciclo de revisión, siempre en solo lectura.
+    boolean inspeccionDisponibleParaRevision =
+        Set.of("BORRADOR", "ENVIADA", "EN_REVISION").contains(inspeccion.getEstado());
     if (inspeccion.getEliminadoEn() != null
-        || (!autor && !catedraticoAsignado)
-        || !"BORRADOR".equals(inspeccion.getEstado())) {
+        || !(autor && "BORRADOR".equals(inspeccion.getEstado()))
+            && !(catedraticoAsignado && inspeccionDisponibleParaRevision)) {
       throw new ApiException(
           HttpStatus.NOT_FOUND,
           "inspeccion_no_encontrada",
