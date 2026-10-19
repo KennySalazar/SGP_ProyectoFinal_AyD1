@@ -1224,6 +1224,7 @@ class InspeccionServiceHu024Test {
             AHORA);
     inspeccion.setAsignacionPuenteId(asignacionId);
     ReflectionTestUtils.setField(inspeccion, "estado", "EN_REVISION");
+    ReflectionTestUtils.setField(inspeccion, "version", 0L);
     when(inspeccionRepository.findConDetallesById(inspeccionId))
         .thenReturn(Optional.of(inspeccion));
     when(asignacionPuenteRepository.perteneceACatedratico(asignacionId, catedraticoId))
