@@ -1,3 +1,4 @@
+import { OperacionIdempotenteService } from './operacion-idempotente.service';
 import { FotografiaResponse, MetadatosFotografia } from '../models/fotografia.models';
 import { HttpClient } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
@@ -19,17 +20,17 @@ import { PuenteResponse, PaginaResponse } from '../../puentes/models/puente.mode
 @Injectable({ providedIn: 'root' })
 export class InspeccionApiService {
   private readonly http = inject(HttpClient);
+  private readonly operaciones = inject(OperacionIdempotenteService);
   iniciarInspeccion(
     request: IniciarInspeccionRequest,
     idempotencyKey?: string,
   ): Observable<IniciarInspeccionResponse> {
-    const headers: Record<string, string> = {};
-    if (idempotencyKey) {
-      headers['Idempotency-Key'] = idempotencyKey;
-    }
-    return this.http.post<IniciarInspeccionResponse>('/api/v1/inspecciones', request, {
-      headers,
-    });
+    return this.operaciones.ejecutar<IniciarInspeccionResponse>(
+      'POST',
+      '/api/v1/inspecciones',
+      request,
+      idempotencyKey,
+    );
   }
   obtenerDatosPermanentes(puenteId: string): Observable<DatosPermanentesResponse | null> {
     return this.http
@@ -109,7 +110,8 @@ export class InspeccionApiService {
     id: string,
     request: GuardarBorradorRequest,
   ): Observable<InspeccionBorradorResponse> {
-    return this.http.put<InspeccionBorradorResponse>(
+    return this.operaciones.ejecutar<InspeccionBorradorResponse>(
+      'PUT',
       `/api/v1/inspecciones/${encodeURIComponent(id)}/borrador`,
       request,
     );
@@ -126,10 +128,19 @@ export class InspeccionApiService {
     });
   }
   enviar(id: string, idempotencyKey?: string): Observable<InspeccionResumenResponse> {
-    return this.http.post<InspeccionResumenResponse>(
+    return this.operaciones.ejecutar<InspeccionResumenResponse>(
+      'POST',
       `/api/v1/inspecciones/${encodeURIComponent(id)}/enviar`,
       null,
-      idempotencyKey ? { headers: { 'Idempotency-Key': idempotencyKey } } : {},
+      idempotencyKey,
+    );
+  }
+  reenviar(id: string, idempotencyKey?: string): Observable<InspeccionResumenResponse> {
+    return this.operaciones.ejecutar<InspeccionResumenResponse>(
+      'POST',
+      `/api/v1/inspecciones/${encodeURIComponent(id)}/reenviar`,
+      null,
+      idempotencyKey,
     );
   }
   publicar(id: string): Observable<InspeccionResumenResponse> {

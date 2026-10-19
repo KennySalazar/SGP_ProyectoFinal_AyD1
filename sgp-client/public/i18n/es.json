@@ -1570,7 +1570,10 @@
         "BUENO": "Bueno",
         "REGULAR": "Regular",
         "MALO": "Malo"
-      }
+      },
+      "indicadorPendiente": "Completa la evaluacion pendiente en: {{recorrido}}. Guarda el borrador y vuelve a consultar el IC.",
+      "datosPendientes": "Completa los datos de evaluacion y guarda el borrador antes de consultar el IC.",
+      "seccionPendiente": "Completa la seccion {{seccion}} y guarda el borrador antes de consultar el IC."
     }
   }
 }

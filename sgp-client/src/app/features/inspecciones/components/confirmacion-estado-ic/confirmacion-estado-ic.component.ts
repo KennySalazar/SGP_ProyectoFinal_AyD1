@@ -46,6 +46,7 @@ export class ConfirmacionEstadoIcComponent {
   readonly respuesta = signal<ConfirmacionEstadoIcResponse | null>(null);
   readonly procesando = signal(false);
   readonly error = signal<string | null>(null);
+  readonly seccionPendiente = signal<string | null>(null);
   readonly exito = signal(false);
   readonly restringido = signal(false);
   readonly estados = [
@@ -72,6 +73,7 @@ export class ConfirmacionEstadoIcComponent {
       this.solicitud++;
       this.respuesta.set(null);
       this.error.set(null);
+      this.seccionPendiente.set(null);
       this.exito.set(false);
       this.restringido.set(false);
       this.finalizar();
@@ -146,6 +148,7 @@ export class ConfirmacionEstadoIcComponent {
     this.procesando.set(true);
     this.ocupado.emit(true);
     this.error.set(null);
+    this.seccionPendiente.set(null);
     this.exito.set(false);
   }
 
@@ -157,7 +160,25 @@ export class ConfirmacionEstadoIcComponent {
   private fallar(err: HttpErrorResponse, turno: number): void {
     if (turno !== this.solicitud) return;
     const codigo = err.error?.code;
-    if (err.status === 403) {
+    if (codigo === 'datos_ic_incompletos' && err.status === 422) {
+      this.respuesta.set(null);
+      const secciones: Record<string, string> = {
+        subestructura: 'Subestructura',
+        superestructura: 'Superestructura',
+        elementos_no_estructurales: 'Elementos no estructurales',
+        caracteristicas_cauce: 'Caracteristicas del cauce',
+        identificacion: 'Identificacion del puente',
+        datos_generales: 'Datos generales',
+        tramos: 'Tramos',
+        otros: 'Otros',
+      };
+      const ruta =
+        typeof err.error?.detail === 'string'
+          ? err.error.detail.match(/\/([a-z_]+)/)?.[1]
+          : undefined;
+      this.seccionPendiente.set(ruta ? (secciones[ruta] ?? null) : null);
+      this.error.set('inspecciones.confirmacionIc.datosPendientes');
+    } else if (err.status === 403) {
       this.restringido.set(true);
       this.respuesta.set(null);
       this.error.set('inspecciones.confirmacionIc.noAutorizado');

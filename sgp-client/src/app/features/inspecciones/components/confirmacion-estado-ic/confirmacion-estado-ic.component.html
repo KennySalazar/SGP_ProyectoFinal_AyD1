@@ -20,7 +20,12 @@
     }}
   </button>
   @if (error(); as mensaje) {
-    <p class="error" role="alert">{{ mensaje | transloco }}</p>
+    <p class="error" role="alert">
+      {{
+        (seccionPendiente() ? 'inspecciones.confirmacionIc.seccionPendiente' : mensaje)
+          | transloco: { seccion: seccionPendiente() }
+      }}
+    </p>
   }
   @if (calculo(); as c) {
     <dl>
