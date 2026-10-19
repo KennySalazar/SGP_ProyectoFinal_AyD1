@@ -262,4 +262,19 @@ describe('IniciarInspeccionDialogComponent', () => {
     expect(component.resultado()).toEqual(contexto);
     expect(mockApi.iniciarInspeccion).not.toHaveBeenCalled();
   });
+  it('permite corregir el formulario y usa otro UUID despues de un error determinista', () => {
+    mockApi.iniciarInspeccion.mockReturnValue(
+      throwError(() => ({ status: 422, error: { detail: 'Revise la fecha' } })),
+    );
+    component.form.patchValue({ fechaInspeccion: component.hoy });
+    component.iniciarInspeccion();
+    const primera = mockApi.iniciarInspeccion.mock.calls[0];
+    expect(component.form.enabled).toBe(true);
+    component.form.patchValue({ nombreAutor: 'Corregido' });
+    component.iniciarInspeccion();
+    const segunda = mockApi.iniciarInspeccion.mock.calls[1];
+    expect(segunda[0].nombreAutor).toBe('Corregido');
+    expect(segunda[0].id).not.toBe(primera[0].id);
+    expect(segunda[1]).not.toBe(primera[1]);
+  });
 });

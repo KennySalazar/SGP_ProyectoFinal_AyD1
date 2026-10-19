@@ -1,3 +1,4 @@
+import { esResultadoIncierto } from '../../services/operacion-idempotente.service';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -284,6 +285,11 @@ export class IniciarInspeccionDialogComponent implements OnChanges {
         this.inspeccionIniciada.emit(res);
       },
       error: (err) => {
+        if (this.auth.user()?.id !== actor || this.puente?.id !== request.puenteId) return;
+        if (!esResultadoIncierto(err)) {
+          this.solicitudInicio = null;
+          this.form.enable({ emitEvent: false });
+        }
         this.guardando.set(false);
         const backendMsg =
           err.error?.message ||

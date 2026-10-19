@@ -1,3 +1,5 @@
+import { mensajeCampo } from '../../utils/nombre-campo';
+import { esResultadoIncierto } from '../../services/operacion-idempotente.service';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -78,7 +80,7 @@ export class CompletarInspeccionPage implements OnInit {
   private revisionGuardada = 0;
   private ultimaHuellaDatos: string | null = null;
   private guardadoForzadoDuranteSolicitud = false;
-  private readonly claveIdempotenciaEnvio = crypto.randomUUID();
+  private guardadoPendiente: { request: GuardarBorradorRequest; revision: number } | null = null;
 
   protected readonly reporteFotos = viewChild(ReporteFotograficoComponent);
   readonly fotografiasOcupadas = computed(() => this.reporteFotos()?.ocupado() ?? false);
@@ -296,8 +298,8 @@ export class CompletarInspeccionPage implements OnInit {
         fecha_inspeccion: fecha || b.fechaInspeccion,
       },
     };
-    const revisionSolicitud = this.revisionDatos;
-    const request: GuardarBorradorRequest = {
+    const revisionSolicitud = this.guardadoPendiente?.revision ?? this.revisionDatos;
+    const request: GuardarBorradorRequest = this.guardadoPendiente?.request ?? {
       version: b.version,
       datos: valorActual,
       identificacionCapturada:
@@ -314,10 +316,12 @@ export class CompletarInspeccionPage implements OnInit {
           numeroColegiado: a.numeroColegiado ?? a.colegiado,
         })) ?? null,
     };
+    this.guardadoPendiente = { request: structuredClone(request), revision: revisionSolicitud };
     this.guardando.set(true);
     this.estadoAutoguardado.set('guardando');
     this.inspeccionApi.guardarBorrador(b.id, request).subscribe({
       next: (actualizada) => {
+        this.guardadoPendiente = null;
         this.guardando.set(false);
         this.borrador.set(actualizada);
         this.revisionGuardada = Math.max(this.revisionGuardada, revisionSolicitud);
@@ -338,6 +342,7 @@ export class CompletarInspeccionPage implements OnInit {
         }
       },
       error: (err: HttpErrorResponse) => {
+        if (!esResultadoIncierto(err)) this.guardadoPendiente = null;
         this.guardando.set(false);
         this.estadoAutoguardado.set(null);
         this.procesarErrorGuardado(err);
@@ -380,9 +385,7 @@ export class CompletarInspeccionPage implements OnInit {
     this.errorAccion.set(null);
     this.apiErrors.clear();
     const peticion =
-      accion === 'publicar'
-        ? this.inspeccionApi.publicar(b.id)
-        : this.inspeccionApi.enviar(b.id, this.claveIdempotenciaEnvio);
+      accion === 'publicar' ? this.inspeccionApi.publicar(b.id) : this.inspeccionApi.enviar(b.id);
     peticion.pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: (resultado) => {
         this.ejecutandoAccion.set(false);
@@ -422,7 +425,10 @@ export class CompletarInspeccionPage implements OnInit {
       mensaje: problema?.detail ?? 'No fue posible completar la acción sobre la inspección.',
       campos: errores
         .filter((e) => e.campo && !e.campo.startsWith('fotografias.'))
-        .map((e) => ({ campo: e.campo ?? '', mensaje: e.mensaje ?? '' })),
+        .map((e) => ({
+          campo: e.campo ?? '',
+          mensaje: mensajeCampo(e.campo ?? '', e.mensaje ?? '', this.esquema()),
+        })),
       fotografias: errores
         .filter((e) => e.campo?.startsWith('fotografias.'))
         .map((e) => (e.campo ?? '').replace('fotografias.', '')),

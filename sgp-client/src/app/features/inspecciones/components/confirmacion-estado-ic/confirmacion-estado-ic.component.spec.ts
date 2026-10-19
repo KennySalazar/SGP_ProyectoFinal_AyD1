@@ -256,4 +256,38 @@ describe('Confirmacion del estado calculado HU032', () => {
     expect(component.procesando()).toBe(false);
     expect(component.calculo()?.indiceCalculado).toBe(80);
   });
+  it('explica la seccion pendiente sin mostrar rutas tecnicas y permite volver a consultar', () => {
+    consultar();
+    component.consultar();
+    http
+      .expectOne(url)
+      .flush(
+        { code: 'datos_ic_incompletos', detail: 'Falta evaluar la ruta /subestructura' },
+        { status: 422, statusText: 'Unprocessable Entity' },
+      );
+    fixture.detectChanges();
+    expect(component.seccionPendiente()).toBe('Subestructura');
+    expect(component.respuesta()).toBeNull();
+    expect(component.restringido()).toBe(false);
+    expect(fixture.nativeElement.textContent).not.toContain('/subestructura');
+    expect(fixture.nativeElement.textContent).toContain(
+      'inspecciones.confirmacionIc.seccionPendiente',
+    );
+    consultar();
+    expect(component.seccionPendiente()).toBeNull();
+    expect(component.calculo()?.indiceCalculado).toBe(80);
+  });
+
+  it('usa una indicacion general cuando los datos pendientes no identifican una seccion conocida', () => {
+    component.consultar();
+    http
+      .expectOne(url)
+      .flush(
+        { code: 'datos_ic_incompletos', detail: 'Falta evaluar el elemento pilas' },
+        { status: 422, statusText: 'Unprocessable Entity' },
+      );
+    expect(component.error()).toBe('inspecciones.confirmacionIc.datosPendientes');
+    expect(component.seccionPendiente()).toBeNull();
+    expect(component.procesando()).toBe(false);
+  });
 });
