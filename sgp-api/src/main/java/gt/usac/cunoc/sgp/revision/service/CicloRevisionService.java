@@ -99,8 +99,8 @@ public class CicloRevisionService {
         "INSPECCION_ENVIADA",
         "Inspección enviada para revisión",
         "Un estudiante envió la inspección del puente " + inspeccion.getPuente().getCodigo() + ".",
-        "revision",
-        revision.getId(),
+        "inspeccion",
+        inspeccion.getId(),
         "revision-enviada:" + revision.getId());
     return revision;
   }

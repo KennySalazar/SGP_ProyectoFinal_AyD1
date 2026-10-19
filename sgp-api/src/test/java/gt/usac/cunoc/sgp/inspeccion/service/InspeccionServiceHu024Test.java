@@ -1199,6 +1199,43 @@ class InspeccionServiceHu024Test {
     assertThat(response.rolAutor()).isEqualTo("ESTUDIANTE");
   }
 
+  @Test
+  @DisplayName("HU-036: El Catedrático asignado puede abrir una inspección enviada o en revisión")
+  void obtenerBorrador_catedraticoAsignado_puedeAbrirInspeccionEnRevision() {
+    UUID autorId = estudiante.getId();
+    UUID catedraticoId = catedratico.getId();
+    UUID inspeccionId = UUID.randomUUID();
+    UUID asignacionId = UUID.randomUUID();
+    Inspeccion inspeccion =
+        new Inspeccion(
+            inspeccionId,
+            puenteActivo,
+            versionActiva,
+            autorId,
+            "ESTUDIANTE",
+            "Alumno",
+            LocalDate.of(2026, 10, 15),
+            "disp-1",
+            null,
+            null,
+            null,
+            null,
+            objectMapper.createObjectNode(),
+            AHORA);
+    inspeccion.setAsignacionPuenteId(asignacionId);
+    ReflectionTestUtils.setField(inspeccion, "estado", "EN_REVISION");
+    when(inspeccionRepository.findConDetallesById(inspeccionId))
+        .thenReturn(Optional.of(inspeccion));
+    when(asignacionPuenteRepository.perteneceACatedratico(asignacionId, catedraticoId))
+        .thenReturn(true);
+
+    InspeccionBorradorResponse response =
+        inspeccionService.obtenerBorrador(inspeccionId, catedraticoId);
+
+    assertThat(response.id()).isEqualTo(inspeccionId);
+    assertThat(response.estado()).isEqualTo("EN_REVISION");
+  }
+
   private String hashSolicitudInicio() {
     var r =
         new IniciarInspeccionRequest(
