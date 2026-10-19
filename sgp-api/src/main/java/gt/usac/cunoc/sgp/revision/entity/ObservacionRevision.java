@@ -100,6 +100,16 @@ public class ObservacionRevision {
     return id;
   }
 
+  /**
+   * El servicio aplica autorización, bloqueo de ciclo y auditoría antes de confirmar la edición.
+   */
+  public void editarTexto(String texto) {
+    if (texto == null || texto.isBlank() || texto.length() > 2000) {
+      throw new IllegalArgumentException("La observación requiere texto de hasta 2000 caracteres");
+    }
+    contenido = texto;
+  }
+
   public Revision getRevision() {
     return revision;
   }

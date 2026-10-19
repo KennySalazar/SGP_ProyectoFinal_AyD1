@@ -6,6 +6,9 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 public interface ObservacionRevisionRepository extends JpaRepository<ObservacionRevision, UUID> {
   List<ObservacionRevision> findByRevisionIdOrderByCreadoEnAscIdAsc(UUID revisionId);
@@ -15,4 +18,34 @@ public interface ObservacionRevisionRepository extends JpaRepository<Observacion
   long countByRevisionId(UUID revisionId);
 
   long countByRevisionIdAndEstado(UUID revisionId, EstadoObservacion estado);
+
+  @Query(
+      "select count(r) > 0 from Revision r where r.id = :id and r.revisorId = :actor and r.inspeccion.eliminadoEn is null")
+  boolean existeCicloDelRevisor(@Param("id") UUID id, @Param("actor") UUID actor);
+
+  @Query(
+      """
+      select count(o) as total,
+             coalesce(sum(case when o.estado = :estado then 1 else 0 end), 0) as pendientes
+      from ObservacionRevision o where o.revision.id = :revisionId
+      """)
+  ConteoObservaciones contarPorCiclo(
+      @Param("revisionId") UUID revisionId, @Param("estado") EstadoObservacion estado);
+
+  /** Acceso al campo ya mapeado en Revision, sin duplicar su representación persistida. */
+  @Query("select r.observacionGeneral from Revision r where r.id = :revisionId")
+  String buscarGeneral(@Param("revisionId") UUID revisionId);
+
+  /**
+   * El servicio debe poseer los bloqueos de ciclo e inspección y auditar en la misma transacción.
+   */
+  @Modifying(flushAutomatically = true)
+  @Query("update Revision r set r.observacionGeneral = :texto where r.id = :revisionId")
+  int actualizarGeneral(@Param("revisionId") UUID revisionId, @Param("texto") String texto);
+
+  interface ConteoObservaciones {
+    long getTotal();
+
+    long getPendientes();
+  }
 }
