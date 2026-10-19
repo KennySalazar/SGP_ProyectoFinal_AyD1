@@ -211,6 +211,7 @@
   border: 1px solid var(--sgp-border);
   border-radius: 12px;
   background: var(--sgp-surface, #ffffff);
+  box-shadow: 0 2px 6px rgba(7, 20, 38, 0.04);
 
   &:focus-visible {
     outline: 2px solid var(--sgp-blue-600);
@@ -221,26 +222,45 @@
   td {
     padding: 0.85rem 1rem;
     border-bottom: 1px solid var(--sgp-border);
+    border-right: 1px solid #e2e8f0;
     vertical-align: middle;
     line-height: 1.45;
     text-align: left;
+
+    &:last-child {
+      border-right: none;
+    }
   }
 
   th[scope='col'] {
-    background: var(--sgp-surface-soft);
-    color: var(--sgp-navy-900);
+    background: #f1f5f9;
+    color: var(--sgp-navy-950);
     font-weight: 700;
-    font-size: 0.825rem;
-    letter-spacing: 0.02em;
+    font-size: 0.78rem;
+    letter-spacing: 0.04em;
     text-transform: uppercase;
+    border-bottom: 2px solid #cbd5e1;
+    border-right: 1px solid #cbd5e1;
     white-space: nowrap;
+
+    &:last-child {
+      border-right: none;
+    }
   }
 
   tbody tr {
     transition: background-color 0.15s ease;
 
+    &:nth-child(even) {
+      background-color: #f8fafc;
+    }
+
+    &:nth-child(odd) {
+      background-color: #ffffff;
+    }
+
     &:hover {
-      background-color: var(--sgp-surface-soft);
+      background-color: #eff6ff !important;
     }
 
     &:last-child td {
@@ -249,52 +269,70 @@
   }
 
   .col-numero {
-    width: 4%;
+    width: 3.8rem;
+    min-width: 3.8rem;
     text-align: center;
   }
 
   .col-codigo {
-    width: 13%;
+    width: 9.5rem;
+    min-width: 9.5rem;
   }
 
   .col-elemento {
-    width: 21%;
+    width: 14.5rem;
+    min-width: 14.5rem;
   }
 
   .col-condicion {
-    width: 15%;
+    width: 13.5rem;
+    min-width: 13.5rem;
   }
 
   .col-tipo {
-    width: 10%;
+    width: 8rem;
+    min-width: 8rem;
+    text-align: center;
   }
 
   .col-intervencion {
-    width: 17%;
+    width: 18rem;
+    min-width: 18rem;
   }
 
   .col-prioridad {
-    width: 7%;
+    width: 7.5rem;
+    min-width: 7.5rem;
+    text-align: center;
   }
 
   .col-validacion {
-    width: 9%;
+    width: 8.5rem;
+    min-width: 8.5rem;
+    text-align: center;
   }
 
   .col-estado {
-    width: 6%;
+    width: 6.5rem;
+    min-width: 6.5rem;
+    text-align: center;
   }
 
   .col-acciones {
-    width: 11%;
+    width: 8.5rem;
+    min-width: 8.5rem;
+    text-align: center;
   }
 }
 
-.col-numero-celda {
-  font-size: 0.825rem;
-  font-weight: 600;
-  color: var(--sgp-steel-500);
-  text-align: center;
+.badge-numero {
+  display: inline-block;
+  padding: 0.2rem 0.55rem;
+  background: #e2e8f0;
+  color: #334155;
+  border-radius: 6px;
+  font-weight: 700;
+  font-size: 0.8rem;
 }
 
 .codigo-wrapper {
@@ -306,7 +344,7 @@
     font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
     font-weight: 700;
     font-size: 0.875rem;
-    color: var(--sgp-navy-900);
+    color: var(--sgp-navy-950);
   }
 
   .pill-revision {
@@ -324,15 +362,23 @@
 .elemento-wrapper {
   display: flex;
   flex-direction: column;
-  gap: 0.15rem;
-  max-width: 260px;
+  gap: 0.2rem;
+  max-width: 250px;
 
   .elemento-prefijo {
-    font-size: 0.72rem;
+    font-size: 0.74rem;
     color: var(--sgp-steel-500);
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+
+    i {
+      font-size: 0.72rem;
+      color: var(--sgp-blue-600);
+    }
   }
 
   .elemento-nombre {
@@ -344,44 +390,55 @@
   }
 }
 
-.condicion-chip {
+.condicion-card {
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
-  background: var(--sgp-surface-soft);
-  border: 1px solid var(--sgp-border);
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
   border-radius: 6px;
   padding: 0.25rem 0.55rem;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   font-size: 0.8rem;
-  max-width: 220px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  max-width: 240px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 
-  .condicion-ind {
-    color: var(--sgp-navy-800);
+  .cond-indicador {
+    color: #1e293b;
     font-weight: 600;
   }
 
-  .condicion-op {
-    color: var(--sgp-blue-600);
+  .cond-operador {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: #dbeafe;
+    color: #1d4ed8;
     font-weight: 700;
+    padding: 0.1rem 0.35rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
   }
 
-  .condicion-umb {
-    color: var(--sgp-steel-700);
-    font-weight: 600;
+  .cond-umbral {
+    color: #0f172a;
+    font-weight: 700;
   }
 }
 
-.intervencion-texto {
-  max-width: 240px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  font-size: 0.875rem;
-  color: var(--sgp-navy-900);
+.intervencion-wrapper {
+  display: flex;
+  align-items: flex-start;
+
+  .intervencion-texto {
+    font-size: 0.875rem;
+    color: #1e293b;
+    line-height: 1.45;
+    word-break: break-word;
+  }
 }
 
 .badge-validacion {
@@ -420,8 +477,11 @@
 .acciones-fila {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
   gap: 0.35rem;
+
+  &.justify-center {
+    justify-content: center;
+  }
 
   .btn-accion {
     width: 32px;

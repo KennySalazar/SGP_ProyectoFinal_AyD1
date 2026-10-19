@@ -171,25 +171,33 @@
         [value]="reglas()"
         [loading]="cargando()"
         dataKey="id"
-        [tableStyle]="{ 'min-width': '65rem', width: '100%', 'border-collapse': 'collapse' }"
+        [tableStyle]="{ 'min-width': '85rem', width: '100%', 'border-collapse': 'collapse' }"
         styleClass="p-datatable-sm"
       >
         <ng-template pTemplate="header">
           <tr>
-            <th scope="col" class="col-numero">{{ 'mantenimiento.thNumero' | transloco }}</th>
+            <th scope="col" class="col-numero text-center">
+              {{ 'mantenimiento.thNumero' | transloco }}
+            </th>
             <th scope="col" class="col-codigo">{{ 'mantenimiento.thCodigo' | transloco }}</th>
             <th scope="col" class="col-elemento">{{ 'mantenimiento.thElemento' | transloco }}</th>
             <th scope="col" class="col-condicion">{{ 'mantenimiento.thCondicion' | transloco }}</th>
-            <th scope="col" class="col-tipo">{{ 'mantenimiento.thTipo' | transloco }}</th>
+            <th scope="col" class="col-tipo text-center">
+              {{ 'mantenimiento.thTipo' | transloco }}
+            </th>
             <th scope="col" class="col-intervencion">
               {{ 'mantenimiento.thIntervencion' | transloco }}
             </th>
-            <th scope="col" class="col-prioridad">{{ 'mantenimiento.thPrioridad' | transloco }}</th>
-            <th scope="col" class="col-validacion">
+            <th scope="col" class="col-prioridad text-center">
+              {{ 'mantenimiento.thPrioridad' | transloco }}
+            </th>
+            <th scope="col" class="col-validacion text-center">
               {{ 'mantenimiento.thValidacion' | transloco }}
             </th>
-            <th scope="col" class="col-estado">{{ 'mantenimiento.thEstado' | transloco }}</th>
-            <th scope="col" class="col-acciones text-right">
+            <th scope="col" class="col-estado text-center">
+              {{ 'mantenimiento.thEstado' | transloco }}
+            </th>
+            <th scope="col" class="col-acciones text-center">
               <span class="sr-only">{{ 'mantenimiento.thAcciones' | transloco }}</span>
             </th>
           </tr>
@@ -197,47 +205,50 @@
 
         <ng-template pTemplate="body" let-regla let-indice="rowIndex">
           <tr class="fila-regla">
-            <td class="col-numero-celda">{{ paginaActual() * tamanioPagina() + indice + 1 }}</td>
-            <td>
+            <td class="col-numero-celda text-center">
+              <span class="badge-numero">{{ paginaActual() * tamanioPagina() + indice + 1 }}</span>
+            </td>
+            <td class="col-codigo-celda">
               <div class="codigo-wrapper">
                 <span class="codigo-texto">{{ regla.codigo }}</span>
                 <span class="pill-revision">Rev. {{ regla.numeroRevision }}</span>
               </div>
             </td>
-            <td>
+            <td class="col-elemento-celda">
               @let ruta = desglosarRuta(regla.elementoRef);
               <div class="elemento-wrapper" [title]="regla.elementoRef">
-                @if (ruta.prefijo) {
-                <span class="elemento-prefijo">{{ ruta.prefijo }}</span>
-                }
+                <span class="elemento-prefijo">
+                  <i class="pi pi-folder" aria-hidden="true"></i>
+                  {{ ruta.prefijo || 'General/' }}
+                </span>
                 <strong class="elemento-nombre">{{ ruta.nombre }}</strong>
               </div>
             </td>
-            <td>
-              <div class="condicion-chip" [title]="formatearCondicion(regla.condicion)">
-                <span class="condicion-ind">{{ regla.condicion?.indicador }}</span>
-                <span class="condicion-op">{{ simboloOperador(regla.condicion?.operador) }}</span>
-                <span class="condicion-umb">{{ regla.condicion?.umbral }}</span>
+            <td class="col-condicion-celda">
+              <div class="condicion-card" [title]="formatearCondicion(regla.condicion)">
+                <span class="cond-indicador">{{ regla.condicion?.indicador }}</span>
+                <span class="cond-operador">{{ simboloOperador(regla.condicion?.operador) }}</span>
+                <span class="cond-umbral">{{ regla.condicion?.umbral }}</span>
               </div>
             </td>
-            <td>
+            <td class="col-tipo-celda text-center">
               <p-tag
                 [value]="regla.tipoMantenimiento"
                 [severity]="severidadTipo(regla.tipoMantenimiento)"
               />
             </td>
-            <td>
-              <div class="intervencion-texto" [title]="regla.intervencionSugerida">
-                {{ regla.intervencionSugerida }}
+            <td class="col-intervencion-celda">
+              <div class="intervencion-wrapper" [title]="regla.intervencionSugerida">
+                <span class="intervencion-texto">{{ regla.intervencionSugerida }}</span>
               </div>
             </td>
-            <td>
+            <td class="col-prioridad-celda text-center">
               <p-tag
                 [value]="prioridadBaseDe(regla)"
                 [severity]="severidadPrioridad(prioridadBaseDe(regla))"
               />
             </td>
-            <td>
+            <td class="col-validacion-celda text-center">
               @if (regla.provisional) {
               <span class="badge-validacion provisional" title="Provisional · sin validar">
                 <i class="pi pi-clock" aria-hidden="true"></i>
@@ -250,14 +261,14 @@
               </span>
               }
             </td>
-            <td>
+            <td class="col-estado-celda text-center">
               <p-tag
                 [value]="regla.activa ? 'Activa' : 'Inactiva'"
                 [severity]="regla.activa ? 'success' : 'secondary'"
               />
             </td>
-            <td class="text-right">
-              <div class="acciones-fila">
+            <td class="col-acciones-celda text-center">
+              <div class="acciones-fila justify-center">
                 <button
                   pButton
                   type="button"
