@@ -131,6 +131,9 @@
   font-size: 0.72rem;
 }
 .sidebar-section {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
   padding-top: 1.4rem;
 }
 .section-label {
@@ -180,11 +183,22 @@ nav a.active {
 nav a.active i {
   color: #93c5fd;
 }
+.nav-count {
+  min-width: 1.55rem;
+  margin-left: auto;
+  padding: 0.18rem 0.4rem;
+  border-radius: 999px;
+  background: #dbeafe;
+  color: #123f77;
+  font-size: 0.72rem;
+  font-weight: 850;
+  text-align: center;
+}
 .sidebar-spacer {
-  flex: 1;
-  min-height: 1rem;
+  min-height: 0;
 }
 .user-panel {
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   gap: 0.7rem;
@@ -221,6 +235,7 @@ nav a.active i {
   text-transform: capitalize;
 }
 .logout {
+  flex-shrink: 0;
   width: 100%;
   display: flex;
   align-items: center;
@@ -278,6 +293,7 @@ nav a.active i {
     padding: 0;
     min-width: 0;
     overflow-x: auto;
+    overflow-y: hidden;
   }
   nav {
     display: flex;

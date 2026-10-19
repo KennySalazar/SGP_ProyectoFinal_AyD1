@@ -16,17 +16,26 @@ import gt.usac.cunoc.sgp.inspeccion.model.EventoInspeccion;
 import gt.usac.cunoc.sgp.inspeccion.repository.HistorialEstadoInspeccionRepository;
 import gt.usac.cunoc.sgp.inspeccion.repository.InspeccionRepository;
 import gt.usac.cunoc.sgp.puente.repository.PuenteRepository;
+import gt.usac.cunoc.sgp.revision.entity.Revision;
+import gt.usac.cunoc.sgp.revision.service.CicloRevisionService;
+import gt.usac.cunoc.sgp.sync.model.SolicitudOperacion;
+import gt.usac.cunoc.sgp.sync.service.OperacionIdempotenteService;
 import gt.usac.cunoc.sgp.usuario.entity.UsuarioProfesional;
 import gt.usac.cunoc.sgp.usuario.model.RoleName;
 import gt.usac.cunoc.sgp.usuario.repository.UsuarioProfesionalRepository;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
@@ -55,6 +64,8 @@ public class TransicionInspeccionService {
   private final InspeccionMapper mapper;
   private final ObjectMapper json;
   private final Clock clock;
+  private CicloRevisionService ciclosRevision;
+  private OperacionIdempotenteService operaciones;
 
   public TransicionInspeccionService(
       InspeccionRepository inspecciones,
@@ -81,9 +92,46 @@ public class TransicionInspeccionService {
     this.clock = clock;
   }
 
+  @Autowired(required = false)
+  void setCiclosRevision(CicloRevisionService ciclosRevision) {
+    this.ciclosRevision = ciclosRevision;
+  }
+
+  @Autowired(required = false)
+  void setOperaciones(OperacionIdempotenteService operaciones) {
+    this.operaciones = operaciones;
+  }
+
   /** El Estudiante envía su inspección completa a revisión (RN-INS-06, RN-REV-01). */
   @Transactional
   public InspeccionResumenResponse enviar(UUID inspeccionId, UUID usuarioId) {
+    return enviarInterno(inspeccionId, usuarioId);
+  }
+
+  @Transactional
+  public InspeccionResumenResponse enviar(
+      UUID inspeccionId, UUID usuarioId, String idempotencyKey) {
+    if (idempotencyKey == null || idempotencyKey.isBlank() || operaciones == null) {
+      return enviarInterno(inspeccionId, usuarioId);
+    }
+    SolicitudOperacion solicitud =
+        new SolicitudOperacion(
+            usuarioId,
+            idempotencyKey,
+            "POST",
+            "/api/v1/inspecciones/" + inspeccionId + "/enviar",
+            hash(inspeccionId.toString()),
+            "revision",
+            inspeccionId);
+    return operaciones.ejecutar(
+        solicitud,
+        InspeccionResumenResponse.class,
+        200,
+        () -> enviarInterno(inspeccionId, usuarioId),
+        InspeccionResumenResponse::id);
+  }
+
+  private InspeccionResumenResponse enviarInterno(UUID inspeccionId, UUID usuarioId) {
     Inspeccion inspeccion = bloquear(inspeccionId);
     exigirAutor(inspeccion, usuarioId);
     if (publicaSinRevision(inspeccion)) {
@@ -96,7 +144,13 @@ public class TransicionInspeccionService {
     MaquinaEstadosInspeccion.destino(inspeccion.estadoActual(), EventoInspeccion.ENVIAR);
     exigirCompleta(inspeccion);
 
-    aplicar(inspeccion, EventoInspeccion.ENVIAR, usuarioId, null);
+    Revision revision = ciclosRevision != null ? ciclosRevision.crearParaEnvio(inspeccion) : null;
+    aplicar(
+        inspeccion,
+        EventoInspeccion.ENVIAR,
+        usuarioId,
+        null,
+        revision != null ? revision.getId() : null);
     return mapper.toResumenResponse(inspecciones.saveAndFlush(inspeccion));
   }
 
@@ -130,9 +184,16 @@ public class TransicionInspeccionService {
   @Transactional
   @PreAuthorize("hasRole('CATEDRATICO')")
   public InspeccionResumenResponse iniciarRevision(UUID inspeccionId, UUID revisorId) {
+    return iniciarRevision(inspeccionId, revisorId, null);
+  }
+
+  @Transactional
+  @PreAuthorize("hasRole('CATEDRATICO')")
+  public InspeccionResumenResponse iniciarRevision(
+      UUID inspeccionId, UUID revisorId, UUID revisionId) {
     Inspeccion inspeccion = bloquear(inspeccionId);
     exigirRevisorDistintoDelAutor(inspeccion, revisorId);
-    aplicar(inspeccion, EventoInspeccion.INICIAR_REVISION, revisorId, null);
+    aplicar(inspeccion, EventoInspeccion.INICIAR_REVISION, revisorId, null, revisionId);
     return mapper.toResumenResponse(inspecciones.saveAndFlush(inspeccion));
   }
 
@@ -199,6 +260,15 @@ public class TransicionInspeccionService {
   /** Aplica la transición validada, con su historial y auditoría en la misma transacción. */
   private void aplicar(
       Inspeccion inspeccion, EventoInspeccion evento, UUID usuarioId, String motivo) {
+    aplicar(inspeccion, evento, usuarioId, motivo, null);
+  }
+
+  private void aplicar(
+      Inspeccion inspeccion,
+      EventoInspeccion evento,
+      UUID usuarioId,
+      String motivo,
+      UUID revisionId) {
     EstadoInspeccion anterior = inspeccion.estadoActual();
     EstadoInspeccion destino = MaquinaEstadosInspeccion.destino(anterior, evento);
     Instant ahora = clock.instant();
@@ -212,6 +282,7 @@ public class TransicionInspeccionService {
             anterior.name(),
             destino.name(),
             usuarioId,
+            revisionId,
             evento.name(),
             motivo,
             ahora));
@@ -372,5 +443,15 @@ public class TransicionInspeccionService {
         "inspeccion_no_encontrada",
         "Inspeccion no encontrada",
         "No existe la inspeccion " + inspeccionId);
+  }
+
+  private String hash(String valor) {
+    try {
+      return HexFormat.of()
+          .formatHex(
+              MessageDigest.getInstance("SHA-256").digest(valor.getBytes(StandardCharsets.UTF_8)));
+    } catch (NoSuchAlgorithmException ex) {
+      throw new IllegalStateException("SHA-256 no está disponible", ex);
+    }
   }
 }

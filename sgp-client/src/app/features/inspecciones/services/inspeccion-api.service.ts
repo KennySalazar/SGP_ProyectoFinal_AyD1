@@ -125,10 +125,11 @@ export class InspeccionApiService {
       params,
     });
   }
-  enviar(id: string): Observable<InspeccionResumenResponse> {
+  enviar(id: string, idempotencyKey?: string): Observable<InspeccionResumenResponse> {
     return this.http.post<InspeccionResumenResponse>(
       `/api/v1/inspecciones/${encodeURIComponent(id)}/enviar`,
       null,
+      idempotencyKey ? { headers: { 'Idempotency-Key': idempotencyKey } } : {},
     );
   }
   publicar(id: string): Observable<InspeccionResumenResponse> {

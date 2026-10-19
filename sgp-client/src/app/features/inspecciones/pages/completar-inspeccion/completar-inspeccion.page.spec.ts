@@ -361,7 +361,7 @@ describe('CompletarInspeccionPage', () => {
       component.abrirConfirmacion();
       component.confirmarAccion();
       fixture.detectChanges();
-      expect(mockInspeccionApi.enviar).toHaveBeenCalledWith('inspeccion-123');
+      expect(mockInspeccionApi.enviar).toHaveBeenCalledWith('inspeccion-123', expect.any(String));
       expect(fixture.nativeElement.textContent).toContain('inspecciones.transicion.enviada');
     });
     it('un 422 detalla por separado los campos y las fotografías que faltan', () => {

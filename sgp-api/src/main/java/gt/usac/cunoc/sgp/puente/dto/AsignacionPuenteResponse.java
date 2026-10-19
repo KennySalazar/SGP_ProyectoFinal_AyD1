@@ -12,4 +12,6 @@ public record AsignacionPuenteResponse(
     UUID puenteId,
     String puenteCodigo,
     String puenteNombre,
-    Instant asignadoEn) {}
+    Instant asignadoEn,
+    UUID inspeccionId,
+    String estadoInspeccion) {}
