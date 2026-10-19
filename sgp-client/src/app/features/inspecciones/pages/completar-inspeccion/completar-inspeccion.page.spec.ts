@@ -388,7 +388,7 @@ describe('CompletarInspeccionPage', () => {
       fixture.detectChanges();
       expect(component.errorAccion()).toEqual({
         mensaje: 'Faltan 1 campos obligatorios y 2 categorias de fotografia.',
-        campos: [{ campo: 'subestructura', mensaje: 'El campo subestructura es obligatorio' }],
+        campos: [{ campo: 'subestructura', mensaje: 'El campo Subestructura es obligatorio' }],
         fotografias: ['ACCESO', 'CAUCE'],
       });
       expect(component.confirmandoAccion()).toBe(true);

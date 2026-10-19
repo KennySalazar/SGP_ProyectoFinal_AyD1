@@ -1,3 +1,4 @@
+import { mensajeCampo } from '../../utils/nombre-campo';
 import { esResultadoIncierto } from '../../services/operacion-idempotente.service';
 import {
   ChangeDetectionStrategy,
@@ -424,7 +425,10 @@ export class CompletarInspeccionPage implements OnInit {
       mensaje: problema?.detail ?? 'No fue posible completar la acción sobre la inspección.',
       campos: errores
         .filter((e) => e.campo && !e.campo.startsWith('fotografias.'))
-        .map((e) => ({ campo: e.campo ?? '', mensaje: e.mensaje ?? '' })),
+        .map((e) => ({
+          campo: e.campo ?? '',
+          mensaje: mensajeCampo(e.campo ?? '', e.mensaje ?? '', this.esquema()),
+        })),
       fotografias: errores
         .filter((e) => e.campo?.startsWith('fotografias.'))
         .map((e) => (e.campo ?? '').replace('fotografias.', '')),
