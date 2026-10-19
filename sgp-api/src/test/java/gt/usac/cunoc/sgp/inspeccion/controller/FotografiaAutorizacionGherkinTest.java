@@ -69,6 +69,7 @@ class FotografiaAutorizacionGherkinTest {
   @Autowired MockMvc mvc;
   @MockBean InspeccionRepository inspecciones;
   @MockBean AsignacionPuenteRepository asignaciones;
+  @MockBean gt.usac.cunoc.sgp.revision.repository.RevisionRepository revisiones;
   @MockBean ArchivoRepository archivos;
   @MockBean ArchivoInspeccionRepository vinculos;
   @MockBean RegistroFotografiasInspeccion registro;

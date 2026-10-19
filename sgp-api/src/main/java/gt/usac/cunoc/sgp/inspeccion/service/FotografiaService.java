@@ -12,6 +12,7 @@ import gt.usac.cunoc.sgp.inspeccion.entity.Inspeccion;
 import gt.usac.cunoc.sgp.inspeccion.repository.InspeccionRepository;
 import gt.usac.cunoc.sgp.inspeccion.validation.ValidadorAnclajeFotografico;
 import gt.usac.cunoc.sgp.puente.repository.AsignacionPuenteRepository;
+import gt.usac.cunoc.sgp.revision.repository.RevisionRepository;
 import gt.usac.cunoc.sgp.sync.model.SolicitudOperacion;
 import gt.usac.cunoc.sgp.sync.service.*;
 import gt.usac.cunoc.sgp.usuario.model.RoleName;
@@ -30,6 +31,7 @@ import org.springframework.web.multipart.MultipartFile;
 public class FotografiaService {
   private final InspeccionRepository inspecciones;
   private final AsignacionPuenteRepository asignaciones;
+  private final RevisionRepository revisiones;
   private final ArchivoRepository archivos;
   private final ArchivoInspeccionRepository vinculos;
   private final RegistroFotografiasInspeccion registroFotografias;
@@ -61,9 +63,11 @@ public class FotografiaService {
       ObjectMapper json,
       Clock clock,
       AsignacionPuenteRepository asignaciones,
+      RevisionRepository revisiones,
       PlatformTransactionManager tm) {
     this.inspecciones = inspecciones;
     this.asignaciones = asignaciones;
+    this.revisiones = revisiones;
     this.archivos = archivos;
     this.vinculos = vinculos;
     this.registroFotografias = registroFotografias;
@@ -358,6 +362,15 @@ public class FotografiaService {
                         "inspeccion_no_encontrada",
                         "Inspección no encontrada."));
     if ("PUBLICADA".equals(i.getEstado()) || i.getAutorId().equals(actor)) return;
+    if ("EN_REVISION".equals(i.getEstado())) {
+      if (rol != RoleName.CATEDRATICO)
+        throw error(
+            HttpStatus.FORBIDDEN,
+            "lectura_revision_no_permitida",
+            "La lectura de una inspección en revisión requiere ser su autor o su catedrático revisor.");
+      if (revisiones.existsByInspeccionIdAndRevisorIdAndEstado(id, actor, "EN_CURSO")) return;
+      throw error(HttpStatus.NOT_FOUND, "inspeccion_no_encontrada", "Inspección no encontrada.");
+    }
     if (rol == RoleName.CATEDRATICO
         && "BORRADOR".equals(i.getEstado())
         && i.getAsignacionPuenteId() != null
