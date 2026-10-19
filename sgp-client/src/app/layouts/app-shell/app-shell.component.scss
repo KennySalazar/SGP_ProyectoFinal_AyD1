@@ -135,6 +135,20 @@
   min-height: 0;
   overflow-y: auto;
   padding-top: 1.4rem;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.22) transparent;
+}
+.sidebar-section::-webkit-scrollbar {
+  width: 6px;
+}
+.sidebar-section::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.22);
+}
+.sidebar-section::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.36);
 }
 .section-label {
   display: block;

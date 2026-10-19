@@ -2,6 +2,8 @@ package gt.usac.cunoc.sgp.mantenimiento.repository;
 
 import gt.usac.cunoc.sgp.mantenimiento.entity.OrdenMantenimiento;
 import gt.usac.cunoc.sgp.mantenimiento.model.EstadoOrden;
+import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.domain.Page;
@@ -28,4 +30,21 @@ public interface OrdenMantenimientoRepository extends Repository<OrdenMantenimie
           + " AND (:estado IS NULL OR o.estado = :estado)")
   Page<OrdenMantenimiento> buscar(
       @Param("puenteId") UUID puenteId, @Param("estado") EstadoOrden estado, Pageable pageable);
+
+  /** Evita generar dos veces la misma propuesta para una inspección (HU-046). */
+  boolean existsByInspeccionOrigenIdAndClaveGeneracion(
+      UUID inspeccionOrigenId, String claveGeneracion);
+
+  /** Órdenes que originó una inspección, de la más antigua a la más reciente. */
+  List<OrdenMantenimiento> findByInspeccionOrigenIdOrderByCreadoEnAscIdAsc(UUID inspeccionOrigenId);
+
+  /** Órdenes de un elemento del puente que siguen en curso, para no proponer lo ya propuesto. */
+  @Query(
+      "SELECT o FROM OrdenMantenimiento o"
+          + " WHERE o.puenteId = :puenteId AND o.elementoRef = :elementoRef"
+          + " AND o.estado IN :estados")
+  List<OrdenMantenimiento> findPorElementoYEstados(
+      @Param("puenteId") UUID puenteId,
+      @Param("elementoRef") String elementoRef,
+      @Param("estados") Collection<EstadoOrden> estados);
 }

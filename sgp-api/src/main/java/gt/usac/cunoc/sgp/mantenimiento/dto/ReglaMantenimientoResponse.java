@@ -1,7 +1,7 @@
 package gt.usac.cunoc.sgp.mantenimiento.dto;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import gt.usac.cunoc.sgp.mantenimiento.model.TipoMantenimiento;
+import gt.usac.cunoc.sgp.mantenimiento.model.TipoOrden;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -13,7 +13,7 @@ public record ReglaMantenimientoResponse(
     String versionFormularioCodigo,
     String elementoRef,
     JsonNode condicion,
-    TipoMantenimiento tipoMantenimiento,
+    TipoOrden tipoMantenimiento,
     String intervencionSugerida,
     JsonNode reglaPrioridad,
     boolean activa,

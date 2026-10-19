@@ -18,8 +18,8 @@ import gt.usac.cunoc.sgp.mantenimiento.dto.ReglaMantenimientoResponse;
 import gt.usac.cunoc.sgp.mantenimiento.dto.ResumenReglasVersionResponse;
 import gt.usac.cunoc.sgp.mantenimiento.entity.ReglaMantenimiento;
 import gt.usac.cunoc.sgp.mantenimiento.mapper.ReglaMantenimientoMapper;
-import gt.usac.cunoc.sgp.mantenimiento.model.PrioridadMantenimiento;
-import gt.usac.cunoc.sgp.mantenimiento.model.TipoMantenimiento;
+import gt.usac.cunoc.sgp.mantenimiento.model.PrioridadOrden;
+import gt.usac.cunoc.sgp.mantenimiento.model.TipoOrden;
 import gt.usac.cunoc.sgp.mantenimiento.repository.ReglaMantenimientoRepository;
 import gt.usac.cunoc.sgp.usuario.entity.UserAccount;
 import gt.usac.cunoc.sgp.usuario.model.RoleName;
@@ -126,31 +126,21 @@ class ReglaMantenimientoServiceTest {
     }
 
     // RN-MTO-03: Contiene los 4 tipos de mantenimiento
-    assertThat(
-            guardadas.stream()
-                .anyMatch(r -> r.getTipoMantenimiento() == TipoMantenimiento.RUTINARIO))
+    assertThat(guardadas.stream().anyMatch(r -> r.getTipoMantenimiento() == TipoOrden.RUTINARIO))
         .isTrue();
-    assertThat(
-            guardadas.stream()
-                .anyMatch(r -> r.getTipoMantenimiento() == TipoMantenimiento.PREVENTIVO))
+    assertThat(guardadas.stream().anyMatch(r -> r.getTipoMantenimiento() == TipoOrden.PREVENTIVO))
         .isTrue();
-    assertThat(
-            guardadas.stream()
-                .anyMatch(r -> r.getTipoMantenimiento() == TipoMantenimiento.CORRECTIVO))
+    assertThat(guardadas.stream().anyMatch(r -> r.getTipoMantenimiento() == TipoOrden.CORRECTIVO))
         .isTrue();
-    assertThat(
-            guardadas.stream()
-                .anyMatch(r -> r.getTipoMantenimiento() == TipoMantenimiento.EMERGENCIA))
+    assertThat(guardadas.stream().anyMatch(r -> r.getTipoMantenimiento() == TipoOrden.EMERGENCIA))
         .isTrue();
 
     // Daños graves proponen EMERGENCIA con prioridad más alta (CRITICA)
     List<ReglaMantenimiento> emergencias =
-        guardadas.stream()
-            .filter(r -> r.getTipoMantenimiento() == TipoMantenimiento.EMERGENCIA)
-            .toList();
+        guardadas.stream().filter(r -> r.getTipoMantenimiento() == TipoOrden.EMERGENCIA).toList();
     assertThat(emergencias).isNotEmpty();
     for (ReglaMantenimiento regla : emergencias) {
-      assertThat(regla.getPrioridadBase()).isEqualTo(PrioridadMantenimiento.CRITICA);
+      assertThat(regla.getPrioridadBase()).isEqualTo(PrioridadOrden.CRITICA);
     }
   }
 
@@ -178,7 +168,7 @@ class ReglaMantenimientoServiceTest {
             VERSION_ID,
             "/elemento_fantasma/inexistente",
             condicion,
-            TipoMantenimiento.CORRECTIVO,
+            TipoOrden.CORRECTIVO,
             "Reparación",
             objectMapper.readTree("{\"prioridad_base\":\"ALTA\"}"),
             true);
@@ -208,7 +198,7 @@ class ReglaMantenimientoServiceTest {
             VERSION_ID,
             "/elementos_no_estructurales/junta_entrada",
             condicion,
-            TipoMantenimiento.CORRECTIVO,
+            TipoOrden.CORRECTIVO,
             "Reparación de junta",
             objectMapper.readTree("{\"prioridad_base\":\"ALTA\"}"),
             true);
@@ -242,7 +232,7 @@ class ReglaMantenimientoServiceTest {
             VERSION_ID,
             "/elementos_no_estructurales/junta_entrada",
             condicion,
-            TipoMantenimiento.RUTINARIO,
+            TipoOrden.RUTINARIO,
             "Limpieza de junta",
             reglaPrioridad,
             true);
@@ -271,7 +261,7 @@ class ReglaMantenimientoServiceTest {
             "/superestructura/elemento_portante_acero",
             objectMapper.readTree(
                 "{\"indicador\":\"pintura\",\"operador\":\"IGUAL\",\"umbral\":\"MALO\"}"),
-            TipoMantenimiento.PREVENTIVO,
+            TipoOrden.PREVENTIVO,
             "Pintura general",
             objectMapper.readTree("{\"prioridad_base\":\"MEDIA\"}"),
             true,
@@ -289,7 +279,7 @@ class ReglaMantenimientoServiceTest {
             "/superestructura/elemento_portante_acero",
             objectMapper.readTree(
                 "{\"indicador\":\"pintura\",\"operador\":\"IGUAL\",\"umbral\":\"PESIMO\"}"),
-            TipoMantenimiento.CORRECTIVO,
+            TipoOrden.CORRECTIVO,
             "Reemplazo de recubrimiento y protección anticorrosiva",
             objectMapper.readTree("{\"prioridad_base\":\"ALTA\"}"),
             true);
@@ -302,7 +292,7 @@ class ReglaMantenimientoServiceTest {
     verify(reglaRepository).desactivarTodasLasRevisiones("RM-VIGA-001", VERSION_ID);
     assertThat(response.codigo()).isEqualTo("RM-VIGA-001");
     assertThat(response.numeroRevision()).isEqualTo(2);
-    assertThat(response.tipoMantenimiento()).isEqualTo(TipoMantenimiento.CORRECTIVO);
+    assertThat(response.tipoMantenimiento()).isEqualTo(TipoOrden.CORRECTIVO);
     assertThat(response.provisional()).isTrue();
   }
 
@@ -319,7 +309,7 @@ class ReglaMantenimientoServiceTest {
             "/superestructura/elemento_portante_acero",
             objectMapper.readTree(
                 "{\"indicador\":\"pintura\",\"operador\":\"IGUAL\",\"umbral\":\"MALO\"}"),
-            TipoMantenimiento.PREVENTIVO,
+            TipoOrden.PREVENTIVO,
             "Pintura",
             objectMapper.readTree("{\"prioridad_base\":\"MEDIA\"}"),
             true,

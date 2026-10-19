@@ -13,6 +13,7 @@ import gt.usac.cunoc.sgp.inspeccion.entity.Inspeccion;
 import gt.usac.cunoc.sgp.inspeccion.mapper.InspeccionMapper;
 import gt.usac.cunoc.sgp.inspeccion.model.EstadoInspeccion;
 import gt.usac.cunoc.sgp.inspeccion.model.EventoInspeccion;
+import gt.usac.cunoc.sgp.inspeccion.model.InspeccionPublicadaEvent;
 import gt.usac.cunoc.sgp.inspeccion.repository.HistorialEstadoInspeccionRepository;
 import gt.usac.cunoc.sgp.inspeccion.repository.InspeccionRepository;
 import gt.usac.cunoc.sgp.puente.repository.PuenteRepository;
@@ -36,6 +37,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
@@ -66,6 +68,7 @@ public class TransicionInspeccionService {
   private final Clock clock;
   private CicloRevisionService ciclosRevision;
   private OperacionIdempotenteService operaciones;
+  private ApplicationEventPublisher eventos;
 
   public TransicionInspeccionService(
       InspeccionRepository inspecciones,
@@ -100,6 +103,15 @@ public class TransicionInspeccionService {
   @Autowired(required = false)
   void setOperaciones(OperacionIdempotenteService operaciones) {
     this.operaciones = operaciones;
+  }
+
+  /**
+   * Publicador de eventos internos (HU-046). Opcional, como las demás dependencias añadidas después
+   * del constructor: sin él la publicación funciona igual, sin avisar al mantenimiento.
+   */
+  @Autowired(required = false)
+  void setEventos(ApplicationEventPublisher eventos) {
+    this.eventos = eventos;
   }
 
   /** El Estudiante envía su inspección completa a revisión (RN-INS-06, RN-REV-01). */
@@ -254,6 +266,9 @@ public class TransicionInspeccionService {
   private InspeccionResumenResponse publicarConIndice(Inspeccion inspeccion, UUID usuarioId) {
     Inspeccion guardada = inspecciones.saveAndFlush(inspeccion);
     publicacionIc.integrarPublicacion(guardada.getId(), usuarioId);
+    if (eventos != null) {
+      eventos.publishEvent(new InspeccionPublicadaEvent(guardada.getId(), usuarioId));
+    }
     return mapper.toResumenResponse(guardada);
   }
 

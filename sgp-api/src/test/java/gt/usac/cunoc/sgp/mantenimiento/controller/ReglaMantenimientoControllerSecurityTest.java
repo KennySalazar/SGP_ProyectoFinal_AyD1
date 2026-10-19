@@ -17,7 +17,7 @@ import gt.usac.cunoc.sgp.common.exception.ApiExceptionHandler;
 import gt.usac.cunoc.sgp.common.security.JwtData;
 import gt.usac.cunoc.sgp.formulario.repository.VersionFormularioRepository;
 import gt.usac.cunoc.sgp.mantenimiento.dto.ReglaMantenimientoResponse;
-import gt.usac.cunoc.sgp.mantenimiento.model.TipoMantenimiento;
+import gt.usac.cunoc.sgp.mantenimiento.model.TipoOrden;
 import gt.usac.cunoc.sgp.mantenimiento.service.ReglaMantenimientoService;
 import gt.usac.cunoc.sgp.usuario.model.RoleName;
 import java.time.Instant;
@@ -192,7 +192,7 @@ class ReglaMantenimientoControllerSecurityTest {
             "SIECA-v1",
             "/elementos_no_estructurales/junta_entrada",
             OBJECT_MAPPER.readTree("{\"indicador\":\"junta_limpia\"}"),
-            TipoMantenimiento.RUTINARIO,
+            TipoOrden.RUTINARIO,
             "Limpieza",
             OBJECT_MAPPER.readTree("{\"prioridad_base\":\"BAJA\"}"),
             true,
@@ -231,7 +231,7 @@ class ReglaMantenimientoControllerSecurityTest {
             "SIECA-v1",
             "/elementos_no_estructurales/junta_entrada",
             OBJECT_MAPPER.readTree("{\"indicador\":\"junta_limpia\"}"),
-            TipoMantenimiento.RUTINARIO,
+            TipoOrden.RUTINARIO,
             "Limpieza",
             OBJECT_MAPPER.readTree("{\"prioridad_base\":\"BAJA\"}"),
             true,
