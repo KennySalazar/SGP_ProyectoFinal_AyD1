@@ -4,7 +4,7 @@ import { TestBed } from '@angular/core/testing';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { ReglaMantenimientoApiService } from './regla-mantenimiento-api.service';
 
-describe('Característica: API de catálogo de reglas de mantenimiento HU-045', () => {
+describe('Característica: API de catálogo de reglas de mantenimiento', () => {
   let api: ReglaMantenimientoApiService;
   let http: HttpTestingController;
 

@@ -248,16 +248,21 @@
     }
   }
 
+  .col-numero {
+    width: 4%;
+    text-align: center;
+  }
+
   .col-codigo {
-    width: 14%;
+    width: 13%;
   }
 
   .col-elemento {
-    width: 22%;
+    width: 21%;
   }
 
   .col-condicion {
-    width: 16%;
+    width: 15%;
   }
 
   .col-tipo {
@@ -265,24 +270,31 @@
   }
 
   .col-intervencion {
-    width: 18%;
+    width: 17%;
   }
 
   .col-prioridad {
-    width: 8%;
-  }
-
-  .col-validacion {
-    width: 10%;
-  }
-
-  .col-estado {
     width: 7%;
   }
 
-  .col-acciones {
-    width: 12%;
+  .col-validacion {
+    width: 9%;
   }
+
+  .col-estado {
+    width: 6%;
+  }
+
+  .col-acciones {
+    width: 11%;
+  }
+}
+
+.col-numero-celda {
+  font-size: 0.825rem;
+  font-weight: 600;
+  color: var(--sgp-steel-500);
+  text-align: center;
 }
 
 .codigo-wrapper {

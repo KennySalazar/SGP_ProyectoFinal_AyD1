@@ -13,7 +13,7 @@
   </div>
   }
 
-  <!-- Advertencia de versión sin reglas activas (Criterio de aceptación) -->
+  <!-- Advertencia de versión sin reglas activas -->
   @if (resumen()?.advertenciaSinReglasActivas) {
   <div class="alert-warning" role="alert">
     <div class="alert-icon">
@@ -176,6 +176,7 @@
       >
         <ng-template pTemplate="header">
           <tr>
+            <th scope="col" class="col-numero">{{ 'mantenimiento.thNumero' | transloco }}</th>
             <th scope="col" class="col-codigo">{{ 'mantenimiento.thCodigo' | transloco }}</th>
             <th scope="col" class="col-elemento">{{ 'mantenimiento.thElemento' | transloco }}</th>
             <th scope="col" class="col-condicion">{{ 'mantenimiento.thCondicion' | transloco }}</th>
@@ -194,8 +195,9 @@
           </tr>
         </ng-template>
 
-        <ng-template pTemplate="body" let-regla>
+        <ng-template pTemplate="body" let-regla let-indice="rowIndex">
           <tr class="fila-regla">
+            <td class="col-numero-celda">{{ paginaActual() * tamanioPagina() + indice + 1 }}</td>
             <td>
               <div class="codigo-wrapper">
                 <span class="codigo-texto">{{ regla.codigo }}</span>
@@ -317,7 +319,7 @@
 
         <ng-template pTemplate="emptymessage">
           <tr>
-            <td colspan="9" class="sin-resultados-td">
+            <td colspan="10" class="sin-resultados-td">
               <div class="sin-resultados">
                 <i class="pi pi-inbox" aria-hidden="true"></i>
                 <p role="status">{{ 'mantenimiento.sinReglas' | transloco }}</p>

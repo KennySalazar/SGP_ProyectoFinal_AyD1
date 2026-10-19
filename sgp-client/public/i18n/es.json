@@ -64,7 +64,7 @@
   "mantenimiento": {
     "kicker": "Mantenimiento",
     "titulo": "Catálogo de Reglas Daño → Intervención",
-    "descripcion": "Catálogo versionado de reglas que asocian indicadores de daño del formulario con intervenciones técnicas sugeridas (RN-MTO-02, RN-MTO-03).",
+    "descripcion": "Catálogo versionado de reglas que asocian indicadores de daño del formulario con intervenciones técnicas sugeridas.",
     "advertenciaTitulo": "Atención: Sin reglas activas",
     "sembrarCatalogo": "Sembrar catálogo provisional (18 reglas)",
     "totalReglas": "Total de Reglas",
@@ -80,6 +80,7 @@
     "tituloTabla": "Reglas de Mantenimiento",
     "subtituloTabla": "Reglas que vinculan deterioros del formulario con órdenes de trabajo propuestas.",
     "versionActivaLabel": "Versión activa",
+    "thNumero": "N.°",
     "thCodigo": "Código / Rev.",
     "thElemento": "Elemento Ref",
     "thCondicion": "Condición",
