@@ -12,6 +12,7 @@ import gt.usac.cunoc.sgp.formulario.validation.JsonSchemaValidatorService;
 import gt.usac.cunoc.sgp.inspeccion.dto.ConfirmarEstadoIcRequest;
 import gt.usac.cunoc.sgp.inspeccion.mapper.InspeccionMapperImpl;
 import gt.usac.cunoc.sgp.inspeccion.model.EstadoCondicion;
+import gt.usac.cunoc.sgp.inspeccion.model.InspeccionPublicadaEvent;
 import gt.usac.cunoc.sgp.inspeccion.service.*;
 import gt.usac.cunoc.sgp.usuario.model.RoleName;
 import java.math.BigDecimal;
@@ -22,6 +23,7 @@ import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.CopyOnWriteArrayList;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -33,6 +35,7 @@ import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
+import org.springframework.context.event.EventListener;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -103,6 +106,7 @@ class PublicacionRealIcIntegrationTest {
   @Autowired private ObjectMapper json;
   @Autowired private TransicionInspeccionService transiciones;
   @Autowired private ConfirmacionEstadoIcService confirmaciones;
+  @Autowired private EventosDePublicacion eventosDePublicacion;
 
   private UUID autorId;
   private UUID puenteId;
@@ -111,6 +115,7 @@ class PublicacionRealIcIntegrationTest {
 
   @BeforeEach
   void preparar() throws Exception {
+    eventosDePublicacion.recibidos.clear();
     autorId = UUID.randomUUID();
     puenteId = UUID.randomUUID();
     versionId = UUID.randomUUID();
@@ -308,6 +313,23 @@ class PublicacionRealIcIntegrationTest {
   }
 
   @Test
+  void publicarEmiteElEventoQueDisparaElMantenimientoSoloSiTodoSeConfirmo() {
+    transiciones.publicar(inspeccionId, autorId);
+
+    assertThat(eventosDePublicacion.recibidos)
+        .containsExactly(new InspeccionPublicadaEvent(inspeccionId, autorId));
+  }
+
+  @Test
+  void unaPublicacionRevertidaNoEmiteElEvento() {
+    jdbc.update("DELETE FROM configuracion_ic_elemento WHERE version_formulario_id=?", versionId);
+
+    assertThrows(ApiException.class, () -> transiciones.publicar(inspeccionId, autorId));
+
+    assertThat(eventosDePublicacion.recibidos).isEmpty();
+  }
+
+  @Test
   void faltaDePesoRevierteEstadosHistorialResultadoYAuditoria() {
     jdbc.update("DELETE FROM configuracion_ic_elemento WHERE version_formulario_id=?", versionId);
     assertThrows(ApiException.class, () -> transiciones.publicar(inspeccionId, autorId));
@@ -351,6 +373,8 @@ class PublicacionRealIcIntegrationTest {
     autenticar(revisorId, RoleName.CATEDRATICO);
     transiciones.iniciarRevision(inspeccionId, revisorId);
     transiciones.aprobar(inspeccionId, revisorId);
+    assertThat(eventosDePublicacion.recibidos)
+        .containsExactly(new InspeccionPublicadaEvent(inspeccionId, revisorId));
     comprobarPublicacion("50", "Bueno", 3);
     var fila =
         jdbc.queryForMap(
@@ -492,8 +516,23 @@ class PublicacionRealIcIntegrationTest {
     }
 
     @Bean
+    EventosDePublicacion eventosDePublicacion() {
+      return new EventosDePublicacion();
+    }
+
+    @Bean
     LocalValidatorFactoryBean validator() {
       return new LocalValidatorFactoryBean();
+    }
+  }
+
+  /** Guarda los eventos de publicación para comprobar quién los recibiría. */
+  static class EventosDePublicacion {
+    final List<InspeccionPublicadaEvent> recibidos = new CopyOnWriteArrayList<>();
+
+    @EventListener
+    public void alPublicarse(InspeccionPublicadaEvent evento) {
+      recibidos.add(evento);
     }
   }
 }
