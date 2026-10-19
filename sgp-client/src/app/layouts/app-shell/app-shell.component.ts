@@ -4,11 +4,12 @@ import { AuthStore } from '../../core/services/auth.store';
 import { ConnectivityService } from '../../offline/services/connectivity.service';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { RevisionApiService } from '../../features/revision/services/revision-api.service';
+import { CampanaAvisosComponent } from '../../features/notificaciones/components/campana-avisos/campana-avisos.component';
 
 @Component({
   selector: 'app-shell',
   standalone: true,
-  imports: [RouterOutlet, RouterLink, RouterLinkActive, TranslocoPipe],
+  imports: [RouterOutlet, RouterLink, RouterLinkActive, TranslocoPipe, CampanaAvisosComponent],
   templateUrl: './app-shell.component.html',
   styleUrl: './app-shell.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -18,12 +19,6 @@ export class AppShellComponent {
   readonly connectivity = inject(ConnectivityService);
   readonly revisiones = inject(RevisionApiService);
   private readonly router = inject(Router);
-
-  constructor() {
-    if (this.auth.user()?.role === 'CATEDRATICO') {
-      this.revisiones.cargarContador().subscribe({ error: () => undefined });
-    }
-  }
 
   logout(): void {
     this.auth

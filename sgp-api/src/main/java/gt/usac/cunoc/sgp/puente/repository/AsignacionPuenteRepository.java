@@ -12,6 +12,28 @@ import org.springframework.data.repository.query.Param;
 
 public interface AsignacionPuenteRepository extends JpaRepository<AsignacionPuente, UUID> {
 
+  @Query(
+      """
+      SELECT count(ap) > 0 FROM AsignacionPuente ap
+      WHERE ap.id = :id AND ap.revocadoEn IS NULL
+        AND ap.cursoEstudiante.estudiante.id = :autorId AND ap.puente.id = :puenteId
+      """)
+  boolean existsVigenteParaInspeccion(
+      @Param("id") UUID id, @Param("autorId") UUID autorId, @Param("puenteId") UUID puenteId);
+
+  @Query(
+      """
+      SELECT count(ap) > 0 FROM AsignacionPuente ap
+      WHERE ap.id = :id AND ap.revocadoEn IS NULL
+        AND ap.cursoEstudiante.estudiante.id = :autorId AND ap.puente.id = :puenteId
+        AND ap.cursoEstudiante.curso.catedratico.id = :catedraticoId
+      """)
+  boolean existsVigenteParaLecturaFotografica(
+      @Param("id") UUID id,
+      @Param("autorId") UUID autorId,
+      @Param("puenteId") UUID puenteId,
+      @Param("catedraticoId") UUID catedraticoId);
+
   boolean existsByCursoEstudiante_IdAndPuente_IdAndRevocadoEnIsNull(
       UUID cursoEstudianteId, UUID puenteId);
 

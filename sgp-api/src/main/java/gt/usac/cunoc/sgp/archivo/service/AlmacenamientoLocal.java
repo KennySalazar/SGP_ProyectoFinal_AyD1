@@ -3,15 +3,18 @@ package gt.usac.cunoc.sgp.archivo.service;
 import java.io.*;
 import java.nio.file.*;
 
-/** El directorio es privado del proceso y no se sirve mediante HTTP. */
 public class AlmacenamientoLocal implements AlmacenamientoArchivos {
   private final Path raiz;
+  private final boolean permisosPosix;
 
   public AlmacenamientoLocal(Path directorio) throws IOException {
     Files.createDirectories(directorio);
     if (Files.isSymbolicLink(directorio))
       throw new IOException("Directorio de almacenamiento no permitido");
     raiz = directorio.toRealPath();
+    permisosPosix =
+        Files.getFileStore(raiz)
+            .supportsFileAttributeView(java.nio.file.attribute.PosixFileAttributeView.class);
   }
 
   private Path destino(String clave) {
@@ -22,10 +25,14 @@ public class AlmacenamientoLocal implements AlmacenamientoArchivos {
       throws IOException {
     if (tamano <= 0) throw new IOException("Tamaño de objeto inválido");
     Path destino = destino(clave), temporal = raiz.resolve(clave + ".pendiente");
-    Files.createFile(
-        temporal,
-        java.nio.file.attribute.PosixFilePermissions.asFileAttribute(
-            java.nio.file.attribute.PosixFilePermissions.fromString("rw-------")));
+    if (permisosPosix) {
+      Files.createFile(
+          temporal,
+          java.nio.file.attribute.PosixFilePermissions.asFileAttribute(
+              java.nio.file.attribute.PosixFilePermissions.fromString("rw-------")));
+    } else {
+      Files.createFile(temporal);
+    }
     try {
       long escritos = 0;
       try (var salida = Files.newOutputStream(temporal)) {
@@ -38,7 +45,6 @@ public class AlmacenamientoLocal implements AlmacenamientoArchivos {
         }
       }
       if (escritos != tamano) throw new IOException("Longitud de objeto diferente a la declarada");
-      // Publicación atómica sin reemplazo: el enlace falla si la clave ya existe.
       Files.createLink(destino, temporal);
     } finally {
       Files.deleteIfExists(temporal);

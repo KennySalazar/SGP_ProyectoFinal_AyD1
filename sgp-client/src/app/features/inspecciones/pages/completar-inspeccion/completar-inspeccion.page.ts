@@ -32,14 +32,18 @@ import { ApiErrorService } from '../../../../core/services/api-error.service';
 import { AuthStore } from '../../../../core/services/auth.store';
 import { InspeccionApiService } from '../../services/inspeccion-api.service';
 
-type AccionFinal = 'enviar' | 'publicar';
+import { ReporteFotograficoComponent } from '../../components/reporte-fotografico/reporte-fotografico.component';
 
+import { ConfirmacionEstadoIcComponent } from '../../components/confirmacion-estado-ic/confirmacion-estado-ic.component';
+type AccionFinal = 'enviar' | 'publicar';
 interface ErrorAccion {
   mensaje: string;
-  campos: { campo: string; mensaje: string }[];
+  campos: {
+    campo: string;
+    mensaje: string;
+  }[];
   fotografias: string[];
 }
-
 @Component({
   selector: 'app-completar-inspeccion-page',
   standalone: true,
@@ -54,6 +58,8 @@ interface ErrorAccion {
     ProgressBarModule,
     InputTextModule,
     FormularioDinamicoComponent,
+    ReporteFotograficoComponent,
+    ConfirmacionEstadoIcComponent,
   ],
   templateUrl: './completar-inspeccion.page.html',
   styleUrl: './completar-inspeccion.page.scss',
@@ -74,8 +80,12 @@ export class CompletarInspeccionPage implements OnInit {
   private guardadoForzadoDuranteSolicitud = false;
   private readonly claveIdempotenciaEnvio = crypto.randomUUID();
 
+  protected readonly reporteFotos = viewChild(ReporteFotograficoComponent);
+  readonly fotografiasOcupadas = computed(() => this.reporteFotos()?.ocupado() ?? false);
   protected readonly formulario = viewChild(FormularioDinamicoComponent);
-
+  readonly revisionIc = signal(0);
+  readonly operandoIc = signal(false);
+  readonly esAutor = computed(() => this.auth.user()?.id === this.borrador()?.autorId);
   readonly cargando = signal(true);
   readonly guardando = signal(false);
   readonly errorCarga = signal<string | null>(null);
@@ -91,51 +101,39 @@ export class CompletarInspeccionPage implements OnInit {
     return !!borrador && borrador.autorId !== this.auth.user()?.id;
   });
 
-  // Envío o publicación (HU-026)
   readonly confirmandoAccion = signal(false);
   readonly ejecutandoAccion = signal(false);
   readonly errorAccion = signal<ErrorAccion | null>(null);
   readonly resultadoAccion = signal<InspeccionResumenResponse | null>(null);
-
-  /** Acción final según el rol con que se creó la inspección (RN-REV-01, RN-REV-02). */
   readonly accionFinal = computed<AccionFinal | null>(() => {
     const b = this.borrador();
     if (!b || b.estado !== 'BORRADOR' || this.soloLectura()) return null;
     if (b.rolAutor === 'CATEDRATICO' || b.rolAutor === 'PROFESIONAL_EXTERNO') return 'publicar';
     return b.rolAutor === 'ESTUDIANTE' ? 'enviar' : null;
   });
-
-  /** El Profesional externo sin colegiado verificado no puede publicar (RN-USR-04). */
   readonly colegiadoPendiente = computed(
     () => this.accionFinal() === 'publicar' && this.auth.colegiadoPendiente(),
   );
-
-  /** El servidor valida lo guardado; la acción espera a que no haya cambios pendientes. */
   readonly cambiosSinGuardar = computed(
     () => this.guardando() || this.estadoAutoguardado() === 'pendiente',
   );
-
   private readonly datosEnMemoria = signal<Record<string, unknown>>({});
   private readonly datosIniciales = signal<InspeccionBorradorResponse | null>(null);
-
   readonly valoresIniciales = computed<Record<string, unknown> | null>(() => {
     const b = this.datosIniciales();
     if (!b) return null;
-
     const iniciales: Record<string, unknown> = {
       ...(b.datos ?? {}),
     };
-
     const idExistente = (iniciales['identificacion'] as Record<string, unknown>) ?? {};
     iniciales['identificacion'] = {
       nombre_puente: b.nombrePuente,
       codigo: b.codigoPuente,
-      fecha_inspeccion: b.fechaInspeccion,
       nombre_inspector: b.nombreAutor,
       ...(b.identificacionCapturada ?? {}),
       ...idExistente,
+      fecha_inspeccion: b.fechaInspeccion,
     };
-
     if (b.datosPermanentes) {
       const dgExistente = (iniciales['datos_generales'] as Record<string, unknown>) ?? {};
       iniciales['datos_generales'] = {
@@ -153,10 +151,8 @@ export class CompletarInspeccionPage implements OnInit {
         ...dgExistente,
       };
     }
-
     return iniciales;
   });
-
   constructor() {
     this.cambios.pipe(debounceTime(1200), takeUntilDestroyed(this.destroyRef)).subscribe(() => {
       this.guardarBorrador(false);
@@ -166,7 +162,6 @@ export class CompletarInspeccionPage implements OnInit {
         this.guardarBorrador(false);
     });
   }
-
   ngOnInit(): void {
     const id = this.route.snapshot.paramMap.get('id');
     if (!id) {
@@ -174,16 +169,13 @@ export class CompletarInspeccionPage implements OnInit {
       this.cargando.set(false);
       return;
     }
-
     this.cargarBorrador(id);
   }
-
   private cargarBorrador(id: string): void {
     this.cargando.set(true);
     this.errorCarga.set(null);
-
     this.inspeccionApi
-      .obtenerBorrador(id)
+      .obtenerBorrador(id, true)
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (b) => {
@@ -201,7 +193,6 @@ export class CompletarInspeccionPage implements OnInit {
         },
       });
   }
-
   private cargarEsquema(versionId: string): void {
     this.formularioApi
       .obtenerEsquemaPublicado(versionId)
@@ -212,7 +203,6 @@ export class CompletarInspeccionPage implements OnInit {
           this.cargando.set(false);
         },
         error: () => {
-          // Fallback a versión activa si la versión no se encuentra como publicada directamente
           this.formularioApi
             .obtenerActiva()
             .pipe(takeUntilDestroyed(this.destroyRef))
@@ -231,8 +221,13 @@ export class CompletarInspeccionPage implements OnInit {
         },
       });
   }
-
   onValorChange(valor: Record<string, unknown>): void {
+    const fechaFormulario = (valor['identificacion'] as Record<string, unknown> | undefined)?.[
+      'fecha_inspeccion'
+    ];
+    if (typeof fechaFormulario === 'string' && fechaFormulario !== this.fechaInspeccion()) {
+      this.fechaInspeccion.set(fechaFormulario);
+    }
     this.datosEnMemoria.set(valor);
     const huella = JSON.stringify(valor);
     if (this.ultimaHuellaDatos === null) {
@@ -244,45 +239,44 @@ export class CompletarInspeccionPage implements OnInit {
       this.marcarCambio();
     }
   }
-
   onFechaInspeccionChange(fecha: string): void {
     if (this.soloLectura()) return;
     if (fecha === this.fechaInspeccion()) return;
     this.fechaInspeccion.set(fecha);
+    this.formulario()
+      ?.construido()
+      ?.form.get(['identificacion', 'fecha_inspeccion'])
+      ?.setValue(fecha, { emitEvent: false });
     this.marcarCambio();
   }
-
   onSeccionCambiando(): void {
     if (!this.soloLectura()) this.guardarBorrador(false);
   }
-
   private marcarCambio(): void {
     this.revisionDatos++;
+    this.revisionIc.update((revision) => revision + 1);
     this.estadoAutoguardado.set('pendiente');
     this.errorGuardado.set(null);
     this.mensajeExito.set(null);
     this.cambios.next();
   }
-
   guardarBorrador(forzar = true): void {
     const b = this.borrador();
+    if (this.ejecutandoAccion() || this.resultadoAccion()) return;
     if (!b || this.soloLectura() || (!forzar && this.revisionDatos <= this.revisionGuardada))
       return;
     if (this.guardando()) {
       this.guardadoForzadoDuranteSolicitud = true;
       return;
     }
-
     this.errorGuardado.set(null);
     this.mensajeExito.set(null);
-
     const fecha = this.fechaInspeccion();
     if (fecha > this.hoy) {
       this.errorGuardado.set('La fecha de inspección no puede ser posterior a la fecha actual.');
       this.estadoAutoguardado.set('pendiente');
       return;
     }
-
     const anioConstruccion = b.datosPermanentes?.anioConstruccion;
     if (anioConstruccion && fecha) {
       const anioInspeccion = parseInt(fecha.substring(0, 4), 10);
@@ -294,10 +288,15 @@ export class CompletarInspeccionPage implements OnInit {
         return;
       }
     }
-
-    const valorActual = this.formulario()?.valor() ?? this.datosEnMemoria();
+    const valores = this.formulario()?.valor() ?? this.datosEnMemoria();
+    const valorActual = {
+      ...valores,
+      identificacion: {
+        ...((valores['identificacion'] as Record<string, unknown>) ?? {}),
+        fecha_inspeccion: fecha || b.fechaInspeccion,
+      },
+    };
     const revisionSolicitud = this.revisionDatos;
-
     const request: GuardarBorradorRequest = {
       version: b.version,
       datos: valorActual,
@@ -315,10 +314,8 @@ export class CompletarInspeccionPage implements OnInit {
           numeroColegiado: a.numeroColegiado ?? a.colegiado,
         })) ?? null,
     };
-
     this.guardando.set(true);
     this.estadoAutoguardado.set('guardando');
-
     this.inspeccionApi.guardarBorrador(b.id, request).subscribe({
       next: (actualizada) => {
         this.guardando.set(false);
@@ -347,23 +344,38 @@ export class CompletarInspeccionPage implements OnInit {
       },
     });
   }
-
   abrirConfirmacion(): void {
-    if (!this.accionFinal() || this.cambiosSinGuardar() || this.colegiadoPendiente()) return;
+    if (
+      !this.accionFinal() ||
+      this.cambiosSinGuardar() ||
+      this.errorGuardado() ||
+      this.operandoIc() ||
+      this.colegiadoPendiente() ||
+      this.fotografiasOcupadas()
+    )
+      return;
     this.errorAccion.set(null);
     this.confirmandoAccion.set(true);
   }
-
   cancelarConfirmacion(): void {
     if (this.ejecutandoAccion()) return;
     this.confirmandoAccion.set(false);
   }
-
   confirmarAccion(): void {
     const b = this.borrador();
     const accion = this.accionFinal();
-    if (!b || !accion || this.ejecutandoAccion()) return;
-
+    if (
+      !b ||
+      !accion ||
+      !this.confirmandoAccion() ||
+      this.ejecutandoAccion() ||
+      this.cambiosSinGuardar() ||
+      this.errorGuardado() ||
+      this.operandoIc() ||
+      this.colegiadoPendiente() ||
+      this.fotografiasOcupadas()
+    )
+      return;
     this.ejecutandoAccion.set(true);
     this.errorAccion.set(null);
     this.apiErrors.clear();
@@ -371,26 +383,39 @@ export class CompletarInspeccionPage implements OnInit {
       accion === 'publicar'
         ? this.inspeccionApi.publicar(b.id)
         : this.inspeccionApi.enviar(b.id, this.claveIdempotenciaEnvio);
-
     peticion.pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: (resultado) => {
         this.ejecutandoAccion.set(false);
         this.confirmandoAccion.set(false);
         this.resultadoAccion.set(resultado);
+        this.borrador.update((actual) =>
+          actual ? { ...actual, estado: resultado.estado } : actual,
+        );
+        if (resultado.estado === 'PUBLICADA') {
+          void this.router.navigate(['/puentes', resultado.puenteId], { replaceUrl: true });
+        }
       },
       error: (err: HttpErrorResponse) => {
         this.ejecutandoAccion.set(false);
         this.errorAccion.set(this.errorDeAccion(err));
+        if (
+          err.status === 409 &&
+          ['confirmacion_ic_desactualizada', 'calculo_ic_desactualizado'].includes(err.error?.code)
+        ) {
+          this.confirmandoAccion.set(false);
+          this.revisionIc.update((revision) => revision + 1);
+        }
         this.apiErrors.clear();
       },
     });
   }
-
-  /** Separa los campos y las categorías de fotografía faltantes del 422 (RN-INS-06). */
   private errorDeAccion(err: HttpErrorResponse): ErrorAccion {
     const problema = err.error as {
       detail?: string;
-      errores?: { campo?: string; mensaje?: string }[];
+      errores?: {
+        campo?: string;
+        mensaje?: string;
+      }[];
     } | null;
     const errores = problema?.errores ?? [];
     return {
@@ -403,7 +428,6 @@ export class CompletarInspeccionPage implements OnInit {
         .map((e) => (e.campo ?? '').replace('fotografias.', '')),
     };
   }
-
   severidadIc(estado: string | null | undefined): 'success' | 'warn' | 'danger' | 'secondary' {
     switch (estado?.toUpperCase()) {
       case 'BUENO':
@@ -417,7 +441,6 @@ export class CompletarInspeccionPage implements OnInit {
         return 'secondary';
     }
   }
-
   private procesarErrorCarga(err: HttpErrorResponse): void {
     if (err.status === 404) {
       this.errorCarga.set(
@@ -435,7 +458,6 @@ export class CompletarInspeccionPage implements OnInit {
       );
     }
   }
-
   private procesarErrorGuardado(err: HttpErrorResponse): void {
     if (err.status === 403) {
       this.errorGuardado.set(

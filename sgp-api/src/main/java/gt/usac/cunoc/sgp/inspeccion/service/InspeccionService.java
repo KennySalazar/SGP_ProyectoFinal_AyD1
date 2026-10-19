@@ -22,6 +22,8 @@ import gt.usac.cunoc.sgp.inspeccion.dto.IniciarInspeccionResponse;
 import gt.usac.cunoc.sgp.inspeccion.dto.IniciarInspeccionVersionadaRequest;
 import gt.usac.cunoc.sgp.inspeccion.dto.IniciarInspeccionVersionadaResponse;
 import gt.usac.cunoc.sgp.inspeccion.dto.InspeccionBorradorResponse;
+import gt.usac.cunoc.sgp.inspeccion.dto.InspeccionPublicadaDetalleResponse;
+import gt.usac.cunoc.sgp.inspeccion.dto.InspeccionPublicadaResumenResponse;
 import gt.usac.cunoc.sgp.inspeccion.dto.InspeccionResumenResponse;
 import gt.usac.cunoc.sgp.inspeccion.dto.ProgresoBorradorResponse;
 import gt.usac.cunoc.sgp.inspeccion.entity.Inspeccion;
@@ -32,6 +34,7 @@ import gt.usac.cunoc.sgp.inspeccion.model.EntradaCalculoIc;
 import gt.usac.cunoc.sgp.inspeccion.model.ResultadoCalculoIc;
 import gt.usac.cunoc.sgp.inspeccion.repository.InspeccionDatoTecnicoRepository;
 import gt.usac.cunoc.sgp.inspeccion.repository.InspeccionRepository;
+import gt.usac.cunoc.sgp.inspeccion.repository.ResultadoIcRepository;
 import gt.usac.cunoc.sgp.puente.entity.Puente;
 import gt.usac.cunoc.sgp.puente.repository.AsignacionPuenteRepository;
 import gt.usac.cunoc.sgp.puente.repository.PuenteRepository;
@@ -96,7 +99,8 @@ public class InspeccionService {
   private final CalculoIndiceCondicionService calculoIndiceCondicionService;
   private final JsonSchemaValidatorService jsonSchemaValidatorService;
   private final InspeccionMapper inspeccionMapper;
-  private AsignacionPuenteRepository asignacionPuenteRepository;
+  private AsignacionPuenteRepository asignaciones;
+  private final ResultadoIcRepository resultadoIcRepository;
 
   public InspeccionService(
       InspeccionRepository inspeccionRepository,
@@ -104,7 +108,8 @@ public class InspeccionService {
       PuenteRepository puenteRepository,
       JsonSchemaValidatorService jsonSchemaValidatorService,
       InspeccionMapper inspeccionMapper,
-      ObjectMapper objectMapper) {
+      ObjectMapper objectMapper,
+      AsignacionPuenteRepository asignaciones) {
     this(
         inspeccionRepository,
         null,
@@ -120,7 +125,8 @@ public class InspeccionService {
         null,
         null,
         jsonSchemaValidatorService,
-        inspeccionMapper);
+        inspeccionMapper,
+        asignaciones);
   }
 
   public InspeccionService(
@@ -145,6 +151,7 @@ public class InspeccionService {
         auditoriaWriter,
         objectMapper,
         clock,
+        null,
         null,
         null,
         null,
@@ -181,6 +188,44 @@ public class InspeccionService {
         preparadorEntradaIcService,
         calculoIndiceCondicionService,
         null,
+        null,
+        null);
+  }
+
+  public InspeccionService(
+      InspeccionRepository inspeccionRepository,
+      InspeccionDatoTecnicoRepository datoTecnicoRepository,
+      PuenteRepository puenteRepository,
+      VersionFormularioRepository versionFormularioRepository,
+      UserAccountRepository userAccountRepository,
+      UsuarioProfesionalRepository profesionalRepository,
+      OperacionIdempotenteService operaciones,
+      AuditoriaWriter auditoriaWriter,
+      ObjectMapper objectMapper,
+      Clock clock,
+      CalculadorProgresoBorrador calculadorProgreso,
+      PreparadorEntradaIcService preparadorEntradaIcService,
+      CalculoIndiceCondicionService calculoIndiceCondicionService,
+      JsonSchemaValidatorService jsonSchemaValidatorService,
+      InspeccionMapper inspeccionMapper,
+      AsignacionPuenteRepository asignaciones) {
+    this(
+        inspeccionRepository,
+        datoTecnicoRepository,
+        puenteRepository,
+        versionFormularioRepository,
+        userAccountRepository,
+        profesionalRepository,
+        operaciones,
+        auditoriaWriter,
+        objectMapper,
+        clock,
+        calculadorProgreso,
+        preparadorEntradaIcService,
+        calculoIndiceCondicionService,
+        jsonSchemaValidatorService,
+        inspeccionMapper,
+        asignaciones,
         null);
   }
 
@@ -200,7 +245,9 @@ public class InspeccionService {
       PreparadorEntradaIcService preparadorEntradaIcService,
       CalculoIndiceCondicionService calculoIndiceCondicionService,
       JsonSchemaValidatorService jsonSchemaValidatorService,
-      InspeccionMapper inspeccionMapper) {
+      InspeccionMapper inspeccionMapper,
+      AsignacionPuenteRepository asignaciones,
+      ResultadoIcRepository resultadoIcRepository) {
     this.inspeccionRepository = inspeccionRepository;
     this.datoTecnicoRepository = datoTecnicoRepository;
     this.puenteRepository = puenteRepository;
@@ -217,11 +264,13 @@ public class InspeccionService {
     this.calculoIndiceCondicionService = calculoIndiceCondicionService;
     this.jsonSchemaValidatorService = jsonSchemaValidatorService;
     this.inspeccionMapper = inspeccionMapper;
+    this.asignaciones = asignaciones;
+    this.resultadoIcRepository = resultadoIcRepository;
   }
 
   @Autowired(required = false)
-  void setAsignacionPuenteRepository(AsignacionPuenteRepository asignacionPuenteRepository) {
-    this.asignacionPuenteRepository = asignacionPuenteRepository;
+  void setAsignacionPuenteRepository(AsignacionPuenteRepository asignaciones) {
+    this.asignaciones = asignaciones;
   }
 
   /** Conserva el contrato de HU-024 utilizado por los consumidores de HU-028. */
@@ -355,8 +404,36 @@ public class InspeccionService {
             ? request.nombreAutorCapturado()
             : "Inspector";
 
+    if (RoleName.ESTUDIANTE.name().equals(rolUsuario)) {
+      if (request.asignacionPuenteId() == null
+          || asignaciones == null
+          || !asignaciones.existsVigenteParaInspeccion(
+              request.asignacionPuenteId(), usuarioId, puente.getId())
+          || asignaciones
+              .findVigentePorId(request.asignacionPuenteId(), usuarioId, fecha)
+              .isEmpty()) {
+        throw new ApiException(
+            HttpStatus.NOT_FOUND,
+            "asignacion_no_encontrada",
+            "Asignación no encontrada",
+            "No existe una asignación vigente del estudiante para este puente.");
+      }
+    }
+
     Inspeccion inspeccion =
         new Inspeccion(puente, version, usuarioId, rolUsuario, nombre, fecha, dispositivo, datos);
+    if (request.asignacionPuenteId() != null) {
+      if (!RoleName.ESTUDIANTE.name().equals(rolUsuario)
+          && !asignaciones.existsVigenteParaInspeccion(
+              request.asignacionPuenteId(), usuarioId, puente.getId())) {
+        throw new ApiException(
+            HttpStatus.NOT_FOUND,
+            "asignacion_no_encontrada",
+            "Asignación no encontrada",
+            "No existe una asignación vigente del autor para este puente.");
+      }
+      inspeccion.setAsignacionPuenteId(request.asignacionPuenteId());
+    }
     InspeccionResumenResponse response =
         inspeccionMapper.toResumenResponse(inspeccionRepository.save(inspeccion));
     return new IniciarInspeccionVersionadaResponse(
@@ -732,24 +809,24 @@ public class InspeccionService {
     LocalDate hoyGuatemala = LocalDate.now(clock.withZone(ZONA_GUATEMALA));
     UUID asignacionPuenteId = null;
     if (user.getRole().getName() == RoleName.ESTUDIANTE) {
-      if (asignacionPuenteRepository == null) {
+      if (asignaciones == null) {
         throw new ApiException(
-            HttpStatus.FORBIDDEN,
-            "puente_no_asignado",
-            "Puente no asignado",
-            "El estudiante no tiene una asignación vigente para este puente.");
+            HttpStatus.NOT_FOUND,
+            "asignacion_no_encontrada",
+            "Asignación no encontrada",
+            "No existe una asignación vigente del estudiante para este puente.");
       }
       asignacionPuenteId =
-          asignacionPuenteRepository
+          asignaciones
               .findVigenteParaInspeccion(user.getId(), puente.getId(), hoyGuatemala)
               .map(AsignacionPuenteRepository.AsignacionInspeccionProjection::getId)
               .orElseThrow(
                   () ->
                       new ApiException(
-                          HttpStatus.FORBIDDEN,
-                          "puente_no_asignado",
-                          "Puente no asignado",
-                          "El estudiante no tiene una asignación vigente para este puente."));
+                          HttpStatus.NOT_FOUND,
+                          "asignacion_no_encontrada",
+                          "Asignación no encontrada",
+                          "No existe una asignación vigente del estudiante para este puente."));
     }
 
     // 4. Versión activa de formulario (fijada para la inspección)
@@ -1238,6 +1315,44 @@ public class InspeccionService {
   }
 
   @Transactional(readOnly = true)
+  public Page<InspeccionPublicadaResumenResponse> listarPublicadasPorPuente(
+      UUID puenteId, int pagina, int tamanio) {
+    if (pagina < 0 || tamanio < 1 || tamanio > 100) {
+      throw new ApiException(
+          HttpStatus.UNPROCESSABLE_ENTITY,
+          "paginacion_invalida",
+          "Paginación inválida",
+          "La página debe ser mayor o igual a 0 y el tamaño debe estar entre 1 y 100.");
+    }
+    return inspeccionRepository.findPublicadasByPuenteId(
+        puenteId,
+        PageRequest.of(
+            pagina, tamanio, Sort.by(Sort.Order.desc("publicadoEn"), Sort.Order.desc("id"))));
+  }
+
+  @Transactional(readOnly = true)
+  public InspeccionPublicadaDetalleResponse consultarPublicada(UUID id) {
+    Inspeccion inspeccion =
+        inspeccionRepository
+            .findPublicadaConDetallesById(id)
+            .orElseThrow(
+                () ->
+                    new ApiException(
+                        HttpStatus.NOT_FOUND,
+                        "inspeccion_no_encontrada",
+                        "Inspección no encontrada",
+                        "No existe la inspección publicada solicitada."));
+    // Leer el resultado de ESTA publicación, nunca el vigente del puente ni un cálculo nuevo.
+    var resultado = resultadoIcRepository.findPublicacionByInspeccionId(id).orElse(null);
+    UUID correccionId = inspeccionRepository.findCorreccionPublicadaId(id).orElse(null);
+    DatosPermanentesResponse permanentes =
+        inspeccion.getDatoTecnico() == null
+            ? null
+            : aDatosPermanentesResponse(inspeccion.getDatoTecnico());
+    return inspeccionMapper.toPublicadaDetalle(inspeccion, resultado, permanentes, correccionId);
+  }
+
+  @Transactional(readOnly = true)
   public InspeccionResumenResponse consultarPorId(UUID inspeccionId, UUID usuarioId) {
     Inspeccion inspeccion = obtenerInspeccionActiva(inspeccionId);
     boolean academica = RoleName.ESTUDIANTE.name().equals(inspeccion.getRolAutorCreacion());
@@ -1268,8 +1383,8 @@ public class InspeccionService {
 
   private boolean esCatedraticoAsignado(Inspeccion inspeccion, UUID usuarioId) {
     return inspeccion.getAsignacionPuenteId() != null
-        && asignacionPuenteRepository != null
-        && asignacionPuenteRepository.perteneceACatedratico(
+        && asignaciones != null
+        && asignaciones.perteneceACatedratico(
             inspeccion.getAsignacionPuenteId(), usuarioId);
   }
 

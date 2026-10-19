@@ -1,5 +1,6 @@
 package gt.usac.cunoc.sgp.inspeccion.repository;
 
+import gt.usac.cunoc.sgp.inspeccion.dto.InspeccionPublicadaResumenResponse;
 import gt.usac.cunoc.sgp.inspeccion.entity.Inspeccion;
 import jakarta.persistence.LockModeType;
 import java.util.Collection;
@@ -44,6 +45,29 @@ public interface InspeccionRepository extends JpaRepository<Inspeccion, UUID> {
   Page<Inspeccion> findMisInspecciones(
       @Param("autorId") UUID autorId, @Param("estado") String estado, Pageable pageable);
 
+  @Query(
+      value =
+          """
+          SELECT new gt.usac.cunoc.sgp.inspeccion.dto.InspeccionPublicadaResumenResponse(
+            i.id, i.puente.id, i.autorId, i.nombreAutorCapturado,
+            i.fechaInspeccion, i.publicadoEn, i.estado)
+          FROM Inspeccion i
+          WHERE i.puente.id = :puenteId AND i.estado = 'PUBLICADA' AND i.eliminadoEn IS NULL
+          """,
+      countQuery =
+          """
+          SELECT count(i) FROM Inspeccion i
+          WHERE i.puente.id = :puenteId AND i.estado = 'PUBLICADA' AND i.eliminadoEn IS NULL
+          """)
+  Page<InspeccionPublicadaResumenResponse> findPublicadasByPuenteId(
+      @Param("puenteId") UUID puenteId, Pageable pageable);
+
+  @EntityGraph(attributePaths = {"puente", "versionFormulario", "acompanantes", "datoTecnico"})
+  @Query(
+      "SELECT i FROM Inspeccion i WHERE i.id = :id AND i.estado = 'PUBLICADA'"
+          + " AND i.eliminadoEn IS NULL")
+  Optional<Inspeccion> findPublicadaConDetallesById(@Param("id") UUID id);
+
   List<Inspeccion> findByPuenteIdOrderByFechaInspeccionDesc(UUID puenteId);
 
   List<Inspeccion> findByAutorIdOrderByFechaInspeccionDesc(UUID autorId);
@@ -80,6 +104,27 @@ public interface InspeccionRepository extends JpaRepository<Inspeccion, UUID> {
           """,
       nativeQuery = true)
   List<String> findCategoriasFotoDisponibles(@Param("id") UUID id);
+
+  interface ConteoFotoCategoria {
+    String getCategoria();
+
+    long getCantidad();
+  }
+
+  /** Conteos para evaluar evidencia bajo el bloqueo de la inspección. */
+  @Query(
+      value =
+          """
+          SELECT a.categoria_foto AS categoria, count(*) AS cantidad
+          FROM archivo_inspeccion ai
+          JOIN archivo a ON a.id = ai.archivo_id
+          WHERE ai.inspeccion_id = :id
+            AND a.tipo_uso = 'FOTO_INSPECCION'
+            AND a.estado = 'DISPONIBLE'
+          GROUP BY a.categoria_foto
+          """,
+      nativeQuery = true)
+  List<ConteoFotoCategoria> findConteosFotoDisponibles(@Param("id") UUID id);
 
   /** Corrección publicada que supera a la inspección indicada, si existe (RN-INS-08). */
   @Query(

@@ -24,11 +24,14 @@ import { InspeccionApiService } from '../../services/inspeccion-api.service';
 import { ApiErrorService } from '../../../../core/services/api-error.service';
 import { AuthStore } from '../../../../core/services/auth.store';
 
+import { ConfirmacionEstadoIcComponent } from '../../components/confirmacion-estado-ic/confirmacion-estado-ic.component';
+
 @Component({
   selector: 'app-mis-inspecciones-page',
   standalone: true,
   imports: [
     FormsModule,
+    ConfirmacionEstadoIcComponent,
     TranslocoPipe,
     ButtonModule,
     DialogModule,
@@ -51,6 +54,8 @@ export class MisInspeccionesPage {
   private readonly destroyRef = inject(DestroyRef);
   private readonly apiErrors = inject(ApiErrorService);
 
+  readonly inspeccionIc = signal<InspeccionResumenResponse | null>(null);
+  readonly operandoIc = signal(false);
   readonly pagina = signal<PaginaResponse<InspeccionResumenResponse> | null>(null);
   readonly cargando = signal(false);
   readonly error = signal<string | null>(null);
@@ -182,7 +187,6 @@ export class MisInspeccionesPage {
       });
   }
 
-  /** Solo una inspección publicada y vigente admite corrección (HU-027). */
   puedeCorregir(inspeccion: InspeccionResumenResponse): boolean {
     return inspeccion.estado === 'PUBLICADA' && !inspeccion.superadaPorId;
   }
@@ -216,7 +220,6 @@ export class MisInspeccionesPage {
           void this.router.navigate(['/inspecciones', correccion.id, 'borrador']);
         },
         error: (err: HttpErrorResponse) => {
-          // El error se muestra dentro del diálogo; se evita duplicarlo en el aviso global.
           this.apiErrors.clear();
           const problema = err.error as { detail?: string } | null;
           this.errorCorreccion.set(

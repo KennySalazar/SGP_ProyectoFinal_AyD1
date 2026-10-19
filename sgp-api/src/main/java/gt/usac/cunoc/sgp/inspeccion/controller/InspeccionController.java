@@ -10,6 +10,8 @@ import gt.usac.cunoc.sgp.inspeccion.dto.IniciarInspeccionResponse;
 import gt.usac.cunoc.sgp.inspeccion.dto.IniciarInspeccionVersionadaRequest;
 import gt.usac.cunoc.sgp.inspeccion.dto.IniciarInspeccionVersionadaResponse;
 import gt.usac.cunoc.sgp.inspeccion.dto.InspeccionBorradorResponse;
+import gt.usac.cunoc.sgp.inspeccion.dto.InspeccionPublicadaDetalleResponse;
+import gt.usac.cunoc.sgp.inspeccion.dto.InspeccionPublicadaResumenResponse;
 import gt.usac.cunoc.sgp.inspeccion.dto.InspeccionResumenResponse;
 import gt.usac.cunoc.sgp.inspeccion.dto.ValidarRespuestasRequest;
 import gt.usac.cunoc.sgp.inspeccion.service.InspeccionService;
@@ -69,17 +71,25 @@ public class InspeccionController {
   }
 
   @PostMapping("/iniciar")
-  @PreAuthorize("hasAnyRole('CATEDRATICO','PROFESIONAL_EXTERNO')")
+  @PreAuthorize("isAuthenticated()")
   @Operation(
       summary = "Iniciar una inspección con una versión publicada específica",
       description =
-          "Crea una inspección en BORRADOR con la versión publicada indicada y valida las respuestas iniciales contra su esquema. No sustituye la versión solicitada por la versión activa.",
+          "Crea una inspección en BORRADOR con la versión publicada indicada y valida las respuestas iniciales contra su esquema. Los Estudiantes requieren una asignación académica vigente. No sustituye la versión solicitada por la versión activa.",
       security = @SecurityRequirement(name = "bearerAuth"))
   public ResponseEntity<IniciarInspeccionVersionadaResponse> iniciarConVersion(
       @Valid @RequestBody IniciarInspeccionVersionadaRequest request,
       Authentication authentication) {
     UUID usuarioId = usuarioId(authentication);
-    var response = inspeccionService.iniciarInspeccion(request, usuarioId, rol(authentication));
+    String rolUsuario = rol(authentication);
+    if ("ESTUDIANTE".equals(rolUsuario) && request.asignacionPuenteId() == null) {
+      throw new ApiException(
+          HttpStatus.FORBIDDEN,
+          "puente_no_asignado",
+          "Puente no asignado",
+          "El estudiante debe indicar una asignación vigente para iniciar la inspección.");
+    }
+    var response = inspeccionService.iniciarInspeccion(request, usuarioId, rolUsuario);
     return ResponseEntity.status(HttpStatus.CREATED).body(response);
   }
 
@@ -162,6 +172,25 @@ public class InspeccionController {
     UUID usuarioId = usuarioId(authentication);
     inspeccionService.eliminarBorrador(id, usuarioId);
     return ResponseEntity.noContent().build();
+  }
+
+  @GetMapping("/puentes/{puenteId}/publicadas")
+  @PreAuthorize("isAuthenticated()")
+  @Operation(summary = "Consultar historial paginado de inspecciones publicadas de un puente")
+  public ResponseEntity<Page<InspeccionPublicadaResumenResponse>> listarPublicadas(
+      @PathVariable UUID puenteId,
+      @RequestParam(defaultValue = "0") int pagina,
+      @RequestParam(defaultValue = "20") int tamanio) {
+    return ResponseEntity.ok(
+        inspeccionService.listarPublicadasPorPuente(puenteId, pagina, tamanio));
+  }
+
+  @GetMapping("/{id}/publicada")
+  @PreAuthorize("isAuthenticated()")
+  @Operation(summary = "Consultar detalle publicado con versión original e IC persistido")
+  public ResponseEntity<InspeccionPublicadaDetalleResponse> consultarPublicada(
+      @PathVariable UUID id) {
+    return ResponseEntity.ok(inspeccionService.consultarPublicada(id));
   }
 
   @GetMapping("/{id}")

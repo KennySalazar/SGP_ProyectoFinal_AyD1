@@ -1,0 +1,115 @@
+@if (cargando()) {
+<p role="status">{{ 'inspecciones.consulta.cargando' | transloco }}</p>
+} @else if (error(); as mensaje) {
+<section class="surface-card mensaje-error" role="alert" [attr.data-http-status]="estadoHttp()">
+  <h1>{{ 'inspecciones.consulta.error' | transloco }}</h1>
+  <p>{{ mensaje }}</p>
+</section>
+} @else if (detalle(); as d) {
+<header class="page-heading">
+  <div>
+    <p class="page-kicker">{{ 'inspecciones.consulta.titulo' | transloco }}</p>
+    <h1 class="page-title">{{ d.puenteNombre }}</h1>
+    <p class="page-description">{{ 'inspecciones.consulta.soloLectura' | transloco }}</p>
+  </div>
+  <p-tag [value]="'inspecciones.consulta.publicada' | transloco" severity="success" />
+</header>
+@if (d.superadaPorId) {
+<section class="surface-card superada" role="status">
+  <p-tag [value]="'inspecciones.consulta.superada' | transloco" severity="warn" />
+  <a [routerLink]="['/inspecciones', d.superadaPorId, 'publicada']">
+    {{ 'inspecciones.consulta.verCorreccion' | transloco }}
+  </a>
+</section>
+}
+<section class="surface-card metadatos">
+  <h2>{{ 'inspecciones.consulta.metadatos' | transloco }}</h2>
+  <dl>
+    <div>
+      <dt>{{ 'inspecciones.consulta.autor' | transloco }}</dt>
+      <dd>{{ d.nombreAutor }}</dd>
+    </div>
+    <div>
+      <dt>{{ 'inspecciones.consulta.version' | transloco }}</dt>
+      <dd>{{ d.versionFormularioCodigo }}</dd>
+    </div>
+    <div>
+      <dt>{{ 'inspecciones.consulta.creada' | transloco }}</dt>
+      <dd>
+        {{ (d.creadoEn | date:'dd/MM/yyyy HH:mm:ss') || ('inspecciones.consulta.sinDato' |
+        transloco) }}
+      </dd>
+    </div>
+    <div>
+      <dt>{{ 'inspecciones.consulta.enviada' | transloco }}</dt>
+      <dd>
+        {{ (d.enviadoEn | date:'dd/MM/yyyy HH:mm:ss') || ('inspecciones.consulta.sinDato' |
+        transloco) }}
+      </dd>
+    </div>
+    <div>
+      <dt>{{ 'inspecciones.consulta.publicacion' | transloco }}</dt>
+      <dd>
+        {{ (d.publicadoEn | date:'dd/MM/yyyy HH:mm:ss') || ('inspecciones.consulta.sinDato' |
+        transloco) }}
+      </dd>
+    </div>
+    <div>
+      <dt>{{ 'inspecciones.consulta.dispositivo' | transloco }}</dt>
+      <dd>{{ d.dispositivoId }}</dd>
+    </div>
+    <div>
+      <dt>{{ 'inspecciones.consulta.fechaInspeccion' | transloco }}</dt>
+      <dd>{{ d.fechaInspeccion | date:'dd/MM/yyyy' }}</dd>
+    </div>
+  </dl>
+  <h3>{{ 'inspecciones.consulta.acompanantes' | transloco }}</h3>
+  <ul>
+    @for (persona of d.acompanantes; track persona.id) {
+    <li>{{ persona.nombre }} @if (persona.numeroColegiado) { · {{ persona.numeroColegiado }} }</li>
+    } @empty {
+    <li>{{ 'inspecciones.consulta.sinAcompanantes' | transloco }}</li>
+    }
+  </ul>
+</section>
+<section class="surface-card condicion">
+  <h2>{{ 'inspecciones.consulta.icDefinitivo' | transloco }}</h2>
+  @if (d.ic; as ic) {
+  <p class="indice">{{ ic.indiceCalculado | number:'1.2-5' }}</p>
+  <p-tag
+    [value]="'inspecciones.consulta.estados.' + ic.estadoConfirmado | transloco"
+    [severity]="severidad(ic.estadoConfirmado)"
+  />
+  <dl>
+    <div>
+      <dt>{{ 'inspecciones.consulta.calculado' | transloco }}</dt>
+      <dd>{{ 'inspecciones.consulta.estados.' + ic.estadoCalculado | transloco }}</dd>
+    </div>
+    <div>
+      <dt>{{ 'inspecciones.consulta.confirmado' | transloco }}</dt>
+      <dd>{{ 'inspecciones.consulta.estados.' + ic.estadoConfirmado | transloco }}</dd>
+    </div>
+    @if (ic.estadoCalculado !== ic.estadoConfirmado && ic.justificacionAjuste) {
+    <div>
+      <dt>{{ 'inspecciones.consulta.justificacion' | transloco }}</dt>
+      <dd>{{ ic.justificacionAjuste }}</dd>
+    </div>
+    }
+  </dl>
+  } @else {
+  <p>{{ 'inspecciones.consulta.sinIc' | transloco }}</p>
+  }
+</section>
+@if (esquema(); as historico) {
+<app-formulario-dinamico
+  [esquema]="historico"
+  [valoresIniciales]="valores()"
+  [soloLectura]="true"
+/>
+} @else {
+<p class="surface-card mensaje-error" role="alert">
+  {{ 'inspecciones.consulta.sinEsquema' | transloco }}
+</p>
+}
+<app-reporte-fotografico [inspeccion]="d" [soloLectura]="true" />
+}

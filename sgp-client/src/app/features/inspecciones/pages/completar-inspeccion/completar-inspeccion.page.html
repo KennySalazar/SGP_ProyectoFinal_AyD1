@@ -36,7 +36,6 @@
     </div>
   </div>
   } @else if (borrador(); as b) {
-  <!-- Encabezado de la página -->
   <header class="page-heading encabezado-inspeccion">
     <div>
       <p class="page-kicker">{{ 'inspecciones.borrador.kicker' | transloco }}</p>
@@ -109,7 +108,7 @@
         type="button"
         severity="success"
         class="btn-accion-final"
-        [disabled]="cambiosSinGuardar() || colegiadoPendiente()"
+        [disabled]="cambiosSinGuardar() || !!errorGuardado() || operandoIc() || colegiadoPendiente() || fotografiasOcupadas()"
         [attr.title]="cambiosSinGuardar() ? ('inspecciones.transicion.guardaPrimero' | transloco) : null"
         (click)="abrirConfirmacion()"
       >
@@ -119,12 +118,22 @@
       }
     </div>
   </header>
-
   @if (soloLectura()) {
   <div class="alerta-autoguardado surface-card" role="status">
     <i class="pi pi-eye" aria-hidden="true"></i>
     <span>{{ 'inspecciones.borrador.soloLectura' | transloco }}</span>
   </div>
+  } @if (errorAccion() && !confirmandoAccion()) {
+  <div class="estado-mensaje estado-error surface-card" role="alert">
+    {{ errorAccion()?.mensaje }}
+  </div>
+  } @if (esAutor() && b.estado !== 'PUBLICADA' && b.estado !== 'RECHAZADA') {
+  <app-confirmacion-estado-ic
+    [inspeccionId]="b.id"
+    [revision]="revisionIc()"
+    [bloqueado]="cambiosSinGuardar() || !!errorGuardado() || confirmandoAccion() || ejecutandoAccion()"
+    (ocupado)="operandoIc.set($event)"
+  />
   } @if (colegiadoPendiente()) {
   <div class="alerta-autoguardado surface-card" role="status">
     <i class="pi pi-id-card" aria-hidden="true"></i>
@@ -132,10 +141,7 @@
   </div>
   } @else if (accionFinal() && cambiosSinGuardar()) {
   <p class="nota-accion">{{ 'inspecciones.transicion.guardaPrimero' | transloco }}</p>
-  }
-
-  <!-- Avisos de resultado de guardado -->
-  @if (estadoAutoguardado(); as estado) {
+  } @if (estadoAutoguardado(); as estado) {
   <div
     class="surface-card"
     [class.alerta-exito]="estado === 'guardado'"
@@ -158,8 +164,6 @@
     <span>{{ errGuardado }}</span>
   </div>
   }
-
-  <!-- Panel de Avance y Condición Preliminar -->
   <div class="resumen-panel surface-card">
     <div class="avance-general">
       <div class="avance-cabecera">
@@ -175,8 +179,6 @@
       </div>
       <p-progressBar [value]="b.progreso.porcentajeTotal" [showValue]="false" />
     </div>
-
-    <!-- Índice de Condición Preliminar (cuando backend lo proporcione) -->
     @if (b.icPreliminar; as ic) {
     <div class="ic-preliminar-card">
       <div class="ic-cabecera">
@@ -194,10 +196,7 @@
       </div>
       <p class="ic-nota">{{ 'inspecciones.borrador.indicePreliminarNota' | transloco }}</p>
     </div>
-    }
-
-    <!-- Avance por las 8 secciones -->
-    @if (b.progreso.secciones && b.progreso.secciones.length > 0) {
+    } @if (b.progreso.secciones && b.progreso.secciones.length > 0) {
     <div class="secciones-progreso">
       <h4>{{ 'inspecciones.borrador.seccionesTitulo' | transloco }}</h4>
       <div class="secciones-grid">
@@ -227,8 +226,6 @@
     </div>
     }
   </div>
-
-  <!-- Formulario Dinámico -->
   @if (esquema(); as esq) {
   <div class="formulario-contenedor">
     <app-formulario-dinamico
@@ -240,6 +237,11 @@
     />
   </div>
   }
+
+  <app-reporte-fotografico
+    [inspeccion]="b"
+    [soloLectura]="confirmandoAccion() || ejecutandoAccion()"
+  />
 
   <p-dialog
     [header]="'inspecciones.transicion.' + (accionFinal() ?? 'publicar') + 'Titulo' | transloco"

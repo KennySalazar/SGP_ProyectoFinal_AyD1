@@ -29,13 +29,13 @@ import java.security.NoSuchAlgorithmException;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import org.springframework.beans.factory.annotation.Autowired;
+import java.util.stream.Collectors;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
@@ -49,10 +49,6 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class TransicionInspeccionService {
 
-  /** Evidencia fotográfica mínima para enviar o publicar (RN-INS-06). */
-  static final List<String> CATEGORIAS_FOTO_OBLIGATORIAS =
-      List.of("ACCESO", "SUPERESTRUCTURA", "SUBESTRUCTURA", "CAUCE");
-
   /** Roles cuyas inspecciones se publican sin revisión previa (RN-REV-02). */
   private static final Set<String> ROLES_PUBLICACION_DIRECTA =
       Set.of(RoleName.CATEDRATICO.name(), RoleName.PROFESIONAL_EXTERNO.name());
@@ -62,6 +58,7 @@ public class TransicionInspeccionService {
   private final PuenteRepository puentes;
   private final UsuarioProfesionalRepository profesionales;
   private final JsonSchemaValidatorService validadorEsquema;
+  private final ReglasEvidenciaFotografica reglasEvidencia;
   private final PublicacionIndiceCondicionService publicacionIc;
   private final AuditoriaWriter auditoria;
   private final InspeccionMapper mapper;
@@ -76,6 +73,7 @@ public class TransicionInspeccionService {
       PuenteRepository puentes,
       UsuarioProfesionalRepository profesionales,
       JsonSchemaValidatorService validadorEsquema,
+      ReglasEvidenciaFotografica reglasEvidencia,
       PublicacionIndiceCondicionService publicacionIc,
       AuditoriaWriter auditoria,
       InspeccionMapper mapper,
@@ -86,6 +84,7 @@ public class TransicionInspeccionService {
     this.puentes = puentes;
     this.profesionales = profesionales;
     this.validadorEsquema = validadorEsquema;
+    this.reglasEvidencia = reglasEvidencia;
     this.publicacionIc = publicacionIc;
     this.auditoria = auditoria;
     this.mapper = mapper;
@@ -206,6 +205,7 @@ public class TransicionInspeccionService {
     exigirRevisorDistintoDelAutor(inspeccion, revisorId);
     MaquinaEstadosInspeccion.destino(inspeccion.estadoActual(), EventoInspeccion.APROBAR);
     exigirSinCorreccionPublicada(inspeccion);
+    exigirEvidenciaCompleta(inspeccion, List.of());
     aplicar(inspeccion, EventoInspeccion.APROBAR, revisorId, null);
     return publicarConIndice(inspeccion, revisorId);
   }
@@ -314,20 +314,29 @@ public class TransicionInspeccionService {
             inspeccion.getVersionFormulario().getEsquema(), inspeccion.getDatos(), false)
         .forEach(
             error -> faltantes.add(Map.of("campo", error.campo(), "mensaje", error.mensaje())));
-    int campos = faltantes.size();
+    exigirEvidenciaCompleta(inspeccion, faltantes);
+  }
 
-    Set<String> presentes =
-        new HashSet<>(inspecciones.findCategoriasFotoDisponibles(inspeccion.getId()));
-    for (String categoria : CATEGORIAS_FOTO_OBLIGATORIAS) {
-      if (!presentes.contains(categoria)) {
-        faltantes.add(
-            Map.of(
-                "campo",
-                "fotografias." + categoria,
-                "mensaje",
-                "Falta al menos una fotografia de la categoria " + categoria));
-      }
-    }
+  private void exigirEvidenciaCompleta(
+      Inspeccion inspeccion, List<Map<String, String>> erroresCampos) {
+    List<Map<String, String>> faltantes = new ArrayList<>(erroresCampos);
+    int campos = erroresCampos.size();
+    var conteos =
+        inspecciones.findConteosFotoDisponibles(inspeccion.getId()).stream()
+            .collect(
+                Collectors.toMap(
+                    InspeccionRepository.ConteoFotoCategoria::getCategoria,
+                    InspeccionRepository.ConteoFotoCategoria::getCantidad));
+    reglasEvidencia
+        .faltantesObligatorios(conteos)
+        .forEach(
+            faltante ->
+                faltantes.add(
+                    Map.of(
+                        "campo", "fotografias." + faltante.categoria(),
+                        "mensaje",
+                            "Falta al menos una fotografia de la categoria "
+                                + faltante.categoria())));
 
     if (!faltantes.isEmpty()) {
       throw new ApiException(

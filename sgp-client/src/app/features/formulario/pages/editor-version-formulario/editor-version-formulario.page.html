@@ -40,15 +40,29 @@
   </div>
 </header>
 
-@if (ver.estado === 'PUBLICADA') {
-<div class="aviso-inmutable" role="alert">
-  <i class="pi pi-lock" aria-hidden="true"></i>
-  <span>{{ 'formulario.immutableAlert' | transloco }}</span>
-</div>
-} @if (ver.activa) {
+@if (estadoReglas().pendiente) {
 <div class="aviso-activa" role="status">
-  <i class="pi pi-check-circle" aria-hidden="true"></i>
-  <span>{{ 'formulario.activeNotice' | transloco }}</span>
+  <span>{{ 'formulario.reglasIc.pendientes' | transloco }}</span>
+  <button
+    pButton
+    type="button"
+    severity="secondary"
+    [outlined]="true"
+    (click)="cambiarSeccion('pesos')"
+  >
+    {{ 'formulario.weightsTab' | transloco }}
+  </button>
+</div>
+} @if (ver.estado === 'PUBLICADA' || ver.activa) {
+<div class="aviso-activa" role="status">
+  <i class="pi pi-info-circle" aria-hidden="true"></i>
+  <div>
+    @if (ver.activa) {
+    <span>{{ 'formulario.activeNotice' | transloco }}</span>
+    } @if (ver.estado === 'PUBLICADA') {
+    <span style="display: block">{{ 'formulario.immutableAlert' | transloco }}</span>
+    }
+  </div>
 </div>
 } @if (mensajeExito(); as exito) {
 <div class="aviso-exito" role="status">
@@ -62,7 +76,6 @@
 </div>
 }
 
-<!-- Pestañas de sección -->
 <nav class="secciones-nav" role="tablist">
   <button
     pButton
@@ -114,7 +127,6 @@
   }
 </nav>
 
-<!-- Sección 1: Esquema (Editor Visual y Código) -->
 @if (seccionActiva() === 'esquema') {
 <section class="surface-card editor-card">
   <div class="card-header">
@@ -127,32 +139,6 @@
     </div>
 
     <div class="editor-header-actions">
-      <!-- Selector de Modo: Visual vs Código -->
-      <div class="modo-selector" role="group">
-        <button
-          pButton
-          type="button"
-          size="small"
-          [severity]="modoEdicion() === 'visual' ? 'primary' : 'secondary'"
-          [outlined]="modoEdicion() !== 'visual'"
-          (click)="cambiarModoEdicion('visual')"
-        >
-          <i class="pi pi-pencil" aria-hidden="true"></i>
-          <span>{{ 'formulario.modeVisual' | transloco }}</span>
-        </button>
-        <button
-          pButton
-          type="button"
-          size="small"
-          [severity]="modoEdicion() === 'codigo' ? 'primary' : 'secondary'"
-          [outlined]="modoEdicion() !== 'codigo'"
-          (click)="cambiarModoEdicion('codigo')"
-        >
-          <i class="pi pi-code" aria-hidden="true"></i>
-          <span>{{ 'formulario.modeCode' | transloco }}</span>
-        </button>
-      </div>
-
       @if (ver.estado === 'BORRADOR') { @if (modoEdicion() === 'visual') {
       <button
         pButton
@@ -190,7 +176,7 @@
       }
     </div>
     } @else {
-    <!-- Pestañas horizontales de secciones -->
+
     <div class="secciones-tab-bar" role="tablist" aria-label="Secciones del formulario">
       @for (sec of seccionesVisuales(); track sec.clave) {
       <button
@@ -401,10 +387,7 @@
   ></textarea>
   }
 </section>
-}
-
-<!-- Sección 2: Vínculos de almacenamiento -->
-@if (seccionActiva() === 'vinculos') {
+} @if (seccionActiva() === 'vinculos') {
 <section class="surface-card editor-card">
   <div class="card-header">
     <div>
@@ -416,32 +399,6 @@
     </div>
 
     <div class="editor-header-actions">
-      <!-- Selector de Modo: Visual vs Código -->
-      <div class="modo-selector" role="group">
-        <button
-          pButton
-          type="button"
-          size="small"
-          [severity]="modoVinculos() === 'visual' ? 'primary' : 'secondary'"
-          [outlined]="modoVinculos() !== 'visual'"
-          (click)="cambiarModoVinculos('visual')"
-        >
-          <i class="pi pi-table" aria-hidden="true"></i>
-          <span>{{ 'formulario.modeVisual' | transloco }}</span>
-        </button>
-        <button
-          pButton
-          type="button"
-          size="small"
-          [severity]="modoVinculos() === 'codigo' ? 'primary' : 'secondary'"
-          [outlined]="modoVinculos() !== 'codigo'"
-          (click)="cambiarModoVinculos('codigo')"
-        >
-          <i class="pi pi-code" aria-hidden="true"></i>
-          <span>{{ 'formulario.modeCode' | transloco }}</span>
-        </button>
-      </div>
-
       @if (ver.estado === 'BORRADOR') { @if (modoVinculos() === 'visual') {
       <button
         pButton
@@ -588,65 +545,174 @@
   ></textarea>
   }
 </section>
-}
-
-<!-- Sección 3: Pesos de evaluación -->
-@if (seccionActiva() === 'pesos') {
+} @if (seccionActiva() === 'pesos') {
 <section class="surface-card editor-card">
   <div class="card-header">
-    <h2 class="card-title">{{ 'formulario.weightsTab' | transloco }}</h2>
+    <div>
+      <h2 class="card-title">{{ 'formulario.weightsTab' | transloco }}</h2>
+      <p class="card-subtitle">{{ 'formulario.calibracion.nota' | transloco }}</p>
+    </div>
     @if (ver.estado === 'BORRADOR') {
-    <button pButton type="button" [disabled]="guardandoPesos()" (click)="guardarPesos()">
-      <i class="pi pi-save" aria-hidden="true"></i>
-      <span
-        >{{ (guardandoPesos() ? 'formulario.savingWeights' : 'formulario.saveWeights') | transloco
-        }}</span
-      >
+    <button
+      pButton
+      type="button"
+      [disabled]="guardandoPesos() || guardandoEscala() || publicando() || estadoReglas().pendiente || estadoReglas().guardando || !pesosEditables().length || pesosPendientes().length > 0"
+      (click)="guardarPesos()"
+    >
+      {{ (guardandoPesos() ? 'formulario.savingWeights' : 'formulario.saveWeights') | transloco }}
     </button>
     }
   </div>
-
-  <p-table [value]="pesosEditables()" responsiveLayout="scroll" styleClass="p-datatable-sm">
-    <ng-template #header>
-      <tr>
-        <th scope="col">{{ 'formulario.elementRef' | transloco }}</th>
-        <th scope="col">{{ 'formulario.descriptionCol' | transloco }}</th>
-        <th scope="col">{{ 'formulario.weight' | transloco }}</th>
-      </tr>
-    </ng-template>
-
-    <ng-template #body let-elem>
-      <tr>
-        <td><code>{{ elem.elementoRef }}</code></td>
-        <td>{{ elem.descripcion || '—' }}</td>
-        <td style="width: 140px">
-          @if (ver.estado === 'BORRADOR') {
-          <input
-            pInputText
-            type="number"
-            step="0.1"
-            min="0.1"
-            [value]="elem.peso"
-            (input)="actualizarPeso(elem.elementoRef, +$any($event.target).value)"
-            style="width: 100px"
-          />
-          } @else {
-          <strong>{{ elem.peso }}</strong>
-          }
-        </td>
-      </tr>
-    </ng-template>
-  </p-table>
+  @if (pesosPendientes().length) {
+  <div class="aviso-activa" role="status">
+    <details>
+      <summary>
+        {{ 'formulario.calibracion.pendientes' | transloco: { total: pesosPendientes().length } }}
+      </summary>
+      <ul class="lista-pendientes" style="max-height: 12rem; overflow-y: auto">
+        @for (elemento of pesosPendientes(); track elemento.elementoRef) {
+        <li>{{ elemento.descripcion || elemento.elementoRef }}</li>
+        }
+      </ul>
+    </details>
+  </div>
+  }
+  <div
+    class="preguntas-tabla-wrapper"
+    tabindex="0"
+    role="region"
+    [attr.aria-label]="'formulario.weightsTab' | transloco"
+  >
+    <table class="tabla-preguntas">
+      <thead>
+        <tr>
+          <th scope="col">{{ 'formulario.descriptionCol' | transloco }}</th>
+          <th scope="col">{{ 'formulario.weight' | transloco }}</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (elem of pesosEditables(); track elem.elementoRef; let i = $index) {
+        <tr>
+          <td>
+            <label [for]="ver.estado === 'BORRADOR' ? 'peso-ic-' + i : null"
+              >{{ elem.descripcion || elem.elementoRef }}</label
+            >
+            <details>
+              <summary>{{ 'formulario.elementRef' | transloco }}</summary>
+              <code style="overflow-wrap: anywhere">{{ elem.elementoRef }}</code>
+            </details>
+          </td>
+          <td>
+            @if (ver.estado === 'BORRADOR') {
+            <p-inputnumber
+              [inputId]="'peso-ic-' + i"
+              [ngModel]="elem.peso"
+              (ngModelChange)="actualizarPeso(elem.elementoRef, $event)"
+              [useGrouping]="false"
+              [maxFractionDigits]="6"
+              [disabled]="guardandoPesos() || guardandoEscala() || publicando() || estadoReglas().pendiente || estadoReglas().guardando"
+              [fluid]="true"
+            />
+            } @else {
+            <strong>{{ elem.peso ?? ('formulario.calibracion.sinConfigurar' | transloco) }}</strong>
+            }
+          </td>
+        </tr>
+        } @empty {
+        <tr>
+          <td colspan="2">{{ 'formulario.calibracion.sinElementos' | transloco }}</td>
+        </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+</section>
+<section class="surface-card editor-card">
+  <div class="card-header">
+    <div>
+      <h2 class="card-title">{{ 'formulario.calibracion.escalaTitulo' | transloco }}</h2>
+      <p class="card-subtitle">{{ 'formulario.calibracion.escalaNota' | transloco }}</p>
+    </div>
+  </div>
+  <div class="form-row-2" style="margin-bottom: 1rem">
+    @for (nivel of nivelesSeveridad; track nivel) {
+    <div class="form-field">
+      <label class="field-label" [for]="'escala-ic-' + nivel"
+        >{{ 'formulario.calibracion.niveles.' + nivel | transloco }}</label
+      >
+      @if (ver.estado === 'BORRADOR') {
+      <p-inputnumber
+        [fluid]="true"
+        [inputId]="'escala-ic-' + nivel"
+        [ngModel]="escalaEditable()[nivel]"
+        (ngModelChange)="actualizarEscala(nivel, $event)"
+        [useGrouping]="false"
+        [maxFractionDigits]="6"
+        [disabled]="guardandoPesos() || guardandoEscala() || publicando() || estadoReglas().pendiente || estadoReglas().guardando"
+      />
+      } @else {
+      <strong
+        >{{ escalaEditable()[nivel] ?? ('formulario.calibracion.sinConfigurar' | transloco)
+        }}</strong
+      >
+      }
+    </div>
+    }
+  </div>
+  @if (!escalaCorrecta()) {
+  <p class="validation" role="status">{{ 'formulario.calibracion.escalaInvalida' | transloco }}</p>
+  } @if (ver.estado === 'BORRADOR') {
+  <button
+    pButton
+    type="button"
+    [disabled]="!escalaCorrecta() || guardandoEscala() || guardandoPesos() || publicando() || estadoReglas().pendiente || estadoReglas().guardando"
+    (click)="guardarEscala()"
+  >
+    {{ (guardandoEscala() ? 'formulario.calibracion.guardandoEscala' :
+    'formulario.calibracion.guardarEscala') | transloco }}
+  </button>
+  }
 </section>
 }
-
-<!-- Sección 4: Mapeos de campos (RN-FRM-06) -->
-@if (seccionActiva() === 'mapeos' && ver.versionAnteriorId) {
+<div [hidden]="seccionActiva() !== 'pesos'">
+  <app-reglas-ic
+    [version]="ver"
+    [bloqueado]="estadoCriticas().pendiente || estadoCriticas().guardando || guardandoPesos() || guardandoEscala() || guardandoEsquema() || publicando() || guardandoVinculos()"
+    (estado)="estadoReglas.set($event)"
+    (guardada)="version.set($event)"
+  />
+</div>
+<div [hidden]="seccionActiva() !== 'pesos'">
+  <app-calibracion-adicional
+    [version]="ver"
+    [bloqueado]="estadoReglas().pendiente || estadoReglas().guardando || guardandoPesos() || guardandoEscala() || guardandoEsquema() || guardandoVinculos() || publicando()"
+    (estado)="estadoCriticas.set($event)"
+    (guardada)="version.set($event)"
+  />
+</div>
+@if (seccionActiva() === 'publicar' && criticasSinResolver()) {
+<p class="aviso-error" role="alert">
+  {{ 'formulario.adicional.publicacionPendiente' | transloco }}
+</p>
+} @if (seccionActiva() === 'mapeos' && ver.versionAnteriorId) {
 <section class="surface-card editor-card">
   <div class="card-header">
     <h2 class="card-title">{{ 'formulario.mappingTab' | transloco }}</h2>
     @if (ver.estado === 'BORRADOR') {
     <div class="header-acciones">
+      <button
+        pButton
+        type="button"
+        severity="secondary"
+        [outlined]="true"
+        [disabled]="!analisisMapeo() || guardandoMapeos() || completandoEquivalencias()"
+        (click)="completarEquivalencias()"
+      >
+        <span
+          >{{ (completandoEquivalencias() ? 'formulario.preparingEquivalences' :
+          'formulario.completeEquivalences') | transloco }}</span
+        >
+      </button>
       <button
         pButton
         type="button"
@@ -660,7 +726,7 @@
       <button
         pButton
         type="button"
-        [disabled]="guardandoMapeos()"
+        [disabled]="guardandoMapeos() || completandoEquivalencias()"
         (click)="guardarDeclaracionesMapeo()"
       >
         <i class="pi pi-save" aria-hidden="true"></i>
@@ -683,7 +749,7 @@
     <i class="pi pi-exclamation-triangle" aria-hidden="true"></i>
     <div>
       <strong>{{ 'formulario.mappingIncomplete' | transloco }}</strong>
-      <ul class="lista-pendientes">
+      <ul class="lista-pendientes" style="max-height: 12rem; overflow-y: auto">
         @for (pend of analisis.camposOrigenSinMapeo; track pend) {
         <li><code>{{ pend }}</code></li>
         }
@@ -738,10 +804,7 @@
     </ng-template>
   </p-table>
 </section>
-}
-
-<!-- Sección 5: Publicación y activación -->
-@if (seccionActiva() === 'publicar' && ver.estado === 'BORRADOR') {
+} @if (seccionActiva() === 'publicar' && ver.estado === 'BORRADOR') {
 <section class="surface-card editor-card">
   <div class="card-header">
     <div>
@@ -758,12 +821,12 @@
         <span>{{ 'formulario.checkValidSchema' | transloco }}</span>
       </li>
       <li>
-        @if (pesosEditables().length > 0) {
-        <i class="pi pi-check-circle check-ok" aria-hidden="true"></i>
-        <span>{{ 'formulario.checkWeights' | transloco: { total: pesosEditables().length } }}</span>
+        @if (calibracionGuardada() && !calibracionPendiente()) {
+        <i class="pi pi-check-circle check-ok" aria-hidden="true"></i
+        ><span>{{ 'formulario.calibracion.completa' | transloco }}</span>
         } @else {
-        <i class="pi pi-times-circle check-bad" aria-hidden="true"></i>
-        <span>No se han configurado pesos para la versión.</span>
+        <i class="pi pi-times-circle check-bad" aria-hidden="true"></i
+        ><span>{{ 'formulario.calibracion.incompleta' | transloco }}</span>
         }
       </li>
       @if (ver.versionAnteriorId) {
@@ -784,7 +847,7 @@
     <button
       pButton
       severity="success"
-      [disabled]="publicando() || pesosEditables().length === 0 || (ver.versionAnteriorId && !analisisMapeo()?.mapeoCompleto)"
+      [disabled]="!puedePublicar()"
       (click)="abrirConfirmarPublicar()"
     >
       <i class="pi pi-cloud-upload" aria-hidden="true"></i>
@@ -801,7 +864,6 @@
 </div>
 } }
 
-<!-- Diálogo de confirmación de publicación -->
 <p-dialog
   [header]="'formulario.confirmPublishTitle' | transloco"
   [visible]="dialogoConfirmarPublicar()"
@@ -830,7 +892,6 @@
   </div>
 </p-dialog>
 
-<!-- Diálogo de nuevo mapeo -->
 <p-dialog
   [header]="'formulario.addMapping' | transloco"
   [visible]="dialogoNuevoMapeo()"
@@ -906,7 +967,6 @@
   </form>
 </p-dialog>
 
-<!-- Diálogo de nueva versión derivada -->
 <p-dialog
   [header]="'formulario.deriveNew' | transloco"
   [visible]="dialogoNuevaDerivada()"
@@ -944,7 +1004,6 @@
   </form>
 </p-dialog>
 
-<!-- Diálogo para crear/editar Sección -->
 <p-dialog
   [header]="(modoSeccion() === 'crear' ? 'formulario.addSection' : 'formulario.editSection') | transloco"
   [visible]="dialogoSeccion()"
@@ -1016,7 +1075,6 @@
   </form>
 </p-dialog>
 
-<!-- Diálogo para crear/editar Pregunta -->
 <p-dialog
   [header]="(modoPregunta() === 'crear' ? 'formulario.addQuestion' : 'formulario.editQuestion') | transloco"
   [visible]="dialogoPregunta()"
@@ -1239,7 +1297,6 @@
   </form>
 </p-dialog>
 
-<!-- Diálogo para crear/editar Vínculo de Almacenamiento -->
 <p-dialog
   [header]="(modoVinculo() === 'crear' ? 'formulario.addStorageBinding' : 'formulario.editStorageBinding') | transloco"
   [visible]="dialogoVinculo()"

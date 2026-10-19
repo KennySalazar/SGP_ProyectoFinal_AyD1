@@ -5,6 +5,7 @@ import {
   effect,
   inject,
   input,
+  output,
   signal,
   untracked,
 } from '@angular/core';
@@ -25,6 +26,7 @@ import { vacio } from '../../motor/formulario/validadores';
 import { hijosVisibles } from '../../motor/formulario/visibles';
 import { CampoFormularioComponent } from '../campo-formulario/campo-formulario.component';
 import { NodoFormularioComponent } from '../nodo-formulario/nodo-formulario.component';
+import { MarcadorObservacionesComponent } from '../observaciones/marcador-observaciones.component';
 import { RenderizadorNodo } from '../renderizadores';
 
 let secuencia = 0;
@@ -53,7 +55,12 @@ const ICONOS_NO_PRESENTE: Record<string, string> = {
 @Component({
   selector: 'app-elemento-evaluable',
   standalone: true,
-  imports: [TranslocoPipe, CampoFormularioComponent, NodoFormularioComponent],
+  imports: [
+    TranslocoPipe,
+    CampoFormularioComponent,
+    NodoFormularioComponent,
+    MarcadorObservacionesComponent,
+  ],
   templateUrl: './elemento-evaluable.component.html',
   styleUrl: './elemento-evaluable.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -64,6 +71,9 @@ export class ElementoEvaluableComponent {
   readonly nodo = input.required<NodoFormulario>();
   readonly control = input.required<AbstractControl>();
   readonly construido = input.required<FormularioConstruido>();
+  readonly cantidadObservaciones = input(0);
+  readonly observacionesInteractivas = input(false);
+  readonly abrirObservaciones = output<void>();
 
   protected readonly idTitulo = `elemento-${++secuencia}`;
 

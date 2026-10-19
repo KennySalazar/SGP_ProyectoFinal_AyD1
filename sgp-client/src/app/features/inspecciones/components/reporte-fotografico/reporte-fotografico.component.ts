@@ -4,6 +4,7 @@ import {
   ElementRef,
   OnDestroy,
   effect,
+  computed,
   inject,
   input,
   signal,
@@ -13,6 +14,7 @@ import {
 import { FormControl, ReactiveFormsModule, Validators } from '@angular/forms';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { ButtonModule } from 'primeng/button';
+import { DialogModule } from 'primeng/dialog';
 import { SelectModule } from 'primeng/select';
 import { firstValueFrom } from 'rxjs';
 import { AuthStore } from '../../../../core/services/auth.store';
@@ -21,7 +23,11 @@ import {
   FotografiaPendiente,
 } from '../../../../offline/services/fotografias-locales.service';
 import { uuidV7 } from '../../../../offline/services/uuid-v7';
-import { IniciarInspeccionResponse } from '../../models/inspeccion.models';
+import {
+  IniciarInspeccionResponse,
+  InspeccionBorradorResponse,
+  InspeccionPublicadaDetalleResponse,
+} from '../../models/inspeccion.models';
 import {
   CATEGORIAS_FOTO,
   CategoriaFoto,
@@ -34,13 +40,16 @@ import { ProcesadorFotografiasService } from '../../services/procesador-fotograf
 @Component({
   selector: 'app-reporte-fotografico',
   standalone: true,
-  imports: [ReactiveFormsModule, TranslocoPipe, ButtonModule, SelectModule],
+  imports: [ReactiveFormsModule, TranslocoPipe, ButtonModule, SelectModule, DialogModule],
   templateUrl: './reporte-fotografico.component.html',
   styleUrl: './reporte-fotografico.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class ReporteFotograficoComponent implements OnDestroy {
-  readonly inspeccion = input.required<IniciarInspeccionResponse>();
+  readonly inspeccion = input.required<
+    IniciarInspeccionResponse | InspeccionBorradorResponse | InspeccionPublicadaDetalleResponse
+  >();
+  readonly soloLectura = input(false);
   readonly contextoElemento = input<{ elementoRef: string; instanciaElementoId?: string } | null>(
     null,
   );
@@ -62,14 +71,41 @@ export class ReporteFotograficoComponent implements OnDestroy {
   readonly video = viewChild<ElementRef<HTMLVideoElement>>('video');
   private stream: MediaStream | null = null;
   private revision = 0;
+  private contextoActual = '';
+  private generacionCarga = 0;
+  readonly bloqueada = signal(false);
+  readonly inventarioCargado = signal(false);
+  readonly retirada = signal(false);
+  readonly fotoARetirar = signal<FotografiaResponse | null>(null);
+  readonly editable = computed(
+    () =>
+      this.auth.user()?.id === this.inspeccion().autorId &&
+      this.inspeccion().estado === 'BORRADOR' &&
+      !this.soloLectura() &&
+      !this.bloqueada(),
+  );
+  readonly limiteAlcanzado = computed(() => this.confirmadas().length >= 60);
+  readonly conteos = computed(() =>
+    CATEGORIAS_FOTO.map((categoria) => ({
+      categoria,
+      cantidad: this.confirmadas().filter((foto) => foto.categoria === categoria).length,
+    })),
+  );
+  readonly faltantes = computed(() =>
+    this.conteos()
+      .filter((conteo) => conteo.categoria !== 'OTRA' && conteo.cantidad === 0)
+      .map((conteo) => conteo.categoria),
+  );
   constructor() {
     effect(() => {
       const inspeccion = this.inspeccion();
       const usuario = this.auth.user();
       untracked(() => {
+        const contexto = `${usuario?.id}:${usuario?.role}:${inspeccion.id}:${inspeccion.autorId}:${inspeccion.estado}`;
+        if (contexto === this.contextoActual) return;
+        this.contextoActual = contexto;
         this.limpiar();
-        if (usuario?.id === inspeccion.autorId)
-          void this.recargar(usuario.id, inspeccion.id, this.revision);
+        if (usuario) void this.recargar(usuario.id, inspeccion.id, this.revision);
       });
     });
   }
@@ -81,40 +117,58 @@ export class ReporteFotograficoComponent implements OnDestroy {
     );
   }
   private async recargar(usuario: string, id: string, revision: number) {
+    const carga = ++this.generacionCarga;
+    const vigente = () => this.vigente(usuario, id, revision) && carga === this.generacionCarga;
+    const contexto = this.inspeccion();
+    if (usuario === contexto.autorId && contexto.estado !== 'PUBLICADA') {
+      try {
+        await this.locales.guardarContexto(
+          usuario,
+          id,
+          contexto.puenteId,
+          contexto.estado,
+          contexto,
+        );
+        if (!vigente()) return;
+        const pendientes = await this.locales.pendientes(usuario, id);
+        if (!vigente()) return;
+        this.pendientes.set(pendientes);
+      } catch {
+        if (vigente()) this.error.set('persistencia');
+      }
+    }
+    if (!vigente()) return;
     try {
-      const contexto = this.inspeccion();
-      await this.locales.guardarContexto(usuario, id, contexto.puenteId, contexto.estado, contexto);
-      if (!this.vigente(usuario, id, revision)) return;
-      const pendientes = await this.locales.pendientes(usuario, id);
-      if (!this.vigente(usuario, id, revision)) return;
-      this.pendientes.set(pendientes);
       const fotos = await firstValueFrom(this.api.listarFotografias(id));
-      if (!this.vigente(usuario, id, revision)) return;
+      if (!vigente()) return;
+      this.confirmadas().forEach((foto) => this.revocar(foto.miniatura));
       this.confirmadas.set(fotos);
+      this.inventarioCargado.set(true);
       for (const foto of fotos) {
         try {
           const blob = await firstValueFrom(this.api.contenidoFotografia(id, foto.id, true));
-          if (!this.vigente(usuario, id, revision)) return;
+          if (!vigente()) return;
           const miniatura = URL.createObjectURL(blob);
           this.confirmadas.update((lista) =>
             lista.map((f) => (f.id === foto.id ? { ...f, miniatura } : f)),
           );
         } catch {
-          if (this.vigente(usuario, id, revision)) this.error.set('lectura');
+          if (vigente()) this.error.set('lectura');
         }
       }
     } catch {
-      if (this.vigente(usuario, id, revision)) this.error.set('lectura');
+      if (vigente()) this.error.set('lectura');
     }
   }
   async seleccionar(evento: Event) {
     const input = evento.target as HTMLInputElement;
     const archivo = input.files?.[0];
     input.value = '';
-    if (!archivo || this.ocupado()) return;
+    if (!archivo || this.ocupado() || !this.editable() || this.limiteAlcanzado()) return;
     await this.preparar(() => this.procesador.galeria(archivo));
   }
   async abrirCamara() {
+    if (!this.editable() || this.ocupado() || this.limiteAlcanzado()) return;
     this.error.set(null);
     const revision = this.revision;
     this.ocupado.set(true);
@@ -123,7 +177,7 @@ export class ReporteFotograficoComponent implements OnDestroy {
         video: { facingMode: { ideal: 'environment' } },
         audio: false,
       });
-      if (revision !== this.revision) {
+      if (revision !== this.revision || !this.editable()) {
         stream.getTracks().forEach((t) => t.stop());
         return;
       }
@@ -143,6 +197,7 @@ export class ReporteFotograficoComponent implements OnDestroy {
     }
   }
   async capturar() {
+    if (!this.editable() || this.ocupado() || this.limiteAlcanzado()) return;
     const video = this.video()?.nativeElement;
     if (video) await this.preparar(() => this.procesador.camara(video));
     this.cerrarCamara();
@@ -162,7 +217,7 @@ export class ReporteFotograficoComponent implements OnDestroy {
     this.borrador.set(null);
     try {
       const foto = await accion();
-      if (revision !== this.revision) return;
+      if (revision !== this.revision || !this.editable()) return;
       this.revocar(this.previsualizacion());
       this.borrador.set(foto);
       this.previsualizacion.set(URL.createObjectURL(foto.blob));
@@ -183,6 +238,8 @@ export class ReporteFotograficoComponent implements OnDestroy {
       propietarioId = this.auth.user()?.id,
       inspeccionId = this.inspeccion().id;
     if (
+      !this.editable() ||
+      this.limiteAlcanzado() ||
       !imagen ||
       !categoria ||
       !propietarioId ||
@@ -228,6 +285,7 @@ export class ReporteFotograficoComponent implements OnDestroy {
   }
   async reintentar(foto: FotografiaPendiente) {
     if (
+      !this.editable() ||
       this.ocupado() ||
       this.auth.user()?.id !== foto.propietarioId ||
       foto.inspeccionId !== this.inspeccion().id
@@ -257,13 +315,13 @@ export class ReporteFotograficoComponent implements OnDestroy {
       if (!this.vigente(foto.propietarioId, foto.inspeccionId, revision)) return;
       this.pendientes.update((lista) => lista.filter((f) => f.id !== foto.id));
       this.aviso.set(true);
-      this.confirmadas().forEach((f) => this.revocar(f.miniatura));
       await this.recargar(foto.propietarioId, foto.inspeccionId, revision);
     } catch (e) {
       if (!this.vigente(foto.propietarioId, foto.inspeccionId, revision)) return;
       const codigo = (e as { error?: { code?: string } })?.error?.code;
       const errores: Record<string, string> = {
         estado_inspeccion_no_permite_archivos: 'estado',
+        limite_fotografias_excedido: 'limite',
         idempotencia_solicitud_distinta: 'conflicto',
         fotografia_identidad_conflictiva: 'conflicto',
         fotografia_metadatos_invalidos: 'metadatos',
@@ -272,7 +330,60 @@ export class ReporteFotograficoComponent implements OnDestroy {
         anclaje_fotografico_invalido: 'anclaje',
         carga_demasiado_grande: 'tamano',
       };
+      if (codigo === 'estado_inspeccion_no_permite_archivos') this.bloqueada.set(true);
       this.error.set(codigo ? (errores[codigo] ?? 'carga') : 'carga');
+    }
+  }
+  solicitarRetirada(foto: FotografiaResponse) {
+    if (
+      !this.editable() ||
+      this.ocupado() ||
+      foto.inspeccionId !== this.inspeccion().id ||
+      !this.confirmadas().some((confirmada) => confirmada.id === foto.id)
+    )
+      return;
+    this.error.set(null);
+    this.fotoARetirar.set(foto);
+  }
+  cancelarRetirada() {
+    if (!this.ocupado()) this.fotoARetirar.set(null);
+  }
+  async retirar(foto: FotografiaResponse) {
+    const usuario = this.auth.user()?.id;
+    const id = this.inspeccion().id;
+    if (
+      !usuario ||
+      !this.editable() ||
+      this.ocupado() ||
+      foto.inspeccionId !== id ||
+      !this.confirmadas().some((confirmada) => confirmada.id === foto.id)
+    )
+      return;
+    const revision = this.revision;
+    this.ocupado.set(true);
+    this.error.set(null);
+    this.aviso.set(false);
+    this.retirada.set(false);
+    try {
+      await firstValueFrom(this.api.retirarFotografia(id, foto.id));
+      if (!this.vigente(usuario, id, revision)) return;
+      this.generacionCarga++;
+      this.confirmadas()
+        .filter((f) => f.id === foto.id)
+        .forEach((f) => this.revocar(f.miniatura));
+      this.confirmadas.update((fotos) => fotos.filter((f) => f.id !== foto.id));
+      this.retirada.set(true);
+      this.fotoARetirar.set(null);
+      await this.recargar(usuario, id, revision);
+    } catch (e) {
+      if (!this.vigente(usuario, id, revision)) return;
+      const codigo = (e as { error?: { code?: string } })?.error?.code;
+      if (codigo === 'estado_inspeccion_no_permite_archivos') {
+        this.bloqueada.set(true);
+        this.error.set('estado');
+      } else this.error.set('retirada');
+    } finally {
+      if (this.vigente(usuario, id, revision)) this.ocupado.set(false);
     }
   }
   async abrirOriginal(foto: FotografiaResponse) {
@@ -287,7 +398,7 @@ export class ReporteFotograficoComponent implements OnDestroy {
       enlace.click();
       setTimeout(() => URL.revokeObjectURL(url), 1000);
     } catch {
-      this.error.set('lectura');
+      if (revision === this.revision) this.error.set('lectura');
     }
   }
   etiqueta(categoria: string) {
@@ -308,6 +419,10 @@ export class ReporteFotograficoComponent implements OnDestroy {
     this.ocupado.set(false);
     this.error.set(null);
     this.aviso.set(false);
+    this.retirada.set(false);
+    this.fotoARetirar.set(null);
+    this.bloqueada.set(false);
+    this.inventarioCargado.set(false);
   }
   ngOnDestroy() {
     this.limpiar();

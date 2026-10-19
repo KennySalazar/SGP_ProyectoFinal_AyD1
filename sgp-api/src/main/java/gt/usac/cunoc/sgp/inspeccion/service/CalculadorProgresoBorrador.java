@@ -27,28 +27,20 @@ public class CalculadorProgresoBorrador {
 
     List<ProgresoSeccionResponse> secciones = new ArrayList<>(8);
 
-    // 1. Identificación
     secciones.add(calcularIdentificacion(inspeccion, datos, idCap, puente, tecnico));
 
-    // 2. Datos generales
     secciones.add(calcularDatosGenerales(datos, tecnico));
 
-    // 3. Tramos
     secciones.add(calcularTramos(datos));
 
-    // 4. Sub-estructura
     secciones.add(calcularSubestructura(datos));
 
-    // 5. Super-estructura
     secciones.add(calcularSuperestructura(datos));
 
-    // 6. Elementos no estructurales
     secciones.add(calcularElementosNoEstructurales(datos));
 
-    // 7. Características del cauce
     secciones.add(calcularCauce(datos));
 
-    // 8. Otros
     secciones.add(calcularOtros(datos, tecnico));
 
     int totalRequeridos = 0;
@@ -281,7 +273,7 @@ public class CalculadorProgresoBorrador {
         || (tecnico != null && tecnico.getAlumbradoExiste() != null)) completados++;
     if (tieneValor(datos, "/otros/drenajes_aledanos")
         || (tecnico != null && tecnico.getDrenajesAledanosExisten() != null)) completados++;
-    if (tieneValor(datos, "/otros/recomendaciones")) completados++;
+    if (datos != null && datos.at("/otros/recomendaciones").isObject()) completados++;
 
     return crearSeccion("otros", "8. Otros", total, completados);
   }
@@ -303,7 +295,7 @@ public class CalculadorProgresoBorrador {
       }
       return false;
     }
-    // Si pilas está explícitamente declarada como arreglo vacío (un solo tramo sin pilas)
+
     if (pilas.isArray()) return true;
     return false;
   }

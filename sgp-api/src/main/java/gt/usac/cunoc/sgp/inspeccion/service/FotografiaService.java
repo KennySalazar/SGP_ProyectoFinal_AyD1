@@ -11,8 +11,10 @@ import gt.usac.cunoc.sgp.inspeccion.dto.*;
 import gt.usac.cunoc.sgp.inspeccion.entity.Inspeccion;
 import gt.usac.cunoc.sgp.inspeccion.repository.InspeccionRepository;
 import gt.usac.cunoc.sgp.inspeccion.validation.ValidadorAnclajeFotografico;
+import gt.usac.cunoc.sgp.puente.repository.AsignacionPuenteRepository;
 import gt.usac.cunoc.sgp.sync.model.SolicitudOperacion;
 import gt.usac.cunoc.sgp.sync.service.*;
+import gt.usac.cunoc.sgp.usuario.model.RoleName;
 import java.io.*;
 import java.nio.file.*;
 import java.time.*;
@@ -27,10 +29,13 @@ import org.springframework.web.multipart.MultipartFile;
 @Service
 public class FotografiaService {
   private final InspeccionRepository inspecciones;
+  private final AsignacionPuenteRepository asignaciones;
   private final ArchivoRepository archivos;
   private final ArchivoInspeccionRepository vinculos;
+  private final RegistroFotografiasInspeccion registroFotografias;
   private final FotografiaMapper mapper;
   private final ValidadorAnclajeFotografico anclajes;
+  private final ReglasEvidenciaFotografica reglasEvidencia;
   private final ProcesadorImagenes procesador;
   private final CargasImagenService cargas;
   private final ObjetosImagenService objetos;
@@ -44,8 +49,10 @@ public class FotografiaService {
       InspeccionRepository inspecciones,
       ArchivoRepository archivos,
       ArchivoInspeccionRepository vinculos,
+      RegistroFotografiasInspeccion registroFotografias,
       FotografiaMapper mapper,
       ValidadorAnclajeFotografico anclajes,
+      ReglasEvidenciaFotografica reglasEvidencia,
       ProcesadorImagenes procesador,
       CargasImagenService cargas,
       ObjetosImagenService objetos,
@@ -53,12 +60,16 @@ public class FotografiaService {
       OperacionIdempotenteService operaciones,
       ObjectMapper json,
       Clock clock,
+      AsignacionPuenteRepository asignaciones,
       PlatformTransactionManager tm) {
     this.inspecciones = inspecciones;
+    this.asignaciones = asignaciones;
     this.archivos = archivos;
     this.vinculos = vinculos;
+    this.registroFotografias = registroFotografias;
     this.mapper = mapper;
     this.anclajes = anclajes;
+    this.reglasEvidencia = reglasEvidencia;
     this.procesador = procesador;
     this.cargas = cargas;
     this.objetos = objetos;
@@ -75,7 +86,6 @@ public class FotografiaService {
       AdjuntarFotografiaRequest request,
       MultipartFile fichero,
       String clave) {
-    // Estos controles básicos HU-028 se conectarán con la política HU-029 al integrar ambas ramas.
     tx.executeWithoutResult(t -> autorizar(inspeccionId, actor, false));
     CategoriaFoto categoria = validar(request, clave);
     if (fichero.isEmpty())
@@ -116,6 +126,7 @@ public class FotografiaService {
             var i = autorizar(inspeccionId, actor, false);
             borrador(i);
             anclajes.validar(i, request.elementoRef(), request.instanciaElementoId());
+            validarCapacidad(inspeccionId);
           });
       var imagen = procesador.procesar(temporal);
       preparada = cargas.preparar(solicitud, imagen);
@@ -128,6 +139,7 @@ public class FotografiaService {
                 var inspeccion = autorizar(inspeccionId, actor, true);
                 borrador(inspeccion);
                 anclajes.validar(inspeccion, request.elementoRef(), request.instanciaElementoId());
+                validarCapacidad(inspeccionId);
                 operaciones.bloquearEntidad("archivo", request.id());
                 if (archivos.existsById(request.id()))
                   throw error(
@@ -201,6 +213,12 @@ public class FotografiaService {
     }
   }
 
+  private void validarCapacidad(UUID inspeccionId) {
+    reglasEvidencia.validarCapacidadParaNuevaFotografia(
+        vinculos.countByInspeccionIdAndTipoUsoAndArchivo_Estado(
+            inspeccionId, TipoUsoArchivo.FOTO_INSPECCION, EstadoArchivo.DISPONIBLE));
+  }
+
   private CategoriaFoto validar(AdjuntarFotografiaRequest r, String clave) {
     if (r == null
         || r.id() == null
@@ -259,13 +277,26 @@ public class FotografiaService {
       throw error(
           HttpStatus.CONFLICT,
           "estado_inspeccion_no_permite_archivos",
-          "Solo se pueden adjuntar fotografías a un borrador propio.");
+          "Solo se pueden modificar fotografías de un borrador propio.");
+  }
+
+  public void retirar(UUID id, UUID fotoId, UUID actor) {
+    tx.executeWithoutResult(
+        t -> {
+          var inspeccion = autorizar(id, actor, true);
+          borrador(inspeccion);
+          registroFotografias.retirar(id, fotoId, clock.instant());
+        });
   }
 
   public List<FotografiaResponse> listar(UUID id, UUID actor) {
+    return listar(id, actor, null);
+  }
+
+  public List<FotografiaResponse> listar(UUID id, UUID actor, RoleName rol) {
     return tx.execute(
         t -> {
-          autorizar(id, actor, false);
+          autorizarLectura(id, actor, rol);
           return vinculos
               .findByInspeccionIdAndTipoUsoOrderByCreadoEnAsc(id, TipoUsoArchivo.FOTO_INSPECCION)
               .stream()
@@ -276,10 +307,14 @@ public class FotografiaService {
   }
 
   public InputStream contenido(UUID id, UUID fotoId, UUID actor, boolean miniatura) {
+    return contenido(id, fotoId, actor, null, miniatura);
+  }
+
+  public InputStream contenido(UUID id, UUID fotoId, UUID actor, RoleName rol, boolean miniatura) {
     String clave =
         tx.execute(
             t -> {
-              autorizar(id, actor, false);
+              autorizarLectura(id, actor, rol);
               var v =
                   vinculos
                       .findByInspeccionIdAndArchivoIdAndTipoUso(
@@ -307,5 +342,27 @@ public class FotografiaService {
 
   private ApiException error(HttpStatus status, String code, String detail) {
     return new ApiException(status, code, "Fotografía de inspección", detail);
+  }
+
+  private void autorizarLectura(UUID id, UUID actor, RoleName rol) {
+    if (actor == null)
+      throw error(
+          HttpStatus.UNAUTHORIZED, "autenticacion_requerida", "Se requiere una sesión válida.");
+    var i =
+        inspecciones
+            .findByIdAndEliminadoEnIsNull(id)
+            .orElseThrow(
+                () ->
+                    error(
+                        HttpStatus.NOT_FOUND,
+                        "inspeccion_no_encontrada",
+                        "Inspección no encontrada."));
+    if ("PUBLICADA".equals(i.getEstado()) || i.getAutorId().equals(actor)) return;
+    if (rol == RoleName.CATEDRATICO
+        && "BORRADOR".equals(i.getEstado())
+        && i.getAsignacionPuenteId() != null
+        && asignaciones.existsVigenteParaLecturaFotografica(
+            i.getAsignacionPuenteId(), i.getAutorId(), i.getPuente().getId(), actor)) return;
+    throw error(HttpStatus.NOT_FOUND, "inspeccion_no_encontrada", "Inspección no encontrada.");
   }
 }
