@@ -314,7 +314,83 @@ describe('Detalle de revisión HU-037', () => {
     expect(page().puedeEscribir()).toBe(false);
     expect(page().bloqueada()).toBe(true);
     expect(page().editor()).toBeNull();
+    expect(page().detalle()?.estadoRevision).toBe('EN_CURSO');
+    expect(page().listado()?.observaciones).toEqual(lista.observaciones);
   });
+  it.each(['crear', 'editar', 'eliminar', 'general', 'retirarGeneral'])(
+    'HTTP 409 en %s actualiza el estado real y conserva observaciones en lectura',
+    async (operacion) => {
+      await responder();
+      const original = page().observacionesPresentacion()[0];
+      let endpoint = '/api/v1/revisiones/r/observaciones';
+      switch (operacion) {
+        case 'crear':
+          page().seleccionarElemento(destino());
+          page().guardar({ modo: 'CREAR', texto: 'Nota', destino: destino() });
+          break;
+        case 'editar':
+          endpoint += '/o';
+          page().editar(original);
+          page().guardar({
+            modo: 'EDITAR',
+            id: original.id,
+            texto: 'Cambio',
+            destino: original.destino,
+          });
+          break;
+        case 'eliminar':
+          endpoint += '/o';
+          page().solicitarEliminacion(original);
+          page().eliminar();
+          break;
+        case 'general':
+          endpoint += '/general';
+          page().editarGeneral();
+          page().guardar({
+            modo: 'EDITAR',
+            id: 'r',
+            texto: 'Cambio',
+            destino: { tipo: 'GENERAL' },
+          });
+          break;
+        case 'retirarGeneral':
+          endpoint += '/general';
+          page().solicitarEliminacion('GENERAL');
+          page().eliminar();
+          break;
+      }
+      http
+        .expectOne(endpoint)
+        .flush({ detail: 'Ciclo no editable' }, { status: 409, statusText: 'Conflict' });
+      expect(page().bloqueada()).toBe(true);
+      // El estado EN_CURSO no se sustituye localmente: RESUELTA procede de la nueva respuesta GET.
+      expect(page().detalle()?.estadoRevision).toBe('EN_CURSO');
+      http.expectOne('/api/v1/revisiones/r').flush({ ...detalle, estadoRevision: 'RESUELTA' });
+      http.expectOne('/api/v1/revisiones/r/observaciones').flush(structuredClone(lista));
+      fixture.detectChanges();
+      await fixture.whenStable();
+      expect(page().detalle()?.estadoRevision).toBe('RESUELTA');
+      expect(page().puedeEscribir()).toBe(false);
+      expect(page().editor()).toBeNull();
+      expect(page().aEliminar()).toBeNull();
+      page().abrirPanel();
+      fixture.detectChanges();
+      await fixture.whenStable();
+      const panel = fixture.debugElement.query(By.directive(PanelObservacionesComponent))
+        .componentInstance as PanelObservacionesComponent;
+      expect(panel.observaciones()).toHaveLength(2);
+      expect(panel.permitirEdicion()).toBe(false);
+      expect(panel.permitirEliminacion()).toBe(false);
+      expect(html().textContent).toContain('Comprobar longitud.');
+      expect(html().textContent).toContain('Comentario del ciclo');
+      page().editar(original);
+      page().solicitarEliminacion(original);
+      page().editarGeneral();
+      expect(page().editor()).toBeNull();
+      expect(page().aEliminar()).toBeNull();
+      http.expectNone((req) => ['POST', 'PUT', 'DELETE'].includes(req.method));
+    },
+  );
   it('asocia errores 422 de campo al editor y conserva el borrador', async () => {
     await responder();
     page().seleccionarElemento(destino());

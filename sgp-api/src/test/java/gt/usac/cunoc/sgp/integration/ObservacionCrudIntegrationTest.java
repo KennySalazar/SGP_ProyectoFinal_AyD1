@@ -9,7 +9,12 @@ import gt.usac.cunoc.sgp.archivo.model.CategoriaFoto;
 import gt.usac.cunoc.sgp.common.audit.service.AuditoriaWriter;
 import gt.usac.cunoc.sgp.common.exception.ApiException;
 import gt.usac.cunoc.sgp.common.security.JwtData;
+import gt.usac.cunoc.sgp.formulario.validation.JsonSchemaValidatorService;
 import gt.usac.cunoc.sgp.formulario.validation.ValidadorAnclajeFormulario;
+import gt.usac.cunoc.sgp.inspeccion.mapper.InspeccionMapperImpl;
+import gt.usac.cunoc.sgp.inspeccion.service.PublicacionIndiceCondicionService;
+import gt.usac.cunoc.sgp.inspeccion.service.ReglasEvidenciaFotografica;
+import gt.usac.cunoc.sgp.inspeccion.service.TransicionInspeccionService;
 import gt.usac.cunoc.sgp.inspeccion.validation.ValidadorCategoriaFotografica;
 import gt.usac.cunoc.sgp.revision.dto.*;
 import gt.usac.cunoc.sgp.revision.mapper.ObservacionMapperImpl;
@@ -20,6 +25,9 @@ import gt.usac.cunoc.sgp.usuario.model.RoleName;
 import java.time.*;
 import java.util.*;
 import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.locks.LockSupport;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -27,6 +35,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.boot.test.mock.mockito.SpyBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
@@ -58,6 +67,10 @@ import org.testcontainers.utility.DockerImageName;
   ValidadorAnclajeFormulario.class,
   ValidadorCategoriaFotografica.class,
   AuditoriaWriter.class,
+  TransicionInspeccionService.class,
+  InspeccionMapperImpl.class,
+  JsonSchemaValidatorService.class,
+  ReglasEvidenciaFotografica.class,
   ObservacionCrudIntegrationTest.Config.class
 })
 @Testcontainers
@@ -79,6 +92,10 @@ class ObservacionCrudIntegrationTest {
 
   @Autowired ObservacionService servicio;
   @Autowired RevisionRepository revisiones;
+  @Autowired TransicionInspeccionService transiciones;
+  // Solicitar cambios y rechazar usan los servicios, repositorios y auditoría reales.
+  // El cálculo de publicación no se ejecuta en estas carreras y queda fuera de este slice.
+  @MockBean PublicacionIndiceCondicionService publicacionIc;
   @Autowired JdbcTemplate jdbc;
   @Autowired PlatformTransactionManager tm;
   @SpyBean AuditoriaWriter auditoria;
@@ -301,6 +318,8 @@ class ObservacionCrudIntegrationTest {
   @ValueSource(strings = {"PENDIENTE", "RESUELTA"})
   void cicloNoEditableResponde409PeroPermiteLectura(String estado) {
     var observacion = crear();
+    servicio.guardarGeneral(ciclo, revisor, new ObservacionGeneralRequest("General original"));
+    var antes = estadoObservaciones();
     jdbc.update(
         "UPDATE revision SET estado=?,veredicto='APROBADA',resuelta_en=CURRENT_TIMESTAMP WHERE id=?",
         estado,
@@ -318,12 +337,16 @@ class ObservacionCrudIntegrationTest {
         HttpStatus.CONFLICT,
         () -> servicio.guardarGeneral(ciclo, revisor, new ObservacionGeneralRequest("Cambio")));
     assertThat(servicio.listar(ciclo, revisor).total()).isEqualTo(1);
+    assertThat(servicio.obtenerGeneral(ciclo, revisor).texto()).isEqualTo("General original");
+    assertThat(estadoObservaciones()).isEqualTo(antes);
   }
 
   @ParameterizedTest
   @ValueSource(strings = {"BORRADOR", "ENVIADA", "CAMBIOS_SOLICITADOS", "PUBLICADA", "RECHAZADA"})
   void inspeccionFueraDeRevisionImpideTodaEscritura(String estado) {
     var observacion = crear();
+    servicio.guardarGeneral(ciclo, revisor, new ObservacionGeneralRequest("General original"));
+    var antes = estadoObservaciones();
     jdbc.update(
         "UPDATE inspeccion SET estado=?,publicado_en=CASE WHEN ?='PUBLICADA' THEN CURRENT_TIMESTAMP ELSE NULL END WHERE id=?",
         estado,
@@ -341,6 +364,8 @@ class ObservacionCrudIntegrationTest {
     error(
         HttpStatus.CONFLICT,
         () -> servicio.guardarGeneral(ciclo, revisor, new ObservacionGeneralRequest("Cambio")));
+    assertThat(estadoObservaciones()).isEqualTo(antes);
+    assertThat(servicio.listar(ciclo, revisor).total()).isEqualTo(1);
   }
 
   @Test
@@ -467,6 +492,172 @@ class ObservacionCrudIntegrationTest {
     }
     assertThat(servicio.obtener(ciclo, original.id(), revisor).texto()).isEqualTo("Original");
   }
+
+  @Test
+  void consultaDeRevisionBloqueaRealmenteCicloEInspeccionHastaElCommit() throws Exception {
+    conBloqueoConcurrente(
+        this::crear,
+        () -> {
+          // La consulta join fetch de RevisionRepository ya bloquea ambas filas en PostgreSQL.
+          // No se presupone un orden interno de filas elegido por el planificador.
+          for (String tabla : List.of("revision", "inspeccion")) {
+            UUID id = tabla.equals("revision") ? ciclo : inspeccion;
+            assertThatThrownBy(
+                    () ->
+                        jdbc.queryForObject(
+                            "SELECT id FROM " + tabla + " WHERE id=? FOR UPDATE NOWAIT",
+                            UUID.class,
+                            id))
+                .hasRootCauseInstanceOf(java.sql.SQLException.class)
+                .satisfies(
+                    e ->
+                        assertThat(((java.sql.SQLException) e.getCause()).getSQLState())
+                            .isEqualTo("55P03"));
+          }
+          assertThat(estadoObservaciones().observaciones()).isEmpty();
+          assertThat(estadoObservaciones().auditorias()).isZero();
+          error(HttpStatus.CONFLICT, this::crear);
+          assertThat(estadoObservaciones().observaciones()).isEmpty();
+          assertThat(estadoObservaciones().auditorias()).isZero();
+        });
+    assertThat(estadoObservaciones().observaciones()).hasSize(1);
+    assertThat(estadoObservaciones().auditorias()).isEqualTo(1);
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"cambios", "rechazo"})
+  void transicionRealPrimeroImpideTodasLasEscriturasConcurrentesYPosteriores(String evento)
+      throws Exception {
+    var observacion = crear();
+    servicio.guardarGeneral(ciclo, revisor, new ObservacionGeneralRequest("General original"));
+    var antes = estadoObservaciones();
+    conBloqueoConcurrente(
+        () -> transicionar(evento),
+        () -> {
+          rechazarTodasLasEscrituras(observacion.id());
+          assertThat(estadoObservaciones()).isEqualTo(antes);
+        });
+    rechazarTodasLasEscrituras(observacion.id());
+    assertThat(estadoObservaciones()).isEqualTo(antes);
+    assertThat(servicio.listar(ciclo, revisor).observaciones()).hasSize(1);
+    assertThat(jdbc.queryForObject("SELECT estado FROM revision WHERE id=?", String.class, ciclo))
+        .isEqualTo("EN_CURSO");
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT estado FROM inspeccion WHERE id=?", String.class, inspeccion))
+        .isEqualTo(evento.equals("cambios") ? "CAMBIOS_SOLICITADOS" : "RECHAZADA");
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT count(*) FROM historial_estado_inspeccion WHERE inspeccion_id=?",
+                Long.class,
+                inspeccion))
+        .isEqualTo(1);
+  }
+
+  @Test
+  void escrituraPrimeroObligaALaTransicionRealAEsperarSuCommit() throws Exception {
+    var observacion = crear();
+    AtomicInteger escritor = new AtomicInteger();
+    AtomicInteger transicion = new AtomicInteger();
+    AtomicReference<Future<?>> futura = new AtomicReference<>();
+    var inicioTransicion = new CountDownLatch(1);
+    try (var executor = Executors.newSingleThreadExecutor()) {
+      conBloqueoConcurrente(
+          () -> {
+            escritor.set(jdbc.queryForObject("SELECT pg_backend_pid()", Integer.class));
+            servicio.editar(
+                ciclo,
+                observacion.id(),
+                revisor,
+                new EditarObservacionRequest("Antes de transición"));
+          },
+          () -> {
+            futura.set(
+                executor.submit(
+                    () -> {
+                      sesion(revisor, RoleName.CATEDRATICO);
+                      try {
+                        new TransactionTemplate(tm)
+                            .executeWithoutResult(
+                                t -> {
+                                  transicion.set(
+                                      jdbc.queryForObject(
+                                          "SELECT pg_backend_pid()", Integer.class));
+                                  inicioTransicion.countDown();
+                                  transicionar("cambios");
+                                });
+                      } finally {
+                        SecurityContextHolder.clearContext();
+                      }
+                    }));
+            try {
+              assertThat(inicioTransicion.await(10, TimeUnit.SECONDS)).isTrue();
+            } catch (InterruptedException e) {
+              Thread.currentThread().interrupt();
+              throw new IllegalStateException(e);
+            }
+            long limite = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
+            boolean esperando;
+            do {
+              esperando =
+                  Boolean.TRUE.equals(
+                      jdbc.queryForObject(
+                          "SELECT EXISTS (SELECT 1 FROM pg_stat_activity WHERE pid=? AND wait_event_type='Lock' AND ? = ANY(pg_blocking_pids(pid)))",
+                          Boolean.class,
+                          transicion.get(),
+                          escritor.get()));
+              if (!esperando) LockSupport.parkNanos(TimeUnit.MILLISECONDS.toNanos(10));
+            } while (!esperando && System.nanoTime() < limite && !futura.get().isDone());
+            assertThat(esperando)
+                .as("PostgreSQL debe confirmar la espera del bloqueo de inspección")
+                .isTrue();
+            assertThat(futura.get()).isNotDone();
+          });
+      futura.get().get(15, TimeUnit.SECONDS);
+    }
+    assertThat(servicio.obtener(ciclo, observacion.id(), revisor).texto())
+        .isEqualTo("Antes de transición");
+    var antes = estadoObservaciones();
+    rechazarTodasLasEscrituras(observacion.id());
+    assertThat(estadoObservaciones()).isEqualTo(antes);
+    assertThat(antes.auditorias()).isEqualTo(2);
+  }
+
+  private void transicionar(String evento) {
+    if (evento.equals("cambios"))
+      transiciones.solicitarCambios(inspeccion, revisor, "Completar evidencia");
+    else transiciones.rechazar(inspeccion, revisor, "Inspección no aceptada");
+  }
+
+  private void rechazarTodasLasEscrituras(UUID observacion) {
+    error(HttpStatus.CONFLICT, this::crear);
+    error(
+        HttpStatus.CONFLICT,
+        () -> servicio.editar(ciclo, observacion, revisor, new EditarObservacionRequest("Tardía")));
+    error(HttpStatus.CONFLICT, () -> servicio.eliminar(ciclo, observacion, revisor));
+    error(
+        HttpStatus.CONFLICT,
+        () -> servicio.guardarGeneral(ciclo, revisor, new ObservacionGeneralRequest("Tardía")));
+    error(
+        HttpStatus.CONFLICT,
+        () -> servicio.guardarGeneral(ciclo, revisor, new ObservacionGeneralRequest(null)));
+  }
+
+  private EstadoObservaciones estadoObservaciones() {
+    return new EstadoObservaciones(
+        jdbc.queryForList(
+            "SELECT id,contenido,estado FROM observacion_revision WHERE revision_id=? ORDER BY id",
+            ciclo),
+        jdbc.queryForObject(
+            "SELECT observacion_general FROM revision WHERE id=?", String.class, ciclo),
+        jdbc.queryForObject(
+            "SELECT count(*) FROM auditoria WHERE usuario_id=? AND entidad IN ('observacion_revision','revision_observacion_general')",
+            Long.class,
+            revisor));
+  }
+
+  private record EstadoObservaciones(
+      List<Map<String, Object>> observaciones, String general, long auditorias) {}
 
   private void conBloqueoConcurrente(Runnable primera, Runnable concurrente) throws Exception {
     var bloqueada = new CountDownLatch(1);
