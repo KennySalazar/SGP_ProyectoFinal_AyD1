@@ -107,3 +107,20 @@ describe('Reglas editables del IC', () => {
     expect(camposReglasIc(v).filter((c) => c.ruta[0] === 'conversion_indicadores')).toEqual([]);
   });
 });
+
+describe('Rangos fijos de HU018', () => {
+  it.each([
+    [80, 50, 0],
+    [74, 50, 0],
+    [75, 60, 0],
+    [75, 49, 0],
+    [75, 50, 1],
+  ])('rechaza los limites %s, %s, %s', (bueno, regular, malo) => {
+    const actual = version();
+    const valores = valoresReglasIc(actual);
+    valores[JSON.stringify(['rangos_estado', 'BUENO'])] = bueno;
+    valores[JSON.stringify(['rangos_estado', 'REGULAR'])] = regular;
+    valores[JSON.stringify(['rangos_estado', 'MALO'])] = malo;
+    expect(erroresReglasIc(camposReglasIc(actual), valores)).toContain('rangosInvalidos');
+  });
+});

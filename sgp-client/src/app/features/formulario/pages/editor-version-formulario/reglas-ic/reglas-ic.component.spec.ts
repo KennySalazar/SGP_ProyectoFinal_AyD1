@@ -76,12 +76,16 @@ describe('Editor visual de reglas IC', () => {
   it('carga las reglas guardadas y comunica cambios pendientes al editar', () => {
     expect(component.formulario.valid).toBe(true);
     const emit = vi.spyOn(component.estado, 'emit');
-    component.formulario.controls[JSON.stringify(['rangos_estado', 'BUENO'])].setValue(80);
+    component.formulario.controls[
+      JSON.stringify(['agregacion', 'elementos_ausentes_no_portantes'])
+    ].setValue(2);
     expect(emit).toHaveBeenLastCalledWith({ pendiente: true, guardando: false });
     expect(component.errores()).toEqual([]);
   });
   it('envia el esquema vigente y conserva escala y condiciones criticas', () => {
-    component.formulario.controls[JSON.stringify(['rangos_estado', 'BUENO'])].setValue(80);
+    component.formulario.controls[
+      JSON.stringify(['agregacion', 'elementos_ausentes_no_portantes'])
+    ].setValue(2);
     component.guardar();
     expect(actualizar).toHaveBeenCalledWith(
       'v1',
@@ -89,7 +93,7 @@ describe('Editor visual de reglas IC', () => {
         esquema: { type: 'object' },
         reglasEvaluacionIc: expect.objectContaining({
           reglas_evaluacion_ic: expect.objectContaining({
-            rangos_estado: { BUENO: 80, REGULAR: 50, MALO: 0 },
+            rangos_estado: { BUENO: 75, REGULAR: 50, MALO: 0 },
             escala_severidad: { NO_PRESENTA: 0, LEVE: 1, MODERADO: 2, SEVERO: 4 },
             reglas_anulacion: [{ id: 'RN-IC-05' }],
           }),
@@ -114,15 +118,15 @@ describe('Editor visual de reglas IC', () => {
   it('conserva los cambios ante un error del servidor e impide solicitudes duplicadas', () => {
     const pendiente = new Subject<VersionFormulario>();
     actualizar.mockReturnValue(pendiente);
-    const clave = JSON.stringify(['rangos_estado', 'BUENO']);
-    component.formulario.controls[clave].setValue(80);
+    const clave = JSON.stringify(['agregacion', 'elementos_ausentes_no_portantes']);
+    component.formulario.controls[clave].setValue(2);
     component.guardar();
     component.guardar();
     expect(actualizar).toHaveBeenCalledTimes(1);
     const error = { status: 409, error: { detail: 'Version inmutable' } };
     pendiente.error(error);
     expect(normalize).toHaveBeenCalledWith(error);
-    expect(component.formulario.controls[clave].value).toBe(80);
+    expect(component.formulario.controls[clave].value).toBe(2);
     expect(component.guardando()).toBe(false);
   });
   it('un bloqueo externo evita guardar', () => {
@@ -133,22 +137,53 @@ describe('Editor visual de reglas IC', () => {
     expect(component.formulario.disabled).toBe(true);
   });
   it('descarta cambios y recupera los valores guardados sin llamar a la API', () => {
-    const clave = JSON.stringify(['rangos_estado', 'BUENO']);
-    component.formulario.controls[clave].setValue(80);
+    const clave = JSON.stringify(['agregacion', 'elementos_ausentes_no_portantes']);
+    component.formulario.controls[clave].setValue(2);
     const emit = vi.spyOn(component.estado, 'emit');
     component.restablecer();
-    expect(component.formulario.controls[clave].value).toBe(75);
+    expect(component.formulario.controls[clave].value).toBe(3);
     expect(emit).toHaveBeenLastCalledWith({ pendiente: false, guardando: false });
     expect(actualizar).not.toHaveBeenCalled();
   });
   it('una actualizacion de pesos no borra la edicion pendiente de reglas', () => {
-    const clave = JSON.stringify(['rangos_estado', 'BUENO']);
-    component.formulario.controls[clave].setValue(80);
+    const clave = JSON.stringify(['agregacion', 'elementos_ausentes_no_portantes']);
+    component.formulario.controls[clave].setValue(2);
     fixture.componentRef.setInput('version', {
       ...version(),
       pesos: [{ id: 'p1', elementoRef: '/vigas', peso: 2, creadoEn: '' }],
     });
     fixture.detectChanges();
-    expect(component.formulario.controls[clave].value).toBe(80);
+    expect(component.formulario.controls[clave].value).toBe(2);
+  });
+  it('normaliza los rangos del borrador sin modificar el original', () => {
+    const borrador = version();
+    const reglas = borrador.reglasEvaluacionIc['reglas_evaluacion_ic'] as Record<string, unknown>;
+    reglas['rangos_estado'] = { BUENO: 80, REGULAR: 60, MALO: 0 };
+    fixture.componentRef.setInput('version', borrador);
+    fixture.detectChanges();
+    expect(component.formulario.controls[JSON.stringify(['rangos_estado', 'BUENO'])].value).toBe(
+      75,
+    );
+    expect(component.formulario.controls[JSON.stringify(['rangos_estado', 'REGULAR'])].value).toBe(
+      50,
+    );
+    expect(reglas['rangos_estado']).toEqual({ BUENO: 80, REGULAR: 60, MALO: 0 });
+    component.guardar();
+    expect(actualizar).toHaveBeenCalled();
+  });
+  it('conserva los rangos historicos de una version publicada', () => {
+    const publicada = version();
+    publicada.estado = 'PUBLICADA';
+    const reglas = publicada.reglasEvaluacionIc['reglas_evaluacion_ic'] as Record<string, unknown>;
+    reglas['rangos_estado'] = { BUENO: 80, REGULAR: 60, MALO: 0 };
+    fixture.componentRef.setInput('version', publicada);
+    fixture.detectChanges();
+    expect(component.formulario.controls[JSON.stringify(['rangos_estado', 'BUENO'])].value).toBe(
+      80,
+    );
+    expect(component.formulario.disabled).toBe(true);
+    expect(component.errores()).toEqual([]);
+    component.guardar();
+    expect(actualizar).not.toHaveBeenCalled();
   });
 });

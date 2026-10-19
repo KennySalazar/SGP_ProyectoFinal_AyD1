@@ -1123,7 +1123,7 @@
     },
     "reglasIc": {
       "titulo": "Reglas de calculo del IC",
-      "nota": "Configure las reglas de agregacion, los rangos de estado y las equivalencias de los indicadores para esta version.",
+      "nota": "Configure las reglas de agregacion y las equivalencias de los indicadores. Las nuevas versiones utilizan rangos fijos: Bueno desde 75, Regular desde 50 y Malo por debajo de 50.",
       "maximoMedicion": "Los umbrales numericos deben cumplir 0 < leve < moderado < severo. El umbral severo es el maximo admitido por el conversor de mediciones.",
       "guardadas": "Reglas de calculo guardadas.",
       "maximo": "Maximo",
@@ -1134,7 +1134,7 @@
       "algoritmoInvalido": "Indique una version de algoritmo de hasta 50 caracteres.",
       "agregacionInvalida": "Seleccione Maximo o Promedio para cada regla de agregacion.",
       "numerosInvalidos": "Complete los valores numericos dentro de sus limites permitidos.",
-      "rangosInvalidos": "Los rangos deben cumplir: Malo = 0 < Regular < Bueno <= 100.",
+      "rangosInvalidos": "Los rangos deben ser: Bueno = 75, Regular = 50 y Malo = 0.",
       "umbralesInvalidos": "Los umbrales deben cumplir: 0 < Leve < Moderado < Severo.",
       "grupos": {
         "general": "Configuracion general",

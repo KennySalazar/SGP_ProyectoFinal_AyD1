@@ -39,6 +39,7 @@
                 }
                 @default {
                   <p-inputnumber
+                    [readonly]="campo.valorFijo !== undefined"
                     [inputId]="'regla-' + grupo.clave + '-' + i"
                     [formControlName]="campo.clave"
                     [useGrouping]="false"
