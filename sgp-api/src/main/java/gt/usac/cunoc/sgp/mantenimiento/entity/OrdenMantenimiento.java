@@ -1,34 +1,25 @@
 package gt.usac.cunoc.sgp.mantenimiento.entity;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import gt.usac.cunoc.sgp.common.util.UuidV7Generator;
-import gt.usac.cunoc.sgp.mantenimiento.model.EstadoOrdenMantenimiento;
-import gt.usac.cunoc.sgp.mantenimiento.model.PrioridadMantenimiento;
-import gt.usac.cunoc.sgp.mantenimiento.model.TipoMantenimiento;
+import gt.usac.cunoc.sgp.mantenimiento.model.EstadoOrden;
+import gt.usac.cunoc.sgp.mantenimiento.model.PrioridadOrden;
+import gt.usac.cunoc.sgp.mantenimiento.model.TipoOrden;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
-import jakarta.persistence.PrePersist;
-import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 import jakarta.persistence.Version;
 import java.time.Instant;
 import java.time.LocalDate;
-import java.util.Objects;
 import java.util.UUID;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
 /**
- * Orden de mantenimiento de un puente (RN-MTO-01). Nace como propuesta, ya sea generada desde una
- * inspección publicada (HU-046) o creada a mano (HU-047), y avanza por el ciclo de vida de
- * RN-MTO-04.
- *
- * <p>Las referencias a otras tablas se guardan como identificadores para mantener el agregado
- * liviano: las restricciones de integridad ya las declara la base (V10). Los cambios de estado los
- * añadirá HU-047 con su máquina de estados; esta clase solo expone cómo se crea una propuesta.
+ * Orden de mantenimiento de un puente (RN-MTO-01, RN-MTO-03). Su estado solo cambia mediante el
+ * servicio de transiciones (DT-BE-07) y nunca se elimina (RN-MTO-09, DT-BD-11).
  */
 @Entity
 @Table(name = "orden_mantenimiento")
@@ -60,38 +51,36 @@ public class OrdenMantenimiento {
   @Column(name = "instancia_elemento_id", updatable = false)
   private UUID instanciaElementoId;
 
-  /** Clave única por inspección de origen que impide generar dos veces la misma propuesta. */
   @Column(name = "clave_generacion", length = 200, updatable = false)
   private String claveGeneracion;
 
   @Enumerated(EnumType.STRING)
-  @Column(nullable = false, length = 20)
-  private TipoMantenimiento tipo;
+  @Column(nullable = false, length = 20, updatable = false)
+  private TipoOrden tipo;
 
   @Enumerated(EnumType.STRING)
   @Column(nullable = false, length = 20)
-  private EstadoOrdenMantenimiento estado;
+  private EstadoOrden estado;
 
-  @Column(nullable = false, columnDefinition = "TEXT")
+  @Column(nullable = false, columnDefinition = "text")
   private String descripcion;
 
   @Enumerated(EnumType.STRING)
   @Column(name = "prioridad_sugerida", nullable = false, length = 20, updatable = false)
-  private PrioridadMantenimiento prioridadSugerida;
+  private PrioridadOrden prioridadSugerida;
 
   @Enumerated(EnumType.STRING)
   @Column(name = "prioridad_confirmada", nullable = false, length = 20)
-  private PrioridadMantenimiento prioridadConfirmada;
+  private PrioridadOrden prioridadConfirmada;
 
-  @Column(name = "justificacion_prioridad", columnDefinition = "TEXT")
+  @Column(name = "justificacion_prioridad", columnDefinition = "text")
   private String justificacionPrioridad;
 
-  /** Qué valor se encontró y qué regla lo disparó; es la explicación de por qué se propone. */
   @JdbcTypeCode(SqlTypes.JSON)
   @Column(name = "fundamento_generacion", updatable = false)
   private JsonNode fundamentoGeneracion;
 
-  @Column(name = "creado_por_id")
+  @Column(name = "creado_por_id", updatable = false)
   private UUID creadoPorId;
 
   @Column(name = "aceptado_por_id")
@@ -103,7 +92,7 @@ public class OrdenMantenimiento {
   @Column(name = "fecha_programada")
   private LocalDate fechaProgramada;
 
-  @Column(name = "motivo_cierre_sin_ejecucion", columnDefinition = "TEXT")
+  @Column(name = "motivo_cierre_sin_ejecucion", columnDefinition = "text")
   private String motivoCierreSinEjecucion;
 
   @Column(name = "creado_en", nullable = false, updatable = false)
@@ -119,60 +108,54 @@ public class OrdenMantenimiento {
   protected OrdenMantenimiento() {}
 
   /**
-   * Crea una orden en estado PROPUESTA. La prioridad sugerida y la confirmada empiezan iguales
-   * (RN-MTO-06 las separa cuando alguien la modifica).
-   *
-   * <p>Para una orden manual (HU-047) los datos de origen van en {@code null}; para una propuesta
-   * generada (HU-046) llevan la inspección, la regla y la clave de generación. {@code creadoPorId}
-   * es nulo cuando la crea el proceso automático.
+   * Orden creada manualmente por un Catedrático o un Administrador. Nace en PROPUESTA y su
+   * prioridad confirmada empieza igual a la sugerida (RN-MTO-01).
    */
-  public static OrdenMantenimiento nuevaPropuesta(
+  public OrdenMantenimiento(
+      UUID id,
       UUID puenteId,
       UUID inspeccionOrigenId,
-      UUID reglaOrigenId,
-      UUID resultadoIcOrigenId,
       String elementoRef,
       UUID instanciaElementoId,
-      String claveGeneracion,
-      TipoMantenimiento tipo,
+      TipoOrden tipo,
       String descripcion,
-      PrioridadMantenimiento prioridad,
-      JsonNode fundamentoGeneracion,
-      UUID creadoPorId) {
-    OrdenMantenimiento orden = new OrdenMantenimiento();
-    orden.id = UuidV7Generator.generate();
-    orden.puenteId = Objects.requireNonNull(puenteId, "puenteId no puede ser nulo");
-    orden.inspeccionOrigenId = inspeccionOrigenId;
-    orden.reglaOrigenId = reglaOrigenId;
-    orden.resultadoIcOrigenId = resultadoIcOrigenId;
-    orden.elementoRef = elementoRef;
-    orden.instanciaElementoId = instanciaElementoId;
-    orden.claveGeneracion = claveGeneracion;
-    orden.tipo = Objects.requireNonNull(tipo, "tipo no puede ser nulo");
-    orden.estado = EstadoOrdenMantenimiento.PROPUESTA;
-    orden.descripcion = Objects.requireNonNull(descripcion, "descripcion no puede ser nula");
-    Objects.requireNonNull(prioridad, "prioridad no puede ser nula");
-    orden.prioridadSugerida = prioridad;
-    orden.prioridadConfirmada = prioridad;
-    orden.fundamentoGeneracion = fundamentoGeneracion;
-    orden.creadoPorId = creadoPorId;
-    return orden;
+      PrioridadOrden prioridad,
+      UUID creadoPorId,
+      Instant ahora) {
+    this.id = id;
+    this.puenteId = puenteId;
+    this.inspeccionOrigenId = inspeccionOrigenId;
+    this.elementoRef = elementoRef;
+    this.instanciaElementoId = instanciaElementoId;
+    this.tipo = tipo;
+    this.estado = EstadoOrden.PROPUESTA;
+    this.descripcion = descripcion;
+    this.prioridadSugerida = prioridad;
+    this.prioridadConfirmada = prioridad;
+    this.creadoPorId = creadoPorId;
+    this.creadoEn = ahora;
+    this.actualizadoEn = ahora;
   }
 
-  @PrePersist
-  void alPersistir() {
-    Instant ahora = Instant.now();
-    if (this.creadoEn == null) {
-      this.creadoEn = ahora;
-    }
-    if (this.actualizadoEn == null) {
-      this.actualizadoEn = ahora;
-    }
+  /**
+   * Cambia el estado. Solo lo invoca {@code TransicionOrdenService}, después de validar la
+   * transición con la máquina de estados (DT-BE-07).
+   */
+  public void aplicarTransicion(EstadoOrden destino, Instant ahora) {
+    this.estado = destino;
+    this.actualizadoEn = ahora;
   }
 
-  @PreUpdate
-  void alActualizar() {
-    this.actualizadoEn = Instant.now();
+  /** Datos exigidos para PROGRAMADA: quién aceptó, cuándo y para qué fecha. */
+  public void registrarAceptacion(UUID aceptadoPorId, Instant aceptadoEn, LocalDate fecha) {
+    this.aceptadoPorId = aceptadoPorId;
+    this.aceptadoEn = aceptadoEn;
+    this.fechaProgramada = fecha;
+  }
+
+  /** Motivo exigido para DESCARTADA y CANCELADA (RN-MTO-09). */
+  public void registrarMotivoCierre(String motivo) {
+    this.motivoCierreSinEjecucion = motivo;
   }
 
   public UUID getId() {
@@ -215,11 +198,11 @@ public class OrdenMantenimiento {
     return claveGeneracion;
   }
 
-  public TipoMantenimiento getTipo() {
+  public TipoOrden getTipo() {
     return tipo;
   }
 
-  public EstadoOrdenMantenimiento getEstado() {
+  public EstadoOrden getEstado() {
     return estado;
   }
 
@@ -227,11 +210,11 @@ public class OrdenMantenimiento {
     return descripcion;
   }
 
-  public PrioridadMantenimiento getPrioridadSugerida() {
+  public PrioridadOrden getPrioridadSugerida() {
     return prioridadSugerida;
   }
 
-  public PrioridadMantenimiento getPrioridadConfirmada() {
+  public PrioridadOrden getPrioridadConfirmada() {
     return prioridadConfirmada;
   }
 
