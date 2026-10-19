@@ -1,0 +1,744 @@
+<div class="page-container">
+  <header class="page-heading">
+    <span class="page-kicker">{{ 'mantenimiento.kicker' | transloco }}</span>
+    <h1 class="page-title">{{ 'mantenimiento.titulo' | transloco }}</h1>
+    <p class="page-description">{{ 'mantenimiento.descripcion' | transloco }}</p>
+  </header>
+
+  <!-- Mensaje de éxito global de la pantalla -->
+  @if (mensajeExito()) {
+  <div class="alert-exito" role="status">
+    <i class="pi pi-check-circle" aria-hidden="true"></i>
+    <span>{{ mensajeExito() }}</span>
+  </div>
+  }
+
+  <!-- Advertencia de versión sin reglas activas -->
+  @if (resumen()?.advertenciaSinReglasActivas) {
+  <div class="alert-warning" role="alert">
+    <div class="alert-icon">
+      <i class="pi pi-exclamation-triangle" aria-hidden="true"></i>
+    </div>
+    <div class="alert-content">
+      <strong>{{ 'mantenimiento.advertenciaTitulo' | transloco }}</strong>
+      <p>{{ resumen()?.advertenciaSinReglasActivas }}</p>
+    </div>
+    @if (esAdmin && resumen()?.totalReglas === 0) {
+    <button
+      pButton
+      type="button"
+      class="p-button-warning p-button-sm"
+      [disabled]="sembrando()"
+      (click)="sembrarCatalogo()"
+    >
+      <i class="pi pi-sparkles" aria-hidden="true"></i>
+      <span>{{ 'mantenimiento.sembrarCatalogo' | transloco }}</span>
+    </button>
+    }
+  </div>
+  }
+
+  <!-- Tarjetas de resumen métrico -->
+  @if (resumen()) {
+  <div class="metricas-grid">
+    <div class="metrica-card">
+      <span class="metrica-label">{{ 'mantenimiento.totalReglas' | transloco }}</span>
+      <strong class="metrica-valor">{{ resumen()?.totalReglas }}</strong>
+    </div>
+    <div class="metrica-card">
+      <span class="metrica-label">{{ 'mantenimiento.reglasActivas' | transloco }}</span>
+      <strong class="metrica-valor color-success">{{ resumen()?.totalActivas }}</strong>
+    </div>
+    <div class="metrica-card">
+      <span class="metrica-label">{{ 'mantenimiento.reglasProvisionales' | transloco }}</span>
+      <strong class="metrica-valor color-warn">{{ resumen()?.totalProvisionales }}</strong>
+    </div>
+    <div class="metrica-card">
+      <span class="metrica-label">{{ 'mantenimiento.reglasValidadas' | transloco }}</span>
+      <strong class="metrica-valor color-info">{{ resumen()?.totalValidadas }}</strong>
+    </div>
+  </div>
+  }
+
+  <!-- Barra de filtros y acciones -->
+  <div class="surface-card filtros-card">
+    <div class="filtros-grid">
+      <div class="filtro-item">
+        <label for="select-version">{{ 'mantenimiento.versionFormulario' | transloco }}</label>
+        <p-select
+          id="select-version"
+          [options]="versiones()"
+          [ngModel]="versionSeleccionadaId()"
+          (ngModelChange)="cambiarVersion($event)"
+          optionLabel="codigo"
+          optionValue="id"
+          placeholder="Seleccionar versión"
+          styleClass="w-full"
+        />
+      </div>
+
+      <div class="filtro-item">
+        <label for="select-tipo">{{ 'mantenimiento.tipoMantenimiento' | transloco }}</label>
+        <p-select
+          id="select-tipo"
+          [options]="opcionesTipo"
+          [ngModel]="filtroTipo()"
+          (ngModelChange)="aplicarFiltroTipo($event)"
+          optionLabel="label"
+          optionValue="value"
+          placeholder="Todos los tipos"
+          styleClass="w-full"
+        />
+      </div>
+
+      <div class="filtro-item busqueda">
+        <label for="input-elemento">{{ 'mantenimiento.filtrarElemento' | transloco }}</label>
+        <span class="p-input-icon-left w-full">
+          <input
+            id="input-elemento"
+            pInputText
+            type="text"
+            [ngModel]="filtroElemento()"
+            (ngModelChange)="aplicarFiltroElemento($event)"
+            placeholder="Buscar por elemento_ref..."
+            class="w-full"
+          />
+        </span>
+      </div>
+
+      <div class="filtro-item">
+        <label for="select-estado">{{ 'mantenimiento.filtroEstado' | transloco }}</label>
+        <p-select
+          id="select-estado"
+          [options]="opcionesEstado"
+          [ngModel]="filtroActiva()"
+          (ngModelChange)="aplicarFiltroActiva($event)"
+          optionLabel="label"
+          optionValue="value"
+          styleClass="w-full"
+        />
+      </div>
+
+      <div class="filtro-acciones">
+        <button
+          pButton
+          type="button"
+          class="p-button-outlined p-button-secondary"
+          (click)="limpiarFiltros()"
+        >
+          <i class="pi pi-filter-slash" aria-hidden="true"></i>
+          <span>{{ 'mantenimiento.limpiarFiltros' | transloco }}</span>
+        </button>
+
+        @if (esAdmin) {
+        <button pButton type="button" class="p-button-primary" (click)="abrirCrear()">
+          <i class="pi pi-plus" aria-hidden="true"></i>
+          <span>{{ 'mantenimiento.nuevaRegla' | transloco }}</span>
+        </button>
+        }
+      </div>
+    </div>
+  </div>
+
+  <!-- Sección de tabla con formato estándar SGP -->
+  <section class="surface-card lista-card" aria-labelledby="catalogo-reglas-titulo">
+    <div class="card-header">
+      <div class="card-title-group">
+        <h2 id="catalogo-reglas-titulo">{{ 'mantenimiento.tituloTabla' | transloco }}</h2>
+        <p class="card-subtitle">
+          {{ 'mantenimiento.subtituloTabla' | transloco }} @if (versionCodigoActual()) {
+          <span class="version-badge">
+            <i class="pi pi-file" aria-hidden="true"></i>
+            {{ versionCodigoActual() }}
+          </span>
+          }
+        </p>
+      </div>
+      <div class="card-meta">
+        <span class="meta-conteo">
+          <strong>{{ totalElementos() }}</strong> {{ 'mantenimiento.totalReglas' | transloco }}
+        </span>
+      </div>
+    </div>
+
+    <div
+      class="tabla-contenedor"
+      role="region"
+      tabindex="0"
+      aria-labelledby="catalogo-reglas-titulo"
+    >
+      <p-table
+        [value]="reglas()"
+        [loading]="cargando()"
+        dataKey="id"
+        [tableStyle]="{ 'min-width': '85rem', width: '100%', 'border-collapse': 'collapse' }"
+        styleClass="p-datatable-sm"
+      >
+        <ng-template pTemplate="header">
+          <tr>
+            <th scope="col" class="col-numero text-center">
+              {{ 'mantenimiento.thNumero' | transloco }}
+            </th>
+            <th scope="col" class="col-codigo">{{ 'mantenimiento.thCodigo' | transloco }}</th>
+            <th scope="col" class="col-elemento">{{ 'mantenimiento.thElemento' | transloco }}</th>
+            <th scope="col" class="col-condicion">{{ 'mantenimiento.thCondicion' | transloco }}</th>
+            <th scope="col" class="col-tipo text-center">
+              {{ 'mantenimiento.thTipo' | transloco }}
+            </th>
+            <th scope="col" class="col-intervencion">
+              {{ 'mantenimiento.thIntervencion' | transloco }}
+            </th>
+            <th scope="col" class="col-prioridad text-center">
+              {{ 'mantenimiento.thPrioridad' | transloco }}
+            </th>
+            <th scope="col" class="col-validacion text-center">
+              {{ 'mantenimiento.thValidacion' | transloco }}
+            </th>
+            <th scope="col" class="col-estado text-center">
+              {{ 'mantenimiento.thEstado' | transloco }}
+            </th>
+            <th scope="col" class="col-acciones text-center">
+              {{ 'mantenimiento.thAcciones' | transloco }}
+            </th>
+          </tr>
+        </ng-template>
+
+        <ng-template pTemplate="body" let-regla let-indice="rowIndex">
+          <tr class="fila-regla">
+            <td class="col-numero-celda text-center">
+              <span class="badge-numero">{{ paginaActual() * tamanioPagina() + indice + 1 }}</span>
+            </td>
+            <td class="col-codigo-celda">
+              <div class="codigo-wrapper">
+                <span class="codigo-texto">{{ regla.codigo }}</span>
+                <span class="pill-revision">Rev. {{ regla.numeroRevision }}</span>
+              </div>
+            </td>
+            <td class="col-elemento-celda">
+              @let ruta = desglosarRuta(regla.elementoRef);
+              <div class="elemento-wrapper" [title]="regla.elementoRef">
+                <span class="elemento-prefijo">
+                  <i class="pi pi-folder" aria-hidden="true"></i>
+                  {{ ruta.prefijo || 'General/' }}
+                </span>
+                <strong class="elemento-nombre">{{ ruta.nombre }}</strong>
+              </div>
+            </td>
+            <td class="col-condicion-celda">
+              <div class="condicion-card" [title]="formatearCondicion(regla.condicion)">
+                <span class="cond-indicador">{{ regla.condicion?.indicador }}</span>
+                <span class="cond-operador">{{ simboloOperador(regla.condicion?.operador) }}</span>
+                <span class="cond-umbral">{{ regla.condicion?.umbral }}</span>
+              </div>
+            </td>
+            <td class="col-tipo-celda text-center">
+              <p-tag
+                [value]="regla.tipoMantenimiento"
+                [severity]="severidadTipo(regla.tipoMantenimiento)"
+              />
+            </td>
+            <td class="col-intervencion-celda">
+              <div class="intervencion-wrapper" [title]="regla.intervencionSugerida">
+                <span class="intervencion-texto">{{ regla.intervencionSugerida }}</span>
+              </div>
+            </td>
+            <td class="col-prioridad-celda text-center">
+              <p-tag
+                [value]="prioridadBaseDe(regla)"
+                [severity]="severidadPrioridad(prioridadBaseDe(regla))"
+              />
+            </td>
+            <td class="col-validacion-celda text-center">
+              @if (regla.provisional) {
+              <span class="badge-validacion provisional" title="Provisional · sin validar">
+                <i class="pi pi-clock" aria-hidden="true"></i>
+                <span>Provisional</span>
+              </span>
+              } @else {
+              <span class="badge-validacion validada" title="Validada por catedrático">
+                <i class="pi pi-check-circle" aria-hidden="true"></i>
+                <span>Validada</span>
+              </span>
+              }
+            </td>
+            <td class="col-estado-celda text-center">
+              <p-tag
+                [value]="regla.activa ? 'Activa' : 'Inactiva'"
+                [severity]="regla.activa ? 'success' : 'secondary'"
+              />
+            </td>
+            <td class="col-acciones-celda text-center">
+              <div class="acciones-fila justify-center">
+                <button
+                  pButton
+                  type="button"
+                  severity="secondary"
+                  [outlined]="true"
+                  class="btn-accion"
+                  [attr.aria-label]="'mantenimiento.verDetalle' | transloco"
+                  [title]="'mantenimiento.verDetalle' | transloco"
+                  (click)="abrirDetalle(regla)"
+                >
+                  <i class="pi pi-eye" aria-hidden="true"></i>
+                </button>
+
+                @if (esAdmin) { @if (regla.provisional) {
+                <button
+                  pButton
+                  type="button"
+                  severity="success"
+                  [outlined]="true"
+                  class="btn-accion"
+                  [attr.aria-label]="'mantenimiento.validar' | transloco"
+                  [title]="'mantenimiento.validar' | transloco"
+                  (click)="abrirValidar(regla)"
+                >
+                  <i class="pi pi-check" aria-hidden="true"></i>
+                </button>
+                }
+
+                <button
+                  pButton
+                  type="button"
+                  severity="secondary"
+                  [outlined]="true"
+                  class="btn-accion"
+                  [attr.aria-label]="'mantenimiento.editar' | transloco"
+                  [title]="'mantenimiento.editar' | transloco"
+                  (click)="abrirEditar(regla)"
+                >
+                  <i class="pi pi-pencil" aria-hidden="true"></i>
+                </button>
+
+                <button
+                  pButton
+                  type="button"
+                  [severity]="regla.activa ? 'warn' : 'success'"
+                  [outlined]="true"
+                  class="btn-accion"
+                  [attr.aria-label]="regla.activa ? 'Desactivar' : 'Activar'"
+                  [title]="regla.activa ? 'Desactivar regla' : 'Activar regla'"
+                  (click)="abrirCambiarEstado(regla)"
+                >
+                  <i [class]="regla.activa ? 'pi pi-pause' : 'pi pi-play'" aria-hidden="true"></i>
+                </button>
+                }
+              </div>
+            </td>
+          </tr>
+        </ng-template>
+
+        <ng-template pTemplate="emptymessage">
+          <tr>
+            <td colspan="10" class="sin-resultados-td">
+              <div class="sin-resultados">
+                <i class="pi pi-inbox" aria-hidden="true"></i>
+                <p role="status">{{ 'mantenimiento.sinReglas' | transloco }}</p>
+              </div>
+            </td>
+          </tr>
+        </ng-template>
+      </p-table>
+
+      <p-paginator
+        [rows]="tamanioPagina()"
+        [totalRecords]="totalElementos()"
+        [first]="paginaActual() * tamanioPagina()"
+        (onPageChange)="cambiarPagina($event)"
+        [rowsPerPageOptions]="[10, 20, 50]"
+      />
+    </div>
+  </section>
+</div>
+
+<!-- Diálogo: Ver Detalle de Regla -->
+<p-dialog
+  [header]="'Detalle de Regla: ' + (reglaDetalle()?.codigo || '')"
+  [visible]="reglaDetalle() !== null"
+  (visibleChange)="cerrarDetalle()"
+  [modal]="true"
+  [style]="{ width: '600px', maxWidth: '95vw' }"
+>
+  @if (reglaDetalle(); as regla) {
+  <div class="detalle-grid">
+    <div class="detalle-campo">
+      <span class="label">Código y Revisión</span>
+      <span class="valor font-bold">{{ regla.codigo }} (Revisión {{ regla.numeroRevision }})</span>
+    </div>
+    <div class="detalle-campo">
+      <span class="label">Versión Formulario</span>
+      <span class="valor">{{ regla.versionFormularioCodigo }}</span>
+    </div>
+    <div class="detalle-campo full">
+      <span class="label">Elemento Ref</span>
+      <span class="valor font-mono">{{ regla.elementoRef }}</span>
+    </div>
+    <div class="detalle-campo full">
+      <span class="label">Condición (JSON)</span>
+      <pre class="valor-pre">{{ regla.condicion | json }}</pre>
+    </div>
+    <div class="detalle-campo">
+      <span class="label">Tipo de Mantenimiento</span>
+      <p-tag
+        [value]="regla.tipoMantenimiento"
+        [severity]="severidadTipo(regla.tipoMantenimiento)"
+      />
+    </div>
+    <div class="detalle-campo">
+      <span class="label">Prioridad Base</span>
+      <p-tag
+        [value]="prioridadBaseDe(regla)"
+        [severity]="severidadPrioridad(prioridadBaseDe(regla))"
+      />
+    </div>
+    <div class="detalle-campo full">
+      <span class="label">Intervención Sugerida</span>
+      <p class="valor">{{ regla.intervencionSugerida }}</p>
+    </div>
+    <div class="detalle-campo full">
+      <span class="label">Estado de Validación</span>
+      <p-tag [value]="regla.estadoValidacion" [severity]="regla.provisional ? 'warn' : 'success'" />
+      @if (regla.validadoEn) {
+      <small class="block mt-1 text-gray-500">Validado en: {{ regla.validadoEn }}</small>
+      }
+    </div>
+    <div class="detalle-campo">
+      <span class="label">Estado Operativo</span>
+      <p-tag
+        [value]="regla.activa ? 'Activa' : 'Inactiva'"
+        [severity]="regla.activa ? 'success' : 'secondary'"
+      />
+    </div>
+    <div class="detalle-campo">
+      <span class="label">Fecha de Registro</span>
+      <span class="valor text-sm text-gray-600">{{ regla.creadoEn }}</span>
+    </div>
+  </div>
+  }
+  <ng-template pTemplate="footer">
+    <button pButton type="button" class="p-button-secondary" (click)="cerrarDetalle()">
+      <span>Cerrar</span>
+    </button>
+  </ng-template>
+</p-dialog>
+
+<!-- Diálogo: Crear Regla -->
+<p-dialog
+  [header]="'mantenimiento.dialogCrearTitulo' | transloco"
+  [(visible)]="dialogCrearVisible"
+  [modal]="true"
+  [style]="{ width: '650px', maxWidth: '95vw' }"
+>
+  @if (errorOperacion()) {
+  <div class="modal-error mb-4">
+    <i class="pi pi-times-circle" aria-hidden="true"></i>
+    <span>{{ errorOperacion() }}</span>
+  </div>
+  }
+
+  <form [formGroup]="formCrear" (ngSubmit)="guardarCrear()" class="formulario-modal">
+    <div class="campo-grupo">
+      <label for="crear-codigo">{{ 'mantenimiento.formCodigo' | transloco }} *</label>
+      <input
+        id="crear-codigo"
+        pInputText
+        formControlName="codigo"
+        placeholder="Ej. RM-SUB-001"
+        class="w-full"
+      />
+    </div>
+
+    <div class="campo-grupo">
+      <label for="crear-elemento">{{ 'mantenimiento.formElemento' | transloco }} *</label>
+      <input
+        id="crear-elemento"
+        pInputText
+        formControlName="elementoRef"
+        placeholder="Ej. /elementos_no_estructurales/junta_entrada"
+        class="w-full"
+      />
+      <small class="text-gray-500">Ruta canónica en el esquema de la versión activa.</small>
+    </div>
+
+    <div class="form-fila-3">
+      <div class="campo-grupo">
+        <label for="crear-indicador">{{ 'mantenimiento.formIndicador' | transloco }} *</label>
+        <input
+          id="crear-indicador"
+          pInputText
+          formControlName="indicador"
+          placeholder="junta_limpia"
+          class="w-full"
+        />
+      </div>
+      <div class="campo-grupo">
+        <label for="crear-operador">{{ 'mantenimiento.formOperador' | transloco }} *</label>
+        <p-select
+          id="crear-operador"
+          [options]="operadores"
+          formControlName="operador"
+          optionLabel="label"
+          optionValue="value"
+          styleClass="w-full"
+        />
+      </div>
+      <div class="campo-grupo">
+        <label for="crear-umbral">{{ 'mantenimiento.formUmbral' | transloco }} *</label>
+        <input
+          id="crear-umbral"
+          pInputText
+          formControlName="umbral"
+          placeholder="false o MODERADO"
+          class="w-full"
+        />
+      </div>
+    </div>
+
+    <div class="form-fila-2">
+      <div class="campo-grupo">
+        <label for="crear-tipo">{{ 'mantenimiento.formTipo' | transloco }} *</label>
+        <p-select
+          id="crear-tipo"
+          [options]="tiposMantenimiento"
+          formControlName="tipoMantenimiento"
+          styleClass="w-full"
+        />
+      </div>
+      <div class="campo-grupo">
+        <label for="crear-prioridad">{{ 'mantenimiento.formPrioridad' | transloco }} *</label>
+        <p-select
+          id="crear-prioridad"
+          [options]="prioridades"
+          formControlName="prioridadBase"
+          styleClass="w-full"
+        />
+      </div>
+    </div>
+
+    <div class="campo-grupo">
+      <label for="crear-intervencion">{{ 'mantenimiento.formIntervencion' | transloco }} *</label>
+      <textarea
+        id="crear-intervencion"
+        pTextarea
+        formControlName="intervencionSugerida"
+        rows="3"
+        placeholder="Describa la acción correctiva, preventiva o rutinaria sugerida..."
+        class="w-full"
+      ></textarea>
+    </div>
+
+    <div class="modal-footer">
+      <button
+        pButton
+        type="button"
+        class="p-button-outlined p-button-secondary"
+        (click)="dialogCrearVisible.set(false)"
+      >
+        <span>{{ 'mantenimiento.cancelar' | transloco }}</span>
+      </button>
+      <button
+        pButton
+        type="submit"
+        class="p-button-primary"
+        [disabled]="formCrear.invalid || guardando()"
+      >
+        <span>{{ 'mantenimiento.guardar' | transloco }}</span>
+      </button>
+    </div>
+  </form>
+</p-dialog>
+
+<!-- Diálogo: Editar Regla (Crea nueva revisión) -->
+<p-dialog
+  [header]="'mantenimiento.dialogEditarTitulo' | transloco"
+  [(visible)]="dialogEditarVisible"
+  [modal]="true"
+  [style]="{ width: '650px', maxWidth: '95vw' }"
+>
+  @if (errorOperacion()) {
+  <div class="modal-error mb-4">
+    <i class="pi pi-times-circle" aria-hidden="true"></i>
+    <span>{{ errorOperacion() }}</span>
+  </div>
+  }
+
+  <div class="alert-info-modal mb-4">
+    <i class="pi pi-info-circle" aria-hidden="true"></i>
+    <span>
+      Al guardar cambios en la regla <strong>{{ reglaPorEditar()?.codigo }}</strong>, se generará la
+      <strong>Revisión {{ (reglaPorEditar()?.numeroRevision ?? 0) + 1 }}</strong>. La revisión
+      anterior se conservará intacta.
+    </span>
+  </div>
+
+  <form [formGroup]="formEditar" (ngSubmit)="guardarEditar()" class="formulario-modal">
+    <div class="campo-grupo">
+      <label for="edit-elemento">{{ 'mantenimiento.formElemento' | transloco }} *</label>
+      <input
+        id="edit-elemento"
+        pInputText
+        formControlName="elementoRef"
+        placeholder="Ej. /elementos_no_estructurales/junta_entrada"
+        class="w-full"
+      />
+    </div>
+
+    <div class="form-fila-3">
+      <div class="campo-grupo">
+        <label for="edit-indicador">{{ 'mantenimiento.formIndicador' | transloco }} *</label>
+        <input id="edit-indicador" pInputText formControlName="indicador" class="w-full" />
+      </div>
+      <div class="campo-grupo">
+        <label for="edit-operador">{{ 'mantenimiento.formOperador' | transloco }} *</label>
+        <p-select
+          id="edit-operador"
+          [options]="operadores"
+          formControlName="operador"
+          optionLabel="label"
+          optionValue="value"
+          styleClass="w-full"
+        />
+      </div>
+      <div class="campo-grupo">
+        <label for="edit-umbral">{{ 'mantenimiento.formUmbral' | transloco }} *</label>
+        <input id="edit-umbral" pInputText formControlName="umbral" class="w-full" />
+      </div>
+    </div>
+
+    <div class="form-fila-2">
+      <div class="campo-grupo">
+        <label for="edit-tipo">{{ 'mantenimiento.formTipo' | transloco }} *</label>
+        <p-select
+          id="edit-tipo"
+          [options]="tiposMantenimiento"
+          formControlName="tipoMantenimiento"
+          styleClass="w-full"
+        />
+      </div>
+      <div class="campo-grupo">
+        <label for="edit-prioridad">{{ 'mantenimiento.formPrioridad' | transloco }} *</label>
+        <p-select
+          id="edit-prioridad"
+          [options]="prioridades"
+          formControlName="prioridadBase"
+          styleClass="w-full"
+        />
+      </div>
+    </div>
+
+    <div class="campo-grupo">
+      <label for="edit-intervencion">{{ 'mantenimiento.formIntervencion' | transloco }} *</label>
+      <textarea
+        id="edit-intervencion"
+        pTextarea
+        formControlName="intervencionSugerida"
+        rows="3"
+        class="w-full"
+      ></textarea>
+    </div>
+
+    <div class="modal-footer">
+      <button
+        pButton
+        type="button"
+        class="p-button-outlined p-button-secondary"
+        (click)="dialogEditarVisible.set(false)"
+      >
+        <span>{{ 'mantenimiento.cancelar' | transloco }}</span>
+      </button>
+      <button
+        pButton
+        type="submit"
+        class="p-button-primary"
+        [disabled]="formEditar.invalid || guardando()"
+      >
+        <span>{{ 'mantenimiento.crearRevision' | transloco }}</span>
+      </button>
+    </div>
+  </form>
+</p-dialog>
+
+<!-- Diálogo: Confirmar Validación -->
+<p-dialog
+  [header]="'mantenimiento.dialogValidarTitulo' | transloco"
+  [visible]="reglaPorValidar() !== null"
+  (visibleChange)="reglaPorValidar.set(null)"
+  [modal]="true"
+  [style]="{ width: '500px', maxWidth: '95vw' }"
+>
+  @if (reglaPorValidar(); as regla) {
+  <p>
+    ¿Desea marcar como validada la regla
+    <strong>{{ regla.codigo }} (Rev. {{ regla.numeroRevision }})</strong>?
+  </p>
+  <p class="text-sm text-gray-600 mt-2">
+    Esta acción registrará su cuenta y la marca temporal actual como validador técnico de la regla.
+    Dejará de rotularse como «Provisional · sin validar».
+  </p>
+  }
+  <ng-template pTemplate="footer">
+    <button
+      pButton
+      type="button"
+      class="p-button-outlined p-button-secondary"
+      (click)="reglaPorValidar.set(null)"
+    >
+      <span>{{ 'mantenimiento.cancelar' | transloco }}</span>
+    </button>
+    <button
+      pButton
+      type="button"
+      class="p-button-success"
+      [disabled]="guardando()"
+      (click)="confirmarValidar()"
+    >
+      <i class="pi pi-check" aria-hidden="true"></i>
+      <span>{{ 'mantenimiento.confirmarValidacion' | transloco }}</span>
+    </button>
+  </ng-template>
+</p-dialog>
+
+<!-- Diálogo: Confirmar Cambio de Estado (Activar/Desactivar) -->
+<p-dialog
+  [header]="'mantenimiento.dialogEstadoTitulo' | transloco"
+  [visible]="reglaPorCambiarEstado() !== null"
+  (visibleChange)="reglaPorCambiarEstado.set(null)"
+  [modal]="true"
+  [style]="{ width: '500px', maxWidth: '95vw' }"
+>
+  @if (reglaPorCambiarEstado(); as regla) {
+  <p>
+    ¿Desea {{ regla.activa ? 'desactivar' : 'activar' }} la regla
+    <strong>{{ regla.codigo }} (Rev. {{ regla.numeroRevision }})</strong>?
+  </p>
+  @if (!regla.activa) {
+  <p class="text-sm text-gray-600 mt-2">
+    Al activar esta revisión, cualquier otra revisión activa del mismo código para esta versión será
+    desactivada automáticamente.
+  </p>
+  } @else {
+  <p class="text-sm text-gray-600 mt-2">
+    Al desactivar la regla, dejará de generar propuestas nuevas en futuras inspecciones. Las órdenes
+    ya creadas no cambiarán.
+  </p>
+  } }
+  <ng-template pTemplate="footer">
+    <button
+      pButton
+      type="button"
+      class="p-button-outlined p-button-secondary"
+      (click)="reglaPorCambiarEstado.set(null)"
+    >
+      <span>{{ 'mantenimiento.cancelar' | transloco }}</span>
+    </button>
+    <button
+      pButton
+      type="button"
+      [class]="reglaPorCambiarEstado()?.activa ? 'p-button-warning' : 'p-button-success'"
+      [disabled]="guardando()"
+      (click)="confirmarCambiarEstado()"
+    >
+      <span>{{ reglaPorCambiarEstado()?.activa ? 'Desactivar' : 'Activar' }}</span>
+    </button>
+  </ng-template>
+</p-dialog>
