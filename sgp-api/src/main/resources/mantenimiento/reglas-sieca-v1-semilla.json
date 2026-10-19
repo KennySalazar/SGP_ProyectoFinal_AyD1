@@ -201,7 +201,7 @@
     "condicion": {
       "indicador": "golpeado_longitud_m",
       "operador": "MAYOR_O_IGUAL",
-      "umbral": "MODERADO"
+      "umbral": 1
     },
     "tipo_mantenimiento": "CORRECTIVO",
     "intervencion_sugerida": "Sustitución de postes y tramos de baranda de seguridad colisionados para restablecer contención.",
