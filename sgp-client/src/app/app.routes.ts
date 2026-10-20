@@ -1,3 +1,4 @@
+import { salidaGuard } from './features/salida/salida.guard';
 import { Routes } from '@angular/router';
 import { authGuard } from './core/guards/auth.guard';
 import { roleGuard } from './core/guards/role.guard';
@@ -20,6 +21,14 @@ export const routes: Routes = [
         path: 'avisos',
         loadComponent: () =>
           import('./features/notificaciones/pages/avisos/avisos.page').then((m) => m.AvisosPage),
+      },
+      {
+        path: 'preparar-salida',
+        canActivate: [salidaGuard],
+        loadComponent: () =>
+          import('./features/salida/pages/preparar-salida/preparar-salida.page').then(
+            (m) => m.PrepararSalidaPage,
+          ),
       },
       {
         path: 'offline',
