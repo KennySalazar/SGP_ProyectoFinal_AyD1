@@ -597,6 +597,40 @@
       "vacio": "No tienes ciclos con observaciones.",
       "error": "No fue posible consultar tus observaciones.",
       "reintentar": "Reintentar"
+    },
+    "resultado": {
+      "titulo": "Resultado y seguimiento de revisión",
+      "privado": "La calificación es privada: solo el estudiante autor y el catedrático revisor pueden consultarla.",
+      "abrir": "Consultar resultado e historial",
+      "procesando": "Procesando…",
+      "error": "No fue posible completar la operación. Actualice los datos y vuelva a intentar.",
+      "general": "Observación general (obligatoria para solicitar cambios o rechazar)",
+      "calificacion": "Calificación",
+      "escala": "Escala provisional de 0 a 100, con hasta dos decimales.",
+      "veredicto": "Veredicto",
+      "veredictos": {
+        "APROBADA": "Aprobada",
+        "CAMBIOS_SOLICITADOS": "Cambios solicitados",
+        "RECHAZADA": "Rechazada"
+      },
+      "pendientes": "No se puede aprobar: hay observaciones pendientes en este ciclo.",
+      "ic": "Índice de condición calculado",
+      "estado": "Confirmar o ajustar el estado del puente",
+      "justificacion": "Justificación obligatoria si ajusta el estado calculado",
+      "emitir": "Emitir veredicto",
+      "historial": "Historial privado de revisiones",
+      "confirmar": "Confirmar veredicto",
+      "confirmarTexto": "El veredicto cerrará este ciclo. Una aprobación publica la inspección y un rechazo es terminal. Revise su decisión y calificación antes de confirmar."
+    },
+    "atencion": {
+      "atender": "Atender cambios",
+      "editar": "Continuar corrección del borrador",
+      "instrucciones": "Corrija los datos y fotografías, marque las observaciones como resueltas y guarde el borrador antes de volver a enviar a revisión. Se creará un ciclo nuevo con el mismo revisor.",
+      "observaciones": "Observaciones del ciclo",
+      "resueltoPor": "Resuelto por",
+      "respuesta": "Respuesta opcional (hasta 2000 caracteres)",
+      "resolver": "Marcar como resuelta",
+      "abrirCiclo": "Consultar ciclo histórico"
     }
   },
   "puentes": {

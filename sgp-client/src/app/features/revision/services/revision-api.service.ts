@@ -2,6 +2,8 @@ import { HttpClient } from '@angular/common/http';
 import { inject, Injectable, signal } from '@angular/core';
 import { Observable, tap } from 'rxjs';
 import {
+  EmitirVeredictoRequest,
+  RevisionResultadoResponse,
   FiltrosBandejaRevision,
   PaginaObservacionesRecibidas,
   RevisionDetalleResponse,
@@ -104,6 +106,45 @@ export class RevisionApiService {
     return this.http.put<ObservacionGeneralResponse>(
       this.ruta(revisionId) + '/observaciones/general',
       { texto },
+    );
+  }
+  resultado(revisionId: string): Observable<RevisionResultadoResponse> {
+    return this.http.get<RevisionResultadoResponse>(this.ruta(revisionId) + '/resultado');
+  }
+  historial(inspeccionId: string): Observable<RevisionResultadoResponse[]> {
+    return this.http.get<RevisionResultadoResponse[]>(
+      `/api/v1/inspecciones/${encodeURIComponent(inspeccionId)}/revisiones`,
+    );
+  }
+  emitirVeredicto(
+    revisionId: string,
+    request: EmitirVeredictoRequest,
+  ): Observable<RevisionResultadoResponse> {
+    return this.http.post<RevisionResultadoResponse>(this.ruta(revisionId) + '/veredicto', request);
+  }
+  estadoRevision(
+    revisionId: string,
+  ): Observable<
+    import('../../inspecciones/models/inspeccion.models').ConfirmacionEstadoIcResponse
+  > {
+    return this.http.get<
+      import('../../inspecciones/models/inspeccion.models').ConfirmacionEstadoIcResponse
+    >(this.ruta(revisionId) + '/estado-puente');
+  }
+  atenderCambios(revisionId: string): Observable<RevisionResultadoResponse> {
+    return this.http.post<RevisionResultadoResponse>(
+      this.ruta(revisionId) + '/atender-cambios',
+      null,
+    );
+  }
+  resolverObservacion(
+    revisionId: string,
+    id: string,
+    respuesta: string | null,
+  ): Observable<ObservacionResponse> {
+    return this.http.put<ObservacionResponse>(
+      this.ruta(revisionId) + '/observaciones/' + encodeURIComponent(id) + '/resolver',
+      { respuesta },
     );
   }
   private ruta(revisionId: string): string {

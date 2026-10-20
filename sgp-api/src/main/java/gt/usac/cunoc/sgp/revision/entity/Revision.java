@@ -96,6 +96,40 @@ public class Revision {
     }
   }
 
+  public void resolver(String veredicto, String observacion, BigDecimal nota, Instant ahora) {
+    if (!"EN_CURSO".equals(estado)) throw new IllegalStateException("El ciclo ya no está en curso");
+    gt.usac.cunoc.sgp.revision.model.VeredictoRevision.valueOf(veredicto);
+    if (nota == null
+        || nota.signum() < 0
+        || nota.compareTo(new BigDecimal("100")) > 0
+        || nota.scale() > 2)
+      throw new IllegalArgumentException(
+          "La calificación debe estar entre 0 y 100 con hasta dos decimales");
+    if (!"APROBADA".equals(veredicto) && (observacion == null || observacion.isBlank()))
+      throw new IllegalArgumentException("El veredicto requiere observación general");
+    this.veredicto = veredicto;
+    this.observacionGeneral = observacion;
+    this.calificacion = nota;
+    this.resueltaEn = java.util.Objects.requireNonNull(ahora);
+    this.estado = "RESUELTA";
+  }
+
+  public String getVeredicto() {
+    return veredicto;
+  }
+
+  public String getObservacionGeneral() {
+    return observacionGeneral;
+  }
+
+  public BigDecimal getCalificacion() {
+    return calificacion;
+  }
+
+  public Instant getResueltaEn() {
+    return resueltaEn;
+  }
+
   public UUID getId() {
     return id;
   }

@@ -107,6 +107,9 @@ export interface ObservacionResponse {
   estado: EstadoObservacion;
   creadoPorId: string;
   creadoEn: string;
+  resueltoPorId?: string | null;
+  resueltoEn?: string | null;
+  respuestaAutor?: string | null;
 }
 export interface ObservacionGeneralResponse {
   revisionId: string;
@@ -136,4 +139,28 @@ export interface PaginaObservacionesRecibidas {
   size: number;
   totalElements: number;
   empty: boolean;
+}
+
+export type VeredictoRevision = 'APROBADA' | 'CAMBIOS_SOLICITADOS' | 'RECHAZADA';
+/** Información privada: nunca se reutiliza en avisos ni listados públicos. */
+export interface RevisionResultadoResponse {
+  revisionId: string;
+  inspeccionId: string;
+  autorId: string;
+  revisorId: string;
+  numeroCiclo: number;
+  estadoRevision: 'PENDIENTE' | 'EN_CURSO' | 'RESUELTA';
+  estadoInspeccion: EstadoInspeccion;
+  veredicto: VeredictoRevision | null;
+  observacionGeneral: string | null;
+  calificacion: number | null;
+  enviadaEn: string;
+  resueltaEn: string | null;
+}
+export interface EmitirVeredictoRequest {
+  veredicto: VeredictoRevision;
+  calificacion: number;
+  observacionGeneral: string | null;
+  confirmacionEstado:
+    import('../../inspecciones/models/inspeccion.models').ConfirmarEstadoIcRequest | null;
 }
