@@ -369,6 +369,7 @@ class FotografiaFlujoIntegrationTest {
         "UPDATE inspeccion SET estado=?, publicado_en=CURRENT_TIMESTAMP WHERE id=?",
         estado,
         evidencia.inspeccion());
+    if ("EN_REVISION".equals(estado)) crearRevisionEnCurso(evidencia.inspeccion(), usuario);
     exigirLecturas(evidencia, usuario, RoleName.CATEDRATICO, 200);
     exigirLecturas(evidencia, evidencia.autor(), RoleName.ESTUDIANTE, 200);
   }
@@ -379,8 +380,19 @@ class FotografiaFlujoIntegrationTest {
     UUID asignacion = crearAsignacion(autor, puente, usuario);
     UUID inspeccion = iniciarVersionada(autor, RoleName.ESTUDIANTE, asignacion);
     jdbc.update("UPDATE inspeccion SET estado='EN_REVISION' WHERE id=?", inspeccion);
+    crearRevisionEnCurso(inspeccion, usuario);
 
     assertThat(fotos.listar(inspeccion, usuario, RoleName.CATEDRATICO)).isEmpty();
+  }
+
+  void crearRevisionEnCurso(UUID inspeccion, UUID revisor) {
+    // EN_REVISION requiere un ciclo iniciado y asignado a este revisor (HU-037).
+    jdbc.update(
+        "INSERT INTO revision(id,inspeccion_id,numero_ciclo,revisor_id,estado,enviada_en,iniciada_en,version_inspeccion_enviada,contenido_enviado,hash_contenido) SELECT ?,id,1,?,'EN_CURSO',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,version,'{}',? FROM inspeccion WHERE id=?",
+        UUID.randomUUID(),
+        revisor,
+        "a".repeat(64),
+        inspeccion);
   }
 
   @ParameterizedTest
