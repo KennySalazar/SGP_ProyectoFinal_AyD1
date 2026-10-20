@@ -17,6 +17,7 @@ import { ProcesadorFotografiasService } from '../../services/procesador-fotograf
 import { By } from '@angular/platform-browser';
 import { ConfirmacionEstadoIcComponent } from '../../components/confirmacion-estado-ic/confirmacion-estado-ic.component';
 import { CompletarInspeccionPage } from './completar-inspeccion.page';
+import { ResultadoRevisionComponent } from '../../../revision/components/resultado-revision/resultado-revision.component';
 @Pipe({ name: 'transloco', standalone: true })
 class MockTranslocoPipe implements PipeTransform {
   transform(key: string, params?: Record<string, unknown>): string {
@@ -195,6 +196,7 @@ describe('CompletarInspeccionPage', () => {
       remove: { imports: [TranslocoPipe] },
       add: { imports: [MockTranslocoPipe] },
     });
+    TestBed.overrideComponent(ResultadoRevisionComponent, { set: { template: '' } });
     TestBed.overrideComponent(FormularioDinamicoComponent, { set: { template: '' } });
     TestBed.overrideComponent(ReporteFotograficoComponent, { set: { template: '' } });
     TestBed.overrideComponent(ConfirmacionEstadoIcComponent, { set: { template: '' } });

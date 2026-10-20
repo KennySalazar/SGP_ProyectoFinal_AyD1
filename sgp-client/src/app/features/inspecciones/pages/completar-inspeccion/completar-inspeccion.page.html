@@ -35,7 +35,9 @@
       </a>
     </div>
   </div>
-  } @else if (borrador(); as b) {
+  } @else if (borrador(); as b) { @if (b.rolAutor === 'ESTUDIANTE') {
+  <app-resultado-revision [inspeccionId]="b.id" />
+  }
   <header class="page-heading encabezado-inspeccion">
     <div>
       <p class="page-kicker">{{ 'inspecciones.borrador.kicker' | transloco }}</p>
