@@ -1,0 +1,73 @@
+.perfil-card {
+  display: grid;
+  gap: 1.25rem;
+  max-width: 40rem;
+  padding: 1.5rem;
+}
+.cuenta {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+  margin: 0;
+  padding-bottom: 1.1rem;
+  border-bottom: 1px solid var(--sgp-border);
+}
+.cuenta dt {
+  color: var(--sgp-steel-500);
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+.cuenta dd {
+  margin: 0.2rem 0 0;
+  color: var(--sgp-navy-900);
+  font-weight: 650;
+  overflow-wrap: anywhere;
+}
+form {
+  display: grid;
+  gap: 0.9rem;
+}
+label {
+  display: grid;
+  gap: 0.45rem;
+  color: var(--sgp-navy-900);
+  font-size: 0.84rem;
+  font-weight: 750;
+}
+.validation {
+  color: #b91c1c;
+  font-weight: 600;
+}
+.nota {
+  display: flex;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0.7rem 0.9rem;
+  color: var(--sgp-steel-700);
+  font-size: 0.88rem;
+  background: var(--sgp-surface-soft);
+  border: 1px solid var(--sgp-border);
+  border-radius: 10px;
+}
+.confirmacion {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  margin: 0;
+  padding: 0.7rem 0.9rem;
+  color: #166534;
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-radius: 10px;
+}
+.accion {
+  justify-content: center;
+  width: 100%;
+}
+@media (max-width: 560px) {
+  .cuenta {
+    grid-template-columns: 1fr;
+  }
+}

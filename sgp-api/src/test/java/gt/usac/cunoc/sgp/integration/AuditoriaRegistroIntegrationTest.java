@@ -86,6 +86,7 @@ import org.testcontainers.utility.DockerImageName;
     })
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @Import({
+  gt.usac.cunoc.sgp.usuario.service.PerfilUsuarioService.class,
   PuenteService.class,
   PuenteMapperImpl.class,
   CatalogoTerritorialService.class,
@@ -392,7 +393,9 @@ class AuditoriaRegistroIntegrationTest {
     when(otpService.issue(any(UserAccount.class), eq(OtpPurpose.REGISTRO))).thenReturn(desafio);
 
     // Cuando se registra con correo y contraseña
-    authService.register(new RegisterRequest("nuevo.hu006@ejemplo.com", "Auditoria2026"));
+    authService.register(
+        new RegisterRequest(
+            "nuevo.hu006@ejemplo.com", "Auditoria2026", "Nuevo Usuario", "nuevo.hu006"));
 
     // Entonces el actor y la entidad son el usuario creado y no se guarda el hash
     var auditoria = auditoriaRepository.findAll().get(0);

@@ -24,9 +24,13 @@ public class CuentaInvitadaService {
   private final PasswordEncoder passwordEncoder;
   private final SecureRandom random = new SecureRandom();
 
-  public CuentaInvitadaService(UserAccountRepository users, PasswordEncoder passwordEncoder) {
+  private final PerfilUsuarioService perfiles;
+
+  public CuentaInvitadaService(
+      UserAccountRepository users, PasswordEncoder passwordEncoder, PerfilUsuarioService perfiles) {
     this.users = users;
     this.passwordEncoder = passwordEncoder;
+    this.perfiles = perfiles;
   }
 
   /**
@@ -52,15 +56,18 @@ public class CuentaInvitadaService {
       tipo = UserAccount.class,
       idArg = "usuarioId",
       actorEsEntidad = true)
-  public void activar(UUID usuarioId, String password) {
+  public void activar(
+      UUID usuarioId, String password, String nombreCompleto, String nombreUsuario) {
     UserAccount user =
         users
             .findWithRoleById(usuarioId)
             .orElseThrow(() -> new IllegalStateException("La invitacion no tiene cuenta asociada"));
+    perfiles.aplicar(user, nombreCompleto, nombreUsuario);
     user.setPasswordHash(passwordEncoder.encode(password));
     user.clearFailedLogins();
     user.verify();
     user.activate();
+    perfiles.guardar(user);
   }
 
   private String secretoAleatorio() {

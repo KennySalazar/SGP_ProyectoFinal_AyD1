@@ -71,6 +71,7 @@ import org.testcontainers.utility.DockerImageName;
     })
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @Import({
+  gt.usac.cunoc.sgp.usuario.service.PerfilUsuarioService.class,
   UsuarioService.class,
   ProfesionalService.class,
   RefreshTokenService.class,

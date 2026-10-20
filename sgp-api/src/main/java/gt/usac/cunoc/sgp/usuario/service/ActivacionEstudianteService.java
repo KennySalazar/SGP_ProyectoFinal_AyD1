@@ -54,7 +54,11 @@ public class ActivacionEstudianteService {
         .stream()
         .map(
             estudiante ->
-                new EstudiantePendienteResponse(estudiante.getId(), estudiante.getEmail()))
+                new EstudiantePendienteResponse(
+                    estudiante.getId(),
+                    estudiante.getEmail(),
+                    estudiante.getNombreCompleto(),
+                    estudiante.getNombreUsuario()))
         .toList();
   }
 

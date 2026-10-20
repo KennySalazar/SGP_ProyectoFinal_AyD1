@@ -75,6 +75,7 @@ import org.testcontainers.utility.DockerImageName;
     })
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @Import({
+  gt.usac.cunoc.sgp.usuario.service.PerfilUsuarioService.class,
   InvitacionService.class,
   CuentaInvitadaService.class,
   ProfesionalService.class,
@@ -101,6 +102,15 @@ class ProfesionalExternoIntegrationTest {
   private static final Instant AHORA = Instant.parse("2026-10-07T18:00:00Z");
   private static final String CORREO = "ingeniero.hu002@ejemplo.com";
   private static final String CONTRASENA = "Puentes2026";
+
+  private static final java.util.concurrent.atomic.AtomicInteger SECUENCIA_PERFIL =
+      new java.util.concurrent.atomic.AtomicInteger();
+
+  /** Un nombre de usuario distinto en cada llamada: el índice único no admite repetidos. */
+  private static String usuarioUnico() {
+    return "prueba" + SECUENCIA_PERFIL.incrementAndGet();
+  }
+
   private static final Pattern TOKEN = Pattern.compile("token=([A-Za-z0-9_-]+)");
 
   private static final DockerImageName POSTGIS_IMAGE =
@@ -198,7 +208,9 @@ class ProfesionalExternoIntegrationTest {
     InvitacionResponse invitacion = invitar(CORREO, "12345");
     SecurityContextHolder.clearContext();
 
-    invitacionService.aceptar(new AceptarInvitacionRequest(ultimoToken(), CONTRASENA));
+    invitacionService.aceptar(
+        new AceptarInvitacionRequest(
+            ultimoToken(), CONTRASENA, "Persona de Prueba", usuarioUnico()));
 
     // Puede autenticarse.
     assertThat(authService.login(new LoginRequest(CORREO, CONTRASENA))).isNotNull();
@@ -212,11 +224,42 @@ class ProfesionalExternoIntegrationTest {
   }
 
   @Test
+  @DisplayName("Escenario: la cuenta activada actualiza su perfil y el cambio queda auditado")
+  void laCuentaActivadaActualizaSuPerfilYElCambioQuedaAuditado() {
+    invitar(CORREO, "12345");
+    SecurityContextHolder.clearContext();
+    invitacionService.aceptar(
+        new AceptarInvitacionRequest(ultimoToken(), CONTRASENA, "Persona Uno", "persona.uno"));
+    auditoriaRepository.deleteAll();
+
+    var respuesta =
+        authService.actualizarPerfil(
+            CORREO,
+            new gt.usac.cunoc.sgp.usuario.dto.ActualizarPerfilRequest(
+                "  Persona   Dos ", "Persona.DOS"));
+
+    assertThat(respuesta.nombreCompleto()).isEqualTo("Persona Dos");
+    assertThat(respuesta.nombreUsuario()).isEqualTo("persona.dos");
+    assertThat(authService.currentUser(CORREO).nombreUsuario()).isEqualTo("persona.dos");
+    var registros = auditoriaRepository.findAll();
+    assertThat(registros).hasSize(1);
+    var registro = registros.get(0);
+    assertThat(registro.getAccion()).isEqualTo(AccionAuditoria.MODIFICAR);
+    assertThat(registro.getEntidad()).isEqualTo("usuario");
+    assertThat(registro.getValoresAnteriores().get("nombreUsuario").asText())
+        .isEqualTo("persona.uno");
+    assertThat(registro.getValoresPosteriores().get("nombreUsuario").asText())
+        .isEqualTo("persona.dos");
+  }
+
+  @Test
   @DisplayName("Escenario: Administrador verifica el colegiado")
   void administradorVerificaElColegiadoYQuedaAuditado() {
     InvitacionResponse invitacion = invitar(CORREO, "12345");
     SecurityContextHolder.clearContext();
-    invitacionService.aceptar(new AceptarInvitacionRequest(ultimoToken(), CONTRASENA));
+    invitacionService.aceptar(
+        new AceptarInvitacionRequest(
+            ultimoToken(), CONTRASENA, "Persona de Prueba", usuarioUnico()));
     autenticar(ADMINISTRADOR_ID, "admin.hu002@ejemplo.com", RoleName.ADMINISTRADOR);
     auditoriaRepository.deleteAll();
 

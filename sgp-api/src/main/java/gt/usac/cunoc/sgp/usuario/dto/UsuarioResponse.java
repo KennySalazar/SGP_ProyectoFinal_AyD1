@@ -11,6 +11,8 @@ import java.util.UUID;
 public record UsuarioResponse(
     UUID id,
     String email,
+    String nombreCompleto,
+    String nombreUsuario,
     RoleName rol,
     EstadoUsuario estado,
     boolean verificado,
