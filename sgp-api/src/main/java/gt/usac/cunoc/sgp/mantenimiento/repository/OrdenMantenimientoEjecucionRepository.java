@@ -11,5 +11,7 @@ public interface OrdenMantenimientoEjecucionRepository
 
   OrdenMantenimientoEjecucion save(OrdenMantenimientoEjecucion ejecucion);
 
+  OrdenMantenimientoEjecucion saveAndFlush(OrdenMantenimientoEjecucion ejecucion);
+
   Optional<OrdenMantenimientoEjecucion> findById(UUID ordenMantenimientoId);
 }

@@ -55,6 +55,21 @@ public class OrdenMantenimientoEjecucion {
     this.actualizadoEn = iniciadoEn;
   }
 
+  /**
+   * Registra la fecha de ejecución y el responsable: un usuario del sistema, el nombre de una
+   * persona o empresa externa, o ambos (RN-MTO-05). El servicio valida antes de llamar.
+   */
+  public void registrar(
+      LocalDate fechaEjecucion,
+      UUID responsableUsuarioId,
+      String responsableNombre,
+      Instant ahora) {
+    this.fechaEjecucion = fechaEjecucion;
+    this.responsableUsuarioId = responsableUsuarioId;
+    this.responsableNombre = responsableNombre;
+    this.actualizadoEn = ahora;
+  }
+
   public UUID getOrdenMantenimientoId() {
     return ordenMantenimientoId;
   }

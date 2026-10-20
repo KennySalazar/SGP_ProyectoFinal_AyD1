@@ -2,6 +2,7 @@ package gt.usac.cunoc.sgp.mantenimiento.controller;
 
 import gt.usac.cunoc.sgp.common.exception.ApiException;
 import gt.usac.cunoc.sgp.common.security.JwtData;
+import gt.usac.cunoc.sgp.mantenimiento.dto.CerrarComoEjecutadaRequest;
 import gt.usac.cunoc.sgp.mantenimiento.dto.CerrarSinEjecucionRequest;
 import gt.usac.cunoc.sgp.mantenimiento.dto.CrearOrdenMantenimientoRequest;
 import gt.usac.cunoc.sgp.mantenimiento.dto.HistorialEstadoOrdenResponse;
@@ -140,6 +141,21 @@ public class OrdenMantenimientoController {
       @RequestBody CerrarSinEjecucionRequest request,
       Authentication authentication) {
     return transiciones.cancelar(id, request, usuarioId(authentication));
+  }
+
+  @PostMapping("/{id}/cerrar")
+  @PreAuthorize("hasAnyRole('CATEDRATICO','ADMINISTRADOR')")
+  @Operation(
+      summary = "Cerrar una orden como ejecutada",
+      description =
+          "EN_EJECUCION a EJECUTADA. Exige fecha de ejecución, responsable y al menos una "
+              + "fotografía de evidencia disponible (422 con el detalle de lo que falta). Responde "
+              + "503 si el almacenamiento no responde; en ambos casos la orden no cambia.")
+  public OrdenMantenimientoResponse cerrar(
+      @PathVariable UUID id,
+      @RequestBody CerrarComoEjecutadaRequest request,
+      Authentication authentication) {
+    return transiciones.cerrarComoEjecutada(id, request, usuarioId(authentication));
   }
 
   private UUID usuarioId(Authentication authentication) {
