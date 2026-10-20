@@ -19,12 +19,59 @@ describe('OrdenMantenimientoApiService', () => {
 
   afterEach(() => http.verify());
 
-  it('lista las órdenes con filtro de estado y paginación', () => {
-    service.listar(1, 50, 'EN_EJECUCION').subscribe();
+  it('lista las órdenes con todos los filtros combinados y estados repetidos', () => {
+    service
+      .listar(
+        {
+          puenteId: 'puente-1',
+          estados: ['DESCARTADA', 'CANCELADA'],
+          tipo: 'CORRECTIVO',
+          prioridad: 'ALTA',
+          desde: '2026-10-01',
+          hasta: '2026-10-20',
+        },
+        1,
+        100,
+      )
+      .subscribe();
 
-    const request = http.expectOne(`${base}?pagina=1&tamanio=50&estado=EN_EJECUCION`);
+    const request = http.expectOne((r) => r.url === base);
+    const params = request.request.params;
     expect(request.request.method).toBe('GET');
+    expect(params.getAll('estado')).toEqual(['DESCARTADA', 'CANCELADA']);
+    expect(params.get('puenteId')).toBe('puente-1');
+    expect(params.get('tipo')).toBe('CORRECTIVO');
+    expect(params.get('prioridad')).toBe('ALTA');
+    expect(params.get('desde')).toBe('2026-10-01');
+    expect(params.get('hasta')).toBe('2026-10-20');
+    expect(params.get('pagina')).toBe('1');
+    expect(params.get('tamanio')).toBe('100');
     request.flush({ content: [] });
+  });
+
+  it('omite los filtros vacíos y pide los totales por estado', () => {
+    service.totales({ tipo: null, prioridad: 'BAJA', desde: null }).subscribe();
+
+    const request = http.expectOne(`${base}/totales?prioridad=BAJA`);
+    expect(request.request.method).toBe('GET');
+    request.flush({ total: 0, porEstado: {} });
+  });
+
+  it('crea una orden manual', () => {
+    const orden = {
+      puenteId: 'puente-1',
+      tipo: 'CORRECTIVO' as const,
+      descripcion: 'Reparar barandal',
+      prioridad: 'ALTA' as const,
+      elementoRef: null,
+      inspeccionOrigenId: null,
+    };
+    service.crear(orden).subscribe();
+
+    const request = http.expectOne(base);
+    expect(request.request.method).toBe('POST');
+    expect(request.request.body).toEqual(orden);
+    request.flush({});
   });
 
   it('cierra la orden como ejecutada con la versión leída', () => {

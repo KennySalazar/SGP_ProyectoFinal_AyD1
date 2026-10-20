@@ -10,6 +10,7 @@ import gt.usac.cunoc.sgp.common.audit.service.AuditoriaWriter;
 import gt.usac.cunoc.sgp.common.exception.ApiException;
 import gt.usac.cunoc.sgp.mantenimiento.dto.CerrarSinEjecucionRequest;
 import gt.usac.cunoc.sgp.mantenimiento.dto.CrearOrdenMantenimientoRequest;
+import gt.usac.cunoc.sgp.mantenimiento.dto.FiltroOrdenesRequest;
 import gt.usac.cunoc.sgp.mantenimiento.dto.IniciarEjecucionRequest;
 import gt.usac.cunoc.sgp.mantenimiento.dto.OrdenMantenimientoResponse;
 import gt.usac.cunoc.sgp.mantenimiento.dto.ProgramarOrdenRequest;
@@ -313,7 +314,10 @@ class CicloVidaOrdenMantenimientoIntegrationTest {
     assertThatThrownBy(() -> crear(ADMINISTRADOR_ID))
         .isInstanceOfSatisfying(
             ApiException.class, e -> assertThat(e.getCode()).isEqualTo("puente_inactivo"));
-    assertThat(ordenes.listar(puenteId, null, 0, 20).getContent())
+    assertThat(
+            ordenes
+                .listar(new FiltroOrdenesRequest(puenteId, null, null, null, null, null), 0, 20)
+                .getContent())
         .extracting(OrdenMantenimientoResponse::id)
         .containsExactly(existente.id());
   }
@@ -355,6 +359,122 @@ class CicloVidaOrdenMantenimientoIntegrationTest {
                 inspeccionPropia),
             ADMINISTRADOR_ID);
     assertThat(conInspeccion.inspeccionOrigenId()).isEqualTo(inspeccionPropia);
+  }
+
+  @Test
+  void laBandejaCombinaEstadosTipoPrioridadPuenteYFechaDeCreacion() {
+    OrdenMantenimientoResponse preventiva = crear(ADMINISTRADOR_ID);
+    OrdenMantenimientoResponse correctiva = crearCon("CORRECTIVO", "ALTA");
+    OrdenMantenimientoResponse emergencia = crearCon("EMERGENCIA", "ALTA");
+    transiciones.descartar(
+        correctiva.id(), new CerrarSinEjecucionRequest("Duplicada", 0L), CATEDRATICO_ID);
+    transiciones.aceptarYProgramar(
+        emergencia.id(), new ProgramarOrdenRequest(HOY, 0L), CATEDRATICO_ID);
+    transiciones.cancelar(
+        emergencia.id(), new CerrarSinEjecucionRequest("Sin presupuesto", 1L), CATEDRATICO_ID);
+    UUID otroPuente = insertarPuente();
+
+    assertThat(
+            ids(
+                new FiltroOrdenesRequest(
+                    puenteId, List.of("DESCARTADA", "CANCELADA"), null, "ALTA", HOY, HOY)))
+        .containsExactlyInAnyOrder(correctiva.id(), emergencia.id());
+    assertThat(
+            ids(
+                new FiltroOrdenesRequest(
+                    puenteId, List.of("DESCARTADA", "CANCELADA"), "EMERGENCIA", null, null, null)))
+        .containsExactly(emergencia.id());
+    assertThat(
+            ids(new FiltroOrdenesRequest(puenteId, List.of("PROPUESTA"), null, null, null, null)))
+        .containsExactly(preventiva.id());
+    assertThat(ids(new FiltroOrdenesRequest(puenteId, null, null, null, HOY.plusDays(1), null)))
+        .isEmpty();
+    assertThat(ids(new FiltroOrdenesRequest(otroPuente, null, null, null, null, null))).isEmpty();
+
+    var totales = ordenes.totales(new FiltroOrdenesRequest(puenteId, null, null, null, HOY, HOY));
+    assertThat(totales.total()).isEqualTo(3);
+    assertThat(totales.porEstado())
+        .containsEntry(EstadoOrden.PROPUESTA, 1L)
+        .containsEntry(EstadoOrden.DESCARTADA, 1L)
+        .containsEntry(EstadoOrden.CANCELADA, 1L)
+        .containsEntry(EstadoOrden.EJECUTADA, 0L);
+    assertThat(
+            ordenes
+                .totales(new FiltroOrdenesRequest(puenteId, null, null, "ALTA", null, null))
+                .total())
+        .isEqualTo(2);
+  }
+
+  @Test
+  void unaOrdenDeUnaReglaSinValidarSeRotulaProvisional() {
+    UUID provisional = insertarOrdenDeRegla(insertarRegla(false));
+    UUID validada = insertarOrdenDeRegla(insertarRegla(true));
+
+    assertThat(ordenes.obtener(provisional).reglaProvisional()).isTrue();
+    assertThat(ordenes.obtener(validada).reglaProvisional()).isFalse();
+    assertThat(crear(ADMINISTRADOR_ID).reglaProvisional()).isNull();
+    assertThat(
+            ordenes.listar(new FiltroOrdenesRequest(puenteId, null, null, null, null, null), 0, 20))
+        .filteredOn(o -> o.id().equals(provisional))
+        .extracting(OrdenMantenimientoResponse::reglaProvisional)
+        .containsExactly(true);
+  }
+
+  private List<UUID> ids(FiltroOrdenesRequest filtro) {
+    return ordenes.listar(filtro, 0, 100).map(OrdenMantenimientoResponse::id).getContent();
+  }
+
+  private OrdenMantenimientoResponse crearCon(String tipo, String prioridad) {
+    return ordenes.crear(
+        new CrearOrdenMantenimientoRequest(
+            puenteId, tipo, "Orden " + tipo, prioridad, null, null, null),
+        ADMINISTRADOR_ID);
+  }
+
+  private UUID insertarRegla(boolean validada) {
+    UUID versionId = UUID.randomUUID();
+    jdbc.update(
+        """
+        INSERT INTO version_formulario (id, codigo, estado, activa, esquema,
+          hash_contenido, version_algoritmo_ic, creado_por_id, publicado_por_id, publicado_en)
+        VALUES (?, ?, 'PUBLICADA', false, '{"type":"object"}'::jsonb, ?, 'ic-hu049', ?, ?, ?)
+        """,
+        versionId,
+        "HU049-" + versionId,
+        "c".repeat(64),
+        ADMINISTRADOR_ID,
+        ADMINISTRADOR_ID,
+        OffsetDateTime.ofInstant(AHORA.minusSeconds(3600), ZoneOffset.UTC));
+    UUID reglaId = UUID.randomUUID();
+    jdbc.update(
+        """
+        INSERT INTO regla_mantenimiento (id, codigo, numero_revision, version_formulario_id,
+          elemento_ref, condicion, tipo_mantenimiento, intervencion_sugerida, regla_prioridad,
+          activa, creado_por_id, validado_por_id, validado_en)
+        VALUES (?, 'R-HU049', 1, ?, '/superestructura/drenaje', '{}'::jsonb, 'CORRECTIVO',
+          'Limpiar drenaje', '{}'::jsonb, true, ?, ?, ?)
+        """,
+        reglaId,
+        versionId,
+        ADMINISTRADOR_ID,
+        validada ? ADMINISTRADOR_ID : null,
+        validada ? OffsetDateTime.ofInstant(AHORA, ZoneOffset.UTC) : null);
+    return reglaId;
+  }
+
+  private UUID insertarOrdenDeRegla(UUID reglaId) {
+    UUID ordenId = UUID.randomUUID();
+    jdbc.update(
+        """
+        INSERT INTO orden_mantenimiento (id, puente_id, regla_origen_id, elemento_ref, tipo,
+          descripcion, prioridad_sugerida, prioridad_confirmada)
+        VALUES (?, ?, ?, '/superestructura/drenaje', 'CORRECTIVO', 'Limpiar drenaje',
+          'MEDIA', 'MEDIA')
+        """,
+        ordenId,
+        puenteId,
+        reglaId);
+    return ordenId;
   }
 
   private OrdenMantenimientoResponse crear(UUID usuarioId) {

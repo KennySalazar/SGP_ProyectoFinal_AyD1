@@ -1,18 +1,44 @@
-import { ChangeDetectionStrategy, Component, DestroyRef, inject, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  DestroyRef,
+  inject,
+  signal,
+} from '@angular/core';
 import { DatePipe } from '@angular/common';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { ButtonModule } from 'primeng/button';
+import { DatePickerModule } from 'primeng/datepicker';
 import { PaginatorModule, PaginatorState } from 'primeng/paginator';
 import { SelectModule } from 'primeng/select';
+import { SkeletonModule } from 'primeng/skeleton';
+import { TabsModule } from 'primeng/tabs';
 import { TagModule } from 'primeng/tag';
-import { finalize } from 'rxjs';
-import { EstadoOrden, PaginaOrdenesMantenimiento } from '../../models/orden-mantenimiento.models';
+import { catchError, finalize, of } from 'rxjs';
+import { PuenteCatalogoResponse } from '../../../puentes/models/puente.models';
+import { PuenteApiService } from '../../../puentes/services/puente-api.service';
+import {
+  FiltrosOrdenes,
+  PaginaOrdenesMantenimiento,
+  TotalesOrdenes,
+} from '../../models/orden-mantenimiento.models';
+import { PrioridadMantenimiento, TipoMantenimiento } from '../../models/regla-mantenimiento.models';
 import { OrdenMantenimientoApiService } from '../../services/orden-mantenimiento-api.service';
-import { severidadEstadoOrden } from '../../utils/estado-orden';
+import {
+  aFechaIso,
+  PESTANAS_ORDENES,
+  severidadEstadoOrden,
+  ZONA_GUATEMALA,
+} from '../../utils/estado-orden';
 
+const TIPOS: TipoMantenimiento[] = ['RUTINARIO', 'PREVENTIVO', 'CORRECTIVO', 'EMERGENCIA'];
+const PRIORIDADES: PrioridadMantenimiento[] = ['BAJA', 'MEDIA', 'ALTA', 'CRITICA'];
+
+/** Bandeja general de mantenimiento (HU-049): pestañas por estado y filtros combinados. */
 @Component({
   selector: 'app-ordenes-mantenimiento-page',
   standalone: true,
@@ -22,8 +48,11 @@ import { severidadEstadoOrden } from '../../utils/estado-orden';
     RouterLink,
     TranslocoPipe,
     ButtonModule,
+    DatePickerModule,
     PaginatorModule,
     SelectModule,
+    SkeletonModule,
+    TabsModule,
     TagModule,
   ],
   templateUrl: './ordenes-mantenimiento.page.html',
@@ -32,53 +61,121 @@ import { severidadEstadoOrden } from '../../utils/estado-orden';
 })
 export class OrdenesMantenimientoPage {
   private readonly api = inject(OrdenMantenimientoApiService);
+  private readonly puentesApi = inject(PuenteApiService);
   private readonly destroyRef = inject(DestroyRef);
 
-  readonly pagina = signal<PaginaOrdenesMantenimiento | null>(null);
-  readonly cargando = signal(false);
-  readonly error = signal(false);
-  readonly estadoFiltro = signal<EstadoOrden | null>(null);
-  readonly tamanio = signal(20);
-
-  readonly estados: { label: string; value: EstadoOrden | null }[] = [
-    { label: 'Todas', value: null },
-    { label: 'Propuesta', value: 'PROPUESTA' },
-    { label: 'Programada', value: 'PROGRAMADA' },
-    { label: 'En ejecución', value: 'EN_EJECUCION' },
-    { label: 'Ejecutada', value: 'EJECUTADA' },
-    { label: 'Descartada', value: 'DESCARTADA' },
-    { label: 'Cancelada', value: 'CANCELADA' },
-  ];
-
+  readonly pestanas = PESTANAS_ORDENES;
+  readonly tipos = TIPOS;
+  readonly prioridades = PRIORIDADES;
+  readonly zona = ZONA_GUATEMALA;
   readonly severidad = severidadEstadoOrden;
 
+  readonly pestana = signal(PESTANAS_ORDENES[0].clave);
+  readonly pagina = signal<PaginaOrdenesMantenimiento | null>(null);
+  readonly totales = signal<TotalesOrdenes | null>(null);
+  readonly cargando = signal(false);
+  readonly error = signal(false);
+  readonly tamanio = signal(20);
+
+  readonly tipo = signal<TipoMantenimiento | null>(null);
+  readonly prioridad = signal<PrioridadMantenimiento | null>(null);
+  readonly puenteId = signal<string | null>(null);
+  readonly desde = signal<Date | null>(null);
+  readonly hasta = signal<Date | null>(null);
+
+  readonly puentes = signal<PuenteCatalogoResponse[]>([]);
+  readonly nombresPuente = computed(() => {
+    const nombres: Record<string, string> = {};
+    for (const puente of this.puentes()) {
+      nombres[puente.id] = `${puente.codigo} · ${puente.nombre}`;
+    }
+    return nombres;
+  });
+  readonly hayFiltros = computed(
+    () => !!(this.tipo() || this.prioridad() || this.puenteId() || this.desde() || this.hasta()),
+  );
+
   constructor() {
+    this.puentesApi
+      .listarCatalogo({ pagina: 0, tamanio: 100 })
+      .pipe(
+        takeUntilDestroyed(this.destroyRef),
+        catchError(() => of(null)),
+      )
+      .subscribe((respuesta) => this.puentes.set(respuesta?.content ?? []));
     this.cargar();
   }
 
-  cargar(pagina = 0): void {
-    this.cargando.set(true);
-    this.error.set(false);
-    this.api
-      .listar(pagina, this.tamanio(), this.estadoFiltro())
-      .pipe(
-        takeUntilDestroyed(this.destroyRef),
-        finalize(() => this.cargando.set(false)),
-      )
-      .subscribe({
-        next: (respuesta) => this.pagina.set(respuesta),
-        error: () => this.error.set(true),
-      });
+  total(clave: string): number | null {
+    const totales = this.totales();
+    if (!totales) return null;
+    const pestana = this.pestanas.find((p) => p.clave === clave);
+    return (pestana?.estados ?? []).reduce((suma, estado) => suma + totales.porEstado[estado], 0);
   }
 
-  cambiarEstado(estado: EstadoOrden | null): void {
-    this.estadoFiltro.set(estado);
+  cambiarPestana(clave: string | number | undefined): void {
+    if (typeof clave !== 'string' || clave === this.pestana()) return;
+    this.pestana.set(clave);
+    this.cargarLista(0);
+  }
+
+  aplicarFiltros(): void {
+    this.cargar();
+  }
+
+  limpiarFiltros(): void {
+    this.tipo.set(null);
+    this.prioridad.set(null);
+    this.puenteId.set(null);
+    this.desde.set(null);
+    this.hasta.set(null);
     this.cargar();
   }
 
   cambiarPagina(evento: PaginatorState): void {
     if (evento.page === undefined || evento.rows === undefined) return;
     this.tamanio.set(evento.rows);
-    this.cargar(evento.page);
+    this.cargarLista(evento.page);
+  }
+
+  /** Recarga la pestaña actual y los totales de todas las pestañas. */
+  cargar(): void {
+    this.cargarLista(0);
+    this.api
+      .totales(this.filtros())
+      .pipe(
+        takeUntilDestroyed(this.destroyRef),
+        catchError(() => of(null)),
+      )
+      .subscribe((totales) => this.totales.set(totales));
+  }
+
+  cargarLista(pagina = this.pagina()?.number ?? 0): void {
+    const estados = this.pestanas.find((p) => p.clave === this.pestana())?.estados ?? [];
+    this.cargando.set(true);
+    this.error.set(false);
+    this.api
+      .listar({ ...this.filtros(), estados }, pagina, this.tamanio())
+      .pipe(
+        takeUntilDestroyed(this.destroyRef),
+        finalize(() => this.cargando.set(false)),
+      )
+      .subscribe({
+        next: (respuesta) => this.pagina.set(respuesta),
+        error: () => {
+          this.pagina.set(null);
+          this.error.set(true);
+        },
+      });
+  }
+
+  private filtros(): FiltrosOrdenes {
+    return {
+      puenteId: this.puenteId(),
+      tipo: this.tipo(),
+      prioridad: this.prioridad(),
+      desde: aFechaIso(this.desde()),
+      hasta: aFechaIso(this.hasta()),
+    };
   }
 }

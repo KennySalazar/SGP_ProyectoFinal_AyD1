@@ -8,8 +8,10 @@ import gt.usac.cunoc.sgp.common.exception.ApiException;
 import gt.usac.cunoc.sgp.common.util.UuidV7Generator;
 import gt.usac.cunoc.sgp.inspeccion.repository.InspeccionRepository;
 import gt.usac.cunoc.sgp.mantenimiento.dto.CrearOrdenMantenimientoRequest;
+import gt.usac.cunoc.sgp.mantenimiento.dto.FiltroOrdenesRequest;
 import gt.usac.cunoc.sgp.mantenimiento.dto.HistorialEstadoOrdenResponse;
 import gt.usac.cunoc.sgp.mantenimiento.dto.OrdenMantenimientoResponse;
+import gt.usac.cunoc.sgp.mantenimiento.dto.TotalesOrdenesResponse;
 import gt.usac.cunoc.sgp.mantenimiento.entity.HistorialEstadoOrden;
 import gt.usac.cunoc.sgp.mantenimiento.entity.OrdenMantenimiento;
 import gt.usac.cunoc.sgp.mantenimiento.mapper.OrdenMantenimientoMapper;
@@ -24,8 +26,11 @@ import java.time.Clock;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.EnumMap;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import org.springframework.data.domain.Page;
@@ -41,6 +46,11 @@ import org.springframework.transaction.annotation.Transactional;
  */
 @Service
 public class OrdenMantenimientoService {
+
+  /** Límites del rango de creación cuando la bandeja no filtra por fecha. */
+  private static final Instant INICIO_DE_LOS_TIEMPOS = Instant.parse("1970-01-01T00:00:00Z");
+
+  private static final Instant FIN_DE_LOS_TIEMPOS = Instant.parse("9999-12-31T00:00:00Z");
 
   static final int LONGITUD_MAXIMA_DESCRIPCION = 4000;
   static final int LONGITUD_MAXIMA_ELEMENTO_REF = 300;
@@ -190,10 +200,13 @@ public class OrdenMantenimientoService {
     return mapper.toResponse(buscar(ordenId));
   }
 
-  /** Órdenes filtradas por puente y estado, de la más reciente a la más antigua. */
+  /**
+   * Bandeja de mantenimiento con filtros combinados (HU-049), de la más reciente a la más antigua.
+   * Sin estados se listan todos.
+   */
   @Transactional(readOnly = true)
   public Page<OrdenMantenimientoResponse> listar(
-      UUID puenteId, String estado, int pagina, int tamanio) {
+      FiltroOrdenesRequest filtro, int pagina, int tamanio) {
     if (pagina < 0 || tamanio < 1 || tamanio > 100) {
       throw new ApiException(
           HttpStatus.UNPROCESSABLE_ENTITY,
@@ -202,22 +215,93 @@ public class OrdenMantenimientoService {
           "La página debe ser mayor o igual a 0 y el tamaño debe estar entre 1 y 100.");
     }
     List<Map<String, String>> errores = new ArrayList<>();
-    EstadoOrden filtroEstado =
-        estado == null || estado.isBlank()
+    Set<EstadoOrden> estados = EnumSet.noneOf(EstadoOrden.class);
+    if (filtro.estados() != null) {
+      for (String estado : filtro.estados()) {
+        EstadoOrden convertido =
+            texto(estado) == null ? null : convertir(EstadoOrden.class, estado, "estado", errores);
+        if (convertido != null) {
+          estados.add(convertido);
+        }
+      }
+    }
+    Filtros comunes = comunes(filtro, errores);
+    PageRequest orden =
+        PageRequest.of(
+            pagina, tamanio, Sort.by(Sort.Order.desc("creadoEn"), Sort.Order.desc("id")));
+    return ordenes
+        .filtrar(
+            estados.isEmpty() ? EnumSet.allOf(EstadoOrden.class) : estados,
+            filtro.puenteId(),
+            comunes.tipo(),
+            comunes.prioridad(),
+            comunes.desde(),
+            comunes.hasta(),
+            orden)
+        .map(mapper::toResponse);
+  }
+
+  /** Total por estado con los filtros de la bandeja, para el contador de cada pestaña. */
+  @Transactional(readOnly = true)
+  public TotalesOrdenesResponse totales(FiltroOrdenesRequest filtro) {
+    Filtros comunes = comunes(filtro, new ArrayList<>());
+    Map<EstadoOrden, Long> porEstado = new EnumMap<>(EstadoOrden.class);
+    for (EstadoOrden estado : EstadoOrden.values()) {
+      porEstado.put(estado, 0L);
+    }
+    long total = 0;
+    for (Object[] fila :
+        ordenes.contarPorEstado(
+            filtro.puenteId(),
+            comunes.tipo(),
+            comunes.prioridad(),
+            comunes.desde(),
+            comunes.hasta())) {
+      long cantidad = ((Number) fila[1]).longValue();
+      porEstado.put((EstadoOrden) fila[0], cantidad);
+      total += cantidad;
+    }
+    return new TotalesOrdenesResponse(total, porEstado);
+  }
+
+  /** Filtros compartidos por la lista y los totales, ya validados y convertidos. */
+  private record Filtros(TipoOrden tipo, PrioridadOrden prioridad, Instant desde, Instant hasta) {}
+
+  private static Filtros comunes(FiltroOrdenesRequest filtro, List<Map<String, String>> errores) {
+    TipoOrden tipo =
+        texto(filtro.tipo()) == null
             ? null
-            : convertir(EstadoOrden.class, estado, "estado", errores);
+            : convertir(TipoOrden.class, filtro.tipo(), "tipo", errores);
+    PrioridadOrden prioridad =
+        texto(filtro.prioridad()) == null
+            ? null
+            : convertir(PrioridadOrden.class, filtro.prioridad(), "prioridad", errores);
+    if (filtro.desde() != null
+        && filtro.hasta() != null
+        && filtro.desde().isAfter(filtro.hasta())) {
+      errores.add(error("desde", "La fecha inicial no puede ser posterior a la final."));
+    }
     if (!errores.isEmpty()) {
       throw new ApiException(
           HttpStatus.UNPROCESSABLE_ENTITY,
           "filtro_invalido",
           "Filtro invalido",
-          "El estado indicado no existe.",
+          "Revise los filtros de la búsqueda.",
           errores);
     }
-    PageRequest orden =
-        PageRequest.of(
-            pagina, tamanio, Sort.by(Sort.Order.desc("creadoEn"), Sort.Order.desc("id")));
-    return ordenes.buscar(puenteId, filtroEstado, orden).map(mapper::toResponse);
+    Instant desde =
+        filtro.desde() == null
+            ? INICIO_DE_LOS_TIEMPOS
+            : filtro.desde().atStartOfDay(TransicionOrdenService.ZONA_GUATEMALA).toInstant();
+    Instant hasta =
+        filtro.hasta() == null
+            ? FIN_DE_LOS_TIEMPOS
+            : filtro
+                .hasta()
+                .plusDays(1)
+                .atStartOfDay(TransicionOrdenService.ZONA_GUATEMALA)
+                .toInstant();
+    return new Filtros(tipo, prioridad, desde, hasta);
   }
 
   /** Historial de estados ordenado por secuencia; nunca se modifica (RN-MTO-04). */

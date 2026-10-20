@@ -4,9 +4,24 @@
 </a>
 
 @if (cargando() && !orden()) {
-<p class="mensaje" role="status">{{ 'mantenimiento.ordenes.cargandoDetalle' | transloco }}</p>
+<div class="esqueleto-detalle" aria-hidden="true">
+  <p-skeleton width="30%" height="0.9rem" />
+  <p-skeleton width="70%" height="2.2rem" />
+  <div class="detalle-grid">
+    <p-skeleton height="14rem" borderRadius="18px" />
+    <p-skeleton height="14rem" borderRadius="18px" />
+  </div>
+</div>
+<span class="sr-only" role="status">{{ 'mantenimiento.ordenes.cargandoDetalle' | transloco }}</span>
 } @else if (errorCarga()) {
-<p class="mensaje error" role="alert">{{ 'mantenimiento.ordenes.errorDetalle' | transloco }}</p>
+<div class="estado-error surface-card" role="alert">
+  <i class="pi pi-exclamation-circle" aria-hidden="true"></i>
+  <p>{{ 'mantenimiento.ordenes.errorDetalle' | transloco }}</p>
+  <button pButton type="button" severity="secondary" [outlined]="true" (click)="cargar()">
+    <i class="pi pi-refresh" aria-hidden="true"></i
+    ><span>{{ 'mantenimiento.ordenes.reintentar' | transloco }}</span>
+  </button>
+</div>
 } @else if (orden(); as o) {
 <header class="page-heading encabezado-orden">
   <div>
@@ -20,7 +35,10 @@
         [value]="'mantenimiento.ordenes.estados.' + o.estado | transloco"
         [severity]="severidad(o.estado)"
       />
-      @if (puente(); as p) {
+      <p-tag [value]="'mantenimiento.ordenes.tipos.' + o.tipo | transloco" severity="secondary" />
+      @if (o.reglaProvisional) {
+      <p-tag [value]="'mantenimiento.ordenes.provisional' | transloco" severity="warn" />
+      } @if (puente(); as p) {
       <span>{{ p.codigo }} · {{ p.nombre }}</span>
       }
       <span
@@ -96,24 +114,27 @@
           <h2>{{ 'mantenimiento.ordenes.ejecucion.titulo' | transloco }}</h2>
           <p>
             @if (ejecucion(); as e) { {{ 'mantenimiento.ordenes.ejecucion.iniciada' | transloco }}
-            {{ e.iniciadoEn | date: 'dd/MM/yyyy HH:mm' }} }
+            {{ e.iniciadoEn | date: 'dd/MM/yyyy HH:mm' : zona }} }
           </p>
         </div>
       </div>
 
       @if (enEjecucion()) {
       <div class="formulario-ejecucion">
-        <label>
-          <span>{{ 'mantenimiento.ordenes.ejecucion.fecha' | transloco }}</span>
-          <input
-            pInputText
-            type="date"
-            [min]="fechaMinimaEjecucion()"
-            [max]="hoy"
+        <div class="campo">
+          <label for="detalle-1">{{ 'mantenimiento.ordenes.ejecucion.fecha' | transloco }}</label>
+          <p-datepicker
+            inputId="detalle-1"
             [ngModel]="fechaEjecucion()"
             (ngModelChange)="fechaEjecucion.set($event); ejecucionGuardada.set(false)"
+            dateFormat="dd/mm/yy"
+            [minDate]="fechaMinimaEjecucion()"
+            [maxDate]="hoy"
+            [showIcon]="true"
+            placeholder="dd/mm/aaaa"
+            styleClass="w-full"
           />
-        </label>
+        </div>
 
         <fieldset class="selector-responsable">
           <legend>{{ 'mantenimiento.ordenes.ejecucion.responsable' | transloco }}</legend>
@@ -255,7 +276,7 @@
             }
           </button>
           <div class="miniatura-datos">
-            <span>{{ evidencia.subidoEn | date: 'dd/MM/yyyy HH:mm' }}</span>
+            <span>{{ evidencia.subidoEn | date: 'dd/MM/yyyy HH:mm' : zona }}</span>
             @if (evidencia.elementoRef) {
             <small>{{ evidencia.elementoRef }}</small>
             }
@@ -293,7 +314,27 @@
           <dt>{{ 'mantenimiento.ordenes.prioridadSugerida' | transloco }}</dt>
           <dd>{{ 'mantenimiento.ordenes.prioridades.' + o.prioridadSugerida | transloco }}</dd>
         </div>
-        @if (o.elementoRef) {
+        <div>
+          <dt>{{ 'mantenimiento.ordenes.prioridadConfirmada' | transloco }}</dt>
+          <dd>{{ 'mantenimiento.ordenes.prioridades.' + o.prioridadConfirmada | transloco }}</dd>
+        </div>
+        @if (puente(); as p) {
+        <div>
+          <dt>{{ 'mantenimiento.ordenes.puente' | transloco }}</dt>
+          <dd>
+            <a [routerLink]="['/puentes', p.id]">{{ p.codigo }} · {{ p.nombre }}</a>
+          </dd>
+        </div>
+        } @if (o.inspeccionOrigenId) {
+        <div>
+          <dt>{{ 'mantenimiento.ordenes.inspeccionOrigen' | transloco }}</dt>
+          <dd>
+            <a [routerLink]="['/inspecciones', o.inspeccionOrigenId, 'publicada']">
+              {{ 'mantenimiento.ordenes.verInspeccion' | transloco }}
+            </a>
+          </dd>
+        </div>
+        } @if (o.elementoRef) {
         <div>
           <dt>{{ 'mantenimiento.ordenes.elemento' | transloco }}</dt>
           <dd class="codigo">{{ o.elementoRef }}</dd>
@@ -306,9 +347,26 @@
         }
         <div>
           <dt>{{ 'mantenimiento.ordenes.creada' | transloco }}</dt>
-          <dd>{{ o.creadoEn | date: 'dd/MM/yyyy HH:mm' }}</dd>
+          <dd>{{ o.creadoEn | date: 'dd/MM/yyyy HH:mm' : zona }}</dd>
+        </div>
+        <div class="dato-ancho">
+          <dt>{{ 'mantenimiento.ordenes.descripcionOrden' | transloco }}</dt>
+          <dd>{{ o.descripcion }}</dd>
         </div>
       </dl>
+      @if (fundamento().length > 0) {
+      <div class="fundamento">
+        <h3>{{ 'mantenimiento.ordenes.fundamento' | transloco }}</h3>
+        <dl>
+          @for (dato of fundamento(); track dato.clave) {
+          <div>
+            <dt>{{ 'mantenimiento.ordenes.fundamentoCampos.' + dato.clave | transloco }}</dt>
+            <dd class="codigo">{{ dato.valor }}</dd>
+          </div>
+          }
+        </dl>
+      </div>
+      }
     </section>
   </div>
 
@@ -318,7 +376,7 @@
       @for (fila of historial(); track fila.secuencia) {
       <li>
         <strong>{{ 'mantenimiento.ordenes.estados.' + fila.estadoNuevo | transloco }}</strong>
-        <span>{{ fila.creadoEn | date: 'dd/MM/yyyy HH:mm' }}</span>
+        <span>{{ fila.creadoEn | date: 'dd/MM/yyyy HH:mm' : zona }}</span>
         @if (fila.motivo) {
         <small>{{ fila.motivo }}</small>
         }
@@ -340,16 +398,26 @@
   <p>{{ 'mantenimiento.ordenes.dialogos.' + (accion() ?? 'iniciar') + 'Texto' | transloco }}</p>
 
   @if (accion() === 'programar') {
-  <label class="campo-dialogo">
-    <span>{{ 'mantenimiento.ordenes.dialogos.fechaProgramada' | transloco }}</span>
-    <input
-      pInputText
-      type="date"
-      [min]="hoy"
+  <div class="campo campo-dialogo">
+    <label for="detalle-2"
+      >{{ 'mantenimiento.ordenes.dialogos.fechaProgramada' | transloco }}</label
+    >
+    <p-datepicker
+      inputId="detalle-2"
       [ngModel]="fechaProgramada()"
       (ngModelChange)="fechaProgramada.set($event)"
+      dateFormat="dd/mm/yy"
+      [minDate]="hoy"
+      [showIcon]="true"
+      placeholder="dd/mm/aaaa"
+      appendTo="body"
+      styleClass="w-full"
+      [attr.aria-invalid]="!!errorCampo('fechaProgramada')"
     />
-  </label>
+    @if (errorCampo('fechaProgramada'); as error) {
+    <small class="error-campo" role="alert">{{ error }}</small>
+    }
+  </div>
   } @if (accion() === 'descartar' || accion() === 'cancelar') {
   <label class="campo-dialogo">
     <span>{{ 'mantenimiento.ordenes.dialogos.motivo' | transloco }}</span>
@@ -359,7 +427,11 @@
       maxlength="2000"
       [ngModel]="motivo()"
       (ngModelChange)="motivo.set($event)"
+      [attr.aria-invalid]="!!errorCampo('motivo')"
     ></textarea>
+    @if (errorCampo('motivo'); as error) {
+    <small class="error-campo" role="alert">{{ error }}</small>
+    }
   </label>
   } @if (accion() === 'cerrar') {
   <ul
@@ -393,18 +465,19 @@
       requisitosCierre().evidencias } }}
     </li>
   </ul>
-  } @if (errorAccion(); as error) {
+  } @if (errorAccion(); as error) { @if (error.campos.length === 0 || erroresGenerales().length > 0)
+  {
   <div class="error-dialogo" role="alert">
     <p>{{ error.mensaje }}</p>
-    @if (error.campos.length > 1) {
+    @if (erroresGenerales().length > 1) {
     <ul>
-      @for (campo of error.campos; track campo.campo) {
+      @for (campo of erroresGenerales(); track campo.campo) {
       <li>{{ campo.mensaje }}</li>
       }
     </ul>
     }
   </div>
-  }
+  } }
 
   <div class="dialog-acciones">
     <button

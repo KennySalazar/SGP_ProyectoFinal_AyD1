@@ -30,4 +30,6 @@ public record OrdenMantenimientoResponse(
     String motivoCierreSinEjecucion,
     OffsetDateTime creadoEn,
     OffsetDateTime actualizadoEn,
-    Long version) {}
+    Long version,
+    /** Nació de una regla sin validar: se rotula «Provisional» (HU-049). */
+    Boolean reglaProvisional) {}
