@@ -26,6 +26,32 @@ export interface OrdenMantenimiento {
   creadoEn: string;
   actualizadoEn: string;
   version: number;
+  /** Nació de una regla sin validar (HU-049); nulo si se creó a mano. */
+  reglaProvisional: boolean | null;
+}
+
+/** Filtros combinados de la bandeja; las fechas son días de creación (yyyy-MM-dd). */
+export interface FiltrosOrdenes {
+  puenteId?: string | null;
+  estados?: EstadoOrden[];
+  tipo?: TipoMantenimiento | null;
+  prioridad?: PrioridadMantenimiento | null;
+  desde?: string | null;
+  hasta?: string | null;
+}
+
+export interface TotalesOrdenes {
+  total: number;
+  porEstado: Record<EstadoOrden, number>;
+}
+
+export interface CrearOrdenRequest {
+  puenteId: string;
+  tipo: TipoMantenimiento;
+  descripcion: string;
+  prioridad: PrioridadMantenimiento;
+  elementoRef: string | null;
+  inspeccionOrigenId: string | null;
 }
 
 export interface PaginaOrdenesMantenimiento {

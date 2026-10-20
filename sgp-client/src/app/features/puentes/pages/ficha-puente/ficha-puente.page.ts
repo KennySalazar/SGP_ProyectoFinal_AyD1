@@ -22,6 +22,7 @@ import { AuthStore } from '../../../../core/services/auth.store';
 import { AppShellComponent } from '../../../../layouts/app-shell/app-shell.component';
 import { SelectorUbicacionComponent } from '../../../../shared/components/selector-ubicacion/selector-ubicacion.component';
 import { IniciarInspeccionDialogComponent } from '../../../inspecciones/components/iniciar-inspeccion-dialog/iniciar-inspeccion-dialog.component';
+import { MantenimientoPuenteComponent } from '../../../mantenimiento/components/mantenimiento-puente/mantenimiento-puente.component';
 import { PaginaResponse, PuenteResponse } from '../../models/puente.models';
 import { PuenteApiService } from '../../services/puente-api.service';
 
@@ -39,6 +40,7 @@ import { PuenteApiService } from '../../services/puente-api.service';
     AppShellComponent,
     SelectorUbicacionComponent,
     IniciarInspeccionDialogComponent,
+    MantenimientoPuenteComponent,
   ],
   templateUrl: './ficha-puente.page.html',
   styleUrl: './ficha-puente.page.scss',

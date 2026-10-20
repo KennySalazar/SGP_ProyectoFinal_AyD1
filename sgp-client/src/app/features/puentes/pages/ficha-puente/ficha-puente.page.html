@@ -284,6 +284,13 @@
         </div>
         }
       </section>
+
+      <!-- Seccion 5: Mantenimiento (HU-049) -->
+      @if (auth.authenticated()) {
+      <section class="surface-card ficha-seccion">
+        <app-mantenimiento-puente [puente]="p" />
+      </section>
+      }
     </div>
 
     <app-iniciar-inspeccion-dialog [(visible)]="mostrarModalIniciar" [puente]="puente()" />

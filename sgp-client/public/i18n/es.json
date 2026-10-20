@@ -64,8 +64,8 @@
     "reviewInbox": "Bandeja de revisión",
     "pendingReviewsCount": "{{count}} inspecciones por revisar",
     "avisos": "Avisos",
-    "maintenanceRules": "Reglas de mantenimiento",
-    "maintenanceOrders": "Órdenes de mantenimiento"
+    "maintenanceRules": "Catálogo de mantenimiento",
+    "maintenanceOrders": "Mantenimiento"
   },
   "mantenimiento": {
     "kicker": "Mantenimiento",
@@ -220,7 +220,60 @@
         "retirando": "Retirando...",
         "retirarTitulo": "Retirar evidencia",
         "retirarTexto": "La fotografía quedará retirada con su motivo y dejará de contar como evidencia."
+      },
+      "reintentar": "Reintentar",
+      "vacioFiltros": "Ninguna orden cumple todos los filtros seleccionados.",
+      "provisional": "Provisional",
+      "prioridadConfirmada": "Prioridad confirmada",
+      "puente": "Puente",
+      "inspeccionOrigen": "Inspección de origen",
+      "verInspeccion": "Ver inspección publicada",
+      "descripcionOrden": "Descripción",
+      "fundamento": "Fundamento de la propuesta",
+      "fundamentoCampos": {
+        "reglaCodigo": "Regla",
+        "reglaRevision": "Revisión de la regla",
+        "elementoRef": "Elemento",
+        "indicador": "Indicador",
+        "operador": "Operador",
+        "umbral": "Umbral",
+        "valorEncontrado": "Valor encontrado",
+        "instanciaElementoId": "Instancia del elemento"
+      },
+      "pestanas": {
+        "propuestas": "Propuestas",
+        "programadas": "Programadas",
+        "enEjecucion": "En ejecución",
+        "ejecutadas": "Ejecutadas",
+        "cerradas": "Descartadas o canceladas"
+      },
+      "filtros": {
+        "titulo": "Filtros de la bandeja",
+        "todos": "Todos",
+        "todas": "Todas",
+        "puente": "Puente",
+        "desde": "Creadas desde",
+        "hasta": "Creadas hasta",
+        "aplicar": "Aplicar filtros",
+        "limpiar": "Limpiar filtros"
       }
+    },
+    "puente": {
+      "titulo": "Mantenimiento",
+      "nuevaOrden": "Nueva orden",
+      "nuevaOrdenTexto": "La orden de {{puente}} se creará como propuesta y podrá programarse desde su detalle.",
+      "creada": "Orden creada como propuesta.",
+      "abiertas": "Abiertas",
+      "cerradas": "Historial",
+      "error": "No fue posible cargar las órdenes de mantenimiento de este puente.",
+      "sinAbiertas": "Este puente no tiene órdenes de mantenimiento abiertas.",
+      "sinCerradas": "Este puente todavía no tiene órdenes cerradas.",
+      "seleccionar": "Selecciona una opción",
+      "elementoOpcional": "Elemento (opcional)",
+      "inspeccionOpcional": "Inspección de origen (opcional)",
+      "sinInspeccion": "Sin inspección de origen",
+      "crear": "Crear orden",
+      "creando": "Creando..."
     }
   },
   "avisos": {

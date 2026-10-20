@@ -12,6 +12,7 @@ import { AppShellComponent } from '../../../../layouts/app-shell/app-shell.compo
 import { SelectorUbicacionComponent } from '../../../../shared/components/selector-ubicacion/selector-ubicacion.component';
 import { SelectorUbicacionStubComponent } from '../../../../shared/components/selector-ubicacion/selector-ubicacion.testing';
 import { IniciarInspeccionDialogComponent } from '../../../inspecciones/components/iniciar-inspeccion-dialog/iniciar-inspeccion-dialog.component';
+import { MantenimientoPuenteComponent } from '../../../mantenimiento/components/mantenimiento-puente/mantenimiento-puente.component';
 import { PuenteResponse } from '../../models/puente.models';
 import { FichaPuentePage } from './ficha-puente.page';
 
@@ -31,6 +32,11 @@ class IniciarInspeccionDialogStubComponent {
   @Input() puente: PuenteResponse | null = null;
   @Output() visibleChange = new EventEmitter<boolean>();
   @Output() inspeccionIniciada = new EventEmitter<unknown>();
+}
+
+@Component({ selector: 'app-mantenimiento-puente', standalone: true, template: '' })
+class MantenimientoPuenteStubComponent {
+  @Input() puente: PuenteResponse | null = null;
 }
 
 describe('FichaPuentePage', () => {
@@ -134,13 +140,19 @@ describe('FichaPuentePage', () => {
 
     TestBed.overrideComponent(FichaPuentePage, {
       remove: {
-        imports: [TranslocoPipe, SelectorUbicacionComponent, IniciarInspeccionDialogComponent],
+        imports: [
+          TranslocoPipe,
+          SelectorUbicacionComponent,
+          IniciarInspeccionDialogComponent,
+          MantenimientoPuenteComponent,
+        ],
       },
       add: {
         imports: [
           TraduccionTestPipe,
           SelectorUbicacionStubComponent,
           IniciarInspeccionDialogStubComponent,
+          MantenimientoPuenteStubComponent,
         ],
       },
     });

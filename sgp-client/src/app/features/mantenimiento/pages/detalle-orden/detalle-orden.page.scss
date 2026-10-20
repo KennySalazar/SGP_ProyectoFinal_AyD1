@@ -88,7 +88,7 @@
   gap: 1rem;
   max-width: 34rem;
 }
-.formulario-ejecucion label,
+.formulario-ejecucion .campo,
 .carga-evidencia label:not(.boton-archivo),
 .campo-dialogo {
   display: grid;
@@ -326,4 +326,42 @@ dd {
     flex: 1;
     justify-content: center;
   }
+}
+.esqueleto-detalle {
+  display: grid;
+  gap: 0.8rem;
+}
+.estado-error {
+  display: grid;
+  justify-items: center;
+  gap: 0.6rem;
+  padding: 2rem 1rem;
+  color: #b91c1c;
+  text-align: center;
+}
+.estado-error p {
+  margin: 0;
+}
+.dato-ancho {
+  grid-column: 1 / -1;
+}
+.fundamento {
+  padding-top: 1rem;
+  margin-top: 1rem;
+  border-top: 1px solid var(--sgp-border);
+}
+.fundamento h3 {
+  margin: 0 0 0.75rem;
+  color: var(--sgp-navy-900);
+  font-size: 0.95rem;
+}
+.fundamento dl {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+  gap: 0.75rem;
+  margin: 0;
+}
+.error-campo {
+  color: #b91c1c;
+  font-weight: 600;
 }

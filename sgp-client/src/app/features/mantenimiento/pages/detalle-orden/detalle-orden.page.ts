@@ -15,7 +15,9 @@ import { TranslocoPipe } from '@jsverse/transloco';
 import { ButtonModule } from 'primeng/button';
 import { DialogModule } from 'primeng/dialog';
 import { InputTextModule } from 'primeng/inputtext';
+import { DatePickerModule } from 'primeng/datepicker';
 import { SelectModule } from 'primeng/select';
+import { SkeletonModule } from 'primeng/skeleton';
 import { TagModule } from 'primeng/tag';
 import { TextareaModule } from 'primeng/textarea';
 import { finalize, forkJoin, Observable, of } from 'rxjs';
@@ -32,7 +34,7 @@ import {
 } from '../../models/orden-mantenimiento.models';
 import { OrdenMantenimientoApiService } from '../../services/orden-mantenimiento-api.service';
 import { comprimirImagen } from '../../utils/comprimir-imagen';
-import { severidadEstadoOrden } from '../../utils/estado-orden';
+import { aFechaIso, severidadEstadoOrden, ZONA_GUATEMALA } from '../../utils/estado-orden';
 
 export type AccionOrden = 'programar' | 'descartar' | 'iniciar' | 'cancelar' | 'cerrar';
 
@@ -56,7 +58,9 @@ const TIPOS_ACEPTADOS = ['image/jpeg', 'image/webp'];
     ButtonModule,
     DialogModule,
     InputTextModule,
+    DatePickerModule,
     SelectModule,
+    SkeletonModule,
     TagModule,
     TextareaModule,
   ],
@@ -82,7 +86,7 @@ export class DetalleOrdenPage {
   readonly errorCarga = signal(false);
 
   readonly accion = signal<AccionOrden | null>(null);
-  readonly fechaProgramada = signal('');
+  readonly fechaProgramada = signal<Date | null>(null);
   readonly motivo = signal('');
   readonly procesando = signal(false);
   readonly errorAccion = signal<ErrorAccion | null>(null);
@@ -90,7 +94,7 @@ export class DetalleOrdenPage {
   readonly modoResponsable = signal<ModoResponsable>('usuario');
   readonly responsableUsuarioId = signal<string | null>(null);
   readonly responsableNombre = signal('');
-  readonly fechaEjecucion = signal('');
+  readonly fechaEjecucion = signal<Date | null>(null);
   readonly guardandoEjecucion = signal(false);
   readonly errorEjecucion = signal<ErrorAccion | null>(null);
   readonly ejecucionGuardada = signal(false);
@@ -104,14 +108,29 @@ export class DetalleOrdenPage {
   readonly errorRetiro = signal<string | null>(null);
   readonly evidenciaAmpliada = signal<string | null>(null);
 
-  readonly hoy = fechaLocal(new Date());
+  readonly hoy = inicioDelDia(new Date());
+  readonly zona = ZONA_GUATEMALA;
   readonly severidad = severidadEstadoOrden;
+  /** Campos de los diálogos cuyo error del servidor se muestra junto al control. */
+  private readonly camposDialogo = ['fechaProgramada', 'motivo'];
 
   readonly enEjecucion = computed(() => this.orden()?.estado === 'EN_EJECUCION');
   readonly fechaMinimaEjecucion = computed(() => {
     const iniciado = this.ejecucion()?.iniciadoEn;
-    return iniciado ? fechaLocal(new Date(iniciado)) : this.hoy;
+    return iniciado ? inicioDelDia(new Date(iniciado)) : this.hoy;
   });
+  /** Fundamento de una propuesta generada, como pares clave-valor legibles. */
+  readonly fundamento = computed(() => {
+    const datos = this.orden()?.fundamentoGeneracion;
+    if (!datos || typeof datos !== 'object') return [];
+    return Object.entries(datos as Record<string, unknown>).map(([clave, valor]) => ({
+      clave,
+      valor: typeof valor === 'object' && valor !== null ? JSON.stringify(valor) : String(valor),
+    }));
+  });
+  readonly erroresGenerales = computed(
+    () => this.errorAccion()?.campos.filter((c) => !this.camposDialogo.includes(c.campo)) ?? [],
+  );
   readonly requisitosCierre = computed(() => {
     const ejecucion = this.ejecucion();
     return {
@@ -213,7 +232,7 @@ export class DetalleOrdenPage {
     this.ejecucionGuardada.set(false);
     this.api
       .registrarEjecucion(this.ordenId, {
-        fechaEjecucion: this.fechaEjecucion() || null,
+        fechaEjecucion: aFechaIso(this.fechaEjecucion()),
         responsableUsuarioId: externo ? null : this.responsableUsuarioId(),
         responsableNombre: externo ? this.responsableNombre().trim() : null,
       })
@@ -325,6 +344,11 @@ export class DetalleOrdenPage {
     this.evidenciaAmpliada.set(null);
   }
 
+  /** Error del servidor para un campo del diálogo, mostrado junto a ese campo. */
+  errorCampo(campo: string): string | null {
+    return this.errorAccion()?.campos.find((c) => c.campo === campo)?.mensaje ?? null;
+  }
+
   etiquetaResponsable(ejecucion: EjecucionOrden): string {
     return [ejecucion.responsableUsuarioEmail, ejecucion.responsableNombre]
       .filter((valor) => !!valor)
@@ -334,7 +358,7 @@ export class DetalleOrdenPage {
   private ejecutar(orden: OrdenMantenimiento, accion: AccionOrden): Observable<unknown> {
     switch (accion) {
       case 'programar':
-        return this.api.programar(orden.id, this.fechaProgramada(), orden.version);
+        return this.api.programar(orden.id, aFechaIso(this.fechaProgramada()) ?? '', orden.version);
       case 'descartar':
         return this.api.descartar(orden.id, this.motivo().trim(), orden.version);
       case 'cancelar':
@@ -383,7 +407,7 @@ export class DetalleOrdenPage {
   }
 
   private prepararFormulario(ejecucion: EjecucionOrden | null): void {
-    this.fechaEjecucion.set(ejecucion?.fechaEjecucion ?? '');
+    this.fechaEjecucion.set(deFechaIso(ejecucion?.fechaEjecucion));
     this.responsableUsuarioId.set(ejecucion?.responsableUsuarioId ?? null);
     this.responsableNombre.set(ejecucion?.responsableNombre ?? '');
     this.modoResponsable.set(
@@ -427,10 +451,15 @@ export class DetalleOrdenPage {
   }
 }
 
-function fechaLocal(fecha: Date): string {
-  const mes = String(fecha.getMonth() + 1).padStart(2, '0');
-  const dia = String(fecha.getDate()).padStart(2, '0');
-  return `${fecha.getFullYear()}-${mes}-${dia}`;
+function inicioDelDia(fecha: Date): Date {
+  return new Date(fecha.getFullYear(), fecha.getMonth(), fecha.getDate());
+}
+
+/** Interpreta yyyy-MM-dd como día del calendario local, sin desplazarlo por la zona. */
+function deFechaIso(fecha: string | null | undefined): Date | null {
+  if (!fecha) return null;
+  const [anio, mes, dia] = fecha.split('-').map(Number);
+  return new Date(anio, mes - 1, dia);
 }
 
 function errorDe(err: HttpErrorResponse, porDefecto: string): ErrorAccion {

@@ -6,66 +6,197 @@
   </div>
 </header>
 
-<section class="surface-card lista-ordenes">
-  <div class="lista-cabecera">
-    <div>
-      <h2>{{ 'mantenimiento.ordenes.listaTitulo' | transloco }}</h2>
-      <p>{{ 'mantenimiento.ordenes.listaDescripcion' | transloco }}</p>
-    </div>
+<section
+  class="surface-card filtros"
+  [attr.aria-label]="'mantenimiento.ordenes.filtros.titulo' | transloco"
+>
+  <div class="campo">
+    <label for="filtro-1">{{ 'mantenimiento.ordenes.tipo' | transloco }}</label>
     <p-select
-      [options]="estados"
-      optionLabel="label"
-      optionValue="value"
-      [ngModel]="estadoFiltro()"
-      (ngModelChange)="cambiarEstado($event)"
-      [ariaLabel]="'mantenimiento.ordenes.filtrarEstado' | transloco"
+      inputId="filtro-1"
+      [options]="tipos"
+      [ngModel]="tipo()"
+      (ngModelChange)="tipo.set($event)"
+      [showClear]="true"
+      [placeholder]="'mantenimiento.ordenes.filtros.todos' | transloco"
+      styleClass="w-full"
+    >
+      <ng-template #selectedItem let-valor>
+        {{ 'mantenimiento.ordenes.tipos.' + valor | transloco }}
+      </ng-template>
+      <ng-template #item let-valor
+        >{{ 'mantenimiento.ordenes.tipos.' + valor | transloco }}</ng-template
+      >
+    </p-select>
+  </div>
+  <div class="campo">
+    <label for="filtro-2">{{ 'mantenimiento.ordenes.prioridad' | transloco }}</label>
+    <p-select
+      inputId="filtro-2"
+      [options]="prioridades"
+      [ngModel]="prioridad()"
+      (ngModelChange)="prioridad.set($event)"
+      [showClear]="true"
+      [placeholder]="'mantenimiento.ordenes.filtros.todas' | transloco"
+      styleClass="w-full"
+    >
+      <ng-template #selectedItem let-valor>
+        {{ 'mantenimiento.ordenes.prioridades.' + valor | transloco }}
+      </ng-template>
+      <ng-template #item let-valor
+        >{{ 'mantenimiento.ordenes.prioridades.' + valor | transloco }}</ng-template
+      >
+    </p-select>
+  </div>
+  <div class="campo filtro-puente">
+    <label for="filtro-3">{{ 'mantenimiento.ordenes.filtros.puente' | transloco }}</label>
+    <p-select
+      inputId="filtro-3"
+      [options]="puentes()"
+      optionValue="id"
+      optionLabel="nombre"
+      [filter]="true"
+      filterBy="codigo,nombre"
+      [ngModel]="puenteId()"
+      (ngModelChange)="puenteId.set($event)"
+      [showClear]="true"
+      [placeholder]="'mantenimiento.ordenes.filtros.todos' | transloco"
+      styleClass="w-full"
+    >
+      <ng-template #item let-puente>{{ puente.codigo }} · {{ puente.nombre }}</ng-template>
+    </p-select>
+  </div>
+  <div class="campo">
+    <label for="filtro-4">{{ 'mantenimiento.ordenes.filtros.desde' | transloco }}</label>
+    <p-datepicker
+      inputId="filtro-4"
+      [ngModel]="desde()"
+      (ngModelChange)="desde.set($event)"
+      dateFormat="dd/mm/yy"
+      [showIcon]="true"
+      [showClear]="true"
+      [maxDate]="hasta()"
+      placeholder="dd/mm/aaaa"
+      styleClass="w-full"
     />
   </div>
+  <div class="campo">
+    <label for="filtro-5">{{ 'mantenimiento.ordenes.filtros.hasta' | transloco }}</label>
+    <p-datepicker
+      inputId="filtro-5"
+      [ngModel]="hasta()"
+      (ngModelChange)="hasta.set($event)"
+      dateFormat="dd/mm/yy"
+      [showIcon]="true"
+      [showClear]="true"
+      [minDate]="desde()"
+      placeholder="dd/mm/aaaa"
+      styleClass="w-full"
+    />
+  </div>
+  <div class="filtros-acciones">
+    <button pButton type="button" (click)="aplicarFiltros()">
+      <i class="pi pi-filter" aria-hidden="true"></i
+      ><span>{{ 'mantenimiento.ordenes.filtros.aplicar' | transloco }}</span>
+    </button>
+    @if (hayFiltros()) {
+    <button pButton type="button" severity="secondary" [outlined]="true" (click)="limpiarFiltros()">
+      <i class="pi pi-times" aria-hidden="true"></i
+      ><span>{{ 'mantenimiento.ordenes.filtros.limpiar' | transloco }}</span>
+    </button>
+    }
+  </div>
+</section>
 
-  @if (error()) {
-  <p class="mensaje error" role="alert">{{ 'mantenimiento.ordenes.errorCarga' | transloco }}</p>
-  } @if (cargando()) {
-  <p class="mensaje" role="status">{{ 'mantenimiento.ordenes.cargando' | transloco }}</p>
-  } @if (!cargando() && pagina()?.content?.length === 0) {
-  <p class="mensaje" role="status">{{ 'mantenimiento.ordenes.vacio' | transloco }}</p>
-  } @for (orden of pagina()?.content ?? []; track orden.id) {
-  <article class="orden-fila">
-    <div class="orden-principal">
-      <div class="fila-titulo">
-        <h3>{{ orden.descripcion }}</h3>
-        <p-tag
-          [value]="'mantenimiento.ordenes.estados.' + orden.estado | transloco"
-          [severity]="severidad(orden.estado)"
-        />
-      </div>
-      <p>
-        {{ 'mantenimiento.ordenes.tipos.' + orden.tipo | transloco }} · {{
-        'mantenimiento.ordenes.prioridad' | transloco }}: {{ 'mantenimiento.ordenes.prioridades.' +
-        orden.prioridadConfirmada | transloco }} @if (orden.fechaProgramada) { · {{
-        'mantenimiento.ordenes.programadaPara' | transloco }} {{ orden.fechaProgramada | date:
-        'dd/MM/yyyy' }} }
-      </p>
-      @if (orden.elementoRef) {
-      <small>{{ orden.elementoRef }}</small>
+<section class="surface-card lista-ordenes">
+  <p-tabs [value]="pestana()" (valueChange)="cambiarPestana($event)" [scrollable]="true">
+    <p-tablist>
+      @for (p of pestanas; track p.clave) {
+      <p-tab [value]="p.clave">
+        <span>{{ 'mantenimiento.ordenes.pestanas.' + p.clave | transloco }}</span>
+        @if (total(p.clave) !== null) {
+        <span class="contador">{{ total(p.clave) }}</span>
+        }
+      </p-tab>
       }
+    </p-tablist>
+  </p-tabs>
+
+  <div class="lista" [attr.aria-busy]="cargando()">
+    @if (cargando()) { @for (fila of [1, 2, 3]; track fila) {
+    <div class="orden-fila esqueleto" aria-hidden="true">
+      <div class="orden-principal">
+        <p-skeleton width="60%" height="1.2rem" />
+        <p-skeleton width="40%" height="0.9rem" styleClass="mt" />
+      </div>
+      <p-skeleton width="8rem" height="2.75rem" />
     </div>
-    <a
-      pButton
-      severity="secondary"
-      [outlined]="true"
-      [routerLink]="['/mantenimiento/ordenes', orden.id]"
-    >
-      <i class="pi pi-eye" aria-hidden="true"></i
-      ><span>{{ 'mantenimiento.ordenes.verDetalle' | transloco }}</span>
-    </a>
-  </article>
-  } @if (pagina() && pagina()!.totalElements > 0) {
-  <p-paginator
-    [first]="pagina()!.number * pagina()!.size"
-    [rows]="pagina()!.size"
-    [totalRecords]="pagina()!.totalElements"
-    [rowsPerPageOptions]="[10, 20, 50, 100]"
-    (onPageChange)="cambiarPagina($event)"
-  />
-  }
+    }
+    <span class="sr-only" role="status">{{ 'mantenimiento.ordenes.cargando' | transloco }}</span>
+    } @else if (error()) {
+    <div class="estado-lista" role="alert">
+      <i class="pi pi-exclamation-circle" aria-hidden="true"></i>
+      <p>{{ 'mantenimiento.ordenes.errorCarga' | transloco }}</p>
+      <button pButton type="button" severity="secondary" [outlined]="true" (click)="cargar()">
+        <i class="pi pi-refresh" aria-hidden="true"></i
+        ><span>{{ 'mantenimiento.ordenes.reintentar' | transloco }}</span>
+      </button>
+    </div>
+    } @else { @for (orden of pagina()?.content ?? []; track orden.id) {
+    <article class="orden-fila">
+      <div class="orden-principal">
+        <div class="fila-titulo">
+          <h3>{{ orden.descripcion }}</h3>
+          <p-tag
+            [value]="'mantenimiento.ordenes.estados.' + orden.estado | transloco"
+            [severity]="severidad(orden.estado)"
+          />
+          <p-tag
+            [value]="'mantenimiento.ordenes.tipos.' + orden.tipo | transloco"
+            severity="secondary"
+          />
+          @if (orden.reglaProvisional) {
+          <p-tag [value]="'mantenimiento.ordenes.provisional' | transloco" severity="warn" />
+          }
+        </div>
+        <p>
+          @if (nombresPuente()[orden.puenteId]; as puente) {
+          <span>{{ puente }}</span> · } {{ 'mantenimiento.ordenes.prioridad' | transloco }}: {{
+          'mantenimiento.ordenes.prioridades.' + orden.prioridadConfirmada | transloco }} · {{
+          'mantenimiento.ordenes.creada' | transloco }} {{ orden.creadoEn | date: 'dd/MM/yyyy' :
+          zona }} @if (orden.fechaProgramada) { · {{ 'mantenimiento.ordenes.programadaPara' |
+          transloco }} {{ orden.fechaProgramada | date: 'dd/MM/yyyy' }} }
+        </p>
+        @if (orden.elementoRef) {
+        <small>{{ orden.elementoRef }}</small>
+        }
+      </div>
+      <a
+        pButton
+        severity="secondary"
+        [outlined]="true"
+        [routerLink]="['/mantenimiento/ordenes', orden.id]"
+      >
+        <i class="pi pi-eye" aria-hidden="true"></i
+        ><span>{{ 'mantenimiento.ordenes.verDetalle' | transloco }}</span>
+      </a>
+    </article>
+    } @empty {
+    <div class="estado-lista" role="status">
+      <i class="pi pi-inbox" aria-hidden="true"></i>
+      <p>
+        {{ (hayFiltros() ? 'mantenimiento.ordenes.vacioFiltros' : 'mantenimiento.ordenes.vacio') |
+        transloco }}
+      </p>
+    </div>
+    } @if (pagina() && pagina()!.totalElements > 0) {
+    <p-paginator
+      [first]="pagina()!.number * pagina()!.size"
+      [rows]="pagina()!.size"
+      [totalRecords]="pagina()!.totalElements"
+      [rowsPerPageOptions]="[10, 20, 50, 100]"
+      (onPageChange)="cambiarPagina($event)"
+    />
+    } }
+  </div>
 </section>

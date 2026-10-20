@@ -42,6 +42,7 @@ function orden(overrides: Partial<OrdenMantenimiento> = {}): OrdenMantenimiento 
     creadoEn: '2026-10-18T10:00:00Z',
     actualizadoEn: '2026-10-20T10:00:00Z',
     version: 2,
+    reglaProvisional: null,
     ...overrides,
   };
 }
@@ -141,7 +142,7 @@ describe('DetalleOrdenPage', () => {
 
     page.cambiarModoResponsable('externo');
     page.responsableNombre.set('  Constructora Los Altos ');
-    page.fechaEjecucion.set('2026-10-20');
+    page.fechaEjecucion.set(new Date(2026, 9, 20));
     page.guardarEjecucion();
 
     const request = http.expectOne(`${BASE}/ejecucion`);
@@ -232,5 +233,67 @@ describe('DetalleOrdenPage', () => {
     expect(texto()).not.toContain('mantenimiento.ordenes.acciones.cerrar');
     expect(texto()).not.toContain('mantenimiento.ordenes.ejecucion.guardar');
     expect(texto()).toContain('catedratico@cunoc.edu.gt · Constructora Los Altos');
+  });
+
+  it('muestra el origen de una propuesta generada: inspección, fundamento y rótulo provisional', () => {
+    cargar(
+      orden({
+        estado: 'PROPUESTA',
+        inspeccionOrigenId: 'inspeccion-1',
+        reglaProvisional: true,
+        fundamentoGeneracion: { reglaCodigo: 'R-01', umbral: 3, valorEncontrado: 4 },
+      }),
+    );
+
+    const elemento = fixture.nativeElement as HTMLElement;
+    expect(elemento.textContent).toContain('mantenimiento.ordenes.provisional');
+    expect(elemento.querySelector('a[href="/inspecciones/inspeccion-1/publicada"]')).not.toBeNull();
+    expect(page.fundamento()).toEqual([
+      { clave: 'reglaCodigo', valor: 'R-01' },
+      { clave: 'umbral', valor: '3' },
+      { clave: 'valorEncontrado', valor: '4' },
+    ]);
+    expect(elemento.textContent).toContain('mantenimiento.ordenes.fundamentoCampos.reglaCodigo');
+  });
+
+  it('programa con la fecha elegida y muestra el error del servidor junto al campo', () => {
+    cargar(orden({ estado: 'PROPUESTA', version: 0 }));
+
+    page.abrirAccion('programar');
+    page.fechaProgramada.set(new Date(2026, 9, 25));
+    page.confirmarAccion();
+
+    const request = http.expectOne(`${BASE}/programar`);
+    expect(request.request.body).toEqual({ fechaProgramada: '2026-10-25', version: 0 });
+    request.flush(
+      {
+        detail: 'La fecha programada no puede ser anterior a hoy.',
+        errores: [
+          { campo: 'fechaProgramada', mensaje: 'La fecha programada no puede ser anterior a hoy.' },
+        ],
+      },
+      { status: 422, statusText: 'Unprocessable Entity' },
+    );
+    fixture.detectChanges();
+
+    expect(page.errorCampo('fechaProgramada')).toBe(
+      'La fecha programada no puede ser anterior a hoy.',
+    );
+    expect(page.erroresGenerales()).toEqual([]);
+    const error = document.querySelector('.error-campo');
+    expect(error?.textContent).toContain('La fecha programada no puede ser anterior a hoy.');
+  });
+
+  it('ofrece reintentar cuando falla la carga del detalle', () => {
+    http.expectOne(`${BASE}/historial`).flush([]);
+    http.expectOne(BASE).flush(null, { status: 500, statusText: 'Error' });
+    fixture.detectChanges();
+
+    expect(page.errorCarga()).toBe(true);
+    (fixture.nativeElement as HTMLElement)
+      .querySelector<HTMLButtonElement>('.estado-error button')
+      ?.click();
+    cargar(orden({ estado: 'PROPUESTA' }));
+    expect(page.errorCarga()).toBe(false);
   });
 });
