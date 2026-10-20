@@ -32,6 +32,22 @@ import {
 } from '../../models/inspeccion.models';
 import { uuidV7 } from '../../../../offline/services/uuid-v7';
 import { InspeccionApiService } from '../../services/inspeccion-api.service';
+import { InspeccionesLocalesService } from '../../../../offline/services/inspecciones-locales.service';
+import { ConnectivityService } from '../../../../offline/services/connectivity.service';
+
+function calcularDistanciaMetros(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 6371000.0;
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLon = ((lon2 - lon1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos((lat1 * Math.PI) / 180) *
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLon / 2) *
+      Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
 
 @Component({
   selector: 'app-iniciar-inspeccion-dialog',
@@ -60,6 +76,8 @@ export class IniciarInspeccionDialogComponent implements OnChanges {
   private readonly fb = inject(FormBuilder);
   private readonly auth = inject(AuthStore);
   private readonly api = inject(InspeccionApiService);
+  private readonly inspeccionesLocales = inject(InspeccionesLocalesService);
+  private readonly connectivity = inject(ConnectivityService);
   private readonly router = inject(Router);
 
   readonly form: FormGroup = this.fb.group({
@@ -275,6 +293,13 @@ export class IniciarInspeccionDialogComponent implements OnChanges {
     this.form.disable({ emitEvent: false });
     this.solicitudAutorId = this.auth.user()?.id ?? null;
     const actor = this.solicitudAutorId;
+
+    // Si no hay red, iniciar directamente en modo local
+    if (!this.connectivity.online()) {
+      void this.iniciarOffline(request, actor);
+      return;
+    }
+
     this.api.iniciarInspeccion(request, clientUuid).subscribe({
       next: (res) => {
         if (this.auth.user()?.id !== actor || this.puente?.id !== request.puenteId) return;
@@ -284,8 +309,13 @@ export class IniciarInspeccionDialogComponent implements OnChanges {
         void this.cargarReporte();
         this.inspeccionIniciada.emit(res);
       },
-      error: (err) => {
+      error: async (err) => {
         if (this.auth.user()?.id !== actor || this.puente?.id !== request.puenteId) return;
+        // Si falló por falta de red o error de conectividad, persistir offline
+        if (err.status === 0 || !navigator.onLine) {
+          await this.iniciarOffline(request, actor);
+          return;
+        }
         if (!esResultadoIncierto(err)) {
           this.solicitudInicio = null;
           this.form.enable({ emitEvent: false });
@@ -300,15 +330,91 @@ export class IniciarInspeccionDialogComponent implements OnChanges {
     });
   }
 
+  private async iniciarOffline(
+    request: IniciarInspeccionRequest,
+    actor: string | null,
+  ): Promise<void> {
+    try {
+      const user = this.auth.user();
+      const autorId = actor || user?.id || 'autor-local';
+      const rolAutor = user?.role || 'PROFESIONAL_EXTERNO';
+      const nombreAutor = (request.nombreAutor || user?.email || 'Inspector').trim();
+      const esquemaActivo = await this.inspeccionesLocales.obtenerEsquemaActivoLocal();
+      const versionFormularioId = esquemaActivo?.id || 'version-preparada-local';
+
+      // Validación GPS > 500m
+      let advertenciaGps = false;
+      let distanciaCalculada: number | undefined = undefined;
+      let mensajeAdvertencia: string | undefined = undefined;
+
+      const pLat = this.puente?.latitud;
+      const pLng = this.puente?.longitud;
+
+      if (pLat != null && pLng != null && request.latitud != null && request.longitud != null) {
+        distanciaCalculada = Math.round(
+          calcularDistanciaMetros(pLat, pLng, request.latitud, request.longitud),
+        );
+        if (distanciaCalculada > 500) {
+          advertenciaGps = true;
+          mensajeAdvertencia = `El dispositivo se encuentra a más de 500 metros del puente (${distanciaCalculada} m).`;
+        }
+      }
+
+      const sinGps = request.latitud == null || request.longitud == null;
+
+      const res = await this.inspeccionesLocales.iniciarInspeccionLocal(
+        request,
+        autorId,
+        rolAutor,
+        nombreAutor,
+        this.puente?.nombre || '',
+        this.puente?.codigo || '',
+        this.puente?.departamento?.nombre || '',
+        this.puente?.municipio?.nombre,
+        versionFormularioId,
+        request.confirmarDatosPermanentes ? this.datosPermanentes() : null,
+        sinGps,
+      );
+
+      res.advertenciaGps = advertenciaGps;
+      res.distanciaAlPuenteM = distanciaCalculada;
+      res.mensajeAdvertenciaGps = mensajeAdvertencia;
+
+      this.guardando.set(false);
+      this.resultado.set(res);
+      this.solicitudInicio = null;
+      void this.cargarReporte();
+      this.inspeccionIniciada.emit(res);
+    } catch (e: unknown) {
+      this.guardando.set(false);
+      this.form.enable({ emitEvent: false });
+      this.error.set((e as Error).message || 'Error al guardar la inspección sin conexión.');
+    }
+  }
+
   private cargarDatosPermanentes(puenteId: string): void {
     this.cargandoPermanentes.set(true);
+    if (!this.connectivity.online()) {
+      this.inspeccionesLocales.obtenerDatosPermanentesLocal(puenteId).then(
+        (datos) => {
+          this.datosPermanentes.set(datos);
+          this.cargandoPermanentes.set(false);
+        },
+        () => {
+          this.datosPermanentes.set(null);
+          this.cargandoPermanentes.set(false);
+        },
+      );
+      return;
+    }
     this.api.obtenerDatosPermanentes(puenteId).subscribe({
       next: (datos) => {
         this.datosPermanentes.set(datos);
         this.cargandoPermanentes.set(false);
       },
-      error: () => {
-        this.datosPermanentes.set(null);
+      error: async () => {
+        const local = await this.inspeccionesLocales.obtenerDatosPermanentesLocal(puenteId);
+        this.datosPermanentes.set(local);
         this.cargandoPermanentes.set(false);
       },
     });

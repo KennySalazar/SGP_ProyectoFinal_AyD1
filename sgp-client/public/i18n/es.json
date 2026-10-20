@@ -1583,9 +1583,11 @@
       "quitarAcompanante": "Quitar acompañante",
       "iniciando": "Iniciando inspección...",
       "botonIniciar": "Iniciar inspección",
-      "irAFormulario": "Ir al formulario"
+      "irAFormulario": "Ir al formulario",
+      "advertenciaGps500m": "El dispositivo se encuentra a más de 500 metros de la ubicación guardada del puente. La inspección se creará con advertencia."
     },
     "fotos": {
+      "offlineSprint4Aviso": "La captura y subida de fotografías se habilita con conexión hasta Sprint 4.",
       "titulo": "Fotografías de la inspección",
       "descripcion": "Capture una fotografía con ubicación o seleccione una imagen con GPS y fecha EXIF con zona horaria o fecha UTC de GPS. Las cargas fallidas se conservan para reintentar.",
       "galeria": "Seleccionar desde galería",
@@ -1644,6 +1646,8 @@
       "autoguardando": "Guardando cambios...",
       "cambiosPendientes": "Cambios pendientes; se guardarán automáticamente.",
       "guardadoExitoso": "Avance de borrador guardado exitosamente.",
+      "guardadoDispositivo": "Guardado en este dispositivo a las {{hora}}",
+      "almacenamientoLleno": "Almacenamiento local insuficiente para guardar los cambios.",
       "cargando": "Cargando inspección y esquema del formulario...",
       "notFound": "Inspección no encontrada o no tiene permisos para acceder a este borrador.",
       "forbidden": "Acceso denegado: Solo el autor de la inspección puede modificar este borrador.",
@@ -1694,7 +1698,8 @@
         "EN_REVISION": "En revisión",
         "CAMBIOS_SOLICITADOS": "Cambios solicitados",
         "PUBLICADA": "Publicada",
-        "RECHAZADA": "Rechazada"
+        "RECHAZADA": "Rechazada",
+        "PENDIENTE_SYNC": "Pendiente de sincronizar"
       }
     },
     "correccion": {
@@ -1738,6 +1743,7 @@
     },
     "confirmacionIc": {
       "titulo": "Confirmacion del estado del IC",
+      "icPreliminarOffline": "El IC preliminar se calcula en el servidor y estará disponible al sincronizar",
       "nota": "Consulte el calculo actualizado antes de confirmar el estado. Si selecciona un estado distinto del calculado, debe justificar su criterio profesional. El ajuste no modifica el valor numerico del IC.",
       "guardarPrimero": "Guarde los cambios de la inspeccion antes de consultar o confirmar el calculo.",
       "consultar": "Consultar calculo actualizado",

@@ -33,6 +33,11 @@ import {
 import { ApiErrorService } from '../../../../core/services/api-error.service';
 import { AuthStore } from '../../../../core/services/auth.store';
 import { InspeccionApiService } from '../../services/inspeccion-api.service';
+import {
+  InspeccionesLocalesService,
+  BorradorLocalPayload,
+} from '../../../../offline/services/inspecciones-locales.service';
+import { ConnectivityService } from '../../../../offline/services/connectivity.service';
 
 import { ReporteFotograficoComponent } from '../../components/reporte-fotografico/reporte-fotografico.component';
 
@@ -74,6 +79,8 @@ export class CompletarInspeccionPage implements OnInit {
   private readonly formularioApi = inject(FormularioApiService);
   private readonly auth = inject(AuthStore);
   private readonly apiErrors = inject(ApiErrorService);
+  private readonly inspeccionesLocales = inject(InspeccionesLocalesService);
+  private readonly connectivity = inject(ConnectivityService);
   private readonly destroyRef = inject(DestroyRef);
   private readonly cambios = new Subject<void>();
   private revisionDatos = 0;
@@ -97,6 +104,9 @@ export class CompletarInspeccionPage implements OnInit {
   readonly borrador = signal<InspeccionBorradorResponse | null>(null);
   readonly esquema = signal<EsquemaJson | null>(null);
   readonly fechaInspeccion = signal<string>('');
+  readonly horaGuardadoLocal = signal<string | null>(null);
+  readonly errorAlmacenamiento = signal<string | null>(null);
+  readonly esOffline = computed(() => !this.connectivity.online());
   readonly hoy = new Date().toISOString().slice(0, 10);
   readonly soloLectura = computed(() => {
     const borrador = this.borrador();
@@ -176,26 +186,80 @@ export class CompletarInspeccionPage implements OnInit {
   private cargarBorrador(id: string): void {
     this.cargando.set(true);
     this.errorCarga.set(null);
-    this.inspeccionApi
-      .obtenerBorrador(id, true)
-      .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe({
-        next: (b) => {
-          this.borrador.set(b);
-          this.datosIniciales.set(b);
-          this.fechaInspeccion.set(b.fechaInspeccion || this.hoy);
-          if (b.datos) {
-            this.datosEnMemoria.set(b.datos);
-          }
-          this.cargarEsquema(b.versionFormularioId);
-        },
-        error: (err: HttpErrorResponse) => {
-          this.cargando.set(false);
-          this.procesarErrorCarga(err);
-        },
-      });
+
+    // Intentar primero desde Dexie si estamos offline o si existe localmente
+    this.inspeccionesLocales.obtenerInspeccionLocal(id).then((local) => {
+      if (local && local.payload) {
+        const payload = local.payload as BorradorLocalPayload;
+        const b = payload.borrador;
+        this.borrador.set(b);
+        this.datosIniciales.set(b);
+        this.fechaInspeccion.set(b.fechaInspeccion || this.hoy);
+        if (b.datos) {
+          this.datosEnMemoria.set(b.datos);
+        }
+        if (local.actualizadoEn) {
+          const d = new Date(local.actualizadoEn);
+          const hh = String(d.getHours()).padStart(2, '0');
+          const mm = String(d.getMinutes()).padStart(2, '0');
+          this.horaGuardadoLocal.set(`${hh}:${mm}`);
+        }
+        this.cargarEsquema(b.versionFormularioId);
+        return;
+      }
+
+      // Si no está local o no hay Dexie disponible, acudir a la API
+      this.inspeccionApi
+        .obtenerBorrador(id, true)
+        .pipe(takeUntilDestroyed(this.destroyRef))
+        .subscribe({
+          next: (b) => {
+            this.borrador.set(b);
+            this.datosIniciales.set(b);
+            this.fechaInspeccion.set(b.fechaInspeccion || this.hoy);
+            if (b.datos) {
+              this.datosEnMemoria.set(b.datos);
+            }
+            this.cargarEsquema(b.versionFormularioId);
+          },
+          error: (err: HttpErrorResponse) => {
+            this.cargando.set(false);
+            this.procesarErrorCarga(err);
+          },
+        });
+    });
   }
   private cargarEsquema(versionId: string): void {
+    // Si no hay red, consultar el esquema guardado en Dexie
+    if (!this.connectivity.online()) {
+      this.inspeccionesLocales.obtenerEsquemaLocal(versionId).then(
+        (localSchema) => {
+          if (localSchema && localSchema.schema) {
+            this.esquema.set(localSchema.schema as EsquemaJson);
+            this.cargando.set(false);
+          } else {
+            this.inspeccionesLocales.obtenerEsquemaActivoLocal().then((activo) => {
+              if (activo && activo.schema) {
+                this.esquema.set(activo.schema as EsquemaJson);
+              } else {
+                this.errorCarga.set(
+                  'No fue posible obtener el esquema del formulario para esta inspección.',
+                );
+              }
+              this.cargando.set(false);
+            });
+          }
+        },
+        () => {
+          this.cargando.set(false);
+          this.errorCarga.set(
+            'No fue posible obtener el esquema del formulario para esta inspección.',
+          );
+        },
+      );
+      return;
+    }
+
     this.formularioApi
       .obtenerEsquemaPublicado(versionId)
       .pipe(takeUntilDestroyed(this.destroyRef))
@@ -205,21 +269,28 @@ export class CompletarInspeccionPage implements OnInit {
           this.cargando.set(false);
         },
         error: () => {
-          this.formularioApi
-            .obtenerActiva()
-            .pipe(takeUntilDestroyed(this.destroyRef))
-            .subscribe({
-              next: (activa) => {
-                this.esquema.set(activa.esquema as EsquemaJson);
-                this.cargando.set(false);
-              },
-              error: () => {
-                this.cargando.set(false);
-                this.errorCarga.set(
-                  'No fue posible obtener el esquema del formulario para esta inspección.',
-                );
-              },
-            });
+          this.inspeccionesLocales.obtenerEsquemaLocal(versionId).then((local) => {
+            if (local && local.schema) {
+              this.esquema.set(local.schema as EsquemaJson);
+              this.cargando.set(false);
+              return;
+            }
+            this.formularioApi
+              .obtenerActiva()
+              .pipe(takeUntilDestroyed(this.destroyRef))
+              .subscribe({
+                next: (activa) => {
+                  this.esquema.set(activa.esquema as EsquemaJson);
+                  this.cargando.set(false);
+                },
+                error: () => {
+                  this.cargando.set(false);
+                  this.errorCarga.set(
+                    'No fue posible obtener el esquema del formulario para esta inspección.',
+                  );
+                },
+              });
+          });
         },
       });
   }
@@ -238,8 +309,67 @@ export class CompletarInspeccionPage implements OnInit {
     }
     if (!this.soloLectura() && huella !== this.ultimaHuellaDatos) {
       this.ultimaHuellaDatos = huella;
+      this.guardarEnDexieInmediato(valor);
       this.marcarCambio();
     }
+  }
+
+  private guardarEnDexieInmediato(valores: Record<string, unknown>): void {
+    const b = this.borrador();
+    if (!b || this.soloLectura()) return;
+
+    const fecha = this.fechaInspeccion();
+    if (fecha > this.hoy) {
+      this.errorGuardado.set('La fecha de inspección no puede ser posterior a la fecha actual.');
+      return;
+    }
+    const anioConstruccion = b.datosPermanentes?.anioConstruccion;
+    if (anioConstruccion && fecha) {
+      const anioInspeccion = parseInt(fecha.substring(0, 4), 10);
+      if (anioInspeccion < anioConstruccion) {
+        this.errorGuardado.set(
+          `La fecha de inspección (${anioInspeccion}) no puede ser anterior al año de construcción registrado (${anioConstruccion}).`,
+        );
+        return;
+      }
+    }
+
+    const d = new Date();
+    const hh = String(d.getHours()).padStart(2, '0');
+    const mm = String(d.getMinutes()).padStart(2, '0');
+    const ahoraIso = d.toISOString();
+
+    const borradorActualizado: InspeccionBorradorResponse = {
+      ...b,
+      datos: valores,
+      fechaInspeccion: fecha || b.fechaInspeccion,
+      actualizadoEn: ahoraIso,
+    };
+
+    const payload: BorradorLocalPayload = {
+      borrador: borradorActualizado,
+      versionFormularioId: b.versionFormularioId,
+      dispositivoId: b.dispositivoId,
+      autorId: b.autorId,
+    };
+
+    this.inspeccionesLocales
+      .guardarInspeccionLocal({
+        id: b.id,
+        puenteId: b.puenteId,
+        propietarioId: b.autorId,
+        estado: b.estado,
+        actualizadoEn: ahoraIso,
+        payload: payload,
+        sincronizado: false,
+      })
+      .then(() => {
+        this.horaGuardadoLocal.set(`${hh}:${mm}`);
+        this.errorAlmacenamiento.set(null);
+      })
+      .catch((err: Error) => {
+        this.errorAlmacenamiento.set(err.message || 'Almacenamiento local insuficiente.');
+      });
   }
   onFechaInspeccionChange(fecha: string): void {
     if (this.soloLectura()) return;
@@ -319,6 +449,16 @@ export class CompletarInspeccionPage implements OnInit {
     this.guardadoPendiente = { request: structuredClone(request), revision: revisionSolicitud };
     this.guardando.set(true);
     this.estadoAutoguardado.set('guardando');
+    // Si no hay red, el guardado local en Dexie ya se realizó inmediatamente
+    if (!this.connectivity.online()) {
+      this.guardadoPendiente = null;
+      this.guardando.set(false);
+      this.revisionGuardada = Math.max(this.revisionGuardada, revisionSolicitud);
+      this.estadoAutoguardado.set('guardado');
+      this.mensajeExito.set('Avance guardado localmente en este dispositivo.');
+      return;
+    }
+
     this.inspeccionApi.guardarBorrador(b.id, request).subscribe({
       next: (actualizada) => {
         this.guardadoPendiente = null;
@@ -351,6 +491,7 @@ export class CompletarInspeccionPage implements OnInit {
   }
   abrirConfirmacion(): void {
     if (
+      !this.connectivity.online() ||
       !this.accionFinal() ||
       this.cambiosSinGuardar() ||
       this.errorGuardado() ||
