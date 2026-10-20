@@ -5,18 +5,22 @@ import gt.usac.cunoc.sgp.common.security.JwtData;
 import gt.usac.cunoc.sgp.mantenimiento.dto.CerrarComoEjecutadaRequest;
 import gt.usac.cunoc.sgp.mantenimiento.dto.CerrarSinEjecucionRequest;
 import gt.usac.cunoc.sgp.mantenimiento.dto.CrearOrdenMantenimientoRequest;
+import gt.usac.cunoc.sgp.mantenimiento.dto.FiltroOrdenesRequest;
 import gt.usac.cunoc.sgp.mantenimiento.dto.HistorialEstadoOrdenResponse;
 import gt.usac.cunoc.sgp.mantenimiento.dto.IniciarEjecucionRequest;
 import gt.usac.cunoc.sgp.mantenimiento.dto.OrdenMantenimientoResponse;
 import gt.usac.cunoc.sgp.mantenimiento.dto.ProgramarOrdenRequest;
+import gt.usac.cunoc.sgp.mantenimiento.dto.TotalesOrdenesResponse;
 import gt.usac.cunoc.sgp.mantenimiento.service.OrdenMantenimientoService;
 import gt.usac.cunoc.sgp.mantenimiento.service.TransicionOrdenService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.data.domain.Page;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -67,14 +71,40 @@ public class OrdenMantenimientoController {
   @Operation(
       summary = "Listar órdenes de mantenimiento",
       description =
-          "Filtros opcionales puenteId y estado. Incluye las órdenes de puentes dados de baja. "
-              + "Página desde 0, tamaño entre 1 y 100; de la más reciente a la más antigua.")
+          "Filtros combinables: puenteId, estado (se puede repetir), tipo, prioridad confirmada y "
+              + "rango de creación desde/hasta (yyyy-MM-dd, ambos incluidos, hora de Guatemala). "
+              + "Incluye las órdenes de puentes dados de baja. Página desde 0, tamaño entre 1 y "
+              + "100; de la más reciente a la más antigua.")
   public Page<OrdenMantenimientoResponse> listar(
       @RequestParam(required = false) UUID puenteId,
-      @RequestParam(required = false) String estado,
+      @RequestParam(required = false) List<String> estado,
+      @RequestParam(required = false) String tipo,
+      @RequestParam(required = false) String prioridad,
+      @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
+          LocalDate desde,
+      @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
+          LocalDate hasta,
       @RequestParam(defaultValue = "0") int pagina,
       @RequestParam(defaultValue = "20") int tamanio) {
-    return ordenes.listar(puenteId, estado, pagina, tamanio);
+    return ordenes.listar(
+        new FiltroOrdenesRequest(puenteId, estado, tipo, prioridad, desde, hasta), pagina, tamanio);
+  }
+
+  @GetMapping("/totales")
+  @PreAuthorize("isAuthenticated()")
+  @Operation(
+      summary = "Totales de órdenes por estado",
+      description =
+          "Mismos filtros que el listado, salvo el estado; para el contador de cada pestaña.")
+  public TotalesOrdenesResponse totales(
+      @RequestParam(required = false) UUID puenteId,
+      @RequestParam(required = false) String tipo,
+      @RequestParam(required = false) String prioridad,
+      @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
+          LocalDate desde,
+      @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
+          LocalDate hasta) {
+    return ordenes.totales(new FiltroOrdenesRequest(puenteId, null, tipo, prioridad, desde, hasta));
   }
 
   @GetMapping("/{id}")

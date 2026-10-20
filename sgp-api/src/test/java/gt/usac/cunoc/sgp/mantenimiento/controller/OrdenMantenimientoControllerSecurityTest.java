@@ -17,6 +17,7 @@ import gt.usac.cunoc.sgp.common.exception.ApiExceptionHandler;
 import gt.usac.cunoc.sgp.common.security.JwtData;
 import gt.usac.cunoc.sgp.mantenimiento.dto.CerrarComoEjecutadaRequest;
 import gt.usac.cunoc.sgp.mantenimiento.dto.CerrarSinEjecucionRequest;
+import gt.usac.cunoc.sgp.mantenimiento.dto.FiltroOrdenesRequest;
 import gt.usac.cunoc.sgp.mantenimiento.dto.IniciarEjecucionRequest;
 import gt.usac.cunoc.sgp.mantenimiento.dto.ProgramarOrdenRequest;
 import gt.usac.cunoc.sgp.mantenimiento.service.OrdenMantenimientoService;
@@ -159,7 +160,45 @@ class OrdenMantenimientoControllerSecurityTest {
   }
 
   @Test
+  void laBandejaRecibeLosFiltrosCombinados() throws Exception {
+    UUID puente = UUID.fromString("019a0000-0000-7000-8000-000000004901");
+    mockMvc
+        .perform(
+            get(BASE)
+                .param("puenteId", puente.toString())
+                .param("estado", "DESCARTADA", "CANCELADA")
+                .param("tipo", "CORRECTIVO")
+                .param("prioridad", "ALTA")
+                .param("desde", "2026-10-01")
+                .param("hasta", "2026-10-20")
+                .param("pagina", "2")
+                .param("tamanio", "100")
+                .principal(autenticar(RoleName.ESTUDIANTE)))
+        .andExpect(status().isOk());
+    verify(ordenes)
+        .listar(
+            new FiltroOrdenesRequest(
+                puente,
+                List.of("DESCARTADA", "CANCELADA"),
+                "CORRECTIVO",
+                "ALTA",
+                LocalDate.of(2026, 10, 1),
+                LocalDate.of(2026, 10, 20)),
+            2,
+            100);
+
+    mockMvc
+        .perform(
+            get(BASE + "/totales")
+                .param("tipo", "CORRECTIVO")
+                .principal(autenticar(RoleName.PROFESIONAL_EXTERNO)))
+        .andExpect(status().isOk());
+    verify(ordenes).totales(new FiltroOrdenesRequest(null, null, "CORRECTIVO", null, null, null));
+  }
+
+  @Test
   void unVisitanteNoConsultaLasOrdenes() throws Exception {
+    mockMvc.perform(get(BASE + "/totales")).andExpect(status().isUnauthorized());
     mockMvc.perform(get(BASE)).andExpect(status().isUnauthorized());
     mockMvc.perform(get(BASE + "/{id}", ORDEN_ID)).andExpect(status().isUnauthorized());
     mockMvc.perform(get(BASE + "/{id}/historial", ORDEN_ID)).andExpect(status().isUnauthorized());

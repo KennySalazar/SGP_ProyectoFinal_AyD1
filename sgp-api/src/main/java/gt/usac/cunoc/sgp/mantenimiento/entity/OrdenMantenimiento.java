@@ -14,6 +14,7 @@ import jakarta.persistence.Version;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.UUID;
+import org.hibernate.annotations.Formula;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
@@ -35,6 +36,14 @@ public class OrdenMantenimiento {
 
   @Column(name = "regla_origen_id", updatable = false)
   private UUID reglaOrigenId;
+
+  /**
+   * Verdadero si la orden nació de una regla todavía sin validar (HU-049); nulo si no tiene regla.
+   * Se calcula al leer la orden y nunca se escribe.
+   */
+  @Formula(
+      "(SELECT r.validado_por_id IS NULL FROM regla_mantenimiento r WHERE r.id = regla_origen_id)")
+  private Boolean reglaProvisional;
 
   @Column(name = "resultado_ic_origen_id", updatable = false)
   private UUID resultadoIcOrigenId;
@@ -210,6 +219,10 @@ public class OrdenMantenimiento {
 
   public UUID getReglaOrigenId() {
     return reglaOrigenId;
+  }
+
+  public Boolean getReglaProvisional() {
+    return reglaProvisional;
   }
 
   public UUID getResultadoIcOrigenId() {

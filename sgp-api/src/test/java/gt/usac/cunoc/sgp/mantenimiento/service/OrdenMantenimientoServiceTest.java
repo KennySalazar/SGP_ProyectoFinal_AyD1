@@ -18,7 +18,9 @@ import gt.usac.cunoc.sgp.common.audit.service.AuditoriaWriter;
 import gt.usac.cunoc.sgp.common.exception.ApiException;
 import gt.usac.cunoc.sgp.inspeccion.repository.InspeccionRepository;
 import gt.usac.cunoc.sgp.mantenimiento.dto.CrearOrdenMantenimientoRequest;
+import gt.usac.cunoc.sgp.mantenimiento.dto.FiltroOrdenesRequest;
 import gt.usac.cunoc.sgp.mantenimiento.dto.OrdenMantenimientoResponse;
+import gt.usac.cunoc.sgp.mantenimiento.dto.TotalesOrdenesResponse;
 import gt.usac.cunoc.sgp.mantenimiento.entity.HistorialEstadoOrden;
 import gt.usac.cunoc.sgp.mantenimiento.entity.OrdenMantenimiento;
 import gt.usac.cunoc.sgp.mantenimiento.mapper.OrdenMantenimientoMapperImpl;
@@ -31,7 +33,9 @@ import gt.usac.cunoc.sgp.puente.entity.Puente;
 import gt.usac.cunoc.sgp.puente.repository.PuenteRepository;
 import java.time.Clock;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.ZoneOffset;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -254,44 +258,125 @@ class OrdenMantenimientoServiceTest {
   }
 
   @Test
-  void listarFiltraPorPuenteYEstadoOrdenandoDeLaMasReciente() {
-    when(ordenes.buscar(eq(PUENTE_ID), eq(EstadoOrden.PROGRAMADA), any()))
+  void listarCombinaTodosLosFiltrosOrdenandoDeLaMasReciente() {
+    when(ordenes.filtrar(any(), any(), any(), any(), any(), any(), any()))
         .thenReturn(new PageImpl<>(List.of(orden())));
 
-    Page<OrdenMantenimientoResponse> pagina = service.listar(PUENTE_ID, "PROGRAMADA", 1, 50);
+    Page<OrdenMantenimientoResponse> pagina =
+        service.listar(
+            new FiltroOrdenesRequest(
+                PUENTE_ID,
+                List.of("DESCARTADA", "CANCELADA"),
+                "CORRECTIVO",
+                "ALTA",
+                LocalDate.of(2026, 10, 1),
+                LocalDate.of(2026, 10, 20)),
+            1,
+            100);
 
     assertThat(pagina.getContent()).hasSize(1);
     ArgumentCaptor<Pageable> captor = ArgumentCaptor.forClass(Pageable.class);
-    verify(ordenes).buscar(eq(PUENTE_ID), eq(EstadoOrden.PROGRAMADA), captor.capture());
+    verify(ordenes)
+        .filtrar(
+            eq(EnumSet.of(EstadoOrden.DESCARTADA, EstadoOrden.CANCELADA)),
+            eq(PUENTE_ID),
+            eq(TipoOrden.CORRECTIVO),
+            eq(PrioridadOrden.ALTA),
+            // Días completos en hora de Guatemala (UTC-6); el final es exclusivo.
+            eq(Instant.parse("2026-10-01T06:00:00Z")),
+            eq(Instant.parse("2026-10-21T06:00:00Z")),
+            captor.capture());
     assertThat(captor.getValue().getPageNumber()).isEqualTo(1);
-    assertThat(captor.getValue().getPageSize()).isEqualTo(50);
+    assertThat(captor.getValue().getPageSize()).isEqualTo(100);
     assertThat(captor.getValue().getSort())
         .isEqualTo(Sort.by(Sort.Order.desc("creadoEn"), Sort.Order.desc("id")));
   }
 
   @Test
-  void listarSinEstadoNoFiltraPorEstado() {
-    when(ordenes.buscar(isNull(), isNull(), any())).thenReturn(Page.empty());
+  void listarSinFiltrosIncluyeTodosLosEstadosYFechas() {
+    when(ordenes.filtrar(any(), isNull(), isNull(), isNull(), any(), any(), any()))
+        .thenReturn(Page.empty());
 
-    assertThat(service.listar(null, " ", 0, 20)).isEmpty();
-    assertThat(service.listar(null, null, 0, 20)).isEmpty();
+    assertThat(
+            service.listar(
+                new FiltroOrdenesRequest(null, List.of(" "), null, " ", null, null), 0, 20))
+        .isEmpty();
+    assertThat(service.listar(new FiltroOrdenesRequest(null, null, null, null, null, null), 0, 20))
+        .isEmpty();
+
+    ArgumentCaptor<java.util.Collection<EstadoOrden>> estados = ArgumentCaptor.captor();
+    ArgumentCaptor<Instant> desde = ArgumentCaptor.forClass(Instant.class);
+    ArgumentCaptor<Instant> hasta = ArgumentCaptor.forClass(Instant.class);
+    verify(ordenes, org.mockito.Mockito.times(2))
+        .filtrar(
+            estados.capture(),
+            isNull(),
+            isNull(),
+            isNull(),
+            desde.capture(),
+            hasta.capture(),
+            any());
+    assertThat(estados.getValue()).containsExactlyInAnyOrder(EstadoOrden.values());
+    assertThat(desde.getValue()).isBefore(Instant.parse("2000-01-01T00:00:00Z"));
+    assertThat(hasta.getValue()).isAfter(Instant.parse("3000-01-01T00:00:00Z"));
   }
 
   @ParameterizedTest
   @CsvSource({"-1,20", "0,0", "0,101"})
   void unaPaginacionInvalidaResponde422(int pagina, int tamanio) {
     assertCodigo(
-        () -> service.listar(null, null, pagina, tamanio),
+        () -> service.listar(sinFiltros(), pagina, tamanio),
         HttpStatus.UNPROCESSABLE_ENTITY,
         "paginacion_invalida");
   }
 
   @Test
-  void unEstadoInexistenteEnElFiltroResponde422() {
-    assertCodigo(
-        () -> service.listar(null, "ARCHIVADA", 0, 20),
-        HttpStatus.UNPROCESSABLE_ENTITY,
-        "filtro_invalido");
+  void filtrosInexistentesORangoInvertidoResponden422ConCadaCampo() {
+    assertThatThrownBy(
+            () ->
+                service.listar(
+                    new FiltroOrdenesRequest(
+                        null,
+                        List.of("ARCHIVADA"),
+                        "PINTURA",
+                        "URGENTE",
+                        LocalDate.of(2026, 10, 20),
+                        LocalDate.of(2026, 10, 1)),
+                    0,
+                    20))
+        .isInstanceOfSatisfying(
+            ApiException.class,
+            e -> {
+              assertThat(e.getStatus()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+              assertThat(e.getCode()).isEqualTo("filtro_invalido");
+              assertThat(e.getErrores())
+                  .extracting(error -> error.get("campo"))
+                  .containsExactly("estado", "tipo", "prioridad", "desde");
+            });
+    verifyNoInteractions(ordenes);
+  }
+
+  @Test
+  void losTotalesIncluyenTodosLosEstadosAunqueValganCero() {
+    when(ordenes.contarPorEstado(eq(PUENTE_ID), isNull(), eq(PrioridadOrden.ALTA), any(), any()))
+        .thenReturn(
+            List.of(
+                new Object[] {EstadoOrden.PROPUESTA, 3L},
+                new Object[] {EstadoOrden.CANCELADA, 2L}));
+
+    TotalesOrdenesResponse totales =
+        service.totales(new FiltroOrdenesRequest(PUENTE_ID, null, null, "ALTA", null, null));
+
+    assertThat(totales.total()).isEqualTo(5);
+    assertThat(totales.porEstado())
+        .containsEntry(EstadoOrden.PROPUESTA, 3L)
+        .containsEntry(EstadoOrden.CANCELADA, 2L)
+        .containsEntry(EstadoOrden.EJECUTADA, 0L)
+        .hasSize(EstadoOrden.values().length);
+  }
+
+  private static FiltroOrdenesRequest sinFiltros() {
+    return new FiltroOrdenesRequest(null, null, null, null, null, null);
   }
 
   @Test
