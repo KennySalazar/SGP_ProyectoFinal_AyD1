@@ -8,10 +8,29 @@
       <div class="workspace-meta">
         <app-campana-avisos />
         <span class="environment">{{ 'app.development' | transloco }}</span>
-        <span class="connectivity" [class.offline]="!connectivity.online()">
-          <span class="dot"></span>
-          {{ (connectivity.online() ? 'connectivity.online' : 'connectivity.offline') | transloco }}
-        </span>
+        @if (sincronizacion.cola$ | async; as cola) {
+          <a class="connectivity" [class.offline]="!connectivity.online()" routerLink="/offline">
+            <span class="dot"></span>
+            @if (cantidadPendiente(cola, 'INSPECCION') + cantidadPendiente(cola, 'FOTO') === 0) {
+              {{ 'offline.synced' | transloco }}
+            } @else {
+              {{
+                (connectivity.online() ? 'connectivity.online' : 'connectivity.offline') | transloco
+              }}
+              · {{ cantidadPendiente(cola, 'INSPECCION') }}
+              {{ 'offline.pendingInspections' | transloco }} · {{ cantidadPendiente(cola, 'FOTO') }}
+              {{ 'offline.pendingFiles' | transloco }}
+            }
+          </a>
+          @if (
+            cantidadPendiente(cola, 'INSPECCION') + cantidadPendiente(cola, 'FOTO') > 0 &&
+            connectivity.online()
+          ) {
+            <button type="button" class="sync-now" (click)="sincronizacion.sincronizarAhora()">
+              {{ 'offline.syncNow' | transloco }}
+            </button>
+          }
+        }
       </div>
     </header>
 

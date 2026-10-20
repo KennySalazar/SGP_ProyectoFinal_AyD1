@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { sgpDb, LocalInspection, LocalFormSchema } from './db/sgp-db';
+import { sgpDb, LocalInspection, LocalFormSchema, SyncQueueItem } from './db/sgp-db';
 import {
   InspeccionesLocalesService,
   BorradorLocalPayload,
@@ -10,10 +10,17 @@ describe('HU-042: Inspecciones Locales y Recuperación tras Recarga', () => {
   let service: InspeccionesLocalesService;
   const inspeccionesMemoria = new Map<string, LocalInspection>();
   const esquemasMemoria = new Map<string, LocalFormSchema>();
+  const colaMemoria = new Map<string, SyncQueueItem>();
 
   beforeEach(() => {
     inspeccionesMemoria.clear();
     esquemasMemoria.clear();
+    colaMemoria.clear();
+
+    vi.spyOn(sgpDb, 'transaction').mockImplementation((...args: unknown[]) => {
+      const accion = args.at(-1) as () => Promise<unknown>;
+      return accion() as never;
+    });
 
     vi.spyOn(sgpDb.inspecciones, 'put').mockImplementation((item: LocalInspection) => {
       inspeccionesMemoria.set(item.id, item);
@@ -32,6 +39,22 @@ describe('HU-042: Inspecciones Locales y Recuperación tras Recarga', () => {
     vi.spyOn(sgpDb.inspecciones, 'toArray').mockImplementation(() => {
       return Promise.resolve([...inspeccionesMemoria.values()]) as never;
     });
+    vi.spyOn(sgpDb.cola_sync, 'put').mockImplementation((item: SyncQueueItem) => {
+      colaMemoria.set(item.id, item);
+      return Promise.resolve(item.id) as never;
+    });
+    vi.spyOn(sgpDb.cola_sync, 'orderBy').mockReturnValue({
+      last: async () =>
+        [...colaMemoria.values()].sort((a, b) => a.creadoEn.localeCompare(b.creadoEn)).at(-1),
+    } as never);
+    vi.spyOn(sgpDb.cola_sync, 'where').mockReturnValue({
+      equals: (id: string) => ({
+        toArray: async () => [...colaMemoria.values()].filter((item) => item.entityId === id),
+        delete: async () => {
+          for (const [key, item] of colaMemoria) if (item.entityId === id) colaMemoria.delete(key);
+        },
+      }),
+    } as never);
 
     vi.spyOn(sgpDb.esquemas_formulario, 'put').mockImplementation((item: LocalFormSchema) => {
       esquemasMemoria.set(item.id, item);
@@ -99,9 +122,14 @@ describe('HU-042: Inspecciones Locales y Recuperación tras Recarga', () => {
     expect(local).toBeDefined();
     expect(local?.id).toBe(req.id);
     expect(local?.sincronizado).toBe(false);
+    const operacion = [...colaMemoria.values()][0];
+    expect(operacion?.operacion).toBe('CREAR_INSPECCION');
+    expect(operacion?.propietarioId).toBe('user-uuid-1');
+    expect(operacion?.idempotencyKey).toBe(req.id);
     expect(local?.propietarioId).toBe('user-uuid-1');
 
     const payload = local?.payload as BorradorLocalPayload;
+    expect(payload.borrador.version).toBe(0);
     expect(payload.borrador.nombrePuente).toBe('Puente Los Altos');
     expect(payload.borrador.fechaInspeccion).toBe('2026-10-20');
     expect(payload.versionFormularioId).toBe('version-sieca-v1');
@@ -279,9 +307,11 @@ describe('HU-042: Inspecciones Locales y Recuperación tras Recarga', () => {
 
     const normalizar = (item: LocalInspection | undefined) => {
       const raw = item?.payload as Record<string, unknown> | undefined;
-      return (raw && typeof raw === 'object' && 'borrador' in raw && raw['borrador']
-        ? raw['borrador']
-        : raw) as Record<string, unknown> | undefined;
+      return (
+        raw && typeof raw === 'object' && 'borrador' in raw && raw['borrador']
+          ? raw['borrador']
+          : raw
+      ) as Record<string, unknown> | undefined;
     };
 
     const recuperadoEnv = await service.obtenerInspeccionLocal(idEnvoltorio);

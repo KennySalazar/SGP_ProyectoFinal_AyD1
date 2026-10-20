@@ -116,7 +116,8 @@ export class MisInspeccionesPage {
     // Obtener las inspecciones locales pendientes de sincronizar
     this.inspeccionesLocales.listarPendientesPorUsuario(autorId).then((pendientesLocales) => {
       const localesResumen: InspeccionResumenResponse[] = pendientesLocales.map((loc) => {
-        const payload = (loc.payload || {}) as BorradorLocalPayload;
+        const raw = (loc.payload || {}) as BorradorLocalPayload & Record<string, unknown>;
+        const payload = (raw.borrador ? raw : { borrador: raw }) as BorradorLocalPayload;
         const b = payload.borrador;
         return {
           id: loc.id,
@@ -171,14 +172,18 @@ export class MisInspeccionesPage {
         )
         .subscribe({
           next: (respuesta) => {
-            let combinadas = [...localesResumen, ...respuesta.content];
+            const porId = new Map(
+              respuesta.content.map((inspeccion) => [inspeccion.id, inspeccion]),
+            );
+            for (const local of localesResumen) porId.set(local.id, local);
+            let combinadas = [...porId.values()];
             if (filtro) {
               combinadas = combinadas.filter((i) => i.estado === filtro);
             }
             this.pagina.set({
               ...respuesta,
               content: combinadas,
-              totalElements: respuesta.totalElements + localesResumen.length,
+              totalElements: Math.max(respuesta.totalElements, combinadas.length),
               empty: combinadas.length === 0,
             });
           },

@@ -293,6 +293,12 @@ export class IniciarInspeccionDialogComponent implements OnChanges {
     this.form.disable({ emitEvent: false });
     this.solicitudAutorId = this.auth.user()?.id ?? null;
     const actor = this.solicitudAutorId;
+    if (!actor) {
+      this.guardando.set(false);
+      this.form.enable({ emitEvent: false });
+      this.error.set('Inicie sesión para crear una inspección.');
+      return;
+    }
 
     // Si no hay red, iniciar directamente en modo local
     if (!this.connectivity.online()) {
@@ -300,34 +306,56 @@ export class IniciarInspeccionDialogComponent implements OnChanges {
       return;
     }
 
-    this.api.iniciarInspeccion(request, clientUuid).subscribe({
-      next: (res) => {
-        if (this.auth.user()?.id !== actor || this.puente?.id !== request.puenteId) return;
-        this.guardando.set(false);
-        this.resultado.set(res);
-        this.solicitudInicio = null;
-        void this.cargarReporte();
-        this.inspeccionIniciada.emit(res);
-      },
-      error: async (err) => {
-        if (this.auth.user()?.id !== actor || this.puente?.id !== request.puenteId) return;
-        // Si falló por falta de red o error de conectividad, persistir offline
-        if (err.status === 0 || !navigator.onLine) {
-          await this.iniciarOffline(request, actor);
+    void this.inspeccionesLocales
+      .encolarInicio(actor, request)
+      .then((operacion) => {
+        if (this.auth.user()?.id !== actor) {
+          void this.inspeccionesLocales.marcarOperacionPendiente(
+            operacion.id,
+            'La sesión actual no corresponde al propietario de la inspección.',
+          );
+          this.guardando.set(false);
           return;
         }
-        if (!esResultadoIncierto(err)) {
-          this.solicitudInicio = null;
-          this.form.enable({ emitEvent: false });
-        }
+        this.api.iniciarInspeccion(request, operacion.idempotencyKey).subscribe({
+          next: (res) => {
+            void this.inspeccionesLocales.confirmarInicio(operacion.id, res.id, actor);
+            if (this.auth.user()?.id !== actor || this.puente?.id !== request.puenteId) return;
+            this.guardando.set(false);
+            this.resultado.set(res);
+            this.solicitudInicio = null;
+            void this.cargarReporte();
+            this.inspeccionIniciada.emit(res);
+          },
+          error: async (err) => {
+            if (this.auth.user()?.id !== actor || this.puente?.id !== request.puenteId) return;
+            // Si falló por falta de red o error de conectividad, persistir offline
+            if (err.status === 0 || !navigator.onLine || esResultadoIncierto(err)) {
+              await this.iniciarOffline(request, actor);
+              return;
+            }
+            if (!esResultadoIncierto(err)) {
+              void this.inspeccionesLocales.marcarOperacionParaIntervencion(
+                operacion.id,
+                String(err.error?.detail ?? err.error?.message ?? err.message),
+              );
+              this.solicitudInicio = null;
+              this.form.enable({ emitEvent: false });
+            }
+            this.guardando.set(false);
+            const backendMsg =
+              err.error?.message ||
+              err.error?.detail ||
+              'Ocurrió un error al iniciar la inspección. Verifique los datos ingresados.';
+            this.error.set(backendMsg);
+          },
+        });
+      })
+      .catch((err: Error) => {
         this.guardando.set(false);
-        const backendMsg =
-          err.error?.message ||
-          err.error?.detail ||
-          'Ocurrió un error al iniciar la inspección. Verifique los datos ingresados.';
-        this.error.set(backendMsg);
-      },
-    });
+        this.form.enable({ emitEvent: false });
+        this.error.set(err.message || 'No fue posible guardar la operación para sincronizar.');
+      });
   }
 
   private async iniciarOffline(

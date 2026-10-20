@@ -44,9 +44,13 @@ export interface SyncQueueItem {
   tipo: 'INSPECCION' | 'FOTO';
   entityId: string;
   idempotencyKey: string;
+  propietarioId?: string;
+  operacion?: 'CREAR_INSPECCION' | 'GUARDAR_BORRADOR';
+  payload?: unknown;
   intentos: number;
   creadoEn: string;
   ultimoError?: string;
+  estado?: 'PENDIENTE' | 'ENVIANDO' | 'INTERVENCION';
 }
 
 export interface LocalNotificacion {
@@ -87,6 +91,9 @@ export class SgpDatabase extends Dexie {
     this.version(2).stores({
       notificaciones: 'id,leidoEn,creadoEn',
       notificaciones_meta: 'key',
+    });
+    this.version(3).stores({
+      cola_sync: 'id,tipo,entityId,creadoEn,intentos,propietarioId,estado',
     });
   }
 }
