@@ -1,0 +1,71 @@
+<header class="page-heading">
+  <div>
+    <p class="page-kicker">{{ 'mantenimiento.kicker' | transloco }}</p>
+    <h1 class="page-title">{{ 'mantenimiento.ordenes.titulo' | transloco }}</h1>
+    <p class="page-description">{{ 'mantenimiento.ordenes.descripcion' | transloco }}</p>
+  </div>
+</header>
+
+<section class="surface-card lista-ordenes">
+  <div class="lista-cabecera">
+    <div>
+      <h2>{{ 'mantenimiento.ordenes.listaTitulo' | transloco }}</h2>
+      <p>{{ 'mantenimiento.ordenes.listaDescripcion' | transloco }}</p>
+    </div>
+    <p-select
+      [options]="estados"
+      optionLabel="label"
+      optionValue="value"
+      [ngModel]="estadoFiltro()"
+      (ngModelChange)="cambiarEstado($event)"
+      [ariaLabel]="'mantenimiento.ordenes.filtrarEstado' | transloco"
+    />
+  </div>
+
+  @if (error()) {
+  <p class="mensaje error" role="alert">{{ 'mantenimiento.ordenes.errorCarga' | transloco }}</p>
+  } @if (cargando()) {
+  <p class="mensaje" role="status">{{ 'mantenimiento.ordenes.cargando' | transloco }}</p>
+  } @if (!cargando() && pagina()?.content?.length === 0) {
+  <p class="mensaje" role="status">{{ 'mantenimiento.ordenes.vacio' | transloco }}</p>
+  } @for (orden of pagina()?.content ?? []; track orden.id) {
+  <article class="orden-fila">
+    <div class="orden-principal">
+      <div class="fila-titulo">
+        <h3>{{ orden.descripcion }}</h3>
+        <p-tag
+          [value]="'mantenimiento.ordenes.estados.' + orden.estado | transloco"
+          [severity]="severidad(orden.estado)"
+        />
+      </div>
+      <p>
+        {{ 'mantenimiento.ordenes.tipos.' + orden.tipo | transloco }} · {{
+        'mantenimiento.ordenes.prioridad' | transloco }}: {{ 'mantenimiento.ordenes.prioridades.' +
+        orden.prioridadConfirmada | transloco }} @if (orden.fechaProgramada) { · {{
+        'mantenimiento.ordenes.programadaPara' | transloco }} {{ orden.fechaProgramada | date:
+        'dd/MM/yyyy' }} }
+      </p>
+      @if (orden.elementoRef) {
+      <small>{{ orden.elementoRef }}</small>
+      }
+    </div>
+    <a
+      pButton
+      severity="secondary"
+      [outlined]="true"
+      [routerLink]="['/mantenimiento/ordenes', orden.id]"
+    >
+      <i class="pi pi-eye" aria-hidden="true"></i
+      ><span>{{ 'mantenimiento.ordenes.verDetalle' | transloco }}</span>
+    </a>
+  </article>
+  } @if (pagina() && pagina()!.totalElements > 0) {
+  <p-paginator
+    [first]="pagina()!.number * pagina()!.size"
+    [rows]="pagina()!.size"
+    [totalRecords]="pagina()!.totalElements"
+    [rowsPerPageOptions]="[10, 20, 50, 100]"
+    (onPageChange)="cambiarPagina($event)"
+  />
+  }
+</section>

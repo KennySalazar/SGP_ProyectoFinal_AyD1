@@ -73,6 +73,9 @@
           <a routerLink="/mantenimiento/reglas" routerLinkActive="active">
             <i class="pi pi-wrench"></i><span>{{ 'nav.maintenanceRules' | transloco }}</span>
           </a>
+          <a routerLink="/mantenimiento/ordenes" routerLinkActive="active">
+            <i class="pi pi-briefcase"></i><span>{{ 'nav.maintenanceOrders' | transloco }}</span>
+          </a>
         }
         @if (auth.user()?.role === 'ADMINISTRADOR') {
           <a

@@ -15,9 +15,16 @@ import static org.mockito.Mockito.when;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import gt.usac.cunoc.sgp.archivo.entity.Archivo;
+import gt.usac.cunoc.sgp.archivo.entity.ArchivoEvidenciaMantenimiento;
+import gt.usac.cunoc.sgp.archivo.model.EstadoArchivo;
+import gt.usac.cunoc.sgp.archivo.model.TipoUsoArchivo;
+import gt.usac.cunoc.sgp.archivo.repository.ArchivoEvidenciaMantenimientoRepository;
+import gt.usac.cunoc.sgp.archivo.service.AlmacenamientoArchivos;
 import gt.usac.cunoc.sgp.common.audit.model.AccionAuditoria;
 import gt.usac.cunoc.sgp.common.audit.service.AuditoriaWriter;
 import gt.usac.cunoc.sgp.common.exception.ApiException;
+import gt.usac.cunoc.sgp.mantenimiento.dto.CerrarComoEjecutadaRequest;
 import gt.usac.cunoc.sgp.mantenimiento.dto.CerrarSinEjecucionRequest;
 import gt.usac.cunoc.sgp.mantenimiento.dto.IniciarEjecucionRequest;
 import gt.usac.cunoc.sgp.mantenimiento.dto.OrdenMantenimientoResponse;
@@ -33,10 +40,12 @@ import gt.usac.cunoc.sgp.mantenimiento.repository.HistorialEstadoOrdenRepository
 import gt.usac.cunoc.sgp.mantenimiento.repository.OrdenMantenimientoEjecucionRepository;
 import gt.usac.cunoc.sgp.mantenimiento.repository.OrdenMantenimientoRepository;
 import gt.usac.cunoc.sgp.notificacion.service.NotificacionService;
+import java.io.IOException;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -61,6 +70,8 @@ class TransicionOrdenServiceTest {
   private OrdenMantenimientoRepository ordenes;
   private HistorialEstadoOrdenRepository historial;
   private OrdenMantenimientoEjecucionRepository ejecuciones;
+  private ArchivoEvidenciaMantenimientoRepository evidencias;
+  private AlmacenamientoArchivos almacenamiento;
   private AuditoriaWriter auditoria;
   private NotificacionService notificaciones;
   private TransicionOrdenService service;
@@ -70,6 +81,8 @@ class TransicionOrdenServiceTest {
     ordenes = mock(OrdenMantenimientoRepository.class);
     historial = mock(HistorialEstadoOrdenRepository.class);
     ejecuciones = mock(OrdenMantenimientoEjecucionRepository.class);
+    evidencias = mock(ArchivoEvidenciaMantenimientoRepository.class);
+    almacenamiento = mock(AlmacenamientoArchivos.class);
     auditoria = mock(AuditoriaWriter.class);
     notificaciones = mock(NotificacionService.class);
     service =
@@ -77,6 +90,8 @@ class TransicionOrdenServiceTest {
             ordenes,
             historial,
             ejecuciones,
+            evidencias,
+            almacenamiento,
             auditoria,
             notificaciones,
             new OrdenMantenimientoMapperImpl(),
@@ -365,6 +380,204 @@ class TransicionOrdenServiceTest {
     assertSinCambios(orden, terminal);
   }
 
+  @Test
+  void cerrarComoEjecutadaGuardaElCierreYAvisaAlCreador() throws IOException {
+    OrdenMantenimiento orden = orden(EstadoOrden.EN_EJECUCION, CREADOR_ID);
+    ejecucion(HOY, null, "Constructora Los Altos");
+    evidencia("evidencia-1.jpg");
+    when(almacenamiento.existe("evidencia-1.jpg")).thenReturn(true);
+
+    OrdenMantenimientoResponse response =
+        service.cerrarComoEjecutada(ORDEN_ID, new CerrarComoEjecutadaRequest(3L), USUARIO_ID);
+
+    assertThat(response.estado()).isEqualTo(EstadoOrden.EJECUTADA);
+    assertThat(orden.getActualizadoEn()).isEqualTo(AHORA);
+    HistorialEstadoOrden fila = historialGuardado();
+    assertThat(fila.getEstadoAnterior()).isEqualTo("EN_EJECUCION");
+    assertThat(fila.getEstadoNuevo()).isEqualTo("EJECUTADA");
+    assertThat(fila.getRealizadoPorId()).isEqualTo(USUARIO_ID);
+
+    JsonNode despues = auditoriaDeCambio("EN_EJECUCION");
+    assertThat(despues.get("evento").asText()).isEqualTo("CERRAR_COMO_EJECUTADA");
+    assertThat(despues.get("fechaEjecucion").asText()).isEqualTo("2026-10-20");
+    assertThat(despues.get("responsableNombre").asText()).isEqualTo("Constructora Los Altos");
+    assertThat(despues.get("evidencias").asLong()).isEqualTo(1);
+    verify(notificaciones)
+        .notificar(
+            eq(CREADOR_ID),
+            eq("ORDEN_MANTENIMIENTO"),
+            eq("Orden de mantenimiento ejecutada"),
+            contains("20/10/2026"),
+            eq("orden_mantenimiento"),
+            eq(ORDEN_ID),
+            eq("orden-mantenimiento:" + ORDEN_ID + ":EJECUTADA"));
+  }
+
+  @Test
+  void cerrarSinFechaNiEvidenciaResponde422ConLoQueFaltaYLaOrdenSigueEnEjecucion() {
+    OrdenMantenimiento orden = orden(EstadoOrden.EN_EJECUCION, CREADOR_ID);
+    ejecucion(null, USUARIO_ID, null);
+    when(evidencias.findByOrdenMantenimientoIdAndArchivo_EstadoOrderByCreadoEnAsc(
+            ORDEN_ID, EstadoArchivo.DISPONIBLE))
+        .thenReturn(List.of());
+
+    assertThatThrownBy(
+            () ->
+                service.cerrarComoEjecutada(
+                    ORDEN_ID, new CerrarComoEjecutadaRequest(3L), USUARIO_ID))
+        .isInstanceOfSatisfying(
+            ApiException.class,
+            e -> {
+              assertThat(e.getStatus()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+              assertThat(e.getCode()).isEqualTo("cierre_incompleto");
+              assertThat(e.getErrores())
+                  .extracting(error -> error.get("campo"))
+                  .containsExactly("fechaEjecucion", "evidencias");
+            });
+    assertThat(orden.getEstado()).isEqualTo(EstadoOrden.EN_EJECUCION);
+    verify(historial, never()).save(any());
+    verify(ordenes, never()).saveAndFlush(any());
+    verifyNoInteractions(auditoria, notificaciones);
+  }
+
+  @Test
+  void cerrarSinResponsableResponde422() {
+    orden(EstadoOrden.EN_EJECUCION, CREADOR_ID);
+    when(ejecuciones.findById(ORDEN_ID)).thenReturn(Optional.empty());
+
+    assertThatThrownBy(
+            () ->
+                service.cerrarComoEjecutada(
+                    ORDEN_ID, new CerrarComoEjecutadaRequest(3L), USUARIO_ID))
+        .isInstanceOfSatisfying(
+            ApiException.class,
+            e ->
+                assertThat(e.getErrores())
+                    .extracting(error -> error.get("campo"))
+                    .contains("responsable"));
+  }
+
+  @Test
+  void unResponsableEnBlancoNoCuentaParaElCierre() {
+    orden(EstadoOrden.EN_EJECUCION, CREADOR_ID);
+    ejecucion(HOY, null, "   ");
+
+    assertThatThrownBy(
+            () ->
+                service.cerrarComoEjecutada(
+                    ORDEN_ID, new CerrarComoEjecutadaRequest(3L), USUARIO_ID))
+        .isInstanceOfSatisfying(
+            ApiException.class,
+            e ->
+                assertThat(e.getErrores())
+                    .extracting(error -> error.get("campo"))
+                    .containsExactly("responsable", "evidencias"));
+  }
+
+  @Test
+  void cerrarSinCuerpoExigeLaVersion() {
+    assertError(
+        () -> service.cerrarComoEjecutada(ORDEN_ID, null, USUARIO_ID),
+        HttpStatus.UNPROCESSABLE_ENTITY,
+        "solicitud_invalida");
+    verifyNoInteractions(ordenes, auditoria);
+  }
+
+  @Test
+  void unaEvidenciaCuyoObjetoNoExisteNoCuenta() throws IOException {
+    orden(EstadoOrden.EN_EJECUCION, CREADOR_ID);
+    ejecucion(HOY, USUARIO_ID, null);
+    evidencia("perdida.jpg");
+    when(almacenamiento.existe("perdida.jpg")).thenReturn(false);
+
+    assertError(
+        () -> service.cerrarComoEjecutada(ORDEN_ID, new CerrarComoEjecutadaRequest(3L), USUARIO_ID),
+        HttpStatus.UNPROCESSABLE_ENTITY,
+        "cierre_incompleto");
+  }
+
+  @Test
+  void siElAlmacenamientoNoRespondeElCierreResponde503SinCambiarElEstado() throws IOException {
+    OrdenMantenimiento orden = orden(EstadoOrden.EN_EJECUCION, CREADOR_ID);
+    ejecucion(HOY, USUARIO_ID, null);
+    evidencia("evidencia-1.jpg");
+    when(almacenamiento.existe("evidencia-1.jpg")).thenThrow(new IOException("sin conexión"));
+
+    assertError(
+        () -> service.cerrarComoEjecutada(ORDEN_ID, new CerrarComoEjecutadaRequest(3L), USUARIO_ID),
+        HttpStatus.SERVICE_UNAVAILABLE,
+        "almacenamiento_no_disponible");
+    assertThat(orden.getEstado()).isEqualTo(EstadoOrden.EN_EJECUCION);
+    verify(ordenes, never()).saveAndFlush(any());
+    verifyNoInteractions(auditoria, notificaciones);
+  }
+
+  @ParameterizedTest
+  @EnumSource(
+      value = EstadoOrden.class,
+      names = {"PROPUESTA", "PROGRAMADA"})
+  void soloUnaOrdenEnEjecucionSeCierraComoEjecutada(EstadoOrden estado) {
+    OrdenMantenimiento orden = orden(estado, CREADOR_ID);
+
+    assertError(
+        () -> service.cerrarComoEjecutada(ORDEN_ID, new CerrarComoEjecutadaRequest(3L), USUARIO_ID),
+        HttpStatus.CONFLICT,
+        "transicion_invalida");
+    assertSinCambios(orden, estado);
+  }
+
+  @Test
+  void unaOrdenEjecutadaNoSeVuelveACerrar() {
+    OrdenMantenimiento orden = orden(EstadoOrden.EJECUTADA, CREADOR_ID);
+
+    assertError(
+        () -> service.cerrarComoEjecutada(ORDEN_ID, new CerrarComoEjecutadaRequest(3L), USUARIO_ID),
+        HttpStatus.CONFLICT,
+        "estado_terminal");
+    assertSinCambios(orden, EstadoOrden.EJECUTADA);
+  }
+
+  @Test
+  void cerrarConVersionDesactualizadaResponde409() {
+    orden(EstadoOrden.EN_EJECUCION, CREADOR_ID);
+
+    assertError(
+        () -> service.cerrarComoEjecutada(ORDEN_ID, new CerrarComoEjecutadaRequest(2L), USUARIO_ID),
+        HttpStatus.CONFLICT,
+        "version_desactualizada");
+  }
+
+  private void ejecucion(LocalDate fecha, UUID responsableId, String responsableNombre) {
+    OrdenMantenimientoEjecucion ejecucion =
+        new OrdenMantenimientoEjecucion(ORDEN_ID, AHORA.minusSeconds(3600), USUARIO_ID);
+    ejecucion.registrar(fecha, responsableId, responsableNombre, AHORA);
+    when(ejecuciones.findById(ORDEN_ID)).thenReturn(Optional.of(ejecucion));
+  }
+
+  private void evidencia(String clave) {
+    Archivo archivo =
+        new Archivo(
+            UUID.randomUUID(),
+            TipoUsoArchivo.EVIDENCIA_MANTENIMIENTO,
+            null,
+            null,
+            clave,
+            clave,
+            "mini-" + clave,
+            "image/jpeg",
+            100,
+            "a".repeat(64),
+            10,
+            10,
+            null,
+            null,
+            USUARIO_ID,
+            AHORA);
+    when(evidencias.findByOrdenMantenimientoIdAndArchivo_EstadoOrderByCreadoEnAsc(
+            ORDEN_ID, EstadoArchivo.DISPONIBLE))
+        .thenReturn(List.of(new ArchivoEvidenciaMantenimiento(archivo, ORDEN_ID, null, AHORA)));
+  }
+
   private OrdenMantenimiento orden(EstadoOrden estado, UUID creadoPorId) {
     OrdenMantenimiento orden =
         new OrdenMantenimiento(
@@ -381,6 +594,7 @@ class TransicionOrdenServiceTest {
     ReflectionTestUtils.setField(orden, "estado", estado);
     ReflectionTestUtils.setField(orden, "version", 3L);
     when(ordenes.findById(ORDEN_ID)).thenReturn(Optional.of(orden));
+    when(ordenes.findByIdForUpdate(ORDEN_ID)).thenReturn(Optional.of(orden));
     return orden;
   }
 

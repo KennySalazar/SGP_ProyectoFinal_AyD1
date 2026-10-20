@@ -2,10 +2,15 @@ package gt.usac.cunoc.sgp.mantenimiento.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import gt.usac.cunoc.sgp.archivo.entity.ArchivoEvidenciaMantenimiento;
+import gt.usac.cunoc.sgp.archivo.model.EstadoArchivo;
+import gt.usac.cunoc.sgp.archivo.repository.ArchivoEvidenciaMantenimientoRepository;
+import gt.usac.cunoc.sgp.archivo.service.AlmacenamientoArchivos;
 import gt.usac.cunoc.sgp.common.audit.model.AccionAuditoria;
 import gt.usac.cunoc.sgp.common.audit.service.AuditoriaWriter;
 import gt.usac.cunoc.sgp.common.exception.ApiException;
 import gt.usac.cunoc.sgp.common.util.UuidV7Generator;
+import gt.usac.cunoc.sgp.mantenimiento.dto.CerrarComoEjecutadaRequest;
 import gt.usac.cunoc.sgp.mantenimiento.dto.CerrarSinEjecucionRequest;
 import gt.usac.cunoc.sgp.mantenimiento.dto.IniciarEjecucionRequest;
 import gt.usac.cunoc.sgp.mantenimiento.dto.OrdenMantenimientoResponse;
@@ -20,15 +25,19 @@ import gt.usac.cunoc.sgp.mantenimiento.repository.HistorialEstadoOrdenRepository
 import gt.usac.cunoc.sgp.mantenimiento.repository.OrdenMantenimientoEjecucionRepository;
 import gt.usac.cunoc.sgp.mantenimiento.repository.OrdenMantenimientoRepository;
 import gt.usac.cunoc.sgp.notificacion.service.NotificacionService;
+import java.io.IOException;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -51,6 +60,8 @@ public class TransicionOrdenService {
   private final OrdenMantenimientoRepository ordenes;
   private final HistorialEstadoOrdenRepository historial;
   private final OrdenMantenimientoEjecucionRepository ejecuciones;
+  private final ArchivoEvidenciaMantenimientoRepository evidencias;
+  private final AlmacenamientoArchivos almacenamiento;
   private final AuditoriaWriter auditoria;
   private final NotificacionService notificaciones;
   private final OrdenMantenimientoMapper mapper;
@@ -61,6 +72,8 @@ public class TransicionOrdenService {
       OrdenMantenimientoRepository ordenes,
       HistorialEstadoOrdenRepository historial,
       OrdenMantenimientoEjecucionRepository ejecuciones,
+      ArchivoEvidenciaMantenimientoRepository evidencias,
+      AlmacenamientoArchivos almacenamiento,
       AuditoriaWriter auditoria,
       NotificacionService notificaciones,
       OrdenMantenimientoMapper mapper,
@@ -69,6 +82,8 @@ public class TransicionOrdenService {
     this.ordenes = ordenes;
     this.historial = historial;
     this.ejecuciones = ejecuciones;
+    this.evidencias = evidencias;
+    this.almacenamiento = almacenamiento;
     this.auditoria = auditoria;
     this.notificaciones = notificaciones;
     this.mapper = mapper;
@@ -150,6 +165,91 @@ public class TransicionOrdenService {
     return mapper.toResponse(ordenes.saveAndFlush(orden));
   }
 
+  /**
+   * EN_EJECUCION a EJECUTADA (RN-MTO-05). Exige fecha de ejecución, responsable y al menos una
+   * fotografía de evidencia disponible en el almacenamiento; si falta algo responde 422 con el
+   * detalle y la orden no cambia. El estado, el historial y la auditoría se guardan juntos.
+   */
+  @Transactional
+  public OrdenMantenimientoResponse cerrarComoEjecutada(
+      UUID ordenId, CerrarComoEjecutadaRequest request, UUID usuarioId) {
+    Long version = exigirVersion(request == null ? null : request.version());
+    OrdenMantenimiento orden = conVersion(ordenes.findByIdForUpdate(ordenId), ordenId, version);
+    EstadoOrden anterior = orden.getEstado();
+    EstadoOrden destino = MaquinaEstadosOrden.destino(anterior, EventoOrden.CERRAR_COMO_EJECUTADA);
+
+    Optional<OrdenMantenimientoEjecucion> ejecucion = ejecuciones.findById(ordenId);
+    LocalDate fecha = ejecucion.map(OrdenMantenimientoEjecucion::getFechaEjecucion).orElse(null);
+    UUID responsableId =
+        ejecucion.map(OrdenMantenimientoEjecucion::getResponsableUsuarioId).orElse(null);
+    String responsableNombre =
+        ejecucion.map(OrdenMantenimientoEjecucion::getResponsableNombre).orElse(null);
+    long fotografias = evidenciasAlmacenadas(ordenId);
+
+    List<Map<String, String>> faltantes = new ArrayList<>();
+    if (fecha == null) {
+      faltantes.add(faltante("fechaEjecucion", "Falta la fecha de ejecución."));
+    }
+    if (responsableId == null && (responsableNombre == null || responsableNombre.isBlank())) {
+      faltantes.add(faltante("responsable", "Falta el responsable de la intervención."));
+    }
+    if (fotografias == 0) {
+      faltantes.add(faltante("evidencias", "Falta al menos una fotografía de evidencia."));
+    }
+    if (!faltantes.isEmpty()) {
+      throw new ApiException(
+          HttpStatus.UNPROCESSABLE_ENTITY,
+          "cierre_incompleto",
+          "Cierre incompleto",
+          faltantes.stream()
+              .map(f -> f.get("mensaje"))
+              .collect(Collectors.joining(" ", "No se puede cerrar la orden como ejecutada. ", "")),
+          faltantes);
+    }
+
+    Instant ahora = clock.instant();
+    ObjectNode extra =
+        json.createObjectNode()
+            .put("fechaEjecucion", fecha.toString())
+            .put("responsableUsuarioId", responsableId == null ? null : responsableId.toString())
+            .put("responsableNombre", responsableNombre)
+            .put("evidencias", fotografias);
+    registrarCambio(
+        orden, anterior, destino, EventoOrden.CERRAR_COMO_EJECUTADA, usuarioId, null, ahora, extra);
+    avisarAlCreador(
+        orden,
+        destino,
+        "Orden de mantenimiento ejecutada",
+        "La orden de mantenimiento que creaste se ejecutó el " + FORMATO_FECHA.format(fecha) + ".");
+    return mapper.toResponse(ordenes.saveAndFlush(orden));
+  }
+
+  /** Evidencias disponibles cuyo objeto sigue en el almacenamiento; 503 si este no responde. */
+  private long evidenciasAlmacenadas(UUID ordenId) {
+    long disponibles = 0;
+    for (ArchivoEvidenciaMantenimiento evidencia :
+        evidencias.findByOrdenMantenimientoIdAndArchivo_EstadoOrderByCreadoEnAsc(
+            ordenId, EstadoArchivo.DISPONIBLE)) {
+      try {
+        if (almacenamiento.existe(evidencia.getArchivo().getClaveObjetoOriginal())) {
+          disponibles++;
+        }
+      } catch (IOException e) {
+        throw new ApiException(
+            HttpStatus.SERVICE_UNAVAILABLE,
+            "almacenamiento_no_disponible",
+            "Almacenamiento no disponible",
+            "No se pudo verificar la evidencia fotográfica. La orden sigue EN_EJECUCION; intente"
+                + " de nuevo más tarde.");
+      }
+    }
+    return disponibles;
+  }
+
+  private static Map<String, String> faltante(String campo, String mensaje) {
+    return Map.of("campo", campo, "mensaje", mensaje);
+  }
+
   private OrdenMantenimientoResponse cerrarSinEjecucion(
       UUID ordenId,
       CerrarSinEjecucionRequest request,
@@ -225,16 +325,19 @@ public class TransicionOrdenService {
   }
 
   private OrdenMantenimiento buscarConVersion(UUID ordenId, Long version) {
+    return conVersion(ordenes.findById(ordenId), ordenId, version);
+  }
+
+  private OrdenMantenimiento conVersion(
+      Optional<OrdenMantenimiento> encontrada, UUID ordenId, Long version) {
     OrdenMantenimiento orden =
-        ordenes
-            .findById(ordenId)
-            .orElseThrow(
-                () ->
-                    new ApiException(
-                        HttpStatus.NOT_FOUND,
-                        "orden_no_encontrada",
-                        "Orden no encontrada",
-                        "No existe la orden de mantenimiento " + ordenId));
+        encontrada.orElseThrow(
+            () ->
+                new ApiException(
+                    HttpStatus.NOT_FOUND,
+                    "orden_no_encontrada",
+                    "Orden no encontrada",
+                    "No existe la orden de mantenimiento " + ordenId));
     if (!Objects.equals(orden.getVersion(), version)) {
       throw new ApiException(
           HttpStatus.CONFLICT,
