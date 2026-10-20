@@ -1,3 +1,4 @@
+import { anclajeDeControl, CONTEXTO_OBSERVACIONES } from '../observaciones/contexto-observaciones';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -66,6 +67,7 @@ const ICONOS_NO_PRESENTE: Record<string, string> = {
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class ElementoEvaluableComponent {
+  private readonly contextoObservaciones = inject(CONTEXTO_OBSERVACIONES, { optional: true });
   private readonly transloco = inject(TranslocoService);
 
   readonly nodo = input.required<NodoFormulario>();
@@ -266,6 +268,18 @@ export class ElementoEvaluableComponent {
     effect(() => {
       this.tipoEstado();
       untracked(() => this.decision.set(null));
+    });
+    effect(() => {
+      const destino = this.contextoObservaciones?.destinoNavegacion();
+      if (!destino) return;
+      const propio = anclajeDeControl(this.control());
+      if (
+        propio &&
+        destino.anclaje.elementoRef.startsWith(propio.elementoRef + '/') &&
+        destino.anclaje.instanciaElementoId === propio.instanciaElementoId
+      ) {
+        untracked(() => this.decision.set(true));
+      }
     });
   }
 

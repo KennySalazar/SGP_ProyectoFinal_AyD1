@@ -107,6 +107,7 @@ class DatabaseMigrationIntegrationTest {
       assertTrue(tableExists(statement, "inspeccion"));
       assertTrue(tableExists(statement, "inspeccion_dato_tecnico"));
       assertTrue(tableExists(statement, "revision"));
+      assertTrue(columnExists(statement, "observacion_revision", "categoria_fotografica"));
       assertTrue(tableExists(statement, "resultado_ic"));
       assertTrue(tableExists(statement, "confirmacion_estado_inspeccion"));
       for (String columna :

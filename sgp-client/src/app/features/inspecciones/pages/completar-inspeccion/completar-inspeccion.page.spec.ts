@@ -221,7 +221,7 @@ describe('CompletarInspeccionPage', () => {
     await fixture.whenStable();
     const reporte = fixture.debugElement.query(By.directive(ReporteFotograficoComponent))
       .componentInstance as ReporteFotograficoComponent;
-    expect(reporte.inspeccion().id).toBe('inspeccion-123');
+    expect(reporte.inspeccion()!.id).toBe('inspeccion-123');
     expect(mockInspeccionApi.listarFotografias).toHaveBeenCalledWith('inspeccion-123');
     reporte.ocupado.set(true);
     fixture.detectChanges();
@@ -515,7 +515,7 @@ describe('CompletarInspeccionPage', () => {
     const reporte = fixture.debugElement.query(By.directive(ReporteFotograficoComponent))
       .componentInstance as ReporteFotograficoComponent;
     expect(confirmacion.inspeccionId()).toBe(mockBorrador.id);
-    expect(reporte.inspeccion().id).toBe(mockBorrador.id);
+    expect(reporte.inspeccion()!.id).toBe(mockBorrador.id);
     confirmacion.ocupado.emit(true);
     fixture.detectChanges();
     expect(component.operandoIc()).toBe(true);

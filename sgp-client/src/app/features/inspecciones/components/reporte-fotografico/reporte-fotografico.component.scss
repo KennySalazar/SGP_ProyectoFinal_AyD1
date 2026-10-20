@@ -49,3 +49,13 @@ figcaption {
 .mensaje-error {
   color: #b91c1c;
 }
+.categoria {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.categoria > button {
+  min-width: 44px;
+  min-height: 44px;
+  max-width: 100%;
+  white-space: normal;
+}

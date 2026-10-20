@@ -16,6 +16,9 @@ import org.springframework.data.repository.query.Param;
 
 public interface RevisionRepository extends JpaRepository<Revision, UUID> {
 
+  boolean existsByInspeccionIdAndRevisorIdAndEstado(
+      UUID inspeccionId, UUID revisorId, String estado);
+
   @Query("select coalesce(max(r.numeroCiclo), 0) from Revision r where r.inspeccion.id = :id")
   int ultimoCiclo(@Param("id") UUID inspeccionId);
 

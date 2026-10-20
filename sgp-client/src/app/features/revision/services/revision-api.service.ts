@@ -3,6 +3,13 @@ import { inject, Injectable, signal } from '@angular/core';
 import { Observable, tap } from 'rxjs';
 import {
   FiltrosBandejaRevision,
+  PaginaObservacionesRecibidas,
+  RevisionDetalleResponse,
+  CrearObservacionRequest,
+  ObservacionResponse,
+  ListadoObservacionesResponse,
+  ContadorObservacionesResponse,
+  ObservacionGeneralResponse,
   PaginaBorradoresEstudiante,
   PaginaRevisiones,
   ResultadoInicioRevision,
@@ -45,5 +52,61 @@ export class RevisionApiService {
       `/api/v1/revisiones/${encodeURIComponent(revisionId)}/iniciar`,
       null,
     );
+  }
+  recibidas(pagina = 0): Observable<PaginaObservacionesRecibidas> {
+    return this.http.get<PaginaObservacionesRecibidas>('/api/v1/observaciones/recibidas', {
+      params: { pagina, tamanio: 20 },
+    });
+  }
+  detalle(revisionId: string): Observable<RevisionDetalleResponse> {
+    return this.http.get<RevisionDetalleResponse>(this.ruta(revisionId));
+  }
+  observaciones(revisionId: string): Observable<ListadoObservacionesResponse> {
+    return this.http.get<ListadoObservacionesResponse>(this.ruta(revisionId) + '/observaciones');
+  }
+  observacion(revisionId: string, id: string): Observable<ObservacionResponse> {
+    return this.http.get<ObservacionResponse>(
+      this.ruta(revisionId) + '/observaciones/' + encodeURIComponent(id),
+    );
+  }
+  crearObservacion(
+    revisionId: string,
+    request: CrearObservacionRequest,
+  ): Observable<ObservacionResponse> {
+    return this.http.post<ObservacionResponse>(this.ruta(revisionId) + '/observaciones', request);
+  }
+  editarObservacion(
+    revisionId: string,
+    id: string,
+    texto: string,
+  ): Observable<ObservacionResponse> {
+    return this.http.put<ObservacionResponse>(
+      this.ruta(revisionId) + '/observaciones/' + encodeURIComponent(id),
+      { texto },
+    );
+  }
+  eliminarObservacion(revisionId: string, id: string): Observable<void> {
+    return this.http.delete<void>(
+      this.ruta(revisionId) + '/observaciones/' + encodeURIComponent(id),
+    );
+  }
+  contadorObservaciones(revisionId: string): Observable<ContadorObservacionesResponse> {
+    return this.http.get<ContadorObservacionesResponse>(
+      this.ruta(revisionId) + '/observaciones/contador',
+    );
+  }
+  observacionGeneral(revisionId: string): Observable<ObservacionGeneralResponse> {
+    return this.http.get<ObservacionGeneralResponse>(
+      this.ruta(revisionId) + '/observaciones/general',
+    );
+  }
+  guardarGeneral(revisionId: string, texto: string | null): Observable<ObservacionGeneralResponse> {
+    return this.http.put<ObservacionGeneralResponse>(
+      this.ruta(revisionId) + '/observaciones/general',
+      { texto },
+    );
+  }
+  private ruta(revisionId: string): string {
+    return '/api/v1/revisiones/' + encodeURIComponent(revisionId);
   }
 }

@@ -1,5 +1,6 @@
 @let n = nodo();
 @if (n.tipo !== 'uuid') {
+  <app-anclaje-observaciones [nodo]="nodo()" [control]="control()" />
   <div
     class="campo"
     [class.en-grilla]="modoGrilla()"

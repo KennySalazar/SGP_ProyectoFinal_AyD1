@@ -37,10 +37,10 @@ import { RevisionApiService } from '../../services/revision-api.service';
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class BandejaRevisionPage {
+  private readonly router = inject(Router);
   private readonly api = inject(RevisionApiService);
   private readonly apiErrors = inject(ApiErrorService);
   private readonly destroyRef = inject(DestroyRef);
-  private readonly router = inject(Router);
 
   readonly pagina = signal<PaginaRevisiones | null>(null);
   readonly borradores = signal<PaginaBorradoresEstudiante | null>(null);
@@ -130,6 +130,10 @@ export class BandejaRevisionPage {
 
   iniciar(revision: RevisionBandejaResponse): void {
     if (this.iniciando()) return;
+    if (revision.estadoRevision === 'EN_CURSO') {
+      void this.router.navigate(['/revisiones', revision.revisionId]);
+      return;
+    }
     this.iniciando.set(revision.revisionId);
     this.mensaje.set(null);
     this.api
@@ -141,7 +145,7 @@ export class BandejaRevisionPage {
       .subscribe({
         next: () => {
           this.api.cargarContador().pipe(takeUntilDestroyed(this.destroyRef)).subscribe();
-          void this.router.navigate(['/inspecciones', revision.inspeccionId]);
+          void this.router.navigate(['/revisiones', revision.revisionId]);
         },
         error: (error) => this.apiErrors.normalize(error),
       });

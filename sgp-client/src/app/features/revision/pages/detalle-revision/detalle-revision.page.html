@@ -1,0 +1,180 @@
+<header class="page-heading">
+  <p class="page-kicker">{{ 'revision.detalle.kicker' | transloco }}</p>
+  <h1 class="page-title">{{ 'revision.detalle.titulo' | transloco }}</h1>
+  <a pButton [routerLink]="consultaAutor() ? '/observaciones' : '/revisiones'"
+    ><i class="pi pi-arrow-left" aria-hidden="true"></i>{{ (consultaAutor() ?
+    'revision.autor.volver' : 'revision.detalle.volver') | transloco }}</a
+  >
+</header>
+@if (error()) {
+<p class="validation surface-card aviso" role="alert">{{ error() }}</p>
+} @if (cargando()) {
+<p role="status">{{ 'revision.detalle.cargando' | transloco }}</p>
+} @if (detalle(); as d) {
+<section class="surface-card resumen" aria-labelledby="contexto-revision">
+  <h2 id="contexto-revision">
+    {{ 'revision.detalle.ciclo' | transloco }} {{ d.numeroCiclo }} · {{ d.estadoRevision }}
+  </h2>
+  <dl>
+    <div>
+      <dt>{{ 'revision.detalle.puente' | transloco }}</dt>
+      <dd>{{ d.puenteId }}</dd>
+    </div>
+    <div>
+      <dt>{{ 'revision.detalle.inspeccion' | transloco }}</dt>
+      <dd>{{ d.inspeccionId }}</dd>
+    </div>
+    <div>
+      <dt>{{ 'revision.detalle.autor' | transloco }}</dt>
+      <dd>{{ d.autorId }}</dd>
+    </div>
+    <div>
+      <dt>{{ 'revision.detalle.enviada' | transloco }}</dt>
+      <dd>{{ d.enviadaEn | date:'dd/MM/yyyy HH:mm' }}</dd>
+    </div>
+    <div>
+      <dt>{{ 'revision.detalle.version' | transloco }}</dt>
+      <dd>{{ d.versionFormularioCodigo }}</dd>
+    </div>
+  </dl>
+  <p class="ic">
+    <strong>IC {{ d.icPreliminar.etiqueta }}: {{ d.icPreliminar.indice }}</strong> · {{
+    d.icPreliminar.estado }}
+  </p>
+  @if (d.identificacionCapturada; as identificacion) {
+  <h3>{{ 'revision.detalle.identificacion' | transloco }}</h3>
+  <dl>
+    @for (dato of identificacion | keyvalue; track dato.key) {
+    <div>
+      <dt>{{ dato.key }}</dt>
+      <dd>{{ dato.value | json }}</dd>
+    </div>
+    }
+  </dl>
+  } @if (!puedeEscribir()) {
+  <p role="status">
+    <i class="pi pi-lock" aria-hidden="true"></i>{{ 'revision.detalle.soloLectura' | transloco }}
+  </p>
+  }
+  <button pButton type="button" (click)="abrirPanel()">
+    <i class="pi pi-comments" aria-hidden="true"></i>{{ 'observaciones.panel' | transloco }}
+  </button>
+  <p role="status">
+    {{ 'observaciones.resumen' | transloco: {total: listado()?.total ?? 0, pendientes:
+    listado()?.pendientes ?? 0} }}
+  </p>
+</section>
+<div class="revision" [class.con-panel]="panelAbierto()">
+  <div class="contenido">
+    <app-formulario-dinamico
+      [esquema]="d.esquemaFormulario"
+      [valoresIniciales]="valores()"
+      [soloLectura]="true"
+    />
+    @if (contextoFotos(); as contexto) { @if (!d.fotografiasCongeladas) {
+    <p class="surface-card aviso" role="note">
+      {{ 'revision.detalle.fotosNoCongeladas' | transloco }}
+    </p>
+    }
+    <app-reporte-fotografico
+      [revisionSoloLectura]="contexto"
+      [soloLectura]="true"
+      [observacionesCategoria]="conteosCategoria()"
+      [permitirObservarCategoria]="puedeEscribir()"
+      (observarCategoria)="observarCategoria($event)"
+      (abrirObservacionesCategoria)="abrirPanel()"
+    />
+    }
+    <section class="surface-card general">
+      <h2>{{ 'observaciones.general' | transloco }}</h2>
+      <p class="texto">
+        {{ listado()?.general?.texto ?? ('revision.detalle.sinGeneral' | transloco) }}
+      </p>
+      @if (puedeEscribir()) {
+      <button pButton type="button" (click)="editarGeneral()">
+        {{ 'observaciones.editar' | transloco }}
+      </button>
+      @if (listado()?.general?.texto) {
+      <button
+        pButton
+        type="button"
+        severity="danger"
+        [outlined]="true"
+        (click)="solicitarEliminacion('GENERAL')"
+      >
+        {{ 'observaciones.eliminar' | transloco }}
+      </button>
+      } }
+    </section>
+  </div>
+  <app-panel-observaciones
+    [observaciones]="observacionesPresentacion()"
+    [desplegable]="true"
+    [abierto]="panelAbierto()"
+    (abiertoChange)="panelAbierto.set($event)"
+    [permitirEdicion]="puedeEscribir()"
+    [permitirEliminacion]="puedeEscribir()"
+    (navegar)="navegar($event)"
+    (editar)="editar($event)"
+    (eliminar)="solicitarEliminacion($event)"
+    (cerrado)="panelCerrado()"
+  />
+</div>
+}
+<p-dialog
+  [visible]="editor() !== null"
+  (visibleChange)="!$event && !ocupado() && editor.set(null)"
+  [modal]="true"
+  [closable]="!ocupado()"
+  [closeOnEscape]="!ocupado()"
+  [draggable]="false"
+  [resizable]="false"
+  [header]="'observaciones.panel' | transloco"
+  [style]="{width:'min(36rem, 95vw)'}"
+>
+  @if (editor(); as contexto) {
+  <app-editor-observaciones
+    [contexto]="contexto"
+    [ocupado]="ocupado() || bloqueada()"
+    [errorServidor]="errorEditor()"
+    (guardar)="guardar($event)"
+    (cancelar)="editor.set(null)"
+  />
+  }
+</p-dialog>
+<p-dialog
+  [visible]="aEliminar() !== null"
+  (visibleChange)="!$event && !ocupado() && aEliminar.set(null)"
+  [modal]="true"
+  [closable]="!ocupado()"
+  [closeOnEscape]="!ocupado()"
+  [draggable]="false"
+  [resizable]="false"
+  [header]="'observaciones.eliminar' | transloco"
+  [style]="{width:'min(32rem, 95vw)'}"
+>
+  <p>{{ 'revision.detalle.confirmarEliminacion' | transloco }}</p>
+  @if (error()) {
+  <p role="alert">{{ error() }}</p>
+  }
+  <div class="acciones">
+    <button
+      pButton
+      type="button"
+      severity="secondary"
+      [outlined]="true"
+      [disabled]="ocupado()"
+      (click)="aEliminar.set(null)"
+    >
+      {{ 'observaciones.cancelar' | transloco }}</button
+    ><button
+      pButton
+      type="button"
+      severity="danger"
+      [disabled]="!puedeEscribir()"
+      (click)="eliminar()"
+    >
+      {{ 'observaciones.eliminar' | transloco }}
+    </button>
+  </div>
+</p-dialog>
