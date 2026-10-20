@@ -1,5 +1,7 @@
 import { TestBed, ComponentFixture } from '@angular/core/testing';
 import { signal } from '@angular/core';
+import { By } from '@angular/platform-browser';
+import { MarcadorObservacionesComponent } from '../../../formulario/components/observaciones/marcador-observaciones.component';
 import { TranslocoTestingModule } from '@jsverse/transloco';
 import { of, throwError } from 'rxjs';
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
@@ -298,5 +300,45 @@ describe('Reporte fotográfico', () => {
     expect(fixture.componentInstance.previsualizacion()).toBeNull();
     expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:prueba');
     expect(fixture.componentInstance.pendientes()).toEqual([]);
+  });
+  it('agrupa categorías del ciclo usando streaming existente, con contexto exclusivamente de lectura', async () => {
+    api.listarFotografias.mockReturnValue(
+      of([foto, { ...foto, id: 'foto-cauce', categoria: 'CAUCE' }]),
+    );
+    api.contenidoFotografia.mockReturnValue(of(new Blob(['imagen'], { type: 'image/jpeg' })));
+    locales.guardarContexto.mockClear();
+    locales.pendientes.mockClear();
+    fixture.componentRef.setInput('revisionSoloLectura', {
+      id: 'galeria',
+      autorId: 'autor',
+      puenteId: 'puente',
+    });
+    fixture.componentRef.setInput('soloLectura', true);
+    fixture.componentRef.setInput('observacionesCategoria', { CAUCE: 2 });
+    fixture.componentRef.setInput('permitirObservarCategoria', true);
+    const observar = vi.fn();
+    fixture.componentInstance.observarCategoria.subscribe(observar);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    await vi.waitFor(() => expect(fixture.componentInstance.confirmadas()).toHaveLength(2));
+    fixture.detectChanges();
+    const raiz = fixture.nativeElement as HTMLElement;
+    const cauce = raiz.querySelector('[data-categoria-fotografica="CAUCE"]')!;
+    expect(cauce.querySelectorAll('figure')).toHaveLength(1);
+    expect(
+      raiz.querySelector('[data-categoria-fotografica="ACCESO"]')!.querySelectorAll('figure'),
+    ).toHaveLength(1);
+    expect(
+      (
+        fixture.debugElement.query(By.directive(MarcadorObservacionesComponent))
+          .componentInstance as MarcadorObservacionesComponent
+      ).cantidad(),
+    ).toBe(2);
+    cauce.querySelector<HTMLButtonElement>(':scope > button')!.click();
+    expect(observar).toHaveBeenCalledExactlyOnceWith('CAUCE');
+    expect(fixture.componentInstance.editable()).toBe(false);
+    expect(locales.guardarContexto).not.toHaveBeenCalled();
+    expect(locales.pendientes).not.toHaveBeenCalled();
+    expect(api.contenidoFotografia).toHaveBeenCalledWith('galeria', 'foto-cauce', true);
   });
 });

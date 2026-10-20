@@ -33,6 +33,14 @@ export const routes: Routes = [
           import('./features/inspecciones/inspecciones.routes').then((m) => m.inspeccionesRoutes),
       },
       {
+        path: 'observaciones',
+        canActivate: [roleGuard('ESTUDIANTE')],
+        loadChildren: () =>
+          import('./features/revision/observaciones-autor.routes').then(
+            (m) => m.observacionesAutorRoutes,
+          ),
+      },
+      {
         path: 'revisiones',
         canActivate: [roleGuard('CATEDRATICO')],
         loadChildren: () =>

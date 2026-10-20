@@ -20,7 +20,10 @@
     "irA": "Ir al elemento: {{elemento}}",
     "vacio": "Sin observaciones.",
     "sinEstadoGeneral": "General del ciclo, sin estado de pendiente",
-    "estados": { "PENDIENTE": "Pendiente", "RESUELTA": "Resuelta" }
+    "estados": {
+      "PENDIENTE": "Pendiente",
+      "RESUELTA": "Resuelta"
+    }
   },
   "app": {
     "title": "Sistema de Gestion de Puentes",
@@ -504,6 +507,43 @@
         "ENVIADA": "Enviada",
         "EN_REVISION": "En revisión"
       }
+    },
+    "detalle": {
+      "kicker": "Revisión académica",
+      "titulo": "Detalle de revisión",
+      "volver": "Volver a la bandeja",
+      "cargando": "Cargando contenido enviado…",
+      "ciclo": "Ciclo",
+      "puente": "Puente (identificador)",
+      "inspeccion": "Inspección (identificador)",
+      "autor": "Autor (identificador)",
+      "enviada": "Fecha de envío",
+      "version": "Versión histórica",
+      "identificacion": "Identificación capturada",
+      "soloLectura": "El contenido enviado es de solo lectura. La escritura de observaciones depende del estado del ciclo.",
+      "fotosNoCongeladas": "Las fotografías se consultan mediante acceso protegido. No existe una instantánea fotográfica histórica de este ciclo.",
+      "sinGeneral": "Sin observación general.",
+      "sinAnclaje": "Observación anterior sin anclaje",
+      "observarElemento": "Observar {{elemento}}",
+      "observarCategoria": "Observar categoría",
+      "confirmarEliminacion": "¿Eliminar esta observación? Esta acción no se puede deshacer.",
+      "errores": {
+        "401": "Inicia sesión para consultar esta revisión.",
+        "403": "Tu rol no permite consultar esta revisión.",
+        "404": "La revisión no está disponible.",
+        "409": "El estado cambió. Se actualizó el detalle y se bloqueó la edición.",
+        "422": "Revisa los campos y el anclaje indicados.",
+        "otro": "No se pudo completar la operación."
+      }
+    },
+    "autor": {
+      "titulo": "Observaciones recibidas",
+      "descripcion": "Consulta las observaciones sobre el contenido enviado en cada ciclo. Esta vista es de solo lectura.",
+      "volver": "Volver a observaciones recibidas",
+      "abrir": "Ver contenido observado",
+      "vacio": "No tienes ciclos con observaciones.",
+      "error": "No fue posible consultar tus observaciones.",
+      "reintentar": "Reintentar"
     }
   },
   "puentes": {

@@ -395,6 +395,40 @@ class FotografiaFlujoIntegrationTest {
     exigirLecturas(evidencia, evidencia.autor(), RoleName.ESTUDIANTE, 200);
   }
 
+  @Test
+  void revisorDelCicloLeeStreamingSinAdquirirPermisoDeModificarFotografias() throws Exception {
+    var evidencia = evidenciaAcademica();
+    UUID revisor = crearUsuario(RoleName.CATEDRATICO);
+    UUID ciclo = UUID.randomUUID();
+    jdbc.update("UPDATE inspeccion SET estado='EN_REVISION' WHERE id=?", evidencia.inspeccion());
+    jdbc.update(
+        "INSERT INTO revision(id,inspeccion_id,numero_ciclo,revisor_id,estado,enviada_en,version_inspeccion_enviada,contenido_enviado,hash_contenido) VALUES (?,?,1,?,'EN_CURSO',CURRENT_TIMESTAMP,0,'{}',?)",
+        ciclo,
+        evidencia.inspeccion(),
+        revisor,
+        "a".repeat(64));
+    exigirLecturas(evidencia, revisor, RoleName.CATEDRATICO, 200);
+    exigirLecturas(evidencia, usuario, RoleName.CATEDRATICO, 404);
+    exigirLecturas(evidencia, crearUsuario(RoleName.CATEDRATICO), RoleName.CATEDRATICO, 404);
+    exigirLecturas(evidencia, crearUsuario(RoleName.ADMINISTRADOR), RoleName.ADMINISTRADOR, 403);
+    exigirLecturas(evidencia, evidencia.autor(), RoleName.ESTUDIANTE, 200);
+    exigirLecturas(evidencia, null, null, 401);
+    assertThatThrownBy(() -> fotos.retirar(evidencia.inspeccion(), evidencia.foto(), revisor))
+        .isInstanceOfSatisfying(
+            ApiException.class, e -> assertThat(e.getStatus().value()).isEqualTo(404));
+    assertThatThrownBy(
+            () -> fotos.retirar(evidencia.inspeccion(), evidencia.foto(), evidencia.autor()))
+        .isInstanceOfSatisfying(
+            ApiException.class, e -> assertThat(e.getStatus().value()).isEqualTo(409));
+    jdbc.update("UPDATE revision SET estado='PENDIENTE' WHERE id=?", ciclo);
+    exigirLecturas(evidencia, revisor, RoleName.CATEDRATICO, 404);
+    // Sin manifiesto del ciclo: al volver a borrador el autor puede retirar la evidencia actual.
+    jdbc.update("UPDATE inspeccion SET estado='BORRADOR' WHERE id=?", evidencia.inspeccion());
+    fotos.retirar(evidencia.inspeccion(), evidencia.foto(), evidencia.autor());
+    assertThat(fotos.listar(evidencia.inspeccion(), evidencia.autor(), RoleName.ESTUDIANTE))
+        .isEmpty();
+  }
+
   @ParameterizedTest
   @EnumSource(RoleName.class)
   void cualquierRolAutenticadoConsultaLasTresRutasDePublicada(RoleName rol) throws Exception {
@@ -436,7 +470,11 @@ class FotografiaFlujoIntegrationTest {
     UUID lector = crearUsuario(rol);
     for (String estado : List.of("ENVIADA", "EN_REVISION", "CAMBIOS_SOLICITADOS", "RECHAZADA")) {
       jdbc.update("UPDATE inspeccion SET estado=? WHERE id=?", estado, evidencia.inspeccion());
-      exigirLecturas(evidencia, lector, rol, 404);
+      exigirLecturas(
+          evidencia,
+          lector,
+          rol,
+          estado.equals("EN_REVISION") && rol != RoleName.CATEDRATICO ? 403 : 404);
     }
   }
 

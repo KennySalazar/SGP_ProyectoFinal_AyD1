@@ -2,6 +2,11 @@ import { Routes } from '@angular/router';
 
 export const revisionRoutes: Routes = [
   {
+    path: ':revisionId',
+    loadComponent: () =>
+      import('./pages/detalle-revision/detalle-revision.page').then((m) => m.DetalleRevisionPage),
+  },
+  {
     path: '',
     pathMatch: 'full',
     loadComponent: () =>

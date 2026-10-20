@@ -1,0 +1,57 @@
+:host {
+  display: block;
+  min-width: 0;
+}
+.resumen,
+.general,
+.aviso {
+  padding: 1rem;
+  margin-block: 1rem;
+}
+.revision {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 1rem;
+  align-items: start;
+}
+.revision.con-panel {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 24rem);
+}
+.contenido {
+  min-width: 0;
+}
+dl {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr));
+  gap: 1rem;
+}
+dd {
+  margin: 0.25rem 0 0;
+  overflow-wrap: anywhere;
+}
+dt {
+  font-weight: 600;
+}
+p {
+  overflow-wrap: anywhere;
+}
+.texto {
+  white-space: pre-wrap;
+}
+.acciones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+button,
+a[pButton] {
+  min-width: 44px;
+  min-height: 44px;
+  max-width: 100%;
+  white-space: normal;
+}
+@media (max-width: 640px) {
+  .revision.con-panel {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

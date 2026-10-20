@@ -180,6 +180,17 @@ export class FormularioDinamicoComponent {
     });
   }
 
+  /** Selecciona la sección histórica que contiene la referencia canónica, sin alterar valores. */
+  mostrarAnclaje(elementoRef: string): boolean {
+    const primera = elementoRef.split('/')[1]?.replace(/~1/g, '/').replace(/~0/g, '~');
+    const indice = this.entradas().findIndex(
+      (e) => e.tipo === 'esquema' && e.nodo.clave === primera,
+    );
+    if (indice < 0) return false;
+    this.irA(indice);
+    return true;
+  }
+
   protected irA(indice: number): void {
     const total = this.entradas().length;
     if (indice < 0 || indice >= total || indice === this.indiceActivo()) return;
