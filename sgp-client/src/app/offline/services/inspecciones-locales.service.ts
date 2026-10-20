@@ -102,11 +102,24 @@ export class InspeccionesLocalesService {
     respuesta: InspeccionBorradorResponse,
   ): Promise<void> {
     await sgpDb.transaction('rw', sgpDb.inspecciones, sgpDb.cola_sync, async () => {
+      const operacionConfirmada = await sgpDb.cola_sync.get(idOperacion);
       await sgpDb.cola_sync.delete(idOperacion);
       const local = await sgpDb.inspecciones.get(inspeccionId);
       if (!local || local.propietarioId !== propietarioId) return;
       const payload = local.payload as BorradorLocalPayload;
       const pendientes = await sgpDb.cola_sync.where('entityId').equals(inspeccionId).toArray();
+      const edicionesPosteriores = pendientes
+        .filter(
+          (item) =>
+            item.operacion === 'GUARDAR_BORRADOR' &&
+            item.propietarioId === propietarioId &&
+            operacionConfirmada !== undefined &&
+            item.creadoEn > operacionConfirmada.creadoEn,
+        )
+        .sort((a, b) => b.creadoEn.localeCompare(a.creadoEn));
+      const datosPosteriores = (
+        edicionesPosteriores[0]?.payload as GuardarBorradorRequest | undefined
+      )?.datos;
       await sgpDb.inspecciones.put({
         ...local,
         sincronizado: pendientes.length === 0,
@@ -114,8 +127,10 @@ export class InspeccionesLocalesService {
           ...payload,
           borrador: {
             ...respuesta,
-            datos: payload.borrador?.datos,
-            fechaInspeccion: payload.borrador?.fechaInspeccion,
+            datos: datosPosteriores ?? respuesta.datos,
+            fechaInspeccion: datosPosteriores
+              ? payload.borrador?.fechaInspeccion
+              : respuesta.fechaInspeccion,
           },
         },
       });
@@ -173,7 +188,37 @@ export class InspeccionesLocalesService {
    * Obtiene una inspección local por su ID.
    */
   async obtenerInspeccionLocal(id: string): Promise<LocalInspection | undefined> {
-    return sgpDb.inspecciones.get(id);
+    const local = await sgpDb.inspecciones.get(id);
+    if (!local) return undefined;
+
+    if (typeof local.payload !== 'object' || local.payload === null) return local;
+    const raw = local.payload as Record<string, unknown>;
+    const envuelto = 'borrador' in raw && raw['borrador'] !== null;
+    const borrador = (envuelto ? raw['borrador'] : raw) as
+      | InspeccionBorradorResponse
+      | undefined;
+    const datosLocales = borrador?.datos;
+    if (datosLocales !== undefined && datosLocales !== null && Object.keys(datosLocales).length > 0)
+      return local;
+    if (!local.propietarioId) return local;
+
+    const pendientes = await sgpDb.cola_sync.where('entityId').equals(id).toArray();
+    const ultimaOperacion = pendientes
+      .filter(
+        (item) =>
+          item.operacion === 'GUARDAR_BORRADOR' &&
+          item.propietarioId === local.propietarioId,
+      )
+      .sort((a, b) => b.creadoEn.localeCompare(a.creadoEn))[0];
+    const datosEnCola = (ultimaOperacion?.payload as GuardarBorradorRequest | undefined)?.datos;
+    if (!datosEnCola || Object.keys(datosEnCola).length === 0 || !borrador) return local;
+
+    return {
+      ...local,
+      payload: envuelto
+        ? { ...raw, borrador: { ...borrador, datos: datosEnCola } }
+        : { ...borrador, datos: datosEnCola },
+    };
   }
 
   /**

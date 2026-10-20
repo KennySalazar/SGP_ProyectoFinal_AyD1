@@ -477,7 +477,8 @@ export class CompletarInspeccionPage implements OnInit {
         return;
       }
     }
-    const valores = this.formulario()?.valor() ?? this.datosEnMemoria();
+    const formulario = this.formulario();
+    const valores = formulario?.construido() ? formulario.valor() : this.datosEnMemoria();
     const valorActual = {
       ...valores,
       identificacion: {

@@ -4,7 +4,10 @@ import {
   InspeccionesLocalesService,
   BorradorLocalPayload,
 } from './services/inspecciones-locales.service';
-import { IniciarInspeccionRequest } from '../features/inspecciones/models/inspeccion.models';
+import {
+  IniciarInspeccionRequest,
+  InspeccionBorradorResponse,
+} from '../features/inspecciones/models/inspeccion.models';
 
 describe('HU-042: Inspecciones Locales y Recuperación tras Recarga', () => {
   let service: InspeccionesLocalesService;
@@ -44,6 +47,13 @@ describe('HU-042: Inspecciones Locales y Recuperación tras Recarga', () => {
     vi.spyOn(sgpDb.cola_sync, 'put').mockImplementation((item: SyncQueueItem) => {
       colaMemoria.set(item.id, item);
       return Promise.resolve(item.id) as never;
+    });
+    vi.spyOn(sgpDb.cola_sync, 'get').mockImplementation((id: unknown) => {
+      return Promise.resolve(colaMemoria.get(String(id))) as never;
+    });
+    vi.spyOn(sgpDb.cola_sync, 'delete').mockImplementation((id: unknown) => {
+      colaMemoria.delete(String(id));
+      return Promise.resolve() as never;
     });
     vi.spyOn(sgpDb.cola_sync, 'orderBy').mockReturnValue({
       last: async () =>
@@ -280,6 +290,175 @@ describe('HU-042: Inspecciones Locales y Recuperación tras Recarga', () => {
     expect(guardado.version).toBe(4);
     expect(guardado.datos).toEqual({ campo: 'cambio local' });
     expect([...colaMemoria.values()][0]?.estado).toBe('PENDIENTE');
+  });
+
+  it('conserva campos locales al confirmar la sincronización y reabrir el borrador', async () => {
+    const inspeccionId = 'inspection-form-data-roundtrip';
+    const camposGuardados = {
+      subestructura: { estribo_entrada: { estado: 'Bueno', observacion: 'Sin fisuras' } },
+    };
+    const borrador: InspeccionBorradorResponse = {
+      id: inspeccionId,
+      puenteId: 'bridge-1',
+      codigoPuente: 'P-001',
+      nombrePuente: 'Puente local',
+      versionFormularioId: 'form-v1',
+      codigoVersionFormulario: 'v1',
+      autorId: 'user-1',
+      rolAutor: 'ESTUDIANTE',
+      nombreAutor: 'Inspector',
+      estado: 'BORRADOR',
+      fechaInspeccion: '2026-10-20',
+      dispositivoId: 'device-1',
+      version: 4,
+      creadoEn: '2026-10-20T10:00:00Z',
+      acompanantes: [],
+      progreso: {
+        totalCamposRequeridos: 0,
+        totalCamposCompletados: 0,
+        porcentajeTotal: 0,
+        secciones: [],
+      },
+      datos: camposGuardados,
+    };
+    await service.guardarInspeccionLocal({
+      id: inspeccionId,
+      puenteId: 'bridge-1',
+      propietarioId: 'user-1',
+      estado: 'BORRADOR',
+      actualizadoEn: '2026-10-20T10:01:00Z',
+      payload: {
+        borrador,
+        versionFormularioId: 'form-v1',
+        dispositivoId: 'device-1',
+        autorId: 'user-1',
+      },
+      sincronizado: false,
+    });
+    colaMemoria.set('save-1', {
+      id: 'save-1',
+      tipo: 'INSPECCION',
+      entityId: inspeccionId,
+      propietarioId: 'user-1',
+      idempotencyKey: 'same-key-on-retry',
+      operacion: 'GUARDAR_BORRADOR',
+      payload: { version: 4, datos: camposGuardados },
+      intentos: 1,
+      creadoEn: '2026-10-20T10:01:00Z',
+    });
+
+    await service.confirmarGuardado('save-1', inspeccionId, 'user-1', {
+      ...borrador,
+      version: 5,
+      datos: { identificacion: { observacion: 'Confirmado por servidor' } },
+    });
+
+    const reabierta = await service.obtenerInspeccionLocal(inspeccionId);
+    const recuperado = (reabierta?.payload as BorradorLocalPayload).borrador;
+    expect(recuperado.datos).toEqual({ identificacion: { observacion: 'Confirmado por servidor' } });
+    expect(recuperado.version).toBe(5);
+    expect(reabierta?.sincronizado).toBe(true);
+
+    const cacheVacia = {
+      ...reabierta!,
+      sincronizado: false,
+      payload: {
+        ...(reabierta?.payload as BorradorLocalPayload),
+        borrador: { ...recuperado, datos: {} },
+      },
+    };
+    inspeccionesMemoria.set(inspeccionId, cacheVacia);
+    colaMemoria.set('save-2', {
+      id: 'save-2',
+      tipo: 'INSPECCION',
+      entityId: inspeccionId,
+      propietarioId: 'user-1',
+      idempotencyKey: 'stable-retry-key',
+      operacion: 'GUARDAR_BORRADOR',
+      payload: { version: 5, datos: camposGuardados },
+      intentos: 1,
+      creadoEn: '2026-10-20T10:02:00Z',
+    });
+
+    const restauradaOffline = await service.obtenerInspeccionLocal(inspeccionId);
+    expect(
+      (restauradaOffline?.payload as BorradorLocalPayload).borrador.datos,
+    ).toEqual(camposGuardados);
+
+    await service.confirmarGuardado('save-2', inspeccionId, 'user-1', {
+      ...borrador,
+      version: 6,
+      datos: camposGuardados,
+    });
+
+    const recuperadaTrasRecarga = await service.obtenerInspeccionLocal(inspeccionId);
+    expect(
+      (recuperadaTrasRecarga?.payload as BorradorLocalPayload).borrador.datos,
+    ).toEqual(camposGuardados);
+    expect(recuperadaTrasRecarga?.sincronizado).toBe(true);
+  });
+
+  it('conserva la edición pendiente posterior y no reutiliza datos de la operación confirmada', async () => {
+    const inspeccionId = 'inspection-newer-pending-edit';
+    const datosOperacionConfirmada = { identificacion: { observacion: 'Versión enviada' } };
+    const datosEdicionPosterior = { identificacion: { observacion: 'Edición posterior' } };
+    const borrador: InspeccionBorradorResponse = {
+      id: inspeccionId,
+      puenteId: 'bridge-1',
+      codigoPuente: 'P-001',
+      nombrePuente: 'Puente local',
+      versionFormularioId: 'form-v1',
+      codigoVersionFormulario: 'v1',
+      autorId: 'user-1',
+      rolAutor: 'ESTUDIANTE',
+      nombreAutor: 'Inspector',
+      estado: 'BORRADOR',
+      fechaInspeccion: '2026-10-20',
+      dispositivoId: 'device-1',
+      version: 4,
+      creadoEn: '2026-10-20T10:00:00Z',
+      acompanantes: [],
+      progreso: { totalCamposRequeridos: 0, totalCamposCompletados: 0, porcentajeTotal: 0, secciones: [] },
+      datos: datosOperacionConfirmada,
+    };
+    await service.guardarInspeccionLocal({
+      id: inspeccionId,
+      puenteId: 'bridge-1',
+      propietarioId: 'user-1',
+      estado: 'BORRADOR',
+      actualizadoEn: '2026-10-20T10:01:00Z',
+      payload: {
+        borrador: { ...borrador, datos: datosEdicionPosterior },
+        versionFormularioId: 'form-v1',
+        dispositivoId: 'device-1',
+        autorId: 'user-1',
+      },
+      sincronizado: false,
+    });
+    colaMemoria.set('save-confirmed', {
+      id: 'save-confirmed', tipo: 'INSPECCION', entityId: inspeccionId, propietarioId: 'user-1',
+      idempotencyKey: 'key-confirmed', operacion: 'GUARDAR_BORRADOR',
+      payload: { version: 4, datos: datosOperacionConfirmada }, intentos: 0,
+      creadoEn: '2026-10-20T10:01:00Z',
+    });
+    colaMemoria.set('save-newer', {
+      id: 'save-newer', tipo: 'INSPECCION', entityId: inspeccionId, propietarioId: 'user-1',
+      idempotencyKey: 'key-newer', operacion: 'GUARDAR_BORRADOR',
+      payload: { version: 5, datos: datosEdicionPosterior }, intentos: 0,
+      creadoEn: '2026-10-20T10:02:00Z',
+    });
+
+    await service.confirmarGuardado('save-confirmed', inspeccionId, 'user-1', {
+      ...borrador,
+      version: 5,
+      datos: datosOperacionConfirmada,
+    });
+
+    const guardada = await service.obtenerInspeccionLocal(inspeccionId);
+    expect((guardada?.payload as BorradorLocalPayload).borrador.datos).toEqual(datosEdicionPosterior);
+    expect(colaMemoria.has('save-confirmed')).toBe(false);
+    expect(colaMemoria.has('save-newer')).toBe(true);
+    expect(guardada?.sincronizado).toBe(false);
   });
 
   it('guarda y recupera el esquema congelado del formulario en Dexie', async () => {
