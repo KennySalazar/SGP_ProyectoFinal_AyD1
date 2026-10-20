@@ -20,16 +20,19 @@ public class ObservacionController {
     this.observaciones = observaciones;
   }
 
+  @PreAuthorize("hasAnyRole('CATEDRATICO', 'ESTUDIANTE')")
   @GetMapping
   public ListadoObservacionesResponse listar(@PathVariable UUID revisionId, Authentication auth) {
     return observaciones.listar(revisionId, actor(auth));
   }
 
+  @PreAuthorize("hasAnyRole('CATEDRATICO', 'ESTUDIANTE')")
   @GetMapping("/contador")
   public ContadorObservacionesResponse contar(@PathVariable UUID revisionId, Authentication auth) {
     return observaciones.contar(revisionId, actor(auth));
   }
 
+  @PreAuthorize("hasAnyRole('CATEDRATICO', 'ESTUDIANTE')")
   @GetMapping("/{observacionId}")
   public ObservacionResponse obtener(
       @PathVariable UUID revisionId, @PathVariable UUID observacionId, Authentication auth) {
@@ -61,6 +64,7 @@ public class ObservacionController {
     observaciones.eliminar(revisionId, observacionId, actor(auth));
   }
 
+  @PreAuthorize("hasAnyRole('CATEDRATICO', 'ESTUDIANTE')")
   @GetMapping("/general")
   public ObservacionGeneralResponse general(@PathVariable UUID revisionId, Authentication auth) {
     return observaciones.obtenerGeneral(revisionId, actor(auth));

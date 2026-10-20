@@ -1,9 +1,9 @@
 <header class="page-heading">
   <p class="page-kicker">{{ 'revision.detalle.kicker' | transloco }}</p>
   <h1 class="page-title">{{ 'revision.detalle.titulo' | transloco }}</h1>
-  <a pButton routerLink="/revisiones"
-    ><i class="pi pi-arrow-left" aria-hidden="true"></i>{{ 'revision.detalle.volver' | transloco
-    }}</a
+  <a pButton [routerLink]="consultaAutor() ? '/observaciones' : '/revisiones'"
+    ><i class="pi pi-arrow-left" aria-hidden="true"></i>{{ (consultaAutor() ?
+    'revision.autor.volver' : 'revision.detalle.volver') | transloco }}</a
   >
 </header>
 @if (error()) {

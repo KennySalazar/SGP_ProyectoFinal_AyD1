@@ -26,6 +26,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.springframework.dao.PessimisticLockingFailureException;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
@@ -72,6 +74,32 @@ public class ObservacionService {
     this.clock = clock;
   }
 
+  @PreAuthorize("hasRole('ESTUDIANTE')")
+  public Page<CicloObservacionesResponse> recibidas(UUID actor, int pagina, int tamanio) {
+    if (actor == null)
+      throw new ApiException(
+          HttpStatus.UNAUTHORIZED,
+          "autenticacion_requerida",
+          "Autenticación requerida",
+          "Se requiere una sesión válida.");
+    if (pagina < 0 || tamanio < 1 || tamanio > 100)
+      throw new ApiException(
+          HttpStatus.UNPROCESSABLE_ENTITY,
+          "paginacion_invalida",
+          "Paginación inválida",
+          "La página debe ser no negativa y el tamaño debe estar entre 1 y 100.");
+    return observaciones
+        .ciclosDelAutor(actor, PageRequest.of(pagina, tamanio))
+        .map(
+            r ->
+                new CicloObservacionesResponse(
+                    r.getId(),
+                    r.getInspeccion().getId(),
+                    r.getNumeroCiclo(),
+                    r.getEstado(),
+                    r.getEnviadaEn()));
+  }
+
   @Transactional
   public ObservacionResponse crear(UUID revisionId, UUID actor, CrearObservacionRequest request) {
     Revision ciclo = autorizar(revisionId, actor, true);
@@ -97,6 +125,7 @@ public class ObservacionService {
     return respuesta;
   }
 
+  @PreAuthorize("hasAnyRole('CATEDRATICO', 'ESTUDIANTE')")
   public ListadoObservacionesResponse listar(UUID revisionId, UUID actor) {
     autorizar(revisionId, actor, false);
     var lista =
@@ -112,11 +141,13 @@ public class ObservacionService {
         new ObservacionGeneralResponse(revisionId, observaciones.buscarGeneral(revisionId)));
   }
 
+  @PreAuthorize("hasAnyRole('CATEDRATICO', 'ESTUDIANTE')")
   public ObservacionResponse obtener(UUID revisionId, UUID id, UUID actor) {
     autorizar(revisionId, actor, false);
     return mapper.toResponse(buscar(revisionId, id));
   }
 
+  @PreAuthorize("hasAnyRole('CATEDRATICO', 'ESTUDIANTE')")
   public ContadorObservacionesResponse contar(UUID revisionId, UUID actor) {
     autorizar(revisionId, actor, false);
     var cuenta = observaciones.contarPorCiclo(revisionId, EstadoObservacion.PENDIENTE);
@@ -148,6 +179,7 @@ public class ObservacionService {
     auditar(actor, AccionAuditoria.MODIFICAR, id, antes, null);
   }
 
+  @PreAuthorize("hasAnyRole('CATEDRATICO', 'ESTUDIANTE')")
   public ObservacionGeneralResponse obtenerGeneral(UUID revisionId, UUID actor) {
     autorizar(revisionId, actor, false);
     return new ObservacionGeneralResponse(revisionId, observaciones.buscarGeneral(revisionId));
@@ -186,14 +218,17 @@ public class ObservacionService {
           "Autenticación requerida",
           "Se requiere una sesión válida.");
     // Autorizar antes del bloqueo evita revelar al ajeno si un ciclo existente está ocupado.
-    if (!observaciones.existeCicloDelRevisor(id, actor)) throw noEncontrada();
+    if (!(escritura
+        ? observaciones.existeCicloDelRevisor(id, actor)
+        : observaciones.existeCicloLegible(id, actor))) throw noEncontrada();
     Revision ciclo;
     try {
       ciclo =
           (escritura ? revisiones.findByIdForUpdate(id) : revisiones.findById(id))
               .orElseThrow(this::noEncontrada);
-      if (!ciclo.getRevisorId().equals(actor) || ciclo.getInspeccion().getEliminadoEn() != null)
-        throw noEncontrada();
+      if ((!ciclo.getRevisorId().equals(actor)
+              && (escritura || !ciclo.getInspeccion().getAutorId().equals(actor)))
+          || ciclo.getInspeccion().getEliminadoEn() != null) throw noEncontrada();
       if (escritura) {
         var inspeccion =
             inspecciones

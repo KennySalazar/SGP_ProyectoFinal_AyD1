@@ -66,6 +66,12 @@
             ><span>{{ 'nav.myInspections' | transloco }}</span>
           </a>
         }
+        @if (auth.user()?.role === 'ESTUDIANTE') {
+          <a routerLink="/observaciones" routerLinkActive="active" ariaCurrentWhenActive="page">
+            <i class="pi pi-comments" aria-hidden="true"></i
+            ><span>{{ 'revision.autor.titulo' | transloco }}</span>
+          </a>
+        }
         <a routerLink="/seguridad" routerLinkActive="active">
           <i class="pi pi-shield"></i><span>{{ 'nav.security' | transloco }}</span>
         </a>

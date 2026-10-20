@@ -12,7 +12,7 @@ import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/v1/revisiones")
-@PreAuthorize("hasRole('CATEDRATICO')")
+@PreAuthorize("hasAnyRole('CATEDRATICO', 'ESTUDIANTE')")
 public class RevisionDetalleController {
   private final RevisionDetalleService detalle;
 

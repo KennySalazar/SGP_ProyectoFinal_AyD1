@@ -253,6 +253,22 @@ class RevisionDetalleIntegrationTest {
   }
 
   @Test
+  void autorRecibeSnapshotHistoricoYOtroEstudianteNoAccede() {
+    var auth =
+        new UsernamePasswordAuthenticationToken(
+            "test", null, List.of(new SimpleGrantedAuthority("ROLE_ESTUDIANTE")));
+    auth.setDetails(new JwtData("test", autor, RoleName.ESTUDIANTE, 0));
+    SecurityContextHolder.getContext().setAuthentication(auth);
+    var respuesta = servicio.obtener(ciclo, autor);
+    assertThat(respuesta.datos()).isEqualTo(snapshot.path("datos"));
+    assertThat(respuesta.esquemaFormulario()).isEqualTo(esquema);
+    assertThat(respuesta.versionFormularioId()).isEqualTo(version);
+    assertThatThrownBy(() -> servicio.obtener(ciclo, usuario("ESTUDIANTE")))
+        .isInstanceOfSatisfying(
+            ApiException.class, e -> assertThat(e.getStatus()).isEqualTo(HttpStatus.NOT_FOUND));
+  }
+
+  @Test
   void contenidoIncompletoNoSeReconstruyeDesdeLaInspeccionViva() {
     jdbc.update("UPDATE revision SET contenido_enviado='{}' WHERE id=?", ciclo);
     assertThatThrownBy(() -> servicio.obtener(ciclo, revisor))

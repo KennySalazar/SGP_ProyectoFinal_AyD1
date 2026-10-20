@@ -3,6 +3,7 @@ import { inject, Injectable, signal } from '@angular/core';
 import { Observable, tap } from 'rxjs';
 import {
   FiltrosBandejaRevision,
+  PaginaObservacionesRecibidas,
   RevisionDetalleResponse,
   CrearObservacionRequest,
   ObservacionResponse,
@@ -51,6 +52,11 @@ export class RevisionApiService {
       `/api/v1/revisiones/${encodeURIComponent(revisionId)}/iniciar`,
       null,
     );
+  }
+  recibidas(pagina = 0): Observable<PaginaObservacionesRecibidas> {
+    return this.http.get<PaginaObservacionesRecibidas>('/api/v1/observaciones/recibidas', {
+      params: { pagina, tamanio: 20 },
+    });
   }
   detalle(revisionId: string): Observable<RevisionDetalleResponse> {
     return this.http.get<RevisionDetalleResponse>(this.ruta(revisionId));

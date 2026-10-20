@@ -31,7 +31,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
 @WebMvcTest(
-    controllers = ObservacionController.class,
+    controllers = {ObservacionController.class, ObservacionAutorController.class},
     properties = "app.cors.allowed-origins=http://localhost:4200")
 @Import({
   SecurityConfiguration.class,
@@ -86,11 +86,50 @@ class ObservacionControllerSecurityTest {
   }
 
   @ParameterizedTest
-  @EnumSource(value = RoleName.class, names = "CATEDRATICO", mode = EnumSource.Mode.EXCLUDE)
+  @EnumSource(
+      value = RoleName.class,
+      names = {"CATEDRATICO", "ESTUDIANTE"},
+      mode = EnumSource.Mode.EXCLUDE)
   void otrosRolesNoPuedenConsultarNiEscribir(RoleName rol) throws Exception {
     for (var request : operaciones())
       mvc.perform(request.with(authentication(sesion(rol)))).andExpect(status().isForbidden());
     verifyNoInteractions(servicio);
+  }
+
+  @Test
+  void estudianteSoloLeeYNoPuedeEscribir() throws Exception {
+    for (var request : operaciones()) {
+      boolean lectura =
+          request
+              .buildRequest(new org.springframework.mock.web.MockServletContext())
+              .getMethod()
+              .equals("GET");
+      mvc.perform(request.with(authentication(sesion(RoleName.ESTUDIANTE))))
+          .andExpect(lectura ? status().isOk() : status().isForbidden());
+    }
+    verify(servicio).listar(ciclo, actor);
+    verify(servicio).contar(ciclo, actor);
+    verify(servicio).obtenerGeneral(ciclo, actor);
+    verify(servicio).obtener(ciclo, id, actor);
+    verify(servicio, never()).crear(any(), any(), any());
+    verify(servicio, never()).editar(any(), any(), any(), any());
+    verify(servicio, never()).eliminar(any(), any(), any());
+    verify(servicio, never()).guardarGeneral(any(), any(), any());
+  }
+
+  @Test
+  void recibidasUsaSoloActorJwtYExigeEstudiante() throws Exception {
+    String ruta = "/api/v1/observaciones/recibidas";
+    mvc.perform(get(ruta)).andExpect(status().isUnauthorized());
+    for (RoleName rol :
+        List.of(RoleName.CATEDRATICO, RoleName.ADMINISTRADOR, RoleName.PROFESIONAL_EXTERNO))
+      mvc.perform(get(ruta).with(authentication(sesion(rol)))).andExpect(status().isForbidden());
+    mvc.perform(
+            get(ruta)
+                .param("autorId", UUID.randomUUID().toString())
+                .with(authentication(sesion(RoleName.ESTUDIANTE))))
+        .andExpect(status().isOk());
+    verify(servicio).recibidas(actor, 0, 20);
   }
 
   @Test

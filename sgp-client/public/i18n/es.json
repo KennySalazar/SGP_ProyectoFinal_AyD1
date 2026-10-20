@@ -431,6 +431,15 @@
         "422": "Revisa los campos y el anclaje indicados.",
         "otro": "No se pudo completar la operación."
       }
+    },
+    "autor": {
+      "titulo": "Observaciones recibidas",
+      "descripcion": "Consulta las observaciones sobre el contenido enviado en cada ciclo. Esta vista es de solo lectura.",
+      "volver": "Volver a observaciones recibidas",
+      "abrir": "Ver contenido observado",
+      "vacio": "No tienes ciclos con observaciones.",
+      "error": "No fue posible consultar tus observaciones.",
+      "reintentar": "Reintentar"
     }
   },
   "puentes": {

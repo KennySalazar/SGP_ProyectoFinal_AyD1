@@ -60,7 +60,10 @@ class RevisionDetalleControllerSecurityTest {
   }
 
   @ParameterizedTest
-  @EnumSource(value = RoleName.class, names = "CATEDRATICO", mode = EnumSource.Mode.EXCLUDE)
+  @EnumSource(
+      value = RoleName.class,
+      names = {"CATEDRATICO", "ESTUDIANTE"},
+      mode = EnumSource.Mode.EXCLUDE)
   void otrosRolesReciben403(RoleName rol) throws Exception {
     mvc.perform(get(ruta).with(authentication(sesion(rol)))).andExpect(status().isForbidden());
     verifyNoInteractions(servicio);
@@ -75,6 +78,14 @@ class RevisionDetalleControllerSecurityTest {
         .andExpect(status().isOk())
         .andExpect(header().string(HttpHeaders.CACHE_CONTROL, containsString("no-store")))
         .andExpect(header().string(HttpHeaders.CACHE_CONTROL, containsString("private")));
+    verify(servicio).obtener(ciclo, actor);
+  }
+
+  @Test
+  void autorConsultaDetalleConSuIdentidadJwtSinCache() throws Exception {
+    mvc.perform(get(ruta).with(authentication(sesion(RoleName.ESTUDIANTE))))
+        .andExpect(status().isOk())
+        .andExpect(header().string(HttpHeaders.CACHE_CONTROL, containsString("no-store")));
     verify(servicio).obtener(ciclo, actor);
   }
 

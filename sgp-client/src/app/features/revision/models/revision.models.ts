@@ -121,3 +121,19 @@ export interface ListadoObservacionesResponse extends ContadorObservacionesRespo
   observaciones: ObservacionResponse[];
   general: ObservacionGeneralResponse;
 }
+
+/** Cada enlace abre el snapshot del ciclo indicado, nunca el borrador actual. */
+export interface CicloObservacionesResponse {
+  revisionId: string;
+  inspeccionId: string;
+  numeroCiclo: number;
+  estadoRevision: 'PENDIENTE' | 'EN_CURSO' | 'RESUELTA';
+  enviadaEn: string;
+}
+export interface PaginaObservacionesRecibidas {
+  content: CicloObservacionesResponse[];
+  number: number;
+  size: number;
+  totalElements: number;
+  empty: boolean;
+}

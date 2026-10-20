@@ -436,10 +436,91 @@ describe('Detalle de revisión HU-037', () => {
     params.next(convertToParamMap({ revisionId: 'r2' }));
     expect(antiguas.every((r) => r.cancelled)).toBe(true);
     http.expectOne('/api/v1/revisiones/r2').flush({ ...detalle, revisionId: 'r2' });
-    http.expectOne('/api/v1/revisiones/r2/observaciones').flush({ ...lista, revisionId: 'r2' });
+    http.expectOne('/api/v1/revisiones/r2/observaciones').flush({
+      ...lista,
+      revisionId: 'r2',
+      observaciones: lista.observaciones.map((o) => ({ ...o, revisionId: 'r2' })),
+    });
     fixture.detectChanges();
     await fixture.whenStable();
     expect(page().detalle()?.revisionId).toBe('r2');
+  });
+  it('autor consulta marcadores, general y panel sin acciones sobre su snapshot', async () => {
+    user.set({ id: 'autor', role: 'ESTUDIANTE' });
+    await responder();
+    expect(page().puedeEscribir()).toBe(false);
+    expect(html().querySelector('a')?.getAttribute('href')).toBe('/observaciones');
+    expect(html().textContent).toContain('Comentario del ciclo');
+    page().navegar(destino());
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+    const exacto = html().querySelector(
+      `[data-elemento-ref="/tramos/longitud"][data-instancia-id="${uuid2}"]`,
+    )!;
+    expect(exacto.textContent).toContain('2 observaciones');
+    expect(
+      html().querySelector(`[data-elemento-ref="/tramos/longitud"][data-instancia-id="${uuid1}"]`)
+        ?.textContent,
+    ).not.toContain('observaciones');
+    page().abrirPanel();
+    fixture.detectChanges();
+    await fixture.whenStable();
+    const panel = fixture.debugElement.query(By.directive(PanelObservacionesComponent))
+      .componentInstance as PanelObservacionesComponent;
+    expect(panel.permitirEdicion()).toBe(false);
+    expect(panel.permitirEliminacion()).toBe(false);
+    expect(html().textContent).not.toContain('Agregar observación');
+    expect(html().querySelector('.general button')).toBeNull();
+    page().seleccionarElemento(destino());
+    page().editar(page().observacionesPresentacion()[0]);
+    page().editarGeneral();
+    page().solicitarEliminacion(page().observacionesPresentacion()[0]);
+    expect(page().editor()).toBeNull();
+    expect(page().aEliminar()).toBeNull();
+    http.expectNone((r) => r.method !== 'GET');
+  });
+  it('autor no recibe datos de otro propietario ni observaciones de otro ciclo', async () => {
+    user.set({ id: 'otro', role: 'ESTUDIANTE' });
+    await responder();
+    expect(page().detalle()).toBeNull();
+    expect(page().estadoHttp()).toBe(404);
+  });
+  it('rechaza una lista que pertenece a un ciclo distinto del snapshot', async () => {
+    user.set({ id: 'autor', role: 'ESTUDIANTE' });
+    await responder(detalle, {
+      ...lista,
+      observaciones: [{ ...observacion, revisionId: 'anterior' }],
+    });
+    expect(page().detalle()).toBeNull();
+    expect(page().estadoHttp()).toBe(404);
+  });
+  it('al cambiar de ciclo no conserva marcadores de otro esquema ni UUID', async () => {
+    user.set({ id: 'autor', role: 'ESTUDIANTE' });
+    await responder();
+    params.next(convertToParamMap({ revisionId: 'r2' }));
+    fixture.detectChanges();
+    expect(page().observacionesPresentacion()).toEqual([]);
+    http.expectOne('/api/v1/revisiones/r2').flush({
+      ...detalle,
+      revisionId: 'r2',
+      versionFormularioId: 'v2',
+      esquemaFormulario: { type: 'object', properties: { nueva: { type: 'string' } } },
+      datos: { nueva: 'Otro ciclo' },
+    });
+    http.expectOne('/api/v1/revisiones/r2/observaciones').flush({
+      ...lista,
+      revisionId: 'r2',
+      observaciones: [],
+      total: 0,
+      pendientes: 0,
+      general: { revisionId: 'r2', texto: null },
+    });
+    fixture.detectChanges();
+    await fixture.whenStable();
+    expect(html().querySelector('[data-instancia-id="' + uuid2 + '"]')).toBeNull();
+    expect(html().textContent).not.toContain('Comprobar longitud.');
+    expect(page().detalle()?.versionFormularioId).toBe('v2');
   });
   it('el panel usa sus eventos existentes y mantiene cierre/restauración de foco por teclado', async () => {
     await responder();

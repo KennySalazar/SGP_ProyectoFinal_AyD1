@@ -111,6 +111,14 @@ export class DetalleRevisionPage implements ContextoObservacionesFormulario {
   readonly editor = signal<ContextoEditorObservacion | null>(null);
   readonly aEliminar = signal<ObservacionPresentacion | 'GENERAL' | null>(null);
   readonly destinoNavegacion = signal<DestinoElementoObservacion | null>(null);
+  readonly consultaAutor = computed(() => this.auth.user()?.role === 'ESTUDIANTE');
+  private puedeLeer(d: RevisionDetalleResponse): boolean {
+    const u = this.auth.user();
+    return (
+      (u?.role === 'CATEDRATICO' && u.id === d.revisorId) ||
+      (u?.role === 'ESTUDIANTE' && u.id === d.autorId)
+    );
+  }
   readonly puedeEscribir = computed(() => {
     const d = this.detalle();
     const u = this.auth.user();
@@ -156,9 +164,8 @@ export class DetalleRevisionPage implements ContextoObservacionesFormulario {
 
   constructor() {
     effect(() => {
-      const usuario = this.auth.user();
       const detalle = this.detalle();
-      if (detalle && (usuario?.role !== 'CATEDRATICO' || usuario.id !== detalle.revisorId)) {
+      if (detalle && !this.puedeLeer(detalle)) {
         this.cancelarEscritura.next();
         this.limpiarPrivados();
         this.bloqueada.set(true);
@@ -196,8 +203,10 @@ export class DetalleRevisionPage implements ContextoObservacionesFormulario {
       .subscribe((respuesta) => {
         if (!respuesta) return;
         if (
-          this.auth.user()?.role !== 'CATEDRATICO' ||
-          respuesta.detalle.revisorId !== this.auth.user()?.id
+          !this.puedeLeer(respuesta.detalle) ||
+          respuesta.detalle.revisionId !== this.id ||
+          respuesta.listado.revisionId !== this.id ||
+          respuesta.listado.observaciones.some((o) => o.revisionId !== this.id)
         ) {
           this.limpiarPrivados();
           this.estadoHttp.set(404);

@@ -1,10 +1,13 @@
 package gt.usac.cunoc.sgp.revision.repository;
 
 import gt.usac.cunoc.sgp.revision.entity.ObservacionRevision;
+import gt.usac.cunoc.sgp.revision.entity.Revision;
 import gt.usac.cunoc.sgp.revision.model.EstadoObservacion;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -22,6 +25,22 @@ public interface ObservacionRevisionRepository extends JpaRepository<Observacion
   @Query(
       "select count(r) > 0 from Revision r where r.id = :id and r.revisorId = :actor and r.inspeccion.eliminadoEn is null")
   boolean existeCicloDelRevisor(@Param("id") UUID id, @Param("actor") UUID actor);
+
+  @Query(
+      "select count(r) > 0 from Revision r where r.id = :id "
+          + "and (r.revisorId = :actor or r.inspeccion.autorId = :actor) "
+          + "and r.inspeccion.eliminadoEn is null")
+  boolean existeCicloLegible(@Param("id") UUID id, @Param("actor") UUID actor);
+
+  @Query(
+      """
+      select r from Revision r
+      where r.inspeccion.autorId = :actor and r.inspeccion.eliminadoEn is null
+        and (r.observacionGeneral is not null or exists
+          (select o.id from ObservacionRevision o where o.revision = r))
+      order by r.enviadaEn desc, r.id desc
+      """)
+  Page<Revision> ciclosDelAutor(@Param("actor") UUID actor, Pageable pagina);
 
   @Query(
       """

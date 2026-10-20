@@ -17,7 +17,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
-@PreAuthorize("hasRole('CATEDRATICO')")
+@PreAuthorize("hasAnyRole('CATEDRATICO', 'ESTUDIANTE')")
 public class RevisionDetalleService {
   private final RevisionRepository revisiones;
   private final VersionFormularioRepository versiones;
@@ -44,8 +44,8 @@ public class RevisionDetalleService {
           "Autenticación requerida",
           "Se requiere una sesión válida.");
     var ciclo = revisiones.findById(revisionId).orElseThrow(this::noEncontrada);
-    if (!actor.equals(ciclo.getRevisorId()) || ciclo.getInspeccion().getEliminadoEn() != null)
-      throw noEncontrada();
+    if ((!actor.equals(ciclo.getRevisorId()) && !actor.equals(ciclo.getInspeccion().getAutorId()))
+        || ciclo.getInspeccion().getEliminadoEn() != null) throw noEncontrada();
     JsonNode snapshot = ciclo.getContenidoEnviado();
     UUID inspeccionId = identificador(snapshot, "inspeccionId");
     if (!inspeccionId.equals(ciclo.getInspeccion().getId())) throw contenidoInvalido();

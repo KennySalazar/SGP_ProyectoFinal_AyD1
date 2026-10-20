@@ -280,9 +280,9 @@ class ObservacionCrudIntegrationTest {
   }
 
   @Test
-  void ajenoYAutorNoPuedenConsultarNiModificarNiCruzarObservacionesDeCiclo() {
+  void ajenoNoPuedeConsultarNiModificarNiCruzarObservacionesDeCiclo() {
     var observacion = crear();
-    for (UUID actor : List.of(ajeno, autor)) {
+    for (UUID actor : List.of(ajeno)) {
       error(HttpStatus.NOT_FOUND, () -> servicio.listar(ciclo, actor));
       error(HttpStatus.NOT_FOUND, () -> servicio.contar(ciclo, actor));
       error(HttpStatus.NOT_FOUND, () -> servicio.obtenerGeneral(ciclo, actor));
@@ -304,10 +304,66 @@ class ObservacionCrudIntegrationTest {
     assertThat(servicio.contar(ciclo, revisor).total()).isEqualTo(1);
   }
 
+  @ParameterizedTest
+  @ValueSource(strings = {"EN_CURSO", "RESUELTA"})
+  void autorLeeSuCicloGeneralYContadoresPeroNuncaEscribe(String estado) {
+    var observacion = crear();
+    servicio.guardarGeneral(ciclo, revisor, new ObservacionGeneralRequest("General del ciclo"));
+    jdbc.update(
+        "UPDATE revision SET estado=?,veredicto='APROBADA',resuelta_en=CURRENT_TIMESTAMP WHERE id=?",
+        estado,
+        ciclo);
+    sesion(autor, RoleName.ESTUDIANTE);
+    assertThat(servicio.listar(ciclo, autor).observaciones())
+        .extracting(ObservacionResponse::id)
+        .containsExactly(observacion.id());
+    assertThat(servicio.obtener(ciclo, observacion.id(), autor).texto())
+        .isEqualTo(observacion.texto());
+    assertThat(servicio.contar(ciclo, autor).pendientes()).isEqualTo(1);
+    assertThat(servicio.obtenerGeneral(ciclo, autor).texto()).isEqualTo("General del ciclo");
+    assertThat(servicio.recibidas(autor, 0, 20).getContent())
+        .extracting(CicloObservacionesResponse::revisionId)
+        .contains(ciclo);
+    var antes = estadoObservaciones();
+    assertThatThrownBy(() -> servicio.crear(ciclo, autor, elemento("/campo", null, "No")))
+        .isInstanceOf(AccessDeniedException.class);
+    assertThatThrownBy(
+            () ->
+                servicio.editar(ciclo, observacion.id(), autor, new EditarObservacionRequest("No")))
+        .isInstanceOf(AccessDeniedException.class);
+    assertThatThrownBy(() -> servicio.eliminar(ciclo, observacion.id(), autor))
+        .isInstanceOf(AccessDeniedException.class);
+    assertThatThrownBy(
+            () -> servicio.guardarGeneral(ciclo, autor, new ObservacionGeneralRequest("No")))
+        .isInstanceOf(AccessDeniedException.class);
+    assertThat(estadoObservaciones()).isEqualTo(antes);
+  }
+
+  @Test
+  void otroEstudianteNoLeeNiDescubreCiclosAjenoYNoSeCruzanObservaciones() {
+    var observacion = crear();
+    UUID otro = usuario("ESTUDIANTE");
+    sesion(otro, RoleName.ESTUDIANTE);
+    assertThat(servicio.recibidas(otro, 0, 20).isEmpty()).isTrue();
+    error(HttpStatus.NOT_FOUND, () -> servicio.listar(ciclo, otro));
+    error(HttpStatus.NOT_FOUND, () -> servicio.contar(ciclo, otro));
+    error(HttpStatus.NOT_FOUND, () -> servicio.obtenerGeneral(ciclo, otro));
+    error(HttpStatus.NOT_FOUND, () -> servicio.obtener(ciclo, observacion.id(), otro));
+    UUID segundo = UUID.randomUUID();
+    jdbc.update(
+        "INSERT INTO revision(id,inspeccion_id,numero_ciclo,revisor_id,estado,veredicto,resuelta_en,enviada_en,version_inspeccion_enviada,contenido_enviado,hash_contenido) SELECT ?,inspeccion_id,2,revisor_id,'RESUELTA','APROBADA',CURRENT_TIMESTAMP,enviada_en,version_inspeccion_enviada,contenido_enviado,hash_contenido FROM revision WHERE id=?",
+        segundo,
+        ciclo);
+    sesion(autor, RoleName.ESTUDIANTE);
+    error(HttpStatus.NOT_FOUND, () -> servicio.obtener(segundo, observacion.id(), autor));
+    assertThat(servicio.listar(segundo, autor).observaciones()).isEmpty();
+    error(HttpStatus.UNPROCESSABLE_ENTITY, () -> servicio.recibidas(autor, -1, 20));
+    error(HttpStatus.UNPROCESSABLE_ENTITY, () -> servicio.recibidas(autor, 0, 101));
+  }
+
   @Test
   void servicioTambienRechazaOtrosRoles() {
-    for (RoleName rol :
-        List.of(RoleName.ESTUDIANTE, RoleName.ADMINISTRADOR, RoleName.PROFESIONAL_EXTERNO)) {
+    for (RoleName rol : List.of(RoleName.ADMINISTRADOR, RoleName.PROFESIONAL_EXTERNO)) {
       sesion(autor, rol);
       assertThatThrownBy(() -> servicio.listar(ciclo, revisor))
           .isInstanceOf(AccessDeniedException.class);
