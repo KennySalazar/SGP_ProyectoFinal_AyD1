@@ -144,9 +144,7 @@ export class BandejaRevisionPage {
       )
       .subscribe({
         next: () => {
-          this.mensaje.set(revision.estadoRevision === 'PENDIENTE' ? 'iniciada' : 'reanudada');
           this.api.cargarContador().pipe(takeUntilDestroyed(this.destroyRef)).subscribe();
-          this.cargar(this.pagina()?.number ?? 0);
           void this.router.navigate(['/revisiones', revision.revisionId]);
         },
         error: (error) => this.apiErrors.normalize(error),

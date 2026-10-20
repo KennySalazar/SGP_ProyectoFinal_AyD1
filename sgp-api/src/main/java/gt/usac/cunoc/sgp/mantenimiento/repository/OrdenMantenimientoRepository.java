@@ -2,10 +2,14 @@ package gt.usac.cunoc.sgp.mantenimiento.repository;
 
 import gt.usac.cunoc.sgp.mantenimiento.entity.OrdenMantenimiento;
 import gt.usac.cunoc.sgp.mantenimiento.model.EstadoOrden;
+import jakarta.persistence.LockModeType;
+import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.Repository;
 import org.springframework.data.repository.query.Param;
@@ -22,10 +26,32 @@ public interface OrdenMantenimientoRepository extends Repository<OrdenMantenimie
 
   Optional<OrdenMantenimiento> findById(UUID id);
 
+  /** Serializa la ejecución de una orden: evidencia, responsable y cierre (HU-048). */
+  @Lock(LockModeType.PESSIMISTIC_WRITE)
+  @Query("SELECT o FROM OrdenMantenimiento o WHERE o.id = :id")
+  Optional<OrdenMantenimiento> findByIdForUpdate(@Param("id") UUID id);
+
   @Query(
       "SELECT o FROM OrdenMantenimiento o"
           + " WHERE (:puenteId IS NULL OR o.puenteId = :puenteId)"
           + " AND (:estado IS NULL OR o.estado = :estado)")
   Page<OrdenMantenimiento> buscar(
       @Param("puenteId") UUID puenteId, @Param("estado") EstadoOrden estado, Pageable pageable);
+
+  /** Evita generar dos veces la misma propuesta para una inspección (HU-046). */
+  boolean existsByInspeccionOrigenIdAndClaveGeneracion(
+      UUID inspeccionOrigenId, String claveGeneracion);
+
+  /** Órdenes que originó una inspección, de la más antigua a la más reciente. */
+  List<OrdenMantenimiento> findByInspeccionOrigenIdOrderByCreadoEnAscIdAsc(UUID inspeccionOrigenId);
+
+  /** Órdenes de un elemento del puente que siguen en curso, para no proponer lo ya propuesto. */
+  @Query(
+      "SELECT o FROM OrdenMantenimiento o"
+          + " WHERE o.puenteId = :puenteId AND o.elementoRef = :elementoRef"
+          + " AND o.estado IN :estados")
+  List<OrdenMantenimiento> findPorElementoYEstados(
+      @Param("puenteId") UUID puenteId,
+      @Param("elementoRef") String elementoRef,
+      @Param("estados") Collection<EstadoOrden> estados);
 }

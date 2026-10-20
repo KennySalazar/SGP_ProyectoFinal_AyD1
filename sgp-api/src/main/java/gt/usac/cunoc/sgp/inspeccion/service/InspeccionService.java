@@ -39,6 +39,7 @@ import gt.usac.cunoc.sgp.puente.entity.Puente;
 import gt.usac.cunoc.sgp.puente.repository.AsignacionPuenteRepository;
 import gt.usac.cunoc.sgp.puente.repository.PuenteRepository;
 import gt.usac.cunoc.sgp.sync.model.SolicitudOperacion;
+import gt.usac.cunoc.sgp.sync.service.HuellaSolicitud;
 import gt.usac.cunoc.sgp.sync.service.OperacionIdempotenteService;
 import gt.usac.cunoc.sgp.usuario.entity.UserAccount;
 import gt.usac.cunoc.sgp.usuario.model.RoleName;
@@ -323,7 +324,10 @@ public class InspeccionService {
       var existente = inspeccionRepository.findConDetallesById(request.id());
       if (existente.isPresent()) {
         var i = existente.get();
-        if (!i.getAutorId().equals(user.getId())
+        if ((i.getHuellaSolicitudInicio() != null
+                && !i.getHuellaSolicitudInicio()
+                    .equals(HuellaSolicitud.calcular(objectMapper.valueToTree(request))))
+            || !i.getAutorId().equals(user.getId())
             || i.getEliminadoEn() != null
             || !i.getPuente().getId().equals(request.puenteId())
             || !i.getFechaInspeccion().equals(request.fechaInspeccion())
@@ -605,10 +609,13 @@ public class InspeccionService {
 
     boolean autor = inspeccion.getAutorId().equals(usuarioId);
     boolean catedraticoAsignado = esCatedraticoAsignado(inspeccion, usuarioId);
-    // El autor edita; el Catedrático asignado puede consultar el borrador en solo lectura.
+    // El autor solo puede editar su borrador. El catedrático asignado puede consultar la
+    // inspección del estudiante durante el ciclo de revisión, siempre en solo lectura.
+    boolean inspeccionDisponibleParaRevision =
+        Set.of("BORRADOR", "ENVIADA", "EN_REVISION").contains(inspeccion.getEstado());
     if (inspeccion.getEliminadoEn() != null
-        || (!autor && !catedraticoAsignado)
-        || !"BORRADOR".equals(inspeccion.getEstado())) {
+        || !(autor && "BORRADOR".equals(inspeccion.getEstado()))
+            && !(catedraticoAsignado && inspeccionDisponibleParaRevision)) {
       throw new ApiException(
           HttpStatus.NOT_FOUND,
           "inspeccion_no_encontrada",
@@ -946,6 +953,8 @@ public class InspeccionService {
             datosPermanentesConfirmadosEn,
             datosIniciales,
             ahora);
+    inspeccion.setHuellaSolicitudInicio(
+        HuellaSolicitud.calcular(objectMapper.valueToTree(request)));
     inspeccion.setAsignacionPuenteId(asignacionPuenteId);
 
     if (request.confirmarDatosPermanentes() && tecnicoVigente != null) {

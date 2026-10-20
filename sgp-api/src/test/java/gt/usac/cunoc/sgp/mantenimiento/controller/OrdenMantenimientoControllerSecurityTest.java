@@ -15,6 +15,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import gt.usac.cunoc.sgp.common.exception.ApiException;
 import gt.usac.cunoc.sgp.common.exception.ApiExceptionHandler;
 import gt.usac.cunoc.sgp.common.security.JwtData;
+import gt.usac.cunoc.sgp.mantenimiento.dto.CerrarComoEjecutadaRequest;
 import gt.usac.cunoc.sgp.mantenimiento.dto.CerrarSinEjecucionRequest;
 import gt.usac.cunoc.sgp.mantenimiento.dto.IniciarEjecucionRequest;
 import gt.usac.cunoc.sgp.mantenimiento.dto.ProgramarOrdenRequest;
@@ -79,7 +80,7 @@ class OrdenMantenimientoControllerSecurityTest {
   }
 
   @ParameterizedTest
-  @ValueSource(strings = {"programar", "descartar", "iniciar", "cancelar"})
+  @ValueSource(strings = {"programar", "descartar", "iniciar", "cancelar", "cerrar"})
   void catedraticoYAdministradorPuedenCambiarElEstado(String accion) throws Exception {
     for (RoleName rol : List.of(RoleName.CATEDRATICO, RoleName.ADMINISTRADOR)) {
       reset(transiciones);
@@ -89,7 +90,7 @@ class OrdenMantenimientoControllerSecurityTest {
   }
 
   @ParameterizedTest
-  @ValueSource(strings = {"programar", "descartar", "iniciar", "cancelar"})
+  @ValueSource(strings = {"programar", "descartar", "iniciar", "cancelar", "cerrar"})
   void profesionalExternoYEstudianteReciben403(String accion) throws Exception {
     for (RoleName rol : List.of(RoleName.PROFESIONAL_EXTERNO, RoleName.ESTUDIANTE)) {
       mockMvc
@@ -101,7 +102,7 @@ class OrdenMantenimientoControllerSecurityTest {
   }
 
   @ParameterizedTest
-  @ValueSource(strings = {"programar", "descartar", "iniciar", "cancelar"})
+  @ValueSource(strings = {"programar", "descartar", "iniciar", "cancelar", "cerrar"})
   void unVisitanteRecibe401(String accion) throws Exception {
     mockMvc.perform(transicion(accion)).andExpect(status().isUnauthorized());
     verifyNoInteractions(transiciones);
@@ -221,6 +222,9 @@ class OrdenMantenimientoControllerSecurityTest {
       case "cancelar" ->
           verify(transiciones)
               .cancelar(ORDEN_ID, new CerrarSinEjecucionRequest("Motivo", 3L), USUARIO_ID);
+      case "cerrar" ->
+          verify(transiciones)
+              .cerrarComoEjecutada(ORDEN_ID, new CerrarComoEjecutadaRequest(3L), USUARIO_ID);
       default -> throw new IllegalArgumentException(accion);
     }
   }

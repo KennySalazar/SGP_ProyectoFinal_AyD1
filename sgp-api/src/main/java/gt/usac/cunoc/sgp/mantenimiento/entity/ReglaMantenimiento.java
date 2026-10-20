@@ -2,8 +2,8 @@ package gt.usac.cunoc.sgp.mantenimiento.entity;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import gt.usac.cunoc.sgp.formulario.entity.VersionFormulario;
-import gt.usac.cunoc.sgp.mantenimiento.model.PrioridadMantenimiento;
-import gt.usac.cunoc.sgp.mantenimiento.model.TipoMantenimiento;
+import gt.usac.cunoc.sgp.mantenimiento.model.PrioridadOrden;
+import gt.usac.cunoc.sgp.mantenimiento.model.TipoOrden;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -48,7 +48,7 @@ public class ReglaMantenimiento {
 
   @Enumerated(EnumType.STRING)
   @Column(name = "tipo_mantenimiento", nullable = false, length = 20)
-  private TipoMantenimiento tipoMantenimiento;
+  private TipoOrden tipoMantenimiento;
 
   @Column(name = "intervencion_sugerida", nullable = false, columnDefinition = "TEXT")
   private String intervencionSugerida;
@@ -81,7 +81,7 @@ public class ReglaMantenimiento {
       VersionFormulario versionFormulario,
       String elementoRef,
       JsonNode condicion,
-      TipoMantenimiento tipoMantenimiento,
+      TipoOrden tipoMantenimiento,
       String intervencionSugerida,
       JsonNode reglaPrioridad,
       boolean activa,
@@ -146,7 +146,7 @@ public class ReglaMantenimiento {
     return condicion;
   }
 
-  public TipoMantenimiento getTipoMantenimiento() {
+  public TipoOrden getTipoMantenimiento() {
     return tipoMantenimiento;
   }
 
@@ -158,15 +158,15 @@ public class ReglaMantenimiento {
     return reglaPrioridad;
   }
 
-  public PrioridadMantenimiento getPrioridadBase() {
+  public PrioridadOrden getPrioridadBase() {
     if (reglaPrioridad != null && reglaPrioridad.hasNonNull("prioridad_base")) {
       try {
-        return PrioridadMantenimiento.valueOf(reglaPrioridad.get("prioridad_base").asText());
+        return PrioridadOrden.valueOf(reglaPrioridad.get("prioridad_base").asText());
       } catch (IllegalArgumentException e) {
-        return PrioridadMantenimiento.MEDIA;
+        return PrioridadOrden.MEDIA;
       }
     }
-    return PrioridadMantenimiento.MEDIA;
+    return PrioridadOrden.MEDIA;
   }
 
   public boolean isActiva() {

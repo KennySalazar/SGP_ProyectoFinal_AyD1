@@ -135,6 +135,14 @@ public class Archivo implements org.springframework.data.domain.Persistable<UUID
     }
   }
 
+  /** Retira el archivo documentando por qué deja de contar como evidencia (HU-048). */
+  public void retirar(Instant ahora, String motivo) {
+    if (estado == EstadoArchivo.DISPONIBLE) {
+      retirar(ahora);
+      motivoRetiro = motivo;
+    }
+  }
+
   public UUID getId() {
     return id;
   }

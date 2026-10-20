@@ -372,7 +372,7 @@ public class FotografiaService {
       throw error(HttpStatus.NOT_FOUND, "inspeccion_no_encontrada", "Inspección no encontrada.");
     }
     if (rol == RoleName.CATEDRATICO
-        && "BORRADOR".equals(i.getEstado())
+        && Set.of("BORRADOR", "ENVIADA", "EN_REVISION").contains(i.getEstado())
         && i.getAsignacionPuenteId() != null
         && asignaciones.existsVigenteParaLecturaFotografica(
             i.getAsignacionPuenteId(), i.getAutorId(), i.getPuente().getId(), actor)) return;

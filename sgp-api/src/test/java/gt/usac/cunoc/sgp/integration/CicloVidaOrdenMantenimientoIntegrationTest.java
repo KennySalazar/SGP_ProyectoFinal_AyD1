@@ -4,6 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import gt.usac.cunoc.sgp.archivo.service.AlmacenamientoArchivos;
+import gt.usac.cunoc.sgp.archivo.service.AlmacenamientoLocal;
 import gt.usac.cunoc.sgp.common.audit.service.AuditoriaWriter;
 import gt.usac.cunoc.sgp.common.exception.ApiException;
 import gt.usac.cunoc.sgp.mantenimiento.dto.CerrarSinEjecucionRequest;
@@ -459,6 +461,11 @@ class CicloVidaOrdenMantenimientoIntegrationTest {
     @Bean
     ObjectMapper objectMapper() {
       return new ObjectMapper();
+    }
+
+    @Bean
+    AlmacenamientoArchivos almacenamientoArchivos() throws java.io.IOException {
+      return new AlmacenamientoLocal(java.nio.file.Files.createTempDirectory("sgp-hu047-"));
     }
   }
 }

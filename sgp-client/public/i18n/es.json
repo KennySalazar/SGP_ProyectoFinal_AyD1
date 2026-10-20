@@ -64,7 +64,8 @@
     "reviewInbox": "Bandeja de revisión",
     "pendingReviewsCount": "{{count}} inspecciones por revisar",
     "avisos": "Avisos",
-    "maintenanceRules": "Reglas de mantenimiento"
+    "maintenanceRules": "Reglas de mantenimiento",
+    "maintenanceOrders": "Órdenes de mantenimiento"
   },
   "mantenimiento": {
     "kicker": "Mantenimiento",
@@ -117,7 +118,110 @@
     "cancelar": "Cancelar",
     "guardar": "Guardar regla",
     "crearRevision": "Crear nueva revisión",
-    "confirmarValidacion": "Marcar como validada"
+    "confirmarValidacion": "Marcar como validada",
+    "ordenes": {
+      "titulo": "Órdenes de mantenimiento",
+      "descripcion": "Programa, ejecuta y cierra las intervenciones de los puentes dejando constancia verificable de lo realizado.",
+      "listaTitulo": "Órdenes registradas",
+      "listaDescripcion": "De la más reciente a la más antigua, incluidas las de puentes dados de baja.",
+      "filtrarEstado": "Filtrar por estado",
+      "cargando": "Cargando órdenes...",
+      "errorCarga": "No fue posible cargar las órdenes. Intenta nuevamente.",
+      "vacio": "No hay órdenes que coincidan con el filtro seleccionado.",
+      "verDetalle": "Ver detalle",
+      "volver": "Volver a las órdenes",
+      "cargandoDetalle": "Cargando la orden...",
+      "errorDetalle": "No fue posible cargar la orden. Es posible que no exista.",
+      "kickerDetalle": "Orden de mantenimiento",
+      "prioridad": "Prioridad",
+      "prioridadSugerida": "Prioridad sugerida",
+      "programadaPara": "Programada para el",
+      "motivoCierre": "Motivo del cierre",
+      "datosTitulo": "Datos de la orden",
+      "tipo": "Tipo",
+      "elemento": "Elemento",
+      "justificacion": "Justificación de la prioridad",
+      "creada": "Creada",
+      "historial": "Historial de estados",
+      "estados": {
+        "PROPUESTA": "Propuesta",
+        "PROGRAMADA": "Programada",
+        "EN_EJECUCION": "En ejecución",
+        "EJECUTADA": "Ejecutada",
+        "DESCARTADA": "Descartada",
+        "CANCELADA": "Cancelada"
+      },
+      "tipos": {
+        "RUTINARIO": "Rutinario",
+        "PREVENTIVO": "Preventivo",
+        "CORRECTIVO": "Correctivo",
+        "EMERGENCIA": "Emergencia"
+      },
+      "prioridades": {
+        "BAJA": "Baja",
+        "MEDIA": "Media",
+        "ALTA": "Alta",
+        "CRITICA": "Crítica"
+      },
+      "acciones": {
+        "programar": "Programar",
+        "descartar": "Descartar",
+        "iniciar": "Iniciar ejecución",
+        "cancelar": "Cancelar orden",
+        "cerrar": "Cerrar como ejecutada"
+      },
+      "dialogos": {
+        "programarTitulo": "Programar la orden",
+        "programarTexto": "La orden pasará a Programada para la fecha indicada.",
+        "descartarTitulo": "Descartar la orden",
+        "descartarTexto": "La propuesta quedará descartada con su motivo. Esta acción no se puede deshacer.",
+        "cancelarTitulo": "Cancelar la orden",
+        "cancelarTexto": "La orden programada quedará cancelada con su motivo. Esta acción no se puede deshacer.",
+        "iniciarTitulo": "Iniciar la ejecución",
+        "iniciarTexto": "La orden pasará a En ejecución y se registrará la fecha y hora de inicio. Desde ese momento podrás indicar el responsable y subir la evidencia.",
+        "cerrarTitulo": "Cerrar como ejecutada",
+        "cerrarTexto": "La orden quedará Ejecutada y su fecha, responsable y evidencia ya no se podrán modificar.",
+        "fechaProgramada": "Fecha programada",
+        "motivo": "Motivo",
+        "requisitos": "Requisitos para cerrar",
+        "requisitoFecha": "Fecha de ejecución",
+        "requisitoResponsable": "Responsable",
+        "requisitoEvidencias": "Fotografías de evidencia: {{total}}",
+        "registrada": "registrada",
+        "registrado": "registrado",
+        "pendiente": "pendiente",
+        "procesando": "Procesando..."
+      },
+      "ejecucion": {
+        "titulo": "Ejecución",
+        "iniciada": "Iniciada el",
+        "fecha": "Fecha de ejecución",
+        "responsable": "Responsable de la intervención",
+        "usuarioSistema": "Usuario del sistema",
+        "externo": "Persona o empresa externa",
+        "seleccionarUsuario": "Selecciona un usuario",
+        "nombreExterno": "Nombre de la persona o empresa",
+        "guardar": "Guardar ejecución",
+        "guardando": "Guardando...",
+        "guardada": "Ejecución guardada."
+      },
+      "evidencia": {
+        "titulo": "Evidencia fotográfica",
+        "descripcion": "Se necesita al menos una fotografía para cerrar la orden como ejecutada.",
+        "elemento": "Elemento (opcional)",
+        "elementoPlaceholder": "/superestructura/drenaje",
+        "subir": "Subir fotografía",
+        "subiendo": "Subiendo...",
+        "nota": "JPEG o WebP. Se comprime en el dispositivo a 1600 px antes de subirse.",
+        "vacia": "Todavía no hay fotografías de evidencia.",
+        "ampliar": "Ver fotografía completa",
+        "alt": "Fotografía de evidencia del mantenimiento",
+        "retirar": "Retirar",
+        "retirando": "Retirando...",
+        "retirarTitulo": "Retirar evidencia",
+        "retirarTexto": "La fotografía quedará retirada con su motivo y dejará de contar como evidencia."
+      }
+    }
   },
   "avisos": {
     "title": "Avisos",
@@ -1610,7 +1714,10 @@
         "BUENO": "Bueno",
         "REGULAR": "Regular",
         "MALO": "Malo"
-      }
+      },
+      "indicadorPendiente": "Completa la evaluacion pendiente en: {{recorrido}}. Guarda el borrador y vuelve a consultar el IC.",
+      "datosPendientes": "Completa los datos de evaluacion y guarda el borrador antes de consultar el IC.",
+      "seccionPendiente": "Completa la seccion {{seccion}} y guarda el borrador antes de consultar el IC."
     }
   }
 }

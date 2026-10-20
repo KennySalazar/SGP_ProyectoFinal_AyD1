@@ -361,7 +361,7 @@ describe('CompletarInspeccionPage', () => {
       component.abrirConfirmacion();
       component.confirmarAccion();
       fixture.detectChanges();
-      expect(mockInspeccionApi.enviar).toHaveBeenCalledWith('inspeccion-123', expect.any(String));
+      expect(mockInspeccionApi.enviar).toHaveBeenCalledWith('inspeccion-123');
       expect(fixture.nativeElement.textContent).toContain('inspecciones.transicion.enviada');
     });
     it('un 422 detalla por separado los campos y las fotografías que faltan', () => {
@@ -388,7 +388,7 @@ describe('CompletarInspeccionPage', () => {
       fixture.detectChanges();
       expect(component.errorAccion()).toEqual({
         mensaje: 'Faltan 1 campos obligatorios y 2 categorias de fotografia.',
-        campos: [{ campo: 'subestructura', mensaje: 'El campo subestructura es obligatorio' }],
+        campos: [{ campo: 'subestructura', mensaje: 'El campo Subestructura es obligatorio' }],
         fotografias: ['ACCESO', 'CAUCE'],
       });
       expect(component.confirmandoAccion()).toBe(true);
@@ -550,5 +550,17 @@ describe('CompletarInspeccionPage', () => {
     expect(TestBed.inject(Router).navigate).not.toHaveBeenCalled();
     expect(component.borrador()?.estado).toBe('BORRADOR');
     expect(component.errorAccion()?.mensaje).toBe('Faltan datos');
+  });
+  it('reintenta el guardado incierto con el cuerpo original aunque haya nuevas ediciones', () => {
+    fixture.detectChanges();
+    mockInspeccionApi.guardarBorrador.mockReturnValue(
+      throwError(() => new HttpErrorResponse({ status: 0 })),
+    );
+    component.guardarBorrador();
+    const primera = structuredClone(mockInspeccionApi.guardarBorrador.mock.calls.at(-1)![1]);
+    component.fechaInspeccion.set('2026-10-14');
+    component.guardarBorrador();
+    expect(mockInspeccionApi.guardarBorrador.mock.calls.at(-1)![1]).toEqual(primera);
+    expect(component.fechaInspeccion()).toBe('2026-10-14');
   });
 });

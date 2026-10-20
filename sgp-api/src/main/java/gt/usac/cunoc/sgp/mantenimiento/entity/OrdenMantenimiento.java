@@ -138,6 +138,44 @@ public class OrdenMantenimiento {
   }
 
   /**
+   * Propuesta generada por el sistema a partir de una inspección publicada (HU-046, RN-MTO-02).
+   * Nace en PROPUESTA, sin autor humano, con la regla que la originó y la clave que impide generar
+   * dos veces la misma. La prioridad sugerida y la confirmada empiezan iguales.
+   */
+  public static OrdenMantenimiento propuestaGenerada(
+      UUID id,
+      UUID puenteId,
+      UUID inspeccionOrigenId,
+      UUID reglaOrigenId,
+      UUID resultadoIcOrigenId,
+      String elementoRef,
+      UUID instanciaElementoId,
+      String claveGeneracion,
+      TipoOrden tipo,
+      String descripcion,
+      PrioridadOrden prioridad,
+      JsonNode fundamentoGeneracion,
+      Instant ahora) {
+    OrdenMantenimiento orden =
+        new OrdenMantenimiento(
+            id,
+            puenteId,
+            inspeccionOrigenId,
+            elementoRef,
+            instanciaElementoId,
+            tipo,
+            descripcion,
+            prioridad,
+            null,
+            ahora);
+    orden.reglaOrigenId = reglaOrigenId;
+    orden.resultadoIcOrigenId = resultadoIcOrigenId;
+    orden.claveGeneracion = claveGeneracion;
+    orden.fundamentoGeneracion = fundamentoGeneracion;
+    return orden;
+  }
+
+  /**
    * Cambia el estado. Solo lo invoca {@code TransicionOrdenService}, después de validar la
    * transición con la máquina de estados (DT-BE-07).
    */
