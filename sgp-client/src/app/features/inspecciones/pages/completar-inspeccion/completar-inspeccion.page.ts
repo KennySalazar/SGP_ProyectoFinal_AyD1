@@ -105,6 +105,7 @@ export class CompletarInspeccionPage implements OnInit {
   readonly esquema = signal<EsquemaJson | null>(null);
   readonly fechaInspeccion = signal<string>('');
   readonly horaGuardadoLocal = signal<string | null>(null);
+  readonly esSoloLocal = signal(false);
   readonly errorAlmacenamiento = signal<string | null>(null);
   readonly esOffline = computed(() => !this.connectivity.online());
   readonly hoy = new Date().toISOString().slice(0, 10);
@@ -190,6 +191,9 @@ export class CompletarInspeccionPage implements OnInit {
     // Intentar primero desde Dexie si estamos offline o si existe localmente
     this.inspeccionesLocales.obtenerInspeccionLocal(id).then((local) => {
       if (local && local.payload) {
+        if (!local.sincronizado) {
+          this.esSoloLocal.set(true);
+        }
         const payload = local.payload as BorradorLocalPayload;
         const b = payload.borrador;
         this.borrador.set(b);
@@ -449,8 +453,8 @@ export class CompletarInspeccionPage implements OnInit {
     this.guardadoPendiente = { request: structuredClone(request), revision: revisionSolicitud };
     this.guardando.set(true);
     this.estadoAutoguardado.set('guardando');
-    // Si no hay red, el guardado local en Dexie ya se realizó inmediatamente
-    if (!this.connectivity.online()) {
+    // Si no hay red o es un borrador que solo existe localmente (no sincronizado en servidor)
+    if (!this.connectivity.online() || this.esSoloLocal()) {
       this.guardadoPendiente = null;
       this.guardando.set(false);
       this.revisionGuardada = Math.max(this.revisionGuardada, revisionSolicitud);
@@ -492,6 +496,7 @@ export class CompletarInspeccionPage implements OnInit {
   abrirConfirmacion(): void {
     if (
       !this.connectivity.online() ||
+      this.esSoloLocal() ||
       !this.accionFinal() ||
       this.cambiosSinGuardar() ||
       this.errorGuardado() ||
