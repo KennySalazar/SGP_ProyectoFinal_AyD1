@@ -216,6 +216,20 @@ describe('CompletarInspeccionPage', () => {
     expect(component.borrador()?.icPreliminar?.indice).toBe(82.5);
   });
 
+  it('renderiza borradores nuevos o reanudados que todavía no incluyen progreso', () => {
+    mockInspeccionApi.obtenerBorrador.mockReturnValue(
+      of({ ...mockBorrador, progreso: undefined } as unknown as InspeccionBorradorResponse),
+    );
+
+    expect(() => fixture.detectChanges()).not.toThrow();
+    expect(component.borrador()?.progreso).toEqual({
+      totalCamposRequeridos: 0,
+      totalCamposCompletados: 0,
+      porcentajeTotal: 0,
+      secciones: [],
+    });
+  });
+
   it('integra el reporte del borrador reanudado y bloquea la transición durante cargas', async () => {
     fixture.detectChanges();
     await fixture.whenStable();

@@ -42,20 +42,20 @@ describe('HU-042: Inspecciones Locales y Recuperación tras Recarga', () => {
       return Promise.resolve(esquemasMemoria.get(String(id))) as never;
     });
 
-    vi.spyOn(sgpDb.esquemas_formulario, 'where').mockImplementation((field: string) => {
+    vi.spyOn(sgpDb.esquemas_formulario, 'where').mockImplementation(((field: string) => {
       return {
         equals: (val: unknown) => ({
           toArray: async () =>
             [...esquemasMemoria.values()].filter(
-              (e) => (e as Record<string, unknown>)[field] === val,
+              (e) => (e as unknown as Record<string, unknown>)[field] === val,
             ),
           first: async () =>
             [...esquemasMemoria.values()].find(
-              (e) => (e as Record<string, unknown>)[field] === val,
+              (e) => (e as unknown as Record<string, unknown>)[field] === val,
             ),
         }),
       } as never;
-    });
+    }) as never);
 
     service = new InspeccionesLocalesService();
   });
@@ -95,7 +95,7 @@ describe('HU-042: Inspecciones Locales y Recuperación tras Recarga', () => {
     expect(res.estado).toBe('BORRADOR');
 
     // Comprobar persistencia directa en Dexie
-    const local = await service.obtenerInspeccionLocal(req.id);
+    const local = await service.obtenerInspeccionLocal(req.id!);
     expect(local).toBeDefined();
     expect(local?.id).toBe(req.id);
     expect(local?.sincronizado).toBe(false);
@@ -213,5 +213,87 @@ describe('HU-042: Inspecciones Locales y Recuperación tras Recarga', () => {
 
     encontrado = await service.obtenerInspeccionLocal(id);
     expect(encontrado).toBeUndefined();
+  });
+
+  it('permite recuperar un borrador local tanto con envoltura { borrador: ... } como con formato de borrador directo', async () => {
+    // 1. Formato con envoltura { borrador: ... } (HU-042 iniciarInspeccionLocal)
+    const idEnvoltorio = '018f6730-env';
+    await service.guardarInspeccionLocal({
+      id: idEnvoltorio,
+      puenteId: 'bridge-1',
+      propietarioId: 'user-1',
+      estado: 'BORRADOR',
+      actualizadoEn: new Date().toISOString(),
+      sincronizado: false,
+      payload: {
+        borrador: {
+          id: idEnvoltorio,
+          puenteId: 'bridge-1',
+          codigoPuente: 'P-001',
+          nombrePuente: 'Puente Envoltorio',
+          versionFormularioId: 'v1',
+          codigoVersionFormulario: 'v1',
+          autorId: 'user-1',
+          rolAutor: 'ESTUDIANTE',
+          nombreAutor: 'Estudiante',
+          estado: 'BORRADOR',
+          fechaInspeccion: '2026-10-20',
+          dispositivoId: 'dev-1',
+          version: 1,
+          creadoEn: new Date().toISOString(),
+          acompanantes: [],
+          datos: { seccion1: { campo: 'valor1' } },
+        },
+        versionFormularioId: 'v1',
+      },
+    });
+
+    // 2. Formato directo (almacenado como InspeccionBorradorResponse plano)
+    const idDirecto = '018f6730-direct';
+    await service.guardarInspeccionLocal({
+      id: idDirecto,
+      puenteId: 'bridge-2',
+      propietarioId: 'user-1',
+      estado: 'BORRADOR',
+      actualizadoEn: new Date().toISOString(),
+      sincronizado: true,
+      payload: {
+        id: idDirecto,
+        puenteId: 'bridge-2',
+        codigoPuente: 'P-002',
+        nombrePuente: 'Puente Directo',
+        versionFormularioId: 'v2',
+        codigoVersionFormulario: 'v2',
+        autorId: 'user-1',
+        rolAutor: 'CATEDRATICO',
+        nombreAutor: 'Profesor',
+        estado: 'BORRADOR',
+        fechaInspeccion: '2026-10-18',
+        dispositivoId: 'dev-2',
+        version: 1,
+        creadoEn: new Date().toISOString(),
+        acompanantes: [],
+        datos: { seccion1: { campo: 'valor2' } },
+      },
+    });
+
+    const normalizar = (item: LocalInspection | undefined) => {
+      const raw = item?.payload as Record<string, unknown> | undefined;
+      return (raw && typeof raw === 'object' && 'borrador' in raw && raw['borrador']
+        ? raw['borrador']
+        : raw) as Record<string, unknown> | undefined;
+    };
+
+    const recuperadoEnv = await service.obtenerInspeccionLocal(idEnvoltorio);
+    const borradorEnv = normalizar(recuperadoEnv);
+    expect(borradorEnv).toBeDefined();
+    expect(borradorEnv?.['fechaInspeccion']).toBe('2026-10-20');
+    expect(borradorEnv?.['nombrePuente']).toBe('Puente Envoltorio');
+
+    const recuperadoDirecto = await service.obtenerInspeccionLocal(idDirecto);
+    const borradorDirecto = normalizar(recuperadoDirecto);
+    expect(borradorDirecto).toBeDefined();
+    expect(borradorDirecto?.['fechaInspeccion']).toBe('2026-10-18');
+    expect(borradorDirecto?.['nombrePuente']).toBe('Puente Directo');
   });
 });

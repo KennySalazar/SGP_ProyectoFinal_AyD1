@@ -194,22 +194,29 @@ export class CompletarInspeccionPage implements OnInit {
         if (!local.sincronizado) {
           this.esSoloLocal.set(true);
         }
-        const payload = local.payload as BorradorLocalPayload;
-        const b = payload.borrador;
-        this.borrador.set(b);
-        this.datosIniciales.set(b);
-        this.fechaInspeccion.set(b.fechaInspeccion || this.hoy);
-        if (b.datos) {
-          this.datosEnMemoria.set(b.datos);
+        const rawPayload = local.payload as Record<string, unknown>;
+        const b = (
+          rawPayload && typeof rawPayload === 'object' && 'borrador' in rawPayload && rawPayload['borrador']
+            ? rawPayload['borrador']
+            : rawPayload
+        ) as InspeccionBorradorResponse;
+
+        if (b && typeof b === 'object' && (b.fechaInspeccion || b.id || b.versionFormularioId)) {
+          this.borrador.set(this.conProgreso(b));
+          this.datosIniciales.set(b);
+          this.fechaInspeccion.set(b.fechaInspeccion || this.hoy);
+          if (b.datos) {
+            this.datosEnMemoria.set(b.datos);
+          }
+          if (local.actualizadoEn) {
+            const d = new Date(local.actualizadoEn);
+            const hh = String(d.getHours()).padStart(2, '0');
+            const mm = String(d.getMinutes()).padStart(2, '0');
+            this.horaGuardadoLocal.set(`${hh}:${mm}`);
+          }
+          this.cargarEsquema(b.versionFormularioId);
+          return;
         }
-        if (local.actualizadoEn) {
-          const d = new Date(local.actualizadoEn);
-          const hh = String(d.getHours()).padStart(2, '0');
-          const mm = String(d.getMinutes()).padStart(2, '0');
-          this.horaGuardadoLocal.set(`${hh}:${mm}`);
-        }
-        this.cargarEsquema(b.versionFormularioId);
-        return;
       }
 
       // Si no está local o no hay Dexie disponible, acudir a la API
@@ -218,7 +225,7 @@ export class CompletarInspeccionPage implements OnInit {
         .pipe(takeUntilDestroyed(this.destroyRef))
         .subscribe({
           next: (b) => {
-            this.borrador.set(b);
+            this.borrador.set(this.conProgreso(b));
             this.datosIniciales.set(b);
             this.fechaInspeccion.set(b.fechaInspeccion || this.hoy);
             if (b.datos) {
@@ -297,6 +304,18 @@ export class CompletarInspeccionPage implements OnInit {
           });
         },
       });
+  }
+
+  private conProgreso(borrador: InspeccionBorradorResponse): InspeccionBorradorResponse {
+    return {
+      ...borrador,
+      progreso: borrador.progreso ?? {
+        totalCamposRequeridos: 0,
+        totalCamposCompletados: 0,
+        porcentajeTotal: 0,
+        secciones: [],
+      },
+    };
   }
   onValorChange(valor: Record<string, unknown>): void {
     const fechaFormulario = (valor['identificacion'] as Record<string, unknown> | undefined)?.[
@@ -467,7 +486,7 @@ export class CompletarInspeccionPage implements OnInit {
       next: (actualizada) => {
         this.guardadoPendiente = null;
         this.guardando.set(false);
-        this.borrador.set(actualizada);
+        this.borrador.set(this.conProgreso(actualizada));
         this.revisionGuardada = Math.max(this.revisionGuardada, revisionSolicitud);
         const hayCambiosNuevos = this.revisionDatos > revisionSolicitud;
         if (!hayCambiosNuevos && actualizada.datos) {
