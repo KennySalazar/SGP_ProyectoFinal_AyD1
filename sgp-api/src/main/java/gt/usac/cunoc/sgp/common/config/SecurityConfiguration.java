@@ -74,6 +74,13 @@ public class SecurityConfiguration {
                       "/api/v1/puentes/*",
                       "/api/v1/catalogos/departamentos")
                   .permitAll()
+                  // El visitante puede leer el foro pero no participar (RN-FOR-09).
+                  .requestMatchers(
+                      HttpMethod.GET,
+                      "/api/v1/puentes/*/hilos",
+                      "/api/v1/hilos/*",
+                      "/api/v1/hilos/*/comentarios")
+                  .permitAll()
                   .requestMatchers(
                       HttpMethod.POST,
                       "/api/v1/invitaciones/validacion",

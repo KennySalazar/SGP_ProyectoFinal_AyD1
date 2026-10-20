@@ -1,0 +1,229 @@
+<button pButton type="button" severity="secondary" [outlined]="true" (click)="volver.emit()">
+  <i class="pi pi-arrow-left" aria-hidden="true"></i
+  ><span>{{ 'foro.hilo.volver' | transloco }}</span>
+</button>
+
+<ng-template #autor let-usuario="usuario" let-rol="rol">
+  @if (usuario) {
+    <strong>{{ '@' + usuario }}</strong>
+  } @else {
+    <strong>{{ 'foro.roles.' + rol | transloco }}</strong>
+  }
+</ng-template>
+
+@if (cargando() && !hilo()) {
+  <div class="hilo-cargando" aria-hidden="true">
+    <p-skeleton width="55%" height="1.4rem" />
+    <p-skeleton width="35%" height="0.9rem" />
+    <p-skeleton width="90%" height="3rem" />
+  </div>
+  <span class="sr-only" role="status">{{ 'foro.cargando' | transloco }}</span>
+} @else if (error()) {
+  <div class="estado" role="alert">
+    <i class="pi pi-exclamation-circle" aria-hidden="true"></i>
+    <p>{{ 'foro.hilo.error' | transloco }}</p>
+    <button pButton type="button" severity="secondary" [outlined]="true" (click)="cargar()">
+      <i class="pi pi-refresh" aria-hidden="true"></i
+      ><span>{{ 'foro.reintentar' | transloco }}</span>
+    </button>
+  </div>
+} @else if (hilo(); as h) {
+  <header class="hilo-cabecera">
+    <h3>{{ h.titulo }}</h3>
+    <div class="etiquetas">
+      <p-tag
+        [value]="'foro.categorias.' + h.categoria | transloco"
+        [severity]="severidad(h.categoria)"
+      />
+      @if (h.cerrado) {
+        <p-tag [value]="'foro.hilo.cerrado' | transloco" severity="secondary" icon="pi pi-lock" />
+      }
+    </div>
+    <p class="meta">
+      <ng-container
+        [ngTemplateOutlet]="autor"
+        [ngTemplateOutletContext]="{ usuario: h.autorUsuario, rol: h.autorRol }"
+      />
+      · {{ h.creadoEn | date: 'dd/MM/yyyy HH:mm' : zona }}
+    </p>
+  </header>
+
+  @if (h.cerrado) {
+    <p class="aviso" role="status">
+      <i class="pi pi-lock" aria-hidden="true"></i>
+      {{ 'foro.hilo.avisoCerrado' | transloco }}
+    </p>
+  }
+
+  <section
+    class="comentarios"
+    [attr.aria-label]="'foro.hilo.comentarios' | transloco"
+    [attr.aria-busy]="cargandoMas()"
+  >
+    @for (comentario of principales(); track comentario.id) {
+      <article class="comentario">
+        <p class="comentario-meta">
+          <ng-container
+            [ngTemplateOutlet]="autor"
+            [ngTemplateOutletContext]="{
+              usuario: comentario.autorUsuario,
+              rol: comentario.autorRol,
+            }"
+          />
+          · {{ comentario.creadoEn | date: 'dd/MM/yyyy HH:mm' : zona }}
+        </p>
+        <p class="contenido">{{ comentario.contenido }}</p>
+
+        @if (respuestasPorPadre().get(comentario.id); as respuestas) {
+          <div class="respuestas">
+            @for (respuesta of respuestas; track respuesta.id) {
+              <article class="comentario respuesta">
+                <p class="comentario-meta">
+                  <i class="pi pi-reply" aria-hidden="true"></i>
+                  <ng-container
+                    [ngTemplateOutlet]="autor"
+                    [ngTemplateOutletContext]="{
+                      usuario: respuesta.autorUsuario,
+                      rol: respuesta.autorRol,
+                    }"
+                  />
+                  · {{ respuesta.creadoEn | date: 'dd/MM/yyyy HH:mm' : zona }}
+                </p>
+                <p class="contenido">{{ respuesta.contenido }}</p>
+              </article>
+            }
+          </div>
+        }
+
+        @if (puedeParticipar()) {
+          @if (respondiendoA() === comentario.id) {
+            <form class="formulario respuesta-formulario" (ngSubmit)="responder()">
+              <label>
+                <span>{{ 'foro.hilo.tuRespuesta' | transloco }}</span>
+                <textarea
+                  pTextarea
+                  name="respuesta"
+                  rows="3"
+                  [attr.maxlength]="limite"
+                  [ngModel]="textoRespuesta()"
+                  (ngModelChange)="textoRespuesta.set($event)"
+                ></textarea>
+                <small class="contador-texto">{{ textoRespuesta().length }} / {{ limite }}</small>
+              </label>
+              @if (errorRespuesta(); as error) {
+                <p class="error-formulario" role="alert">{{ error }}</p>
+              }
+              <div class="acciones">
+                <button
+                  pButton
+                  type="button"
+                  severity="secondary"
+                  [outlined]="true"
+                  [disabled]="publicandoRespuesta()"
+                  (click)="cancelarRespuesta()"
+                >
+                  <span>{{ 'common.cancel' | transloco }}</span>
+                </button>
+                <button
+                  pButton
+                  type="submit"
+                  [disabled]="publicandoRespuesta() || !textoRespuesta().trim()"
+                >
+                  <i class="pi pi-send" aria-hidden="true"></i
+                  ><span>{{
+                    (publicandoRespuesta() ? 'foro.hilo.respondiendo' : 'foro.hilo.responder')
+                      | transloco
+                  }}</span>
+                </button>
+              </div>
+            </form>
+          } @else {
+            <button
+              pButton
+              type="button"
+              class="boton-responder"
+              [attr.data-comentario]="comentario.id"
+              severity="secondary"
+              [text]="true"
+              [attr.aria-label]="
+                'foro.hilo.responderA'
+                  | transloco
+                    : {
+                        autor: comentario.autorUsuario
+                          ? '@' + comentario.autorUsuario
+                          : ('foro.roles.' + comentario.autorRol | transloco),
+                      }
+              "
+              (click)="abrirRespuesta(comentario.id)"
+            >
+              <i class="pi pi-reply" aria-hidden="true"></i
+              ><span>{{ 'foro.hilo.responder' | transloco }}</span>
+            </button>
+          }
+        }
+      </article>
+    } @empty {
+      <div class="estado" role="status">
+        <i class="pi pi-comments" aria-hidden="true"></i>
+        <p>{{ 'foro.hilo.sinComentarios' | transloco }}</p>
+      </div>
+    }
+
+    @if (hayMas()) {
+      <button
+        pButton
+        type="button"
+        class="cargar-mas"
+        severity="secondary"
+        [outlined]="true"
+        [disabled]="cargandoMas()"
+        (click)="cargarMas()"
+      >
+        <i class="pi pi-chevron-down" aria-hidden="true"></i
+        ><span>{{
+          (cargandoMas() ? 'foro.hilo.cargandoMas' : 'foro.hilo.cargarMas') | transloco
+        }}</span>
+      </button>
+    }
+  </section>
+
+  @if (puedeParticipar()) {
+    <form class="formulario" (ngSubmit)="publicar()">
+      <label>
+        <span>{{ 'foro.hilo.escribir' | transloco }}</span>
+        <textarea
+          pTextarea
+          name="comentario"
+          rows="4"
+          [attr.maxlength]="limite"
+          [ngModel]="texto()"
+          (ngModelChange)="texto.set($event)"
+        ></textarea>
+        <small class="contador-texto">{{ texto().length }} / {{ limite }}</small>
+      </label>
+      @if (errorPublicar(); as error) {
+        <p class="error-formulario" role="alert">{{ error }}</p>
+      }
+      @if (publicado()) {
+        <p class="confirmacion" role="status">
+          <i class="pi pi-check-circle" aria-hidden="true"></i>
+          {{ 'foro.hilo.publicado' | transloco }}
+        </p>
+      }
+      <div class="acciones">
+        <button pButton type="submit" [disabled]="publicando() || !texto().trim()">
+          <i class="pi pi-send" aria-hidden="true"></i
+          ><span>{{
+            (publicando() ? 'foro.hilo.publicando' : 'foro.hilo.publicar') | transloco
+          }}</span>
+        </button>
+      </div>
+    </form>
+  } @else if (!autenticado()) {
+    <p class="aviso" role="note">
+      <i class="pi pi-info-circle" aria-hidden="true"></i>
+      {{ 'foro.sinSesion' | transloco }}
+      <a routerLink="/login">{{ 'foro.iniciarSesion' | transloco }}</a>
+    </p>
+  }
+}
