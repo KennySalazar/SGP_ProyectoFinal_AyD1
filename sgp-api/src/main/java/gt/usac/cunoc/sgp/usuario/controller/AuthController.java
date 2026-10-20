@@ -3,6 +3,7 @@ package gt.usac.cunoc.sgp.usuario.controller;
 import gt.usac.cunoc.sgp.common.config.JwtProperties;
 import gt.usac.cunoc.sgp.common.config.RefreshCookieProperties;
 import gt.usac.cunoc.sgp.usuario.dto.AccessTokenResponse;
+import gt.usac.cunoc.sgp.usuario.dto.ActualizarPerfilRequest;
 import gt.usac.cunoc.sgp.usuario.dto.ChallengeResponse;
 import gt.usac.cunoc.sgp.usuario.dto.ChangePasswordRequest;
 import gt.usac.cunoc.sgp.usuario.dto.LoginRequest;
@@ -31,6 +32,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.CookieValue;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -157,6 +159,20 @@ public class AuthController {
   @SecurityRequirement(name = "bearerAuth")
   public UserResponse currentUser(Authentication authentication) {
     return authService.currentUser(authentication.getName());
+  }
+
+  @PutMapping("/me/perfil")
+  @PreAuthorize("isAuthenticated()")
+  @SecurityRequirement(name = "bearerAuth")
+  @Operation(
+      summary = "Actualizar el perfil de la cuenta",
+      description =
+          "Cualquier rol. Nombre completo (2 a 200 caracteres) y nombre de usuario (3 a 30 "
+              + "caracteres, único sin distinguir mayúsculas; se guarda en minúsculas). 409 si el "
+              + "nombre de usuario ya está en uso y 422 si es inválido o está reservado.")
+  public UserResponse actualizarPerfil(
+      Authentication authentication, @Valid @RequestBody ActualizarPerfilRequest request) {
+    return authService.actualizarPerfil(authentication.getName(), request);
   }
 
   private <T> ResponseEntity<T> withRefreshCookie(T body, String rawRefreshToken) {

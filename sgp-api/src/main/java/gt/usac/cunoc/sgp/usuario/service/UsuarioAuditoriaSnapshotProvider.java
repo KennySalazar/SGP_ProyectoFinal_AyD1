@@ -35,6 +35,8 @@ public class UsuarioAuditoriaSnapshotProvider implements AuditoriaSnapshotProvid
     return new UsuarioSnapshot(
         usuario.getId(),
         usuario.getEmail(),
+        usuario.getNombreCompleto(),
+        usuario.getNombreUsuario(),
         usuario.getRole().getName().name(),
         usuario.isVerified(),
         usuario.isActivated(),
@@ -47,6 +49,8 @@ public class UsuarioAuditoriaSnapshotProvider implements AuditoriaSnapshotProvid
   public record UsuarioSnapshot(
       UUID id,
       String email,
+      String nombreCompleto,
+      String nombreUsuario,
       String rol,
       boolean verificado,
       boolean activado,

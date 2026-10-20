@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { ButtonModule } from 'primeng/button';
@@ -26,6 +26,15 @@ export class ActivacionEstudiantesPage {
   private readonly apiErrors = inject(ApiErrorService);
 
   readonly estudiantes = signal<EstudiantePendienteResponse[]>([]);
+  /** Cada estudiante con una etiqueta que lo distingue: su nombre y usuario si los tiene, y su correo. */
+  readonly opcionesEstudiantes = computed(() =>
+    this.estudiantes().map((estudiante) => ({
+      id: estudiante.id,
+      etiqueta: estudiante.nombreCompleto
+        ? `${estudiante.nombreCompleto} (@${estudiante.nombreUsuario ?? '—'}) · ${estudiante.email}`
+        : estudiante.email,
+    })),
+  );
   readonly cursos = signal<CursoDisponibleResponse[]>([]);
   readonly cargando = signal(false);
   readonly guardando = signal(false);

@@ -41,6 +41,7 @@
     "footer": "CUNOC · AyD1 · 2026"
   },
   "nav": {
+    "profile": "Mi perfil",
     "main": "Navegacion principal",
     "goHome": "Ir al inicio",
     "operation": "OPERACION",
@@ -334,6 +335,24 @@
       "cargandoMas": "Cargando...",
       "errorPublicar": "No fue posible publicar el comentario."
     }
+  },
+  "perfil": {
+    "nombreCompleto": "Nombre completo",
+    "nombreCompletoPlaceholder": "Nombre y apellidos",
+    "nombreUsuario": "Nombre de usuario",
+    "nombreUsuarioPlaceholder": "por ejemplo, ana.reyes",
+    "reglaNombreUsuario": "De 3 a 30 caracteres: letras, dígitos, punto, guion o guion bajo, empezando y terminando con letra o dígito.",
+    "kicker": "Cuenta",
+    "titulo": "Mi perfil",
+    "descripcion": "Tu nombre de usuario es lo que ven los demás en el foro. Tu nombre completo solo lo ven las personas con sesión.",
+    "datosCuenta": "Datos de la cuenta",
+    "rol": "Rol",
+    "guardar": "Guardar perfil",
+    "guardando": "Guardando...",
+    "guardado": "Tu perfil se actualizó.",
+    "aviso": "Completa tu perfil: sin nombre de usuario no apareces con nombre en el foro ni pueden mencionarte.",
+    "completar": "Completar perfil",
+    "notaPublico": "Tu nombre de usuario es lo que verán los demás en el foro y lo que se escribe tras la arroba para mencionarte. Tu nombre completo no se muestra públicamente."
   },
   "avisos": {
     "title": "Avisos",

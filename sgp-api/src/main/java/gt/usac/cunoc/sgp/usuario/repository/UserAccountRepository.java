@@ -22,6 +22,11 @@ public interface UserAccountRepository extends JpaRepository<UserAccount, UUID> 
   @EntityGraph(attributePaths = "role")
   Optional<UserAccount> findWithRoleById(UUID id);
 
+  /** Quien tiene ese nombre de usuario; la comparación usa el índice sobre {@code lower(...)}. */
+  @Query("select u from UserAccount u where lower(u.nombreUsuario) = :nombreUsuario")
+  Optional<UserAccount> findByNombreUsuarioEnMinusculas(
+      @Param("nombreUsuario") String nombreUsuario);
+
   @EntityGraph(attributePaths = "role")
   List<UserAccount> findByRole_NameAndActiveTrueOrderByEmailAsc(RoleName roleName);
 

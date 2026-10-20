@@ -80,6 +80,7 @@ import org.testcontainers.utility.DockerImageName;
     })
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @Import({
+  gt.usac.cunoc.sgp.usuario.service.PerfilUsuarioService.class,
   InvitacionService.class,
   CuentaInvitadaService.class,
   ProfesionalService.class,
@@ -105,6 +106,15 @@ class InvitacionCatedraticoIntegrationTest {
   private static final Instant AHORA = Instant.parse("2026-10-06T18:00:00Z");
   private static final String CORREO = "catedratico@usac.edu.gt";
   private static final String CONTRASENA = "Puentes2026";
+
+  private static final java.util.concurrent.atomic.AtomicInteger SECUENCIA_PERFIL =
+      new java.util.concurrent.atomic.AtomicInteger();
+
+  /** Un nombre de usuario distinto en cada llamada: el índice único no admite repetidos. */
+  private static String usuarioUnico() {
+    return "prueba" + SECUENCIA_PERFIL.incrementAndGet();
+  }
+
   private static final Pattern TOKEN = Pattern.compile("token=([A-Za-z0-9_-]+)");
 
   private static final DockerImageName POSTGIS_IMAGE =
@@ -274,7 +284,9 @@ class InvitacionCatedraticoIntegrationTest {
     assertThat(publica.email()).isEqualTo(CORREO);
     assertThat(publica.rol()).isEqualTo(RoleName.CATEDRATICO);
 
-    var mensaje = invitacionService.aceptar(new AceptarInvitacionRequest(token, CONTRASENA));
+    var mensaje =
+        invitacionService.aceptar(
+            new AceptarInvitacionRequest(token, CONTRASENA, "Persona de Prueba", usuarioUnico()));
     assertThat(mensaje.message()).contains("activada");
 
     var cuenta =
@@ -316,15 +328,100 @@ class InvitacionCatedraticoIntegrationTest {
   }
 
   @Test
+  @DisplayName("Escenario: la aceptación guarda el perfil con el nombre de usuario en minúsculas")
+  void laAceptacionGuardaElNombreCompletoYElNombreDeUsuarioNormalizados() {
+    invitar();
+    String token = ultimoToken();
+    SecurityContextHolder.clearContext();
+
+    invitacionService.aceptar(
+        new AceptarInvitacionRequest(token, CONTRASENA, "  Ana   Catedrática ", "Ana.Catedratica"));
+
+    var perfil =
+        jdbc.queryForMap(
+            "SELECT nombre_completo, nombre_usuario FROM usuario WHERE email = ?", CORREO);
+    assertThat(perfil.get("nombre_completo")).isEqualTo("Ana Catedrática");
+    assertThat(perfil.get("nombre_usuario")).isEqualTo("ana.catedratica");
+  }
+
+  @Test
+  @DisplayName("Escenario: un nombre de usuario en uso no consume la invitación")
+  void unNombreDeUsuarioEnUsoSeRechazaSinConsumirLaInvitacion() {
+    UUID otraPersona = UUID.randomUUID();
+    insertarUsuario(otraPersona, "otra.persona@usac.edu.gt", "ESTUDIANTE");
+    jdbc.update("UPDATE usuario SET nombre_usuario = 'ocupado' WHERE id = ?", otraPersona);
+    invitar();
+    String token = ultimoToken();
+    SecurityContextHolder.clearContext();
+
+    assertThatThrownBy(
+            () ->
+                invitacionService.aceptar(
+                    new AceptarInvitacionRequest(token, CONTRASENA, "Ana Catedrática", "OCUPADO")))
+        .isInstanceOfSatisfying(
+            ApiException.class,
+            e -> {
+              assertThat(e.getStatus()).isEqualTo(HttpStatus.CONFLICT);
+              assertThat(e.getCode()).isEqualTo("nombre_usuario_en_uso");
+            });
+
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT count(*) FROM invitacion_usuario WHERE aceptado_en IS NULL", Integer.class))
+        .isEqualTo(1);
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT activado FROM usuario WHERE email = ?", Boolean.class, CORREO))
+        .isFalse();
+
+    invitacionService.aceptar(
+        new AceptarInvitacionRequest(token, CONTRASENA, "Ana Catedrática", "ana.libre"));
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT activado FROM usuario WHERE email = ?", Boolean.class, CORREO))
+        .isTrue();
+  }
+
+  @Test
+  @DisplayName("Escenario: un nombre de usuario reservado se rechaza con el detalle del campo")
+  void unNombreDeUsuarioReservadoSeRechazaConElDetalleDelCampo() {
+    invitar();
+    String token = ultimoToken();
+    SecurityContextHolder.clearContext();
+
+    assertThatThrownBy(
+            () ->
+                invitacionService.aceptar(
+                    new AceptarInvitacionRequest(token, CONTRASENA, "Ana Catedrática", "Admin")))
+        .isInstanceOfSatisfying(
+            ApiException.class,
+            e -> {
+              assertThat(e.getStatus()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+              assertThat(e.getCode()).isEqualTo("perfil_invalido");
+              assertThat(e.getErrores())
+                  .extracting(error -> error.get("campo"))
+                  .containsExactly("nombreUsuario");
+            });
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT count(*) FROM invitacion_usuario WHERE aceptado_en IS NULL", Integer.class))
+        .isEqualTo(1);
+  }
+
+  @Test
   void elEnlaceEsDeUnSoloUso() {
     invitar();
     String token = ultimoToken();
     SecurityContextHolder.clearContext();
 
-    invitacionService.aceptar(new AceptarInvitacionRequest(token, CONTRASENA));
+    invitacionService.aceptar(
+        new AceptarInvitacionRequest(token, CONTRASENA, "Persona de Prueba", usuarioUnico()));
 
     assertThatThrownBy(
-            () -> invitacionService.aceptar(new AceptarInvitacionRequest(token, "OtraClave2026")))
+            () ->
+                invitacionService.aceptar(
+                    new AceptarInvitacionRequest(
+                        token, "OtraClave2026", "Persona de Prueba", usuarioUnico())))
         .isInstanceOfSatisfying(
             ApiException.class,
             e -> {
@@ -339,7 +436,10 @@ class InvitacionCatedraticoIntegrationTest {
   @Test
   void rechazaTokenDesconocido() {
     assertThatThrownBy(
-            () -> invitacionService.aceptar(new AceptarInvitacionRequest("inventado", CONTRASENA)))
+            () ->
+                invitacionService.aceptar(
+                    new AceptarInvitacionRequest(
+                        "inventado", CONTRASENA, "Persona de Prueba", usuarioUnico())))
         .isInstanceOfSatisfying(
             ApiException.class, e -> assertThat(e.getCode()).isEqualTo("invitacion_invalida"));
   }
@@ -353,7 +453,10 @@ class InvitacionCatedraticoIntegrationTest {
 
     SecurityContextHolder.clearContext();
     assertThatThrownBy(
-            () -> invitacionService.aceptar(new AceptarInvitacionRequest(tokenVencido, CONTRASENA)))
+            () ->
+                invitacionService.aceptar(
+                    new AceptarInvitacionRequest(
+                        tokenVencido, CONTRASENA, "Persona de Prueba", usuarioUnico())))
         .isInstanceOfSatisfying(
             ApiException.class,
             e -> {
@@ -393,10 +496,14 @@ class InvitacionCatedraticoIntegrationTest {
 
     SecurityContextHolder.clearContext();
     assertThatThrownBy(
-            () -> invitacionService.aceptar(new AceptarInvitacionRequest(tokenVencido, CONTRASENA)))
+            () ->
+                invitacionService.aceptar(
+                    new AceptarInvitacionRequest(
+                        tokenVencido, CONTRASENA, "Persona de Prueba", usuarioUnico())))
         .isInstanceOfSatisfying(
             ApiException.class, e -> assertThat(e.getCode()).isEqualTo("invitacion_invalida"));
-    invitacionService.aceptar(new AceptarInvitacionRequest(tokenNuevo, CONTRASENA));
+    invitacionService.aceptar(
+        new AceptarInvitacionRequest(tokenNuevo, CONTRASENA, "Persona de Prueba", usuarioUnico()));
     assertThat(
             jdbc.queryForObject(
                 "SELECT activado FROM usuario WHERE id = ?", Boolean.class, original.usuarioId()))

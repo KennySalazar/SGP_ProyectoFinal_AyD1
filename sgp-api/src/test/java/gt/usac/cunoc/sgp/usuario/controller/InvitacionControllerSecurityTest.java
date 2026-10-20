@@ -197,11 +197,28 @@ class InvitacionControllerSecurityTest {
         .perform(
             post("/api/v1/invitaciones/aceptacion")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{ \"token\": \"abc\", \"password\": \"Catedra2026\" }"))
+                .content(
+                    "{ \"token\": \"abc\", \"password\": \"Catedra2026\", \"nombreCompleto\": \"Ana Catedrática\","
+                        + " \"nombreUsuario\": \"ana.catedratica\" }"))
         .andExpect(status().isOk());
 
     verify(service).validar(new TokenInvitacionRequest("abc"));
-    verify(service).aceptar(new AceptarInvitacionRequest("abc", "Catedra2026"));
+    verify(service)
+        .aceptar(
+            new AceptarInvitacionRequest(
+                "abc", "Catedra2026", "Ana Catedrática", "ana.catedratica"));
+  }
+
+  @Test
+  void rechazaAceptacionSinNombreCompletoNiNombreDeUsuarioCon400() throws Exception {
+    mockMvc
+        .perform(
+            post("/api/v1/invitaciones/aceptacion")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{ \"token\": \"abc\", \"password\": \"Catedra2026\" }"))
+        .andExpect(status().isBadRequest());
+
+    verify(service, never()).aceptar(any());
   }
 
   @Test
@@ -210,7 +227,9 @@ class InvitacionControllerSecurityTest {
         .perform(
             post("/api/v1/invitaciones/aceptacion")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{ \"token\": \"abc\", \"password\": \"solamenteletras\" }"))
+                .content(
+                    "{ \"token\": \"abc\", \"password\": \"solamenteletras\","
+                        + " \"nombreCompleto\": \"Ana Reyes\", \"nombreUsuario\": \"ana.reyes\" }"))
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.errores[0].campo").value("password"));
 
