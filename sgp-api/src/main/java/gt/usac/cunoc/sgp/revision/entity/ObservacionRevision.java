@@ -110,6 +110,17 @@ public class ObservacionRevision {
     contenido = texto;
   }
 
+  public void resolver(UUID actor, String respuesta, Instant ahora) {
+    if (estado != EstadoObservacion.PENDIENTE)
+      throw new IllegalStateException("La observación ya fue resuelta");
+    if (respuesta != null && respuesta.length() > 2000)
+      throw new IllegalArgumentException("Respuesta demasiado larga");
+    estado = EstadoObservacion.RESUELTA;
+    resueltoPorId = Objects.requireNonNull(actor);
+    resueltoEn = Objects.requireNonNull(ahora);
+    respuestaAutor = respuesta;
+  }
+
   public Revision getRevision() {
     return revision;
   }

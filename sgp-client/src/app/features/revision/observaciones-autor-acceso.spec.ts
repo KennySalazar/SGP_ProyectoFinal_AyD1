@@ -4,6 +4,8 @@ import { provideRouter, Router } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
 import { of } from 'rxjs';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { inspeccionesRoutes } from '../inspecciones/inspecciones.routes';
+import { ActivatedRouteSnapshot, CanActivateFn, RouterStateSnapshot } from '@angular/router';
 import { routes } from '../../app.routes';
 import { AuthStore } from '../../core/services/auth.store';
 import { ApiErrorService } from '../../core/services/api-error.service';
@@ -42,15 +44,25 @@ describe('Ruta de observaciones del autor', () => {
     TestBed.overrideComponent(AppShellComponent, { set: { template: '<router-outlet />' } });
     TestBed.overrideComponent(ObservacionesRecibidasPage, { set: { template: '', imports: [] } });
   });
-  it('estudiante accede a la consulta sin habilitar bandeja ni edición', async () => {
+  it('estudiante accede a sus observaciones sin habilitar la bandeja del revisor', async () => {
     usuario.set({ id: 'autor', role: 'ESTUDIANTE' });
     const harness = await RouterTestingHarness.create();
     await harness.navigateByUrl('/observaciones');
     expect(TestBed.inject(Router).url).toBe('/observaciones');
     expect(recibidas).toHaveBeenCalledWith(0);
-    for (const ruta of ['/revisiones', '/inspecciones/i/borrador']) {
+    for (const ruta of ['/revisiones']) {
       await harness.navigateByUrl(ruta);
       expect(TestBed.inject(Router).url).toBe('/');
+    }
+  });
+  it('mantiene el acceso del estudiante al editor propio para HU-039', () => {
+    usuario.set({ id: 'autor', role: 'ESTUDIANTE' });
+    const editor = inspeccionesRoutes.find((r) => r.path === ':id/borrador')!;
+    for (const guard of editor.canActivate ?? []) {
+      const resultado = TestBed.runInInjectionContext(() =>
+        (guard as CanActivateFn)({} as ActivatedRouteSnapshot, {} as RouterStateSnapshot),
+      );
+      expect(resultado).toBe(true);
     }
   });
   it.each(['CATEDRATICO', 'PROFESIONAL_EXTERNO', 'ADMINISTRADOR'])(

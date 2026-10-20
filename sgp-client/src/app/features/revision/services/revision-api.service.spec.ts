@@ -126,4 +126,32 @@ describe('RevisionApiService: contratos de HU-037', () => {
     expect(general.request.method).toBe('PUT');
     general.flush({ revisionId: 'r', texto: null });
   });
+  it('usa los contratos privados del veredicto y la atención de observaciones', () => {
+    api.historial('i').subscribe();
+    http.expectOne('/api/v1/inspecciones/i/revisiones').flush([]);
+    api.resultado('r').subscribe();
+    http.expectOne('/api/v1/revisiones/r/resultado').flush({});
+    api.estadoRevision('r').subscribe();
+    http.expectOne('/api/v1/revisiones/r/estado-puente').flush({});
+    const veredicto = {
+      veredicto: 'CAMBIOS_SOLICITADOS' as const,
+      calificacion: 80.25,
+      observacionGeneral: 'Corregir',
+      confirmacionEstado: null,
+    };
+    api.emitirVeredicto('r', veredicto).subscribe();
+    let req = http.expectOne('/api/v1/revisiones/r/veredicto');
+    expect(req.request.method).toBe('POST');
+    expect(req.request.body).toEqual(veredicto);
+    req.flush({});
+    api.atenderCambios('r').subscribe();
+    req = http.expectOne('/api/v1/revisiones/r/atender-cambios');
+    expect(req.request.method).toBe('POST');
+    req.flush({});
+    api.resolverObservacion('r', 'obs', null).subscribe();
+    req = http.expectOne('/api/v1/revisiones/r/observaciones/obs/resolver');
+    expect(req.request.method).toBe('PUT');
+    expect(req.request.body).toEqual({ respuesta: null });
+    req.flush({});
+  });
 });
