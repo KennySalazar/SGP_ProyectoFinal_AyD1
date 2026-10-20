@@ -54,7 +54,22 @@ export class InspeccionesLocalesService {
     estado: 'PENDIENTE' | 'ENVIANDO' = 'PENDIENTE',
   ): Promise<{ id: string; idempotencyKey: string }> {
     return sgpDb.transaction('rw', sgpDb.inspecciones, sgpDb.cola_sync, async () => {
-      await sgpDb.inspecciones.put(inspeccion);
+      const existenteLocal = await sgpDb.inspecciones.get(inspeccion.id);
+      const versionConfirmada =
+        existenteLocal && existenteLocal.propietarioId === inspeccion.propietarioId
+          ? (existenteLocal.payload as BorradorLocalPayload | undefined)?.borrador?.version
+          : undefined;
+      const borradorEntrante = (inspeccion.payload as BorradorLocalPayload).borrador;
+      await sgpDb.inspecciones.put({
+        ...inspeccion,
+        payload:
+          versionConfirmada !== undefined && borradorEntrante.version < versionConfirmada
+            ? {
+                ...(inspeccion.payload as BorradorLocalPayload),
+                borrador: { ...borradorEntrante, version: versionConfirmada },
+              }
+            : inspeccion.payload,
+      });
       const existentes = await sgpDb.cola_sync.where('entityId').equals(inspeccion.id).toArray();
       const duplicada = existentes.find(
         (item) =>
@@ -172,11 +187,11 @@ export class InspeccionesLocalesService {
   }
 
   /**
-   * Obtiene todas las inspecciones locales creadas por el usuario que estén pendientes de sincronizar.
+   * Obtiene las inspecciones locales del usuario, pendientes o ya sincronizadas.
    */
-  async listarPendientesPorUsuario(autorId: string): Promise<LocalInspection[]> {
+  async listarPorUsuario(autorId: string): Promise<LocalInspection[]> {
     const todas = await sgpDb.inspecciones.toArray();
-    return todas.filter((i) => i.propietarioId === autorId && i.sincronizado === false);
+    return todas.filter((i) => i.propietarioId === autorId);
   }
 
   async liberarInspeccionesSincronizadas(propietarioId: string): Promise<number> {
@@ -200,7 +215,7 @@ export class InspeccionesLocalesService {
    * Obtiene la versión activa de formulario guardada localmente en Dexie.
    */
   async obtenerEsquemaActivoLocal(): Promise<LocalFormSchema | undefined> {
-    const activos = await sgpDb.esquemas_formulario.where('activo').equals(1).toArray();
+    const activos = (await sgpDb.esquemas_formulario.toArray()).filter((item) => item.activo);
     if (activos.length > 0) return activos[0];
     const todos = await sgpDb.esquemas_formulario.toArray();
     return todos.length > 0 ? todos[todos.length - 1] : undefined;
@@ -220,7 +235,20 @@ export class InspeccionesLocalesService {
    * Guarda un esquema en Dexie.
    */
   async guardarEsquemaLocal(esquema: LocalFormSchema): Promise<void> {
-    await sgpDb.esquemas_formulario.put(esquema);
+    await sgpDb.transaction('rw', sgpDb.esquemas_formulario, async () => {
+      const existente = await sgpDb.esquemas_formulario.get(esquema.id);
+      if (esquema.activo) {
+        await sgpDb.esquemas_formulario.toCollection().modify({ activo: false });
+      }
+      await sgpDb.esquemas_formulario.put({
+        ...esquema,
+        activo: esquema.activo || existente?.activo === true,
+      });
+    });
+  }
+
+  async guardarPuenteLocal(bridge: LocalBridge): Promise<void> {
+    await sgpDb.puentes.put(bridge);
   }
 
   /**

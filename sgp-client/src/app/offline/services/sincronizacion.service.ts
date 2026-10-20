@@ -2,6 +2,7 @@ import { Injectable, inject, signal } from '@angular/core';
 import { firstValueFrom, from } from 'rxjs';
 import { HttpErrorResponse } from '@angular/common/http';
 import { AuthStore } from '../../core/services/auth.store';
+import { TokenRefreshService } from '../../core/services/token-refresh.service';
 import { InspeccionApiService } from '../../features/inspecciones/services/inspeccion-api.service';
 import {
   IniciarInspeccionRequest,
@@ -9,14 +10,19 @@ import {
 } from '../../features/inspecciones/models/inspeccion.models';
 import { ConnectivityService } from './connectivity.service';
 import { SyncQueueItem, sgpDb } from '../db/sgp-db';
-import { BorradorLocalPayload } from './inspecciones-locales.service';
+import {
+  BorradorLocalPayload,
+  InspeccionesLocalesService,
+} from './inspecciones-locales.service';
 import { liveQuery } from 'dexie';
 
 @Injectable({ providedIn: 'root' })
 export class SincronizacionService {
   private readonly auth = inject(AuthStore);
+  private readonly tokenRefresh = inject(TokenRefreshService);
   private readonly api = inject(InspeccionApiService);
   private readonly connectivity = inject(ConnectivityService);
+  private readonly inspeccionesLocales = inject(InspeccionesLocalesService);
   private ejecutando = false;
   private iniciado = false;
   readonly sincronizando = signal(false);
@@ -43,11 +49,19 @@ export class SincronizacionService {
 
   async sincronizarAhora(): Promise<void> {
     if (this.ejecutando || !this.connectivity.online()) return;
-    const propietarioId = this.auth.user()?.id;
-    if (!propietarioId) return;
     this.ejecutando = true;
     this.sincronizando.set(true);
     try {
+      // El perfil cacheado permite consultar datos offline, pero no autoriza peticiones.
+      // Renueva y valida la sesión antes de tocar el estado de cualquier operación.
+      try {
+        await firstValueFrom(this.tokenRefresh.refresh());
+        await firstValueFrom(this.auth.loadMe());
+      } catch {
+        return;
+      }
+      const propietarioId = this.auth.user()?.id;
+      if (!propietarioId) return;
       const cola = (await sgpDb.cola_sync.toArray())
         .filter(
           (item) =>
@@ -97,20 +111,12 @@ export class SincronizacionService {
           const actualizado = await firstValueFrom(
             this.api.guardarBorrador(item.entityId, request, item.idempotencyKey),
           );
-          if (local) {
-            const payload = local.payload as BorradorLocalPayload;
-            await sgpDb.inspecciones.put({
-              ...local,
-              payload: {
-                ...payload,
-                borrador: {
-                  ...actualizado,
-                  datos: borrador?.datos,
-                  fechaInspeccion: borrador?.fechaInspeccion,
-                },
-              },
-            });
-          }
+          await this.inspeccionesLocales.confirmarGuardado(
+            item.id,
+            item.entityId,
+            propietarioId,
+            actualizado,
+          );
         }
         await sgpDb.cola_sync.delete(item.id);
         await this.marcarConfirmada(item.entityId, propietarioId);

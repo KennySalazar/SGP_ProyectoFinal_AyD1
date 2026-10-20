@@ -114,8 +114,8 @@ export class MisInspeccionesPage {
     const filtro = this.estadoFiltro();
 
     // Obtener las inspecciones locales pendientes de sincronizar
-    this.inspeccionesLocales.listarPendientesPorUsuario(autorId).then((pendientesLocales) => {
-      const localesResumen: InspeccionResumenResponse[] = pendientesLocales.map((loc) => {
+    this.inspeccionesLocales.listarPorUsuario(autorId).then((inspeccionesLocales) => {
+      const localesResumen: InspeccionResumenResponse[] = inspeccionesLocales.map((loc) => {
         const raw = (loc.payload || {}) as BorradorLocalPayload & Record<string, unknown>;
         const payload = (raw.borrador ? raw : { borrador: raw }) as BorradorLocalPayload;
         const b = payload.borrador;
@@ -129,7 +129,9 @@ export class MisInspeccionesPage {
           versionFormularioId: b?.versionFormularioId || payload.versionFormularioId || '',
           codigoVersionFormulario: b?.codigoVersionFormulario || payload.versionFormularioId || '',
           fechaInspeccion: b?.fechaInspeccion || loc.actualizadoEn?.slice(0, 10) || '',
-          estado: 'PENDIENTE_SYNC',
+          estado: loc.sincronizado
+            ? ((b?.estado as EstadoInspeccion | undefined) ?? (loc.estado as EstadoInspeccion))
+            : 'PENDIENTE_SYNC',
           tipo: 'INICIAL',
           autorId: loc.propietarioId || autorId,
           rolAutorCreacion: b?.rolAutor || 'PROFESIONAL_EXTERNO',
@@ -321,6 +323,12 @@ export class MisInspeccionesPage {
       .subscribe({
         next: (respuesta) => {
           this.puenteSeleccionado.set(respuesta);
+          void this.inspeccionesLocales.guardarPuenteLocal({
+            id: respuesta.id,
+            codigo: respuesta.codigo,
+            actualizadoEn: respuesta.creadoEn,
+            payload: respuesta,
+          });
           this.mostrarInicio.set(true);
         },
         error: () => this.error.set('bridge'),

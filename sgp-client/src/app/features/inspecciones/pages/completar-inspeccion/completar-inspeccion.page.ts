@@ -280,6 +280,12 @@ export class CompletarInspeccionPage implements OnInit {
       .subscribe({
         next: (res) => {
           this.esquema.set(res.esquema as EsquemaJson);
+          void this.inspeccionesLocales.guardarEsquemaLocal({
+            id: res.id,
+            version: String(res.version),
+            schema: res.esquema,
+            activo: false,
+          });
           this.cargando.set(false);
         },
         error: () => {
@@ -295,6 +301,12 @@ export class CompletarInspeccionPage implements OnInit {
               .subscribe({
                 next: (activa) => {
                   this.esquema.set(activa.esquema as EsquemaJson);
+                  void this.inspeccionesLocales.guardarEsquemaLocal({
+                    id: activa.id,
+                    version: String(activa.version),
+                    schema: activa.esquema,
+                    activo: true,
+                  });
                   this.cargando.set(false);
                 },
                 error: () => {

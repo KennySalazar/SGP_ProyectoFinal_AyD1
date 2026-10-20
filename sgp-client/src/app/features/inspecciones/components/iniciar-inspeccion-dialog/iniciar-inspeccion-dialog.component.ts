@@ -34,6 +34,7 @@ import { uuidV7 } from '../../../../offline/services/uuid-v7';
 import { InspeccionApiService } from '../../services/inspeccion-api.service';
 import { InspeccionesLocalesService } from '../../../../offline/services/inspecciones-locales.service';
 import { ConnectivityService } from '../../../../offline/services/connectivity.service';
+import { FormularioApiService } from '../../../formulario/services/formulario-api.service';
 
 function calcularDistanciaMetros(lat1: number, lon1: number, lat2: number, lon2: number): number {
   const R = 6371000.0;
@@ -78,6 +79,7 @@ export class IniciarInspeccionDialogComponent implements OnChanges {
   private readonly api = inject(InspeccionApiService);
   private readonly inspeccionesLocales = inject(InspeccionesLocalesService);
   private readonly connectivity = inject(ConnectivityService);
+  private readonly formularioApi = inject(FormularioApiService);
   private readonly router = inject(Router);
 
   readonly form: FormGroup = this.fb.group({
@@ -186,12 +188,27 @@ export class IniciarInspeccionDialogComponent implements OnChanges {
         this.solicitudInicio = null;
       if (this.solicitudInicio) return;
       this.reiniciarEstado();
+      this.cachearEsquemaActivo();
       void this.recuperarPendiente();
       this.obtenerGps();
       if (this.puente?.id) {
         this.cargarDatosPermanentes(this.puente.id);
       }
     }
+  }
+
+  private cachearEsquemaActivo(): void {
+    if (!this.connectivity.online()) return;
+    this.formularioApi.obtenerActiva().subscribe({
+      next: (formulario) => {
+        void this.inspeccionesLocales.guardarEsquemaLocal({
+          id: formulario.id,
+          version: String(formulario.version),
+          schema: formulario.esquema,
+          activo: true,
+        });
+      },
+    });
   }
 
   cerrar(): void {

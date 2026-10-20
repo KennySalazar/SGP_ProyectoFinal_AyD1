@@ -10,11 +10,13 @@ describe('HU-042: Inspecciones Locales y Recuperación tras Recarga', () => {
   let service: InspeccionesLocalesService;
   const inspeccionesMemoria = new Map<string, LocalInspection>();
   const esquemasMemoria = new Map<string, LocalFormSchema>();
+  const puentesMemoria = new Map<string, { id: string; codigo?: string; payload: unknown }>();
   const colaMemoria = new Map<string, SyncQueueItem>();
 
   beforeEach(() => {
     inspeccionesMemoria.clear();
     esquemasMemoria.clear();
+    puentesMemoria.clear();
     colaMemoria.clear();
 
     vi.spyOn(sgpDb, 'transaction').mockImplementation((...args: unknown[]) => {
@@ -60,6 +62,23 @@ describe('HU-042: Inspecciones Locales y Recuperación tras Recarga', () => {
       esquemasMemoria.set(item.id, item);
       return Promise.resolve(item.id) as never;
     });
+    vi.spyOn(sgpDb.esquemas_formulario, 'toArray').mockImplementation(() =>
+      Promise.resolve([...esquemasMemoria.values()]) as never,
+    );
+    vi.spyOn(sgpDb.esquemas_formulario, 'toCollection').mockReturnValue({
+      modify: async (changes: Partial<LocalFormSchema>) => {
+        for (const [id, schema] of esquemasMemoria)
+          esquemasMemoria.set(id, { ...schema, ...changes });
+        return esquemasMemoria.size;
+      },
+    } as never);
+    vi.spyOn(sgpDb.puentes, 'put').mockImplementation((item) => {
+      puentesMemoria.set(item.id, item);
+      return Promise.resolve(item.id) as never;
+    });
+    vi.spyOn(sgpDb.puentes, 'toArray').mockImplementation(() =>
+      Promise.resolve([...puentesMemoria.values()]) as never,
+    );
 
     vi.spyOn(sgpDb.esquemas_formulario, 'get').mockImplementation((id: unknown) => {
       return Promise.resolve(esquemasMemoria.get(String(id))) as never;
@@ -203,6 +222,66 @@ describe('HU-042: Inspecciones Locales y Recuperación tras Recarga', () => {
     });
   });
 
+  it('no regresa la versión confirmada del servidor al encolar datos desde una página reanudada', async () => {
+    const inspeccionId = 'inspection-version-regression';
+    const borrador = {
+      id: inspeccionId,
+      puenteId: 'bridge-1',
+      codigoPuente: 'P-001',
+      nombrePuente: 'Puente local',
+      versionFormularioId: 'form-v1',
+      codigoVersionFormulario: 'v1',
+      autorId: 'user-1',
+      rolAutor: 'ESTUDIANTE',
+      nombreAutor: 'Inspector',
+      estado: 'BORRADOR',
+      fechaInspeccion: '2026-10-20',
+      dispositivoId: 'device-1',
+      acompanantes: [],
+      version: 4,
+      creadoEn: '2026-10-20T10:00:00Z',
+      progreso: {
+        totalCamposRequeridos: 0,
+        totalCamposCompletados: 0,
+        porcentajeTotal: 0,
+        secciones: [],
+      },
+      datos: { campo: 'confirmado' },
+    };
+    const local: LocalInspection = {
+      id: inspeccionId,
+      puenteId: borrador.puenteId,
+      propietarioId: 'user-1',
+      estado: 'BORRADOR',
+      actualizadoEn: borrador.creadoEn,
+      payload: {
+        borrador,
+        versionFormularioId: borrador.versionFormularioId,
+        dispositivoId: borrador.dispositivoId,
+        autorId: borrador.autorId,
+      } satisfies BorradorLocalPayload,
+      sincronizado: false,
+    };
+    inspeccionesMemoria.set(inspeccionId, local);
+
+    await service.guardarBorradorLocal(
+      {
+        ...local,
+        payload: {
+          ...(local.payload as BorradorLocalPayload),
+          borrador: { ...borrador, version: 3, datos: { campo: 'cambio local' } },
+        },
+      },
+      { version: 3, datos: { campo: 'cambio local' } },
+    );
+
+    const guardado = (inspeccionesMemoria.get(inspeccionId)?.payload as BorradorLocalPayload)
+      .borrador;
+    expect(guardado.version).toBe(4);
+    expect(guardado.datos).toEqual({ campo: 'cambio local' });
+    expect([...colaMemoria.values()][0]?.estado).toBe('PENDIENTE');
+  });
+
   it('guarda y recupera el esquema congelado del formulario en Dexie', async () => {
     const esquema: LocalFormSchema = {
       id: 'version-sieca-3',
@@ -220,6 +299,41 @@ describe('HU-042: Inspecciones Locales y Recuperación tras Recarga', () => {
     expect(obtenido).toBeDefined();
     expect(obtenido?.version).toBe('3.0');
     expect(obtenido?.schema).toEqual(esquema.schema);
+
+    await service.guardarEsquemaLocal({ ...esquema, id: 'version-sieca-4', version: '4.0' });
+    expect((await service.obtenerEsquemaLocal(esquema.id))?.activo).toBe(false);
+    expect((await service.obtenerEsquemaActivoLocal())?.id).toBe('version-sieca-4');
+  });
+
+  it('guarda puentes consultados para volver a seleccionarlos sin conexión', async () => {
+    await service.guardarPuenteLocal({
+      id: 'bridge-local',
+      codigo: 'P-001',
+      payload: { nombre: 'Puente local' },
+    });
+
+    expect(await service.obtenerPuentesPreparados()).toEqual([
+      { id: 'bridge-local', codigo: 'P-001', payload: { nombre: 'Puente local' } },
+    ]);
+  });
+
+  it('lista inspecciones del usuario incluyendo las ya sincronizadas', async () => {
+    inspeccionesMemoria.set('pendiente', {
+      id: 'pendiente', puenteId: 'p1', propietarioId: 'user-1', estado: 'BORRADOR',
+      actualizadoEn: '', payload: {}, sincronizado: false,
+    });
+    inspeccionesMemoria.set('sincronizada', {
+      id: 'sincronizada', puenteId: 'p2', propietarioId: 'user-1', estado: 'BORRADOR',
+      actualizadoEn: '', payload: {}, sincronizado: true,
+    });
+    inspeccionesMemoria.set('otro-usuario', {
+      id: 'otro-usuario', puenteId: 'p3', propietarioId: 'user-2', estado: 'BORRADOR',
+      actualizadoEn: '', payload: {}, sincronizado: true,
+    });
+
+    const resultado = await service.listarPorUsuario('user-1');
+
+    expect(resultado.map((item) => item.id)).toEqual(['pendiente', 'sincronizada']);
   });
 
   it('elimina un borrador local sin sincronizar de la base de datos Dexie', async () => {
