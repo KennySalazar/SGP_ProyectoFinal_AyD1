@@ -3,6 +3,9 @@ export type RoleName = 'ADMINISTRADOR' | 'CATEDRATICO' | 'PROFESIONAL_EXTERNO' |
 export interface UserSession {
   id: string;
   email: string;
+  /** Nulos en las cuentas anteriores a que el perfil fuera obligatorio. */
+  nombreCompleto?: string | null;
+  nombreUsuario?: string | null;
   role: RoleName;
   verified: boolean;
   activated: boolean;

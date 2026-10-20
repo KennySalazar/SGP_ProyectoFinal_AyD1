@@ -16,6 +16,8 @@ public interface UsuarioMapper {
 
   @Mapping(target = "id", source = "usuario.id")
   @Mapping(target = "email", source = "usuario.email")
+  @Mapping(target = "nombreCompleto", source = "usuario.nombreCompleto")
+  @Mapping(target = "nombreUsuario", source = "usuario.nombreUsuario")
   @Mapping(target = "rol", source = "usuario.role.name")
   @Mapping(target = "estado", source = "estado")
   @Mapping(target = "verificado", source = "usuario.verified")

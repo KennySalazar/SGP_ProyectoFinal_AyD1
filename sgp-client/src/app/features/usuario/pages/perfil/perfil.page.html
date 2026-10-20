@@ -1,0 +1,63 @@
+<header class="page-heading">
+  <p class="page-kicker">{{ 'perfil.kicker' | transloco }}</p>
+  <h1 class="page-title">{{ 'perfil.titulo' | transloco }}</h1>
+  <p class="page-description">{{ 'perfil.descripcion' | transloco }}</p>
+</header>
+
+<section class="surface-card perfil-card">
+  <dl class="cuenta" [attr.aria-label]="'perfil.datosCuenta' | transloco">
+    <div>
+      <dt>{{ 'common.email' | transloco }}</dt>
+      <dd>{{ auth.user()?.email }}</dd>
+    </div>
+    <div>
+      <dt>{{ 'perfil.rol' | transloco }}</dt>
+      <dd>@if (auth.user()?.role; as rol) { {{ 'invitaciones.roles.' + rol | transloco }} }</dd>
+    </div>
+  </dl>
+
+  @if (guardado()) {
+  <p class="confirmacion" role="status">
+    <i class="pi pi-check-circle" aria-hidden="true"></i>
+    {{ 'perfil.guardado' | transloco }}
+  </p>
+  }
+
+  <form [formGroup]="form" (ngSubmit)="guardar()" novalidate>
+    <label
+      >{{ 'perfil.nombreCompleto' | transloco }}<input
+        pInputText
+        formControlName="nombreCompleto"
+        autocomplete="name"
+        [attr.maxlength]="limiteNombre"
+        [placeholder]="'perfil.nombreCompletoPlaceholder' | transloco"
+    /></label>
+    @if (errorNombre(); as mensaje) {
+    <small class="validation" role="alert">{{ mensaje }}</small>
+    }
+    <label
+      >{{ 'perfil.nombreUsuario' | transloco }}<input
+        pInputText
+        formControlName="nombreUsuario"
+        autocomplete="username"
+        autocapitalize="none"
+        maxlength="30"
+        [placeholder]="'perfil.nombreUsuarioPlaceholder' | transloco"
+    /></label>
+    @if (form.controls.nombreUsuario.touched && form.controls.nombreUsuario.invalid) {
+    <small class="validation">{{ 'perfil.reglaNombreUsuario' | transloco }}</small>
+    } @if (errorUsuario(); as mensaje) {
+    <small class="validation" role="alert">{{ mensaje }}</small>
+    }
+    <p class="nota">
+      <i class="pi pi-id-card" aria-hidden="true"></i> {{ 'perfil.notaPublico' | transloco }}
+    </p>
+    @if (errorGeneral(); as mensaje) {
+    <p class="validation" role="alert">{{ mensaje }}</p>
+    }
+    <button pButton class="accion" type="submit" [disabled]="form.invalid || guardando()">
+      <i class="pi pi-save" aria-hidden="true"></i
+      ><span>{{ (guardando() ? 'perfil.guardando' : 'perfil.guardar') | transloco }}</span>
+    </button>
+  </form>
+</section>
