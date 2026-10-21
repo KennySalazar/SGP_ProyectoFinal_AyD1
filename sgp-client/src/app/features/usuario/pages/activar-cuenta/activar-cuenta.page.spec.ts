@@ -7,6 +7,7 @@ import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { afterEach, describe, expect, it } from 'vitest';
 import { ApiErrorService } from '../../../../core/services/api-error.service';
 import { AuthCardComponent } from '../../../../shared/components/auth-card/auth-card.component';
+import { ContrasenaVisibleComponent } from '../../../../shared/components/contrasena-visible/contrasena-visible.component';
 import { ActivarCuentaPage } from './activar-cuenta.page';
 
 @Pipe({ name: 'transloco' })
@@ -34,7 +35,7 @@ describe('Característica: activación de cuenta invitada HU001', () => {
         },
       ],
     });
-    for (const componente of [ActivarCuentaPage, AuthCardComponent]) {
+    for (const componente of [ActivarCuentaPage, AuthCardComponent, ContrasenaVisibleComponent]) {
       TestBed.overrideComponent(componente, {
         remove: { imports: [TranslocoPipe] },
         add: { imports: [TraduccionTestPipe] },
@@ -114,6 +115,24 @@ describe('Característica: activación de cuenta invitada HU001', () => {
       expect(page.estado()).toBe('lista');
     },
   );
+
+  it('Escenario: la contraseña y su confirmación se muestran u ocultan por separado', () => {
+    crear('token-1');
+    validarInvitacion();
+    const html = fixture.nativeElement as HTMLElement;
+    const password = html.querySelector<HTMLInputElement>('input[formControlName="password"]')!;
+    const confirmacion = html.querySelector<HTMLInputElement>(
+      'input[formControlName="confirmacion"]',
+    )!;
+    const ojo = (campo: HTMLInputElement) =>
+      campo.closest('app-contrasena-visible')!.querySelector<HTMLButtonElement>('button.ojo')!;
+
+    expect(html.querySelectorAll('button.ojo')).toHaveLength(2);
+    ojo(password).click();
+
+    expect(password.type).toBe('text');
+    expect(confirmacion.type).toBe('password');
+  });
 
   it('Escenario: enlace de invitación vencido indica que solo el Administrador puede reenviarla', () => {
     // Dado un enlace vencido

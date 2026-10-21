@@ -16,6 +16,7 @@ import { finalize } from 'rxjs';
 import { ProblemDetails } from '../../../../core/models/problem-details';
 import { ApiErrorService } from '../../../../core/services/api-error.service';
 import { AuthCardComponent } from '../../../../shared/components/auth-card/auth-card.component';
+import { ContrasenaVisibleComponent } from '../../../../shared/components/contrasena-visible/contrasena-visible.component';
 import { InvitacionPublica } from '../../models/invitacion.models';
 import { UsuarioApiService } from '../../services/usuario-api.service';
 import { LIMITE_NOMBRE_COMPLETO, PATRON_NOMBRE_USUARIO } from '../../utils/reglas-perfil';
@@ -33,6 +34,7 @@ function contrasenasIguales(control: AbstractControl): ValidationErrors | null {
   standalone: true,
   imports: [
     ReactiveFormsModule,
+    ContrasenaVisibleComponent,
     RouterLink,
     AuthCardComponent,
     ButtonModule,

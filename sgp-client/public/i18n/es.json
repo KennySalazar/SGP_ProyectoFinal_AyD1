@@ -393,6 +393,8 @@
     "email": "Correo electronico",
     "emailShort": "Correo",
     "password": "Contrasena",
+    "showPassword": "Mostrar contraseña",
+    "hidePassword": "Ocultar contraseña",
     "currentPassword": "Contrasena actual",
     "newPassword": "Nueva contrasena",
     "otpCode": "Codigo OTP",
