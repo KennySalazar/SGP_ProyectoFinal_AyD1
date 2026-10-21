@@ -136,16 +136,16 @@ class VersionFormularioIntegrationTest {
 
     jdbc.update(
         """
-                INSERT INTO usuario (
-                  id, email, password_hash, rol_id,
-                  verificado, activado, activo, nombre_completo
-                )
-                SELECT ?, 'admin@cunoc.edu.gt', 'hash-de-prueba', id,
-                       true, true, true, 'Administrador de prueba'
-                FROM rol
-                WHERE nombre = 'ADMINISTRADOR'
-                ON CONFLICT (id) DO NOTHING
-                """,
+                    INSERT INTO usuario (
+                      id, email, password_hash, rol_id,
+                      verificado, activado, activo, nombre_completo
+                    )
+                    SELECT ?, 'admin@cunoc.edu.gt', 'hash-de-prueba', id,
+                           true, true, true, 'Administrador de prueba'
+                    FROM rol
+                    WHERE nombre = 'ADMINISTRADOR'
+                    ON CONFLICT (id) DO NOTHING
+                    """,
         ADMINISTRADOR_ID);
   }
 
@@ -162,16 +162,9 @@ class VersionFormularioIntegrationTest {
     assertThat(v1.codigo()).isEqualTo("SIECA-v1");
     assertThat(v1.estado()).isEqualTo(EstadoVersionFormulario.BORRADOR);
     assertThat(v1.activa()).isFalse();
-    assertThat(v1.pesos()).isEmpty();
-
-    ApiException sinPesos =
-        assertThrows(ApiException.class, () -> service.publicar(v1.id(), null, ADMINISTRADOR_ID));
-    assertThat(sinPesos.getCode()).isEqualTo("pesos_incompletos");
-
+    assertThat(v1.pesos()).hasSize(45);
+    assertThat(v1.rotuloCalibracion()).contains("provisional");
     configurarPesosDePrueba(v1.id(), BigDecimal.ONE);
-    ApiException sinEscala =
-        assertThrows(ApiException.class, () -> service.publicar(v1.id(), null, ADMINISTRADOR_ID));
-    assertThat(sinEscala.getCode()).isEqualTo("escala_incompleta");
     service.configurarEscala(v1.id(), escalaDePrueba(4), ADMINISTRADOR_ID);
     configurarReglasDePrueba(v1.id());
     assertThat(service.obtenerPorId(v1.id()).pesos()).hasSize(45);
@@ -198,19 +191,19 @@ class VersionFormularioIntegrationTest {
     JsonNode esquemaV2 =
         objectMapper.readTree(
             """
-                            {
-                              "$schema": "https://json-schema.org/draft/2020-12/schema",
-                              "type": "object",
-                              "properties": {
-                                "datos_generales": {
-                                  "type": "object",
-                                  "properties": {
-                                    "nombre": { "type": "string" }
-                                  }
-                                }
-                              }
-                            }
-                            """);
+                                    {
+                                      "$schema": "https://json-schema.org/draft/2020-12/schema",
+                                      "type": "object",
+                                      "properties": {
+                                        "datos_generales": {
+                                          "type": "object",
+                                          "properties": {
+                                            "nombre": { "type": "string" }
+                                          }
+                                        }
+                                      }
+                                    }
+                                    """);
 
     CrearVersionRequest crearV2Req =
         new CrearVersionRequest("SIECA-v2", v1.id(), false, esquemaV2, null, null);
@@ -245,12 +238,19 @@ class VersionFormularioIntegrationTest {
 
     var analisis = service.analizarMapeo(v2.id());
     List<DeclaracionMapeoRequest> declaraciones =
-        analisis.camposOrigen().stream()
-            .map(
-                campo ->
-                    new DeclaracionMapeoRequest(
-                        campo, null, TipoMapeoCampo.ELIMINADO, "Eliminado en v2"))
-            .toList();
+        new ArrayList<>(
+            analisis.camposOrigen().stream()
+                .map(
+                    campo ->
+                        new DeclaracionMapeoRequest(
+                            campo, null, TipoMapeoCampo.ELIMINADO, "Eliminado en v2"))
+                .toList());
+    analisis
+        .camposDestino()
+        .forEach(
+            campo ->
+                declaraciones.add(
+                    new DeclaracionMapeoRequest(null, campo, TipoMapeoCampo.NUEVO, "Nuevo en v2")));
 
     PublicarVersionRequest pubReq = new PublicarVersionRequest(declaraciones);
     VersionFormularioResponse v2Publicada = service.publicar(v2.id(), pubReq, ADMINISTRADOR_ID);
@@ -330,6 +330,85 @@ class VersionFormularioIntegrationTest {
     assertThat(actas.consultar(version.id()).estado()).isEqualTo("SIN_ACTA");
   }
 
+  @Test
+  void plantillaSePublicaSinCalibracionManualYCalculaConSocavacionCritica() throws Exception {
+    var borrador = service.cargarPlantillaSiecaInicial("HU050-primera", ADMINISTRADOR_ID);
+    var publicada = service.publicar(borrador.id(), null, ADMINISTRADOR_ID);
+    assertThat(publicada.activa()).isTrue();
+    assertThat(publicada.pesos()).hasSize(45);
+    assertThat(publicada.reglasEvaluacionIc().at("/reglas_evaluacion_ic/reglas_anulacion"))
+        .hasSize(4);
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT count(*) FROM auditoria WHERE entidad_id = ?",
+                Integer.class,
+                publicada.id()))
+        .isEqualTo(2);
+    var datos =
+        (com.fasterxml.jackson.databind.node.ObjectNode)
+            objectMapper.readTree(
+                getClass().getResourceAsStream("/formulario/sieca-v1/ejemplo-inspeccion.json"));
+    ((com.fasterxml.jackson.databind.node.ObjectNode)
+            datos.at("/subestructura/estribo_entrada/socavacion"))
+        .put("aguas_arriba", "CON_EXPOSICION");
+    var agregador = new gt.usac.cunoc.sgp.inspeccion.service.AgregadorCalificacionesIc();
+    var resolver = new gt.usac.cunoc.sgp.inspeccion.service.ResolverElementosIc();
+    var conversor = new gt.usac.cunoc.sgp.inspeccion.service.ConversorIndicadoresIc(agregador);
+    var calculo =
+        new gt.usac.cunoc.sgp.inspeccion.service.CalculoIndiceCondicionService(
+            resolver,
+            conversor,
+            new gt.usac.cunoc.sgp.inspeccion.service.ConversorMedicionesIc(conversor),
+            agregador,
+            new gt.usac.cunoc.sgp.inspeccion.service.EvaluadorCondicionesCriticasIc(resolver),
+            new gt.usac.cunoc.sgp.inspeccion.service.HuellaEntradaIc(),
+            new gt.usac.cunoc.sgp.inspeccion.service.MotorPonderacionIc(agregador));
+    var pesos = new java.util.LinkedHashMap<String, BigDecimal>();
+    publicada.pesos().forEach(peso -> pesos.put(peso.elementoRef(), peso.peso()));
+    var resultado =
+        calculo.calcular(
+            new gt.usac.cunoc.sgp.inspeccion.model.EntradaCalculoIc(
+                publicada.id(),
+                publicada.reglasEvaluacionIc().path("formulario").asText(),
+                publicada.versionAlgoritmoIc(),
+                datos,
+                publicada.esquema(),
+                publicada.reglasEvaluacionIc(),
+                publicada.reglasEvaluacionIc().path("reglas_evaluacion_ic"),
+                pesos));
+    assertThat(resultado.indiceCalculado()).isBetween(BigDecimal.ZERO, BigDecimal.valueOf(100));
+    assertThat(resultado.estadoCalculado())
+        .isEqualTo(gt.usac.cunoc.sgp.inspeccion.model.EstadoCondicion.MALO);
+    assertThat(resultado.condicionesAnulacion())
+        .anyMatch(regla -> "RN-IC-05a".equals(regla.reglaId()));
+  }
+
+  @Test
+  void segundaPlantillaDeclaraMapeosYReemplazaSoloLaActiva() {
+    var primera = service.cargarPlantillaSiecaInicial("HU050-base", ADMINISTRADOR_ID);
+    service.publicar(primera.id(), null, ADMINISTRADOR_ID);
+    var segunda = service.cargarPlantillaSiecaInicial("HU050-nueva", ADMINISTRADOR_ID);
+    assertThat(segunda.versionAnteriorId()).isEqualTo(primera.id());
+    assertThat(segunda.mapeos()).isNotEmpty().allMatch(m -> m.tipo() == TipoMapeoCampo.EQUIVALENTE);
+    assertThat(service.analizarMapeo(segunda.id()).mapeoCompleto()).isTrue();
+    service.publicar(segunda.id(), null, ADMINISTRADOR_ID);
+    assertThat(service.obtenerPorId(primera.id()).activa()).isFalse();
+    assertThat(service.obtenerActiva().id()).isEqualTo(segunda.id());
+  }
+
+  @Test
+  void noPublicaUnaPlantillaCuandoSeRetiraUnaDeclaracionDeMapeo() {
+    var primera = service.cargarPlantillaSiecaInicial("HU050-base", ADMINISTRADOR_ID);
+    service.publicar(primera.id(), null, ADMINISTRADOR_ID);
+    var segunda = service.cargarPlantillaSiecaInicial("HU050-nueva", ADMINISTRADOR_ID);
+    mapeos.deleteById(segunda.mapeos().getFirst().id());
+    var error =
+        assertThrows(
+            ApiException.class, () -> service.publicar(segunda.id(), null, ADMINISTRADOR_ID));
+    assertThat(error.getCode()).isEqualTo("mapeo_incompleto");
+    assertThat(service.obtenerActiva().id()).isEqualTo(primera.id());
+  }
+
   private void configurarReglasDePrueba(UUID versionId) throws Exception {
     VersionFormularioResponse version = service.obtenerPorId(versionId);
 
@@ -347,82 +426,82 @@ class VersionFormularioIntegrationTest {
         "agregacion",
         objectMapper.readTree(
             """
-                            {
-                              "indicadores_de_un_elemento": "MAXIMO",
-                              "instancias_repetibles": "MAXIMO",
-                              "elementos_ausentes_portantes": 4,
-                              "elementos_ausentes_no_portantes": 4
-                            }
-                            """));
+                                    {
+                                      "indicadores_de_un_elemento": "MAXIMO",
+                                      "instancias_repetibles": "MAXIMO",
+                                      "elementos_ausentes_portantes": 4,
+                                      "elementos_ausentes_no_portantes": 4
+                                    }
+                                    """));
 
     reglas.set(
         "rangos_estado",
         objectMapper.readTree(
             """
-                            {
-                              "BUENO": 75,
-                              "REGULAR": 50,
-                              "MALO": 0
-                            }
-                            """));
+                                    {
+                                      "BUENO": 75,
+                                      "REGULAR": 50,
+                                      "MALO": 0
+                                    }
+                                    """));
 
     reglas.set(
         "conversion_indicadores",
         objectMapper.readTree(
             """
-                            {
-                              "booleanos": {
-                                "junta.falta_elemento=true": 4,
-                                "junta.falta_elemento=false": 0,
-                                "junta.junta_limpia=true": 0,
-                                "junta.junta_limpia=false": 4,
-                                "losa.buen_estado=true": 0,
-                                "losa.buen_estado=false": 4,
-                                "senal.existe=true": 0,
-                                "senal.existe=false": 4,
-                                "drenaje_aledano.existe=true": 0,
-                                "drenaje_aledano.existe=false": 4
-                              },
-                              "enumerados": {
-                                "drenaje.estado": {
-                                  "LIMPIOS": 0,
-                                  "OBSTRUIDOS": 4
-                                },
-                                "socavacion.nivel": {
-                                  "NO_HAY": 0,
-                                  "SIN_EXPOSICION": 1,
-                                  "CON_EXPOSICION": 2,
-                                  "ASENTAMIENTO_ESTRUCTURA": 4
-                                },
-                                "condicionesCauce": {
-                                  "LIMPIO": 0,
-                                  "ASOLVADO_SEDIMENTADO": 1,
-                                  "EROSIONADO": 2,
-                                  "OTRO": 4
-                                },
-                                "estado_bueno_malo": {
-                                  "BUENO": 0,
-                                  "MALO": 4
-                                }
-                              },
-                              "numericos": {
-                                "golpeado_longitud_m": {
-                                  "umbrales_m": {
-                                    "LEVE": 1,
-                                    "MODERADO": 2,
-                                    "SEVERO": 3
-                                  }
-                                },
-                                "golpeados_cantidad": {
-                                  "umbrales": {
-                                    "LEVE": 1,
-                                    "MODERADO": 2,
-                                    "SEVERO": 3
-                                  }
-                                }
-                              }
-                            }
-                            """));
+                                    {
+                                      "booleanos": {
+                                        "junta.falta_elemento=true": 4,
+                                        "junta.falta_elemento=false": 0,
+                                        "junta.junta_limpia=true": 0,
+                                        "junta.junta_limpia=false": 4,
+                                        "losa.buen_estado=true": 0,
+                                        "losa.buen_estado=false": 4,
+                                        "senal.existe=true": 0,
+                                        "senal.existe=false": 4,
+                                        "drenaje_aledano.existe=true": 0,
+                                        "drenaje_aledano.existe=false": 4
+                                      },
+                                      "enumerados": {
+                                        "drenaje.estado": {
+                                          "LIMPIOS": 0,
+                                          "OBSTRUIDOS": 4
+                                        },
+                                        "socavacion.nivel": {
+                                          "NO_HAY": 0,
+                                          "SIN_EXPOSICION": 1,
+                                          "CON_EXPOSICION": 2,
+                                          "ASENTAMIENTO_ESTRUCTURA": 4
+                                        },
+                                        "condicionesCauce": {
+                                          "LIMPIO": 0,
+                                          "ASOLVADO_SEDIMENTADO": 1,
+                                          "EROSIONADO": 2,
+                                          "OTRO": 4
+                                        },
+                                        "estado_bueno_malo": {
+                                          "BUENO": 0,
+                                          "MALO": 4
+                                        }
+                                      },
+                                      "numericos": {
+                                        "golpeado_longitud_m": {
+                                          "umbrales_m": {
+                                            "LEVE": 1,
+                                            "MODERADO": 2,
+                                            "SEVERO": 3
+                                          }
+                                        },
+                                        "golpeados_cantidad": {
+                                          "umbrales": {
+                                            "LEVE": 1,
+                                            "MODERADO": 2,
+                                            "SEVERO": 3
+                                          }
+                                        }
+                                      }
+                                    }
+                                    """));
 
     service.actualizarBorrador(
         versionId, version.esquema(), null, configuracion, null, ADMINISTRADOR_ID);

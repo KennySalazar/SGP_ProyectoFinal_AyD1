@@ -40,7 +40,12 @@ public final class ValidadorReglasCriticasIc {
       if (!"MALO".equals(texto(regla.get("estado_resultante"), "estado_resultante de " + id))) {
         throw error("La regla " + id + " debe tener estado_resultante MALO");
       }
-      if (regla.hasNonNull("pendiente")) {
+      if (regla.hasNonNull("pendiente")
+          && !(reglas.path("calibracion_provisional").isBoolean()
+              && reglas.path("calibracion_provisional").booleanValue()
+              && Set.of("RN-IC-05a", "RN-IC-05c").contains(id)
+              && regla.path("pendiente").isTextual()
+              && !regla.path("pendiente").asText().isBlank())) {
         throw error("La regla " + id + " tiene una decision pendiente de calibracion");
       }
       List<String> elementos = lista(regla.get("elementos"), "elementos de " + id);
