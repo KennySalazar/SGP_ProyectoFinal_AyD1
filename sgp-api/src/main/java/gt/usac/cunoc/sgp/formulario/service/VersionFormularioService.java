@@ -279,6 +279,8 @@ public class VersionFormularioService {
     Instant ahora = clock.instant();
     UUID id = UUID.randomUUID();
 
+    VersionFormulario anterior = versiones.findByActivaTrue().orElse(null);
+
     VersionFormulario versionInicial =
         new VersionFormulario(
             id,
@@ -288,14 +290,13 @@ public class VersionFormularioService {
             esquema,
             vinculos,
             elementosIcNode,
-            null,
+            anterior,
             usuarioId,
             ahora,
             ahora);
 
     VersionFormulario guardada = versiones.save(versionInicial);
 
-    // Precargar configuración de pesos a partir del catálogo elementos-ic.json
     if (elementosIcNode.has("elementos") && elementosIcNode.get("elementos").isArray()) {
       for (JsonNode elem : elementosIcNode.get("elementos")) {
         JsonNode pesoConfigurado = elem.get("peso");
@@ -335,6 +336,43 @@ public class VersionFormularioService {
 
         configuracionesIc.save(configuracion);
       }
+    }
+
+    if (anterior != null) {
+      Set<String> origen =
+          new java.util.LinkedHashSet<>(campoExtractor.extraerCampos(anterior.getEsquema()));
+      Set<String> destino = new java.util.LinkedHashSet<>(campoExtractor.extraerCampos(esquema));
+      List<MapeoCampoFormulario> declaraciones = new ArrayList<>();
+      for (String campo : origen) {
+        boolean equivalente = destino.contains(campo);
+        declaraciones.add(
+            new MapeoCampoFormulario(
+                UUID.randomUUID(),
+                anterior,
+                guardada,
+                campo,
+                equivalente ? campo : null,
+                equivalente ? TipoMapeoCampo.EQUIVALENTE : TipoMapeoCampo.ELIMINADO,
+                "Declaracion inicial desde plantilla SIECA; revisar antes de publicar",
+                usuarioId,
+                ahora));
+      }
+      for (String campo : destino) {
+        if (!origen.contains(campo)) {
+          declaraciones.add(
+              new MapeoCampoFormulario(
+                  UUID.randomUUID(),
+                  anterior,
+                  guardada,
+                  null,
+                  campo,
+                  TipoMapeoCampo.NUEVO,
+                  "Campo nuevo de plantilla SIECA",
+                  usuarioId,
+                  ahora));
+        }
+      }
+      mapeos.saveAll(declaraciones);
     }
 
     return construirRespuestaDetallada(guardada);
@@ -605,7 +643,11 @@ public class VersionFormularioService {
         mapeos.findAllByVersionOrigenIdAndVersionDestinoId(origen.getId(), destino.getId());
 
     Set<String> mapeadosOrigen = new HashSet<>();
+    Set<String> mapeadosDestino = new HashSet<>();
     for (MapeoCampoFormulario m : mapeosGuardados) {
+      if (m.getElementoRefDestino() != null) {
+        mapeadosDestino.add(m.getElementoRefDestino());
+      }
       if (m.getElementoRefOrigen() != null) {
         mapeadosOrigen.add(m.getElementoRefOrigen());
       }
@@ -623,7 +665,7 @@ public class VersionFormularioService {
         camposDestino,
         mapeosGuardados.stream().map(mapper::toMapeoResponse).toList(),
         pendientes,
-        pendientes.isEmpty());
+        pendientes.isEmpty() && camposDestino.stream().allMatch(mapeadosDestino::contains));
   }
 
   @Transactional
@@ -668,7 +710,9 @@ public class VersionFormularioService {
             "mapeo_incompleto",
             "Mapeo de campos incompleto",
             "Debe declarar para cada campo de la versión anterior si es equivalente, renombrado, nuevo o eliminado. Faltan por declarar: "
-                + analisis.camposOrigenSinMapeo());
+                + analisis.camposOrigenSinMapeo()
+                + "; campos destino sin declarar: "
+                + analisis.camposDestinoSinMapeo());
       }
     }
 

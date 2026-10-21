@@ -213,12 +213,18 @@ public class TransicionInspeccionService {
   @Transactional
   @PreAuthorize("hasRole('CATEDRATICO')")
   public InspeccionResumenResponse aprobar(UUID inspeccionId, UUID revisorId) {
+    return aprobar(inspeccionId, revisorId, null);
+  }
+
+  @Transactional
+  @PreAuthorize("hasRole('CATEDRATICO')")
+  public InspeccionResumenResponse aprobar(UUID inspeccionId, UUID revisorId, UUID revisionId) {
     Inspeccion inspeccion = bloquearParaPublicar(inspeccionId);
     exigirRevisorDistintoDelAutor(inspeccion, revisorId);
     MaquinaEstadosInspeccion.destino(inspeccion.estadoActual(), EventoInspeccion.APROBAR);
     exigirSinCorreccionPublicada(inspeccion);
     exigirEvidenciaCompleta(inspeccion, List.of());
-    aplicar(inspeccion, EventoInspeccion.APROBAR, revisorId, null);
+    aplicar(inspeccion, EventoInspeccion.APROBAR, revisorId, null, revisionId);
     return publicarConIndice(inspeccion, revisorId);
   }
 
@@ -226,26 +232,48 @@ public class TransicionInspeccionService {
   @PreAuthorize("hasRole('CATEDRATICO')")
   public InspeccionResumenResponse solicitarCambios(
       UUID inspeccionId, UUID revisorId, String motivo) {
-    return resolverConMotivo(inspeccionId, revisorId, motivo, EventoInspeccion.SOLICITAR_CAMBIOS);
+    return solicitarCambios(inspeccionId, revisorId, motivo, null);
+  }
+
+  @Transactional
+  @PreAuthorize("hasRole('CATEDRATICO')")
+  public InspeccionResumenResponse solicitarCambios(
+      UUID inspeccionId, UUID revisorId, String motivo, UUID revisionId) {
+    return resolverConMotivo(
+        inspeccionId, revisorId, motivo, EventoInspeccion.SOLICITAR_CAMBIOS, revisionId);
   }
 
   @Transactional
   @PreAuthorize("hasRole('CATEDRATICO')")
   public InspeccionResumenResponse rechazar(UUID inspeccionId, UUID revisorId, String motivo) {
-    return resolverConMotivo(inspeccionId, revisorId, motivo, EventoInspeccion.RECHAZAR);
+    return rechazar(inspeccionId, revisorId, motivo, null);
+  }
+
+  @Transactional
+  @PreAuthorize("hasRole('CATEDRATICO')")
+  public InspeccionResumenResponse rechazar(
+      UUID inspeccionId, UUID revisorId, String motivo, UUID revisionId) {
+    return resolverConMotivo(
+        inspeccionId, revisorId, motivo, EventoInspeccion.RECHAZAR, revisionId);
   }
 
   /** Con cambios solicitados, la inspección vuelve al autor como borrador editable (RN-REV-06). */
   @Transactional
   public InspeccionResumenResponse devolverABorrador(UUID inspeccionId, UUID usuarioId) {
+    return devolverABorrador(inspeccionId, usuarioId, null);
+  }
+
+  @Transactional
+  public InspeccionResumenResponse devolverABorrador(
+      UUID inspeccionId, UUID usuarioId, UUID revisionId) {
     Inspeccion inspeccion = bloquear(inspeccionId);
     exigirAutor(inspeccion, usuarioId);
-    aplicar(inspeccion, EventoInspeccion.DEVOLVER_A_BORRADOR, usuarioId, null);
+    aplicar(inspeccion, EventoInspeccion.DEVOLVER_A_BORRADOR, usuarioId, null, revisionId);
     return mapper.toResumenResponse(inspecciones.saveAndFlush(inspeccion));
   }
 
   private InspeccionResumenResponse resolverConMotivo(
-      UUID inspeccionId, UUID revisorId, String motivo, EventoInspeccion evento) {
+      UUID inspeccionId, UUID revisorId, String motivo, EventoInspeccion evento, UUID revisionId) {
     if (motivo == null || motivo.isBlank()) {
       throw new ApiException(
           HttpStatus.UNPROCESSABLE_ENTITY,
@@ -255,7 +283,7 @@ public class TransicionInspeccionService {
     }
     Inspeccion inspeccion = bloquear(inspeccionId);
     exigirRevisorDistintoDelAutor(inspeccion, revisorId);
-    aplicar(inspeccion, evento, revisorId, motivo.strip());
+    aplicar(inspeccion, evento, revisorId, motivo.strip(), revisionId);
     return mapper.toResumenResponse(inspecciones.saveAndFlush(inspeccion));
   }
 

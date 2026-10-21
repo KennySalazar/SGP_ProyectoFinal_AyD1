@@ -36,7 +36,7 @@ public interface ObservacionRevisionRepository extends JpaRepository<Observacion
       """
       select r from Revision r
       where r.inspeccion.autorId = :actor and r.inspeccion.eliminadoEn is null
-        and (r.observacionGeneral is not null or exists
+        and (r.estado = 'RESUELTA' or r.observacionGeneral is not null or exists
           (select o.id from ObservacionRevision o where o.revision = r))
       order by r.enviadaEn desc, r.id desc
       """)

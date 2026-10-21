@@ -34,6 +34,7 @@ class CicloRevisionServiceTest {
   private final CicloRevisionService service =
       new CicloRevisionService(
           revisiones,
+          mock(gt.usac.cunoc.sgp.revision.repository.ObservacionRevisionRepository.class),
           asignaciones,
           notificaciones,
           new ObjectMapper(),

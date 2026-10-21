@@ -64,6 +64,11 @@
     listado()?.pendientes ?? 0} }}
   </p>
 </section>
+<app-resultado-revision
+  [inspeccionId]="d.inspeccionId"
+  [revisionId]="d.revisionId"
+  (actualizado)="actualizarRevision()"
+/>
 <div class="revision" [class.con-panel]="panelAbierto()">
   <div class="contenido">
     <app-formulario-dinamico

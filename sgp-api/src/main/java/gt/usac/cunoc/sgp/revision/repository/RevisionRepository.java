@@ -16,6 +16,17 @@ import org.springframework.data.repository.query.Param;
 
 public interface RevisionRepository extends JpaRepository<Revision, UUID> {
 
+  @Query("select r.inspeccion.puente.id from Revision r where r.id = :id")
+  Optional<UUID> findPuenteId(@Param("id") UUID id);
+
+  Optional<Revision> findFirstByInspeccionIdOrderByNumeroCicloDesc(UUID inspeccionId);
+
+  @Query(
+      "select r from Revision r where r.inspeccion.id = :id and r.inspeccion.eliminadoEn is null "
+          + "and (r.revisorId = :actor or r.inspeccion.autorId = :actor) order by r.numeroCiclo desc")
+  java.util.List<Revision> historialPrivado(
+      @Param("id") UUID inspeccionId, @Param("actor") UUID actor);
+
   boolean existsByInspeccionIdAndRevisorIdAndEstado(
       UUID inspeccionId, UUID revisorId, String estado);
 
@@ -85,6 +96,7 @@ public interface RevisionRepository extends JpaRepository<Revision, UUID> {
           JOIN curso c ON c.id = ce.curso_id
           JOIN asignatura a ON a.id = c.asignatura_id
           WHERE r.revisor_id = :revisorId
+            AND r.estado IN ('PENDIENTE', 'EN_CURSO')
             AND i.eliminado_en IS NULL
             AND i.estado IN ('ENVIADA', 'EN_REVISION')
             AND (:estado = '' OR i.estado = :estado)
@@ -111,6 +123,7 @@ public interface RevisionRepository extends JpaRepository<Revision, UUID> {
           JOIN curso c ON c.id = ce.curso_id
           JOIN asignatura a ON a.id = c.asignatura_id
           WHERE r.revisor_id = :revisorId
+            AND r.estado IN ('PENDIENTE', 'EN_CURSO')
             AND i.eliminado_en IS NULL
             AND i.estado IN ('ENVIADA', 'EN_REVISION')
             AND (:estado = '' OR i.estado = :estado)

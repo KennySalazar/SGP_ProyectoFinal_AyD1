@@ -211,10 +211,12 @@ export class NotificacionesStore implements OnDestroy {
     if (entidadUpper === 'INSPECCION') {
       return ['/inspecciones', entidadId];
     }
-    // Las notificaciones anteriores de revisión conservan el identificador del ciclo, no el de
-    // la inspección. La bandeja permite iniciar o reanudar ese ciclo sin construir una ruta inválida.
+    // El estudiante consulta el resultado privado; el revisor inicia o reanuda desde su bandeja.
+    // entidadId identifica el ciclo, no la inspección.
     if (entidadUpper === 'REVISION') {
-      return ['/revisiones'];
+      return this.auth.user()?.role === 'ESTUDIANTE'
+        ? ['/observaciones', entidadId]
+        : ['/revisiones'];
     }
     if (entidadUpper === 'ORDEN' || entidadUpper === 'MANTENIMIENTO') {
       return ['/mantenimiento', 'ordenes', entidadId];

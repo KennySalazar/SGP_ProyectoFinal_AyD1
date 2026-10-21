@@ -62,10 +62,13 @@ import {
 } from '../../models/revision.models';
 import { RevisionApiService } from '../../services/revision-api.service';
 
+import { ResultadoRevisionComponent } from '../../components/resultado-revision/resultado-revision.component';
+
 @Component({
   selector: 'app-detalle-revision-page',
   standalone: true,
   imports: [
+    ResultadoRevisionComponent,
     DatePipe,
     JsonPipe,
     KeyValuePipe,
@@ -216,6 +219,11 @@ export class DetalleRevisionPage implements ContextoObservacionesFormulario {
         this.detalle.set(respuesta.detalle);
         this.listado.set(respuesta.listado);
       });
+  }
+  actualizarRevision(): void {
+    this.editor.set(null);
+    this.aEliminar.set(null);
+    this.refrescar.next();
   }
   anclajeDisponible(anclaje: AnclajeFormulario): boolean {
     if (!anclaje.instanciaElementoId) return true;

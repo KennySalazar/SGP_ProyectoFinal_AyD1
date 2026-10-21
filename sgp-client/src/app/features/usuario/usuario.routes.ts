@@ -39,6 +39,10 @@ export const usuarioPublicRoutes: Routes = [
 
 export const usuarioProtectedRoutes: Routes = [
   {
+    path: 'perfil',
+    loadComponent: () => import('./pages/perfil/perfil.page').then((m) => m.PerfilPage),
+  },
+  {
     path: 'seguridad',
     loadComponent: () => import('./pages/security/security.page').then((m) => m.SecurityPage),
   },

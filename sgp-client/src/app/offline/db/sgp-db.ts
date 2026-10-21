@@ -1,12 +1,21 @@
+import type {
+  ResumenSalida,
+  SolicitudSalidaLocal,
+} from '../../features/salida/models/salida.models';
 import Dexie, { Table } from 'dexie';
 
 export interface LocalBridge {
+  propietarioId?: string;
+  origen?: 'PREPARACION';
+  origenId?: string;
   id: string;
   codigo?: string;
   actualizadoEn?: string;
   payload: unknown;
 }
 export interface LocalInspection {
+  origen?: 'PREPARACION';
+  origenId?: string;
   propietarioId?: string;
   id: string;
   puenteId: string;
@@ -35,6 +44,9 @@ export interface LocalPhoto {
   sincronizado: boolean;
 }
 export interface LocalFormSchema {
+  propietarioId?: string;
+  origen?: 'PREPARACION';
+  origenId?: string;
   id: string;
   version: string;
   schema: unknown;
@@ -80,9 +92,11 @@ export class SgpDatabase extends Dexie {
   cola_sync!: Table<SyncQueueItem, string>;
   notificaciones!: Table<LocalNotificacion, string>;
   notificaciones_meta!: Table<LocalNotificacionMeta, string>;
+  preparaciones_salida!: Table<ResumenSalida, string>;
+  solicitudes_salida!: Table<SolicitudSalidaLocal, string>;
 
-  constructor() {
-    super('sgp_offline');
+  constructor(nombre = 'sgp_offline') {
+    super(nombre);
     this.version(1).stores({
       puentes: 'id,codigo,actualizadoEn',
       inspecciones: 'id,puenteId,estado,actualizadoEn,sincronizado',
@@ -96,6 +110,8 @@ export class SgpDatabase extends Dexie {
     });
     this.version(3).stores({
       cola_sync: 'id,tipo,entityId,creadoEn,intentos,propietarioId,estado',
+      preparaciones_salida: 'propietarioId',
+      solicitudes_salida: 'propietarioId',
     });
   }
 }

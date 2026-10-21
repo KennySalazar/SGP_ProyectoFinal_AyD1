@@ -224,7 +224,11 @@ public class InvitacionService {
     exigirPendiente(invitacion, ahora);
 
     invitacion.aceptar(ahora);
-    cuentas.activar(invitacion.getUsuarioCreadoId(), request.password());
+    cuentas.activar(
+        invitacion.getUsuarioCreadoId(),
+        request.password(),
+        request.nombreCompleto(),
+        request.nombreUsuario());
 
     return new MessageResponse("La cuenta fue activada. Ya puede iniciar sesion.");
   }

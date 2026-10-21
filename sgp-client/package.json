@@ -39,6 +39,7 @@
     "@types/node": "^22.20.5",
     "angular-eslint": "^21.0.1",
     "eslint": "^9.39.1",
+    "fake-indexeddb": "^6.2.6",
     "jsdom": "^27.4.0",
     "prettier": "^3.8.1",
     "typescript": "~5.9.2",

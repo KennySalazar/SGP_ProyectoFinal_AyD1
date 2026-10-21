@@ -11,4 +11,18 @@ public record ObservacionResponse(
     String texto,
     EstadoObservacion estado,
     UUID creadoPorId,
-    Instant creadoEn) {}
+    Instant creadoEn,
+    UUID resueltoPorId,
+    Instant resueltoEn,
+    String respuestaAutor) {
+  public ObservacionResponse(
+      UUID id,
+      UUID revisionId,
+      DestinoObservacion destino,
+      String texto,
+      EstadoObservacion estado,
+      UUID creadoPorId,
+      Instant creadoEn) {
+    this(id, revisionId, destino, texto, estado, creadoPorId, creadoEn, null, null, null);
+  }
+}

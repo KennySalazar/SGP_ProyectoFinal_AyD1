@@ -35,6 +35,14 @@
     </header>
 
     <section class="route-content">
+      @if (avisarPerfil()) {
+        <p class="aviso-perfil" role="status">
+          <i class="pi pi-id-card" aria-hidden="true"></i>
+          <span>{{ 'perfil.aviso' | transloco }}</span>
+          <a routerLink="/perfil">{{ 'perfil.completar' | transloco }}</a>
+        </p>
+      }
+      <app-aviso-salida />
       <ng-content />
       <router-outlet />
     </section>
@@ -64,6 +72,11 @@
           <i class="pi pi-list" aria-hidden="true"></i
           ><span>{{ 'nav.bridgeCatalog' | transloco }}</span>
         </a>
+        @if (puedePrepararSalida()) {
+          <a routerLink="/preparar-salida" routerLinkActive="active" ariaCurrentWhenActive="page">
+            <i class="pi pi-download" aria-hidden="true"></i><span>Preparar salida</span>
+          </a>
+        }
         <a routerLink="/offline" routerLinkActive="active">
           <i class="pi pi-cloud"></i><span>{{ 'nav.offline' | transloco }}</span>
         </a>
@@ -91,6 +104,10 @@
             ><span>{{ 'revision.autor.titulo' | transloco }}</span>
           </a>
         }
+        <a routerLink="/perfil" routerLinkActive="active">
+          <i class="pi pi-id-card" aria-hidden="true"></i
+          ><span>{{ 'nav.profile' | transloco }}</span>
+        </a>
         <a routerLink="/seguridad" routerLinkActive="active">
           <i class="pi pi-shield"></i><span>{{ 'nav.security' | transloco }}</span>
         </a>
@@ -163,9 +180,9 @@
     <div class="sidebar-spacer"></div>
 
     <div class="user-panel">
-      <div class="user-avatar">{{ auth.user()?.email?.charAt(0)?.toUpperCase() || 'U' }}</div>
+      <div class="user-avatar">{{ nombreVisible().charAt(0).toUpperCase() || 'U' }}</div>
       <div class="user-data">
-        <strong>{{ auth.user()?.email }}</strong>
+        <strong>{{ nombreVisible() }}</strong>
         <span>{{ auth.user()?.role }}</span>
       </div>
     </div>

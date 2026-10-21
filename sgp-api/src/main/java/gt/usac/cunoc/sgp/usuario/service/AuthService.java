@@ -6,6 +6,7 @@ import gt.usac.cunoc.sgp.common.exception.ApiException;
 import gt.usac.cunoc.sgp.common.security.JwtService;
 import gt.usac.cunoc.sgp.common.util.EmailNormalizer;
 import gt.usac.cunoc.sgp.usuario.dto.AccessTokenResponse;
+import gt.usac.cunoc.sgp.usuario.dto.ActualizarPerfilRequest;
 import gt.usac.cunoc.sgp.usuario.dto.ChallengeResponse;
 import gt.usac.cunoc.sgp.usuario.dto.ChangePasswordRequest;
 import gt.usac.cunoc.sgp.usuario.dto.LoginRequest;
@@ -45,6 +46,7 @@ public class AuthService {
   private final Clock clock;
   private final UserMapper userMapper;
   private final UsuarioProfesionalRepository profesionales;
+  private final PerfilUsuarioService perfiles;
 
   public AuthService(
       UserAccountRepository users,
@@ -55,7 +57,8 @@ public class AuthService {
       RefreshTokenService refreshTokens,
       Clock clock,
       UserMapper userMapper,
-      UsuarioProfesionalRepository profesionales) {
+      UsuarioProfesionalRepository profesionales,
+      PerfilUsuarioService perfiles) {
     this.users = users;
     this.roles = roles;
     this.passwordEncoder = passwordEncoder;
@@ -65,6 +68,7 @@ public class AuthService {
     this.clock = clock;
     this.userMapper = userMapper;
     this.profesionales = profesionales;
+    this.perfiles = perfiles;
   }
 
   @Transactional
@@ -86,9 +90,10 @@ public class AuthService {
         roles
             .findByName(RoleName.ESTUDIANTE)
             .orElseThrow(() -> new IllegalStateException("Falta el rol ESTUDIANTE"));
-    UserAccount user =
-        users.save(
-            new UserAccount(email, passwordEncoder.encode(request.password()), role, false, false));
+    UserAccount cuenta =
+        new UserAccount(email, passwordEncoder.encode(request.password()), role, false, false);
+    perfiles.aplicar(cuenta, request.nombreCompleto(), request.nombreUsuario());
+    UserAccount user = perfiles.guardar(cuenta);
     var challenge = otpService.issue(user, OtpPurpose.REGISTRO);
     return new ChallengeResponse(
         challenge.getId(),
@@ -301,6 +306,20 @@ public class AuthService {
         purpose == OtpPurpose.ACTIVAR_2FA
             ? "La autenticacion de dos factores fue activada"
             : "La autenticacion de dos factores fue desactivada");
+  }
+
+  /** Cambia el nombre completo y el nombre de usuario de la cuenta que inició sesión. */
+  @Transactional
+  @Auditable(
+      accion = AccionAuditoria.MODIFICAR,
+      entidad = "usuario",
+      tipo = UserAccount.class,
+      emailArgIndex = 0)
+  public UserResponse actualizarPerfil(String rawEmail, ActualizarPerfilRequest request) {
+    UserAccount user = requireUser(rawEmail);
+    perfiles.aplicar(user, request.nombreCompleto(), request.nombreUsuario());
+    perfiles.guardar(user);
+    return currentUser(rawEmail);
   }
 
   @Transactional(readOnly = true)

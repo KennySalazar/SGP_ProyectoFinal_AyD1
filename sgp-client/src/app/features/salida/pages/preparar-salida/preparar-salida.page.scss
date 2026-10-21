@@ -1,0 +1,161 @@
+.salida {
+  max-width: 1080px;
+  margin: 0 auto;
+  color: var(--text-color, #243247);
+}
+.eyebrow {
+  font-size: 0.78rem;
+  letter-spacing: 0.12em;
+  color: #52677d;
+  font-weight: 700;
+}
+h1 {
+  font-size: clamp(1.7rem, 4vw, 2.3rem);
+  margin: 0.5rem 0;
+}
+h2 {
+  font-size: 1.2rem;
+  margin: 0 0 1rem;
+}
+p {
+  line-height: 1.6;
+}
+.tarjeta {
+  background: var(--surface-card, #fff);
+  border: 1px solid #dce3eb;
+  border-radius: 16px;
+  padding: 1.4rem;
+  margin: 1.3rem 0;
+}
+.alerta {
+  background: #fff5db;
+  color: #674400;
+  padding: 1rem;
+  border-radius: 10px;
+  border: 1px solid #e5c576;
+}
+.error {
+  background: #fff0ef;
+  color: #842621;
+  border-color: #edb7b3;
+}
+.exito {
+  color: #17643c;
+  font-weight: 700;
+}
+.filtros {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 0.8rem;
+}
+.filtros label {
+  display: grid;
+  gap: 0.4rem;
+  flex: 1 1 210px;
+}
+input:not([type='checkbox']),
+select {
+  min-height: 44px;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0.6rem;
+  border: 1px solid #9aa9ba;
+  border-radius: 8px;
+  background: #fff;
+  color: #243247;
+  font: inherit;
+}
+button {
+  min-width: 44px;
+  min-height: 44px;
+  border: 1px solid #264f78;
+  background: #264f78;
+  color: #fff;
+  border-radius: 8px;
+  padding: 0.65rem 1rem;
+  font: inherit;
+  cursor: pointer;
+}
+button.secundario {
+  background: transparent;
+  color: #264f78;
+}
+button:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+button:focus-visible,
+input:focus-visible,
+select:focus-visible {
+  outline: 3px solid #cf8a16;
+  outline-offset: 3px;
+}
+.puentes {
+  list-style: none;
+  padding: 0;
+  margin: 1rem 0;
+}
+.puentes li {
+  border-bottom: 1px solid #e5ebf1;
+  padding: 0.5rem 0;
+}
+.elegir {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  min-height: 54px;
+  cursor: pointer;
+}
+.elegir input {
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+  margin: 0;
+  accent-color: #264f78;
+}
+small {
+  display: block;
+  color: #52677d;
+  margin-top: 0.35rem;
+}
+.asignado {
+  padding: 0.6rem;
+}
+.acciones {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.8rem;
+}
+dl {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.5rem;
+}
+dt {
+  font-size: 0.85rem;
+  color: #52677d;
+}
+dd {
+  margin: 0.3rem 0 1rem;
+  font-weight: 600;
+}
+.confirmacion {
+  padding: 1rem;
+  background: #f3f6fa;
+  border-radius: 8px;
+  margin-top: 1rem;
+}
+.confirmacion button {
+  margin: 0.3rem;
+}
+@media (max-width: 600px) {
+  .tarjeta {
+    padding: 1rem;
+  }
+  .acciones button,
+  .filtros button {
+    width: 100%;
+  }
+}

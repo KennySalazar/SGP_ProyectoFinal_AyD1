@@ -51,10 +51,13 @@ interface ErrorAccion {
   }[];
   fotografias: string[];
 }
+import { ResultadoRevisionComponent } from '../../../revision/components/resultado-revision/resultado-revision.component';
+
 @Component({
   selector: 'app-completar-inspeccion-page',
   standalone: true,
   imports: [
+    ResultadoRevisionComponent,
     CommonModule,
     FormsModule,
     RouterLink,

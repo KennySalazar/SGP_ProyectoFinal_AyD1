@@ -5,12 +5,16 @@ import {
   ChallengeResponse,
   LoginResponse,
   MessageResponse,
+  UserSession,
 } from '../../../core/models/auth.models';
 import { InvitacionPublica } from '../models/invitacion.models';
+import { PerfilCuenta } from '../utils/reglas-perfil';
 
 export interface EstudiantePendienteResponse {
   id: string;
   email: string;
+  nombreCompleto: string | null;
+  nombreUsuario: string | null;
 }
 
 export interface CursoDisponibleResponse {
@@ -37,7 +41,9 @@ export class UsuarioApiService {
     );
   }
 
-  register(data: { email: string; password: string }): Observable<ChallengeResponse> {
+  register(
+    data: { email: string; password: string } & PerfilCuenta,
+  ): Observable<ChallengeResponse> {
     return this.http.post<ChallengeResponse>('/api/v1/auth/register', data);
   }
 
@@ -65,8 +71,21 @@ export class UsuarioApiService {
     return this.http.post<InvitacionPublica>('/api/v1/invitaciones/validacion', { token });
   }
 
-  aceptarInvitacion(token: string, password: string): Observable<MessageResponse> {
-    return this.http.post<MessageResponse>('/api/v1/invitaciones/aceptacion', { token, password });
+  aceptarInvitacion(
+    token: string,
+    password: string,
+    perfil: PerfilCuenta,
+  ): Observable<MessageResponse> {
+    return this.http.post<MessageResponse>('/api/v1/invitaciones/aceptacion', {
+      token,
+      password,
+      ...perfil,
+    });
+  }
+
+  /** Cambia el nombre completo y el nombre de usuario; responde la sesión ya actualizada. */
+  actualizarPerfil(perfil: PerfilCuenta): Observable<UserSession> {
+    return this.http.put<UserSession>('/api/v1/auth/me/perfil', perfil);
   }
 
   requestTwoFactorChange(

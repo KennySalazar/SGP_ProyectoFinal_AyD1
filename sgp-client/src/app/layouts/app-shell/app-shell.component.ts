@@ -1,6 +1,9 @@
-import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { AsyncPipe } from '@angular/common';
-import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
+import { AvisoSalidaComponent } from '../../features/salida/components/aviso-salida.component';
+import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
+import { toSignal } from '@angular/core/rxjs-interop';
+import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
+import { filter, map } from 'rxjs';
 import { AuthStore } from '../../core/services/auth.store';
 import { ConnectivityService } from '../../offline/services/connectivity.service';
 import { SyncQueueItem } from '../../offline/db/sgp-db';
@@ -14,6 +17,7 @@ import { SincronizacionService } from '../../offline/services/sincronizacion.ser
   standalone: true,
   imports: [
     AsyncPipe,
+    AvisoSalidaComponent,
     RouterOutlet,
     RouterLink,
     RouterLinkActive,
@@ -26,10 +30,42 @@ import { SincronizacionService } from '../../offline/services/sincronizacion.ser
 })
 export class AppShellComponent {
   readonly auth = inject(AuthStore);
+  readonly puedePrepararSalida = () => {
+    const usuario = this.auth.user();
+    return (
+      !!usuario &&
+      usuario.active &&
+      usuario.activated &&
+      usuario.verified &&
+      ['ESTUDIANTE', 'CATEDRATICO', 'PROFESIONAL_EXTERNO'].includes(usuario.role) &&
+      (usuario.role !== 'PROFESIONAL_EXTERNO' || usuario.colegiadoVerificado === true)
+    );
+  };
   readonly connectivity = inject(ConnectivityService);
   readonly sincronizacion = inject(SincronizacionService);
   readonly revisiones = inject(RevisionApiService);
   private readonly router = inject(Router);
+  private readonly url = toSignal(
+    this.router.events.pipe(
+      filter((evento): evento is NavigationEnd => evento instanceof NavigationEnd),
+      map((evento) => evento.urlAfterRedirects),
+    ),
+    { initialValue: this.router.url },
+  );
+
+  /** Cuentas anteriores a que el perfil fuera obligatorio: solo se les avisa, no se les bloquea. */
+  readonly perfilIncompleto = computed(() => {
+    const usuario = this.auth.user();
+    return !!usuario && (!usuario.nombreUsuario || !usuario.nombreCompleto);
+  });
+  readonly avisarPerfil = computed(
+    () => this.perfilIncompleto() && !this.url().startsWith('/perfil'),
+  );
+  /** Lo que identifica a la persona en el panel lateral: su nombre, o su correo si no lo tiene. */
+  readonly nombreVisible = computed(() => {
+    const usuario = this.auth.user();
+    return usuario?.nombreCompleto || usuario?.email || '';
+  });
 
   constructor() {
     this.sincronizacion.iniciar();

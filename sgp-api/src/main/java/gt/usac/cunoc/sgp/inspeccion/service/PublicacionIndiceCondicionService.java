@@ -120,7 +120,8 @@ public class PublicacionIndiceCondicionService {
     var entrada = preparador.preparar(inspeccion.versionFormularioId(), inspeccion.datos());
     var calculo = calculador.calcular(entrada);
     Instant ahora = clock.instant();
-    DecisionEstado decision = resolverDecision(inspeccionId, inspeccion.autorId(), calculo);
+    DecisionEstado decision =
+        resolverDecision(inspeccionId, inspeccion.autorId(), usuarioId, calculo);
 
     ResultadoIc resultado =
         new ResultadoIc(
@@ -226,7 +227,7 @@ public class PublicacionIndiceCondicionService {
   }
 
   private DecisionEstado resolverDecision(
-      UUID inspeccionId, UUID autorInspeccionId, ResultadoCalculoIc calculo) {
+      UUID inspeccionId, UUID autorInspeccionId, UUID publicadorId, ResultadoCalculoIc calculo) {
     var decisiones =
         jdbc.query(
             """
@@ -236,7 +237,16 @@ public class PublicacionIndiceCondicionService {
             WHERE inspeccion_id = ?
             """,
             (rs, numero) -> {
-              if (!autorInspeccionId.equals(rs.getObject("realizado_por_id", UUID.class))) {
+              UUID confirmadoPor = rs.getObject("realizado_por_id", UUID.class);
+              boolean revisorActual =
+                  publicadorId.equals(confirmadoPor)
+                      && Boolean.TRUE.equals(
+                          jdbc.queryForObject(
+                              "select exists(select 1 from revision where inspeccion_id=? and revisor_id=? and estado='EN_CURSO')",
+                              Boolean.class,
+                              inspeccionId,
+                              publicadorId));
+              if (!autorInspeccionId.equals(confirmadoPor) && !revisorActual) {
                 throw error(
                     HttpStatus.CONFLICT,
                     "confirmacion_ic_autor_invalido",
