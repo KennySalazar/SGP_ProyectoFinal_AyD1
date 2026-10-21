@@ -28,13 +28,14 @@
     } @if(!challengeId()){
     <form [formGroup]="requestForm" (ngSubmit)="request()">
       <label
-        >{{ 'common.currentPassword' | transloco }}<input
-          pInputText
-          type="password"
-          formControlName="currentPassword"
-          autocomplete="current-password"
-          [placeholder]="'common.confirmPasswordPlaceholder' | transloco"
-      /></label>
+        >{{ 'common.currentPassword' | transloco }}<app-contrasena-visible
+          ><input
+            pInputText
+            type="password"
+            formControlName="currentPassword"
+            autocomplete="current-password"
+            [placeholder]="'common.confirmPasswordPlaceholder' | transloco" /></app-contrasena-visible
+      ></label>
       <button pButton class="primary-action" type="submit" [disabled]="requestForm.invalid">
         <i
           class="pi"

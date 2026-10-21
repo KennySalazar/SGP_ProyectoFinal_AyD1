@@ -257,4 +257,15 @@
 }
 
 <app-reporte-fotografico [inspeccion]="d" [soloLectura]="true" />
+<section class="surface-card foro">
+  <app-foro-inspeccion
+    #foro
+    [inspeccionId]="d.id"
+    [ancla]="seleccion()"
+    [etiquetaDeAncla]="etiquetaDeAncla()"
+    (anclaQuitada)="seleccion.set(null)"
+    (irAElemento)="irAElemento($event)"
+    (anclasCambian)="anclas.set($event)"
+  />
+</section>
 }

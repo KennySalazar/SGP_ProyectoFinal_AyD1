@@ -9,13 +9,18 @@ export class FotografiasLocalesService {
       const anterior = await sgpDb.fotos.get(foto.id);
       if (anterior && anterior.propietarioId !== foto.propietarioId) throw new Error('propietario');
       await sgpDb.fotos.put(foto);
+      const ultimo = await sgpDb.cola_sync.orderBy('creadoEn').last();
+      const ahora = Date.now();
       await sgpDb.cola_sync.put({
         id: foto.id,
         tipo: 'FOTO',
         entityId: foto.id,
+        propietarioId: foto.propietarioId,
         idempotencyKey: foto.idempotencyKey,
         intentos: 0,
-        creadoEn: new Date().toISOString(),
+        creadoEn: new Date(
+          Math.max(ahora, ultimo ? Date.parse(ultimo.creadoEn) + 1 : ahora),
+        ).toISOString(),
       });
     });
   }

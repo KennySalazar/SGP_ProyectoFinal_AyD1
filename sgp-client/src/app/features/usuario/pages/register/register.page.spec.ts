@@ -6,6 +6,7 @@ import { Router, provideRouter } from '@angular/router';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { AuthCardComponent } from '../../../../shared/components/auth-card/auth-card.component';
+import { ContrasenaVisibleComponent } from '../../../../shared/components/contrasena-visible/contrasena-visible.component';
 import { RegisterPage } from './register.page';
 
 @Pipe({ name: 'transloco' })
@@ -30,7 +31,7 @@ describe('Registro de estudiantes', () => {
         { provide: TranslocoService, useValue: { translate: (clave: string) => clave } },
       ],
     });
-    for (const componente of [RegisterPage, AuthCardComponent]) {
+    for (const componente of [RegisterPage, AuthCardComponent, ContrasenaVisibleComponent]) {
       TestBed.overrideComponent(componente, {
         remove: { imports: [TranslocoPipe] },
         add: { imports: [TraduccionTestPipe] },
@@ -63,6 +64,21 @@ describe('Registro de estudiantes', () => {
     ).map((campo) => campo.getAttribute('formControlName'));
 
     expect(campos).toEqual(['email', 'nombreCompleto', 'nombreUsuario', 'password']);
+  });
+
+  it('la contraseña se puede mostrar u ocultar con el ojo', () => {
+    crear();
+    const html = fixture.nativeElement as HTMLElement;
+    const campo = html.querySelector<HTMLInputElement>('input[formControlName="password"]')!;
+    const ojo = campo
+      .closest('app-contrasena-visible')!
+      .querySelector<HTMLButtonElement>('button.ojo')!;
+
+    expect(campo.type).toBe('password');
+    ojo.click();
+    expect(campo.type).toBe('text');
+    ojo.click();
+    expect(campo.type).toBe('password');
   });
 
   it('envía el alta con el perfil y avanza a verificar el correo', () => {

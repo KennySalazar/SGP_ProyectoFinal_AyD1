@@ -33,6 +33,11 @@ import {
 import { ApiErrorService } from '../../../../core/services/api-error.service';
 import { AuthStore } from '../../../../core/services/auth.store';
 import { InspeccionApiService } from '../../services/inspeccion-api.service';
+import {
+  InspeccionesLocalesService,
+  BorradorLocalPayload,
+} from '../../../../offline/services/inspecciones-locales.service';
+import { ConnectivityService } from '../../../../offline/services/connectivity.service';
 
 import { ReporteFotograficoComponent } from '../../components/reporte-fotografico/reporte-fotografico.component';
 
@@ -77,6 +82,8 @@ export class CompletarInspeccionPage implements OnInit {
   private readonly formularioApi = inject(FormularioApiService);
   private readonly auth = inject(AuthStore);
   private readonly apiErrors = inject(ApiErrorService);
+  private readonly inspeccionesLocales = inject(InspeccionesLocalesService);
+  private readonly connectivity = inject(ConnectivityService);
   private readonly destroyRef = inject(DestroyRef);
   private readonly cambios = new Subject<void>();
   private revisionDatos = 0;
@@ -100,6 +107,9 @@ export class CompletarInspeccionPage implements OnInit {
   readonly borrador = signal<InspeccionBorradorResponse | null>(null);
   readonly esquema = signal<EsquemaJson | null>(null);
   readonly fechaInspeccion = signal<string>('');
+  readonly esSoloLocal = signal(false);
+  readonly errorAlmacenamiento = signal<string | null>(null);
+  readonly esOffline = computed(() => !this.connectivity.online());
   readonly hoy = new Date().toISOString().slice(0, 10);
   readonly soloLectura = computed(() => {
     const borrador = this.borrador();
@@ -123,7 +133,7 @@ export class CompletarInspeccionPage implements OnInit {
     () => this.guardando() || this.estadoAutoguardado() === 'pendiente',
   );
   private readonly datosEnMemoria = signal<Record<string, unknown>>({});
-  private readonly datosIniciales = signal<InspeccionBorradorResponse | null>(null);
+  readonly datosIniciales = signal<InspeccionBorradorResponse | null>(null);
   readonly valoresIniciales = computed<Record<string, unknown> | null>(() => {
     const b = this.datosIniciales();
     if (!b) return null;
@@ -179,17 +189,80 @@ export class CompletarInspeccionPage implements OnInit {
   private cargarBorrador(id: string): void {
     this.cargando.set(true);
     this.errorCarga.set(null);
+    void this.inspeccionesLocales
+      .tieneConflictoConcurrencia(id, this.auth.user()?.id)
+      .then((conflicto) => {
+        if (conflicto && this.connectivity.online()) {
+          this.cargarBorradorCanonico(id);
+          return;
+        }
+        // En operación normal y sin conexión, Dexie conserva la precedencia existente.
+        void this.inspeccionesLocales.obtenerInspeccionLocal(id).then((local) => {
+          this.cargarBorradorDesdeLocal(id, local);
+        });
+      });
+  }
+
+  private cargarBorradorDesdeLocal(
+    id: string,
+    local: Awaited<ReturnType<InspeccionesLocalesService['obtenerInspeccionLocal']>>,
+  ): void {
+    if (local && local.payload) {
+      if (!local.sincronizado) {
+        this.esSoloLocal.set(true);
+      }
+      const rawPayload = local.payload as Record<string, unknown>;
+      const b = (
+        rawPayload &&
+        typeof rawPayload === 'object' &&
+        'borrador' in rawPayload &&
+        rawPayload['borrador']
+          ? rawPayload['borrador']
+          : rawPayload
+      ) as InspeccionBorradorResponse;
+
+      if (b && typeof b === 'object' && (b.fechaInspeccion || b.id || b.versionFormularioId)) {
+        if (
+          local.sincronizado &&
+          !local.actualizacionLocalPendiente &&
+          this.connectivity.online()
+        ) {
+          this.inspeccionApi
+            .obtenerBorrador(id, true)
+            .pipe(takeUntilDestroyed(this.destroyRef))
+            .subscribe({
+              next: (canonico) => {
+                void this.inspeccionesLocales
+                  .actualizarBorradorCanonicoSiSinPendientes(canonico, canonico.autorId)
+                  .then(async (actualizado) => {
+                    let borrador = canonico;
+                    let sincronizado = actualizado;
+                    if (!actualizado) {
+                      const copiaLocal = await this.inspeccionesLocales.obtenerInspeccionLocal(id);
+                      const payload = copiaLocal?.payload as BorradorLocalPayload | undefined;
+                      borrador = payload?.borrador ?? b;
+                      sincronizado = copiaLocal?.sincronizado ?? false;
+                    }
+                    this.aplicarBorradorLocal(borrador, sincronizado);
+                  })
+                  .catch(() => this.aplicarBorradorLocal(canonico, true));
+              },
+              error: () => this.aplicarBorradorLocal(b, true),
+            });
+        } else {
+          this.aplicarBorradorLocal(b, local.sincronizado && !local.actualizacionLocalPendiente);
+        }
+        return;
+      }
+    }
+
+    // Si no está local o no hay Dexie disponible, acudir a la API
     this.inspeccionApi
       .obtenerBorrador(id, true)
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (b) => {
-          this.borrador.set(b);
-          this.datosIniciales.set(b);
-          this.fechaInspeccion.set(b.fechaInspeccion || this.hoy);
-          if (b.datos) {
-            this.datosEnMemoria.set(b.datos);
-          }
+          this.aplicarBorrador(b);
           this.cargarEsquema(b.versionFormularioId);
         },
         error: (err: HttpErrorResponse) => {
@@ -198,33 +271,145 @@ export class CompletarInspeccionPage implements OnInit {
         },
       });
   }
+
+  private aplicarBorradorLocal(borrador: InspeccionBorradorResponse, sincronizado: boolean): void {
+    this.aplicarBorrador(borrador);
+    this.estadoAutoguardado.set('guardado');
+    this.mensajeExito.set(
+      sincronizado
+        ? 'Borrador guardado en el servidor.'
+        : this.mensajeGuardadoEnDispositivo(new Date(borrador.actualizadoEn ?? Date.now())),
+    );
+    this.cargarEsquema(borrador.versionFormularioId);
+  }
+
+  private cargarBorradorCanonico(id: string): void {
+    this.inspeccionApi
+      .obtenerBorrador(id, true)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (borrador) => {
+          void this.inspeccionesLocales
+            .cachearBorradorCanonico(borrador, borrador.autorId)
+            .catch((error: Error) => {
+              this.errorAlmacenamiento.set(
+                error.message || 'No fue posible actualizar la copia local del borrador.',
+              );
+            })
+            .finally(() => {
+              this.esSoloLocal.set(false);
+              this.aplicarBorrador(borrador);
+              this.cargarEsquema(borrador.versionFormularioId);
+            });
+        },
+        error: (err: HttpErrorResponse) => {
+          this.inspeccionesLocales.obtenerInspeccionLocal(id).then((local) => {
+            this.cargarBorradorDesdeLocal(id, local);
+            if (local)
+              this.errorGuardado.set(
+                'No se pudo actualizar el borrador; se muestra la copia local disponible.',
+              );
+            else this.procesarErrorCarga(err);
+          });
+        },
+      });
+  }
+
+  private aplicarBorrador(borrador: InspeccionBorradorResponse): void {
+    this.ultimaHuellaDatos = null;
+    this.borrador.set(this.conProgreso(borrador));
+    this.datosIniciales.set(borrador);
+    this.fechaInspeccion.set(borrador.fechaInspeccion || this.hoy);
+    this.datosEnMemoria.set(borrador.datos ?? {});
+  }
   private cargarEsquema(versionId: string): void {
+    // Si no hay red, consultar el esquema guardado en Dexie
+    if (!this.connectivity.online()) {
+      this.inspeccionesLocales.obtenerEsquemaLocal(versionId).then(
+        (localSchema) => {
+          if (localSchema && localSchema.schema) {
+            this.esquema.set(localSchema.schema as EsquemaJson);
+            this.cargando.set(false);
+          } else {
+            this.inspeccionesLocales.obtenerEsquemaActivoLocal().then((activo) => {
+              if (activo && activo.schema) {
+                this.esquema.set(activo.schema as EsquemaJson);
+              } else {
+                this.errorCarga.set(
+                  'No fue posible obtener el esquema del formulario para esta inspección.',
+                );
+              }
+              this.cargando.set(false);
+            });
+          }
+        },
+        () => {
+          this.cargando.set(false);
+          this.errorCarga.set(
+            'No fue posible obtener el esquema del formulario para esta inspección.',
+          );
+        },
+      );
+      return;
+    }
+
     this.formularioApi
       .obtenerEsquemaPublicado(versionId)
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (res) => {
           this.esquema.set(res.esquema as EsquemaJson);
+          void this.inspeccionesLocales.guardarEsquemaLocal({
+            id: res.id,
+            version: String(res.version),
+            schema: res.esquema,
+            activo: false,
+          });
           this.cargando.set(false);
         },
         error: () => {
-          this.formularioApi
-            .obtenerActiva()
-            .pipe(takeUntilDestroyed(this.destroyRef))
-            .subscribe({
-              next: (activa) => {
-                this.esquema.set(activa.esquema as EsquemaJson);
-                this.cargando.set(false);
-              },
-              error: () => {
-                this.cargando.set(false);
-                this.errorCarga.set(
-                  'No fue posible obtener el esquema del formulario para esta inspección.',
-                );
-              },
-            });
+          this.inspeccionesLocales.obtenerEsquemaLocal(versionId).then((local) => {
+            if (local && local.schema) {
+              this.esquema.set(local.schema as EsquemaJson);
+              this.cargando.set(false);
+              return;
+            }
+            this.formularioApi
+              .obtenerActiva()
+              .pipe(takeUntilDestroyed(this.destroyRef))
+              .subscribe({
+                next: (activa) => {
+                  this.esquema.set(activa.esquema as EsquemaJson);
+                  void this.inspeccionesLocales.guardarEsquemaLocal({
+                    id: activa.id,
+                    version: String(activa.version),
+                    schema: activa.esquema,
+                    activo: true,
+                  });
+                  this.cargando.set(false);
+                },
+                error: () => {
+                  this.cargando.set(false);
+                  this.errorCarga.set(
+                    'No fue posible obtener el esquema del formulario para esta inspección.',
+                  );
+                },
+              });
+          });
         },
       });
+  }
+
+  private conProgreso(borrador: InspeccionBorradorResponse): InspeccionBorradorResponse {
+    return {
+      ...borrador,
+      progreso: borrador.progreso ?? {
+        totalCamposRequeridos: 0,
+        totalCamposCompletados: 0,
+        porcentajeTotal: 0,
+        secciones: [],
+      },
+    };
   }
   onValorChange(valor: Record<string, unknown>): void {
     const fechaFormulario = (valor['identificacion'] as Record<string, unknown> | undefined)?.[
@@ -241,8 +426,88 @@ export class CompletarInspeccionPage implements OnInit {
     }
     if (!this.soloLectura() && huella !== this.ultimaHuellaDatos) {
       this.ultimaHuellaDatos = huella;
+      this.guardarEnDexieInmediato(valor);
       this.marcarCambio();
     }
+  }
+
+  private guardarEnDexieInmediato(valores: Record<string, unknown>): void {
+    const b = this.borrador();
+    if (!b || this.soloLectura()) return;
+
+    const fecha = this.fechaInspeccion();
+    if (fecha > this.hoy) {
+      this.errorGuardado.set('La fecha de inspección no puede ser posterior a la fecha actual.');
+      return;
+    }
+    const anioConstruccion = b.datosPermanentes?.anioConstruccion;
+    if (anioConstruccion && fecha) {
+      const anioInspeccion = parseInt(fecha.substring(0, 4), 10);
+      if (anioInspeccion < anioConstruccion) {
+        this.errorGuardado.set(
+          `La fecha de inspección (${anioInspeccion}) no puede ser anterior al año de construcción registrado (${anioConstruccion}).`,
+        );
+        return;
+      }
+    }
+
+    const d = new Date();
+    const ahoraIso = d.toISOString();
+
+    const borradorActualizado: InspeccionBorradorResponse = {
+      ...b,
+      datos: valores,
+      fechaInspeccion: fecha || b.fechaInspeccion,
+      actualizadoEn: ahoraIso,
+    };
+
+    const payload: BorradorLocalPayload = {
+      borrador: borradorActualizado,
+      versionFormularioId: b.versionFormularioId,
+      dispositivoId: b.dispositivoId,
+      autorId: b.autorId,
+    };
+    const request: GuardarBorradorRequest = {
+      version: b.version,
+      datos: valores,
+      identificacionCapturada:
+        (valores['identificacion'] as Record<string, unknown>) ?? b.identificacionCapturada ?? null,
+      fechaInspeccion: fecha || b.fechaInspeccion,
+      acompanantes:
+        b.acompanantes?.map((a) => ({
+          id: a.id,
+          usuarioId: a.usuarioId,
+          nombre: a.nombre,
+          colegiado: a.colegiado ?? a.numeroColegiado,
+          numeroColegiado: a.numeroColegiado ?? a.colegiado,
+        })) ?? null,
+    };
+
+    const local = {
+      id: b.id,
+      puenteId: b.puenteId,
+      propietarioId: b.autorId,
+      estado: b.estado,
+      actualizadoEn: ahoraIso,
+      payload: payload,
+      sincronizado: false,
+      actualizacionLocalPendiente: true,
+    };
+    const guardadoLocal =
+      this.connectivity.online() && !this.esSoloLocal()
+        ? this.inspeccionesLocales.guardarBorradorEnCache(local)
+        : this.inspeccionesLocales.guardarBorradorLocal(local, request);
+    void guardadoLocal
+      .then(() => {
+        this.errorAlmacenamiento.set(null);
+        if (!this.connectivity.online() || this.esSoloLocal()) {
+          this.estadoAutoguardado.set('guardado');
+          this.mensajeExito.set(this.mensajeGuardadoEnDispositivo(d));
+        }
+      })
+      .catch((err: Error) => {
+        this.errorAlmacenamiento.set(err.message || 'Almacenamiento local insuficiente.');
+      });
   }
   onFechaInspeccionChange(fecha: string): void {
     if (this.soloLectura()) return;
@@ -293,7 +558,8 @@ export class CompletarInspeccionPage implements OnInit {
         return;
       }
     }
-    const valores = this.formulario()?.valor() ?? this.datosEnMemoria();
+    const formulario = this.formulario();
+    const valores = formulario?.construido() ? formulario.valor() : this.datosEnMemoria();
     const valorActual = {
       ...valores,
       identificacion: {
@@ -322,38 +588,137 @@ export class CompletarInspeccionPage implements OnInit {
     this.guardadoPendiente = { request: structuredClone(request), revision: revisionSolicitud };
     this.guardando.set(true);
     this.estadoAutoguardado.set('guardando');
-    this.inspeccionApi.guardarBorrador(b.id, request).subscribe({
-      next: (actualizada) => {
-        this.guardadoPendiente = null;
-        this.guardando.set(false);
-        this.borrador.set(actualizada);
-        this.revisionGuardada = Math.max(this.revisionGuardada, revisionSolicitud);
-        const hayCambiosNuevos = this.revisionDatos > revisionSolicitud;
-        if (!hayCambiosNuevos && actualizada.datos) {
-          this.datosEnMemoria.set(actualizada.datos);
-        }
-        if (hayCambiosNuevos) {
-          this.estadoAutoguardado.set('pendiente');
-        } else {
+    // Si no hay red o es un borrador que solo existe localmente (no sincronizado en servidor)
+    if (!this.connectivity.online() || this.esSoloLocal()) {
+      void this.inspeccionesLocales
+        .guardarBorradorLocal(
+          {
+            id: b.id,
+            puenteId: b.puenteId,
+            propietarioId: b.autorId,
+            estado: b.estado,
+            actualizadoEn: new Date().toISOString(),
+            payload: {
+              borrador: { ...b, datos: valorActual, fechaInspeccion: fecha || b.fechaInspeccion },
+              versionFormularioId: b.versionFormularioId,
+              dispositivoId: b.dispositivoId,
+              autorId: b.autorId,
+            },
+            sincronizado: false,
+          },
+          request,
+        )
+        .then(() => {
+          this.guardadoPendiente = null;
+          this.guardando.set(false);
+          this.revisionGuardada = Math.max(this.revisionGuardada, revisionSolicitud);
           this.estadoAutoguardado.set('guardado');
-          this.mensajeExito.set('Avance de borrador guardado exitosamente.');
+          this.mensajeExito.set(this.mensajeGuardadoEnDispositivo(new Date()));
+        })
+        .catch((err: Error) => {
+          this.guardando.set(false);
+          this.estadoAutoguardado.set(null);
+          this.errorAlmacenamiento.set(err.message || 'Almacenamiento local insuficiente.');
+        });
+      return;
+    }
+
+    void this.inspeccionesLocales
+      .guardarBorradorLocal(
+        {
+          id: b.id,
+          puenteId: b.puenteId,
+          propietarioId: b.autorId,
+          estado: b.estado,
+          actualizadoEn: new Date().toISOString(),
+          payload: {
+            borrador: { ...b, datos: valorActual, fechaInspeccion: fecha || b.fechaInspeccion },
+            versionFormularioId: b.versionFormularioId,
+            dispositivoId: b.dispositivoId,
+            autorId: b.autorId,
+          },
+          sincronizado: false,
+        },
+        request,
+        'ENVIANDO',
+      )
+      .then((operacion) => {
+        if (this.auth.user()?.id !== b.autorId) {
+          void this.inspeccionesLocales.marcarOperacionPendiente(
+            operacion.id,
+            'La sesión actual no corresponde al propietario de la inspección.',
+          );
+          this.guardando.set(false);
+          this.estadoAutoguardado.set('guardado');
+          this.mensajeExito.set(this.mensajeGuardadoEnDispositivo(new Date()));
+          return;
         }
-        const guardarCambiosPendientes = this.guardadoForzadoDuranteSolicitud && hayCambiosNuevos;
-        this.guardadoForzadoDuranteSolicitud = false;
-        if (guardarCambiosPendientes) {
-          this.guardarBorrador(false);
-        }
-      },
-      error: (err: HttpErrorResponse) => {
-        if (!esResultadoIncierto(err)) this.guardadoPendiente = null;
-        this.guardando.set(false);
-        this.estadoAutoguardado.set(null);
-        this.procesarErrorGuardado(err);
-      },
-    });
+        this.inspeccionApi.guardarBorrador(b.id, request, operacion.idempotencyKey).subscribe({
+          next: (actualizada) => {
+            void this.inspeccionesLocales.confirmarGuardado(
+              operacion.id,
+              b.id,
+              b.autorId,
+              actualizada,
+            );
+            this.guardadoPendiente = null;
+            this.guardando.set(false);
+            this.borrador.set(this.conProgreso(actualizada));
+            this.revisionGuardada = Math.max(this.revisionGuardada, revisionSolicitud);
+            const hayCambiosNuevos = this.revisionDatos > revisionSolicitud;
+            if (!hayCambiosNuevos && actualizada.datos) {
+              this.datosEnMemoria.set(actualizada.datos);
+            }
+            if (hayCambiosNuevos) {
+              this.estadoAutoguardado.set('pendiente');
+            } else {
+              this.estadoAutoguardado.set('guardado');
+              this.mensajeExito.set('Borrador guardado en el servidor.');
+            }
+            const guardarCambiosPendientes =
+              this.guardadoForzadoDuranteSolicitud && hayCambiosNuevos;
+            this.guardadoForzadoDuranteSolicitud = false;
+            if (guardarCambiosPendientes) {
+              this.guardarBorrador(false);
+            }
+          },
+          error: (err: HttpErrorResponse) => {
+            if (err.status !== 0 && err.status < 500) {
+              const codigoError = typeof err.error?.code === 'string' ? err.error.code : undefined;
+              void this.inspeccionesLocales
+                .marcarOperacionParaIntervencion(
+                  operacion.id,
+                  String(err.error?.detail ?? err.error?.message ?? err.message),
+                  codigoError,
+                )
+                .then(() => {
+                  if (codigoError === 'concurrencia_conflicto' && this.connectivity.online()) {
+                    this.cargarBorradorCanonico(b.id);
+                  }
+                });
+            } else {
+              void this.inspeccionesLocales.marcarOperacionPendiente(
+                operacion.id,
+                String(err.message ?? 'Error de conexión'),
+              );
+            }
+            if (!esResultadoIncierto(err)) this.guardadoPendiente = null;
+            this.guardando.set(false);
+            if (operacion) {
+              this.estadoAutoguardado.set('guardado');
+              this.mensajeExito.set(this.mensajeGuardadoEnDispositivo(new Date()));
+            } else {
+              this.estadoAutoguardado.set(null);
+            }
+            this.procesarErrorGuardado(err);
+          },
+        });
+      });
   }
   abrirConfirmacion(): void {
     if (
+      !this.connectivity.online() ||
+      this.esSoloLocal() ||
       !this.accionFinal() ||
       this.cambiosSinGuardar() ||
       this.errorGuardado() ||
@@ -503,5 +868,10 @@ export class CompletarInspeccionPage implements OnInit {
         err.error?.detail || err.error?.message || 'Ocurrió un error al guardar el borrador.',
       );
     }
+  }
+
+  private mensajeGuardadoEnDispositivo(fecha: Date): string {
+    const hora = `${String(fecha.getHours()).padStart(2, '0')}:${String(fecha.getMinutes()).padStart(2, '0')}`;
+    return `Borrador guardado en este dispositivo a las ${hora}.`;
   }
 }

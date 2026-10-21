@@ -277,6 +277,84 @@
       "creando": "Creando..."
     }
   },
+  "foro": {
+    "titulo": "Foro del puente",
+    "descripcion": "Discusión técnica permanente sobre este puente, abierta entre inspecciones y ciclos académicos.",
+    "sinSesion": "Puedes leer las discusiones sin cuenta. Para abrir hilos y comentar necesitas iniciar sesión.",
+    "iniciarSesion": "Iniciar sesión",
+    "cargando": "Cargando el foro",
+    "error": "No se pudo cargar el foro del puente.",
+    "reintentar": "Reintentar",
+    "sinHilos": "Este puente aún no tiene hilos de discusión.",
+    "sinHilosAutenticado": "Este puente aún no tiene hilos. Abre el primero con el botón Nuevo hilo.",
+    "abierto": "Abierto el",
+    "ultimaActividad": "Última actividad",
+    "comentarioUno": "1 comentario",
+    "comentarios": "{{total}} comentarios",
+    "categorias": {
+      "DISCUSION_TECNICA": "Discusión técnica",
+      "PROPUESTA_INTERVENCION": "Propuesta de intervención",
+      "CONSULTA": "Consulta",
+      "REFERENCIA_DOCUMENTAL": "Referencia documental",
+      "ALERTA": "Alerta"
+    },
+    "roles": {
+      "ADMINISTRADOR": "Administrador",
+      "CATEDRATICO": "Catedrático",
+      "PROFESIONAL_EXTERNO": "Profesional externo",
+      "ESTUDIANTE": "Estudiante"
+    },
+    "nuevoHilo": {
+      "abrir": "Nuevo hilo",
+      "texto": "El hilo quedará abierto en el foro de {{puente}} y lo podrá leer cualquier persona.",
+      "titulo": "Título",
+      "categoria": "Categoría",
+      "seleccionar": "Selecciona una categoría",
+      "comentario": "Primer comentario",
+      "crear": "Abrir hilo",
+      "creando": "Abriendo...",
+      "creado": "El hilo se abrió correctamente.",
+      "error": "No fue posible abrir el hilo."
+    },
+    "hilo": {
+      "volver": "Volver a los hilos",
+      "error": "No se pudo cargar el hilo.",
+      "cerrado": "Cerrado",
+      "avisoCerrado": "Este hilo está cerrado y ya no admite comentarios.",
+      "comentarios": "Comentarios",
+      "sinComentarios": "Este hilo aún no tiene comentarios.",
+      "escribir": "Escribe un comentario",
+      "publicar": "Publicar comentario",
+      "publicando": "Publicando...",
+      "publicado": "Tu comentario se publicó.",
+      "responder": "Responder",
+      "responderA": "Responder a {{autor}}",
+      "respondiendo": "Respondiendo...",
+      "tuRespuesta": "Tu respuesta",
+      "cargarMas": "Cargar más comentarios",
+      "cargandoMas": "Cargando...",
+      "errorPublicar": "No fue posible publicar el comentario.",
+      "filtrando": "Mostrando solo los comentarios sobre «{{elemento}}»",
+      "verTodos": "Ver todos los comentarios",
+      "sobre": "Sobre: {{elemento}}",
+      "comentarSobre": "Tu comentario quedará anclado a «{{elemento}}».",
+      "sinComentariosElemento": "Este elemento aún no tiene comentarios.",
+      "verEnFormulario": "Ver en el formulario",
+      "irAlElemento": "Ir a {{elemento}} en el formulario"
+    },
+    "ancla": {
+      "comentarElemento": "Comentar {{elemento}}",
+      "una": "1 comentario",
+      "cantidad": "{{cantidad}} comentarios",
+      "en": "en {{elemento}}"
+    },
+    "inspeccion": {
+      "titulo": "Foro de la inspección",
+      "descripcion": "Discusión abierta sobre esta inspección publicada. Elige un elemento del formulario para comentar un dato concreto.",
+      "error": "No se pudo abrir el foro de la inspección.",
+      "sinHilo": "Esta inspección aún no tiene discusión."
+    }
+  },
   "perfil": {
     "nombreCompleto": "Nombre completo",
     "nombreCompletoPlaceholder": "Nombre y apellidos",
@@ -315,6 +393,8 @@
     "email": "Correo electronico",
     "emailShort": "Correo",
     "password": "Contrasena",
+    "showPassword": "Mostrar contraseña",
+    "hidePassword": "Ocultar contraseña",
     "currentPassword": "Contrasena actual",
     "newPassword": "Nueva contrasena",
     "otpCode": "Codigo OTP",
@@ -458,8 +538,19 @@
   "offline": {
     "kicker": "CAPACIDAD OFFLINE",
     "title": "Diagnostico de almacenamiento",
-    "description": "Estado local de la PWA, persistencia del navegador y elementos pendientes para la futura cola de sincronizacion.",
+    "description": "Estado de conexión, operaciones pendientes y espacio local de la PWA.",
     "pendingItems": "Elementos pendientes",
+    "pendingInspections": "inspecciones por subir",
+    "pendingFiles": "archivos por subir",
+    "synced": "Todo sincronizado",
+    "syncNow": "Sincronizar ahora",
+    "queueTitle": "Cola de sincronización",
+    "inspection": "Inspección",
+    "file": "Archivo",
+    "waiting": "Pendiente",
+    "intervention": "Requiere intervención",
+    "retry": "Reintentar",
+    "releaseSpace": "Liberar inspecciones sincronizadas",
     "usedSpace": "Espacio usado",
     "persistentStorage": "Almacenamiento persistente",
     "localStorage": "ALMACENAMIENTO LOCAL",
@@ -1667,9 +1758,11 @@
       "quitarAcompanante": "Quitar acompañante",
       "iniciando": "Iniciando inspección...",
       "botonIniciar": "Iniciar inspección",
-      "irAFormulario": "Ir al formulario"
+      "irAFormulario": "Ir al formulario",
+      "advertenciaGps500m": "El dispositivo se encuentra a más de 500 metros de la ubicación guardada del puente. La inspección se creará con advertencia."
     },
     "fotos": {
+      "offlineSprint4Aviso": "La captura y subida de fotografías se habilita con conexión hasta Sprint 4.",
       "titulo": "Fotografías de la inspección",
       "descripcion": "Capture una fotografía con ubicación o seleccione una imagen con GPS y fecha EXIF con zona horaria o fecha UTC de GPS. Las cargas fallidas se conservan para reintentar.",
       "galeria": "Seleccionar desde galería",
@@ -1723,11 +1816,9 @@
       "titulo": "Completar inspección técnica",
       "subtitulo": "Captura y edición incremental de borrador de inspección de puente",
       "volverPuente": "Volver a ficha del puente",
-      "guardar": "Guardar borrador",
-      "guardando": "Guardando...",
       "autoguardando": "Guardando cambios...",
       "cambiosPendientes": "Cambios pendientes; se guardarán automáticamente.",
-      "guardadoExitoso": "Avance de borrador guardado exitosamente.",
+      "almacenamientoLleno": "Almacenamiento local insuficiente para guardar los cambios.",
       "cargando": "Cargando inspección y esquema del formulario...",
       "notFound": "Inspección no encontrada o no tiene permisos para acceder a este borrador.",
       "forbidden": "Acceso denegado: Solo el autor de la inspección puede modificar este borrador.",
@@ -1778,7 +1869,8 @@
         "EN_REVISION": "En revisión",
         "CAMBIOS_SOLICITADOS": "Cambios solicitados",
         "PUBLICADA": "Publicada",
-        "RECHAZADA": "Rechazada"
+        "RECHAZADA": "Rechazada",
+        "PENDIENTE_SYNC": "Pendiente de sincronizar"
       }
     },
     "correccion": {
@@ -1822,6 +1914,7 @@
     },
     "confirmacionIc": {
       "titulo": "Confirmacion del estado del IC",
+      "icPreliminarOffline": "El IC preliminar se calcula en el servidor y estará disponible al sincronizar",
       "nota": "Consulte el calculo actualizado antes de confirmar el estado. Si selecciona un estado distinto del calculado, debe justificar su criterio profesional. El ajuste no modifica el valor numerico del IC.",
       "guardarPrimero": "Guarde los cambios de la inspeccion antes de consultar o confirmar el calculo.",
       "consultar": "Consultar calculo actualizado",

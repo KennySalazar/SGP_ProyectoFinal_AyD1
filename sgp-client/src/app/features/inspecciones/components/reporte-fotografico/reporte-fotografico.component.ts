@@ -39,6 +39,7 @@ import {
 } from '../../models/fotografia.models';
 import { InspeccionApiService } from '../../services/inspeccion-api.service';
 import { ProcesadorFotografiasService } from '../../services/procesador-fotografias.service';
+import { ConnectivityService } from '../../../../offline/services/connectivity.service';
 @Component({
   selector: 'app-reporte-fotografico',
   standalone: true,
@@ -72,6 +73,8 @@ export class ReporteFotograficoComponent implements OnDestroy {
       return contexto;
     },
   );
+  private readonly connectivity = inject(ConnectivityService);
+  readonly esOffline = computed(() => !this.connectivity.online());
   readonly inspeccion = input<
     | IniciarInspeccionResponse
     | InspeccionBorradorResponse

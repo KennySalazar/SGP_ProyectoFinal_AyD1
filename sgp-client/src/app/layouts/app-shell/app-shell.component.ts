@@ -1,3 +1,4 @@
+import { AsyncPipe } from '@angular/common';
 import { AvisoSalidaComponent } from '../../features/salida/components/aviso-salida.component';
 import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
@@ -5,14 +6,17 @@ import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } fro
 import { filter, map } from 'rxjs';
 import { AuthStore } from '../../core/services/auth.store';
 import { ConnectivityService } from '../../offline/services/connectivity.service';
+import { SyncQueueItem } from '../../offline/db/sgp-db';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { RevisionApiService } from '../../features/revision/services/revision-api.service';
 import { CampanaAvisosComponent } from '../../features/notificaciones/components/campana-avisos/campana-avisos.component';
+import { SincronizacionService } from '../../offline/services/sincronizacion.service';
 
 @Component({
   selector: 'app-shell',
   standalone: true,
   imports: [
+    AsyncPipe,
     AvisoSalidaComponent,
     RouterOutlet,
     RouterLink,
@@ -38,6 +42,7 @@ export class AppShellComponent {
     );
   };
   readonly connectivity = inject(ConnectivityService);
+  readonly sincronizacion = inject(SincronizacionService);
   readonly revisiones = inject(RevisionApiService);
   private readonly router = inject(Router);
   private readonly url = toSignal(
@@ -61,6 +66,16 @@ export class AppShellComponent {
     const usuario = this.auth.user();
     return usuario?.nombreCompleto || usuario?.email || '';
   });
+
+  constructor() {
+    this.sincronizacion.iniciar();
+  }
+
+  cantidadPendiente(items: SyncQueueItem[], tipo: 'INSPECCION' | 'FOTO'): number {
+    const propietarioId = this.auth.user()?.id;
+    return items.filter((item) => item.propietarioId === propietarioId && item.tipo === tipo)
+      .length;
+  }
 
   logout(): void {
     this.auth

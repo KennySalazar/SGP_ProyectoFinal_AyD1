@@ -76,11 +76,18 @@
     <div class="inspeccion-principal">
       <div class="fila-titulo">
         <h3>{{ inspeccion.codigoPuente }} · {{ inspeccion.nombrePuente }}</h3>
+        @if (inspeccion.estado === 'PENDIENTE_SYNC') {
+        <p-tag
+          icon="pi pi-cloud-upload"
+          [value]="etiquetaEstado(inspeccion.estado) | transloco"
+          [severity]="severidad(inspeccion.estado)"
+        />
+        } @else {
         <p-tag
           [value]="etiquetaEstado(inspeccion.estado) | transloco"
           [severity]="severidad(inspeccion.estado)"
         />
-        @if (inspeccion.tipo === 'CORRECCION') {
+        } @if (inspeccion.tipo === 'CORRECCION') {
         <p-tag [value]="'inspecciones.correccion.tagCorreccion' | transloco" severity="info" />
         } @if (inspeccion.superadaPorId) {
         <p-tag [value]="'inspecciones.correccion.tagSuperada' | transloco" severity="secondary" />
@@ -116,7 +123,7 @@
       >
         {{ 'inspecciones.confirmacionIc.titulo' | transloco }}
       </button>
-      } @if (inspeccion.estado === 'BORRADOR') {
+      } @if (inspeccion.estado === 'BORRADOR' || inspeccion.estado === 'PENDIENTE_SYNC') {
       <button
         pButton
         type="button"

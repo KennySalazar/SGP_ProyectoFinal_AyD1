@@ -12,6 +12,7 @@ import { AppShellComponent } from '../../../../layouts/app-shell/app-shell.compo
 import { SelectorUbicacionComponent } from '../../../../shared/components/selector-ubicacion/selector-ubicacion.component';
 import { SelectorUbicacionStubComponent } from '../../../../shared/components/selector-ubicacion/selector-ubicacion.testing';
 import { IniciarInspeccionDialogComponent } from '../../../inspecciones/components/iniciar-inspeccion-dialog/iniciar-inspeccion-dialog.component';
+import { ForoPuenteComponent } from '../../../foro/components/foro-puente/foro-puente.component';
 import { MantenimientoPuenteComponent } from '../../../mantenimiento/components/mantenimiento-puente/mantenimiento-puente.component';
 import { PuenteResponse } from '../../models/puente.models';
 import { FichaPuentePage } from './ficha-puente.page';
@@ -36,6 +37,11 @@ class IniciarInspeccionDialogStubComponent {
 
 @Component({ selector: 'app-mantenimiento-puente', standalone: true, template: '' })
 class MantenimientoPuenteStubComponent {
+  @Input() puente: PuenteResponse | null = null;
+}
+
+@Component({ selector: 'app-foro-puente', standalone: true, template: '' })
+class ForoPuenteStubComponent {
   @Input() puente: PuenteResponse | null = null;
 }
 
@@ -145,6 +151,7 @@ describe('FichaPuentePage', () => {
           SelectorUbicacionComponent,
           IniciarInspeccionDialogComponent,
           MantenimientoPuenteComponent,
+          ForoPuenteComponent,
         ],
       },
       add: {
@@ -153,6 +160,7 @@ describe('FichaPuentePage', () => {
           SelectorUbicacionStubComponent,
           IniciarInspeccionDialogStubComponent,
           MantenimientoPuenteStubComponent,
+          ForoPuenteStubComponent,
         ],
       },
     });

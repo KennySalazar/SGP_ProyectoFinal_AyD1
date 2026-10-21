@@ -40,3 +40,35 @@
     </div>
   </div>
 </section>
+
+@if (cola$ | async; as cola) {
+<section class="diagnostic-card" aria-live="polite">
+  <div class="card-head"><h2>{{ 'offline.queueTitle' | transloco }}</h2></div>
+  @for (item of cola; track item.id) { @if (propietario(item)) {
+  <div class="queue-row">
+    <span
+      >{{ item.tipo === 'INSPECCION' ? ('offline.inspection' | transloco) : ('offline.file' |
+      transloco) }}</span
+    >
+    <span
+      >{{ item.estado === 'INTERVENCION' ? ('offline.intervention' | transloco) : ('offline.waiting'
+      | transloco) }}</span
+    >
+    @if (item.estado === 'INTERVENCION') {
+    <span role="alert">{{ item.ultimoError }}</span>
+    <button type="button" (click)="sync.reintentar(item.id)">
+      {{ 'offline.retry' | transloco }}
+    </button>
+    }
+  </div>
+  } }
+  <button
+    type="button"
+    (click)="sync.sincronizarAhora()"
+    [disabled]="!sync.sincronizando() && !cola.length"
+  >
+    {{ 'offline.syncNow' | transloco }}
+  </button>
+  <button type="button" (click)="liberarEspacio()">{{ 'offline.releaseSpace' | transloco }}</button>
+</section>
+}

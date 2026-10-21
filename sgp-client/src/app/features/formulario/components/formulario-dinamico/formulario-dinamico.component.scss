@@ -125,6 +125,13 @@ li {
   display: grid;
   gap: 0.25rem;
 
+  /* El icono de comentarios de la sección va pegado a su título. */
+  .titulo-seccion {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+  }
+
   h2 {
     margin: 0;
     color: var(--sgp-navy-900);

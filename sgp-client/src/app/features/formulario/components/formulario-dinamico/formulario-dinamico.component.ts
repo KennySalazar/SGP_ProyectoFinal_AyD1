@@ -22,6 +22,7 @@ import { FormularioConstruido } from '../../motor/formulario/constructor';
 import { resumirElementos, ResumenElementos } from '../../motor/formulario/danos';
 import { RENDERIZADOR_ELEMENTO_EVALUABLE } from '../elemento-evaluable/elemento-evaluable.component';
 import { NodoFormularioComponent } from '../nodo-formulario/nodo-formulario.component';
+import { AnclajeComentariosComponent } from '../comentarios/anclaje-comentarios.component';
 import { RENDERIZADORES_PREDETERMINADOS } from '../renderizadores';
 import { RenderizadorNodoDirective } from '../renderizador-nodo.directive';
 import { SeccionApoyo } from '../secciones-apoyo';
@@ -51,7 +52,13 @@ type Resultado = { construido: FormularioConstruido } | { error: string } | null
 @Component({
   selector: 'app-formulario-dinamico',
   standalone: true,
-  imports: [TranslocoPipe, ButtonModule, NodoFormularioComponent, RenderizadorNodoDirective],
+  imports: [
+    TranslocoPipe,
+    ButtonModule,
+    NodoFormularioComponent,
+    RenderizadorNodoDirective,
+    AnclajeComentariosComponent,
+  ],
   // La captura de daños por elemento (HU-034) viene incluida; quien use el formulario puede sumar
   // sus propios renderizadores con RENDERIZADORES_NODO, que tienen prioridad.
   providers: [

@@ -1,6 +1,12 @@
 <section class="reporte surface-card" [attr.aria-label]="'inspecciones.fotos.titulo' | transloco">
   <h3>{{ 'inspecciones.fotos.titulo' | transloco }}</h3>
   <p>{{ 'inspecciones.fotos.descripcion' | transloco }}</p>
+  @if (esOffline()) {
+    <div class="alerta-offline" role="status">
+      <i class="pi pi-info-circle" aria-hidden="true"></i>
+      <p>{{ 'inspecciones.fotos.offlineSprint4Aviso' | transloco }}</p>
+    </div>
+  }
   @if (!editable()) {
     <p role="status">
       {{

@@ -33,13 +33,14 @@
     }
     <p class="note"><i class="pi pi-id-card"></i> {{ 'perfil.notaPublico' | transloco }}</p>
     <label
-      >{{ 'common.password' | transloco }}<input
-        pInputText
-        type="password"
-        formControlName="password"
-        autocomplete="new-password"
-        [placeholder]="'common.minPasswordPlaceholder' | transloco"
-    /></label>
+      >{{ 'common.password' | transloco }}<app-contrasena-visible
+        ><input
+          pInputText
+          type="password"
+          formControlName="password"
+          autocomplete="new-password"
+          [placeholder]="'common.minPasswordPlaceholder' | transloco" /></app-contrasena-visible
+    ></label>
     <p class="note"><i class="pi pi-info-circle"></i> {{ 'auth.register.rule' | transloco }}</p>
     <button pButton class="primary" type="submit" [disabled]="form.invalid">
       <i class="pi pi-user-plus"></i><span>{{ 'auth.register.title' | transloco }}</span>

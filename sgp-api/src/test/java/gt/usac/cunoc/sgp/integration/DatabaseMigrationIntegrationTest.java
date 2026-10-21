@@ -37,7 +37,7 @@ class DatabaseMigrationIntegrationTest {
             .load();
 
     var result = flyway.migrate();
-    assertEquals(20, result.migrationsExecuted);
+    assertEquals(21, result.migrationsExecuted);
 
     flyway.validate();
 
@@ -59,6 +59,7 @@ class DatabaseMigrationIntegrationTest {
       assertTrue(tableExists(statement, "limite_territorial"));
       assertEquals(1, rowCount(statement, "limite_territorial"));
       assertTrue(indexExists(statement, "idx_limite_territorial_geometria_gist"));
+      assertTrue(indexExists(statement, "uq_foro_hilo_inspeccion"));
 
       try (ResultSet limite =
           statement.executeQuery(

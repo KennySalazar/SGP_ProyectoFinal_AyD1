@@ -8,7 +8,10 @@
   [attr.aria-labelledby]="idTitulo"
 >
   <header class="cabecera">
-    <h4 [id]="idTitulo">{{ elemento().titulo }}</h4>
+    <div class="titulo">
+      <h4 [id]="idTitulo">{{ elemento().titulo }}</h4>
+      <app-anclaje-comentarios [nodo]="nodo()" [control]="control()" [enTitulo]="true" />
+    </div>
     <p class="estado" [attr.data-estado]="estado().tipo" [attr.data-subtipo]="subtipo()">
       <i class="pi" [class]="icono()" aria-hidden="true"></i>
       <span>{{ textoEstado() }}</span>

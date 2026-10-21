@@ -12,4 +12,15 @@ public record AnalisisMapeoResponse(
     List<String> camposDestino,
     List<MapeoCampoResponse> mapeosDeclarados,
     List<String> camposOrigenSinMapeo,
-    boolean mapeoCompleto) {}
+    boolean mapeoCompleto) {
+  @com.fasterxml.jackson.annotation.JsonProperty("camposDestinoSinMapeo")
+  public List<String> camposDestinoSinMapeo() {
+    if (versionOrigenId == null) return List.of();
+    var declarados =
+        mapeosDeclarados.stream()
+            .map(MapeoCampoResponse::elementoRefDestino)
+            .filter(java.util.Objects::nonNull)
+            .collect(java.util.stream.Collectors.toSet());
+    return camposDestino.stream().filter(campo -> !declarados.contains(campo)).toList();
+  }
+}

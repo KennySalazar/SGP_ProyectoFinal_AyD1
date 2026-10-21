@@ -17,10 +17,10 @@ class ValidadorReglasCriticasIcTest {
     return (ObjectNode)
         json.readTree(
             """
-                    {"reglas_anulacion":[{"id":"RN-IC-05a","descripcion":"Socavacion critica",
-                    "estado_resultante":"MALO","pendiente":null,"elementos":["/socavacion"],
-                    "condicion":{"indicador":"aguas_arriba","algun_valor_en":["CON_EXPOSICION"]}}]}
-                    """);
+                            {"reglas_anulacion":[{"id":"RN-IC-05a","descripcion":"Socavacion critica",
+                            "estado_resultante":"MALO","pendiente":null,"elementos":["/socavacion"],
+                            "condicion":{"indicador":"aguas_arriba","algun_valor_en":["CON_EXPOSICION"]}}]}
+                            """);
   }
 
   @Test
@@ -39,6 +39,20 @@ class ValidadorReglasCriticasIcTest {
     assertThatThrownBy(() -> ValidadorReglasCriticasIc.validar(reglas))
         .isInstanceOf(ApiException.class)
         .hasMessageContaining(id);
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"RN-IC-05a", "RN-IC-05c"})
+  void aceptaNotasPendientesSoloConCalibracionProvisional(String id) throws Exception {
+    var reglas = reglas();
+    reglas.put("calibracion_provisional", true);
+    ((ObjectNode) reglas.path("reglas_anulacion").get(0))
+        .put("id", id)
+        .put("pendiente", "Revisar con el Catedratico");
+    assertThat(ValidadorReglasCriticasIc.validar(reglas)).hasSize(1);
+    ((ObjectNode) reglas.path("reglas_anulacion").get(0)).put("id", "RN-IC-05b");
+    assertThatThrownBy(() -> ValidadorReglasCriticasIc.validar(reglas))
+        .isInstanceOf(ApiException.class);
   }
 
   @Test
@@ -79,16 +93,16 @@ class ValidadorReglasCriticasIcTest {
     JsonNode catalogo =
         json.readTree(
             """
-                    {"elementos":[{"elemento_ref":"/otro","indicadores":["aguas_arriba"]}]}
-                    """);
+                            {"elementos":[{"elemento_ref":"/otro","indicadores":["aguas_arriba"]}]}
+                            """);
     assertThatThrownBy(() -> ValidadorReglasCriticasIc.validarCatalogo(reglas, catalogo))
         .isInstanceOf(ApiException.class)
         .hasMessageContaining("fuera del catalogo");
     JsonNode sinIndicador =
         json.readTree(
             """
-                    {"elementos":[{"elemento_ref":"/socavacion","indicadores":["aguas_abajo"]}]}
-                    """);
+                            {"elementos":[{"elemento_ref":"/socavacion","indicadores":["aguas_abajo"]}]}
+                            """);
     assertThatThrownBy(() -> ValidadorReglasCriticasIc.validarCatalogo(reglas, sinIndicador))
         .isInstanceOf(ApiException.class)
         .hasMessageContaining("indicador fuera del catalogo");
@@ -99,6 +113,8 @@ class ValidadorReglasCriticasIcTest {
     try (var entrada = getClass().getResourceAsStream("/formulario/sieca-v1/elementos-ic.json")) {
       ObjectNode catalogo = (ObjectNode) json.readTree(entrada);
       ObjectNode reglas = (ObjectNode) catalogo.get("reglas_evaluacion_ic");
+      ValidadorReglasCriticasIc.validarCatalogo(reglas, catalogo);
+      reglas.put("calibracion_provisional", false);
       assertThatThrownBy(() -> ValidadorReglasCriticasIc.validarCatalogo(reglas, catalogo))
           .isInstanceOf(ApiException.class)
           .hasMessageContaining("pendiente");
