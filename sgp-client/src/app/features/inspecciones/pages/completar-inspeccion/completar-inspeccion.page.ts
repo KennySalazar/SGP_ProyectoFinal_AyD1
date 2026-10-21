@@ -133,7 +133,7 @@ export class CompletarInspeccionPage implements OnInit {
     () => this.guardando() || this.estadoAutoguardado() === 'pendiente',
   );
   private readonly datosEnMemoria = signal<Record<string, unknown>>({});
-  private readonly datosIniciales = signal<InspeccionBorradorResponse | null>(null);
+  readonly datosIniciales = signal<InspeccionBorradorResponse | null>(null);
   readonly valoresIniciales = computed<Record<string, unknown> | null>(() => {
     const b = this.datosIniciales();
     if (!b) return null;

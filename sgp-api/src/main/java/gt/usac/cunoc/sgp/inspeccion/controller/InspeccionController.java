@@ -3,6 +3,7 @@ package gt.usac.cunoc.sgp.inspeccion.controller;
 import gt.usac.cunoc.sgp.common.exception.ApiException;
 import gt.usac.cunoc.sgp.common.security.JwtData;
 import gt.usac.cunoc.sgp.inspeccion.dto.DatosPermanentesResponse;
+import gt.usac.cunoc.sgp.inspeccion.dto.ExportacionInspeccionResponse;
 import gt.usac.cunoc.sgp.inspeccion.dto.GuardarBorradorRequest;
 import gt.usac.cunoc.sgp.inspeccion.dto.GuardarRespuestasRequest;
 import gt.usac.cunoc.sgp.inspeccion.dto.IniciarInspeccionRequest;
@@ -23,6 +24,8 @@ import java.net.URI;
 import java.util.Map;
 import java.util.UUID;
 import org.springframework.data.domain.Page;
+import org.springframework.http.ContentDisposition;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -191,6 +194,26 @@ public class InspeccionController {
   public ResponseEntity<InspeccionPublicadaDetalleResponse> consultarPublicada(
       @PathVariable UUID id) {
     return ResponseEntity.ok(inspeccionService.consultarPublicada(id));
+  }
+
+  @GetMapping("/{id}/exportar")
+  @PreAuthorize("isAuthenticated()")
+  @Operation(
+      summary = "Exportar inspección publicada con esquema original y datos técnicos",
+      description =
+          "Descarga un archivo JSON estructurado y sanitizado con los datos capturados y el esquema "
+              + "de la versión original con que se levantó. Excluye datos de otros usuarios y referencias internas.",
+      security = @SecurityRequirement(name = "bearerAuth"))
+  public ResponseEntity<ExportacionInspeccionResponse> exportar(@PathVariable UUID id) {
+    ExportacionInspeccionResponse exportacion = inspeccionService.exportarInspeccion(id);
+    return ResponseEntity.ok()
+        .header(
+            HttpHeaders.CONTENT_DISPOSITION,
+            ContentDisposition.attachment()
+                .filename("inspeccion-" + id + ".json")
+                .build()
+                .toString())
+        .body(exportacion);
   }
 
   @GetMapping("/{id}")

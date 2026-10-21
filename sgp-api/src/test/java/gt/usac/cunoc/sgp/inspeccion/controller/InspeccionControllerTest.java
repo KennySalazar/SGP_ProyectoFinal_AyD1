@@ -379,11 +379,54 @@ class InspeccionControllerTest {
     verify(inspeccionService).consultarPublicada(id);
   }
 
+  @Test
+  void exportarInspeccionAutenticadoRetornaJsonConAttachmentHeader() throws Exception {
+    UUID id = UUID.randomUUID();
+    var auth = autenticacionMock(UUID.randomUUID(), RoleName.ESTUDIANTE);
+    SecurityContextHolder.getContext().setAuthentication(auth);
+
+    gt.usac.cunoc.sgp.inspeccion.dto.ExportacionInspeccionResponse exportacion =
+        new gt.usac.cunoc.sgp.inspeccion.dto.ExportacionInspeccionResponse(
+            id,
+            LocalDate.of(2026, 10, 15),
+            new gt.usac.cunoc.sgp.inspeccion.dto.ExportacionInspeccionResponse
+                .PuenteResumenExportacion(
+                UUID.randomUUID(), "P-001", "Puente Central", "Guatemala", "Guatemala"),
+            new gt.usac.cunoc.sgp.inspeccion.dto.ExportacionInspeccionResponse
+                .VersionFormularioExportacion(
+                UUID.randomUUID(), "SIECA-v1", objectMapper.createObjectNode()),
+            null,
+            "PUBLICADA",
+            "VIGENTE",
+            null,
+            objectMapper.createObjectNode(),
+            null,
+            null,
+            List.of(),
+            List.of(),
+            Instant.now());
+
+    when(inspeccionService.exportarInspeccion(eq(id))).thenReturn(exportacion);
+
+    mvc.perform(get("/api/v1/inspecciones/{id}/exportar", id))
+        .andExpect(status().isOk())
+        .andExpect(
+            org.springframework.test.web.servlet.result.MockMvcResultMatchers.header()
+                .string(
+                    org.springframework.http.HttpHeaders.CONTENT_DISPOSITION,
+                    "attachment; filename=\"inspeccion-" + id + ".json\""))
+        .andExpect(jsonPath("$.id").value(id.toString()))
+        .andExpect(jsonPath("$.estado").value("PUBLICADA"));
+
+    verify(inspeccionService).exportarInspeccion(id);
+  }
+
   @ParameterizedTest
   @ValueSource(
       strings = {
         "/api/v1/inspecciones/00000000-0000-0000-0000-000000000030",
         "/api/v1/inspecciones/00000000-0000-0000-0000-000000000030/publicada",
+        "/api/v1/inspecciones/00000000-0000-0000-0000-000000000030/exportar",
         "/api/v1/inspecciones/puentes/00000000-0000-0000-0000-000000000030/publicadas"
       })
   void consultaSinSesionResponde401SinInvocarServicio(String ruta) throws Exception {

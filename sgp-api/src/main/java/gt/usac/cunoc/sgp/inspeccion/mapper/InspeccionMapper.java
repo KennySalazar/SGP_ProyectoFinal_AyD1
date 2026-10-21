@@ -3,6 +3,7 @@ package gt.usac.cunoc.sgp.inspeccion.mapper;
 import gt.usac.cunoc.sgp.inspeccion.dto.DatosPermanentesResponse;
 import gt.usac.cunoc.sgp.inspeccion.dto.InspeccionPublicadaDetalleResponse;
 import gt.usac.cunoc.sgp.inspeccion.dto.InspeccionResumenResponse;
+import gt.usac.cunoc.sgp.inspeccion.dto.RelacionVersionActivaResponse;
 import gt.usac.cunoc.sgp.inspeccion.dto.ResultadoIcPublicadoResponse;
 import gt.usac.cunoc.sgp.inspeccion.entity.Inspeccion;
 import gt.usac.cunoc.sgp.inspeccion.entity.ResultadoIc;
@@ -37,11 +38,13 @@ public interface InspeccionMapper {
   @Mapping(
       target = "vigencia",
       expression = "java(correccionId == null ? \"VIGENTE\" : \"SUPERADA\")")
+  @Mapping(target = "relacionVersionActiva", source = "relacionVersionActiva")
   InspeccionPublicadaDetalleResponse toPublicadaDetalle(
       Inspeccion inspeccion,
       ResultadoIc resultado,
       DatosPermanentesResponse datosPermanentes,
-      UUID correccionId);
+      UUID correccionId,
+      RelacionVersionActivaResponse relacionVersionActiva);
 
   ResultadoIcPublicadoResponse toResultadoPublicado(ResultadoIc resultado);
 }

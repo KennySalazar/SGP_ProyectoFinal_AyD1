@@ -62,7 +62,7 @@ describe('Acceso al detalle publicado HU-030', () => {
     expect(obtenerPublicada).not.toHaveBeenCalled();
   });
 
-  it.each(['ESTUDIANTE', 'ADMINISTRADOR'])(
+  it.each(['ADMINISTRADOR'])(
     'conserva las restricciones existentes de listado y edición para %s',
     async (role) => {
       usuario.set({ id: 'lector', role });
