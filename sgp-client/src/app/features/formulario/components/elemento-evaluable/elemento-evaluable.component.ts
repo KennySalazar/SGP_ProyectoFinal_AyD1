@@ -1,3 +1,4 @@
+import { AnclajeComentariosComponent } from '../comentarios/anclaje-comentarios.component';
 import { anclajeDeControl, CONTEXTO_OBSERVACIONES } from '../observaciones/contexto-observaciones';
 import {
   ChangeDetectionStrategy,
@@ -61,6 +62,7 @@ const ICONOS_NO_PRESENTE: Record<string, string> = {
     CampoFormularioComponent,
     NodoFormularioComponent,
     MarcadorObservacionesComponent,
+    AnclajeComentariosComponent,
   ],
   templateUrl: './elemento-evaluable.component.html',
   styleUrl: './elemento-evaluable.component.scss',

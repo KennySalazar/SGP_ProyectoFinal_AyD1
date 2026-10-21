@@ -123,7 +123,16 @@
                 | transloco: { actual: indiceActivo() + 1, total: entradas().length }
             }}
           </p>
-          <h2 #encabezado tabindex="-1">{{ activa.titulo }}</h2>
+          <div class="titulo-seccion">
+            <h2 #encabezado tabindex="-1">{{ activa.titulo }}</h2>
+            @if (activa.tipo === 'esquema') {
+              <app-anclaje-comentarios
+                [nodo]="activa.nodo"
+                [control]="c.form.controls[activa.nodo.clave]"
+                [enTitulo]="true"
+              />
+            }
+          </div>
           @if (activa.descripcion) {
             <p class="descripcion">{{ activa.descripcion }}</p>
           }
@@ -142,6 +151,7 @@
               [nodo]="entrada.nodo"
               [control]="c.form.controls[entrada.nodo.clave]"
               [construido]="c"
+              [comentariosEnCabecera]="true"
             />
           } @else {
             <ng-container

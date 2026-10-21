@@ -277,6 +277,84 @@
       "creando": "Creando..."
     }
   },
+  "foro": {
+    "titulo": "Foro del puente",
+    "descripcion": "Discusión técnica permanente sobre este puente, abierta entre inspecciones y ciclos académicos.",
+    "sinSesion": "Puedes leer las discusiones sin cuenta. Para abrir hilos y comentar necesitas iniciar sesión.",
+    "iniciarSesion": "Iniciar sesión",
+    "cargando": "Cargando el foro",
+    "error": "No se pudo cargar el foro del puente.",
+    "reintentar": "Reintentar",
+    "sinHilos": "Este puente aún no tiene hilos de discusión.",
+    "sinHilosAutenticado": "Este puente aún no tiene hilos. Abre el primero con el botón Nuevo hilo.",
+    "abierto": "Abierto el",
+    "ultimaActividad": "Última actividad",
+    "comentarioUno": "1 comentario",
+    "comentarios": "{{total}} comentarios",
+    "categorias": {
+      "DISCUSION_TECNICA": "Discusión técnica",
+      "PROPUESTA_INTERVENCION": "Propuesta de intervención",
+      "CONSULTA": "Consulta",
+      "REFERENCIA_DOCUMENTAL": "Referencia documental",
+      "ALERTA": "Alerta"
+    },
+    "roles": {
+      "ADMINISTRADOR": "Administrador",
+      "CATEDRATICO": "Catedrático",
+      "PROFESIONAL_EXTERNO": "Profesional externo",
+      "ESTUDIANTE": "Estudiante"
+    },
+    "nuevoHilo": {
+      "abrir": "Nuevo hilo",
+      "texto": "El hilo quedará abierto en el foro de {{puente}} y lo podrá leer cualquier persona.",
+      "titulo": "Título",
+      "categoria": "Categoría",
+      "seleccionar": "Selecciona una categoría",
+      "comentario": "Primer comentario",
+      "crear": "Abrir hilo",
+      "creando": "Abriendo...",
+      "creado": "El hilo se abrió correctamente.",
+      "error": "No fue posible abrir el hilo."
+    },
+    "hilo": {
+      "volver": "Volver a los hilos",
+      "error": "No se pudo cargar el hilo.",
+      "cerrado": "Cerrado",
+      "avisoCerrado": "Este hilo está cerrado y ya no admite comentarios.",
+      "comentarios": "Comentarios",
+      "sinComentarios": "Este hilo aún no tiene comentarios.",
+      "escribir": "Escribe un comentario",
+      "publicar": "Publicar comentario",
+      "publicando": "Publicando...",
+      "publicado": "Tu comentario se publicó.",
+      "responder": "Responder",
+      "responderA": "Responder a {{autor}}",
+      "respondiendo": "Respondiendo...",
+      "tuRespuesta": "Tu respuesta",
+      "cargarMas": "Cargar más comentarios",
+      "cargandoMas": "Cargando...",
+      "errorPublicar": "No fue posible publicar el comentario.",
+      "filtrando": "Mostrando solo los comentarios sobre «{{elemento}}»",
+      "verTodos": "Ver todos los comentarios",
+      "sobre": "Sobre: {{elemento}}",
+      "comentarSobre": "Tu comentario quedará anclado a «{{elemento}}».",
+      "sinComentariosElemento": "Este elemento aún no tiene comentarios.",
+      "verEnFormulario": "Ver en el formulario",
+      "irAlElemento": "Ir a {{elemento}} en el formulario"
+    },
+    "ancla": {
+      "comentarElemento": "Comentar {{elemento}}",
+      "una": "1 comentario",
+      "cantidad": "{{cantidad}} comentarios",
+      "en": "en {{elemento}}"
+    },
+    "inspeccion": {
+      "titulo": "Foro de la inspección",
+      "descripcion": "Discusión abierta sobre esta inspección publicada. Elige un elemento del formulario para comentar un dato concreto.",
+      "error": "No se pudo abrir el foro de la inspección.",
+      "sinHilo": "Esta inspección aún no tiene discusión."
+    }
+  },
   "perfil": {
     "nombreCompleto": "Nombre completo",
     "nombreCompletoPlaceholder": "Nombre y apellidos",

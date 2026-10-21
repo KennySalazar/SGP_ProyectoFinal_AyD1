@@ -291,6 +291,11 @@
         <app-mantenimiento-puente [puente]="p" />
       </section>
       }
+
+      <!-- Seccion 6: Foro del puente (HU-063): lo puede leer cualquiera -->
+      <section class="surface-card ficha-seccion">
+        <app-foro-puente [puente]="p" />
+      </section>
     </div>
 
     <app-iniciar-inspeccion-dialog [(visible)]="mostrarModalIniciar" [puente]="puente()" />
