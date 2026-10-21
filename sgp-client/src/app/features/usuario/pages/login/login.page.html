@@ -19,13 +19,14 @@
       {{ 'common.password' | transloco }}
       <span class="input-wrap"
         ><i class="pi pi-key"></i
-        ><input
-          pInputText
-          type="password"
-          formControlName="password"
-          autocomplete="current-password"
-          [placeholder]="'common.passwordPlaceholder' | transloco"
-      /></span>
+        ><app-contrasena-visible
+          ><input
+            pInputText
+            type="password"
+            formControlName="password"
+            autocomplete="current-password"
+            [placeholder]="'common.passwordPlaceholder' | transloco" /></app-contrasena-visible
+      ></span>
     </label>
     <button pButton class="primary" type="submit" [disabled]="form.invalid">
       <i class="pi pi-sign-in"></i><span>{{ 'common.continue' | transloco }}</span>

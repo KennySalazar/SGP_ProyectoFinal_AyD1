@@ -4,6 +4,7 @@ import { Router, RouterLink } from '@angular/router';
 import { ButtonModule } from 'primeng/button';
 import { InputTextModule } from 'primeng/inputtext';
 import { AuthCardComponent } from '../../../../shared/components/auth-card/auth-card.component';
+import { ContrasenaVisibleComponent } from '../../../../shared/components/contrasena-visible/contrasena-visible.component';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { UsuarioApiService } from '../../services/usuario-api.service';
 import { LIMITE_NOMBRE_COMPLETO, PATRON_NOMBRE_USUARIO } from '../../utils/reglas-perfil';
@@ -13,6 +14,7 @@ import { LIMITE_NOMBRE_COMPLETO, PATRON_NOMBRE_USUARIO } from '../../utils/regla
   standalone: true,
   imports: [
     ReactiveFormsModule,
+    ContrasenaVisibleComponent,
     RouterLink,
     AuthCardComponent,
     ButtonModule,
