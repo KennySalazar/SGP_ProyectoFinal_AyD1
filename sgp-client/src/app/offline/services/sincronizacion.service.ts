@@ -4,6 +4,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { AuthStore } from '../../core/services/auth.store';
 import { TokenRefreshService } from '../../core/services/token-refresh.service';
 import { InspeccionApiService } from '../../features/inspecciones/services/inspeccion-api.service';
+import { MetadatosFotografia } from '../../features/inspecciones/models/fotografia.models';
 import {
   IniciarInspeccionRequest,
   GuardarBorradorRequest,
@@ -11,6 +12,7 @@ import {
 import { ConnectivityService } from './connectivity.service';
 import { SyncQueueItem, sgpDb } from '../db/sgp-db';
 import { BorradorLocalPayload, InspeccionesLocalesService } from './inspecciones-locales.service';
+import { FotografiasLocalesService } from './fotografias-locales.service';
 import { liveQuery } from 'dexie';
 
 @Injectable({ providedIn: 'root' })
@@ -20,6 +22,7 @@ export class SincronizacionService {
   private readonly api = inject(InspeccionApiService);
   private readonly connectivity = inject(ConnectivityService);
   private readonly inspeccionesLocales = inject(InspeccionesLocalesService);
+  private readonly fotografiasLocales = inject(FotografiasLocalesService);
   private ejecutando = false;
   private iniciado = false;
   readonly sincronizando = signal(false);
@@ -72,6 +75,21 @@ export class SincronizacionService {
         await this.procesar(item, propietarioId);
         if (await sgpDb.cola_sync.get(item.id)) break;
       }
+      // Las fotografías dependen de que el borrador ya exista en el servidor. Se procesan
+      // después de toda la cola de inspecciones y siempre de una en una.
+      const fotos = (await sgpDb.cola_sync.toArray())
+        .filter(
+          (item) =>
+            item.tipo === 'FOTO' &&
+            item.propietarioId === propietarioId &&
+            (item.estado ?? 'PENDIENTE') === 'PENDIENTE',
+        )
+        .sort((a, b) => a.creadoEn.localeCompare(b.creadoEn));
+      for (const item of fotos) {
+        if (!this.connectivity.online() || this.auth.user()?.id !== propietarioId) break;
+        if (await this.tieneInspeccionPendiente(item, propietarioId)) continue;
+        await this.procesarFoto(item, propietarioId);
+      }
     } finally {
       this.ejecutando = false;
       this.sincronizando.set(false);
@@ -106,7 +124,7 @@ export class SincronizacionService {
             version: borrador?.version ?? (item.payload as GuardarBorradorRequest).version,
           };
           const actualizado = await firstValueFrom(
-            this.api.guardarBorrador(item.entityId, request, item.idempotencyKey),
+            this.api.guardarBorrador(item.entityId, request, item.idempotencyKey, true),
           );
           await this.inspeccionesLocales.confirmarGuardado(
             item.id,
@@ -143,6 +161,69 @@ export class SincronizacionService {
               // Se conserva la edición conflictiva si no puede consultarse el servidor.
             }
           }
+          return;
+        }
+        await sgpDb.cola_sync.update(item.id, {
+          estado: 'PENDIENTE',
+          intentos: intento + 1,
+          codigoError: undefined,
+          ultimoError: http.message,
+        });
+        await new Promise((resolve) =>
+          setTimeout(resolve, Math.min(16000, 1000 * 2 ** intento) + Math.random() * 350),
+        );
+      }
+    }
+  }
+
+  private async tieneInspeccionPendiente(
+    item: SyncQueueItem,
+    propietarioId: string,
+  ): Promise<boolean> {
+    const foto = await sgpDb.fotos.get(item.entityId);
+    if (!foto || foto.propietarioId !== propietarioId) return false;
+    const pendientes = await sgpDb.cola_sync.where('entityId').equals(foto.inspeccionId).toArray();
+    return pendientes.some((pendiente) => pendiente.tipo === 'INSPECCION');
+  }
+
+  private async procesarFoto(item: SyncQueueItem, propietarioId: string): Promise<void> {
+    const foto = await sgpDb.fotos.get(item.entityId);
+    if (
+      !foto ||
+      foto.propietarioId !== propietarioId ||
+      foto.sincronizado ||
+      !foto.metadatos ||
+      !foto.idempotencyKey
+    ) {
+      await sgpDb.cola_sync.delete(item.id);
+      return;
+    }
+    for (let intento = item.intentos; intento < 5; intento++) {
+      if (this.auth.user()?.id !== propietarioId || !this.connectivity.online()) return;
+      await sgpDb.cola_sync.update(item.id, { estado: 'ENVIANDO', intentos: intento + 1 });
+      try {
+        await firstValueFrom(
+          this.api.adjuntarFotografia(
+            foto.inspeccionId,
+            foto.blob,
+            foto.metadatos as MetadatosFotografia,
+            foto.idempotencyKey,
+          ),
+        );
+        // Solo se libera el Blob una vez que el servidor confirmó la operación idempotente.
+        await this.fotografiasLocales.confirmar(foto.id, propietarioId);
+        return;
+      } catch (error) {
+        const http = error as HttpErrorResponse;
+        const reintentable = http.status === 0 || http.status >= 500;
+        const agotado = intento === 4;
+        if (!reintentable || agotado) {
+          await sgpDb.cola_sync.update(item.id, {
+            estado: 'INTERVENCION',
+            intentos: intento + 1,
+            codigoError: typeof http.error?.code === 'string' ? http.error.code : undefined,
+            ultimoError: String(http.error?.detail ?? http.message ?? 'Error de carga fotográfica'),
+          });
           return;
         }
         await sgpDb.cola_sync.update(item.id, {
