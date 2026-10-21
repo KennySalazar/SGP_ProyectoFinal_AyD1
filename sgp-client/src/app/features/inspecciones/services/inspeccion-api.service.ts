@@ -109,11 +109,13 @@ export class InspeccionApiService {
   guardarBorrador(
     id: string,
     request: GuardarBorradorRequest,
+    idempotencyKey?: string,
   ): Observable<InspeccionBorradorResponse> {
     return this.operaciones.ejecutar<InspeccionBorradorResponse>(
       'PUT',
       `/api/v1/inspecciones/${encodeURIComponent(id)}/borrador`,
       request,
+      idempotencyKey,
     );
   }
   listarMisInspecciones(
