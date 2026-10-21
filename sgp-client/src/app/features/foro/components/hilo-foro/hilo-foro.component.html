@@ -1,7 +1,9 @@
-<button pButton type="button" severity="secondary" [outlined]="true" (click)="volver.emit()">
-  <i class="pi pi-arrow-left" aria-hidden="true"></i
-  ><span>{{ 'foro.hilo.volver' | transloco }}</span>
-</button>
+@if (mostrarVolver()) {
+  <button pButton type="button" severity="secondary" [outlined]="true" (click)="volver.emit()">
+    <i class="pi pi-arrow-left" aria-hidden="true"></i
+    ><span>{{ 'foro.hilo.volver' | transloco }}</span>
+  </button>
+}
 
 <ng-template #autor let-usuario="usuario" let-rol="rol">
   @if (usuario) {
@@ -55,6 +57,36 @@
     </p>
   }
 
+  @if (ancla(); as a) {
+    <div class="filtro" role="status">
+      <p>
+        <i class="pi pi-filter" aria-hidden="true"></i>
+        {{ 'foro.hilo.filtrando' | transloco: { elemento: etiquetaDeAncla()(a) } }}
+      </p>
+      <div class="acciones">
+        <button
+          pButton
+          type="button"
+          severity="secondary"
+          [outlined]="true"
+          (click)="irAElemento.emit(a)"
+        >
+          <i class="pi pi-arrow-up" aria-hidden="true"></i
+          ><span>{{ 'foro.hilo.verEnFormulario' | transloco }}</span>
+        </button>
+        <button
+          pButton
+          type="button"
+          severity="secondary"
+          [outlined]="true"
+          (click)="anclaQuitada.emit()"
+        >
+          <span>{{ 'foro.hilo.verTodos' | transloco }}</span>
+        </button>
+      </div>
+    </div>
+  }
+
   <section
     class="comentarios"
     [attr.aria-label]="'foro.hilo.comentarios' | transloco"
@@ -72,6 +104,22 @@
           />
           · {{ comentario.creadoEn | date: 'dd/MM/yyyy HH:mm' : zona }}
         </p>
+        @if (comentario.elementoRef && !ancla()) {
+          <button
+            type="button"
+            class="sobre"
+            [attr.title]="'foro.hilo.verEnFormulario' | transloco"
+            [attr.aria-label]="
+              ('foro.hilo.sobre' | transloco: { elemento: etiquetaDe(comentario) }) +
+              '. ' +
+              ('foro.hilo.verEnFormulario' | transloco)
+            "
+            (click)="irAElemento.emit(anclaDe(comentario))"
+          >
+            <i class="pi pi-bookmark" aria-hidden="true"></i>
+            <span>{{ 'foro.hilo.sobre' | transloco: { elemento: etiquetaDe(comentario) } }}</span>
+          </button>
+        }
         <p class="contenido">{{ comentario.contenido }}</p>
 
         @if (respuestasPorPadre().get(comentario.id); as respuestas) {
@@ -165,7 +213,11 @@
     } @empty {
       <div class="estado" role="status">
         <i class="pi pi-comments" aria-hidden="true"></i>
-        <p>{{ 'foro.hilo.sinComentarios' | transloco }}</p>
+        <p>
+          {{
+            (ancla() ? 'foro.hilo.sinComentariosElemento' : 'foro.hilo.sinComentarios') | transloco
+          }}
+        </p>
       </div>
     }
 
@@ -189,6 +241,12 @@
 
   @if (puedeParticipar()) {
     <form class="formulario" (ngSubmit)="publicar()">
+      @if (ancla(); as a) {
+        <p class="destino">
+          <i class="pi pi-bookmark" aria-hidden="true"></i>
+          {{ 'foro.hilo.comentarSobre' | transloco: { elemento: etiquetaDeAncla()(a) } }}
+        </p>
+      }
       <label>
         <span>{{ 'foro.hilo.escribir' | transloco }}</span>
         <textarea
@@ -211,6 +269,18 @@
         </p>
       }
       <div class="acciones">
+        @if (ancla()) {
+          <button
+            pButton
+            type="button"
+            severity="secondary"
+            [outlined]="true"
+            [disabled]="publicando()"
+            (click)="cancelarComentarioAnclado()"
+          >
+            <span>{{ 'common.cancel' | transloco }}</span>
+          </button>
+        }
         <button pButton type="submit" [disabled]="publicando() || !texto().trim()">
           <i class="pi pi-send" aria-hidden="true"></i
           ><span>{{

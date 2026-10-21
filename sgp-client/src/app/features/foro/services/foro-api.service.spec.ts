@@ -70,4 +70,69 @@ describe('ForoApiService', () => {
     ]);
     solicitudes.forEach((r) => r.flush({}));
   });
+  it('filtra los comentarios por el campo o elemento anclado', () => {
+    service
+      .listarComentarios('hilo-1', 0, 100, {
+        elementoRef: '/subestructura/pilas',
+        instanciaElementoId: 'pila-2',
+      })
+      .subscribe();
+
+    const request = http.expectOne((r) => r.url === '/api/v1/hilos/hilo-1/comentarios');
+    expect(request.request.params.get('elementoRef')).toBe('/subestructura/pilas');
+    expect(request.request.params.get('instanciaElementoId')).toBe('pila-2');
+    request.flush({ content: [] });
+  });
+
+  it('no envía la instancia cuando el elemento no es repetible', () => {
+    service
+      .listarComentarios('hilo-1', 0, 100, {
+        elementoRef: '/subestructura/estribo',
+        instanciaElementoId: null,
+      })
+      .subscribe();
+
+    const request = http.expectOne((r) => r.url === '/api/v1/hilos/hilo-1/comentarios');
+    expect(request.request.params.get('elementoRef')).toBe('/subestructura/estribo');
+    expect(request.request.params.has('instanciaElementoId')).toBe(false);
+    request.flush({ content: [] });
+  });
+
+  it('sin ancla pide todos los comentarios del hilo', () => {
+    service.listarComentarios('hilo-1', 0, 100).subscribe();
+
+    const request = http.expectOne((r) => r.url === '/api/v1/hilos/hilo-1/comentarios');
+    expect(request.request.params.has('elementoRef')).toBe(false);
+    request.flush({ content: [] });
+  });
+
+  it('comenta un elemento enviando su ancla', () => {
+    const cuerpo = {
+      contenido: 'Se ve expuesta',
+      padreId: null,
+      elementoRef: '/subestructura/pilas',
+      instanciaElementoId: 'pila-2',
+    };
+    service.crearComentario('hilo-1', cuerpo).subscribe();
+
+    const request = http.expectOne('/api/v1/hilos/hilo-1/comentarios');
+    expect(request.request.body).toEqual(cuerpo);
+    request.flush({});
+  });
+
+  it('consulta el hilo de una inspección sin crearlo', () => {
+    service.obtenerHiloDeInspeccion('insp-1').subscribe();
+
+    const request = http.expectOne('/api/v1/inspecciones/insp-1/hilo');
+    expect(request.request.method).toBe('GET');
+    request.flush({ hilo: {}, anclas: [] });
+  });
+
+  it('abre el hilo de una inspección con POST', () => {
+    service.abrirHiloDeInspeccion('insp-1').subscribe();
+
+    const request = http.expectOne('/api/v1/inspecciones/insp-1/hilo');
+    expect(request.request.method).toBe('POST');
+    request.flush({ hilo: {}, anclas: [] });
+  });
 });

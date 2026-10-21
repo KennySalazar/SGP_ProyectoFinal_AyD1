@@ -27,8 +27,9 @@ import { finalize, forkJoin } from 'rxjs';
 import { ApiErrorService } from '../../../../core/services/api-error.service';
 import { AuthStore } from '../../../../core/services/auth.store';
 import { PaginaResponse } from '../../../puentes/models/puente.models';
-import { ComentarioForo, HiloForo, LIMITE_COMENTARIO } from '../../models/foro.models';
+import { AnclaForo, ComentarioForo, HiloForo, LIMITE_COMENTARIO } from '../../models/foro.models';
 import { ForoApiService } from '../../services/foro-api.service';
+import { etiquetaPorOmision } from '../../utils/etiqueta-ancla';
 import { leerProblema, severidadCategoria } from '../../utils/errores-foro';
 import { ZONA_GUATEMALA } from '../../utils/fechas-foro';
 
@@ -38,6 +39,9 @@ const TAMANIO_COMENTARIOS = 100;
 /**
  * Un hilo con sus comentarios (HU-063): cada comentario principal con sus respuestas, a un solo
  * nivel (RN-FOR-04). Cualquiera lo lee; comentar y responder exige sesión (RN-FOR-09).
+ *
+ * En el hilo de una inspección (HU-064) puede recibir un `ancla`: entonces lista solo los
+ * comentarios de ese campo o elemento y los comentarios nuevos quedan anclados a él (RN-FOR-02).
  */
 @Component({
   selector: 'app-hilo-foro',
@@ -67,7 +71,16 @@ export class HiloForoComponent {
   private readonly anfitrion = inject<ElementRef<HTMLElement>>(ElementRef);
 
   readonly hiloId = input.required<string>();
+  readonly ancla = input<AnclaForo | null>(null);
+  readonly etiquetaDeAncla = input<(ancla: AnclaForo) => string>(etiquetaPorOmision);
+  readonly mostrarVolver = input(true);
   readonly volver = output<void>();
+  /** Quien lo usa decide qué hacer al dejar de filtrar por un elemento. */
+  readonly anclaQuitada = output<void>();
+  /** Se publicó un comentario o una respuesta: cambian los totales de los marcadores. */
+  readonly comentarioPublicado = output<void>();
+  /** Quien lo usa lleva la vista al campo o elemento del formulario al que se refiere el ancla. */
+  readonly irAElemento = output<AnclaForo>();
 
   readonly zona = ZONA_GUATEMALA;
   readonly limite = LIMITE_COMENTARIO;
@@ -112,6 +125,7 @@ export class HiloForoComponent {
   constructor() {
     effect(() => {
       this.hiloId();
+      this.ancla();
       untracked(() => this.cargar());
     });
   }
@@ -121,7 +135,7 @@ export class HiloForoComponent {
     this.error.set(false);
     forkJoin({
       hilo: this.api.obtenerHilo(this.hiloId()),
-      pagina: this.api.listarComentarios(this.hiloId(), 0, TAMANIO_COMENTARIOS),
+      pagina: this.api.listarComentarios(this.hiloId(), 0, TAMANIO_COMENTARIOS, this.ancla()),
     })
       .pipe(
         takeUntilDestroyed(this.destroyRef),
@@ -142,7 +156,7 @@ export class HiloForoComponent {
     if (!actual || actual.last || this.cargandoMas()) return;
     this.cargandoMas.set(true);
     this.api
-      .listarComentarios(this.hiloId(), actual.number + 1, TAMANIO_COMENTARIOS)
+      .listarComentarios(this.hiloId(), actual.number + 1, TAMANIO_COMENTARIOS, this.ancla())
       .pipe(
         takeUntilDestroyed(this.destroyRef),
         finalize(() => this.cargandoMas.set(false)),
@@ -159,8 +173,14 @@ export class HiloForoComponent {
     this.publicando.set(true);
     this.errorPublicar.set(null);
     this.publicado.set(false);
+    const ancla = this.ancla();
     this.api
-      .crearComentario(this.hiloId(), { contenido, padreId: null })
+      .crearComentario(this.hiloId(), {
+        contenido,
+        padreId: null,
+        elementoRef: ancla?.elementoRef ?? null,
+        instanciaElementoId: ancla?.instanciaElementoId ?? null,
+      })
       .pipe(
         takeUntilDestroyed(this.destroyRef),
         finalize(() => this.publicando.set(false)),
@@ -170,9 +190,44 @@ export class HiloForoComponent {
           this.texto.set('');
           this.publicado.set(true);
           this.cargar();
+          this.comentarioPublicado.emit();
         },
         error: (err: HttpErrorResponse) => this.errorPublicar.set(this.mensajeDe(err)),
       });
+  }
+
+  /** El ancla de un comentario anclado, para llevar la vista al elemento del formulario. */
+  anclaDe(comentario: ComentarioForo): AnclaForo {
+    return {
+      elementoRef: comentario.elementoRef ?? '',
+      instanciaElementoId: comentario.instanciaElementoId,
+    };
+  }
+
+  /**
+   * Abandona el comentario sobre el elemento elegido: descarta lo escrito, deja de filtrar por el
+   * elemento y deja el foco en el cuadro, que sigue disponible para un comentario general.
+   */
+  cancelarComentarioAnclado(): void {
+    if (this.publicando()) return;
+    this.texto.set('');
+    this.errorPublicar.set(null);
+    this.publicado.set(false);
+    this.anclaQuitada.emit();
+    this.enfocarFormulario();
+  }
+
+  /** Nombre legible del elemento al que está anclado un comentario. */
+  etiquetaDe(comentario: ComentarioForo): string {
+    return this.etiquetaDeAncla()({
+      elementoRef: comentario.elementoRef ?? '',
+      instanciaElementoId: comentario.instanciaElementoId,
+    });
+  }
+
+  /** Lleva el foco al formulario de comentario nuevo, por ejemplo tras elegir un elemento. */
+  enfocarFormulario(): void {
+    this.enfocar('form:not(.respuesta-formulario) textarea');
   }
 
   abrirRespuesta(comentarioId: string): void {
@@ -206,6 +261,7 @@ export class HiloForoComponent {
           this.respondiendoA.set(null);
           this.textoRespuesta.set('');
           this.cargar();
+          this.comentarioPublicado.emit();
         },
         error: (err: HttpErrorResponse) => this.errorRespuesta.set(this.mensajeDe(err)),
       });
@@ -229,6 +285,8 @@ export class HiloForoComponent {
     return (
       problema.campos['contenido'] ??
       problema.campos['padreId'] ??
+      problema.campos['elementoRef'] ??
+      problema.campos['instanciaElementoId'] ??
       problema.mensaje ??
       this.transloco.translate('foro.hilo.errorPublicar')
     );

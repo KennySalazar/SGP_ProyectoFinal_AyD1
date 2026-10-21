@@ -11,8 +11,8 @@ import { HiloForoComponent } from './hilo-foro.component';
 
 @Pipe({ name: 'transloco' })
 class TraduccionTestPipe implements PipeTransform {
-  transform(key: string): string {
-    return key;
+  transform(key: string, params?: Record<string, unknown>): string {
+    return params ? `${key} ${JSON.stringify(params)}` : key;
   }
 }
 
@@ -34,6 +34,8 @@ const PRINCIPAL = {
   id: 'comentario-1',
   hiloId: 'hilo-1',
   padreId: null,
+  elementoRef: null,
+  instanciaElementoId: null,
   autorId: 'usuario-1',
   autorUsuario: 'ana.estudiante',
   autorRol: 'ESTUDIANTE',
@@ -149,7 +151,12 @@ describe('HiloForoComponent', () => {
     componente.texto.set('  Mido mañana.  ');
     componente.publicar();
     const request = http.expectOne((r) => r.url === RUTA_COMENTARIOS && r.method === 'POST');
-    expect(request.request.body).toEqual({ contenido: 'Mido mañana.', padreId: null });
+    expect(request.request.body).toEqual({
+      contenido: 'Mido mañana.',
+      padreId: null,
+      elementoRef: null,
+      instanciaElementoId: null,
+    });
     request.flush({ ...PRINCIPAL, id: 'comentario-3' });
 
     expect(componente.texto()).toBe('');
@@ -307,5 +314,271 @@ describe('HiloForoComponent', () => {
     (elemento().querySelector('button') as HTMLButtonElement).click();
 
     expect(volvio).toBe(true);
+  });
+  describe('en el hilo de una inspección (HU-064)', () => {
+    const PILA = { elementoRef: '/subestructura/pilas', instanciaElementoId: 'pila-2' };
+    const ESTRIBO = { elementoRef: '/subestructura/estribo', instanciaElementoId: null };
+    const ANCLADO = { ...PRINCIPAL, id: 'comentario-9', ...PILA };
+    const etiqueta = (a: { elementoRef: string }) =>
+      a.elementoRef === PILA.elementoRef ? 'Pilas · Pila 2' : 'Estribo';
+
+    /** Elige el elemento después de la primera carga, como hace quien pulsa un marcador. */
+    function elegir(ancla: object | null, comentarios: object[]): void {
+      fixture.componentRef.setInput('etiquetaDeAncla', etiqueta);
+      fixture.componentRef.setInput('ancla', ancla);
+      fixture.detectChanges();
+      cargar(HILO, comentarios);
+    }
+
+    it('con un elemento elegido pide y muestra solo sus comentarios', async () => {
+      await crear(true);
+      cargar(HILO, [PRINCIPAL, ANCLADO]);
+
+      fixture.componentRef.setInput('etiquetaDeAncla', etiqueta);
+      fixture.componentRef.setInput('ancla', PILA);
+      fixture.detectChanges();
+      http.expectOne(RUTA_HILO).flush(HILO);
+      const request = http.expectOne((r) => r.url === RUTA_COMENTARIOS && r.method === 'GET');
+      expect(request.request.params.get('elementoRef')).toBe(PILA.elementoRef);
+      expect(request.request.params.get('instanciaElementoId')).toBe('pila-2');
+      request.flush(pagina([ANCLADO]));
+      fixture.detectChanges();
+
+      expect(elemento().querySelectorAll('article.comentario')).toHaveLength(1);
+      expect(elemento().querySelector('.filtro')?.textContent).toContain(
+        'foro.hilo.filtrando {"elemento":"Pilas · Pila 2"}',
+      );
+      // Ya se sabe de qué elemento son: no se repite en cada comentario.
+      expect(elemento().querySelector('.sobre')).toBeNull();
+    });
+
+    it('sin elemento elegido cada comentario anclado dice sobre qué elemento es', async () => {
+      await crear(false);
+      fixture.componentRef.setInput('etiquetaDeAncla', etiqueta);
+      cargar(HILO, [PRINCIPAL, ANCLADO]);
+
+      const sobre = elemento().querySelectorAll('.sobre');
+      expect(sobre).toHaveLength(1);
+      expect(sobre[0].textContent).toContain('foro.hilo.sobre {"elemento":"Pilas · Pila 2"}');
+      expect(elemento().querySelector('.filtro')).toBeNull();
+    });
+
+    it('los comentarios nuevos quedan anclados al elemento elegido', async () => {
+      await crear(true);
+      cargar(HILO, []);
+      elegir(PILA, []);
+      expect(elemento().querySelector('.destino')?.textContent).toContain(
+        'foro.hilo.comentarSobre {"elemento":"Pilas · Pila 2"}',
+      );
+      let publicados = 0;
+      componente.comentarioPublicado.subscribe(() => publicados++);
+
+      componente.texto.set('Se ve el acero expuesto');
+      componente.publicar();
+      const request = http.expectOne((r) => r.url === RUTA_COMENTARIOS && r.method === 'POST');
+      expect(request.request.body).toEqual({
+        contenido: 'Se ve el acero expuesto',
+        padreId: null,
+        elementoRef: PILA.elementoRef,
+        instanciaElementoId: 'pila-2',
+      });
+      request.flush(ANCLADO);
+      cargar(HILO, [ANCLADO]);
+
+      expect(publicados).toBe(1);
+    });
+
+    it('un elemento sin instancia no envía instancia', async () => {
+      await crear(true);
+      cargar(HILO, []);
+      elegir(ESTRIBO, []);
+
+      componente.texto.set('Texto');
+      componente.publicar();
+      const request = http.expectOne((r) => r.url === RUTA_COMENTARIOS && r.method === 'POST');
+
+      expect(request.request.body.elementoRef).toBe(ESTRIBO.elementoRef);
+      expect(request.request.body.instanciaElementoId).toBeNull();
+      request.flush(ANCLADO);
+      cargar(HILO, []);
+    });
+
+    it('una respuesta no lleva ancla y avisa que cambiaron los totales', async () => {
+      await crear(true);
+      cargar(HILO, [ANCLADO]);
+      let publicados = 0;
+      componente.comentarioPublicado.subscribe(() => publicados++);
+
+      componente.abrirRespuesta('comentario-9');
+      componente.textoRespuesta.set('Coincido');
+      componente.responder();
+      const request = http.expectOne((r) => r.url === RUTA_COMENTARIOS && r.method === 'POST');
+      expect(request.request.body).toEqual({ contenido: 'Coincido', padreId: 'comentario-9' });
+      request.flush({ ...RESPUESTA, ...PILA });
+      cargar(HILO, [ANCLADO]);
+
+      expect(publicados).toBe(1);
+    });
+
+    it('sin comentarios del elemento lo dice con un mensaje propio', async () => {
+      await crear(false);
+      cargar(HILO, [PRINCIPAL]);
+      elegir(ESTRIBO, []);
+
+      expect(elemento().textContent).toContain('foro.hilo.sinComentariosElemento');
+    });
+
+    it('permite dejar de filtrar por el elemento', async () => {
+      await crear(true);
+      cargar(HILO, [ANCLADO]);
+      elegir(PILA, [ANCLADO]);
+      let quitada = 0;
+      componente.anclaQuitada.subscribe(() => quitada++);
+
+      const verTodos = Array.from(
+        elemento().querySelectorAll<HTMLButtonElement>('.filtro button'),
+      ).find((b) => b.textContent?.includes('foro.hilo.verTodos'));
+      verTodos!.click();
+
+      expect(quitada).toBe(1);
+    });
+
+    it('desde el filtro lleva la vista al elemento en el formulario', async () => {
+      await crear(true);
+      cargar(HILO, [ANCLADO]);
+      elegir(PILA, [ANCLADO]);
+      const destinos: unknown[] = [];
+      componente.irAElemento.subscribe((a) => destinos.push(a));
+
+      const ver = Array.from(elemento().querySelectorAll<HTMLButtonElement>('.filtro button')).find(
+        (b) => b.textContent?.includes('foro.hilo.verEnFormulario'),
+      );
+      ver!.click();
+
+      expect(destinos).toEqual([PILA]);
+    });
+
+    it('la referencia «Sobre: …» de un comentario es un enlace que lleva a ese elemento', async () => {
+      await crear(false);
+      fixture.componentRef.setInput('etiquetaDeAncla', etiqueta);
+      cargar(HILO, [PRINCIPAL, ANCLADO]);
+      const destinos: unknown[] = [];
+      componente.irAElemento.subscribe((a) => destinos.push(a));
+
+      const referencias = elemento().querySelectorAll<HTMLButtonElement>('button.sobre');
+      expect(referencias).toHaveLength(1);
+      // Su nombre accesible empieza por el texto visible y dice qué hace.
+      expect(referencias[0].getAttribute('aria-label')).toContain(
+        'foro.hilo.sobre {"elemento":"Pilas · Pila 2"}',
+      );
+      expect(referencias[0].getAttribute('aria-label')).toContain('foro.hilo.verEnFormulario');
+      referencias[0].click();
+
+      expect(destinos).toEqual([{ elementoRef: PILA.elementoRef, instanciaElementoId: 'pila-2' }]);
+    });
+
+    it('cancela el comentario sobre el elemento: descarta lo escrito y vuelve a todo el hilo', async () => {
+      await crear(true);
+      cargar(HILO, []);
+      elegir(PILA, []);
+      componente.texto.set('Texto a medio escribir');
+      componente.errorPublicar.set('Algún error anterior');
+      let quitada = 0;
+      componente.anclaQuitada.subscribe(() => quitada++);
+      fixture.detectChanges();
+
+      const cancelar = Array.from(
+        elemento().querySelectorAll<HTMLButtonElement>('form .acciones button'),
+      ).find((b) => b.textContent?.includes('common.cancel'));
+      cancelar!.click();
+      fixture.detectChanges();
+      await fixture.whenStable();
+
+      expect(quitada).toBe(1);
+      expect(componente.texto()).toBe('');
+      expect(componente.errorPublicar()).toBeNull();
+      http.expectNone((r) => r.method === 'POST');
+      // El foco no se pierde: queda en el cuadro de comentario.
+      expect(document.activeElement).toBe(
+        elemento().querySelector('form:not(.respuesta-formulario) textarea'),
+      );
+    });
+
+    it('sin elemento elegido no hay nada que cancelar', async () => {
+      await crear(true);
+      cargar(HILO, [PRINCIPAL]);
+
+      const textos = Array.from(elemento().querySelectorAll('form .acciones button')).map(
+        (b) => b.textContent ?? '',
+      );
+      expect(textos.some((t) => t.includes('common.cancel'))).toBe(false);
+    });
+
+    it('no se puede cancelar mientras el comentario se está publicando', async () => {
+      await crear(true);
+      cargar(HILO, []);
+      elegir(PILA, []);
+      componente.texto.set('Texto');
+      componente.publicar();
+      let quitada = 0;
+      componente.anclaQuitada.subscribe(() => quitada++);
+
+      componente.cancelarComentarioAnclado();
+
+      expect(quitada).toBe(0);
+      expect(componente.texto()).toBe('Texto');
+      http.expectOne((r) => r.url === RUTA_COMENTARIOS && r.method === 'POST');
+    });
+
+    it('muestra el motivo que da el servidor cuando el elemento no existe', async () => {
+      await crear(true);
+      cargar(HILO, []);
+      elegir(ESTRIBO, []);
+
+      componente.texto.set('Texto');
+      componente.publicar();
+      http
+        .expectOne((r) => r.url === RUTA_COMENTARIOS && r.method === 'POST')
+        .flush(
+          {
+            detail: 'El comentario contiene datos inválidos.',
+            errores: [
+              {
+                campo: 'elementoRef',
+                mensaje: 'El elemento no existe en el formulario con que se levantó la inspección.',
+              },
+            ],
+          },
+          { status: 422, statusText: 'Unprocessable Entity' },
+        );
+      fixture.detectChanges();
+
+      expect(componente.errorPublicar()).toBe(
+        'El elemento no existe en el formulario con que se levantó la inspección.',
+      );
+    });
+
+    it('puede ocultar el botón de volver a la lista de hilos del puente', async () => {
+      await crear(false);
+      fixture.componentRef.setInput('mostrarVolver', false);
+      cargar(HILO, []);
+
+      expect(elemento().querySelector(':scope > button')).toBeNull();
+    });
+
+    it('enfoca el formulario de comentario nuevo y no el de una respuesta', async () => {
+      await crear(true);
+      cargar(HILO, [PRINCIPAL]);
+      componente.abrirRespuesta('comentario-1');
+      fixture.detectChanges();
+
+      componente.enfocarFormulario();
+      fixture.detectChanges();
+      await fixture.whenStable();
+
+      expect(document.activeElement).toBe(
+        elemento().querySelector('form:not(.respuesta-formulario) textarea'),
+      );
+    });
   });
 });

@@ -333,7 +333,26 @@
       "tuRespuesta": "Tu respuesta",
       "cargarMas": "Cargar más comentarios",
       "cargandoMas": "Cargando...",
-      "errorPublicar": "No fue posible publicar el comentario."
+      "errorPublicar": "No fue posible publicar el comentario.",
+      "filtrando": "Mostrando solo los comentarios sobre «{{elemento}}»",
+      "verTodos": "Ver todos los comentarios",
+      "sobre": "Sobre: {{elemento}}",
+      "comentarSobre": "Tu comentario quedará anclado a «{{elemento}}».",
+      "sinComentariosElemento": "Este elemento aún no tiene comentarios.",
+      "verEnFormulario": "Ver en el formulario",
+      "irAlElemento": "Ir a {{elemento}} en el formulario"
+    },
+    "ancla": {
+      "comentarElemento": "Comentar {{elemento}}",
+      "una": "1 comentario",
+      "cantidad": "{{cantidad}} comentarios",
+      "en": "en {{elemento}}"
+    },
+    "inspeccion": {
+      "titulo": "Foro de la inspección",
+      "descripcion": "Discusión abierta sobre esta inspección publicada. Elige un elemento del formulario para comentar un dato concreto.",
+      "error": "No se pudo abrir el foro de la inspección.",
+      "sinHilo": "Esta inspección aún no tiene discusión."
     }
   },
   "perfil": {

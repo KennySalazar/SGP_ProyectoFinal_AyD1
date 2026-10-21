@@ -1,5 +1,8 @@
 @if (nodo().clase !== 'campo') {
   <app-anclaje-observaciones [nodo]="nodo()" [control]="control()" />
+  @if (ubicacionComentarios() === 'fila') {
+    <app-anclaje-comentarios [nodo]="nodo()" [control]="control()" />
+  }
 }
 @let r = renderizador();
 @if (r) {
@@ -52,7 +55,12 @@
           [attr.data-ruta]="objeto().ruta"
         >
           @if (nivel() > 0 && mostrarLeyenda()) {
-            <legend>{{ objeto().titulo }}</legend>
+            <legend>
+              {{ objeto().titulo }}
+              @if (ubicacionComentarios() === 'leyenda') {
+                <app-anclaje-comentarios [nodo]="nodo()" [control]="control()" [enTitulo]="true" />
+              }
+            </legend>
           }
           <div class="campos" [class.con-grupos]="conGrupos()">
             @for (hijo of hijosVisibles(); track hijo.clave) {
@@ -84,10 +92,17 @@
             "
           >
             <div class="cabecera">
-              <strong>{{
-                'formulario.dinamico.instance'
-                  | transloco: { nombre: arreglo().nombreElemento, numero: i + 1 }
-              }}</strong>
+              <span class="titulo-instancia">
+                <strong>{{
+                  'formulario.dinamico.instance'
+                    | transloco: { nombre: arreglo().nombreElemento, numero: i + 1 }
+                }}</strong>
+                <app-anclaje-comentarios
+                  [nodo]="arreglo().elemento"
+                  [control]="instancia"
+                  [enTitulo]="true"
+                />
+              </span>
               <button
                 pButton
                 type="button"
@@ -111,6 +126,7 @@
               [nivel]="nivel() + 1"
               [modoGrilla]="modoGrilla()"
               [mostrarLeyenda]="false"
+              [comentariosEnCabecera]="true"
             />
           </div>
         } @empty {

@@ -3,13 +3,18 @@ import { inject, Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
 import { PaginaResponse } from '../../puentes/models/puente.models';
 import {
+  AnclaForo,
   ComentarioForo,
   CrearComentarioRequest,
   CrearHiloRequest,
   HiloForo,
+  HiloInspeccionForo,
 } from '../models/foro.models';
 
-/** Foro por puente (HU-063). Leer es público; abrir hilos y comentar exige sesión. */
+/**
+ * Foro por puente (HU-063) y por inspección publicada (HU-064). Leer es público; abrir hilos y
+ * comentar exige sesión.
+ */
 @Injectable({ providedIn: 'root' })
 export class ForoApiService {
   private readonly http = inject(HttpClient);
@@ -33,15 +38,38 @@ export class ForoApiService {
     return this.http.get<HiloForo>(`${this.baseUrl}/hilos/${hiloId}`);
   }
 
-  /** Comentarios y respuestas en una sola lista, de los más antiguos a los más nuevos. */
+  /**
+   * Comentarios y respuestas en una sola lista, de los más antiguos a los más nuevos. Con `ancla`
+   * solo los de ese campo o elemento.
+   */
   listarComentarios(
     hiloId: string,
     pagina: number,
     tamanio: number,
+    ancla: AnclaForo | null = null,
   ): Observable<PaginaResponse<ComentarioForo>> {
+    let params = this.paginacion(pagina, tamanio);
+    if (ancla) {
+      params = params.set('elementoRef', ancla.elementoRef);
+      if (ancla.instanciaElementoId)
+        params = params.set('instanciaElementoId', ancla.instanciaElementoId);
+    }
     return this.http.get<PaginaResponse<ComentarioForo>>(
       `${this.baseUrl}/hilos/${hiloId}/comentarios`,
-      { params: this.paginacion(pagina, tamanio) },
+      { params },
+    );
+  }
+
+  /** Público. 404 si la inspección no está publicada o todavía no tiene hilo; nunca lo crea. */
+  obtenerHiloDeInspeccion(inspeccionId: string): Observable<HiloInspeccionForo> {
+    return this.http.get<HiloInspeccionForo>(`${this.baseUrl}/inspecciones/${inspeccionId}/hilo`);
+  }
+
+  /** Con sesión. Devuelve el hilo de la inspección y lo crea si aún no existe (idempotente). */
+  abrirHiloDeInspeccion(inspeccionId: string): Observable<HiloInspeccionForo> {
+    return this.http.post<HiloInspeccionForo>(
+      `${this.baseUrl}/inspecciones/${inspeccionId}/hilo`,
+      {},
     );
   }
 

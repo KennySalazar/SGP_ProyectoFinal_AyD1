@@ -35,6 +35,9 @@ export interface ComentarioForo {
   id: string;
   hiloId: string;
   padreId: string | null;
+  /** Campo o elemento de la inspección al que se ancla (HU-064); nulo si no está anclado. */
+  elementoRef: string | null;
+  instanciaElementoId: string | null;
   autorId: string;
   autorUsuario: string | null;
   autorRol: string;
@@ -51,4 +54,31 @@ export interface CrearHiloRequest {
 export interface CrearComentarioRequest {
   contenido: string;
   padreId: string | null;
+  /** Solo en el hilo de una inspección y en un comentario principal (RN-FOR-02). */
+  elementoRef?: string | null;
+  instanciaElementoId?: string | null;
+}
+
+/**
+ * Campo o elemento de una inspección al que se ancla un comentario. `instanciaElementoId` solo
+ * existe en los elementos repetibles (una pila concreta, un tramo concreto).
+ */
+export interface AnclaForo {
+  elementoRef: string;
+  instanciaElementoId: string | null;
+}
+
+/** Cuántos comentarios tiene un ancla, respuestas incluidas: alimenta el marcador junto al dato. */
+export interface AnclaConTotal extends AnclaForo {
+  total: number;
+}
+
+/** El hilo de una inspección publicada y el resumen de sus comentarios anclados (HU-064). */
+export interface HiloInspeccionForo {
+  hilo: HiloForo;
+  anclas: AnclaConTotal[];
+}
+
+export function mismaAncla(a: AnclaForo, b: AnclaForo): boolean {
+  return a.elementoRef === b.elementoRef && a.instanciaElementoId === b.instanciaElementoId;
 }
