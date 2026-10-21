@@ -1,3 +1,4 @@
+import { etiquetaMapeo, nombresMapeo } from '../../utils/nombres-mapeo';
 import { CalibracionAdicionalComponent } from './calibracion-adicional/calibracion-adicional.component';
 import { criticasPendientes } from '../../utils/reglas-criticas';
 import { ReglasIcComponent } from './reglas-ic/reglas-ic.component';
@@ -101,6 +102,15 @@ export class EditorVersionFormularioPage implements OnInit {
   readonly versionId = signal<string>('');
   readonly version = signal<VersionFormulario | null>(null);
   readonly analisisMapeo = signal<AnalisisMapeo | null>(null);
+  readonly esquemaOrigenMapeo = signal<Record<string, unknown> | null>(null);
+  private readonly nombresDestinoMapeo = computed(() =>
+    nombresMapeo(this.version()?.esquema ?? null),
+  );
+  private readonly nombresOrigenMapeo = computed(() => nombresMapeo(this.esquemaOrigenMapeo()));
+
+  nombreCampoMapeo(ruta: string | null | undefined, origen = false): string {
+    return etiquetaMapeo(ruta, origen ? this.nombresOrigenMapeo() : this.nombresDestinoMapeo());
+  }
   readonly seccionActiva = signal<SeccionActiva>('esquema');
   readonly cargando = signal(false);
   readonly guardandoEsquema = signal(false);
@@ -452,7 +462,17 @@ export class EditorVersionFormularioPage implements OnInit {
             this.seccionVisualActiva.set(secs[0].clave);
           }
           this.vinculosVisuales.set(extraerVinculosVisuales(ver.vinculosAlmacenamiento, secs));
+          this.esquemaOrigenMapeo.set(null);
           if (ver.versionAnteriorId) {
+            this.formularioApi
+              .obtenerPorId(ver.versionAnteriorId)
+              .pipe(takeUntilDestroyed(this.destroyRef))
+              .subscribe({
+                next: (anterior) => {
+                  if (this.version()?.id === id) this.esquemaOrigenMapeo.set(anterior.esquema);
+                },
+                error: () => this.esquemaOrigenMapeo.set(null),
+              });
             this.cargarAnalisisMapeos(id);
           }
         },

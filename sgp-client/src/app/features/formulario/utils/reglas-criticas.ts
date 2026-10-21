@@ -15,7 +15,21 @@ export function reglasCriticas(version: VersionFormulario): Record<string, unkno
 }
 export function criticasPendientes(version: VersionFormulario): boolean {
   const reglas = reglasCriticas(version);
-  return !reglas.length || reglas.some((regla) => regla['pendiente'] != null);
+  const configuracion = version.reglasEvaluacionIc?.['reglas_evaluacion_ic'];
+  const provisional =
+    objetoCritico(configuracion) && configuracion['calibracion_provisional'] === true;
+  return (
+    !reglas.length ||
+    reglas.some((regla) => {
+      if (regla['pendiente'] == null) return false;
+      return !(
+        provisional &&
+        ['RN-IC-05a', 'RN-IC-05c'].includes(String(regla['id'])) &&
+        typeof regla['pendiente'] === 'string' &&
+        regla['pendiente'].trim().length > 0
+      );
+    })
+  );
 }
 export function camposCriticos(
   regla: Record<string, unknown>,

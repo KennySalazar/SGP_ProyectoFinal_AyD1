@@ -97,10 +97,14 @@ export class VersionesFormularioPage implements OnInit {
   }
 
   cargarPlantillaInicial(): void {
+    if (this.cargandoPlantilla() || this.cargando()) return;
+    const codigos = new Set(this.versiones().map((version) => version.codigo));
+    let numero = 1;
+    while (codigos.has(`SIECA-v${numero}`)) numero++;
     this.cargandoPlantilla.set(true);
     this.mensajeExito.set(null);
     this.formularioApi
-      .cargarPlantillaSieca('SIECA-v1')
+      .cargarPlantillaSieca(`SIECA-v${numero}`)
       .pipe(
         takeUntilDestroyed(this.destroyRef),
         finalize(() => this.cargandoPlantilla.set(false)),
@@ -108,9 +112,11 @@ export class VersionesFormularioPage implements OnInit {
       .subscribe({
         next: (nueva) => {
           this.mensajeExito.set(
-            this.transloco.translate('formulario.templateLoaded', { codigo: nueva.codigo }),
+            this.transloco.translate('formulario.templateLoaded', {
+              codigo: nueva.codigo,
+            }),
           );
-          this.cargar();
+          this.router.navigate(['/admin/formularios', nueva.id]);
         },
         error: (err) => this.apiError.normalize(err),
       });
