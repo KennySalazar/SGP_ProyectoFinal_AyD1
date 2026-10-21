@@ -3,15 +3,33 @@ import { HttpClient } from '@angular/common/http';
 import { Observable, tap } from 'rxjs';
 import { AccessTokenResponse, UserSession } from '../models/auth.models';
 
+const OFFLINE_USER_KEY = 'sgp.offline.user';
+
+function isUserSession(value: unknown): value is UserSession {
+  if (typeof value !== 'object' || value === null) return false;
+  const user = value as Partial<UserSession>;
+  return (
+    typeof user.id === 'string' &&
+    typeof user.email === 'string' &&
+    ['ADMINISTRADOR', 'CATEDRATICO', 'PROFESIONAL_EXTERNO', 'ESTUDIANTE'].includes(
+      user.role as string,
+    ) &&
+    typeof user.verified === 'boolean' &&
+    typeof user.activated === 'boolean' &&
+    typeof user.active === 'boolean' &&
+    typeof user.twoFactorEnabled === 'boolean'
+  );
+}
+
 @Injectable({ providedIn: 'root' })
 export class AuthStore {
   private readonly http = inject(HttpClient);
   private readonly tokenState = signal<string | null>(null);
-  private readonly userState = signal<UserSession | null>(null);
+  private readonly userState = signal<UserSession | null>(this.readOfflineUser());
 
   readonly accessToken = this.tokenState.asReadonly();
   readonly user = this.userState.asReadonly();
-  readonly authenticated = computed(() => this.tokenState() !== null && this.userState() !== null);
+  readonly authenticated = computed(() => this.userState() !== null);
   /** Profesional Externo cuyo colegiado aún no verifica el Administrador: no puede inspeccionar. */
   readonly colegiadoPendiente = computed(() => {
     const user = this.userState();
@@ -23,10 +41,16 @@ export class AuthStore {
   }
   setUser(user: UserSession | null): void {
     this.userState.set(user);
+    try {
+      if (user) sessionStorage.setItem(OFFLINE_USER_KEY, JSON.stringify(user));
+      else sessionStorage.removeItem(OFFLINE_USER_KEY);
+    } catch {
+      // La autenticación en memoria sigue funcionando si el almacenamiento no está disponible.
+    }
   }
   clear(): void {
     this.tokenState.set(null);
-    this.userState.set(null);
+    this.setUser(null);
   }
 
   loadMe(): Observable<UserSession> {
@@ -39,5 +63,16 @@ export class AuthStore {
 
   acceptToken(response: AccessTokenResponse): void {
     this.setAccessToken(response.accessToken);
+  }
+
+  private readOfflineUser(): UserSession | null {
+    try {
+      const stored = sessionStorage.getItem(OFFLINE_USER_KEY);
+      if (!stored) return null;
+      const user: unknown = JSON.parse(stored);
+      return isUserSession(user) ? user : null;
+    } catch {
+      return null;
+    }
   }
 }

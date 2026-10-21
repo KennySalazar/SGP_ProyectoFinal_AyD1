@@ -37,7 +37,10 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
           ),
         ),
         catchError((refreshError: unknown) => {
-          auth.clear();
+          const sinConexion =
+            refreshError instanceof HttpErrorResponse &&
+            (refreshError.status === 0 || refreshError.status >= 500);
+          if (!sinConexion) auth.clear();
           return throwError(() => refreshError);
         }),
       );

@@ -133,7 +133,13 @@ export interface InspeccionBorradorResponse {
 }
 
 export type EstadoInspeccion =
-  'BORRADOR' | 'ENVIADA' | 'EN_REVISION' | 'CAMBIOS_SOLICITADOS' | 'PUBLICADA' | 'RECHAZADA';
+  | 'BORRADOR'
+  | 'ENVIADA'
+  | 'EN_REVISION'
+  | 'CAMBIOS_SOLICITADOS'
+  | 'PUBLICADA'
+  | 'RECHAZADA'
+  | 'PENDIENTE_SYNC';
 
 export interface InspeccionResumenResponse {
   id: string;

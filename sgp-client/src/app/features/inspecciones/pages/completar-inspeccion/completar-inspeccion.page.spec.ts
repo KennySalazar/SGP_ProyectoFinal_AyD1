@@ -14,6 +14,8 @@ import { InspeccionApiService } from '../../services/inspeccion-api.service';
 import { ReporteFotograficoComponent } from '../../components/reporte-fotografico/reporte-fotografico.component';
 import { FotografiasLocalesService } from '../../../../offline/services/fotografias-locales.service';
 import { ProcesadorFotografiasService } from '../../services/procesador-fotografias.service';
+import { InspeccionesLocalesService } from '../../../../offline/services/inspecciones-locales.service';
+import { ConnectivityService } from '../../../../offline/services/connectivity.service';
 import { By } from '@angular/platform-browser';
 import { ConfirmacionEstadoIcComponent } from '../../components/confirmacion-estado-ic/confirmacion-estado-ic.component';
 import { CompletarInspeccionPage } from './completar-inspeccion.page';
@@ -181,6 +183,7 @@ describe('CompletarInspeccionPage', () => {
         { provide: ActivatedRoute, useValue: mockActivatedRoute },
         { provide: AuthStore, useValue: { colegiadoPendiente, user: signal({ id: 'usr-1' }) } },
         { provide: ApiErrorService, useValue: mockApiErrors },
+        { provide: ConnectivityService, useValue: { online: signal(true) } },
         {
           provide: FotografiasLocalesService,
           useValue: {
@@ -216,6 +219,20 @@ describe('CompletarInspeccionPage', () => {
     expect(progreso?.totalCamposCompletados).toBe(15);
     expect(component.borrador()?.icPreliminar?.etiqueta).toBe('Preliminar');
     expect(component.borrador()?.icPreliminar?.indice).toBe(82.5);
+  });
+
+  it('renderiza borradores nuevos o reanudados que todavía no incluyen progreso', () => {
+    mockInspeccionApi.obtenerBorrador.mockReturnValue(
+      of({ ...mockBorrador, progreso: undefined } as unknown as InspeccionBorradorResponse),
+    );
+
+    expect(() => fixture.detectChanges()).not.toThrow();
+    expect(component.borrador()?.progreso).toEqual({
+      totalCamposRequeridos: 0,
+      totalCamposCompletados: 0,
+      porcentajeTotal: 0,
+      secciones: [],
+    });
   });
 
   it('integra el reporte del borrador reanudado y bloquea la transición durante cargas', async () => {
@@ -259,12 +276,13 @@ describe('CompletarInspeccionPage', () => {
     );
     expect(component.borrador()?.version).toBe(2);
     expect(component.borrador()?.progreso.totalCamposCompletados).toBe(18);
-    expect(component.mensajeExito()).toContain('guardado exitosamente');
+    expect(component.mensajeExito()).toBe('Borrador guardado en el servidor.');
     expect(component.errorGuardado()).toBeNull();
   });
   it('guarda automáticamente los cambios después de la pausa de escritura', () => {
     vi.useFakeTimers();
     fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('.btn-guardar')).toBeNull();
     component.esquema.set(null);
     fixture.detectChanges();
     mockInspeccionApi.guardarBorrador.mockReturnValue(of(mockBorrador));
@@ -319,6 +337,60 @@ describe('CompletarInspeccionPage', () => {
     expect(component.guardando()).toBe(false);
     expect(component.errorGuardado()).toContain('Conflicto de concurrencia');
     expect(component.borrador()?.version).toBe(1);
+  });
+  it('carga y cachea el borrador del servidor ante un conflicto conocido sin autoguardar datos obsoletos', async () => {
+    const borradorServidor: InspeccionBorradorResponse = {
+      ...mockBorrador,
+      version: 2,
+      datos: { identificacion: { nombre_puente: 'Versión del servidor' } },
+    };
+    mockInspeccionApi.obtenerBorrador.mockReturnValue(of(borradorServidor));
+    const locales = TestBed.inject(InspeccionesLocalesService);
+    vi.spyOn(locales, 'tieneConflictoConcurrencia').mockResolvedValue(true);
+    const guardarCache = vi.spyOn(locales, 'cachearBorradorCanonico').mockResolvedValue();
+    const leerLocal = vi.spyOn(locales, 'obtenerInspeccionLocal');
+
+    fixture.detectChanges();
+    await vi.waitFor(() => expect(component.borrador()?.version).toBe(2));
+
+    expect(mockInspeccionApi.obtenerBorrador).toHaveBeenCalledWith('inspeccion-123', true);
+    expect(leerLocal).not.toHaveBeenCalled();
+    expect(guardarCache).toHaveBeenCalledWith(borradorServidor, 'usr-1');
+    expect(component.datosIniciales()?.datos).toEqual(borradorServidor.datos);
+    expect(mockInspeccionApi.guardarBorrador).not.toHaveBeenCalled();
+  });
+  it('refresca en servidor al reabrir una copia sincronizada, sin usarla para ediciones pendientes', async () => {
+    const borradorServidor: InspeccionBorradorResponse = {
+      ...mockBorrador,
+      version: 2,
+      datos: { identificacion: { nombre_puente: 'Versión actual' } },
+    };
+    const borradorLocal = {
+      ...mockBorrador,
+      datos: { identificacion: { nombre_puente: 'Versión en caché' } },
+    };
+    mockInspeccionApi.obtenerBorrador.mockReturnValue(of(borradorServidor));
+    const locales = TestBed.inject(InspeccionesLocalesService);
+    vi.spyOn(locales, 'tieneConflictoConcurrencia').mockResolvedValue(false);
+    vi.spyOn(locales, 'obtenerInspeccionLocal').mockResolvedValue({
+      id: mockBorrador.id,
+      puenteId: mockBorrador.puenteId,
+      propietarioId: 'usr-1',
+      estado: 'BORRADOR',
+      actualizadoEn: mockBorrador.creadoEn,
+      sincronizado: true,
+      payload: { borrador: borradorLocal },
+    });
+    const refrescar = vi
+      .spyOn(locales, 'actualizarBorradorCanonicoSiSinPendientes')
+      .mockResolvedValue(true);
+
+    fixture.detectChanges();
+    await vi.waitFor(() => expect(component.borrador()?.version).toBe(2));
+
+    expect(mockInspeccionApi.obtenerBorrador).toHaveBeenCalledWith('inspeccion-123', true);
+    expect(refrescar).toHaveBeenCalledWith(borradorServidor, 'usr-1');
+    expect(component.borrador()?.datos).toEqual(borradorServidor.datos);
   });
   it('maneja error 422 de fecha futura', () => {
     fixture.detectChanges();

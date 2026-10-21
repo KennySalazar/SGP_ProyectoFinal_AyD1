@@ -103,7 +103,7 @@ public class VersionFormularioController {
   @Operation(
       summary = "Cargar versión inicial desde plantilla SIECA",
       description =
-          "Carga la plantilla sieca-v1 con sus ocho secciones, reporte fotográfico, recomendaciones y pesos.")
+          "Carga SIECA en borrador con 45 pesos e IC completo provisional, notas de decisiones pendientes y mapeos iniciales respecto a la version activa. Publicar es una segunda accion del Administrador.")
   public ResponseEntity<VersionFormularioResponse> cargarPlantillaSieca(
       @RequestParam(required = false, defaultValue = "SIECA-v1") String codigo,
       Authentication authentication) {

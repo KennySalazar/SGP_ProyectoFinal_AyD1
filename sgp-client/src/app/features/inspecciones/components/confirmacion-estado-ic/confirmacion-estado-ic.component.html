@@ -1,6 +1,13 @@
 <section class="surface-card confirmacion-ic" aria-labelledby="confirmacion-ic-titulo">
   <h2 id="confirmacion-ic-titulo">{{ 'inspecciones.confirmacionIc.titulo' | transloco }}</h2>
-  <p>{{ 'inspecciones.confirmacionIc.nota' | transloco }}</p>
+  @if (esOffline()) {
+    <p class="alerta-offline" role="status">
+      <i class="pi pi-info-circle" aria-hidden="true"></i>
+      {{ 'inspecciones.confirmacionIc.icPreliminarOffline' | transloco }}
+    </p>
+  } @else {
+    <p>{{ 'inspecciones.confirmacionIc.nota' | transloco }}</p>
+  }
   @if (bloqueado()) {
     <p role="status">{{ 'inspecciones.confirmacionIc.guardarPrimero' | transloco }}</p>
   }

@@ -19,6 +19,7 @@ import { SelectModule } from 'primeng/select';
 import { TextareaModule } from 'primeng/textarea';
 import { ConfirmacionEstadoIcResponse, EstadoCondicionIc } from '../../models/inspeccion.models';
 import { InspeccionApiService } from '../../services/inspeccion-api.service';
+import { ConnectivityService } from '../../../../offline/services/connectivity.service';
 
 @Component({
   selector: 'app-confirmacion-estado-ic',
@@ -40,6 +41,8 @@ export class ConfirmacionEstadoIcComponent {
   readonly bloqueado = input(false);
   readonly revision = input(0);
   readonly ocupado = output<boolean>();
+  private readonly connectivity = inject(ConnectivityService);
+  readonly esOffline = computed(() => !this.connectivity.online());
   private readonly api = inject(InspeccionApiService);
   private readonly destroyRef = inject(DestroyRef);
   private solicitud = 0;
@@ -84,6 +87,10 @@ export class ConfirmacionEstadoIcComponent {
   }
 
   consultar(): void {
+    if (this.esOffline()) {
+      this.error.set('inspecciones.confirmacionIc.icPreliminarOffline');
+      return;
+    }
     if (this.bloqueado() || this.procesando() || this.restringido()) return;
     const turno = ++this.solicitud;
     this.iniciar();

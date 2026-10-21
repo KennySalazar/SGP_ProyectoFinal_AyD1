@@ -27,4 +27,12 @@ public record VersionFormularioResponse(
     Instant actualizadoEn,
     long version,
     List<ConfiguracionIcElementoResponse> pesos,
-    List<MapeoCampoResponse> mapeos) {}
+    List<MapeoCampoResponse> mapeos) {
+  @com.fasterxml.jackson.annotation.JsonProperty("rotuloCalibracion")
+  public String rotuloCalibracion() {
+    return reglasEvaluacionIc != null
+            && reglasEvaluacionIc.path("calibracion").path("provisional").asBoolean(false)
+        ? "Calibracion provisional · sin aprobar"
+        : "Calibracion sin aprobacion registrada";
+  }
+}
