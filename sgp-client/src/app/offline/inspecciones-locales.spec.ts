@@ -72,8 +72,8 @@ describe('HU-042: Inspecciones Locales y Recuperación tras Recarga', () => {
       esquemasMemoria.set(item.id, item);
       return Promise.resolve(item.id) as never;
     });
-    vi.spyOn(sgpDb.esquemas_formulario, 'toArray').mockImplementation(() =>
-      Promise.resolve([...esquemasMemoria.values()]) as never,
+    vi.spyOn(sgpDb.esquemas_formulario, 'toArray').mockImplementation(
+      () => Promise.resolve([...esquemasMemoria.values()]) as never,
     );
     vi.spyOn(sgpDb.esquemas_formulario, 'toCollection').mockReturnValue({
       modify: async (changes: Partial<LocalFormSchema>) => {
@@ -86,8 +86,8 @@ describe('HU-042: Inspecciones Locales y Recuperación tras Recarga', () => {
       puentesMemoria.set(item.id, item);
       return Promise.resolve(item.id) as never;
     });
-    vi.spyOn(sgpDb.puentes, 'toArray').mockImplementation(() =>
-      Promise.resolve([...puentesMemoria.values()]) as never,
+    vi.spyOn(sgpDb.puentes, 'toArray').mockImplementation(
+      () => Promise.resolve([...puentesMemoria.values()]) as never,
     );
 
     vi.spyOn(sgpDb.esquemas_formulario, 'get').mockImplementation((id: unknown) => {
@@ -433,7 +433,9 @@ describe('HU-042: Inspecciones Locales y Recuperación tras Recarga', () => {
 
     const reabierta = await service.obtenerInspeccionLocal(inspeccionId);
     const recuperado = (reabierta?.payload as BorradorLocalPayload).borrador;
-    expect(recuperado.datos).toEqual({ identificacion: { observacion: 'Confirmado por servidor' } });
+    expect(recuperado.datos).toEqual({
+      identificacion: { observacion: 'Confirmado por servidor' },
+    });
     expect(recuperado.version).toBe(5);
     expect(reabierta?.sincronizado).toBe(true);
 
@@ -459,9 +461,9 @@ describe('HU-042: Inspecciones Locales y Recuperación tras Recarga', () => {
     });
 
     const restauradaOffline = await service.obtenerInspeccionLocal(inspeccionId);
-    expect(
-      (restauradaOffline?.payload as BorradorLocalPayload).borrador.datos,
-    ).toEqual(camposGuardados);
+    expect((restauradaOffline?.payload as BorradorLocalPayload).borrador.datos).toEqual(
+      camposGuardados,
+    );
 
     await service.confirmarGuardado('save-2', inspeccionId, 'user-1', {
       ...borrador,
@@ -470,9 +472,9 @@ describe('HU-042: Inspecciones Locales y Recuperación tras Recarga', () => {
     });
 
     const recuperadaTrasRecarga = await service.obtenerInspeccionLocal(inspeccionId);
-    expect(
-      (recuperadaTrasRecarga?.payload as BorradorLocalPayload).borrador.datos,
-    ).toEqual(camposGuardados);
+    expect((recuperadaTrasRecarga?.payload as BorradorLocalPayload).borrador.datos).toEqual(
+      camposGuardados,
+    );
     expect(recuperadaTrasRecarga?.sincronizado).toBe(true);
   });
 
@@ -496,7 +498,12 @@ describe('HU-042: Inspecciones Locales y Recuperación tras Recarga', () => {
       version: 4,
       creadoEn: '2026-10-20T10:00:00Z',
       acompanantes: [],
-      progreso: { totalCamposRequeridos: 0, totalCamposCompletados: 0, porcentajeTotal: 0, secciones: [] },
+      progreso: {
+        totalCamposRequeridos: 0,
+        totalCamposCompletados: 0,
+        porcentajeTotal: 0,
+        secciones: [],
+      },
       datos: datosOperacionConfirmada,
     };
     await service.guardarInspeccionLocal({
@@ -514,15 +521,25 @@ describe('HU-042: Inspecciones Locales y Recuperación tras Recarga', () => {
       sincronizado: false,
     });
     colaMemoria.set('save-confirmed', {
-      id: 'save-confirmed', tipo: 'INSPECCION', entityId: inspeccionId, propietarioId: 'user-1',
-      idempotencyKey: 'key-confirmed', operacion: 'GUARDAR_BORRADOR',
-      payload: { version: 4, datos: datosOperacionConfirmada }, intentos: 0,
+      id: 'save-confirmed',
+      tipo: 'INSPECCION',
+      entityId: inspeccionId,
+      propietarioId: 'user-1',
+      idempotencyKey: 'key-confirmed',
+      operacion: 'GUARDAR_BORRADOR',
+      payload: { version: 4, datos: datosOperacionConfirmada },
+      intentos: 0,
       creadoEn: '2026-10-20T10:01:00Z',
     });
     colaMemoria.set('save-newer', {
-      id: 'save-newer', tipo: 'INSPECCION', entityId: inspeccionId, propietarioId: 'user-1',
-      idempotencyKey: 'key-newer', operacion: 'GUARDAR_BORRADOR',
-      payload: { version: 5, datos: datosEdicionPosterior }, intentos: 0,
+      id: 'save-newer',
+      tipo: 'INSPECCION',
+      entityId: inspeccionId,
+      propietarioId: 'user-1',
+      idempotencyKey: 'key-newer',
+      operacion: 'GUARDAR_BORRADOR',
+      payload: { version: 5, datos: datosEdicionPosterior },
+      intentos: 0,
       creadoEn: '2026-10-20T10:02:00Z',
     });
 
@@ -533,7 +550,9 @@ describe('HU-042: Inspecciones Locales y Recuperación tras Recarga', () => {
     });
 
     const guardada = await service.obtenerInspeccionLocal(inspeccionId);
-    expect((guardada?.payload as BorradorLocalPayload).borrador.datos).toEqual(datosEdicionPosterior);
+    expect((guardada?.payload as BorradorLocalPayload).borrador.datos).toEqual(
+      datosEdicionPosterior,
+    );
     expect(colaMemoria.has('save-confirmed')).toBe(false);
     expect(colaMemoria.has('save-newer')).toBe(true);
     expect(guardada?.sincronizado).toBe(false);
@@ -576,16 +595,31 @@ describe('HU-042: Inspecciones Locales y Recuperación tras Recarga', () => {
 
   it('lista inspecciones del usuario incluyendo las ya sincronizadas', async () => {
     inspeccionesMemoria.set('pendiente', {
-      id: 'pendiente', puenteId: 'p1', propietarioId: 'user-1', estado: 'BORRADOR',
-      actualizadoEn: '', payload: {}, sincronizado: false,
+      id: 'pendiente',
+      puenteId: 'p1',
+      propietarioId: 'user-1',
+      estado: 'BORRADOR',
+      actualizadoEn: '',
+      payload: {},
+      sincronizado: false,
     });
     inspeccionesMemoria.set('sincronizada', {
-      id: 'sincronizada', puenteId: 'p2', propietarioId: 'user-1', estado: 'BORRADOR',
-      actualizadoEn: '', payload: {}, sincronizado: true,
+      id: 'sincronizada',
+      puenteId: 'p2',
+      propietarioId: 'user-1',
+      estado: 'BORRADOR',
+      actualizadoEn: '',
+      payload: {},
+      sincronizado: true,
     });
     inspeccionesMemoria.set('otro-usuario', {
-      id: 'otro-usuario', puenteId: 'p3', propietarioId: 'user-2', estado: 'BORRADOR',
-      actualizadoEn: '', payload: {}, sincronizado: true,
+      id: 'otro-usuario',
+      puenteId: 'p3',
+      propietarioId: 'user-2',
+      estado: 'BORRADOR',
+      actualizadoEn: '',
+      payload: {},
+      sincronizado: true,
     });
 
     const resultado = await service.listarPorUsuario('user-1');

@@ -288,9 +288,7 @@ export class InspeccionesLocalesService {
     if (typeof local.payload !== 'object' || local.payload === null) return local;
     const raw = local.payload as Record<string, unknown>;
     const envuelto = 'borrador' in raw && raw['borrador'] !== null;
-    const borrador = (envuelto ? raw['borrador'] : raw) as
-      | InspeccionBorradorResponse
-      | undefined;
+    const borrador = (envuelto ? raw['borrador'] : raw) as InspeccionBorradorResponse | undefined;
     const datosLocales = borrador?.datos;
     if (datosLocales !== undefined && datosLocales !== null && Object.keys(datosLocales).length > 0)
       return local;
@@ -300,8 +298,7 @@ export class InspeccionesLocalesService {
     const ultimaOperacion = pendientes
       .filter(
         (item) =>
-          item.operacion === 'GUARDAR_BORRADOR' &&
-          item.propietarioId === local.propietarioId,
+          item.operacion === 'GUARDAR_BORRADOR' && item.propietarioId === local.propietarioId,
       )
       .sort((a, b) => b.creadoEn.localeCompare(a.creadoEn))[0];
     const datosEnCola = (ultimaOperacion?.payload as GuardarBorradorRequest | undefined)?.datos;

@@ -10,10 +10,7 @@ import {
 } from '../../features/inspecciones/models/inspeccion.models';
 import { ConnectivityService } from './connectivity.service';
 import { SyncQueueItem, sgpDb } from '../db/sgp-db';
-import {
-  BorradorLocalPayload,
-  InspeccionesLocalesService,
-} from './inspecciones-locales.service';
+import { BorradorLocalPayload, InspeccionesLocalesService } from './inspecciones-locales.service';
 import { liveQuery } from 'dexie';
 
 @Injectable({ providedIn: 'root' })
