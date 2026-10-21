@@ -759,6 +759,12 @@ public class VersionFormularioService {
     return construirRespuestaDetallada(publicada);
   }
 
+  @Transactional(propagation = org.springframework.transaction.annotation.Propagation.MANDATORY)
+  public VersionFormularioResponse sembrarPlantillaInicial(String codigo, UUID usuarioId) {
+    var creada = cargarPlantillaSiecaInicial(codigo, usuarioId);
+    return publicar(creada.id(), null, usuarioId);
+  }
+
   private void validarPesosParaPublicacion(VersionFormulario version) {
     JsonNode catalogo = version.getReglasEvaluacionIc();
     JsonNode elementos = catalogo == null ? null : catalogo.get("elementos");
