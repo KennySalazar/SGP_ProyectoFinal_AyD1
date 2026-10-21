@@ -24,10 +24,18 @@ export class OperacionIdempotenteService {
     ruta: string,
     cuerpo: unknown,
     clave?: string,
+    encabezados: Record<string, string> = {},
   ): Observable<T> {
     const actor = this.auth.user()?.id ?? null;
     const serializado = JSON.stringify(cuerpo ?? null);
-    const identidad = JSON.stringify([actor, metodo, ruta, serializado, clave ?? null]);
+    const identidad = JSON.stringify([
+      actor,
+      metodo,
+      ruta,
+      serializado,
+      clave ?? null,
+      encabezados,
+    ]);
     const anterior = this.pendientes.get(identidad);
     if (anterior) return anterior as Observable<T>;
     const idempotencia = clave ?? uuidV7();
@@ -38,7 +46,7 @@ export class OperacionIdempotenteService {
       }
       return this.http.request<T>(metodo, ruta, {
         body: copia,
-        headers: { 'Idempotency-Key': idempotencia },
+        headers: { 'Idempotency-Key': idempotencia, ...encabezados },
       });
     }).pipe(
       tap({

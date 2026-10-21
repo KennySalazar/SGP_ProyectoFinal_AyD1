@@ -112,12 +112,14 @@ export class InspeccionApiService {
     id: string,
     request: GuardarBorradorRequest,
     idempotencyKey?: string,
+    clientePrevalece = false,
   ): Observable<InspeccionBorradorResponse> {
     return this.operaciones.ejecutar<InspeccionBorradorResponse>(
       'PUT',
       `/api/v1/inspecciones/${encodeURIComponent(id)}/borrador`,
       request,
       idempotencyKey,
+      clientePrevalece ? { 'X-Sync-Conflict-Policy': 'client-wins' } : {},
     );
   }
   listarMisInspecciones(

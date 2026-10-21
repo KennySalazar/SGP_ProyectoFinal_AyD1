@@ -8,6 +8,7 @@ import { InspeccionApiService } from '../../features/inspecciones/services/inspe
 import { sgpDb } from '../db/sgp-db';
 import { ConnectivityService } from './connectivity.service';
 import { InspeccionesLocalesService } from './inspecciones-locales.service';
+import { FotografiasLocalesService } from './fotografias-locales.service';
 import { SincronizacionService } from './sincronizacion.service';
 
 describe('SincronizacionService autenticación previa', () => {
@@ -22,6 +23,7 @@ describe('SincronizacionService autenticación previa', () => {
         { provide: ConnectivityService, useValue: { online: () => true } },
         { provide: InspeccionApiService, useValue: {} },
         { provide: InspeccionesLocalesService, useValue: {} },
+        { provide: FotografiasLocalesService, useValue: { confirmar: vi.fn() } },
       ],
     });
     return {

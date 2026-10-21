@@ -19,6 +19,7 @@ import gt.usac.cunoc.sgp.formulario.repository.VersionFormularioRepository;
 import gt.usac.cunoc.sgp.formulario.validation.JsonSchemaValidatorService;
 import gt.usac.cunoc.sgp.inspeccion.dto.AcompananteRequest;
 import gt.usac.cunoc.sgp.inspeccion.dto.AcompananteResponse;
+import gt.usac.cunoc.sgp.inspeccion.dto.ConflictoSincronizacionResponse;
 import gt.usac.cunoc.sgp.inspeccion.dto.DatosPermanentesResponse;
 import gt.usac.cunoc.sgp.inspeccion.dto.ExportacionInspeccionResponse;
 import gt.usac.cunoc.sgp.inspeccion.dto.GuardarBorradorRequest;
@@ -48,7 +49,9 @@ import gt.usac.cunoc.sgp.mantenimiento.repository.OrdenMantenimientoRepository;
 import gt.usac.cunoc.sgp.puente.entity.Puente;
 import gt.usac.cunoc.sgp.puente.repository.AsignacionPuenteRepository;
 import gt.usac.cunoc.sgp.puente.repository.PuenteRepository;
+import gt.usac.cunoc.sgp.sync.entity.ConflictoSincronizacion;
 import gt.usac.cunoc.sgp.sync.model.SolicitudOperacion;
+import gt.usac.cunoc.sgp.sync.repository.ConflictoSincronizacionRepository;
 import gt.usac.cunoc.sgp.sync.service.HuellaSolicitud;
 import gt.usac.cunoc.sgp.sync.service.OperacionIdempotenteService;
 import gt.usac.cunoc.sgp.usuario.entity.UserAccount;
@@ -116,6 +119,9 @@ public class InspeccionService {
   private MapeoCampoFormularioRepository mapeoCampoFormularioRepository;
   private ArchivoInspeccionRepository archivoInspeccionRepository;
   private OrdenMantenimientoRepository ordenMantenimientoRepository;
+
+  @Autowired(required = false)
+  private ConflictoSincronizacionRepository conflictosSincronizacion;
 
   public InspeccionService(
       InspeccionRepository inspeccionRepository,
@@ -417,7 +423,8 @@ public class InspeccionService {
                         HttpStatus.UNPROCESSABLE_ENTITY,
                         "version_no_utilizable",
                         "Versión de formulario no utilizable",
-                        "Solo se pueden iniciar inspecciones con versiones de formulario publicadas"));
+                        "Solo se pueden iniciar inspecciones con versiones de formulario"
+                            + " publicadas"));
 
     JsonNode datos = request.datos();
     if (datos == null || datos.isNull() || datos.isEmpty()) {
@@ -511,6 +518,16 @@ public class InspeccionService {
   @Transactional
   public InspeccionBorradorResponse guardarBorrador(
       UUID id, GuardarBorradorRequest request, UUID usuarioId) {
+    return guardarBorrador(id, request, usuarioId, false, null);
+  }
+
+  @Transactional
+  public InspeccionBorradorResponse guardarBorrador(
+      UUID id,
+      GuardarBorradorRequest request,
+      UUID usuarioId,
+      boolean clientePrevalece,
+      UUID operacionIdempotenteId) {
     Inspeccion inspeccion =
         inspeccionRepository
             .findConDetallesById(id)
@@ -552,11 +569,35 @@ public class InspeccionService {
     if (request != null
         && request.version() != null
         && !Objects.equals(request.version(), inspeccion.getVersion())) {
-      throw new ApiException(
-          HttpStatus.CONFLICT,
-          "concurrencia_conflicto",
-          "Conflicto de concurrencia",
-          "La inspección fue modificada concurrentemente por otra sesión o dispositivo.");
+      if (!clientePrevalece || operacionIdempotenteId == null || conflictosSincronizacion == null) {
+        throw new ApiException(
+            HttpStatus.CONFLICT,
+            "concurrencia_conflicto",
+            "Conflicto de concurrencia",
+            "La inspección fue modificada concurrentemente por otra sesión o dispositivo.");
+      }
+      var copiaServidor = objectMapper.valueToTree(aBorradorResponse(inspeccion));
+      var conflicto =
+          new ConflictoSincronizacion(
+              UuidV7Generator.generate(),
+              inspeccion.getId(),
+              operacionIdempotenteId,
+              inspeccion.getVersion(),
+              request.version(),
+              copiaServidor,
+              calcularHash(objectMapper.valueToTree(request).toString()),
+              clock.instant());
+      conflictosSincronizacion.save(conflicto);
+      if (auditoriaWriter != null) {
+        auditoriaWriter.registrarEnTransaccion(
+            usuarioId,
+            AccionAuditoria.MODIFICAR,
+            "conflicto_sincronizacion",
+            conflicto.getId(),
+            copiaServidor,
+            objectMapper.valueToTree(request),
+            "HU-059");
+      }
     }
 
     // 9. Fechas futuras o anteriores a la construcción
@@ -624,6 +665,38 @@ public class InspeccionService {
     inspeccionRepository.saveAndFlush(inspeccion);
 
     return aBorradorResponse(inspeccion);
+  }
+
+  @Transactional(readOnly = true)
+  public List<ConflictoSincronizacionResponse> listarConflictosSincronizacion(
+      UUID inspeccionId, UUID usuarioId) {
+    var inspeccion =
+        inspeccionRepository
+            .findActiveById(inspeccionId)
+            .orElseThrow(
+                () ->
+                    new ApiException(
+                        HttpStatus.NOT_FOUND,
+                        "inspeccion_no_encontrada",
+                        "Inspección no encontrada",
+                        "No existe la inspección solicitada."));
+    if (!inspeccion.getAutorId().equals(usuarioId))
+      throw new ApiException(
+          HttpStatus.NOT_FOUND,
+          "inspeccion_no_encontrada",
+          "Inspección no encontrada",
+          "No existe la inspección solicitada.");
+    if (conflictosSincronizacion == null) return List.of();
+    return conflictosSincronizacion.findByInspeccionIdOrderByDetectadoEnDesc(inspeccionId).stream()
+        .map(
+            c ->
+                new ConflictoSincronizacionResponse(
+                    c.getId(),
+                    c.getVersionServidor(),
+                    c.getVersionCliente(),
+                    c.getCopiaServidor(),
+                    c.getDetectadoEn()))
+        .toList();
   }
 
   @Transactional(readOnly = true)
@@ -1114,7 +1187,8 @@ public class InspeccionService {
           HttpStatus.FORBIDDEN,
           "rol_no_autorizado",
           "Acceso denegado",
-          "Solo Estudiantes asignados, Catedráticos y Profesionales externos verificados pueden iniciar inspecciones.");
+          "Solo Estudiantes asignados, Catedráticos y Profesionales externos verificados pueden"
+              + " iniciar inspecciones.");
     }
 
     return user;

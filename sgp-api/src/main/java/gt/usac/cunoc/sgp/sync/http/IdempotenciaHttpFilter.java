@@ -89,6 +89,7 @@ public class IdempotenciaHttpFilter extends OncePerRequestFilter {
       problema(request, response, e);
       return;
     }
+    request.setAttribute("operacionIdempotenteId", reserva.id());
     if (reserva.repetida()) {
       response.setHeader("Idempotent-Replay", "true");
       escribir(response, reserva.respuesta());
