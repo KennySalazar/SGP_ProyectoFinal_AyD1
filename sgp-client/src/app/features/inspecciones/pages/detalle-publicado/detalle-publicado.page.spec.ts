@@ -114,7 +114,7 @@ describe('Detalle publicado de HU-030', () => {
     Object.values(formularios).forEach((fn) => fn.mockReset());
     Object.values(locales).forEach((fn) => fn.mockReset());
     api.obtenerPublicada.mockImplementation(() => of(respuesta));
-    api.exportar.mockReturnValue(of({ id: "original" }));
+    api.exportar.mockReturnValue(of({ id: 'original' }));
     api.obtenerOrdenesMantenimiento.mockReturnValue(of([]));
     api.listarFotografias.mockReturnValue(
       of([
