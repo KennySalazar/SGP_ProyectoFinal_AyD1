@@ -96,15 +96,23 @@ describe('EditorVersionFormularioPage', () => {
         provideRouter([]),
         {
           provide: CalibracionAdicionalApiService,
-          useValue: { consultarActa: () => of({ estado: 'SIN_ACTA', acta: null }) },
+          useValue: {
+            consultarActa: () => of({ estado: 'SIN_ACTA', acta: null }),
+          },
         },
         {
           provide: ActivatedRoute,
           useValue: { snapshot: { paramMap: { get: () => 'v-1' } } },
         },
         { provide: FormularioApiService, useValue: apiMock },
-        { provide: ApiErrorService, useValue: { mostrar: vi.fn(), normalize: vi.fn() } },
-        { provide: TranslocoService, useValue: { translate: (k: string) => k } },
+        {
+          provide: ApiErrorService,
+          useValue: { mostrar: vi.fn(), normalize: vi.fn() },
+        },
+        {
+          provide: TranslocoService,
+          useValue: { translate: (k: string) => k },
+        },
       ],
     });
     TestBed.overrideComponent(EditorVersionFormularioPage, {
@@ -282,7 +290,12 @@ describe('EditorVersionFormularioPage', () => {
         clave: 'identificacion',
         titulo: '1. Identificación del puente',
         preguntas: [
-          { clave: 'codigo', titulo: 'Código del puente', tipo: 'string', obligatorio: true },
+          {
+            clave: 'codigo',
+            titulo: 'Código del puente',
+            tipo: 'string',
+            obligatorio: true,
+          },
         ],
       },
     ]);
@@ -366,7 +379,11 @@ describe('EditorVersionFormularioPage', () => {
       },
     };
     apiMock.configurarEscala.mockReturnValue(
-      of({ ...mockVersion, reglasEvaluacionIc: reglas, calibradoPorId: 'admin-1' }),
+      of({
+        ...mockVersion,
+        reglasEvaluacionIc: reglas,
+        calibradoPorId: 'admin-1',
+      }),
     );
     component.guardarEscala();
     expect(apiMock.configurarEscala).toHaveBeenCalledWith('v-1', {
@@ -457,5 +474,51 @@ describe('EditorVersionFormularioPage', () => {
     expect(detalles).not.toBeNull();
     expect(detalles.open).toBe(false);
     expect(detalles.textContent).toContain('Vigas');
+  });
+  it('publica la plantilla provisional conservando las notas y el rotulo en el detalle', () => {
+    const provisional = structuredClone(mockVersion);
+    provisional.rotuloCalibracion = 'Calibracion provisional · sin aprobar';
+    provisional.reglasEvaluacionIc['calibracion'] = { provisional: true };
+    const reglas = provisional.reglasEvaluacionIc['reglas_evaluacion_ic'] as Record<
+      string,
+      unknown
+    >;
+    reglas['calibracion_provisional'] = true;
+    reglas['reglas_anulacion'] = ['a', 'b', 'c', 'd'].map((letra) => ({
+      id: 'RN-IC-05' + letra,
+      ...(['a', 'c'].includes(letra) ? { pendiente: 'Revision academica pendiente' } : {}),
+    }));
+    component.version.set(provisional);
+    fixture.detectChanges();
+    expect(component.criticasSinResolver()).toBe(false);
+    expect(component.puedePublicar()).toBe(true);
+    expect(fixture.nativeElement.textContent).toContain(provisional.rotuloCalibracion);
+    apiMock.publicar.mockReturnValue(of({ ...provisional, estado: 'PUBLICADA', activa: true }));
+    component.ejecutarPublicacion();
+    fixture.detectChanges();
+    expect(apiMock.publicar).toHaveBeenCalled();
+    expect(component.version()?.rotuloCalibracion).toBe(provisional.rotuloCalibracion);
+    expect(
+      (component.version()?.reglasEvaluacionIc['reglas_evaluacion_ic'] as Record<string, unknown>)[
+        'reglas_anulacion'
+      ],
+    ).toEqual(reglas['reglas_anulacion']);
+  });
+  it('muestra campos nuevos sin declarar y bloquea publicar', () => {
+    component.version.set({ ...mockVersion, versionAnteriorId: 'anterior' });
+    component.analisisMapeo.set({
+      versionDestinoId: 'v-1',
+      versionDestinoCodigo: 'SIECA-v1',
+      camposOrigen: [],
+      camposDestino: ['/nuevo'],
+      mapeosDeclarados: [],
+      camposOrigenSinMapeo: [],
+      camposDestinoSinMapeo: ['/nuevo'],
+      mapeoCompleto: false,
+    });
+    component.cambiarSeccion('mapeos');
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toContain('Nuevo');
+    expect(component.puedePublicar()).toBe(false);
   });
 });

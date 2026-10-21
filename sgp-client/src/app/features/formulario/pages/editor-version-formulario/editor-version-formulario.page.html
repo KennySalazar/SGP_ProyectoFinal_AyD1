@@ -13,7 +13,10 @@
       <h1 class="page-title">{{ ver.codigo }}</h1>
       <p class="page-description">
         @if (ver.estado === 'PUBLICADA') {
-        <span>Versión publicada y activa del formulario SIECA.</span>
+        <span
+          >{{ (ver.activa ? 'formulario.hu050.activa' : 'formulario.hu050.historica') | transloco
+          }}</span
+        >
         } @else {
         <span>Borrador en edición del formulario SIECA.</span>
         } @if (ver.versionAnteriorCodigo) {
@@ -25,6 +28,10 @@
     </div>
 
     <div class="heading-badges">
+      <p-tag
+        [value]="ver.rotuloCalibracion || ('formulario.hu050.sinRegistro' | transloco)"
+        severity="warn"
+      ></p-tag>
       <p-tag
         [value]="ver.estado"
         [severity]="ver.estado === 'PUBLICADA' ? 'success' : 'warn'"
@@ -40,7 +47,11 @@
   </div>
 </header>
 
-@if (estadoReglas().pendiente) {
+@if (ver.reglasEvaluacionIc['calibracion']) {
+<div class="aviso-activa" role="status">
+  <span>{{ 'formulario.hu050.nota' | transloco }}</span>
+</div>
+} @if (estadoReglas().pendiente) {
 <div class="aviso-activa" role="status">
   <span>{{ 'formulario.reglasIc.pendientes' | transloco }}</span>
   <button
@@ -751,7 +762,9 @@
       <strong>{{ 'formulario.mappingIncomplete' | transloco }}</strong>
       <ul class="lista-pendientes" style="max-height: 12rem; overflow-y: auto">
         @for (pend of analisis.camposOrigenSinMapeo; track pend) {
-        <li><code>{{ pend }}</code></li>
+        <li>{{ 'formulario.sourceField' | transloco }}: {{ nombreCampoMapeo(pend, true) }}</li>
+        } @for (pend of analisis.camposDestinoSinMapeo ?? []; track pend) {
+        <li>{{ 'formulario.targetField' | transloco }}: {{ nombreCampoMapeo(pend) }}</li>
         }
       </ul>
     </div>
@@ -773,10 +786,10 @@
 
     <ng-template #body let-map let-i="rowIndex">
       <tr>
-        <td><code>{{ map.elementoRefOrigen || '—' }}</code></td>
-        <td><code>{{ map.elementoRefDestino || '—' }}</code></td>
+        <td>{{ nombreCampoMapeo(map.elementoRefOrigen, true) }}</td>
+        <td>{{ nombreCampoMapeo(map.elementoRefDestino) }}</td>
         <td>
-          <p-tag [value]="map.tipo" severity="info"></p-tag>
+          <p-tag [value]="'formulario.hu050.tipos.' + map.tipo | transloco" severity="info"></p-tag>
         </td>
         <td>{{ map.observacion || '—' }}</td>
         @if (ver.estado === 'BORRADOR') {

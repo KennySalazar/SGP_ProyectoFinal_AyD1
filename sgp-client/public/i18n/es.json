@@ -1305,7 +1305,7 @@
     "saveWeights": "Guardar pesos",
     "savingWeights": "Guardando...",
     "weightsSaved": "Pesos calibrados correctamente.",
-    "mappingComplete": "Mapeo completo. Todos los campos de la versión anterior tienen correspondencia declarada.",
+    "mappingComplete": "Mapeo completo. Todos los campos de ambas versiones tienen su correspondencia declarada.",
     "mappingIncomplete": "Mapeo incompleto. Debe declarar la correspondencia de los siguientes campos de la versión anterior:",
     "unmappedFields": "Campos pendientes de declarar",
     "addMapping": "Declarar mapeo",
@@ -1640,7 +1640,21 @@
       },
       "pendientes": "Complete y guarde las reglas de calculo del IC antes de publicar esta version."
     },
-    "crearSinBaseNota": "Si no selecciona una version base, se cargara la plantilla inicial SIECA. Configure y calibre sus reglas antes de publicarla."
+    "crearSinBaseNota": "Si no selecciona una version base, se cargara la plantilla inicial SIECA. Configure y calibre sus reglas antes de publicarla.",
+    "hu050": {
+      "provisional": "Calibracion provisional · sin aprobar",
+      "nota": "Los valores son provisionales. Las notas pendientes de RN-IC-05a y RN-IC-05c se conservan y no impiden publicar esta plantilla.",
+      "dosPasos": "1. Carga la plantilla SIECA con su IC completo. 2. Revisa y publica la version desde el editor.",
+      "activa": "Version publicada y activa del formulario SIECA.",
+      "historica": "Version publicada historica del formulario SIECA.",
+      "sinRegistro": "Calibracion sin aprobacion registrada",
+      "tipos": {
+        "EQUIVALENTE": "Equivalente",
+        "RENOMBRADO": "Renombrado",
+        "NUEVO": "Nuevo",
+        "ELIMINADO": "Eliminado"
+      }
+    }
   },
   "inspecciones": {
     "historial": {

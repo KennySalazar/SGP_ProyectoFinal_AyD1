@@ -23,10 +23,38 @@ describe('reglas criticas', () => {
   it('bloquea reglas pendientes y catalogos sin reglas', () => {
     const version = (reglas: unknown[]) =>
       ({
-        reglasEvaluacionIc: { reglas_evaluacion_ic: { reglas_anulacion: reglas } },
+        reglasEvaluacionIc: {
+          reglas_evaluacion_ic: { reglas_anulacion: reglas },
+        },
       }) as unknown as VersionFormulario;
     expect(criticasPendientes(version([]))).toBe(true);
     expect(criticasPendientes(version([{ pendiente: 'Revision' }]))).toBe(true);
     expect(criticasPendientes(version([{ pendiente: null }]))).toBe(false);
+  });
+  it.each(['RN-IC-05a', 'RN-IC-05c'])('conserva la nota provisional sin bloquear %s', (id) => {
+    const version = {
+      reglasEvaluacionIc: {
+        reglas_evaluacion_ic: {
+          calibracion_provisional: true,
+          reglas_anulacion: [{ id, pendiente: 'Decision academica pendiente' }],
+        },
+      },
+    } as unknown as VersionFormulario;
+    expect(criticasPendientes(version)).toBe(false);
+    expect(version.reglasEvaluacionIc['reglas_evaluacion_ic']).toEqual({
+      calibracion_provisional: true,
+      reglas_anulacion: [{ id, pendiente: 'Decision academica pendiente' }],
+    });
+  });
+  it.each(['RN-IC-05b', 'RN-IC-05d'])('mantiene bloqueada una nota no autorizada %s', (id) => {
+    const version = {
+      reglasEvaluacionIc: {
+        reglas_evaluacion_ic: {
+          calibracion_provisional: true,
+          reglas_anulacion: [{ id, pendiente: 'Revision' }],
+        },
+      },
+    } as unknown as VersionFormulario;
+    expect(criticasPendientes(version)).toBe(true);
   });
 });

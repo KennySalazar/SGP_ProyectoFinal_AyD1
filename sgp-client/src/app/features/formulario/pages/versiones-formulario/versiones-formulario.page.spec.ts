@@ -64,8 +64,14 @@ describe('VersionesFormularioPage', () => {
       providers: [
         provideRouter([]),
         { provide: FormularioApiService, useValue: apiMock },
-        { provide: ApiErrorService, useValue: { mostrar: vi.fn(), normalize: vi.fn() } },
-        { provide: TranslocoService, useValue: { translate: (k: string) => k } },
+        {
+          provide: ApiErrorService,
+          useValue: { mostrar: vi.fn(), normalize: vi.fn() },
+        },
+        {
+          provide: TranslocoService,
+          useValue: { translate: (k: string) => k },
+        },
       ],
     });
 
@@ -92,8 +98,8 @@ describe('VersionesFormularioPage', () => {
 
   it('debe cargar plantilla inicial SIECA-v1', () => {
     component.cargarPlantillaInicial();
-    expect(apiMock.cargarPlantillaSieca).toHaveBeenCalledWith('SIECA-v1');
-    expect(apiMock.listarVersiones).toHaveBeenCalledTimes(2);
+    expect(apiMock.cargarPlantillaSieca).toHaveBeenCalledWith('SIECA-v2');
+    expect(router.navigate).toHaveBeenCalledWith(['/admin/formularios', '1']);
   });
 
   it('debe crear nueva versión y navegar al detalle', () => {
@@ -107,7 +113,10 @@ describe('VersionesFormularioPage', () => {
     expect(router.navigate).toHaveBeenCalledWith(['/admin/formularios', '2']);
   });
   it('sin version base solicita la plantilla inicial con el codigo indicado', () => {
-    component.nuevoForm.setValue({ codigo: ' SIECA-prueba ', versionBaseId: null });
+    component.nuevoForm.setValue({
+      codigo: ' SIECA-prueba ',
+      versionBaseId: null,
+    });
     component.crearVersion();
     expect(apiMock.crear).toHaveBeenCalledWith({
       codigo: 'SIECA-prueba',
@@ -125,5 +134,18 @@ describe('VersionesFormularioPage', () => {
     component.creandoVersion.set(true);
     component.crearVersion();
     expect(apiMock.crear).not.toHaveBeenCalled();
+  });
+  it('evita cargar dos veces mientras una solicitud esta en curso', () => {
+    component.cargandoPlantilla.set(true);
+    component.cargarPlantillaInicial();
+    expect(apiMock.cargarPlantillaSieca).not.toHaveBeenCalled();
+  });
+  it('elige un codigo libre aunque existan varias plantillas', () => {
+    component.versiones.set([
+      ...mockVersiones,
+      { ...mockVersiones[0], id: '2', codigo: 'SIECA-v2' },
+    ]);
+    component.cargarPlantillaInicial();
+    expect(apiMock.cargarPlantillaSieca).toHaveBeenCalledWith('SIECA-v3');
   });
 });
