@@ -145,7 +145,7 @@
         @for (foto of confirmadasPorCategoria(categoria); track foto.id) {
           <figure>
             @if (foto.miniatura) {
-              <img [src]="foto.miniatura" [alt]="etiqueta(foto.categoria)" />
+              <img [src]="foto.miniatura" [alt]="etiqueta(foto.categoria)" loading="lazy" />
             }
             <figcaption>
               {{ etiqueta(foto.categoria) }} · {{ 'inspecciones.fotos.confirmada' | transloco }}

@@ -70,6 +70,8 @@ export class FormularioDinamicoComponent {
   readonly soloLectura = input(false);
   /** Secciones que no vienen del esquema (por ejemplo, el reporte fotográfico), tras las del esquema. */
   readonly seccionesApoyo = input<SeccionApoyo[]>([]);
+  /** Renderiza todas las secciones simultáneamente para vista de impresión o exportación. */
+  readonly modoImpresion = input(false);
 
   readonly valorChange = output<Record<string, unknown>>();
   readonly seccionCambiando = output<void>();
@@ -129,6 +131,9 @@ export class FormularioDinamicoComponent {
   protected readonly seccionActiva = computed(() => this.entradas()[this.indiceActivo()] ?? null);
   /** Lista de un elemento: obliga a recrear el contenido al cambiar de sección. */
   protected readonly seccionesAMostrar = computed(() => {
+    if (this.modoImpresion()) {
+      return this.entradas();
+    }
     const activa = this.seccionActiva();
     return activa ? [activa] : [];
   });

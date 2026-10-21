@@ -14,6 +14,8 @@ import {
   InspeccionResumenResponse,
   InspeccionPublicadaDetalleResponse,
   InspeccionPublicadaResumenResponse,
+  ExportacionInspeccionResponse,
+  OrdenMantenimientoDetalleItem,
   EstadoInspeccion,
 } from '../models/inspeccion.models';
 import { PuenteResponse, PaginaResponse } from '../../puentes/models/puente.models';
@@ -216,6 +218,18 @@ export class InspeccionApiService {
   obtenerPublicada(id: string): Observable<InspeccionPublicadaDetalleResponse> {
     return this.http.get<InspeccionPublicadaDetalleResponse>(
       `/api/v1/inspecciones/${encodeURIComponent(id)}/publicada`,
+    );
+  }
+
+  exportar(id: string): Observable<ExportacionInspeccionResponse> {
+    return this.http.get<ExportacionInspeccionResponse>(
+      `/api/v1/inspecciones/${encodeURIComponent(id)}/exportar`,
+    );
+  }
+
+  obtenerOrdenesMantenimiento(id: string): Observable<OrdenMantenimientoDetalleItem[]> {
+    return this.http.get<OrdenMantenimientoDetalleItem[]>(
+      `/api/v1/inspecciones/${encodeURIComponent(id)}/ordenes-mantenimiento`,
     );
   }
 }

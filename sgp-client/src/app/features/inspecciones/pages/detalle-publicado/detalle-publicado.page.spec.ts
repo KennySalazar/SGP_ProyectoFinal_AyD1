@@ -81,6 +81,8 @@ describe('Detalle publicado de HU-030', () => {
     publicar: vi.fn(),
     adjuntarFotografia: vi.fn(),
     retirarFotografia: vi.fn(),
+    exportar: vi.fn(),
+    obtenerOrdenesMantenimiento: vi.fn(),
   };
   const formularios = { obtenerActiva: vi.fn(), obtenerEsquemaPublicado: vi.fn() };
   const locales = { guardarContexto: vi.fn(), pendientes: vi.fn(), guardar: vi.fn() };
@@ -103,6 +105,8 @@ describe('Detalle publicado de HU-030', () => {
       ]),
     );
     api.contenidoFotografia.mockReturnValue(of(new Blob(['jpeg'], { type: 'image/jpeg' })));
+    api.obtenerOrdenesMantenimiento.mockReturnValue(of([]));
+    api.exportar.mockReturnValue(of({ id: 'original', estado: 'PUBLICADA' }));
     vi.stubGlobal(
       'URL',
       class extends URL {
@@ -277,5 +281,75 @@ describe('Detalle publicado de HU-030', () => {
     fixture.detectChanges();
     expect(api.obtenerPublicada).toHaveBeenLastCalledWith('correccion');
     expect(fixture.componentInstance.detalle()?.id).toBe('correccion');
+  });
+
+  it('muestra banner de versión histórica y tabla de correspondencia cuando no es la activa', async () => {
+    respuesta.relacionVersionActiva = {
+      esVersionActiva: false,
+      codigoVersionInspeccion: 'SIECA-v1',
+      codigoVersionActiva: 'SIECA-v2',
+      versionActivaId: 'v2',
+      mapeosDeclarados: true,
+      totalEquivalentes: 1,
+      totalNuevos: 1,
+      totalEliminados: 0,
+      mapeos: [
+        {
+          id: 'map-1',
+          elementoRefOrigen: 'subestructura.estribo',
+          elementoRefDestino: 'subestructura.estribo_entrada',
+          tipo: 'EQUIVALENTE',
+          observacion: 'Renombrado menor',
+        },
+      ],
+    };
+    const html = await abrir();
+    const banner = html.querySelector('.version-historica-banner');
+    expect(banner).not.toBeNull();
+    expect(banner?.textContent).toContain('SIECA-v1');
+    expect(banner?.textContent).toContain('SIECA-v2');
+
+    const toggle = html.querySelector<HTMLButtonElement>('.version-banner-accion button');
+    expect(toggle).not.toBeNull();
+    toggle?.click();
+    fixture.detectChanges();
+
+    const tablaMapeo = html.querySelector('.tabla-mapeo-contenedor');
+    expect(tablaMapeo).not.toBeNull();
+    expect(tablaMapeo?.textContent).toContain('subestructura.estribo');
+    expect(tablaMapeo?.textContent).toContain('subestructura.estribo_entrada');
+  });
+
+  it('permite exportar la inspección en JSON invocando el servicio', async () => {
+    const html = await abrir();
+    const botones = Array.from(
+      html.querySelectorAll<HTMLButtonElement>('.acciones-publicada button'),
+    );
+    expect(botones.length).toBeGreaterThanOrEqual(2);
+
+    fixture.componentInstance.exportar();
+    await fixture.whenStable();
+
+    expect(api.exportar).toHaveBeenCalledWith('original');
+  });
+
+  it('muestra propuestas de mantenimiento asociadas si existen', async () => {
+    api.obtenerOrdenesMantenimiento.mockReturnValue(
+      of([
+        {
+          id: 'prop-1',
+          tipo: 'REPARACION',
+          estado: 'PENDIENTE',
+          descripcion: 'Desplazamiento visible',
+          prioridadSugerida: 'ALTA',
+          prioridadConfirmada: 'ALTA',
+          creadoEn: '2026-10-20T10:00:00Z',
+        },
+      ]),
+    );
+
+    const html = await abrir();
+    expect(html.textContent).toContain('REPARACION');
+    expect(html.textContent).toContain('Desplazamiento visible');
   });
 });
