@@ -87,22 +87,7 @@
         <span>{{ 'inspecciones.borrador.volverPuente' | transloco }}</span>
       </a>
 
-      @if (!soloLectura()) {
-      <button
-        pButton
-        type="button"
-        (click)="guardarBorrador()"
-        [disabled]="guardando()"
-        [loading]="guardando()"
-        class="btn-guardar"
-      >
-        <i class="pi pi-save" aria-hidden="true"></i>
-        <span
-          >{{ (guardando() ? 'inspecciones.borrador.guardando' : 'inspecciones.borrador.guardar' ) |
-          transloco }}</span
-        >
-      </button>
-      } @if (accionFinal(); as accion) {
+      @if (accionFinal(); as accion) {
       <button
         pButton
         type="button"
@@ -153,9 +138,9 @@
       aria-hidden="true"
     ></i>
     <span>
-      {{ (estado === 'guardando' ? 'inspecciones.borrador.autoguardando' : estado === 'guardado' ?
-      'inspecciones.borrador.guardadoExitoso' : 'inspecciones.borrador.cambiosPendientes') |
-      transloco }}
+      @if (estado === 'guardado' && mensajeExito()) { {{ mensajeExito() }} } @else { {{ (estado ===
+      'guardando' ? 'inspecciones.borrador.autoguardando' :
+      'inspecciones.borrador.cambiosPendientes') | transloco }} }
     </span>
   </div>
   } @if (errorGuardado(); as errGuardado) {
@@ -167,11 +152,6 @@
   <div class="alerta-error surface-card" role="alert">
     <i class="pi pi-database" aria-hidden="true"></i>
     <span>{{ errEspacio }}</span>
-  </div>
-  } @if (horaGuardadoLocal(); as hora) {
-  <div class="alerta-autoguardado surface-card guardado-local" role="status">
-    <i class="pi pi-save" aria-hidden="true"></i>
-    <span>{{ 'inspecciones.borrador.guardadoDispositivo' | transloco: { hora: hora } }}</span>
   </div>
   }
   <div class="resumen-panel surface-card">

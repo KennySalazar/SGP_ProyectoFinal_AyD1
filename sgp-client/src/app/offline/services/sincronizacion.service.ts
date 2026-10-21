@@ -126,9 +126,11 @@ export class SincronizacionService {
         const reintentable = http.status === 0 || http.status >= 500;
         const agotado = intento === 4;
         if (!reintentable || agotado) {
+          const codigoError = typeof http.error?.code === 'string' ? http.error.code : undefined;
           await sgpDb.cola_sync.update(item.id, {
             estado: 'INTERVENCION',
             intentos: intento + 1,
+            codigoError,
             ultimoError: String(
               http.error?.detail ??
                 http.error?.message ??
@@ -136,11 +138,20 @@ export class SincronizacionService {
                 'Error de sincronización',
             ),
           });
+          if (codigoError === 'concurrencia_conflicto' && this.connectivity.online()) {
+            try {
+              const borrador = await firstValueFrom(this.api.obtenerBorrador(item.entityId, true));
+              await this.inspeccionesLocales.cachearBorradorCanonico(borrador, propietarioId);
+            } catch {
+              // Se conserva la edición conflictiva si no puede consultarse el servidor.
+            }
+          }
           return;
         }
         await sgpDb.cola_sync.update(item.id, {
           estado: 'PENDIENTE',
           intentos: intento + 1,
+          codigoError: undefined,
           ultimoError: http.message,
         });
         await new Promise((resolve) =>

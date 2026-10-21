@@ -104,7 +104,6 @@ export class CompletarInspeccionPage implements OnInit {
   readonly borrador = signal<InspeccionBorradorResponse | null>(null);
   readonly esquema = signal<EsquemaJson | null>(null);
   readonly fechaInspeccion = signal<string>('');
-  readonly horaGuardadoLocal = signal<string | null>(null);
   readonly esSoloLocal = signal(false);
   readonly errorAlmacenamiento = signal<string | null>(null);
   readonly esOffline = computed(() => !this.connectivity.online());
@@ -187,61 +186,138 @@ export class CompletarInspeccionPage implements OnInit {
   private cargarBorrador(id: string): void {
     this.cargando.set(true);
     this.errorCarga.set(null);
-
-    // Intentar primero desde Dexie si estamos offline o si existe localmente
-    this.inspeccionesLocales.obtenerInspeccionLocal(id).then((local) => {
-      if (local && local.payload) {
-        if (!local.sincronizado) {
-          this.esSoloLocal.set(true);
-        }
-        const rawPayload = local.payload as Record<string, unknown>;
-        const b = (
-          rawPayload &&
-          typeof rawPayload === 'object' &&
-          'borrador' in rawPayload &&
-          rawPayload['borrador']
-            ? rawPayload['borrador']
-            : rawPayload
-        ) as InspeccionBorradorResponse;
-
-        if (b && typeof b === 'object' && (b.fechaInspeccion || b.id || b.versionFormularioId)) {
-          this.borrador.set(this.conProgreso(b));
-          this.datosIniciales.set(b);
-          this.fechaInspeccion.set(b.fechaInspeccion || this.hoy);
-          if (b.datos) {
-            this.datosEnMemoria.set(b.datos);
-          }
-          if (local.actualizadoEn) {
-            const d = new Date(local.actualizadoEn);
-            const hh = String(d.getHours()).padStart(2, '0');
-            const mm = String(d.getMinutes()).padStart(2, '0');
-            this.horaGuardadoLocal.set(`${hh}:${mm}`);
-          }
-          this.cargarEsquema(b.versionFormularioId);
+    void this.inspeccionesLocales
+      .tieneConflictoConcurrencia(id, this.auth.user()?.id)
+      .then((conflicto) => {
+        if (conflicto && this.connectivity.online()) {
+          this.cargarBorradorCanonico(id);
           return;
         }
-      }
-
-      // Si no está local o no hay Dexie disponible, acudir a la API
-      this.inspeccionApi
-        .obtenerBorrador(id, true)
-        .pipe(takeUntilDestroyed(this.destroyRef))
-        .subscribe({
-          next: (b) => {
-            this.borrador.set(this.conProgreso(b));
-            this.datosIniciales.set(b);
-            this.fechaInspeccion.set(b.fechaInspeccion || this.hoy);
-            if (b.datos) {
-              this.datosEnMemoria.set(b.datos);
-            }
-            this.cargarEsquema(b.versionFormularioId);
-          },
-          error: (err: HttpErrorResponse) => {
-            this.cargando.set(false);
-            this.procesarErrorCarga(err);
-          },
+        // En operación normal y sin conexión, Dexie conserva la precedencia existente.
+        void this.inspeccionesLocales.obtenerInspeccionLocal(id).then((local) => {
+          this.cargarBorradorDesdeLocal(id, local);
         });
-    });
+      });
+  }
+
+  private cargarBorradorDesdeLocal(
+    id: string,
+    local: Awaited<ReturnType<InspeccionesLocalesService['obtenerInspeccionLocal']>>,
+  ): void {
+    if (local && local.payload) {
+      if (!local.sincronizado) {
+        this.esSoloLocal.set(true);
+      }
+      const rawPayload = local.payload as Record<string, unknown>;
+      const b = (
+        rawPayload &&
+        typeof rawPayload === 'object' &&
+        'borrador' in rawPayload &&
+        rawPayload['borrador']
+          ? rawPayload['borrador']
+          : rawPayload
+      ) as InspeccionBorradorResponse;
+
+      if (b && typeof b === 'object' && (b.fechaInspeccion || b.id || b.versionFormularioId)) {
+        if (
+          local.sincronizado &&
+          !local.actualizacionLocalPendiente &&
+          this.connectivity.online()
+        ) {
+          this.inspeccionApi
+            .obtenerBorrador(id, true)
+            .pipe(takeUntilDestroyed(this.destroyRef))
+            .subscribe({
+              next: (canonico) => {
+                void this.inspeccionesLocales
+                  .actualizarBorradorCanonicoSiSinPendientes(canonico, canonico.autorId)
+                  .then(async (actualizado) => {
+                    let borrador = canonico;
+                    let sincronizado = actualizado;
+                    if (!actualizado) {
+                      const copiaLocal = await this.inspeccionesLocales.obtenerInspeccionLocal(id);
+                      const payload = copiaLocal?.payload as BorradorLocalPayload | undefined;
+                      borrador = payload?.borrador ?? b;
+                      sincronizado = copiaLocal?.sincronizado ?? false;
+                    }
+                    this.aplicarBorradorLocal(borrador, sincronizado);
+                  })
+                  .catch(() => this.aplicarBorradorLocal(canonico, true));
+              },
+              error: () => this.aplicarBorradorLocal(b, true),
+            });
+        } else {
+          this.aplicarBorradorLocal(b, local.sincronizado && !local.actualizacionLocalPendiente);
+        }
+        return;
+      }
+    }
+
+    // Si no está local o no hay Dexie disponible, acudir a la API
+    this.inspeccionApi
+      .obtenerBorrador(id, true)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (b) => {
+          this.aplicarBorrador(b);
+          this.cargarEsquema(b.versionFormularioId);
+        },
+        error: (err: HttpErrorResponse) => {
+          this.cargando.set(false);
+          this.procesarErrorCarga(err);
+        },
+      });
+  }
+
+  private aplicarBorradorLocal(borrador: InspeccionBorradorResponse, sincronizado: boolean): void {
+    this.aplicarBorrador(borrador);
+    this.estadoAutoguardado.set('guardado');
+    this.mensajeExito.set(
+      sincronizado
+        ? 'Borrador guardado en el servidor.'
+        : this.mensajeGuardadoEnDispositivo(new Date(borrador.actualizadoEn ?? Date.now())),
+    );
+    this.cargarEsquema(borrador.versionFormularioId);
+  }
+
+  private cargarBorradorCanonico(id: string): void {
+    this.inspeccionApi
+      .obtenerBorrador(id, true)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (borrador) => {
+          void this.inspeccionesLocales
+            .cachearBorradorCanonico(borrador, borrador.autorId)
+            .catch((error: Error) => {
+              this.errorAlmacenamiento.set(
+                error.message || 'No fue posible actualizar la copia local del borrador.',
+              );
+            })
+            .finally(() => {
+              this.esSoloLocal.set(false);
+              this.aplicarBorrador(borrador);
+              this.cargarEsquema(borrador.versionFormularioId);
+            });
+        },
+        error: (err: HttpErrorResponse) => {
+          this.inspeccionesLocales.obtenerInspeccionLocal(id).then((local) => {
+            this.cargarBorradorDesdeLocal(id, local);
+            if (local)
+              this.errorGuardado.set(
+                'No se pudo actualizar el borrador; se muestra la copia local disponible.',
+              );
+            else this.procesarErrorCarga(err);
+          });
+        },
+      });
+  }
+
+  private aplicarBorrador(borrador: InspeccionBorradorResponse): void {
+    this.ultimaHuellaDatos = null;
+    this.borrador.set(this.conProgreso(borrador));
+    this.datosIniciales.set(borrador);
+    this.fechaInspeccion.set(borrador.fechaInspeccion || this.hoy);
+    this.datosEnMemoria.set(borrador.datos ?? {});
   }
   private cargarEsquema(versionId: string): void {
     // Si no hay red, consultar el esquema guardado en Dexie
@@ -373,8 +449,6 @@ export class CompletarInspeccionPage implements OnInit {
     }
 
     const d = new Date();
-    const hh = String(d.getHours()).padStart(2, '0');
-    const mm = String(d.getMinutes()).padStart(2, '0');
     const ahoraIso = d.toISOString();
 
     const borradorActualizado: InspeccionBorradorResponse = {
@@ -414,6 +488,7 @@ export class CompletarInspeccionPage implements OnInit {
       actualizadoEn: ahoraIso,
       payload: payload,
       sincronizado: false,
+      actualizacionLocalPendiente: true,
     };
     const guardadoLocal =
       this.connectivity.online() && !this.esSoloLocal()
@@ -421,8 +496,11 @@ export class CompletarInspeccionPage implements OnInit {
         : this.inspeccionesLocales.guardarBorradorLocal(local, request);
     void guardadoLocal
       .then(() => {
-        this.horaGuardadoLocal.set(`${hh}:${mm}`);
         this.errorAlmacenamiento.set(null);
+        if (!this.connectivity.online() || this.esSoloLocal()) {
+          this.estadoAutoguardado.set('guardado');
+          this.mensajeExito.set(this.mensajeGuardadoEnDispositivo(d));
+        }
       })
       .catch((err: Error) => {
         this.errorAlmacenamiento.set(err.message || 'Almacenamiento local insuficiente.');
@@ -509,28 +587,36 @@ export class CompletarInspeccionPage implements OnInit {
     this.estadoAutoguardado.set('guardando');
     // Si no hay red o es un borrador que solo existe localmente (no sincronizado en servidor)
     if (!this.connectivity.online() || this.esSoloLocal()) {
-      void this.inspeccionesLocales.guardarBorradorLocal(
-        {
-          id: b.id,
-          puenteId: b.puenteId,
-          propietarioId: b.autorId,
-          estado: b.estado,
-          actualizadoEn: new Date().toISOString(),
-          payload: {
-            borrador: { ...b, datos: valorActual, fechaInspeccion: fecha || b.fechaInspeccion },
-            versionFormularioId: b.versionFormularioId,
-            dispositivoId: b.dispositivoId,
-            autorId: b.autorId,
+      void this.inspeccionesLocales
+        .guardarBorradorLocal(
+          {
+            id: b.id,
+            puenteId: b.puenteId,
+            propietarioId: b.autorId,
+            estado: b.estado,
+            actualizadoEn: new Date().toISOString(),
+            payload: {
+              borrador: { ...b, datos: valorActual, fechaInspeccion: fecha || b.fechaInspeccion },
+              versionFormularioId: b.versionFormularioId,
+              dispositivoId: b.dispositivoId,
+              autorId: b.autorId,
+            },
+            sincronizado: false,
           },
-          sincronizado: false,
-        },
-        request,
-      );
-      this.guardadoPendiente = null;
-      this.guardando.set(false);
-      this.revisionGuardada = Math.max(this.revisionGuardada, revisionSolicitud);
-      this.estadoAutoguardado.set('guardado');
-      this.mensajeExito.set('Avance guardado localmente en este dispositivo.');
+          request,
+        )
+        .then(() => {
+          this.guardadoPendiente = null;
+          this.guardando.set(false);
+          this.revisionGuardada = Math.max(this.revisionGuardada, revisionSolicitud);
+          this.estadoAutoguardado.set('guardado');
+          this.mensajeExito.set(this.mensajeGuardadoEnDispositivo(new Date()));
+        })
+        .catch((err: Error) => {
+          this.guardando.set(false);
+          this.estadoAutoguardado.set(null);
+          this.errorAlmacenamiento.set(err.message || 'Almacenamiento local insuficiente.');
+        });
       return;
     }
 
@@ -560,6 +646,8 @@ export class CompletarInspeccionPage implements OnInit {
             'La sesión actual no corresponde al propietario de la inspección.',
           );
           this.guardando.set(false);
+          this.estadoAutoguardado.set('guardado');
+          this.mensajeExito.set(this.mensajeGuardadoEnDispositivo(new Date()));
           return;
         }
         this.inspeccionApi.guardarBorrador(b.id, request, operacion.idempotencyKey).subscribe({
@@ -582,7 +670,7 @@ export class CompletarInspeccionPage implements OnInit {
               this.estadoAutoguardado.set('pendiente');
             } else {
               this.estadoAutoguardado.set('guardado');
-              this.mensajeExito.set('Avance de borrador guardado exitosamente.');
+              this.mensajeExito.set('Borrador guardado en el servidor.');
             }
             const guardarCambiosPendientes =
               this.guardadoForzadoDuranteSolicitud && hayCambiosNuevos;
@@ -593,10 +681,18 @@ export class CompletarInspeccionPage implements OnInit {
           },
           error: (err: HttpErrorResponse) => {
             if (err.status !== 0 && err.status < 500) {
-              void this.inspeccionesLocales.marcarOperacionParaIntervencion(
-                operacion.id,
-                String(err.error?.detail ?? err.error?.message ?? err.message),
-              );
+              const codigoError = typeof err.error?.code === 'string' ? err.error.code : undefined;
+              void this.inspeccionesLocales
+                .marcarOperacionParaIntervencion(
+                  operacion.id,
+                  String(err.error?.detail ?? err.error?.message ?? err.message),
+                  codigoError,
+                )
+                .then(() => {
+                  if (codigoError === 'concurrencia_conflicto' && this.connectivity.online()) {
+                    this.cargarBorradorCanonico(b.id);
+                  }
+                });
             } else {
               void this.inspeccionesLocales.marcarOperacionPendiente(
                 operacion.id,
@@ -605,7 +701,12 @@ export class CompletarInspeccionPage implements OnInit {
             }
             if (!esResultadoIncierto(err)) this.guardadoPendiente = null;
             this.guardando.set(false);
-            this.estadoAutoguardado.set(null);
+            if (operacion) {
+              this.estadoAutoguardado.set('guardado');
+              this.mensajeExito.set(this.mensajeGuardadoEnDispositivo(new Date()));
+            } else {
+              this.estadoAutoguardado.set(null);
+            }
             this.procesarErrorGuardado(err);
           },
         });
@@ -764,5 +865,10 @@ export class CompletarInspeccionPage implements OnInit {
         err.error?.detail || err.error?.message || 'Ocurrió un error al guardar el borrador.',
       );
     }
+  }
+
+  private mensajeGuardadoEnDispositivo(fecha: Date): string {
+    const hora = `${String(fecha.getHours()).padStart(2, '0')}:${String(fecha.getMinutes()).padStart(2, '0')}`;
+    return `Borrador guardado en este dispositivo a las ${hora}.`;
   }
 }

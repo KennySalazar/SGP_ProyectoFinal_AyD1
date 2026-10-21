@@ -14,6 +14,7 @@ export interface LocalInspection {
   actualizadoEn: string;
   payload: unknown;
   sincronizado: boolean;
+  actualizacionLocalPendiente?: boolean;
 }
 export interface LocalPhoto {
   propietarioId?: string;
@@ -50,6 +51,7 @@ export interface SyncQueueItem {
   intentos: number;
   creadoEn: string;
   ultimoError?: string;
+  codigoError?: string;
   estado?: 'PENDIENTE' | 'ENVIANDO' | 'INTERVENCION';
 }
 

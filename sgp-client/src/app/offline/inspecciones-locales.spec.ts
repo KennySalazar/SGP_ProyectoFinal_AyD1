@@ -292,6 +292,84 @@ describe('HU-042: Inspecciones Locales y Recuperación tras Recarga', () => {
     expect([...colaMemoria.values()][0]?.estado).toBe('PENDIENTE');
   });
 
+  it('actualiza una copia canónica solo si no hay ediciones pendientes', async () => {
+    const canonico: InspeccionBorradorResponse = {
+      id: 'inspection-canonical-refresh',
+      puenteId: 'bridge-1',
+      codigoPuente: 'P-001',
+      nombrePuente: 'Puente',
+      versionFormularioId: 'form-v1',
+      codigoVersionFormulario: 'v1',
+      autorId: 'user-1',
+      rolAutor: 'ESTUDIANTE',
+      nombreAutor: 'Inspector',
+      estado: 'BORRADOR',
+      fechaInspeccion: '2026-10-20',
+      dispositivoId: 'device-1',
+      acompanantes: [],
+      version: 2,
+      creadoEn: '2026-10-20T10:00:00Z',
+      progreso: {
+        totalCamposRequeridos: 0,
+        totalCamposCompletados: 0,
+        porcentajeTotal: 0,
+        secciones: [],
+      },
+      datos: { campo: 'confirmado' },
+    };
+
+    expect(await service.actualizarBorradorCanonicoSiSinPendientes(canonico, 'user-1')).toBe(true);
+    const edicionLocal: LocalInspection = {
+      id: canonico.id,
+      puenteId: canonico.puenteId,
+      propietarioId: 'user-1',
+      estado: 'BORRADOR',
+      actualizadoEn: '2026-10-20T10:01:00Z',
+      sincronizado: true,
+      actualizacionLocalPendiente: true,
+      payload: {
+        borrador: { ...canonico, datos: { campo: 'edición sin conexión' } },
+      },
+    };
+    await service.guardarBorradorEnCache(edicionLocal);
+
+    expect(
+      await service.actualizarBorradorCanonicoSiSinPendientes(
+        { ...canonico, version: 3 },
+        'user-1',
+      ),
+    ).toBe(false);
+    expect(
+      (inspeccionesMemoria.get(canonico.id)?.payload as BorradorLocalPayload).borrador.datos,
+    ).toEqual({ campo: 'edición sin conexión' });
+    expect(inspeccionesMemoria.get(canonico.id)?.actualizacionLocalPendiente).toBe(true);
+
+    const operacion: SyncQueueItem = {
+      id: 'save-pending',
+      tipo: 'INSPECCION',
+      entityId: canonico.id,
+      propietarioId: 'user-1',
+      operacion: 'GUARDAR_BORRADOR',
+      payload: { version: 2, datos: { campo: 'edición sin conexión' } },
+      idempotencyKey: 'pending-key',
+      intentos: 0,
+      creadoEn: '2026-10-20T10:01:00Z',
+      estado: 'PENDIENTE',
+    };
+    colaMemoria.set(operacion.id, operacion);
+
+    expect(
+      await service.actualizarBorradorCanonicoSiSinPendientes(
+        { ...canonico, version: 3, datos: { campo: 'otra versión del servidor' } },
+        'user-1',
+      ),
+    ).toBe(false);
+    expect(
+      (inspeccionesMemoria.get(canonico.id)?.payload as BorradorLocalPayload).borrador.datos,
+    ).toEqual({ campo: 'edición sin conexión' });
+    expect(colaMemoria.get(operacion.id)).toEqual(operacion);
+  });
+
   it('conserva campos locales al confirmar la sincronización y reabrir el borrador', async () => {
     const inspeccionId = 'inspection-form-data-roundtrip';
     const camposGuardados = {

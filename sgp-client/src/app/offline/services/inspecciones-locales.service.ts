@@ -48,6 +48,75 @@ export class InspeccionesLocalesService {
     });
   }
 
+  async cachearBorradorCanonico(
+    borrador: InspeccionBorradorResponse,
+    propietarioId: string,
+  ): Promise<void> {
+    const existente = await sgpDb.inspecciones.get(borrador.id);
+    const payloadExistente =
+      existente?.payload && typeof existente.payload === 'object'
+        ? (existente.payload as Partial<BorradorLocalPayload>)
+        : {};
+    await this.guardarBorradorEnCache({
+      id: borrador.id,
+      puenteId: borrador.puenteId,
+      propietarioId,
+      estado: borrador.estado,
+      actualizadoEn:
+        borrador.actualizadoEn ??
+        borrador.ultimaActividadEn ??
+        borrador.creadoEn ??
+        new Date().toISOString(),
+      payload: {
+        ...payloadExistente,
+        borrador,
+        versionFormularioId: borrador.versionFormularioId,
+        dispositivoId: borrador.dispositivoId,
+        autorId: propietarioId,
+      },
+      sincronizado: true,
+      actualizacionLocalPendiente: false,
+    });
+  }
+
+  async actualizarBorradorCanonicoSiSinPendientes(
+    borrador: InspeccionBorradorResponse,
+    propietarioId: string,
+  ): Promise<boolean> {
+    return sgpDb.transaction('rw', sgpDb.inspecciones, sgpDb.cola_sync, async () => {
+      const pendientes = await sgpDb.cola_sync.where('entityId').equals(borrador.id).toArray();
+      if (pendientes.length > 0) return false;
+
+      const existente = await sgpDb.inspecciones.get(borrador.id);
+      if (existente?.actualizacionLocalPendiente) return false;
+      const payloadExistente =
+        existente?.payload && typeof existente.payload === 'object'
+          ? (existente.payload as Partial<BorradorLocalPayload>)
+          : {};
+      await sgpDb.inspecciones.put({
+        id: borrador.id,
+        puenteId: borrador.puenteId,
+        propietarioId,
+        estado: borrador.estado,
+        actualizadoEn:
+          borrador.actualizadoEn ??
+          borrador.ultimaActividadEn ??
+          borrador.creadoEn ??
+          new Date().toISOString(),
+        payload: {
+          ...payloadExistente,
+          borrador,
+          versionFormularioId: borrador.versionFormularioId,
+          dispositivoId: borrador.dispositivoId,
+          autorId: propietarioId,
+        },
+        sincronizado: true,
+        actualizacionLocalPendiente: false,
+      });
+      return true;
+    });
+  }
+
   async guardarBorradorLocal(
     inspeccion: LocalInspection,
     request: GuardarBorradorRequest,
@@ -123,6 +192,7 @@ export class InspeccionesLocalesService {
       await sgpDb.inspecciones.put({
         ...local,
         sincronizado: pendientes.length === 0,
+        actualizacionLocalPendiente: false,
         payload: {
           ...payload,
           borrador: {
@@ -137,12 +207,36 @@ export class InspeccionesLocalesService {
     });
   }
 
-  async marcarOperacionParaIntervencion(id: string, mensaje: string): Promise<void> {
-    await sgpDb.cola_sync.update(id, { estado: 'INTERVENCION', ultimoError: mensaje });
+  async marcarOperacionParaIntervencion(
+    id: string,
+    mensaje: string,
+    codigoError?: string,
+  ): Promise<void> {
+    await sgpDb.cola_sync.update(id, {
+      estado: 'INTERVENCION',
+      ultimoError: mensaje,
+      codigoError,
+    });
   }
 
   async marcarOperacionPendiente(id: string, mensaje: string): Promise<void> {
-    await sgpDb.cola_sync.update(id, { estado: 'PENDIENTE', ultimoError: mensaje });
+    await sgpDb.cola_sync.update(id, {
+      estado: 'PENDIENTE',
+      ultimoError: mensaje,
+      codigoError: undefined,
+    });
+  }
+
+  async tieneConflictoConcurrencia(inspeccionId: string, propietarioId?: string): Promise<boolean> {
+    if (!propietarioId) return false;
+    const operaciones = await sgpDb.cola_sync.where('entityId').equals(inspeccionId).toArray();
+    return operaciones.some(
+      (item) =>
+        item.propietarioId === propietarioId &&
+        item.operacion === 'GUARDAR_BORRADOR' &&
+        item.estado === 'INTERVENCION' &&
+        item.codigoError === 'concurrencia_conflicto',
+    );
   }
 
   async encolarInicio(
