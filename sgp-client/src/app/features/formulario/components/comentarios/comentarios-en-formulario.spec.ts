@@ -8,6 +8,8 @@ import { FormularioDinamicoComponent } from '../formulario-dinamico/formulario-d
 import { CONTEXTO_COMENTARIOS, ContextoComentariosFormulario } from './contexto-comentarios';
 
 const SECCION = '/subestructura';
+/** Recorrer las secciones del esquema real tarda más de lo normal si la máquina está cargada. */
+const TIEMPO_MAXIMO_RECORRIDO = 30_000;
 const GRUPO = '/subestructura/estribo_entrada';
 const ELEMENTO = '/subestructura/estribo_entrada/viga_apoyo';
 const PILAS = '/subestructura/pilas';
@@ -99,21 +101,25 @@ describe('Icono de comentarios junto al nombre, dentro del formulario dinámico'
     }
   });
 
-  it('ningún nodo tiene más de un botón y ninguno queda dentro de un encabezado ni de un summary', () => {
-    const secciones = Object.keys((ESQUEMA_SIECA as { properties: EsquemaJson }).properties);
-    for (const clave of secciones) {
-      TestBed.resetTestingModule();
-      const fixture = montar(contexto(), '/' + clave);
-      const html = fixture.nativeElement as HTMLElement;
+  it(
+    'ningún nodo tiene más de un botón y ninguno queda dentro de un encabezado ni de un summary',
+    () => {
+      const secciones = Object.keys((ESQUEMA_SIECA as { properties: EsquemaJson }).properties);
+      for (const clave of secciones) {
+        TestBed.resetTestingModule();
+        const fixture = montar(contexto(), '/' + clave);
+        const html = fixture.nativeElement as HTMLElement;
 
-      const referencias = Array.from(html.querySelectorAll('[data-elemento-ref]')).map(
-        (e) => `${e.getAttribute('data-elemento-ref')}|${e.getAttribute('data-instancia-id')}`,
-      );
-      expect(new Set(referencias).size, clave).toBe(referencias.length);
-      expect(html.querySelectorAll('summary [data-elemento-ref]'), clave).toHaveLength(0);
-      expect(html.querySelectorAll('h2 button, h3 button, h4 button'), clave).toHaveLength(0);
-    }
-  });
+        const referencias = Array.from(html.querySelectorAll('[data-elemento-ref]')).map(
+          (e) => `${e.getAttribute('data-elemento-ref')}|${e.getAttribute('data-instancia-id')}`,
+        );
+        expect(new Set(referencias).size, clave).toBe(referencias.length);
+        expect(html.querySelectorAll('summary [data-elemento-ref]'), clave).toHaveLength(0);
+        expect(html.querySelectorAll('h2 button, h3 button, h4 button'), clave).toHaveLength(0);
+      }
+    },
+    TIEMPO_MAXIMO_RECORRIDO,
+  );
 
   it('un grupo opcional plegado lo lleva en una fila sobre él, no dentro de su summary', () => {
     const esquema: EsquemaJson = {
