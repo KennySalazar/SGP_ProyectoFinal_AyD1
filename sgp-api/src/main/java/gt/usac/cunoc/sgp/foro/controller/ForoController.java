@@ -5,7 +5,10 @@ import gt.usac.cunoc.sgp.common.security.JwtData;
 import gt.usac.cunoc.sgp.foro.dto.ComentarioResponse;
 import gt.usac.cunoc.sgp.foro.dto.CrearComentarioRequest;
 import gt.usac.cunoc.sgp.foro.dto.CrearHiloRequest;
+import gt.usac.cunoc.sgp.foro.dto.HiloInspeccionResponse;
 import gt.usac.cunoc.sgp.foro.dto.HiloResponse;
+import gt.usac.cunoc.sgp.foro.service.ForoInspeccionService;
+import gt.usac.cunoc.sgp.foro.service.ForoInspeccionService.Apertura;
 import gt.usac.cunoc.sgp.foro.service.ForoService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -25,18 +28,20 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * Foro por puente (HU-063). Leer es público (RN-FOR-09); crear hilos y comentar exige una sesión
- * activa de cualquier rol.
+ * Foro por puente (HU-063) y por inspección publicada (HU-064). Leer es público (RN-FOR-09); crear
+ * hilos y comentar exige una sesión activa de cualquier rol.
  */
 @RestController
 @RequestMapping("/api/v1")
-@Tag(name = "Foro", description = "Hilos por puente y sus comentarios")
+@Tag(name = "Foro", description = "Hilos por puente y por inspección, y sus comentarios")
 public class ForoController {
 
   private final ForoService foro;
+  private final ForoInspeccionService foroInspeccion;
 
-  public ForoController(ForoService foro) {
+  public ForoController(ForoService foro, ForoInspeccionService foroInspeccion) {
     this.foro = foro;
+    this.foroInspeccion = foroInspeccion;
   }
 
   @GetMapping("/puentes/{puenteId}/hilos")
@@ -79,6 +84,34 @@ public class ForoController {
     return foro.obtenerHilo(hiloId);
   }
 
+  @GetMapping("/inspecciones/{inspeccionId}/hilo")
+  @PreAuthorize("permitAll()")
+  @Operation(
+      summary = "Consultar el hilo de una inspección publicada",
+      description =
+          "Público. Devuelve el hilo y cuántos comentarios tiene cada campo o elemento anclado. "
+              + "404 si la inspección no existe, no está publicada o aún no tiene hilo; esta "
+              + "consulta nunca lo crea.")
+  public HiloInspeccionResponse obtenerHiloDeInspeccion(@PathVariable UUID inspeccionId) {
+    return foroInspeccion.obtener(inspeccionId);
+  }
+
+  @PostMapping("/inspecciones/{inspeccionId}/hilo")
+  @PreAuthorize("isAuthenticated()")
+  @SecurityRequirement(name = "bearerAuth")
+  @Operation(
+      summary = "Abrir el hilo de una inspección publicada",
+      description =
+          "Cualquier usuario autenticado y activo. Es idempotente: crea el hilo si aún no existe "
+              + "(201), por ejemplo en una inspección publicada antes de esta función, y si ya "
+              + "existe lo devuelve (200). 404 si la inspección no existe o no está publicada.")
+  public ResponseEntity<HiloInspeccionResponse> abrirHiloDeInspeccion(
+      @PathVariable UUID inspeccionId, Authentication authentication) {
+    Apertura apertura = foroInspeccion.abrir(inspeccionId, usuarioId(authentication));
+    return ResponseEntity.status(apertura.creado() ? HttpStatus.CREATED : HttpStatus.OK)
+        .body(apertura.hilo());
+  }
+
   @GetMapping("/hilos/{hiloId}/comentarios")
   @PreAuthorize("permitAll()")
   @Operation(
@@ -86,12 +119,16 @@ public class ForoController {
       description =
           "Público. Comentarios y respuestas en una sola lista, de los más antiguos a los más "
               + "nuevos; una respuesta lleva el padreId de su comentario principal y llega siempre "
-              + "después de él. Página desde 0, tamaño entre 1 y 100 (20 por defecto).")
+              + "después de él. Con elementoRef solo los anclados a ese campo o elemento (sin "
+              + "instanciaElementoId, los del elemento sin instancia). Página desde 0, tamaño "
+              + "entre 1 y 100 (20 por defecto).")
   public Page<ComentarioResponse> listarComentarios(
       @PathVariable UUID hiloId,
       @RequestParam(defaultValue = "0") int pagina,
-      @RequestParam(defaultValue = "20") int tamanio) {
-    return foro.listarComentarios(hiloId, pagina, tamanio);
+      @RequestParam(defaultValue = "20") int tamanio,
+      @RequestParam(required = false) String elementoRef,
+      @RequestParam(required = false) UUID instanciaElementoId) {
+    return foro.listarComentarios(hiloId, pagina, tamanio, elementoRef, instanciaElementoId);
   }
 
   @PostMapping("/hilos/{hiloId}/comentarios")
@@ -102,7 +139,11 @@ public class ForoController {
       description =
           "Cualquier usuario autenticado y activo. El contenido es obligatorio (hasta 2000 "
               + "caracteres). Con padreId responde a un comentario principal del mismo hilo; no "
-              + "se puede responder a una respuesta (422). Un hilo cerrado responde 409.")
+              + "se puede responder a una respuesta (422). En el hilo de una inspección, "
+              + "elementoRef (y instanciaElementoId si el elemento es repetible) ancla el "
+              + "comentario a un campo o elemento que debe existir en el formulario con que se "
+              + "levantó la inspección (422 si no); una respuesta toma el ancla de su comentario. "
+              + "Un hilo cerrado responde 409.")
   public ResponseEntity<ComentarioResponse> crearComentario(
       @PathVariable UUID hiloId,
       @RequestBody CrearComentarioRequest request,

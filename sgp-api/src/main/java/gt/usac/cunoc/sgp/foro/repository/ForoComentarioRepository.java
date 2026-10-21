@@ -20,8 +20,25 @@ public interface ForoComentarioRepository extends JpaRepository<ForoComentario, 
     long getTotal();
   }
 
+  /** Total de comentarios de un campo o elemento de un hilo, con sus respuestas. */
+  interface TotalPorAncla {
+    String getElementoRef();
+
+    UUID getInstanciaElementoId();
+
+    long getTotal();
+  }
+
   /** Comentarios y respuestas de un hilo, en una sola lista paginada. */
   Page<ForoComentario> findByHiloId(UUID hiloId, Pageable pageable);
+
+  /** Los de un elemento que no es repetible (o sin instancia concreta). */
+  Page<ForoComentario> findByHiloIdAndElementoRefAndInstanciaElementoIdIsNull(
+      UUID hiloId, String elementoRef, Pageable pageable);
+
+  /** Los de una instancia concreta de un elemento repetible. */
+  Page<ForoComentario> findByHiloIdAndElementoRefAndInstanciaElementoId(
+      UUID hiloId, String elementoRef, UUID instanciaElementoId, Pageable pageable);
 
   Optional<ForoComentario> findByIdAndHiloId(UUID id, UUID hiloId);
 
@@ -29,4 +46,12 @@ public interface ForoComentarioRepository extends JpaRepository<ForoComentario, 
       "SELECT c.hiloId AS hiloId, COUNT(c) AS total FROM ForoComentario c"
           + " WHERE c.hiloId IN :hilos GROUP BY c.hiloId")
   List<TotalPorHilo> contarPorHilos(@Param("hilos") Collection<UUID> hilos);
+
+  @Query(
+      "SELECT c.elementoRef AS elementoRef, c.instanciaElementoId AS instanciaElementoId,"
+          + " COUNT(c) AS total FROM ForoComentario c"
+          + " WHERE c.hiloId = :hilo AND c.elementoRef IS NOT NULL"
+          + " GROUP BY c.elementoRef, c.instanciaElementoId"
+          + " ORDER BY c.elementoRef, c.instanciaElementoId")
+  List<TotalPorAncla> contarPorAncla(@Param("hilo") UUID hilo);
 }

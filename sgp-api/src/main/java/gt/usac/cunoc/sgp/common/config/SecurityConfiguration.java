@@ -78,6 +78,7 @@ public class SecurityConfiguration {
                   .requestMatchers(
                       HttpMethod.GET,
                       "/api/v1/puentes/*/hilos",
+                      "/api/v1/inspecciones/*/hilo",
                       "/api/v1/hilos/*",
                       "/api/v1/hilos/*/comentarios")
                   .permitAll()

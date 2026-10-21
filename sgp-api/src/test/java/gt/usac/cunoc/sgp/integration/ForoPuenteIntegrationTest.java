@@ -6,12 +6,14 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import gt.usac.cunoc.sgp.common.audit.service.AuditoriaWriter;
 import gt.usac.cunoc.sgp.common.exception.ApiException;
+import gt.usac.cunoc.sgp.formulario.validation.ValidadorAnclajeFormulario;
 import gt.usac.cunoc.sgp.foro.dto.ComentarioResponse;
 import gt.usac.cunoc.sgp.foro.dto.CrearComentarioRequest;
 import gt.usac.cunoc.sgp.foro.dto.CrearHiloRequest;
 import gt.usac.cunoc.sgp.foro.dto.HiloResponse;
 import gt.usac.cunoc.sgp.foro.mapper.ForoMapperImpl;
 import gt.usac.cunoc.sgp.foro.model.CategoriaHilo;
+import gt.usac.cunoc.sgp.foro.service.AnclajeComentarioForo;
 import gt.usac.cunoc.sgp.foro.service.ForoService;
 import jakarta.persistence.EntityManager;
 import java.time.Clock;
@@ -65,6 +67,8 @@ import org.testcontainers.utility.DockerImageName;
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @Import({
   ForoService.class,
+  AnclajeComentarioForo.class,
+  ValidadorAnclajeFormulario.class,
   AuditoriaWriter.class,
   ForoMapperImpl.class,
   ForoPuenteIntegrationTest.Config.class

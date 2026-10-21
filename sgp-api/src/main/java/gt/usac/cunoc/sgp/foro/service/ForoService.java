@@ -19,6 +19,8 @@ import gt.usac.cunoc.sgp.foro.repository.ForoAutorRepository.Autor;
 import gt.usac.cunoc.sgp.foro.repository.ForoComentarioRepository;
 import gt.usac.cunoc.sgp.foro.repository.ForoComentarioRepository.TotalPorHilo;
 import gt.usac.cunoc.sgp.foro.repository.ForoHiloRepository;
+import gt.usac.cunoc.sgp.inspeccion.entity.Inspeccion;
+import gt.usac.cunoc.sgp.inspeccion.repository.InspeccionRepository;
 import gt.usac.cunoc.sgp.puente.entity.Puente;
 import gt.usac.cunoc.sgp.puente.repository.PuenteRepository;
 import java.time.Clock;
@@ -42,6 +44,10 @@ import org.springframework.transaction.annotation.Transactional;
  * Foro por puente (HU-063): hilos permanentes clasificados por categoría (RN-FOR-01, RN-FOR-06) y
  * comentarios con un solo nivel de respuesta (RN-FOR-04). Lo puede leer cualquiera; para participar
  * hace falta una sesión (RN-FOR-09), lo que decide el controlador.
+ *
+ * <p>Los comentarios del hilo de una inspección publicada pueden anclarse a un campo o elemento
+ * (HU-064, RN-FOR-02). Ese hilo solo existe para inspecciones PUBLICADAS (RN-FOR-03), un estado
+ * terminal que la base de datos no deja borrar.
  */
 @Service
 public class ForoService {
@@ -50,6 +56,8 @@ public class ForoService {
   private final ForoComentarioRepository comentarios;
   private final ForoAutorRepository autores;
   private final PuenteRepository puentes;
+  private final InspeccionRepository inspecciones;
+  private final AnclajeComentarioForo anclajes;
   private final AuditoriaWriter auditoria;
   private final ForoMapper mapper;
   private final ObjectMapper json;
@@ -60,6 +68,8 @@ public class ForoService {
       ForoComentarioRepository comentarios,
       ForoAutorRepository autores,
       PuenteRepository puentes,
+      InspeccionRepository inspecciones,
+      AnclajeComentarioForo anclajes,
       AuditoriaWriter auditoria,
       ForoMapper mapper,
       ObjectMapper json,
@@ -68,6 +78,8 @@ public class ForoService {
     this.comentarios = comentarios;
     this.autores = autores;
     this.puentes = puentes;
+    this.inspecciones = inspecciones;
+    this.anclajes = anclajes;
     this.auditoria = auditoria;
     this.mapper = mapper;
     this.json = json;
@@ -155,21 +167,51 @@ public class ForoService {
    * Una respuesta siempre llega después de su comentario principal, así que quien la muestra puede
    * agruparla bajo él a medida que carga páginas.
    */
-  @Transactional(readOnly = true)
   public Page<ComentarioResponse> listarComentarios(UUID hiloId, int pagina, int tamanio) {
+    return listarComentarios(hiloId, pagina, tamanio, null, null);
+  }
+
+  /**
+   * Igual que la lista completa, pero con {@code elementoRef} solo los comentarios anclados a ese
+   * campo o elemento: sin {@code instanciaElementoId}, los del elemento sin instancia; con ella,
+   * los de esa instancia.
+   */
+  @Transactional(readOnly = true)
+  public Page<ComentarioResponse> listarComentarios(
+      UUID hiloId, int pagina, int tamanio, String elementoRef, UUID instanciaElementoId) {
     ContenidoForo.validarPaginacion(pagina, tamanio);
+    String ref = ContenidoForo.limpiarReferencia(elementoRef);
+    if (ref == null && instanciaElementoId != null) {
+      throw new ApiException(
+          HttpStatus.UNPROCESSABLE_ENTITY,
+          "filtro_invalido",
+          "Filtro inválido",
+          "La instancia exige indicar el elemento al que pertenece.",
+          List.of(
+              ContenidoForo.error(
+                  "elementoRef", "La instancia exige indicar el elemento al que pertenece.")));
+    }
     ForoHilo hilo = hiloVisible(hiloId);
+    PageRequest paginacion =
+        PageRequest.of(pagina, tamanio, Sort.by(Sort.Order.asc("creadoEn"), Sort.Order.asc("id")));
     Page<ForoComentario> resultado =
-        comentarios.findByHiloId(
-            hilo.getId(),
-            PageRequest.of(
-                pagina, tamanio, Sort.by(Sort.Order.asc("creadoEn"), Sort.Order.asc("id"))));
+        ref == null
+            ? comentarios.findByHiloId(hilo.getId(), paginacion)
+            : instanciaElementoId == null
+                ? comentarios.findByHiloIdAndElementoRefAndInstanciaElementoIdIsNull(
+                    hilo.getId(), ref, paginacion)
+                : comentarios.findByHiloIdAndElementoRefAndInstanciaElementoId(
+                    hilo.getId(), ref, instanciaElementoId, paginacion);
     Map<UUID, Autor> autoresPorId =
         autoresDe(resultado.getContent().stream().map(ForoComentario::getAutorId).toList());
     return resultado.map(c -> mapper.toComentarioResponse(c, autoresPorId.get(c.getAutorId())));
   }
 
-  /** Agrega un comentario a un hilo, o una respuesta si indica el comentario principal. */
+  /**
+   * Agrega un comentario a un hilo, o una respuesta si indica el comentario principal. En el hilo
+   * de una inspección el comentario principal puede anclarse a un campo o elemento; la respuesta
+   * hereda el ancla de su comentario.
+   */
   @Transactional
   public ComentarioResponse crearComentario(
       UUID hiloId, CrearComentarioRequest request, UUID usuarioId) {
@@ -177,6 +219,8 @@ public class ForoService {
     List<Map<String, String>> errores = new ArrayList<>();
     String contenido = ContenidoForo.limpiarComentario(request.contenido());
     validarComentario(contenido, "contenido", errores);
+    String elementoRef = ContenidoForo.limpiarReferencia(request.elementoRef());
+    UUID instanciaElementoId = request.instanciaElementoId();
     if (request.padreId() != null) {
       var padre = comentarios.findByIdAndHiloId(request.padreId(), hiloId);
       if (padre.isEmpty()) {
@@ -189,6 +233,17 @@ public class ForoService {
                 "padreId",
                 "Solo se puede responder a un comentario principal, no a una respuesta."));
       }
+      if (elementoRef != null || instanciaElementoId != null) {
+        errores.add(
+            ContenidoForo.error(
+                "elementoRef",
+                "Una respuesta toma el elemento del comentario al que responde; no lleva ancla"
+                    + " propia."));
+      }
+      elementoRef = padre.map(ForoComentario::getElementoRef).orElse(null);
+      instanciaElementoId = padre.map(ForoComentario::getInstanciaElementoId).orElse(null);
+    } else {
+      validarAncla(hilo, elementoRef, instanciaElementoId, errores);
     }
     if (!errores.isEmpty()) {
       throw new ApiException(
@@ -205,17 +260,64 @@ public class ForoService {
           "Hilo cerrado",
           "El hilo está cerrado y ya no admite comentarios.");
     }
-    ForoComentario comentario = registrarComentario(hilo, contenido, request.padreId(), usuarioId);
+    ForoComentario comentario =
+        registrarComentario(
+            hilo, contenido, request.padreId(), elementoRef, instanciaElementoId, usuarioId);
     return mapper.toComentarioResponse(comentario, autoresDe(List.of(usuarioId)).get(usuarioId));
+  }
+
+  /**
+   * Un ancla exige el hilo de una inspección y un elemento que exista en el esquema con que se
+   * levantó esa inspección (RN-FOR-02). Sin ancla no hay nada que comprobar.
+   */
+  private void validarAncla(
+      ForoHilo hilo,
+      String elementoRef,
+      UUID instanciaElementoId,
+      List<Map<String, String>> errores) {
+    if (elementoRef == null && instanciaElementoId == null) return;
+    if (elementoRef == null) {
+      errores.add(
+          ContenidoForo.error(
+              "elementoRef", "La instancia exige indicar el elemento al que pertenece."));
+    } else if (hilo.getInspeccionId() == null) {
+      errores.add(
+          ContenidoForo.error(
+              "elementoRef",
+              "Solo los comentarios del hilo de una inspección pueden anclarse a un elemento."));
+    } else {
+      Inspeccion inspeccion =
+          inspecciones
+              .findByIdAndEliminadoEnIsNull(hilo.getInspeccionId())
+              .orElseThrow(ForoService::hiloNoEncontrado);
+      anclajes.validar(inspeccion, elementoRef, instanciaElementoId, errores);
+    }
   }
 
   private ForoComentario registrarComentario(
       ForoHilo hilo, String contenido, UUID padreId, UUID usuarioId) {
+    return registrarComentario(hilo, contenido, padreId, null, null, usuarioId);
+  }
+
+  private ForoComentario registrarComentario(
+      ForoHilo hilo,
+      String contenido,
+      UUID padreId,
+      String elementoRef,
+      UUID instanciaElementoId,
+      UUID usuarioId) {
     Instant ahora = clock.instant();
     ForoComentario comentario =
         comentarios.save(
             new ForoComentario(
-                UuidV7Generator.generate(), hilo.getId(), usuarioId, padreId, contenido, ahora));
+                UuidV7Generator.generate(),
+                hilo.getId(),
+                usuarioId,
+                padreId,
+                elementoRef,
+                instanciaElementoId,
+                contenido,
+                ahora));
     hilos.registrarActividad(hilo.getId(), ahora);
     auditoria.registrarEnTransaccion(
         usuarioId,
@@ -276,18 +378,14 @@ public class ForoService {
 
   /** El hilo de un puente activo; si no existe o el puente está inactivo, 404. */
   private ForoHilo hiloVisible(UUID hiloId) {
-    ForoHilo hilo =
-        hilos
-            .findById(hiloId)
-            .orElseThrow(
-                () ->
-                    new ApiException(
-                        HttpStatus.NOT_FOUND,
-                        "hilo_no_encontrado",
-                        "Hilo no encontrado",
-                        "El hilo no existe."));
+    ForoHilo hilo = hilos.findById(hiloId).orElseThrow(ForoService::hiloNoEncontrado);
     puenteActivo(hilo.getPuenteId());
     return hilo;
+  }
+
+  private static ApiException hiloNoEncontrado() {
+    return new ApiException(
+        HttpStatus.NOT_FOUND, "hilo_no_encontrado", "Hilo no encontrado", "El hilo no existe.");
   }
 
   private Map<UUID, Autor> autoresDe(Collection<UUID> ids) {
@@ -309,6 +407,12 @@ public class ForoService {
     nodo.put("hiloId", comentario.getHiloId().toString());
     if (comentario.getPadreId() != null) {
       nodo.put("padreId", comentario.getPadreId().toString());
+    }
+    if (comentario.getElementoRef() != null) {
+      nodo.put("elementoRef", comentario.getElementoRef());
+    }
+    if (comentario.getInstanciaElementoId() != null) {
+      nodo.put("instanciaElementoId", comentario.getInstanciaElementoId().toString());
     }
     nodo.put("contenido", comentario.getContenido());
     return nodo;

@@ -35,6 +35,13 @@ final class ContenidoForo {
     return limpio.isEmpty() ? null : limpio;
   }
 
+  /** Prepara la referencia a un elemento; devuelve {@code null} si viene vacía. */
+  static String limpiarReferencia(String texto) {
+    if (texto == null) return null;
+    String limpio = texto.strip();
+    return limpio.isEmpty() ? null : limpio;
+  }
+
   static Map<String, String> error(String campo, String mensaje) {
     return Map.of("campo", campo, "mensaje", mensaje);
   }

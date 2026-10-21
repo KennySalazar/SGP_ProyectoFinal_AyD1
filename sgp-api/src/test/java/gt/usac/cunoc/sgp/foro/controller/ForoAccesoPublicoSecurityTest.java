@@ -12,6 +12,7 @@ import gt.usac.cunoc.sgp.common.security.JwtAuthenticationFilter;
 import gt.usac.cunoc.sgp.common.security.JwtService;
 import gt.usac.cunoc.sgp.common.security.ProblemAccessDeniedHandler;
 import gt.usac.cunoc.sgp.common.security.ProblemAuthenticationEntryPoint;
+import gt.usac.cunoc.sgp.foro.service.ForoInspeccionService;
 import gt.usac.cunoc.sgp.foro.service.ForoService;
 import gt.usac.cunoc.sgp.usuario.repository.UserAccountRepository;
 import java.time.Clock;
@@ -51,6 +52,7 @@ class ForoAccesoPublicoSecurityTest {
 
   @Autowired private MockMvc mockMvc;
   @MockBean private ForoService foro;
+  @MockBean private ForoInspeccionService foroInspeccion;
   @MockBean private JwtService jwtService;
   @MockBean private UserAccountRepository usuarios;
 
@@ -58,7 +60,7 @@ class ForoAccesoPublicoSecurityTest {
   void elVisitanteLeeLosHilosElHiloYSusComentariosSinSesion() throws Exception {
     when(foro.listarHilosDePuente(ID, 0, 20))
         .thenReturn(new PageImpl<>(List.of(), PageRequest.of(0, 20), 0));
-    when(foro.listarComentarios(ID, 0, 20))
+    when(foro.listarComentarios(ID, 0, 20, null, null))
         .thenReturn(new PageImpl<>(List.of(), PageRequest.of(0, 20), 0));
 
     mockMvc.perform(get("/api/v1/puentes/" + ID + "/hilos")).andExpect(status().isOk());
@@ -66,6 +68,14 @@ class ForoAccesoPublicoSecurityTest {
     // Sin hilo configurado en el servicio responde 200 con cuerpo vacío: lo que importa es que no
     // lo detenga la seguridad.
     mockMvc.perform(get("/api/v1/hilos/" + ID)).andExpect(status().isOk());
+  }
+
+  @Test
+  void elVisitanteLeeElHiloDeUnaInspeccionPeroNoLoAbre() throws Exception {
+    mockMvc.perform(get("/api/v1/inspecciones/" + ID + "/hilo")).andExpect(status().isOk());
+    mockMvc
+        .perform(post("/api/v1/inspecciones/" + ID + "/hilo"))
+        .andExpect(status().isUnauthorized());
   }
 
   @Test
@@ -88,6 +98,12 @@ class ForoAccesoPublicoSecurityTest {
   void unaRutaDelForoQueNoEsDeLecturaSigueExigiendoSesion() throws Exception {
     mockMvc.perform(get("/api/v1/hilos")).andExpect(status().isUnauthorized());
     mockMvc.perform(get("/api/v1/hilos/" + ID + "/otra-cosa")).andExpect(status().isUnauthorized());
+    // El detalle de una inspección sigue siendo solo para quien tiene sesión; solo su hilo es
+    // público.
+    mockMvc.perform(get("/api/v1/inspecciones/" + ID)).andExpect(status().isUnauthorized());
+    mockMvc
+        .perform(get("/api/v1/inspecciones/" + ID + "/publicada"))
+        .andExpect(status().isUnauthorized());
   }
 
   @TestConfiguration
