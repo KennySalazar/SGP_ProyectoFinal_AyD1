@@ -33,6 +33,7 @@ import { PuenteResponse } from '../../../puentes/models/puente.models';
 import { EstadoOrden, PaginaOrdenesMantenimiento } from '../../models/orden-mantenimiento.models';
 import { PrioridadMantenimiento, TipoMantenimiento } from '../../models/regla-mantenimiento.models';
 import { OrdenMantenimientoApiService } from '../../services/orden-mantenimiento-api.service';
+import { PlanRutinarioComponent } from '../plan-rutinario/plan-rutinario.component';
 import { severidadEstadoOrden, ZONA_GUATEMALA } from '../../utils/estado-orden';
 
 type Grupo = 'abiertas' | 'cerradas';
@@ -64,6 +65,7 @@ const TAMANIO = 10;
     TabsModule,
     TagModule,
     TextareaModule,
+    PlanRutinarioComponent,
   ],
   templateUrl: './mantenimiento-puente.component.html',
   styleUrl: './mantenimiento-puente.component.scss',

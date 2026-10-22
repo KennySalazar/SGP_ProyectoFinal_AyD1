@@ -5,10 +5,13 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyDouble;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import gt.usac.cunoc.sgp.common.exception.ApiException;
+import gt.usac.cunoc.sgp.mantenimiento.service.PlanMantenimientoService;
+import gt.usac.cunoc.sgp.mantenimiento.service.PlanMantenimientoService;
 import gt.usac.cunoc.sgp.puente.dto.DarBajaPuenteRequest;
 import gt.usac.cunoc.sgp.puente.entity.Puente;
 import gt.usac.cunoc.sgp.puente.mapper.PuenteMapper;
@@ -37,6 +40,7 @@ class PuenteBajaReactivacionServiceTest {
 
   private final PuenteRepository repository = mock(PuenteRepository.class);
   private final PuenteMapper mapper = mock(PuenteMapper.class);
+  private final PlanMantenimientoService planes = mock(PlanMantenimientoService.class);
   private final Validator validator = Validation.buildDefaultValidatorFactory().getValidator();
   private final Instant fija = Instant.parse("2026-10-06T12:00:00Z");
   private final Clock clock = Clock.fixed(fija, ZoneOffset.UTC);
@@ -52,7 +56,8 @@ class PuenteBajaReactivacionServiceTest {
             repository,
             mapper,
             validator,
-            clock);
+            clock,
+            planes);
   }
 
   private Puente crearPuenteActivo(UUID id) {
@@ -88,6 +93,7 @@ class PuenteBajaReactivacionServiceTest {
     assertThat(puente.getInactivadoPorId()).isEqualTo(adminId);
     assertThat(puente.getInactivadoEn()).isEqualTo(fija);
     verify(repository).saveAndFlush(puente);
+    verify(planes, never()).crearPorDefecto(puente, adminId);
   }
 
   @Test
@@ -138,6 +144,7 @@ class PuenteBajaReactivacionServiceTest {
     assertThat(puente.getInactivadoPorId()).isNull();
     assertThat(puente.getInactivadoEn()).isNull();
     verify(repository).saveAndFlush(puente);
+    verify(planes).crearPorDefecto(puente, adminId);
   }
 
   @Test

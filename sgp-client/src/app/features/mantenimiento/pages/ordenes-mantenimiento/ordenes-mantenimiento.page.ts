@@ -21,6 +21,7 @@ import { TagModule } from 'primeng/tag';
 import { catchError, finalize, of } from 'rxjs';
 import { PuenteCatalogoResponse } from '../../../puentes/models/puente.models';
 import { PuenteApiService } from '../../../puentes/services/puente-api.service';
+import { PlanMantenimiento } from '../../models/plan-mantenimiento.models';
 import {
   FiltrosOrdenes,
   PaginaOrdenesMantenimiento,
@@ -28,6 +29,7 @@ import {
 } from '../../models/orden-mantenimiento.models';
 import { PrioridadMantenimiento, TipoMantenimiento } from '../../models/regla-mantenimiento.models';
 import { OrdenMantenimientoApiService } from '../../services/orden-mantenimiento-api.service';
+import { PlanMantenimientoApiService } from '../../services/plan-mantenimiento-api.service';
 import {
   aFechaIso,
   PESTANAS_ORDENES,
@@ -62,6 +64,7 @@ const PRIORIDADES: PrioridadMantenimiento[] = ['BAJA', 'MEDIA', 'ALTA', 'CRITICA
 export class OrdenesMantenimientoPage {
   private readonly api = inject(OrdenMantenimientoApiService);
   private readonly puentesApi = inject(PuenteApiService);
+  private readonly planesApi = inject(PlanMantenimientoApiService);
   private readonly destroyRef = inject(DestroyRef);
 
   readonly pestanas = PESTANAS_ORDENES;
@@ -75,6 +78,9 @@ export class OrdenesMantenimientoPage {
   readonly totales = signal<TotalesOrdenes | null>(null);
   readonly cargando = signal(false);
   readonly error = signal(false);
+  readonly planes = signal<PlanMantenimiento[]>([]);
+  readonly cargandoPlanes = signal(true);
+  readonly errorPlanes = signal(false);
   readonly tamanio = signal(20);
 
   readonly tipo = signal<TipoMantenimiento | null>(null);
@@ -104,6 +110,22 @@ export class OrdenesMantenimientoPage {
       )
       .subscribe((respuesta) => this.puentes.set(respuesta?.content ?? []));
     this.cargar();
+    this.cargarPlanes();
+  }
+
+  cargarPlanes(): void {
+    this.cargandoPlanes.set(true);
+    this.errorPlanes.set(false);
+    this.planesApi
+      .listar()
+      .pipe(
+        takeUntilDestroyed(this.destroyRef),
+        finalize(() => this.cargandoPlanes.set(false)),
+      )
+      .subscribe({
+        next: (planes) => this.planes.set(planes),
+        error: () => this.errorPlanes.set(true),
+      });
   }
 
   total(clave: string): number | null {

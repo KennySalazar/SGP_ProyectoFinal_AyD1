@@ -184,6 +184,34 @@ public class OrdenMantenimiento {
     return orden;
   }
 
+  /** PROPUESTA rutinaria identificada por un ciclo inmutable del plan (HU-068). */
+  public static OrdenMantenimiento propuestaCicloRutinario(
+      UUID id,
+      UUID puenteId,
+      UUID planId,
+      int ciclo,
+      String descripcion,
+      PrioridadOrden prioridad,
+      JsonNode fundamento,
+      Instant ahora) {
+    OrdenMantenimiento orden =
+        new OrdenMantenimiento(
+            id,
+            puenteId,
+            null,
+            null,
+            null,
+            TipoOrden.RUTINARIO,
+            descripcion,
+            prioridad,
+            null,
+            ahora);
+    orden.planMantenimientoRutinarioId = planId;
+    orden.cicloPlan = ciclo;
+    orden.fundamentoGeneracion = fundamento;
+    return orden;
+  }
+
   /**
    * Cambia el estado. Solo lo invoca {@code TransicionOrdenService}, después de validar la
    * transición con la máquina de estados (DT-BE-07).
