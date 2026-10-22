@@ -686,6 +686,7 @@
       "soloLectura": "El contenido enviado es de solo lectura. La escritura de observaciones depende del estado del ciclo.",
       "fotosNoCongeladas": "Las fotografías se consultan mediante acceso protegido. No existe una instantánea fotográfica histórica de este ciclo.",
       "sinGeneral": "Sin observación general.",
+      "icNoDisponible": "IC no disponible",
       "sinAnclaje": "Observación anterior sin anclaje",
       "observarElemento": "Observar {{elemento}}",
       "observarCategoria": "Observar categoría",
