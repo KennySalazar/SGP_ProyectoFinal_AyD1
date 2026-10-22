@@ -37,7 +37,7 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 import org.springframework.web.multipart.MultipartFile;
 
 @Service
-@PreAuthorize("hasRole('ADMINISTRADOR')")
+@PreAuthorize("hasAnyRole('ADMINISTRADOR', 'CATEDRATICO')")
 public class ActaCalibracionService {
   private static final Logger LOG = LoggerFactory.getLogger(ActaCalibracionService.class);
   private final VersionFormularioRepository versiones;
@@ -82,6 +82,14 @@ public class ActaCalibracionService {
       UUID versionId, MultipartFile fichero, UUID usuarioId) {
     VersionFormulario version =
         versiones.findByIdForUpdate(versionId).orElseThrow(this::versionNoEncontrada);
+    if (version.getEstado()
+        != gt.usac.cunoc.sgp.formulario.model.EstadoVersionFormulario.BORRADOR) {
+      throw new ApiException(
+          HttpStatus.CONFLICT,
+          "version_inmutable",
+          "Version inmutable",
+          "El acta de una version publicada no puede modificarse. Cree una version nueva.");
+    }
     validarPesos(version);
     byte[] contenido = validador.validar(fichero);
     Archivo anterior = vigente(versionId);
@@ -134,6 +142,8 @@ public class ActaCalibracionService {
       anterior.retirar(ahora);
       archivos.saveAndFlush(anterior);
     }
+    version.setCalibradoPorId(usuarioId);
+    version.setCalibradoEn(ahora);
     version.setActualizadoEn(ahora);
     versiones.saveAndFlush(version);
     var despues = estado(versionId, nuevo);
@@ -267,5 +277,33 @@ public class ActaCalibracionService {
 
   private ApiException error(HttpStatus estado, String codigo, String detalle) {
     return new ApiException(estado, codigo, "Acta de calibracion", detalle);
+  }
+
+  @Transactional
+  public EstadoActaCalibracionResponse adjuntar(
+      UUID versionId, MultipartFile fichero, UUID usuarioId, long versionEsperada) {
+    var version = versiones.findByIdForUpdate(versionId).orElseThrow(this::versionNoEncontrada);
+    if (version.getEstado()
+        != gt.usac.cunoc.sgp.formulario.model.EstadoVersionFormulario.BORRADOR) {
+      throw new ApiException(
+          HttpStatus.CONFLICT,
+          "version_inmutable",
+          "Version inmutable",
+          "El acta de una version publicada no puede modificarse. Cree una version nueva.");
+    }
+    if (version.getVersion() != versionEsperada) {
+      throw new ApiException(
+          HttpStatus.CONFLICT,
+          "concurrencia_conflicto",
+          "Conflicto de version",
+          "La version fue modificada. Recargue antes de adjuntar el acta.");
+    }
+    var respuesta = adjuntar(versionId, fichero, usuarioId);
+    if (version.getVersion() == versionEsperada) {
+      if (versiones.incrementarVersionCalibracion(version.getId(), versionEsperada) != 1) {
+        throw new IllegalStateException("No se pudo incrementar la version de calibracion");
+      }
+    }
+    return respuesta;
   }
 }

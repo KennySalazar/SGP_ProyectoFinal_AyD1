@@ -85,7 +85,7 @@ class VersionFormularioControllerSecurityTest {
   @ParameterizedTest
   @EnumSource(
       value = RoleName.class,
-      names = {"CATEDRATICO", "ESTUDIANTE", "PROFESIONAL_EXTERNO"})
+      names = {"ESTUDIANTE", "PROFESIONAL_EXTERNO"})
   void rechazaNoAdministradoresListarVersiones(RoleName rol) throws Exception {
     var auth = autenticar(rol);
 
@@ -207,14 +207,15 @@ class VersionFormularioControllerSecurityTest {
         .perform(
             post("/api/v1/formularios")
                 .principal(auth)
+                .header("If-Match", "0")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(
                     """
-                                    {
-                                      "codigo": "v1",
-                                      "esquema": {"type": "object"}
-                                    }
-                                    """))
+                                                    {
+                                                      "codigo": "v1",
+                                                      "esquema": {"type": "object"}
+                                                    }
+                                                    """))
         .andExpect(status().isCreated());
 
     verify(service).crear(any(CrearVersionRequest.class), eq(USUARIO_ID));
@@ -223,7 +224,7 @@ class VersionFormularioControllerSecurityTest {
   @ParameterizedTest
   @EnumSource(
       value = RoleName.class,
-      names = {"CATEDRATICO", "ESTUDIANTE", "PROFESIONAL_EXTERNO"})
+      names = {"ESTUDIANTE", "PROFESIONAL_EXTERNO"})
   void rechazaNoAdministradoresCrearVersion(RoleName rol) throws Exception {
     var auth = autenticar(rol);
 
@@ -231,14 +232,15 @@ class VersionFormularioControllerSecurityTest {
         .perform(
             post("/api/v1/formularios")
                 .principal(auth)
+                .header("If-Match", "0")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(
                     """
-                                    {
-                                      "codigo": "v1",
-                                      "esquema": {"type": "object"}
-                                    }
-                                    """))
+                                                    {
+                                                      "codigo": "v1",
+                                                      "esquema": {"type": "object"}
+                                                    }
+                                                    """))
         .andExpect(status().isForbidden())
         .andExpect(jsonPath("$.code").value("access_denied"));
 
@@ -266,32 +268,34 @@ class VersionFormularioControllerSecurityTest {
     var auth = autenticar(RoleName.ADMINISTRADOR);
     UUID id = UUID.randomUUID();
 
-    when(service.calibrarPesos(eq(id), any(), eq(USUARIO_ID))).thenReturn(Collections.emptyList());
+    when(service.calibrarPesos(eq(id), any(), eq(USUARIO_ID), eq(0L)))
+        .thenReturn(Collections.emptyList());
 
     mockMvc
         .perform(
             put("/api/v1/formularios/" + id + "/pesos")
                 .principal(auth)
+                .header("If-Match", "0")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(
                     """
-                                                    [
-                                                      {
-                                                        "elementoRef": "/vigas",
-                                                        "peso": 1,
-                                                        "descripcion": "Vigas"
-                                                      }
-                                                    ]
-                                                    """))
+                                                                    [
+                                                                      {
+                                                                        "elementoRef": "/vigas",
+                                                                        "peso": 1,
+                                                                        "descripcion": "Vigas"
+                                                                      }
+                                                                    ]
+                                                                    """))
         .andExpect(status().isOk());
 
-    verify(service).calibrarPesos(eq(id), any(), eq(USUARIO_ID));
+    verify(service).calibrarPesos(eq(id), any(), eq(USUARIO_ID), eq(0L));
   }
 
   @ParameterizedTest
   @EnumSource(
       value = RoleName.class,
-      names = {"CATEDRATICO", "ESTUDIANTE", "PROFESIONAL_EXTERNO"})
+      names = {"ESTUDIANTE", "PROFESIONAL_EXTERNO"})
   void rechazaNoAdministradoresConfigurarPesos(RoleName rol) throws Exception {
     var auth = autenticar(rol);
     UUID id = UUID.randomUUID();
@@ -300,17 +304,18 @@ class VersionFormularioControllerSecurityTest {
         .perform(
             put("/api/v1/formularios/" + id + "/pesos")
                 .principal(auth)
+                .header("If-Match", "0")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(
                     """
-                                                    [
-                                                      {
-                                                        "elementoRef": "/vigas",
-                                                        "peso": 1,
-                                                        "descripcion": "Vigas"
-                                                      }
-                                                    ]
-                                                    """))
+                                                                    [
+                                                                      {
+                                                                        "elementoRef": "/vigas",
+                                                                        "peso": 1,
+                                                                        "descripcion": "Vigas"
+                                                                      }
+                                                                    ]
+                                                                    """))
         .andExpect(status().isForbidden())
         .andExpect(jsonPath("$.code").value("access_denied"));
 
@@ -326,27 +331,28 @@ class VersionFormularioControllerSecurityTest {
         .perform(
             put("/api/v1/formularios/" + id + "/escala")
                 .principal(auth)
+                .header("If-Match", "0")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(
                     """
-                                                    {
-                                                      "valores": {
-                                                        "NO_PRESENTA": 0,
-                                                        "LEVE": 1,
-                                                        "MODERADO": 2,
-                                                        "SEVERO": 4
-                                                      }
-                                                    }
-                                                    """))
+                                                                    {
+                                                                      "valores": {
+                                                                        "NO_PRESENTA": 0,
+                                                                        "LEVE": 1,
+                                                                        "MODERADO": 2,
+                                                                        "SEVERO": 4
+                                                                      }
+                                                                    }
+                                                                    """))
         .andExpect(status().isOk());
 
-    verify(service).configurarEscala(eq(id), any(), eq(USUARIO_ID));
+    verify(service).configurarEscala(eq(id), any(), eq(USUARIO_ID), eq(0L));
   }
 
   @ParameterizedTest
   @EnumSource(
       value = RoleName.class,
-      names = {"CATEDRATICO", "ESTUDIANTE", "PROFESIONAL_EXTERNO"})
+      names = {"ESTUDIANTE", "PROFESIONAL_EXTERNO"})
   void rechazaNoAdministradoresConfigurarEscala(RoleName rol) throws Exception {
     var auth = autenticar(rol);
     UUID id = UUID.randomUUID();
@@ -355,18 +361,19 @@ class VersionFormularioControllerSecurityTest {
         .perform(
             put("/api/v1/formularios/" + id + "/escala")
                 .principal(auth)
+                .header("If-Match", "0")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(
                     """
-                                                    {
-                                                      "valores": {
-                                                        "NO_PRESENTA": 0,
-                                                        "LEVE": 1,
-                                                        "MODERADO": 2,
-                                                        "SEVERO": 4
-                                                      }
-                                                    }
-                                                    """))
+                                                                    {
+                                                                      "valores": {
+                                                                        "NO_PRESENTA": 0,
+                                                                        "LEVE": 1,
+                                                                        "MODERADO": 2,
+                                                                        "SEVERO": 4
+                                                                      }
+                                                                    }
+                                                                    """))
         .andExpect(status().isForbidden())
         .andExpect(jsonPath("$.code").value("access_denied"));
 
@@ -391,22 +398,24 @@ class VersionFormularioControllerSecurityTest {
         .perform(
             put("/api/v1/formularios/" + id + "/reglas-criticas")
                 .principal(auth)
+                .header("If-Match", "0")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"reglasAnulacion\":[]}"))
         .andExpect(status().isOk());
-    verify(service).configurarReglasCriticas(eq(id), any(), eq(USUARIO_ID));
+    verify(service).configurarReglasCriticas(eq(id), any(), eq(USUARIO_ID), eq(0L));
   }
 
   @ParameterizedTest
   @EnumSource(
       value = RoleName.class,
-      names = {"CATEDRATICO", "ESTUDIANTE", "PROFESIONAL_EXTERNO"})
+      names = {"ESTUDIANTE", "PROFESIONAL_EXTERNO"})
   void rechazaNoAdministradoresConfigurarReglasCriticas(RoleName rol) throws Exception {
     var auth = autenticar(rol);
     mockMvc
         .perform(
             put("/api/v1/formularios/" + UUID.randomUUID() + "/reglas-criticas")
                 .principal(auth)
+                .header("If-Match", "0")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"reglasAnulacion\":[]}"))
         .andExpect(status().isForbidden());
