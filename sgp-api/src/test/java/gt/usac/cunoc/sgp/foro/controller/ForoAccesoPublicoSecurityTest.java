@@ -12,6 +12,7 @@ import gt.usac.cunoc.sgp.common.security.JwtAuthenticationFilter;
 import gt.usac.cunoc.sgp.common.security.JwtService;
 import gt.usac.cunoc.sgp.common.security.ProblemAccessDeniedHandler;
 import gt.usac.cunoc.sgp.common.security.ProblemAuthenticationEntryPoint;
+import gt.usac.cunoc.sgp.foro.service.FiltroComentarios;
 import gt.usac.cunoc.sgp.foro.service.ForoInspeccionService;
 import gt.usac.cunoc.sgp.foro.service.ForoService;
 import gt.usac.cunoc.sgp.usuario.repository.UserAccountRepository;
@@ -60,7 +61,7 @@ class ForoAccesoPublicoSecurityTest {
   void elVisitanteLeeLosHilosElHiloYSusComentariosSinSesion() throws Exception {
     when(foro.listarHilosDePuente(ID, 0, 20))
         .thenReturn(new PageImpl<>(List.of(), PageRequest.of(0, 20), 0));
-    when(foro.listarComentarios(ID, 0, 20, null, null))
+    when(foro.listarComentarios(ID, 0, 20, FiltroComentarios.NINGUNO))
         .thenReturn(new PageImpl<>(List.of(), PageRequest.of(0, 20), 0));
 
     mockMvc.perform(get("/api/v1/puentes/" + ID + "/hilos")).andExpect(status().isOk());

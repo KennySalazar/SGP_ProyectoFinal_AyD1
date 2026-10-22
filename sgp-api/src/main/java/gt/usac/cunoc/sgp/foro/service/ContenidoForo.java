@@ -42,6 +42,13 @@ final class ContenidoForo {
     return limpio.isEmpty() ? null : limpio;
   }
 
+  /**
+   * Escapa {@code %}, {@code _} y el propio escape para usar un texto literal dentro de un LIKE.
+   */
+  static String escaparLike(String texto) {
+    return texto.replace("!", "!!").replace("%", "!%").replace("_", "!_");
+  }
+
   static Map<String, String> error(String campo, String mensaje) {
     return Map.of("campo", campo, "mensaje", mensaje);
   }

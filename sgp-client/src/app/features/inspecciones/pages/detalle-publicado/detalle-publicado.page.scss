@@ -279,6 +279,10 @@ h3 {
   color: #475569;
 }
 
+.herramientas-comentarios {
+  display: flex;
+  justify-content: flex-end;
+}
 .mensaje-error {
   border-left: 4px solid var(--p-red-600);
 }

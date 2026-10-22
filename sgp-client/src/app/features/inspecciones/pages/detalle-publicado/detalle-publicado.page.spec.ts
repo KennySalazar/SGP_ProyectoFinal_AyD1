@@ -458,10 +458,80 @@ describe('Detalle publicado de HU-030', () => {
       );
     });
 
-    it('no marca los campos sueltos: el botón va en los elementos', async () => {
-      const html = await abrir();
+    describe('comentarios por campo', () => {
+      const CAMPO = '/identificacion/ruta';
+      const interruptor = (html: HTMLElement) =>
+        html.querySelector<HTMLButtonElement>('.herramientas-comentarios button');
 
-      expect(html.querySelector('[data-elemento-ref="/identificacion/ruta"]')).toBeNull();
+      it('un campo suelto también se puede comentar y entrega su ancla', async () => {
+        const html = await abrir();
+
+        const boton = botonDe(html, CAMPO)!;
+        expect(boton).not.toBeNull();
+        // El nombre dice a qué sección pertenece el campo, no solo cómo se llama.
+        expect(boton.getAttribute('aria-label')).toBe('Comentar Identificación versión 1 › Ruta');
+        boton.click();
+        fixture.detectChanges();
+
+        expect(foro().ancla()).toEqual({ elementoRef: CAMPO, instanciaElementoId: null });
+      });
+
+      it('el mismo nombre de campo en dos secciones se distingue por su ruta', async () => {
+        await abrir();
+        const etiqueta = fixture.componentInstance.etiquetaDeAncla();
+
+        expect(etiqueta({ elementoRef: '/identificacion/ruta' })).toBe(
+          'Identificación versión 1 › Ruta',
+        );
+        expect(etiqueta({ elementoRef: '/datos_generales/longitud_m' })).toBe(
+          'Datos generales v1 › Longitud',
+        );
+        expect(etiqueta({ elementoRef: '/identificacion/ruta' })).not.toBe(
+          etiqueta({ elementoRef: '/datos_generales/longitud_m' }),
+        );
+      });
+
+      it('el icono de un campo empieza escondido y se queda fijo si tiene comentarios', async () => {
+        const html = await abrir();
+        const anclaje = () => html.querySelector(`[data-elemento-ref="${CAMPO}"]`) as HTMLElement;
+        expect(anclaje().classList.contains('fijo')).toBe(false);
+
+        foro().anclasCambian.emit([{ elementoRef: CAMPO, instanciaElementoId: null, total: 2 }]);
+        fixture.detectChanges();
+
+        expect(anclaje().classList.contains('fijo')).toBe(true);
+        expect(botonDe(html, CAMPO)?.querySelector('.cantidad')?.textContent?.trim()).toBe('2');
+      });
+
+      it('el interruptor deja a la vista el icono de todos los campos y se puede apagar', async () => {
+        const html = await abrir();
+        const iconos = () =>
+          Array.from(
+            html.querySelectorAll<HTMLElement>('app-formulario-dinamico .anclaje.en-campo'),
+          );
+        expect(interruptor(html)?.getAttribute('aria-pressed')).toBe('false');
+        expect(iconos().length).toBeGreaterThan(0);
+        expect(iconos().some((icono) => icono.classList.contains('fijo'))).toBe(false);
+
+        interruptor(html)!.click();
+        fixture.detectChanges();
+
+        expect(interruptor(html)?.getAttribute('aria-pressed')).toBe('true');
+        expect(iconos().every((icono) => icono.classList.contains('fijo'))).toBe(true);
+
+        interruptor(html)!.click();
+        fixture.detectChanges();
+
+        expect(interruptor(html)?.getAttribute('aria-pressed')).toBe('false');
+        expect(iconos().some((icono) => icono.classList.contains('fijo'))).toBe(false);
+      });
+
+      it('sin sesión no se ofrece el interruptor, porque no hay nada que comentar', async () => {
+        autenticado.set(false);
+        const html = await abrir();
+
+        expect(interruptor(html)).toBeNull();
+      });
     });
 
     describe('ir al elemento desde un comentario', () => {
@@ -481,11 +551,26 @@ describe('Detalle publicado de HU-030', () => {
         expect(document.activeElement).toBe(botonDe(html, '/datos_generales'));
       });
 
-      it('un comentario sobre un campo lleva al elemento que lo contiene', async () => {
+      it('un comentario sobre un campo lleva a ese campo, en su sección', async () => {
         const html = await abrir();
 
         foro().irAElemento.emit({
           elementoRef: '/datos_generales/longitud_m',
+          instanciaElementoId: null,
+        });
+        fixture.detectChanges();
+        await fixture.whenStable();
+        fixture.detectChanges();
+
+        expect(encabezado(html)).toBe('Datos generales v1');
+        expect(document.activeElement).toBe(botonDe(html, '/datos_generales/longitud_m'));
+      });
+
+      it('si el campo ya no está en el formulario lleva al elemento que lo contiene', async () => {
+        const html = await abrir();
+
+        foro().irAElemento.emit({
+          elementoRef: '/datos_generales/campo_que_ya_no_existe',
           instanciaElementoId: null,
         });
         fixture.detectChanges();

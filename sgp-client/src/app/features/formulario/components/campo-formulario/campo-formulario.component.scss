@@ -11,6 +11,14 @@
   container-type: inline-size;
 }
 
+/* La etiqueta y el icono de comentarios comparten línea. */
+.titulo-campo {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  min-width: 0;
+}
+
 label,
 legend {
   color: var(--sgp-navy-900);

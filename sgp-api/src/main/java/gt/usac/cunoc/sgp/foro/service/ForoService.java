@@ -168,43 +168,82 @@ public class ForoService {
    * agruparla bajo él a medida que carga páginas.
    */
   public Page<ComentarioResponse> listarComentarios(UUID hiloId, int pagina, int tamanio) {
-    return listarComentarios(hiloId, pagina, tamanio, null, null);
+    return listarComentarios(hiloId, pagina, tamanio, FiltroComentarios.NINGUNO);
+  }
+
+  /** Los comentarios de un campo o elemento; sin {@code elementoRef}, todos los del hilo. */
+  public Page<ComentarioResponse> listarComentarios(
+      UUID hiloId, int pagina, int tamanio, String elementoRef, UUID instanciaElementoId) {
+    return listarComentarios(
+        hiloId, pagina, tamanio, FiltroComentarios.porElemento(elementoRef, instanciaElementoId));
   }
 
   /**
-   * Igual que la lista completa, pero con {@code elementoRef} solo los comentarios anclados a ese
-   * campo o elemento: sin {@code instanciaElementoId}, los del elemento sin instancia; con ella,
-   * los de esa instancia.
+   * Los comentarios de un hilo, más antiguos primero, con el filtro pedido. Con {@code elementoRef}
+   * solo los anclados a ese campo o elemento: sin instancia, los del elemento sin instancia; con
+   * ella, los de esa instancia. Con {@code seccion} los de esa sección y todo lo que contiene; con
+   * {@code soloGenerales}, los que no están anclados. Dos filtros a la vez se rechazan con 422.
    */
   @Transactional(readOnly = true)
   public Page<ComentarioResponse> listarComentarios(
-      UUID hiloId, int pagina, int tamanio, String elementoRef, UUID instanciaElementoId) {
+      UUID hiloId, int pagina, int tamanio, FiltroComentarios filtro) {
     ContenidoForo.validarPaginacion(pagina, tamanio);
-    String ref = ContenidoForo.limpiarReferencia(elementoRef);
-    if (ref == null && instanciaElementoId != null) {
+    String ref = ContenidoForo.limpiarReferencia(filtro.elementoRef());
+    String seccion = ContenidoForo.limpiarReferencia(filtro.seccion());
+    validarFiltro(ref, filtro.instanciaElementoId(), seccion, filtro.soloGenerales());
+    ForoHilo hilo = hiloVisible(hiloId);
+    PageRequest paginacion =
+        PageRequest.of(pagina, tamanio, Sort.by(Sort.Order.asc("creadoEn"), Sort.Order.asc("id")));
+    Page<ForoComentario> resultado;
+    if (filtro.soloGenerales()) {
+      resultado = comentarios.findByHiloIdAndElementoRefIsNull(hilo.getId(), paginacion);
+    } else if (seccion != null) {
+      String raiz = "/" + seccion;
+      resultado =
+          comentarios.findBySeccion(
+              hilo.getId(), raiz, ContenidoForo.escaparLike(raiz) + "/%", paginacion);
+    } else if (ref == null) {
+      resultado = comentarios.findByHiloId(hilo.getId(), paginacion);
+    } else if (filtro.instanciaElementoId() == null) {
+      resultado =
+          comentarios.findByHiloIdAndElementoRefAndInstanciaElementoIdIsNull(
+              hilo.getId(), ref, paginacion);
+    } else {
+      resultado =
+          comentarios.findByHiloIdAndElementoRefAndInstanciaElementoId(
+              hilo.getId(), ref, filtro.instanciaElementoId(), paginacion);
+    }
+    Map<UUID, Autor> autoresPorId =
+        autoresDe(resultado.getContent().stream().map(ForoComentario::getAutorId).toList());
+    return resultado.map(c -> mapper.toComentarioResponse(c, autoresPorId.get(c.getAutorId())));
+  }
+
+  private void validarFiltro(String ref, UUID instancia, String seccion, boolean soloGenerales) {
+    List<Map<String, String>> errores = new ArrayList<>();
+    if (ref == null && instancia != null) {
+      errores.add(
+          ContenidoForo.error(
+              "elementoRef", "La instancia exige indicar el elemento al que pertenece."));
+    }
+    int filtros = (ref != null ? 1 : 0) + (seccion != null ? 1 : 0) + (soloGenerales ? 1 : 0);
+    if (filtros > 1) {
+      errores.add(
+          ContenidoForo.error(
+              "filtro", "Usa un solo filtro a la vez: un elemento, una sección o los generales."));
+    }
+    if (seccion != null && (seccion.contains("/") || seccion.length() > 100)) {
+      errores.add(
+          ContenidoForo.error(
+              "seccion", "La sección es la clave de una sola sección, sin barras (hasta 100)."));
+    }
+    if (!errores.isEmpty()) {
       throw new ApiException(
           HttpStatus.UNPROCESSABLE_ENTITY,
           "filtro_invalido",
           "Filtro inválido",
-          "La instancia exige indicar el elemento al que pertenece.",
-          List.of(
-              ContenidoForo.error(
-                  "elementoRef", "La instancia exige indicar el elemento al que pertenece.")));
+          errores.get(0).get("mensaje"),
+          errores);
     }
-    ForoHilo hilo = hiloVisible(hiloId);
-    PageRequest paginacion =
-        PageRequest.of(pagina, tamanio, Sort.by(Sort.Order.asc("creadoEn"), Sort.Order.asc("id")));
-    Page<ForoComentario> resultado =
-        ref == null
-            ? comentarios.findByHiloId(hilo.getId(), paginacion)
-            : instanciaElementoId == null
-                ? comentarios.findByHiloIdAndElementoRefAndInstanciaElementoIdIsNull(
-                    hilo.getId(), ref, paginacion)
-                : comentarios.findByHiloIdAndElementoRefAndInstanciaElementoId(
-                    hilo.getId(), ref, instanciaElementoId, paginacion);
-    Map<UUID, Autor> autoresPorId =
-        autoresDe(resultado.getContent().stream().map(ForoComentario::getAutorId).toList());
-    return resultado.map(c -> mapper.toComentarioResponse(c, autoresPorId.get(c.getAutorId())));
   }
 
   /**

@@ -36,6 +36,22 @@ public interface ForoComentarioRepository extends JpaRepository<ForoComentario, 
   Page<ForoComentario> findByHiloIdAndElementoRefAndInstanciaElementoIdIsNull(
       UUID hiloId, String elementoRef, Pageable pageable);
 
+  /** Los que no están anclados a ningún campo ni elemento. */
+  Page<ForoComentario> findByHiloIdAndElementoRefIsNull(UUID hiloId, Pageable pageable);
+
+  /**
+   * Los de una sección: anclados a ella misma o a cualquier cosa que contenga. {@code prefijo} es
+   * la raíz con las barras ya escapadas para LIKE (con {@code !}) y terminada en {@code /%}.
+   */
+  @Query(
+      "SELECT c FROM ForoComentario c WHERE c.hiloId = :hilo AND (c.elementoRef = :raiz"
+          + " OR c.elementoRef LIKE :prefijo ESCAPE '!')")
+  Page<ForoComentario> findBySeccion(
+      @Param("hilo") UUID hilo,
+      @Param("raiz") String raiz,
+      @Param("prefijo") String prefijo,
+      Pageable pageable);
+
   /** Los de una instancia concreta de un elemento repetible. */
   Page<ForoComentario> findByHiloIdAndElementoRefAndInstanciaElementoId(
       UUID hiloId, String elementoRef, UUID instanciaElementoId, Pageable pageable);

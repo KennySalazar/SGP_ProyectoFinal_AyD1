@@ -38,9 +38,23 @@
 }
 .comentario {
   display: grid;
-  gap: 0.4rem;
-  padding: 0.9rem 0;
+  gap: 0.2rem;
+  padding: 0.6rem 0;
   border-bottom: 1px solid var(--sgp-border);
+}
+.comentario:focus {
+  outline: none;
+}
+.comentario:focus-visible {
+  outline: 3px solid var(--sgp-blue-600);
+  outline-offset: 2px;
+}
+/* El autor y la fecha, y «Responder» en la misma línea: no agrega una fila por comentario. */
+.comentario-cabecera {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
 }
 .contenido {
   margin: 0;
@@ -48,6 +62,33 @@
   line-height: 1.55;
   overflow-wrap: anywhere;
   white-space: pre-wrap;
+}
+/* Un comentario muy largo se recorta a unas líneas hasta que se pide «Ver más». */
+.contenido.recortado {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 4;
+  line-clamp: 4;
+  overflow: hidden;
+}
+/* Enlaces de texto: el área pulsable mide 44 px sin agregar altura a la línea. */
+.ver-mas {
+  justify-self: start;
+  min-height: 44px;
+  margin-block: -0.7rem;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--sgp-blue-600);
+  font: inherit;
+  font-size: 0.88rem;
+  font-weight: 700;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.ver-mas:focus-visible {
+  outline: 3px solid var(--sgp-blue-600);
+  outline-offset: 2px;
 }
 .respuestas {
   display: grid;
@@ -106,12 +147,57 @@
   overflow-wrap: anywhere;
   cursor: pointer;
 }
+.sobre {
+  margin-block: -0.65rem;
+}
 .sobre:focus-visible {
   outline: 3px solid var(--sgp-blue-600);
   outline-offset: 2px;
 }
 .boton-responder {
-  justify-self: start;
+  flex: 0 0 auto;
+  min-height: 44px;
+  margin-block: -0.7rem;
+  padding: 0.25rem 0.5rem;
+}
+/* Selector de sección y cuántos comentarios se ven. */
+.barra-lista {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem 1rem;
+}
+.filtro-seccion {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+  color: var(--sgp-navy-900);
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+.filtro-seccion select {
+  min-width: 0;
+  max-width: 100%;
+  min-height: 44px;
+  padding: 0.4rem 0.6rem;
+  border: 1px solid var(--sgp-border);
+  border-radius: 10px;
+  background: var(--sgp-surface, #ffffff);
+  color: var(--sgp-navy-900);
+  font: inherit;
+  font-weight: 400;
+}
+.filtro-seccion select:focus-visible {
+  outline: 3px solid var(--sgp-blue-600);
+  outline-offset: 2px;
+}
+.contador-vista {
+  margin: 0;
+  color: var(--sgp-steel-700);
+  font-size: 0.85rem;
 }
 .cargar-mas {
   justify-self: center;
