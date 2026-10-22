@@ -1,3 +1,5 @@
+import { mensajeCalibracion } from '../../utils/error-calibracion';
+import { AuthStore } from '../../../../core/services/auth.store';
 import { etiquetaMapeo, nombresMapeo } from '../../utils/nombres-mapeo';
 import { CalibracionAdicionalComponent } from './calibracion-adicional/calibracion-adicional.component';
 import { criticasPendientes } from '../../utils/reglas-criticas';
@@ -29,7 +31,7 @@ import { SelectModule } from 'primeng/select';
 import { TableModule } from 'primeng/table';
 import { TagModule } from 'primeng/tag';
 import { TextareaModule } from 'primeng/textarea';
-import { finalize } from 'rxjs';
+import { finalize, switchMap } from 'rxjs';
 import { completarEquivalencias } from '../../utils/mapeos-equivalentes';
 import { ApiErrorService } from '../../../../core/services/api-error.service';
 import {
@@ -95,6 +97,8 @@ export class EditorVersionFormularioPage implements OnInit {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly formularioApi = inject(FormularioApiService);
+  readonly auth = inject(AuthStore);
+  readonly esAdministrador = () => this.auth.user()?.role === 'ADMINISTRADOR';
   private readonly apiError = inject(ApiErrorService);
   private readonly transloco = inject(TranslocoService);
   private readonly fb = inject(FormBuilder);
@@ -148,6 +152,7 @@ export class EditorVersionFormularioPage implements OnInit {
   readonly puedePublicar = computed(() => {
     const ver = this.version();
     return (
+      this.esAdministrador() &&
       !!ver &&
       ver.estado === 'BORRADOR' &&
       this.calibracionGuardada() &&
@@ -198,11 +203,19 @@ export class EditorVersionFormularioPage implements OnInit {
     icon: string;
   }[] = [
     { label: 'Texto corto', value: 'string', icon: 'pi pi-align-left' },
-    { label: 'Texto largo / Área de texto', value: 'multiline', icon: 'pi pi-align-justify' },
+    {
+      label: 'Texto largo / Área de texto',
+      value: 'multiline',
+      icon: 'pi pi-align-justify',
+    },
     { label: 'Número entero', value: 'integer', icon: 'pi pi-hashtag' },
     { label: 'Número decimal', value: 'number', icon: 'pi pi-percentage' },
     { label: 'Booleano (Sí/No)', value: 'boolean', icon: 'pi pi-check-square' },
-    { label: 'Selección única (Dropdown)', value: 'select', icon: 'pi pi-list' },
+    {
+      label: 'Selección única (Dropdown)',
+      value: 'select',
+      icon: 'pi pi-list',
+    },
     { label: 'Fecha', value: 'date', icon: 'pi pi-calendar' },
   ];
   readonly seccionForm = this.fb.nonNullable.group({
@@ -240,7 +253,9 @@ export class EditorVersionFormularioPage implements OnInit {
     descripcion: [''],
   });
   readonly destinoPersonalizado = signal(false);
-  readonly columnaPersonalizadaControl = new FormControl<string>('', { nonNullable: true });
+  readonly columnaPersonalizadaControl = new FormControl<string>('', {
+    nonNullable: true,
+  });
   readonly camposFormularioDisponibles = computed(() => {
     const list: {
       label: string;
@@ -277,22 +292,40 @@ export class EditorVersionFormularioPage implements OnInit {
         { valor: 'puente.ruta', etiqueta: 'Ruta del puente' },
         { valor: 'puente.kilometraje', etiqueta: 'Kilometraje' },
         { valor: 'puente.municipio_id', etiqueta: 'Municipio del puente' },
-        { valor: 'puente.departamento_id', etiqueta: 'Departamento del puente' },
+        {
+          valor: 'puente.departamento_id',
+          etiqueta: 'Departamento del puente',
+        },
       ],
     },
     {
       grupo: 'Registro de inspección',
       items: [
-        { valor: 'inspeccion.fecha_inspeccion', etiqueta: 'Fecha oficial de inspección' },
-        { valor: 'inspeccion.nombre_autor_capturado', etiqueta: 'Inspector asignado' },
+        {
+          valor: 'inspeccion.fecha_inspeccion',
+          etiqueta: 'Fecha oficial de inspección',
+        },
+        {
+          valor: 'inspeccion.nombre_autor_capturado',
+          etiqueta: 'Inspector asignado',
+        },
       ],
     },
     {
       grupo: 'Ficha técnica de inspección',
       items: [
-        { valor: 'inspeccion_dato_tecnico.longitud_m', etiqueta: 'Longitud total (m)' },
-        { valor: 'inspeccion_dato_tecnico.numero_tramos', etiqueta: 'Número de tramos' },
-        { valor: 'inspeccion_dato_tecnico.ancho_rodadura_m', etiqueta: 'Ancho de rodadura (m)' },
+        {
+          valor: 'inspeccion_dato_tecnico.longitud_m',
+          etiqueta: 'Longitud total (m)',
+        },
+        {
+          valor: 'inspeccion_dato_tecnico.numero_tramos',
+          etiqueta: 'Número de tramos',
+        },
+        {
+          valor: 'inspeccion_dato_tecnico.ancho_rodadura_m',
+          etiqueta: 'Ancho de rodadura (m)',
+        },
         {
           valor: 'inspeccion_dato_tecnico.ancho_acera_derecha_m',
           etiqueta: 'Ancho acera derecha (m)',
@@ -309,9 +342,18 @@ export class EditorVersionFormularioPage implements OnInit {
           valor: 'inspeccion_dato_tecnico.altura_libre_sobre_cauce_m',
           etiqueta: 'Altura libre sobre cauce (m)',
         },
-        { valor: 'inspeccion_dato_tecnico.tipologia_puente', etiqueta: 'Tipología del puente' },
-        { valor: 'inspeccion_dato_tecnico.tipo_cruce', etiqueta: 'Tipo de cruce' },
-        { valor: 'inspeccion_dato_tecnico.numero_vias_por_sentido', etiqueta: 'Vías por sentido' },
+        {
+          valor: 'inspeccion_dato_tecnico.tipologia_puente',
+          etiqueta: 'Tipología del puente',
+        },
+        {
+          valor: 'inspeccion_dato_tecnico.tipo_cruce',
+          etiqueta: 'Tipo de cruce',
+        },
+        {
+          valor: 'inspeccion_dato_tecnico.numero_vias_por_sentido',
+          etiqueta: 'Vías por sentido',
+        },
         {
           valor: 'inspeccion_dato_tecnico.material_superestructura',
           etiqueta: 'Material de superestructura',
@@ -320,8 +362,14 @@ export class EditorVersionFormularioPage implements OnInit {
           valor: 'inspeccion_dato_tecnico.material_subestructura',
           etiqueta: 'Material de subestructura',
         },
-        { valor: 'inspeccion_dato_tecnico.carga_diseno', etiqueta: 'Carga de diseño' },
-        { valor: 'inspeccion_dato_tecnico.anio_construccion', etiqueta: 'Año de construcción' },
+        {
+          valor: 'inspeccion_dato_tecnico.carga_diseno',
+          etiqueta: 'Carga de diseño',
+        },
+        {
+          valor: 'inspeccion_dato_tecnico.anio_construccion',
+          etiqueta: 'Año de construcción',
+        },
         {
           valor: 'inspeccion_dato_tecnico.trafico_vehiculos_dia',
           etiqueta: 'Tráfico diario (veh/día)',
@@ -330,12 +378,18 @@ export class EditorVersionFormularioPage implements OnInit {
           valor: 'inspeccion_dato_tecnico.porcentaje_camiones_buses',
           etiqueta: 'Porcentaje camiones y buses',
         },
-        { valor: 'inspeccion_dato_tecnico.ruta_pavimentada', etiqueta: 'Ruta pavimentada' },
+        {
+          valor: 'inspeccion_dato_tecnico.ruta_pavimentada',
+          etiqueta: 'Ruta pavimentada',
+        },
         {
           valor: 'inspeccion_dato_tecnico.alineamiento_horizontal',
           etiqueta: 'Alineamiento horizontal',
         },
-        { valor: 'inspeccion_dato_tecnico.esviaje', etiqueta: 'Esviaje / sesgo' },
+        {
+          valor: 'inspeccion_dato_tecnico.esviaje',
+          etiqueta: 'Esviaje / sesgo',
+        },
         {
           valor: 'inspeccion_dato_tecnico.poblacion_antes',
           etiqueta: 'Población antes del puente',
@@ -344,9 +398,18 @@ export class EditorVersionFormularioPage implements OnInit {
           valor: 'inspeccion_dato_tecnico.poblacion_despues',
           etiqueta: 'Población después del puente',
         },
-        { valor: 'inspeccion_dato_tecnico.tipo_cuerpo_agua', etiqueta: 'Tipo de cuerpo de agua' },
-        { valor: 'inspeccion_dato_tecnico.nombre_rio', etiqueta: 'Nombre del río / cauce' },
-        { valor: 'inspeccion_dato_tecnico.encauzamiento', etiqueta: 'Encauzamiento' },
+        {
+          valor: 'inspeccion_dato_tecnico.tipo_cuerpo_agua',
+          etiqueta: 'Tipo de cuerpo de agua',
+        },
+        {
+          valor: 'inspeccion_dato_tecnico.nombre_rio',
+          etiqueta: 'Nombre del río / cauce',
+        },
+        {
+          valor: 'inspeccion_dato_tecnico.encauzamiento',
+          etiqueta: 'Encauzamiento',
+        },
         {
           valor: 'inspeccion_dato_tecnico.antecedente_desbordamiento',
           etiqueta: 'Antecedente de desbordamiento',
@@ -359,7 +422,10 @@ export class EditorVersionFormularioPage implements OnInit {
           valor: 'inspeccion_dato_tecnico.fecha_ultimo_desbordamiento',
           etiqueta: 'Fecha último desbordamiento',
         },
-        { valor: 'inspeccion_dato_tecnico.alumbrado_existe', etiqueta: 'Alumbrado artificial' },
+        {
+          valor: 'inspeccion_dato_tecnico.alumbrado_existe',
+          etiqueta: 'Alumbrado artificial',
+        },
         {
           valor: 'inspeccion_dato_tecnico.drenajes_aledanos_existen',
           etiqueta: 'Drenajes aledaños',
@@ -476,7 +542,8 @@ export class EditorVersionFormularioPage implements OnInit {
             this.cargarAnalisisMapeos(id);
           }
         },
-        error: (err) => this.apiError.normalize(err),
+        error: (err) =>
+          this.errorValidacion.set(mensajeCalibracion(err, (k) => this.transloco.translate(k))),
       });
   }
   cargarAnalisisMapeos(id: string): void {
@@ -495,8 +562,38 @@ export class EditorVersionFormularioPage implements OnInit {
             })),
           );
         },
-        error: (err) => this.apiError.normalize(err),
+        error: (err) =>
+          this.errorValidacion.set(mensajeCalibracion(err, (k) => this.transloco.translate(k))),
       });
+  }
+  readonly dialogoRecargar = signal(false);
+  readonly recargaBloqueada = computed(
+    () =>
+      this.cargando() ||
+      this.guardandoEsquema() ||
+      this.guardandoVinculos() ||
+      this.guardandoPesos() ||
+      this.guardandoEscala() ||
+      this.estadoReglas().guardando ||
+      this.estadoCriticas().guardando ||
+      this.publicando(),
+  );
+  recargarVersion(): void {
+    if (this.recargaBloqueada()) return;
+    this.dialogoRecargar.set(true);
+  }
+  confirmarRecarga(): void {
+    if (this.recargaBloqueada() || !this.dialogoRecargar()) return;
+    this.dialogoRecargar.set(false);
+    this.version.set(null);
+    this.cargarDetalle(this.versionId());
+  }
+  fechaCalibracion(fecha: string): string {
+    return new Intl.DateTimeFormat('es-GT', {
+      dateStyle: 'medium',
+      timeStyle: 'short',
+      timeZone: 'America/Guatemala',
+    }).format(new Date(fecha));
   }
   cambiarSeccion(seccion: SeccionActiva): void {
     this.seccionActiva.set(seccion);
@@ -908,12 +1005,16 @@ export class EditorVersionFormularioPage implements OnInit {
     this.errorValidacion.set(null);
     this.mensajeExito.set(null);
     this.formularioApi
-      .actualizarBorrador(ver.id, {
-        codigo: ver.codigo,
-        esquema: esquemaJson,
-        vinculosAlmacenamiento: vinculosJson,
-        reglasEvaluacionIc: ver.reglasEvaluacionIc,
-      })
+      .actualizarBorrador(
+        ver.id,
+        {
+          codigo: ver.codigo,
+          esquema: esquemaJson,
+          vinculosAlmacenamiento: vinculosJson,
+          reglasEvaluacionIc: ver.reglasEvaluacionIc,
+        },
+        ver.version,
+      )
       .pipe(
         takeUntilDestroyed(this.destroyRef),
         finalize(() => this.guardandoEsquema.set(false)),
@@ -935,13 +1036,7 @@ export class EditorVersionFormularioPage implements OnInit {
           }
         },
         error: (err) => {
-          if (err?.error?.detail) {
-            this.errorValidacion.set(
-              `${this.transloco.translate('formulario.schemaValidationError')} ${err.error.detail}`,
-            );
-          } else {
-            this.apiError.normalize(err);
-          }
+          this.errorValidacion.set(mensajeCalibracion(err, (k) => this.transloco.translate(k)));
         },
       });
   }
@@ -1117,12 +1212,16 @@ export class EditorVersionFormularioPage implements OnInit {
     this.errorValidacion.set(null);
     this.mensajeExito.set(null);
     this.formularioApi
-      .actualizarBorrador(ver.id, {
-        codigo: ver.codigo,
-        esquema: esquemaJson,
-        vinculosAlmacenamiento: vinculosJson,
-        reglasEvaluacionIc: ver.reglasEvaluacionIc,
-      })
+      .actualizarBorrador(
+        ver.id,
+        {
+          codigo: ver.codigo,
+          esquema: esquemaJson,
+          vinculosAlmacenamiento: vinculosJson,
+          reglasEvaluacionIc: ver.reglasEvaluacionIc,
+        },
+        ver.version,
+      )
       .pipe(
         takeUntilDestroyed(this.destroyRef),
         finalize(() => this.guardandoVinculos.set(false)),
@@ -1139,7 +1238,7 @@ export class EditorVersionFormularioPage implements OnInit {
           );
         },
         error: (err) => {
-          const msg = this.apiError.normalize(err);
+          const msg = mensajeCalibracion(err, (k) => this.transloco.translate(k));
           this.errorValidacion.set(msg);
         },
       });
@@ -1187,24 +1286,26 @@ export class EditorVersionFormularioPage implements OnInit {
       descripcion: p.descripcion,
     }));
     this.formularioApi
-      .calibrarPesos(ver.id, payload)
+      .calibrarPesos(ver.id, payload, ver.version)
       .pipe(
+        switchMap(() => this.formularioApi.obtenerPorId(ver.id)),
         takeUntilDestroyed(this.destroyRef),
         finalize(() => this.guardandoPesos.set(false)),
       )
       .subscribe({
-        next: (pesosActualizados) => {
-          const actualizada = { ...ver, pesos: pesosActualizados };
+        next: (actualizada) => {
           this.version.set(actualizada);
           this.pesosEditables.set(elementosCalibracion(actualizada));
           this.mensajeExito.set(this.transloco.translate('formulario.weightsSaved'));
         },
-        error: (err) => this.apiError.normalize(err),
+        error: (err) =>
+          this.errorValidacion.set(mensajeCalibracion(err, (k) => this.transloco.translate(k))),
       });
   }
   readonly completandoEquivalencias = signal(false);
 
   completarEquivalencias(): void {
+    if (!this.esAdministrador()) return;
     const version = this.version();
     const analisis = this.analisisMapeo();
     if (
@@ -1246,7 +1347,8 @@ export class EditorVersionFormularioPage implements OnInit {
             }),
           );
         },
-        error: (err) => this.apiError.normalize(err),
+        error: (err) =>
+          this.errorValidacion.set(mensajeCalibracion(err, (k) => this.transloco.translate(k))),
       });
   }
 
@@ -1283,6 +1385,7 @@ export class EditorVersionFormularioPage implements OnInit {
     this.mapeosEditables.set(lista);
   }
   guardarDeclaracionesMapeo(): void {
+    if (!this.esAdministrador()) return;
     const ver = this.version();
     if (!ver || ver.estado === 'PUBLICADA') return;
     this.guardandoMapeos.set(true);
@@ -1298,7 +1401,8 @@ export class EditorVersionFormularioPage implements OnInit {
           this.mensajeExito.set(this.transloco.translate('formulario.mappingsSaved'));
           this.cargarAnalisisMapeos(ver.id);
         },
-        error: (err) => this.apiError.normalize(err),
+        error: (err) =>
+          this.errorValidacion.set(mensajeCalibracion(err, (k) => this.transloco.translate(k))),
       });
   }
   actualizarEscala(nivel: NivelSeveridad, valor: number | null): void {
@@ -1334,14 +1438,18 @@ export class EditorVersionFormularioPage implements OnInit {
     this.mensajeExito.set(null);
     this.guardandoEscala.set(true);
     this.formularioApi
-      .configurarEscala(ver.id, {
-        valores: {
-          NO_PRESENTA: escala.NO_PRESENTA!,
-          LEVE: escala.LEVE!,
-          MODERADO: escala.MODERADO!,
-          SEVERO: escala.SEVERO!,
+      .configurarEscala(
+        ver.id,
+        {
+          valores: {
+            NO_PRESENTA: escala.NO_PRESENTA!,
+            LEVE: escala.LEVE!,
+            MODERADO: escala.MODERADO!,
+            SEVERO: escala.SEVERO!,
+          },
         },
-      })
+        ver.version,
+      )
       .pipe(
         takeUntilDestroyed(this.destroyRef),
         finalize(() => this.guardandoEscala.set(false)),
@@ -1352,7 +1460,8 @@ export class EditorVersionFormularioPage implements OnInit {
           this.escalaEditable.set(escalaCalibracion(actualizada));
           this.mensajeExito.set(this.transloco.translate('formulario.calibracion.escalaGuardada'));
         },
-        error: (err) => this.apiError.normalize(err),
+        error: (err) =>
+          this.errorValidacion.set(mensajeCalibracion(err, (k) => this.transloco.translate(k))),
       });
   }
   abrirConfirmarPublicar(): void {
@@ -1377,7 +1486,9 @@ export class EditorVersionFormularioPage implements OnInit {
           this.cerrarConfirmarPublicar();
           this.version.set(pub);
           this.mensajeExito.set(
-            this.transloco.translate('formulario.publishedSuccess', { codigo: pub.codigo }),
+            this.transloco.translate('formulario.publishedSuccess', {
+              codigo: pub.codigo,
+            }),
           );
           this.cambiarSeccion('esquema');
         },
@@ -1416,7 +1527,8 @@ export class EditorVersionFormularioPage implements OnInit {
           this.cerrarDialogoNuevaDerivada();
           this.router.navigate(['/admin/formularios', creada.id]);
         },
-        error: (err) => this.apiError.normalize(err),
+        error: (err) =>
+          this.errorValidacion.set(mensajeCalibracion(err, (k) => this.transloco.translate(k))),
       });
   }
 }

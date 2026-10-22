@@ -2,7 +2,9 @@
   <main class="workspace">
     <header class="workspace-bar">
       <div>
-        <p class="workspace-kicker">{{ 'app.technicalPlatform' | transloco }}</p>
+        <p class="workspace-kicker">
+          {{ 'app.technicalPlatform' | transloco }}
+        </p>
         <strong>{{ 'app.title' | transloco }}</strong>
       </div>
       <div class="workspace-meta">
@@ -18,7 +20,8 @@
                 (connectivity.online() ? 'connectivity.online' : 'connectivity.offline') | transloco
               }}
               · {{ cantidadPendiente(cola, 'INSPECCION') }}
-              {{ 'offline.pendingInspections' | transloco }} · {{ cantidadPendiente(cola, 'FOTO') }}
+              {{ 'offline.pendingInspections' | transloco }} ·
+              {{ cantidadPendiente(cola, 'FOTO') }}
               {{ 'offline.pendingFiles' | transloco }}
             }
           </a>
@@ -112,6 +115,9 @@
           <i class="pi pi-shield"></i><span>{{ 'nav.security' | transloco }}</span>
         </a>
         @if (auth.user()?.role === 'ADMINISTRADOR' || auth.user()?.role === 'CATEDRATICO') {
+          <a routerLink="/admin/formularios" routerLinkActive="active">
+            <i class="pi pi-file-edit"></i><span>{{ 'nav.formularioSieca' | transloco }}</span>
+          </a>
           <a routerLink="/mantenimiento/reglas" routerLinkActive="active">
             <i class="pi pi-wrench"></i><span>{{ 'nav.maintenanceRules' | transloco }}</span>
           </a>
@@ -126,9 +132,6 @@
             routerLinkActive="active"
           >
             <i class="pi pi-users"></i><span>{{ 'nav.users' | transloco }}</span>
-          </a>
-          <a routerLink="/admin/formularios" routerLinkActive="active">
-            <i class="pi pi-file-edit"></i><span>{{ 'nav.formularioSieca' | transloco }}</span>
           </a>
           <a routerLink="/admin/cursos" routerLinkActive="active">
             <i class="pi pi-book"></i><span>{{ 'nav.courses' | transloco }}</span>
@@ -180,7 +183,9 @@
     <div class="sidebar-spacer"></div>
 
     <div class="user-panel">
-      <div class="user-avatar">{{ nombreVisible().charAt(0).toUpperCase() || 'U' }}</div>
+      <div class="user-avatar">
+        {{ nombreVisible().charAt(0).toUpperCase() || 'U' }}
+      </div>
       <div class="user-data">
         <strong>{{ nombreVisible() }}</strong>
         <span>{{ auth.user()?.role }}</span>

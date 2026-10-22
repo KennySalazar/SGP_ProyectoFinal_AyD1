@@ -63,6 +63,12 @@ export const routes: Routes = [
           ),
       },
       {
+        path: 'admin/formularios',
+        canActivate: [roleGuard('ADMINISTRADOR', 'CATEDRATICO')],
+        loadChildren: () =>
+          import('./features/formulario/formulario.routes').then((m) => m.formularioRoutes),
+      },
+      {
         path: 'admin',
         canActivate: [roleGuard('ADMINISTRADOR')],
         loadChildren: () => import('./features/admin/admin.routes').then((m) => m.adminRoutes),

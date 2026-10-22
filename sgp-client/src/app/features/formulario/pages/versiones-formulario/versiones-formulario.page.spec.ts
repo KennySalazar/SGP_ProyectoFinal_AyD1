@@ -1,3 +1,4 @@
+import { AuthStore } from '../../../../core/services/auth.store';
 import { Pipe, PipeTransform } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
@@ -62,6 +63,10 @@ describe('VersionesFormularioPage', () => {
     TestBed.configureTestingModule({
       imports: [VersionesFormularioPage],
       providers: [
+        {
+          provide: AuthStore,
+          useValue: { user: () => ({ role: 'ADMINISTRADOR' }) },
+        },
         provideRouter([]),
         { provide: FormularioApiService, useValue: apiMock },
         {
@@ -147,5 +152,19 @@ describe('VersionesFormularioPage', () => {
     ]);
     component.cargarPlantillaInicial();
     expect(apiMock.cargarPlantillaSieca).toHaveBeenCalledWith('SIECA-v3');
+  });
+
+  it('oculta la carga de plantilla y herramientas administrativas al catedratico', () => {
+    vi.spyOn(component.auth, 'user').mockReturnValue({
+      role: 'CATEDRATICO',
+    } as never);
+    fixture.destroy();
+    fixture = TestBed.createComponent(VersionesFormularioPage);
+    component = fixture.componentInstance;
+    fixture.detectChanges();
+    component.cargarPlantillaInicial();
+    expect(apiMock.cargarPlantillaSieca).not.toHaveBeenCalled();
+    expect(fixture.nativeElement.querySelector('nav.accesos')).toBeNull();
+    expect(fixture.nativeElement.textContent).not.toContain('formulario.loadTemplate');
   });
 });

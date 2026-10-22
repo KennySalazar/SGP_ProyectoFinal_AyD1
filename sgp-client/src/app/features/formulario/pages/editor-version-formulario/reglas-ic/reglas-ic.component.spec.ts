@@ -1,6 +1,6 @@
 import { Pipe, PipeTransform } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { TranslocoPipe } from '@jsverse/transloco';
+import { TranslocoService, TranslocoPipe } from '@jsverse/transloco';
 import { Subject, of } from 'rxjs';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiErrorService } from '../../../../../core/services/api-error.service';
@@ -59,7 +59,14 @@ describe('Editor visual de reglas IC', () => {
     TestBed.configureTestingModule({
       imports: [ReglasIcComponent],
       providers: [
-        { provide: FormularioApiService, useValue: { actualizarBorrador: actualizar } },
+        {
+          provide: TranslocoService,
+          useValue: { translate: (key: string) => key },
+        },
+        {
+          provide: FormularioApiService,
+          useValue: { actualizarBorrador: actualizar },
+        },
         { provide: ApiErrorService, useValue: { normalize } },
       ],
     });
@@ -79,7 +86,10 @@ describe('Editor visual de reglas IC', () => {
     component.formulario.controls[
       JSON.stringify(['agregacion', 'elementos_ausentes_no_portantes'])
     ].setValue(2);
-    expect(emit).toHaveBeenLastCalledWith({ pendiente: true, guardando: false });
+    expect(emit).toHaveBeenLastCalledWith({
+      pendiente: true,
+      guardando: false,
+    });
     expect(component.errores()).toEqual([]);
   });
   it('envia el esquema vigente y conserva escala y condiciones criticas', () => {
@@ -94,11 +104,17 @@ describe('Editor visual de reglas IC', () => {
         reglasEvaluacionIc: expect.objectContaining({
           reglas_evaluacion_ic: expect.objectContaining({
             rangos_estado: { BUENO: 75, REGULAR: 50, MALO: 0 },
-            escala_severidad: { NO_PRESENTA: 0, LEVE: 1, MODERADO: 2, SEVERO: 4 },
+            escala_severidad: {
+              NO_PRESENTA: 0,
+              LEVE: 1,
+              MODERADO: 2,
+              SEVERO: 4,
+            },
             reglas_anulacion: [{ id: 'RN-IC-05' }],
           }),
         }),
       }),
+      0,
     );
   });
   it('rechaza rangos invalidos sin enviar la solicitud', () => {
@@ -108,7 +124,10 @@ describe('Editor visual de reglas IC', () => {
     expect(component.errores()).toContain('rangosInvalidos');
   });
   it('una version publicada deshabilita campos y no permite guardar', () => {
-    fixture.componentRef.setInput('version', { ...version(), estado: 'PUBLICADA' });
+    fixture.componentRef.setInput('version', {
+      ...version(),
+      estado: 'PUBLICADA',
+    });
     fixture.detectChanges();
     expect(component.formulario.disabled).toBe(true);
     expect(fixture.nativeElement.querySelector('button[type="submit"]')).toBeNull();
@@ -125,7 +144,7 @@ describe('Editor visual de reglas IC', () => {
     expect(actualizar).toHaveBeenCalledTimes(1);
     const error = { status: 409, error: { detail: 'Version inmutable' } };
     pendiente.error(error);
-    expect(normalize).toHaveBeenCalledWith(error);
+    expect(component.errores()).toEqual(['Version inmutable']);
     expect(component.formulario.controls[clave].value).toBe(2);
     expect(component.guardando()).toBe(false);
   });
@@ -142,7 +161,10 @@ describe('Editor visual de reglas IC', () => {
     const emit = vi.spyOn(component.estado, 'emit');
     component.restablecer();
     expect(component.formulario.controls[clave].value).toBe(3);
-    expect(emit).toHaveBeenLastCalledWith({ pendiente: false, guardando: false });
+    expect(emit).toHaveBeenLastCalledWith({
+      pendiente: false,
+      guardando: false,
+    });
     expect(actualizar).not.toHaveBeenCalled();
   });
   it('una actualizacion de pesos no borra la edicion pendiente de reglas', () => {
@@ -167,7 +189,11 @@ describe('Editor visual de reglas IC', () => {
     expect(component.formulario.controls[JSON.stringify(['rangos_estado', 'REGULAR'])].value).toBe(
       50,
     );
-    expect(reglas['rangos_estado']).toEqual({ BUENO: 80, REGULAR: 60, MALO: 0 });
+    expect(reglas['rangos_estado']).toEqual({
+      BUENO: 80,
+      REGULAR: 60,
+      MALO: 0,
+    });
     component.guardar();
     expect(actualizar).toHaveBeenCalled();
   });

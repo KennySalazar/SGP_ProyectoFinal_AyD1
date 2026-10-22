@@ -1,3 +1,4 @@
+import { AuthStore } from '../../../../core/services/auth.store';
 import { CalibracionAdicionalApiService } from '../../services/calibracion-adicional-api.service';
 import { CalibracionAdicionalComponent } from './calibracion-adicional/calibracion-adicional.component';
 import { ReglasIcComponent } from './reglas-ic/reglas-ic.component';
@@ -93,6 +94,10 @@ describe('EditorVersionFormularioPage', () => {
     TestBed.configureTestingModule({
       imports: [EditorVersionFormularioPage],
       providers: [
+        {
+          provide: AuthStore,
+          useValue: { user: () => ({ role: 'ADMINISTRADOR' }) },
+        },
         provideRouter([]),
         {
           provide: CalibracionAdicionalApiService,
@@ -274,9 +279,11 @@ describe('EditorVersionFormularioPage', () => {
   });
   it('debe calibrar y guardar pesos', () => {
     component.guardarPesos();
-    expect(apiMock.calibrarPesos).toHaveBeenCalledWith('v-1', [
-      { elementoRef: '/vigas', peso: 1.5, descripcion: 'Vigas' },
-    ]);
+    expect(apiMock.calibrarPesos).toHaveBeenCalledWith(
+      'v-1',
+      [{ elementoRef: '/vigas', peso: 1.5, descripcion: 'Vigas' }],
+      1,
+    );
   });
   it('debe publicar la versión exitosamente', () => {
     component.ejecutarPublicacion();
@@ -353,6 +360,13 @@ describe('EditorVersionFormularioPage', () => {
   it('guardar pesos actualiza la version y permite publicar con escala guardada', () => {
     component.actualizarPeso('/vigas', 2);
     apiMock.calibrarPesos.mockReturnValue(of([{ ...mockVersion.pesos[0], peso: 2 }]));
+    apiMock.obtenerPorId.mockReturnValue(
+      of({
+        ...mockVersion,
+        version: 2,
+        pesos: [{ ...mockVersion.pesos[0], peso: 2 }],
+      }),
+    );
     component.guardarPesos();
     expect(component.version()?.pesos[0].peso).toBe(2);
     expect(component.calibracionPendiente()).toBe(false);
@@ -386,9 +400,13 @@ describe('EditorVersionFormularioPage', () => {
       }),
     );
     component.guardarEscala();
-    expect(apiMock.configurarEscala).toHaveBeenCalledWith('v-1', {
-      valores: { NO_PRESENTA: 0, LEVE: 0.5, MODERADO: 2, SEVERO: 4 },
-    });
+    expect(apiMock.configurarEscala).toHaveBeenCalledWith(
+      'v-1',
+      {
+        valores: { NO_PRESENTA: 0, LEVE: 0.5, MODERADO: 2, SEVERO: 4 },
+      },
+      1,
+    );
     expect(component.version()?.calibradoPorId).toBe('admin-1');
     expect(component.calibracionPendiente()).toBe(false);
   });
@@ -453,9 +471,11 @@ describe('EditorVersionFormularioPage', () => {
     expect(component.errorValidacion()).toBeNull();
     expect(component.pesosPendientes()).toHaveLength(0);
     component.guardarPesos();
-    expect(apiMock.calibrarPesos).toHaveBeenCalledWith('v-1', [
-      expect.objectContaining({ elementoRef: '/vigas', peso: 5 }),
-    ]);
+    expect(apiMock.calibrarPesos).toHaveBeenCalledWith(
+      'v-1',
+      [expect.objectContaining({ elementoRef: '/vigas', peso: 5 })],
+      1,
+    );
   });
   it('muestra vinculos en editor visual sin selector de codigo JSON', () => {
     component.cambiarSeccion('vinculos');
@@ -520,5 +540,113 @@ describe('EditorVersionFormularioPage', () => {
     fixture.detectChanges();
     expect(fixture.nativeElement.textContent).toContain('Nuevo');
     expect(component.puedePublicar()).toBe(false);
+  });
+
+  it('permite calibrar al catedratico pero impide publicar y guardar mapeos', () => {
+    vi.spyOn(component.auth, 'user').mockReturnValue({
+      role: 'CATEDRATICO',
+    } as never);
+    component.actualizarPeso('/vigas', 2);
+    component.guardarPesos();
+    expect(apiMock.calibrarPesos).toHaveBeenCalledWith('v-1', expect.any(Array), 1);
+    component.ejecutarPublicacion();
+    component.guardarDeclaracionesMapeo();
+    expect(component.puedePublicar()).toBe(false);
+    expect(apiMock.publicar).not.toHaveBeenCalled();
+    expect(apiMock.guardarMapeos).not.toHaveBeenCalled();
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).not.toContain('formulario.publishTab');
+  });
+  it('conserva los pesos escritos ante conflicto sin reintentar ni sustituir la version', () => {
+    component.actualizarPeso('/vigas', 2);
+    apiMock.calibrarPesos.mockReturnValue(
+      throwError(() => ({
+        status: 409,
+        error: { code: 'concurrencia_conflicto' },
+      })),
+    );
+    apiMock.obtenerPorId.mockClear();
+    component.guardarPesos();
+    expect(component.pesosEditables()[0].peso).toBe(2);
+    expect(component.version()?.version).toBe(1);
+    expect(component.errorValidacion()).toBe('formulario.hu053.conflicto');
+    expect(apiMock.calibrarPesos).toHaveBeenCalledTimes(1);
+    expect(apiMock.obtenerPorId).not.toHaveBeenCalled();
+  });
+  it('actualiza la version tras guardar pesos y la utiliza para guardar escala', () => {
+    apiMock.obtenerPorId.mockReturnValue(of({ ...mockVersion, version: 8 }));
+    component.guardarPesos();
+    component.guardarEscala();
+    expect(apiMock.configurarEscala).toHaveBeenCalledWith('v-1', expect.any(Object), 8);
+  });
+  it('cancelar la recarga conserva cambios sin consultar de nuevo', () => {
+    component.actualizarPeso('/vigas', 3);
+    const confirmar = vi.spyOn(window, 'confirm');
+    apiMock.obtenerPorId.mockClear();
+    component.recargarVersion();
+    expect(component.dialogoRecargar()).toBe(true);
+    expect(confirmar).not.toHaveBeenCalled();
+    component.dialogoRecargar.set(false);
+    expect(apiMock.obtenerPorId).not.toHaveBeenCalled();
+    expect(component.pesosEditables()[0].peso).toBe(3);
+    confirmar.mockRestore();
+  });
+
+  it('muestra Guardar escala al catedratico y conserva Leve decimal al recargar', () => {
+    vi.spyOn(component.auth, 'user').mockReturnValue({ role: 'CATEDRATICO' } as never);
+    component.cambiarSeccion('pesos');
+    component.actualizarEscala('LEVE', 0.5);
+    const actualizada = structuredClone(mockVersion);
+    const reglas = actualizada.reglasEvaluacionIc['reglas_evaluacion_ic'] as Record<
+      string,
+      unknown
+    >;
+    reglas['escala_severidad'] = { NO_PRESENTA: 0, LEVE: 0.5, MODERADO: 2, SEVERO: 4 };
+    actualizada.version = 2;
+    apiMock.configurarEscala.mockReturnValue(of(actualizada));
+    fixture.detectChanges();
+    const boton = (
+      [...fixture.nativeElement.querySelectorAll('button')] as HTMLButtonElement[]
+    ).find((b) => b.textContent?.includes('formulario.calibracion.guardarEscala'));
+    expect(boton).toBeDefined();
+    expect(boton!.disabled).toBe(false);
+    boton!.click();
+    expect(apiMock.configurarEscala).toHaveBeenCalledWith(
+      'v-1',
+      {
+        valores: { NO_PRESENTA: 0, LEVE: 0.5, MODERADO: 2, SEVERO: 4 },
+      },
+      1,
+    );
+    apiMock.obtenerPorId.mockReturnValue(of(actualizada));
+    component.cargarDetalle('v-1');
+    expect(component.escalaEditable().LEVE).toBe(0.5);
+  });
+
+  it('solo recarga al confirmar el dialogo de la aplicacion', () => {
+    component.actualizarEscala('LEVE', 0.25);
+    const actualizada = structuredClone(mockVersion);
+    const reglas = actualizada.reglasEvaluacionIc['reglas_evaluacion_ic'] as Record<
+      string,
+      unknown
+    >;
+    reglas['escala_severidad'] = { NO_PRESENTA: 0, LEVE: 0.75, MODERADO: 2, SEVERO: 4 };
+    actualizada.version = 2;
+    apiMock.obtenerPorId.mockClear().mockReturnValue(of(actualizada));
+    component.recargarVersion();
+    expect(apiMock.obtenerPorId).not.toHaveBeenCalled();
+    expect(component.escalaEditable().LEVE).toBe(0.25);
+    component.confirmarRecarga();
+    expect(apiMock.obtenerPorId).toHaveBeenCalledWith('v-1');
+    expect(component.dialogoRecargar()).toBe(false);
+    expect(component.escalaEditable().LEVE).toBe(0.75);
+  });
+  it('no recarga si se inicio un guardado mientras el dialogo estaba abierto', () => {
+    component.recargarVersion();
+    component.guardandoEscala.set(true);
+    apiMock.obtenerPorId.mockClear();
+    component.confirmarRecarga();
+    expect(apiMock.obtenerPorId).not.toHaveBeenCalled();
+    expect(component.dialogoRecargar()).toBe(true);
   });
 });

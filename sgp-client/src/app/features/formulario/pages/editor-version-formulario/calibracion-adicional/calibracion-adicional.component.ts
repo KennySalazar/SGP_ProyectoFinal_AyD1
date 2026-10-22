@@ -1,3 +1,5 @@
+import { FormularioApiService } from '../../../services/formulario-api.service';
+import { mensajeCalibracion } from '../../../utils/error-calibracion';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -12,7 +14,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormControl, FormRecord, ReactiveFormsModule, Validators } from '@angular/forms';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { ButtonModule } from 'primeng/button';
-import { finalize } from 'rxjs';
+import { finalize, switchMap, map } from 'rxjs';
 import { EstadoActa } from '../../../models/calibracion-adicional.models';
 import { VersionFormulario } from '../../../models/formulario.models';
 import { CalibracionAdicionalApiService } from '../../../services/calibracion-adicional-api.service';
@@ -37,6 +39,7 @@ export class CalibracionAdicionalComponent {
   readonly guardada = output<VersionFormulario>();
   readonly estado = output<{ pendiente: boolean; guardando: boolean }>();
   private readonly api = inject(CalibracionAdicionalApiService);
+  private readonly formularioApi = inject(FormularioApiService);
   private readonly destroyRef = inject(DestroyRef);
   private readonly traduccion = inject(TranslocoService);
   readonly form = new FormRecord<FormControl<string>>({});
@@ -63,7 +66,10 @@ export class CalibracionAdicionalComponent {
         this.firma = firma;
         for (const clave of Object.keys(this.form.controls))
           this.form.removeControl(clave, { emitEvent: false });
-        const vistas = reglas.map((regla) => ({ regla, campos: camposCriticos(regla) }));
+        const vistas = reglas.map((regla) => ({
+          regla,
+          campos: camposCriticos(regla),
+        }));
         for (let i = 0; i < vistas.length; i++)
           for (let j = 0; j < vistas[i].campos.length; j++)
             this.form.addControl(
@@ -88,7 +94,12 @@ export class CalibracionAdicionalComponent {
         this.consultarActa();
       }
     });
-    effect(() => this.estado.emit({ pendiente: this.cambio(), guardando: this.operando() }));
+    effect(() =>
+      this.estado.emit({
+        pendiente: this.cambio(),
+        guardando: this.operando(),
+      }),
+    );
   }
   clave(i: number, j: number): string {
     return `r${i}c${j}`;
@@ -145,7 +156,7 @@ export class CalibracionAdicionalComponent {
     this.error.set(null);
     this.mensaje.set(null);
     this.api
-      .guardarReglas(versionId, reglas)
+      .guardarReglas(versionId, reglas, this.version().version)
       .pipe(
         takeUntilDestroyed(this.destroyRef),
         finalize(() => this.operando.set(false)),
@@ -198,19 +209,30 @@ export class CalibracionAdicionalComponent {
   }
   adjuntar(): void {
     const archivo = this.archivo();
-    if (!archivo || this.operando() || this.bloqueado() || this.cambio()) return;
+    if (
+      this.version().estado !== 'BORRADOR' ||
+      !archivo ||
+      this.operando() ||
+      this.bloqueado() ||
+      this.cambio()
+    )
+      return;
     const id = this.version().id;
     this.operando.set(true);
     this.errorActa.set(null);
     this.api
-      .adjuntarActa(id, archivo)
+      .adjuntarActa(id, archivo, this.version().version)
       .pipe(
+        switchMap((acta) =>
+          this.formularioApi.obtenerPorId(id).pipe(map((version) => ({ acta, version }))),
+        ),
         takeUntilDestroyed(this.destroyRef),
         finalize(() => this.operando.set(false)),
       )
       .subscribe({
-        next: (acta) => {
+        next: ({ acta, version }) => {
           if (this.version().id !== id) return;
+          this.guardada.emit(version);
           this.acta.set(acta);
           this.archivo.set(null);
         },
@@ -282,6 +304,6 @@ export class CalibracionAdicionalComponent {
       });
   }
   private detalle(error: { error?: { detail?: string } }): string {
-    return error.error?.detail ?? this.traduccion.translate('common.operationFailed');
+    return mensajeCalibracion(error, (k) => this.traduccion.translate(k));
   }
 }

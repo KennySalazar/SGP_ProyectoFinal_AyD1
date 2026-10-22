@@ -1,3 +1,4 @@
+import { FormularioApiService } from '../../../services/formulario-api.service';
 import { TestBed } from '@angular/core/testing';
 import { TranslocoService } from '@jsverse/transloco';
 import { of, throwError } from 'rxjs';
@@ -9,6 +10,7 @@ import { VersionFormulario } from '../../../models/formulario.models';
 describe('CalibracionAdicionalComponent', () => {
   const version = {
     id: 'v4',
+    version: 0,
     estado: 'BORRADOR',
     reglasEvaluacionIc: {
       reglas_evaluacion_ic: {
@@ -19,13 +21,21 @@ describe('CalibracionAdicionalComponent', () => {
             pendiente: 'Confirmar alcance',
             estado_resultante: 'MALO',
             elementos: ['/estribo'],
-            condicion: { indicador: 'nivel', algun_valor_en: ['CON_EXPOSICION'] },
+            condicion: {
+              indicador: 'nivel',
+              algun_valor_en: ['CON_EXPOSICION'],
+            },
           },
         ],
       },
     },
   } as unknown as VersionFormulario;
-  const sinActa = { versionFormularioId: 'v4', estado: 'SIN_ACTA', mensaje: '', acta: null };
+  const sinActa = {
+    versionFormularioId: 'v4',
+    estado: 'SIN_ACTA',
+    mensaje: '',
+    acta: null,
+  };
   const api = {
     consultarActa: vi.fn(),
     guardarReglas: vi.fn(),
@@ -42,8 +52,17 @@ describe('CalibracionAdicionalComponent', () => {
     TestBed.configureTestingModule({
       imports: [CalibracionAdicionalComponent],
       providers: [
+        {
+          provide: FormularioApiService,
+          useValue: {
+            obtenerPorId: vi.fn().mockReturnValue(of({ ...version, version: 1 })),
+          },
+        },
         { provide: CalibracionAdicionalApiService, useValue: api },
-        { provide: TranslocoService, useValue: { translate: (clave: string) => clave } },
+        {
+          provide: TranslocoService,
+          useValue: { translate: (clave: string) => clave },
+        },
       ],
     });
     TestBed.overrideComponent(CalibracionAdicionalComponent, {
@@ -86,7 +105,10 @@ describe('CalibracionAdicionalComponent', () => {
     expect(componente.cambio()).toBe(true);
   });
   it('no guarda reglas de una version publicada', () => {
-    fixture.componentRef.setInput('version', { ...version, estado: 'PUBLICADA' });
+    fixture.componentRef.setInput('version', {
+      ...version,
+      estado: 'PUBLICADA',
+    });
     fixture.detectChanges();
     componente.confirmar(0, { target: { checked: true } } as unknown as Event);
     componente.guardar();
@@ -121,5 +143,23 @@ describe('CalibracionAdicionalComponent', () => {
     expect(componente.puedeGuardar()).toBe(true);
     componente.guardar();
     expect(api.guardarReglas).toHaveBeenCalledTimes(1);
+  });
+
+  it('comunica la version nueva tras adjuntar y usa If-Match de la version mostrada', () => {
+    const emit = vi.spyOn(componente.guardada, 'emit');
+    componente.archivo.set(new File(['%PDF'], 'acta.pdf', { type: 'application/pdf' }));
+    componente.adjuntar();
+    expect(api.adjuntarActa).toHaveBeenCalledWith('v4', expect.any(File), 0);
+    expect(emit).toHaveBeenCalledWith(expect.objectContaining({ version: 1 }));
+  });
+  it('no adjunta un acta a una version publicada ni invocando la accion directamente', () => {
+    fixture.componentRef.setInput('version', {
+      ...version,
+      estado: 'PUBLICADA',
+    });
+    fixture.detectChanges();
+    componente.archivo.set(new File(['%PDF'], 'acta.pdf'));
+    componente.adjuntar();
+    expect(api.adjuntarActa).not.toHaveBeenCalled();
   });
 });

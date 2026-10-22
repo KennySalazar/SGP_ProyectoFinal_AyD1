@@ -17,10 +17,11 @@ describe('CalibracionAdicionalApiService', () => {
   afterEach(() => http.verify());
   it('guarda el arreglo completo de reglas en el endpoint especifico', () => {
     const reglas = [{ id: 'RN-IC-05a', pendiente: null }];
-    api.guardarReglas('v/4', reglas).subscribe();
+    api.guardarReglas('v/4', reglas, 2).subscribe();
     const req = http.expectOne('/api/v1/formularios/v%2F4/reglas-criticas');
     expect(req.request.method).toBe('PUT');
     expect(req.request.body).toEqual({ reglasAnulacion: reglas });
+    expect(req.request.headers.get('If-Match')).toBe('2');
     req.flush({});
   });
   it('consulta el estado sin acta', () => {
@@ -31,10 +32,11 @@ describe('CalibracionAdicionalApiService', () => {
   });
   it('envia el PDF como multipart con la parte archivo', () => {
     const archivo = new File(['%PDF'], 'acta.pdf', { type: 'application/pdf' });
-    api.adjuntarActa('v4', archivo).subscribe();
+    api.adjuntarActa('v4', archivo, 4).subscribe();
     const req = http.expectOne('/api/v1/formularios/v4/acta-calibracion');
     expect(req.request.method).toBe('PUT');
     expect(req.request.body.get('archivo')).toBe(archivo);
+    expect(req.request.headers.get('If-Match')).toBe('4');
     expect(req.request.headers.has('Content-Type')).toBe(false);
     req.flush({});
   });

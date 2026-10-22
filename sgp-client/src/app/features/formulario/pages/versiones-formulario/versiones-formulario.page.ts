@@ -1,3 +1,4 @@
+import { AuthStore } from '../../../../core/services/auth.store';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -41,6 +42,8 @@ import { FormularioApiService } from '../../services/formulario-api.service';
 })
 export class VersionesFormularioPage implements OnInit {
   private readonly formularioApi = inject(FormularioApiService);
+  readonly auth = inject(AuthStore);
+  readonly esAdministrador = () => this.auth.user()?.role === 'ADMINISTRADOR';
   private readonly fb = inject(FormBuilder);
   private readonly router = inject(Router);
   private readonly apiError = inject(ApiErrorService);
@@ -97,7 +100,7 @@ export class VersionesFormularioPage implements OnInit {
   }
 
   cargarPlantillaInicial(): void {
-    if (this.cargandoPlantilla() || this.cargando()) return;
+    if (!this.esAdministrador() || this.cargandoPlantilla() || this.cargando()) return;
     const codigos = new Set(this.versiones().map((version) => version.codigo));
     let numero = 1;
     while (codigos.has(`SIECA-v${numero}`)) numero++;
