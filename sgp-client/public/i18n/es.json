@@ -343,6 +343,8 @@
       "irAlElemento": "Ir a {{elemento}} en el formulario"
     },
     "ancla": {
+      "camposAlternar": "Comentarios por campo",
+      "camposAyuda": "Muestra el icono de comentarios junto a cada campo. Sin esto aparece al pasar el puntero sobre el campo o si ya tiene comentarios.",
       "comentarElemento": "Comentar {{elemento}}",
       "una": "1 comentario",
       "cantidad": "{{cantidad}} comentarios",

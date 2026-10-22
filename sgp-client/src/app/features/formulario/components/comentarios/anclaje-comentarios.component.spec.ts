@@ -34,11 +34,13 @@ function arbol(): { raiz: FormGroup; estribo: FormGroup; pila: FormGroup } {
 function contexto(
   totales: Record<string, number>,
   puedeComentar = true,
+  camposVisibles = false,
 ): { ctx: ContextoComentariosFormulario; seleccionar: Mock<(a: AnclajeFormulario) => void> } {
   const seleccionar = vi.fn<(a: AnclajeFormulario) => void>();
   return {
     ctx: {
       puedeComentar: signal(puedeComentar),
+      camposVisibles: signal(camposVisibles),
       totalDe: (a) => totales[`${a.elementoRef}|${a.instanciaElementoId ?? ''}`] ?? 0,
       etiquetaDe: (a) =>
         etiquetas[a.elementoRef + '|' + (a.instanciaElementoId ?? '')] ?? 'Viga de apoyo',
@@ -51,6 +53,7 @@ function contexto(
 function montar(
   control: AbstractControl,
   proveedor: ContextoComentariosFormulario | null,
+  enCampo = false,
 ): ComponentFixture<AnclajeComentariosComponent> {
   TestBed.configureTestingModule({
     providers: [
@@ -71,6 +74,7 @@ function montar(
   const fixture = TestBed.createComponent(AnclajeComentariosComponent);
   fixture.componentRef.setInput('nodo', NODO);
   fixture.componentRef.setInput('control', control);
+  fixture.componentRef.setInput('enCampo', enCampo);
   fixture.detectChanges();
   return fixture;
 }
@@ -181,6 +185,62 @@ describe('AnclajeComentariosComponent', () => {
     expect(enTitulo.nativeElement.querySelector('.anclaje.en-titulo')).not.toBeNull();
   });
 
+  describe('en un campo suelto', () => {
+    const anclaje = (fixture: ComponentFixture<unknown>) =>
+      (fixture.nativeElement as HTMLElement).querySelector('.anclaje') as HTMLElement;
+
+    it('no está siempre a la vista: se muestra al pasar el puntero o al enfocar el campo', () => {
+      const { estribo } = arbol();
+      const fixture = montar(estribo, contexto({}).ctx, true);
+
+      expect(anclaje(fixture).classList.contains('en-campo')).toBe(true);
+      expect(anclaje(fixture).classList.contains('fijo')).toBe(false);
+      // Aunque se vea oculto, se alcanza con el teclado y tiene su nombre accesible.
+      expect(botones(fixture)[0].tabIndex).toBeGreaterThanOrEqual(0);
+      expect(botones(fixture)[0].getAttribute('aria-label')).toContain(
+        'foro.ancla.comentarElemento',
+      );
+    });
+
+    it('con comentarios queda fijo, y muestra su número', () => {
+      const { estribo } = arbol();
+      const fixture = montar(estribo, contexto({ [`${ESTRIBO}|`]: 2 }).ctx, true);
+
+      expect(anclaje(fixture).classList.contains('fijo')).toBe(true);
+      expect(botones(fixture)[0].querySelector('.cantidad')?.textContent?.trim()).toBe('2');
+    });
+
+    it('con el interruptor de comentarios por campo queda a la vista', () => {
+      const { estribo } = arbol();
+      const fixture = montar(estribo, contexto({}, true, true).ctx, true);
+
+      expect(anclaje(fixture).classList.contains('fijo')).toBe(true);
+    });
+
+    it('reacciona cuando se enciende o apaga el interruptor', () => {
+      const { estribo } = arbol();
+      const camposVisibles = signal(false);
+      const ctx: ContextoComentariosFormulario = {
+        ...contexto({}).ctx,
+        camposVisibles,
+      };
+      const fixture = montar(estribo, ctx, true);
+      expect(anclaje(fixture).classList.contains('fijo')).toBe(false);
+
+      camposVisibles.set(true);
+      fixture.detectChanges();
+
+      expect(anclaje(fixture).classList.contains('fijo')).toBe(true);
+    });
+
+    it('fuera de un campo (un elemento o una sección) no lleva la variante de campo', () => {
+      const { estribo } = arbol();
+      const fixture = montar(estribo, contexto({}).ctx);
+
+      expect(anclaje(fixture).classList.contains('en-campo')).toBe(false);
+    });
+  });
+
   it('en un elemento repetible el ancla lleva la instancia y se nombra con ella', () => {
     const { pila } = arbol();
     const { ctx, seleccionar } = contexto({ ['/subestructura/pilas|pila-2']: 4 });
@@ -202,6 +262,7 @@ describe('AnclajeComentariosComponent', () => {
     const total = signal(0);
     const ctx: ContextoComentariosFormulario = {
       puedeComentar: signal(true),
+      camposVisibles: signal(false),
       totalDe: () => total(),
       etiquetaDe: () => 'Viga de apoyo',
       seleccionar: vi.fn(),

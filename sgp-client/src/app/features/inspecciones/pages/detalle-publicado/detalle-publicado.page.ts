@@ -71,6 +71,8 @@ export class DetallePublicadoPage implements ContextoComentariosFormulario {
   private readonly formulario = viewChild(FormularioDinamicoComponent);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   readonly puedeComentar = inject(AuthStore).authenticated;
+  /** Deja a la vista el icono de comentarios de todos los campos (en pantallas táctiles no hay «pasar el puntero»). */
+  readonly camposVisibles = signal(false);
   /** Cuántos comentarios tiene cada elemento, según el foro de la inspección. */
   readonly anclas = signal<readonly AnclaConTotal[]>([]);
   /** Elemento sobre el que se ven y se dejan los comentarios; nulo para todo el hilo. */
@@ -213,6 +215,10 @@ export class DetallePublicadoPage implements ContextoComentariosFormulario {
 
   toggleMapeo(): void {
     this.mostrarMapeo.update((v) => !v);
+  }
+
+  alternarCampos(): void {
+    this.camposVisibles.update((visibles) => !visibles);
   }
 
   etiquetaDe(anclaje: AnclajeFormulario): string {

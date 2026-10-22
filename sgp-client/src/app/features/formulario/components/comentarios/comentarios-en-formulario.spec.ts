@@ -39,6 +39,7 @@ function montar(
 
 const contexto = (): ContextoComentariosFormulario => ({
   puedeComentar: signal(true),
+  camposVisibles: signal(false),
   totalDe: (a) => (a.elementoRef === ELEMENTO ? 2 : 0),
   etiquetaDe: (a) => a.elementoRef,
   seleccionar: vi.fn(),
@@ -116,10 +117,94 @@ describe('Icono de comentarios junto al nombre, dentro del formulario dinámico'
         expect(new Set(referencias).size, clave).toBe(referencias.length);
         expect(html.querySelectorAll('summary [data-elemento-ref]'), clave).toHaveLength(0);
         expect(html.querySelectorAll('h2 button, h3 button, h4 button'), clave).toHaveLength(0);
+        expect(html.querySelectorAll('label button'), clave).toHaveLength(0);
       }
     },
     TIEMPO_MAXIMO_RECORRIDO,
   );
+
+  describe('un campo suelto', () => {
+    const CAMPO_TEXTO = '/identificacion/nombre_puente';
+    const CAMPO_OPCIONES = '/identificacion/ruta_pavimentada';
+
+    it('lleva su icono pegado a la etiqueta, no dentro de ella', () => {
+      const fixture = montar(contexto(), '/identificacion');
+
+      const [anclaje, ...otros] = anclajes(fixture, CAMPO_TEXTO);
+      expect(otros).toHaveLength(0);
+      const titulo = anclaje.closest('.titulo-campo');
+      expect(titulo?.querySelector('label')?.textContent).toContain('Nombre puente');
+      // Un botón dentro de la etiqueta le ensuciaría el nombre al campo.
+      expect(anclaje.closest('label')).toBeNull();
+      expect(titulo?.querySelectorAll('label button')).toHaveLength(0);
+      expect(anclaje.classList.contains('en-campo')).toBe(true);
+      expect(anclaje.classList.contains('en-titulo')).toBe(true);
+    });
+
+    it('con opciones lleva su icono en la leyenda, junto al nombre', () => {
+      const fixture = montar(contexto(), '/identificacion');
+
+      const [anclaje, ...otros] = anclajes(fixture, CAMPO_OPCIONES);
+      expect(otros).toHaveLength(0);
+      expect(anclaje.closest('fieldset.opciones legend')).not.toBeNull();
+      expect(anclaje.classList.contains('en-campo')).toBe(true);
+    });
+
+    it('empieza escondido y se queda fijo cuando el campo tiene comentarios', () => {
+      const ctx = contexto();
+      const conComentarios: ContextoComentariosFormulario = {
+        ...ctx,
+        totalDe: (a) => (a.elementoRef === CAMPO_TEXTO ? 3 : 0),
+      };
+      const fixture = montar(conComentarios, '/identificacion');
+
+      const [conTotal] = anclajes(fixture, CAMPO_TEXTO);
+      const [sinTotal] = anclajes(fixture, '/identificacion/ruta');
+      expect(conTotal.classList.contains('fijo')).toBe(true);
+      expect(conTotal.querySelector('.cantidad')?.textContent?.trim()).toBe('3');
+      expect(sinTotal.classList.contains('fijo')).toBe(false);
+    });
+
+    it('con el interruptor de comentarios por campo todos quedan a la vista', () => {
+      const ctx: ContextoComentariosFormulario = { ...contexto(), camposVisibles: signal(true) };
+      const fixture = montar(ctx, '/identificacion');
+
+      const iconos = Array.from(
+        (fixture.nativeElement as HTMLElement).querySelectorAll<HTMLElement>('.anclaje.en-campo'),
+      );
+      expect(iconos.length).toBeGreaterThan(5);
+      expect(iconos.every((icono) => icono.classList.contains('fijo'))).toBe(true);
+    });
+
+    it('un campo dentro de una instancia lleva el ancla de esa instancia', () => {
+      const fixture = montar(contexto());
+
+      const anclajesDeCampo = Array.from(
+        (fixture.nativeElement as HTMLElement).querySelectorAll<HTMLElement>(
+          `.anclaje.en-campo[data-instancia-id="${PILA_2}"]`,
+        ),
+      );
+      expect(anclajesDeCampo.length).toBeGreaterThan(0);
+      for (const anclaje of anclajesDeCampo) {
+        expect(anclaje.getAttribute('data-elemento-ref')?.startsWith(PILAS + '/')).toBe(true);
+      }
+    });
+
+    it('el identificador de instancia no se puede comentar', () => {
+      const fixture = montar(contexto());
+
+      expect(anclajes(fixture, PILAS + '/instancia_id', PILA_1)).toHaveLength(0);
+    });
+
+    it('elegir un campo entrega su ancla', () => {
+      const ctx = contexto();
+      const fixture = montar(ctx, '/identificacion');
+
+      anclajes(fixture, CAMPO_TEXTO)[0].querySelector('button')!.click();
+
+      expect(ctx.seleccionar).toHaveBeenCalledWith({ elementoRef: CAMPO_TEXTO });
+    });
+  });
 
   it('un grupo opcional plegado lo lleva en una fila sobre él, no dentro de su summary', () => {
     const esquema: EsquemaJson = {

@@ -243,7 +243,22 @@
     </p-table>
   </div>
 </section>
-} @if (esquema(); as historico) {
+} @if (esquema(); as historico) { @if (puedeComentar()) {
+<div class="herramientas-comentarios">
+  <button
+    pButton
+    type="button"
+    severity="secondary"
+    [outlined]="!camposVisibles()"
+    [attr.aria-pressed]="camposVisibles()"
+    [attr.title]="'foro.ancla.camposAyuda' | transloco"
+    (click)="alternarCampos()"
+  >
+    <i class="pi pi-comment" aria-hidden="true"></i>
+    <span>{{ 'foro.ancla.camposAlternar' | transloco }}</span>
+  </button>
+</div>
+}
 <app-formulario-dinamico
   [esquema]="historico"
   [valoresIniciales]="valores()"
