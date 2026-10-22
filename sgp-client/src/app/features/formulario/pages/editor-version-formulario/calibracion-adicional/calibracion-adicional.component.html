@@ -121,6 +121,17 @@
         <dd>{{ fechaLegible(documento.subidoEn) }}</dd>
         <dt>{{ 'formulario.adicional.usuario' | transloco }}</dt>
         <dd>
+          @if (documento.subidoPorNombre?.trim(); as nombre) {
+            <p>{{ nombre }}</p>
+          }
+          @if (documento.subidoPorEmail?.trim(); as correo) {
+            <p>{{ correo }}</p>
+          }
+          @if (!documento.subidoPorNombre?.trim() && !documento.subidoPorEmail?.trim()) {
+            <p>
+              {{ 'formulario.adicional.responsableNoDisponible' | transloco }}
+            </p>
+          }
           <details>
             <summary>
               {{ 'formulario.adicional.verRegistro' | transloco }}
