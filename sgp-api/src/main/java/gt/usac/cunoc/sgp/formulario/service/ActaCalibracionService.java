@@ -18,6 +18,7 @@ import gt.usac.cunoc.sgp.formulario.entity.VersionFormulario;
 import gt.usac.cunoc.sgp.formulario.repository.ConfiguracionIcElementoRepository;
 import gt.usac.cunoc.sgp.formulario.repository.VersionFormularioRepository;
 import gt.usac.cunoc.sgp.formulario.validation.ValidadorActaPdf;
+import gt.usac.cunoc.sgp.usuario.repository.UserAccountRepository;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.security.MessageDigest;
@@ -49,6 +50,7 @@ public class ActaCalibracionService {
   private final AuditoriaWriter auditoria;
   private final ObjectMapper json;
   private final Clock clock;
+  private final UserAccountRepository usuarios;
 
   public ActaCalibracionService(
       VersionFormularioRepository versiones,
@@ -59,7 +61,8 @@ public class ActaCalibracionService {
       ValidadorActaPdf validador,
       AuditoriaWriter auditoria,
       ObjectMapper json,
-      Clock clock) {
+      Clock clock,
+      UserAccountRepository usuarios) {
     this.versiones = versiones;
     this.pesos = pesos;
     this.archivos = archivos;
@@ -69,6 +72,7 @@ public class ActaCalibracionService {
     this.auditoria = auditoria;
     this.json = json;
     this.clock = clock;
+    this.usuarios = usuarios;
   }
 
   @Transactional(readOnly = true)
@@ -223,6 +227,10 @@ public class ActaCalibracionService {
   }
 
   private EstadoActaCalibracionResponse estado(UUID versionId, Archivo archivo) {
+    var responsable =
+        archivo == null || archivo.getSubidoPorId() == null
+            ? null
+            : usuarios.findById(archivo.getSubidoPorId()).orElse(null);
     ActaCalibracionResponse acta =
         archivo == null
             ? null
@@ -233,6 +241,8 @@ public class ActaCalibracionService {
                 archivo.getTamanoBytes(),
                 archivo.getChecksumSha256(),
                 archivo.getSubidoPorId(),
+                responsable == null ? null : responsable.getNombreCompleto(),
+                responsable == null ? null : responsable.getEmail(),
                 archivo.getConfirmadoEn());
     return new EstadoActaCalibracionResponse(
         versionId,
