@@ -59,7 +59,7 @@ class ActaCalibracionControllerSecurityTest {
   }
 
   @ParameterizedTest
-  @ValueSource(strings = {"ESTUDIANTE", "CATEDRATICO", "PROFESIONAL_EXTERNO"})
+  @ValueSource(strings = {"ESTUDIANTE", "PROFESIONAL_EXTERNO"})
   void rechazaConsultaDescargaYCargaSinRolAdministrador(String rol) throws Exception {
     var auth = autenticar(rol);
     String ruta = "/api/v1/formularios/" + id + "/acta-calibracion";
@@ -79,9 +79,10 @@ class ActaCalibracionControllerSecurityTest {
     verifyNoInteractions(service);
   }
 
-  @Test
-  void administradorConsultaSinActa() throws Exception {
-    var auth = autenticar("ADMINISTRADOR");
+  @ParameterizedTest
+  @ValueSource(strings = {"ADMINISTRADOR", "CATEDRATICO"})
+  void administradorConsultaSinActa(String rol) throws Exception {
+    var auth = autenticar(rol);
     when(service.consultar(id))
         .thenReturn(
             new EstadoActaCalibracionResponse(id, "SIN_ACTA", "Sin acta de calibracion", null));
@@ -90,9 +91,10 @@ class ActaCalibracionControllerSecurityTest {
         .andExpect(jsonPath("$.estado").value("SIN_ACTA"));
   }
 
-  @Test
-  void administradorDescargaSinUrlPublicaYConCacheDesactivada() throws Exception {
-    var auth = autenticar("ADMINISTRADOR");
+  @ParameterizedTest
+  @ValueSource(strings = {"ADMINISTRADOR", "CATEDRATICO"})
+  void administradorDescargaSinUrlPublicaYConCacheDesactivada(String rol) throws Exception {
+    var auth = autenticar(rol);
     when(service.descargar(id)).thenReturn(new byte[] {1, 2, 3});
     mvc.perform(get("/api/v1/formularios/" + id + "/acta-calibracion/contenido").principal(auth))
         .andExpect(status().isOk())
