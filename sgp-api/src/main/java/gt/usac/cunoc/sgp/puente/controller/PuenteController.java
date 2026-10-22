@@ -39,6 +39,7 @@ public class PuenteController {
   }
 
   @GetMapping
+  @PreAuthorize("permitAll()")
   @Operation(
       summary = "Consultar el catálogo público de puentes",
       description =
@@ -99,6 +100,7 @@ public class PuenteController {
   }
 
   @GetMapping("/{id}")
+  @PreAuthorize("permitAll()")
   @Operation(
       summary = "Obtener un puente por su identificador",
       description = "Retorna los datos de la ficha de un puente activo.")
