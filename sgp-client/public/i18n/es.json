@@ -1568,7 +1568,8 @@
       "configurada": "Configurada",
       "editarCondiciones": "Editar condiciones de la regla",
       "editarAyuda": "Ajuste los valores segun la calibracion aprobada. Las referencias deben corresponder al catalogo de esta version.",
-      "verRegistro": "Ver identificador del responsable"
+      "verRegistro": "Ver identificador del responsable",
+      "responsableNoDisponible": "Datos del responsable no disponibles"
     },
     "calibracion": {
       "completa": "Pesos y escala configurados",

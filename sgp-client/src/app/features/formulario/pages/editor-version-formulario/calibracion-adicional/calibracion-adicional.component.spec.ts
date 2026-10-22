@@ -1,11 +1,19 @@
 import { FormularioApiService } from '../../../services/formulario-api.service';
 import { TestBed } from '@angular/core/testing';
-import { TranslocoService } from '@jsverse/transloco';
+import { Pipe, PipeTransform } from '@angular/core';
+import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { of, throwError } from 'rxjs';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { CalibracionAdicionalComponent } from './calibracion-adicional.component';
 import { CalibracionAdicionalApiService } from '../../../services/calibracion-adicional-api.service';
 import { VersionFormulario } from '../../../models/formulario.models';
+
+@Pipe({ name: 'transloco', standalone: true })
+class TraduccionPruebaPipe implements PipeTransform {
+  transform(clave: string): string {
+    return clave;
+  }
+}
 
 describe('CalibracionAdicionalComponent', () => {
   const version = {
@@ -66,7 +74,8 @@ describe('CalibracionAdicionalComponent', () => {
       ],
     });
     TestBed.overrideComponent(CalibracionAdicionalComponent, {
-      set: { template: '', imports: [] },
+      remove: { imports: [TranslocoPipe] },
+      add: { imports: [TraduccionPruebaPipe] },
     });
     await TestBed.compileComponents();
     fixture = TestBed.createComponent(CalibracionAdicionalComponent);
@@ -161,5 +170,45 @@ describe('CalibracionAdicionalComponent', () => {
     componente.archivo.set(new File(['%PDF'], 'acta.pdf'));
     componente.adjuntar();
     expect(api.adjuntarActa).not.toHaveBeenCalled();
+  });
+  function mostrarResponsable(nombre?: string | null, email?: string | null) {
+    componente.acta.set({
+      ...sinActa,
+      estado: 'CON_ACTA',
+      acta: {
+        archivoId: 'archivo-1',
+        nombreOriginal: 'acta.pdf',
+        mimeReal: 'application/pdf',
+        tamanoBytes: 10,
+        checksumSha256: 'checksum',
+        subidoPorId: 'autor-del-acta',
+        subidoPorNombre: nombre,
+        subidoPorEmail: email,
+        subidoEn: '2026-10-22T17:00:00Z',
+      },
+    });
+    fixture.detectChanges();
+    return fixture.nativeElement as HTMLElement;
+  }
+
+  it('muestra nombre y correo del autor y conserva su UUID plegado', () => {
+    const vista = mostrarResponsable('Kenny Salazar', 'kenny@ejemplo.com');
+    expect(vista.textContent).toContain('Kenny Salazar');
+    expect(vista.textContent).toContain('kenny@ejemplo.com');
+    const detalle = vista.querySelector('code')?.closest('details');
+    expect(detalle?.open).toBe(false);
+    expect(detalle?.textContent).toContain('autor-del-acta');
+  });
+
+  it('muestra el correo cuando el responsable no tiene nombre', () => {
+    const vista = mostrarResponsable(null, 'kenny@ejemplo.com');
+    expect(vista.textContent).toContain('kenny@ejemplo.com');
+    expect(vista.textContent).not.toContain('formulario.adicional.responsableNoDisponible');
+  });
+
+  it('conserva el identificador si faltan los datos del responsable', () => {
+    const vista = mostrarResponsable();
+    expect(vista.textContent).toContain('formulario.adicional.responsableNoDisponible');
+    expect(vista.querySelector('code')?.textContent).toBe('autor-del-acta');
   });
 });
