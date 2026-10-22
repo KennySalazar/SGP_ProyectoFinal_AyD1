@@ -1666,6 +1666,15 @@
         "NUEVO": "Nuevo",
         "ELIMINADO": "Eliminado"
       }
+    },
+    "hu053": {
+      "conflicto": "Otra persona modifico esta version. Tus cambios siguen en pantalla. Recarga la version antes de volver a guardar.",
+      "inmutable": "Esta version ya fue publicada. Crea una version nueva para cambiar la calibracion.",
+      "sinConexion": "No se pudo guardar. Comprueba la conexion y vuelve a intentarlo. Tus cambios siguen en pantalla.",
+      "recargar": "Recargar version",
+      "confirmarRecarga": "Se descartaran los cambios sin guardar de esta pantalla. ¿Deseas recargar la version?",
+      "fechaCalibracion": "Ultima calibracion",
+      "responsable": "Ver responsable de la calibracion"
     }
   },
   "inspecciones": {

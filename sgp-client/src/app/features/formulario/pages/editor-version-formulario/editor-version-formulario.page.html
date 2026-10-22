@@ -87,6 +87,26 @@
 </div>
 }
 
+<button
+  pButton
+  type="button"
+  severity="secondary"
+  [outlined]="true"
+  (click)="recargarVersion()"
+  [disabled]="cargando() || guardandoEsquema() || guardandoVinculos() || guardandoPesos() || guardandoEscala() || estadoReglas().guardando || estadoCriticas().guardando || publicando()"
+>
+  {{ 'formulario.hu053.recargar' | transloco }}
+</button>
+@if (ver.calibradoEn) {
+<p>
+  {{ 'formulario.hu053.fechaCalibracion' | transloco }}: {{ fechaCalibracion(ver.calibradoEn) }}
+</p>
+@if (ver.calibradoPorId) {
+<details>
+  <summary>{{ 'formulario.hu053.responsable' | transloco }}</summary>
+  <code>{{ ver.calibradoPorId }}</code>
+</details>
+} }
 <nav class="secciones-nav" role="tablist">
   <button
     pButton
@@ -115,7 +135,7 @@
     <i class="pi pi-sliders-h" aria-hidden="true"></i>
     <span>{{ ('formulario.weightsTab' | transloco) + ' (' + pesosEditables().length + ')' }}</span>
   </button>
-  @if (ver.versionAnteriorId) {
+  @if (esAdministrador() && ver.versionAnteriorId) {
   <button
     pButton
     [severity]="seccionActiva() === 'mapeos' ? 'primary' : 'secondary'"
@@ -125,7 +145,7 @@
     <i class="pi pi-arrows-h" aria-hidden="true"></i>
     <span>{{ 'formulario.mappingTab' | transloco }}</span>
   </button>
-  } @if (ver.estado === 'BORRADOR') {
+  } @if (esAdministrador() && ver.estado === 'BORRADOR') {
   <button
     pButton
     [severity]="seccionActiva() === 'publicar' ? 'primary' : 'secondary'"
@@ -705,7 +725,7 @@
 <p class="aviso-error" role="alert">
   {{ 'formulario.adicional.publicacionPendiente' | transloco }}
 </p>
-} @if (seccionActiva() === 'mapeos' && ver.versionAnteriorId) {
+} @if (esAdministrador() && seccionActiva() === 'mapeos' && ver.versionAnteriorId) {
 <section class="surface-card editor-card">
   <div class="card-header">
     <h2 class="card-title">{{ 'formulario.mappingTab' | transloco }}</h2>
@@ -817,7 +837,7 @@
     </ng-template>
   </p-table>
 </section>
-} @if (seccionActiva() === 'publicar' && ver.estado === 'BORRADOR') {
+} @if (esAdministrador() && seccionActiva() === 'publicar' && ver.estado === 'BORRADOR') {
 <section class="surface-card editor-card">
   <div class="card-header">
     <div>
@@ -1433,4 +1453,30 @@
       </button>
     </div>
   </form>
+</p-dialog>
+
+<p-dialog
+  [header]="'formulario.hu053.recargar' | transloco"
+  [visible]="dialogoRecargar()"
+  (visibleChange)="dialogoRecargar.set($event)"
+  [modal]="true"
+  [style]="{ width: 'min(30rem, 95vw)' }"
+  [draggable]="false"
+  [resizable]="false"
+>
+  <p>{{ 'formulario.hu053.confirmarRecarga' | transloco }}</p>
+  <div class="dialog-actions">
+    <button
+      pButton
+      type="button"
+      severity="secondary"
+      [outlined]="true"
+      (click)="dialogoRecargar.set(false)"
+    >
+      {{ 'formulario.cancel' | transloco }}
+    </button>
+    <button pButton type="button" [disabled]="recargaBloqueada()" (click)="confirmarRecarga()">
+      {{ 'formulario.hu053.recargar' | transloco }}
+    </button>
+  </div>
 </p-dialog>

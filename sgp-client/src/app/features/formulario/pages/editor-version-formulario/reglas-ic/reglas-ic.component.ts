@@ -1,3 +1,5 @@
+import { mensajeCalibracion } from '../../../utils/error-calibracion';
+import { TranslocoService } from '@jsverse/transloco';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -17,7 +19,6 @@ import { InputTextModule } from 'primeng/inputtext';
 import { InputNumberModule } from 'primeng/inputnumber';
 import { SelectModule } from 'primeng/select';
 import { finalize } from 'rxjs';
-import { ApiErrorService } from '../../../../../core/services/api-error.service';
 import { VersionFormulario } from '../../../models/formulario.models';
 import { FormularioApiService } from '../../../services/formulario-api.service';
 import {
@@ -49,7 +50,7 @@ export class ReglasIcComponent {
   readonly guardada = output<VersionFormulario>();
   readonly estado = output<{ pendiente: boolean; guardando: boolean }>();
   private readonly api = inject(FormularioApiService);
-  private readonly apiError = inject(ApiErrorService);
+  private readonly traduccion = inject(TranslocoService);
   private readonly destroyRef = inject(DestroyRef);
   readonly guardando = signal(false);
   readonly exito = signal(false);
@@ -166,15 +167,23 @@ export class ReglasIcComponent {
     this.guardando.set(true);
     this.actualizarEstado();
     this.api
-      .actualizarBorrador(version.id, {
-        esquema: version.esquema,
-        reglasEvaluacionIc: aplicarReglasIc(version, this.formulario.getRawValue()),
-      })
+      .actualizarBorrador(
+        version.id,
+        {
+          esquema: version.esquema,
+          reglasEvaluacionIc: aplicarReglasIc(version, this.formulario.getRawValue()),
+        },
+        version.version,
+      )
       .pipe(
         takeUntilDestroyed(this.destroyRef),
         finalize(() => {
           this.guardando.set(false);
-          this.actualizarEstado();
+          this.estado.emit({
+            pendiente:
+              JSON.stringify(this.formulario.getRawValue()) !== JSON.stringify(this.iniciales),
+            guardando: false,
+          });
         }),
       )
       .subscribe({
@@ -184,7 +193,9 @@ export class ReglasIcComponent {
           this.exito.set(true);
           this.guardada.emit(actualizada);
         },
-        error: (error) => this.apiError.normalize(error),
+        error: (error) => {
+          this.errores.set([mensajeCalibracion(error, (k) => this.traduccion.translate(k))]);
+        },
       });
   }
 }
