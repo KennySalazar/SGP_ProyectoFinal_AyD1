@@ -4,13 +4,13 @@ import com.fasterxml.jackson.databind.JsonNode;
 import gt.usac.cunoc.sgp.common.exception.ApiException;
 import gt.usac.cunoc.sgp.formulario.repository.VersionFormularioRepository;
 import gt.usac.cunoc.sgp.inspeccion.dto.IndiceCondicionPreliminarResponse;
-import gt.usac.cunoc.sgp.inspeccion.service.CalculoIndiceCondicionService;
-import gt.usac.cunoc.sgp.inspeccion.service.PreparadorEntradaIcService;
 import gt.usac.cunoc.sgp.revision.dto.RevisionDetalleResponse;
 import gt.usac.cunoc.sgp.revision.repository.RevisionRepository;
 import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
 import java.util.UUID;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
@@ -19,20 +19,18 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @PreAuthorize("hasAnyRole('CATEDRATICO', 'ESTUDIANTE')")
 public class RevisionDetalleService {
+  private static final Logger LOGGER = LoggerFactory.getLogger(RevisionDetalleService.class);
   private final RevisionRepository revisiones;
   private final VersionFormularioRepository versiones;
-  private final PreparadorEntradaIcService preparador;
-  private final CalculoIndiceCondicionService calculador;
+  private final RevisionIndicePreliminarService indicePreliminar;
 
   public RevisionDetalleService(
       RevisionRepository revisiones,
       VersionFormularioRepository versiones,
-      PreparadorEntradaIcService preparador,
-      CalculoIndiceCondicionService calculador) {
+      RevisionIndicePreliminarService indicePreliminar) {
     this.revisiones = revisiones;
     this.versiones = versiones;
-    this.preparador = preparador;
-    this.calculador = calculador;
+    this.indicePreliminar = indicePreliminar;
   }
 
   @Transactional(readOnly = true)
@@ -66,13 +64,15 @@ public class RevisionDetalleService {
         || !version.getEsquema().isObject()
         || version.getEsquema().isEmpty()) throw contenidoInvalido();
 
-    // HU-035 no persiste un resultado IC en Revision ni en contenido_enviado.
-    // El cálculo es de lectura: usa exclusivamente la configuración histórica y los datos enviados.
-    var resultado =
-        calculador.calcular(preparador.preparar(versionId, snapshot.path("datos").deepCopy()));
-    var preliminar =
-        new IndiceCondicionPreliminarResponse(
-            resultado.indiceCalculado(), resultado.estadoCalculado().name(), "PRELIMINAR");
+    IndiceCondicionPreliminarResponse preliminar = null;
+    try {
+      preliminar = indicePreliminar.calcular(versionId, snapshot.path("datos").deepCopy());
+    } catch (RuntimeException e) {
+      LOGGER.warn(
+          "IC preliminar de revision no disponible: tipo={}, motivo={}",
+          e.getClass().getSimpleName(),
+          e instanceof ApiException api ? api.getCode() : "fallo_inesperado_calculo_ic");
+    }
     return new RevisionDetalleResponse(
         ciclo.getId(),
         inspeccionId,
