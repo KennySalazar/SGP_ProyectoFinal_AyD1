@@ -2,6 +2,7 @@ package gt.usac.cunoc.sgp.mantenimiento.controller;
 
 import gt.usac.cunoc.sgp.common.exception.ApiException;
 import gt.usac.cunoc.sgp.common.security.JwtData;
+import gt.usac.cunoc.sgp.mantenimiento.dto.CambiarPrioridadOrdenRequest;
 import gt.usac.cunoc.sgp.mantenimiento.dto.CerrarComoEjecutadaRequest;
 import gt.usac.cunoc.sgp.mantenimiento.dto.CerrarSinEjecucionRequest;
 import gt.usac.cunoc.sgp.mantenimiento.dto.CrearOrdenMantenimientoRequest;
@@ -28,6 +29,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -112,6 +114,16 @@ public class OrdenMantenimientoController {
   @Operation(summary = "Consultar una orden de mantenimiento")
   public OrdenMantenimientoResponse obtener(@PathVariable UUID id) {
     return ordenes.obtener(id);
+  }
+
+  @PutMapping("/{id}/prioridad")
+  @PreAuthorize("hasAnyRole('CATEDRATICO','ADMINISTRADOR')")
+  @Operation(summary = "Cambiar la prioridad confirmada con justificación")
+  public OrdenMantenimientoResponse cambiarPrioridad(
+      @PathVariable UUID id,
+      @RequestBody CambiarPrioridadOrdenRequest request,
+      Authentication authentication) {
+    return ordenes.cambiarPrioridad(id, request, usuarioId(authentication));
   }
 
   @GetMapping("/{id}/historial")

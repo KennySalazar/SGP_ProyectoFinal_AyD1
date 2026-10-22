@@ -7,6 +7,8 @@ import gt.usac.cunoc.sgp.common.audit.model.AccionAuditoria;
 import gt.usac.cunoc.sgp.common.audit.service.AuditoriaWriter;
 import gt.usac.cunoc.sgp.common.exception.ApiException;
 import gt.usac.cunoc.sgp.common.util.UuidV7Generator;
+import gt.usac.cunoc.sgp.formulario.entity.ConfiguracionIcElemento;
+import gt.usac.cunoc.sgp.formulario.repository.ConfiguracionIcElementoRepository;
 import gt.usac.cunoc.sgp.inspeccion.entity.Inspeccion;
 import gt.usac.cunoc.sgp.inspeccion.entity.ResultadoIc;
 import gt.usac.cunoc.sgp.inspeccion.model.EstadoInspeccion;
@@ -74,6 +76,7 @@ public class GeneradorPropuestasMantenimientoService {
   private final OrdenMantenimientoRepository ordenes;
   private final HistorialEstadoOrdenRepository historial;
   private final ResultadoIcRepository resultadosIc;
+  private final ConfiguracionIcElementoRepository configuracionesIc;
   private final UserAccountRepository usuarios;
   private final ResolverElementosIc resolverElementos;
   private final EvaluadorCondicionRegla evaluador;
@@ -88,6 +91,7 @@ public class GeneradorPropuestasMantenimientoService {
       OrdenMantenimientoRepository ordenes,
       HistorialEstadoOrdenRepository historial,
       ResultadoIcRepository resultadosIc,
+      ConfiguracionIcElementoRepository configuracionesIc,
       UserAccountRepository usuarios,
       ResolverElementosIc resolverElementos,
       EvaluadorCondicionRegla evaluador,
@@ -100,6 +104,7 @@ public class GeneradorPropuestasMantenimientoService {
     this.ordenes = ordenes;
     this.historial = historial;
     this.resultadosIc = resultadosIc;
+    this.configuracionesIc = configuracionesIc;
     this.usuarios = usuarios;
     this.resolverElementos = resolverElementos;
     this.evaluador = evaluador;
@@ -151,11 +156,9 @@ public class GeneradorPropuestasMantenimientoService {
 
     UUID puenteId = inspeccion.getPuente().getId();
     UUID versionId = inspeccion.getVersionFormulario().getId();
-    UUID resultadoIcId =
-        resultadosIc
-            .findPublicacionByInspeccionId(inspeccionId)
-            .map(ResultadoIc::getId)
-            .orElse(null);
+    ResultadoIc resultadoIc = resultadosIc.findPublicacionByInspeccionId(inspeccionId).orElse(null);
+    List<ConfiguracionIcElemento> pesosConfigurados =
+        configuracionesIc.findAllByVersionFormularioId(versionId);
     List<ReglaMantenimiento> activas =
         reglas.findByVersionFormularioIdAndActivaTrue(versionId).stream()
             .sorted(Comparator.comparing(ReglaMantenimiento::getCodigo))
@@ -165,7 +168,15 @@ public class GeneradorPropuestasMantenimientoService {
     for (ReglaMantenimiento regla : activas) {
       try {
         evaluarRegla(
-            regla, inspeccion, puenteId, resultadoIcId, versionId, actor, proceso, contadores);
+            regla,
+            inspeccion,
+            puenteId,
+            resultadoIc,
+            pesosConfigurados,
+            versionId,
+            actor,
+            proceso,
+            contadores);
       } catch (RuntimeException e) {
         // Una regla o un dato defectuoso no debe impedir evaluar las demás.
         contadores.conError++;
@@ -193,7 +204,8 @@ public class GeneradorPropuestasMantenimientoService {
       ReglaMantenimiento regla,
       Inspeccion inspeccion,
       UUID puenteId,
-      UUID resultadoIcId,
+      ResultadoIc resultadoIc,
+      List<ConfiguracionIcElemento> pesosConfigurados,
       UUID versionId,
       UUID actor,
       String proceso,
@@ -218,7 +230,8 @@ public class GeneradorPropuestasMantenimientoService {
           regla,
           inspeccion,
           puenteId,
-          resultadoIcId,
+          resultadoIc,
+          pesosConfigurados,
           elemento,
           clave,
           hallado.get(),
@@ -259,7 +272,8 @@ public class GeneradorPropuestasMantenimientoService {
       ReglaMantenimiento regla,
       Inspeccion inspeccion,
       UUID puenteId,
-      UUID resultadoIcId,
+      ResultadoIc resultadoIc,
+      List<ConfiguracionIcElemento> pesosConfigurados,
       ElementoResuelto elemento,
       String clave,
       JsonNode valorEncontrado,
@@ -267,7 +281,15 @@ public class GeneradorPropuestasMantenimientoService {
       String proceso) {
     Instant ahora = clock.instant();
     TipoOrden tipo = regla.getTipoMantenimiento();
-    PrioridadOrden prioridad = regla.getPrioridadBase();
+    PrioridadOrden prioridadBase = regla.getPrioridadBase();
+    PrioridadSugeridaIc.Calculo calculo =
+        PrioridadSugeridaIc.calcular(
+            prioridadBase,
+            resultadoIc,
+            inspeccion.getVersionFormulario().getId(),
+            regla.getElementoRef(),
+            pesosConfigurados);
+    PrioridadOrden prioridad = calculo.prioridad();
     OrdenMantenimiento orden =
         ordenes.saveAndFlush(
             OrdenMantenimiento.propuestaGenerada(
@@ -275,14 +297,14 @@ public class GeneradorPropuestasMantenimientoService {
                 puenteId,
                 inspeccion.getId(),
                 regla.getId(),
-                resultadoIcId,
+                resultadoIc == null ? null : resultadoIc.getId(),
                 regla.getElementoRef(),
                 elemento.instanciaId(),
                 clave,
                 tipo,
                 regla.getIntervencionSugerida(),
                 prioridad,
-                fundamento(regla, elemento, valorEncontrado),
+                fundamento(regla, elemento, valorEncontrado, calculo),
                 ahora));
     historial.save(
         new HistorialEstadoOrden(
@@ -304,6 +326,7 @@ public class GeneradorPropuestasMantenimientoService {
             .put("inspeccionOrigenId", inspeccion.getId().toString())
             .put("reglaCodigo", regla.getCodigo())
             .put("elementoRef", regla.getElementoRef());
+    despues.put("prioridadSugerida", prioridad.name());
     auditoria.registrarEnTransaccion(
         actor,
         AccionAuditoria.CREAR,
@@ -316,7 +339,10 @@ public class GeneradorPropuestasMantenimientoService {
 
   /** Por qué se propone: qué valor se encontró y qué regla lo disparó. */
   private ObjectNode fundamento(
-      ReglaMantenimiento regla, ElementoResuelto elemento, JsonNode valorEncontrado) {
+      ReglaMantenimiento regla,
+      ElementoResuelto elemento,
+      JsonNode valorEncontrado,
+      PrioridadSugeridaIc.Calculo calculo) {
     JsonNode condicion = regla.getCondicion();
     ObjectNode fundamento =
         json.createObjectNode()
@@ -327,6 +353,14 @@ public class GeneradorPropuestasMantenimientoService {
             .put("operador", condicion.path("operador").asText());
     fundamento.set("umbral", condicion.get("umbral"));
     fundamento.set("valorEncontrado", valorEncontrado);
+    fundamento.put("prioridadBase", regla.getPrioridadBase().name());
+    fundamento.put("prioridadSugerida", calculo.prioridad().name());
+    if (calculo.ic() != null) fundamento.put("indiceCondicion", calculo.ic().toPlainString());
+    if (calculo.pesoElemento() != null) fundamento.put("pesoElemento", calculo.pesoElemento().toPlainString());
+    if (calculo.pesoMaximo() != null) fundamento.put("pesoMaximoVersion", calculo.pesoMaximo().toPlainString());
+    if (calculo.pesoRelativo() != null) fundamento.put("pesoRelativo", calculo.pesoRelativo().toPlainString());
+    fundamento.put("formulaPrioridad", "HU-067-OPCION-3");
+    if (calculo.motivoFallback() != null) fundamento.put("motivoFallbackPrioridad", calculo.motivoFallback());
     if (elemento.instanciaId() != null) {
       fundamento.put("instanciaElementoId", elemento.instanciaId().toString());
     }

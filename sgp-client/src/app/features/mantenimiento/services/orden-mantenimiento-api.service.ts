@@ -13,6 +13,7 @@ import {
   ResponsableDisponible,
   TotalesOrdenes,
 } from '../models/orden-mantenimiento.models';
+import { PrioridadMantenimiento } from '../models/regla-mantenimiento.models';
 
 @Injectable({ providedIn: 'root' })
 export class OrdenMantenimientoApiService {
@@ -45,6 +46,17 @@ export class OrdenMantenimientoApiService {
 
   obtener(id: string): Observable<OrdenMantenimiento> {
     return this.http.get<OrdenMantenimiento>(this.url(id));
+  }
+
+  cambiarPrioridad(
+    id: string,
+    prioridad: PrioridadMantenimiento,
+    justificacion: string,
+  ): Observable<OrdenMantenimiento> {
+    return this.http.put<OrdenMantenimiento>(`${this.url(id)}/prioridad`, {
+      prioridad,
+      justificacion,
+    });
   }
 
   historial(id: string): Observable<HistorialEstadoOrden[]> {

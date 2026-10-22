@@ -226,6 +226,9 @@
       "vacioFiltros": "Ninguna orden cumple todos los filtros seleccionados.",
       "provisional": "Provisional",
       "prioridadConfirmada": "Prioridad confirmada",
+      "editarPrioridad": "Cambiar prioridad",
+      "prioridadEditTexto": "La prioridad sugerida se conserva. Indique la prioridad confirmada y el motivo del cambio.",
+      "prioridadGuardando": "Guardando...",
       "puente": "Puente",
       "inspeccionOrigen": "Inspección de origen",
       "verInspeccion": "Ver inspección publicada",
@@ -239,7 +242,15 @@
         "operador": "Operador",
         "umbral": "Umbral",
         "valorEncontrado": "Valor encontrado",
-        "instanciaElementoId": "Instancia del elemento"
+        "instanciaElementoId": "Instancia del elemento",
+        "prioridadBase": "Prioridad base de la regla",
+        "prioridadSugerida": "Prioridad sugerida por HU-067",
+        "indiceCondicion": "Índice de Condición (IC)",
+        "pesoElemento": "Peso del elemento",
+        "pesoMaximoVersion": "Peso máximo de la versión",
+        "pesoRelativo": "Peso relativo",
+        "formulaPrioridad": "Fórmula",
+        "motivoFallbackPrioridad": "Motivo para conservar la prioridad base"
       },
       "pestanas": {
         "propuestas": "Propuestas",

@@ -205,6 +205,14 @@ public class OrdenMantenimiento {
     this.motivoCierreSinEjecucion = motivo;
   }
 
+  /** HU-047: changes only the confirmed priority; the generated suggestion stays immutable. */
+  public void cambiarPrioridadConfirmada(
+      PrioridadOrden prioridad, String justificacion, Instant ahora) {
+    this.prioridadConfirmada = prioridad;
+    this.justificacionPrioridad = justificacion;
+    this.actualizadoEn = ahora;
+  }
+
   public UUID getId() {
     return id;
   }
