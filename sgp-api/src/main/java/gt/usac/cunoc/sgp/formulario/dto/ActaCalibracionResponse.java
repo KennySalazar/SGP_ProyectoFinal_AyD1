@@ -10,4 +10,6 @@ public record ActaCalibracionResponse(
     long tamanoBytes,
     String checksumSha256,
     UUID subidoPorId,
+    String subidoPorNombre,
+    String subidoPorEmail,
     Instant subidoEn) {}
