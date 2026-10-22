@@ -3,7 +3,6 @@ package gt.usac.cunoc.sgp.foro.controller;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.verify;
@@ -24,6 +23,7 @@ import gt.usac.cunoc.sgp.foro.dto.CrearHiloRequest;
 import gt.usac.cunoc.sgp.foro.dto.HiloInspeccionResponse;
 import gt.usac.cunoc.sgp.foro.dto.HiloResponse;
 import gt.usac.cunoc.sgp.foro.model.CategoriaHilo;
+import gt.usac.cunoc.sgp.foro.service.FiltroComentarios;
 import gt.usac.cunoc.sgp.foro.service.ForoInspeccionService;
 import gt.usac.cunoc.sgp.foro.service.ForoInspeccionService.Apertura;
 import gt.usac.cunoc.sgp.foro.service.ForoService;
@@ -100,7 +100,7 @@ class ForoControllerSecurityTest {
   void unVisitanteLeeLosHilosElHiloYSusComentarios() throws Exception {
     when(foro.listarHilosDePuente(eq(PUENTE_ID), eq(0), eq(20))).thenReturn(paginaVacia());
     when(foro.obtenerHilo(HILO_ID)).thenReturn(hilo());
-    when(foro.listarComentarios(eq(HILO_ID), eq(0), eq(20), isNull(), isNull()))
+    when(foro.listarComentarios(eq(HILO_ID), eq(0), eq(20), any(FiltroComentarios.class)))
         .thenReturn(paginaVacia());
 
     mockMvc.perform(get(HILOS)).andExpect(status().isOk());
@@ -123,19 +123,21 @@ class ForoControllerSecurityTest {
   @Test
   void laPaginacionTomaLosValoresDeLaPeticionOLosPredeterminados() throws Exception {
     when(foro.listarHilosDePuente(any(), eq(2), eq(50))).thenReturn(paginaVacia());
-    when(foro.listarComentarios(any(), eq(0), eq(20), any(), any())).thenReturn(paginaVacia());
+    when(foro.listarComentarios(any(), eq(0), eq(20), any(FiltroComentarios.class)))
+        .thenReturn(paginaVacia());
 
     mockMvc.perform(get(HILOS).param("pagina", "2").param("tamanio", "50"));
     mockMvc.perform(get(HILO + "/comentarios"));
 
     verify(foro).listarHilosDePuente(PUENTE_ID, 2, 50);
-    verify(foro).listarComentarios(HILO_ID, 0, 20, null, null);
+    verify(foro).listarComentarios(HILO_ID, 0, 20, FiltroComentarios.NINGUNO);
   }
 
   @Test
   void elFiltroPorElementoLlegaAlServicio() throws Exception {
     UUID instancia = UUID.fromString("019a0000-0000-7000-8000-000000006315");
-    when(foro.listarComentarios(any(), eq(0), eq(20), any(), any())).thenReturn(paginaVacia());
+    when(foro.listarComentarios(any(), eq(0), eq(20), any(FiltroComentarios.class)))
+        .thenReturn(paginaVacia());
 
     mockMvc
         .perform(
@@ -144,7 +146,27 @@ class ForoControllerSecurityTest {
                 .param("instanciaElementoId", instancia.toString()))
         .andExpect(status().isOk());
 
-    verify(foro).listarComentarios(HILO_ID, 0, 20, "/subestructura/pilas", instancia);
+    verify(foro)
+        .listarComentarios(
+            HILO_ID, 0, 20, FiltroComentarios.porElemento("/subestructura/pilas", instancia));
+  }
+
+  @Test
+  void elFiltroPorSeccionYPorGeneralesLlegaAlServicio() throws Exception {
+    when(foro.listarComentarios(any(), eq(0), eq(20), any(FiltroComentarios.class)))
+        .thenReturn(paginaVacia());
+
+    mockMvc
+        .perform(get(HILO + "/comentarios").param("seccion", "subestructura"))
+        .andExpect(status().isOk());
+    mockMvc
+        .perform(get(HILO + "/comentarios").param("soloGenerales", "true"))
+        .andExpect(status().isOk());
+
+    verify(foro)
+        .listarComentarios(
+            HILO_ID, 0, 20, new FiltroComentarios(null, null, "subestructura", false));
+    verify(foro).listarComentarios(HILO_ID, 0, 20, new FiltroComentarios(null, null, null, true));
   }
 
   @Test

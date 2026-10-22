@@ -18,6 +18,7 @@ import gt.usac.cunoc.sgp.foro.dto.HiloResponse;
 import gt.usac.cunoc.sgp.foro.mapper.ForoMapperImpl;
 import gt.usac.cunoc.sgp.foro.model.CategoriaHilo;
 import gt.usac.cunoc.sgp.foro.service.AnclajeComentarioForo;
+import gt.usac.cunoc.sgp.foro.service.FiltroComentarios;
 import gt.usac.cunoc.sgp.foro.service.ForoInspeccionService;
 import gt.usac.cunoc.sgp.foro.service.ForoInspeccionService.Apertura;
 import gt.usac.cunoc.sgp.foro.service.ForoService;
@@ -707,7 +708,153 @@ class ForoInspeccionIntegrationTest {
             });
   }
 
+  // ----------------------------------------------- filtros del listado: sección y generales
+
+  private ComentarioResponse comentar(UUID hilo, String ref, UUID instancia, String texto) {
+    return foro.crearComentario(
+        hilo, new CrearComentarioRequest(texto, null, ref, instancia), ESTUDIANTE_ID);
+  }
+
+  @Test
+  void filtrarPorSeccionTraeLoAncladoALaSeccionYATodoLoQueContiene() {
+    UUID hilo = hiloDeInspeccionPublicada(versionV1);
+    ComentarioResponse enLaSeccion = comentar(hilo, "/subestructura", null, "Sección");
+    ComentarioResponse enElElemento = comentar(hilo, ESTRIBO, null, "Elemento");
+    ComentarioResponse enLaInstancia = comentar(hilo, PILAS + "/socavacion", pila1, "Pila");
+    ComentarioResponse respuesta =
+        foro.crearComentario(
+            hilo, new CrearComentarioRequest("Respuesta", enElElemento.id()), CATEDRATICO_ID);
+    comentar(hilo, GENERAL, null, "Otra sección");
+    foro.crearComentario(hilo, new CrearComentarioRequest("General", null), ESTUDIANTE_ID);
+
+    List<UUID> ids =
+        ids(
+            foro.listarComentarios(
+                    hilo, 0, 20, new FiltroComentarios(null, null, "subestructura", false))
+                .getContent());
+
+    assertThat(ids)
+        .containsExactly(enLaSeccion.id(), enElElemento.id(), enLaInstancia.id(), respuesta.id());
+  }
+
+  @Test
+  void laSeccionNoSeConfundeConOtraDeNombreParecidoNiInterpretaComodines() {
+    UUID hilo = hiloDeInspeccionPublicada(versionV1);
+    UUID propio = insertarComentario(hilo, "/sub_estructura/viga");
+    insertarComentario(hilo, "/subXestructura/viga"); // «_» no es un comodín
+    insertarComentario(hilo, "/sub_estructura_extra/viga"); // el nombre debe ser exacto
+    insertarComentario(hilo, "/subestructura/viga");
+
+    assertThat(
+            ids(
+                foro.listarComentarios(
+                        hilo, 0, 20, new FiltroComentarios(null, null, "sub_estructura", false))
+                    .getContent()))
+        .containsExactly(propio);
+    // «%» tampoco es un comodín
+    assertThat(
+            foro.listarComentarios(hilo, 0, 20, new FiltroComentarios(null, null, "sub%", false))
+                .getContent())
+        .isEmpty();
+  }
+
+  @Test
+  void filtrarPorGeneralesTraeLosNoAncladosYSusRespuestas() {
+    UUID hilo = hiloDeInspeccionPublicada(versionV1);
+    comentar(hilo, ESTRIBO, null, "Anclado");
+    ComentarioResponse general =
+        foro.crearComentario(hilo, new CrearComentarioRequest("General", null), ESTUDIANTE_ID);
+    ComentarioResponse respuesta =
+        foro.crearComentario(
+            hilo, new CrearComentarioRequest("Respuesta", general.id()), CATEDRATICO_ID);
+
+    List<UUID> ids =
+        ids(
+            foro.listarComentarios(hilo, 0, 20, new FiltroComentarios(null, null, null, true))
+                .getContent());
+
+    assertThat(ids).containsExactly(general.id(), respuesta.id());
+  }
+
+  @Test
+  void losFiltrosTambienSePaginan() {
+    UUID hilo = hiloDeInspeccionPublicada(versionV1);
+    for (int i = 0; i < 5; i++) comentar(hilo, ESTRIBO, null, "Uno " + i);
+    comentar(hilo, GENERAL, null, "Fuera");
+    FiltroComentarios filtro = new FiltroComentarios(null, null, "subestructura", false);
+
+    var primera = foro.listarComentarios(hilo, 0, 2, filtro);
+    var ultima = foro.listarComentarios(hilo, 2, 2, filtro);
+
+    assertThat(primera.getTotalElements()).isEqualTo(5);
+    assertThat(primera.getContent()).hasSize(2);
+    assertThat(ultima.getContent()).hasSize(1);
+    assertThat(ultima.isLast()).isTrue();
+  }
+
+  @Test
+  void dosFiltrosALaVezOUnaSeccionConBarrasSeRechazanConUn422() {
+    UUID hilo = hiloDeInspeccionPublicada(versionV1);
+
+    assertFiltroInvalido(
+        () ->
+            foro.listarComentarios(
+                hilo, 0, 20, new FiltroComentarios(ESTRIBO, null, "subestructura", false)),
+        "filtro");
+    assertFiltroInvalido(
+        () -> foro.listarComentarios(hilo, 0, 20, new FiltroComentarios(null, null, "a", true)),
+        "filtro");
+    assertFiltroInvalido(
+        () -> foro.listarComentarios(hilo, 0, 20, new FiltroComentarios(ESTRIBO, null, null, true)),
+        "filtro");
+    assertFiltroInvalido(
+        () ->
+            foro.listarComentarios(
+                hilo, 0, 20, new FiltroComentarios(null, null, "subestructura/pilas", false)),
+        "seccion");
+    assertFiltroInvalido(
+        () -> foro.listarComentarios(hilo, 0, 20, new FiltroComentarios(null, pila1, null, false)),
+        "elementoRef");
+  }
+
+  @Test
+  void unaSeccionVaciaSeIgnoraYDevuelveTodo() {
+    UUID hilo = hiloDeInspeccionPublicada(versionV1);
+    comentar(hilo, ESTRIBO, null, "Uno");
+    foro.crearComentario(hilo, new CrearComentarioRequest("General", null), ESTUDIANTE_ID);
+
+    assertThat(
+            foro.listarComentarios(hilo, 0, 20, new FiltroComentarios(null, null, "  ", false))
+                .getContent())
+        .hasSize(2);
+  }
+
   // ------------------------------------------------------------------------------- ayudas
+
+  /** Un comentario con un ancla cualquiera, sin pasar por la validación del esquema. */
+  private UUID insertarComentario(UUID hilo, String ref) {
+    UUID id = UUID.randomUUID();
+    jdbc.update(
+        "INSERT INTO foro_comentario (id, hilo_id, autor_id, elemento_ref, contenido, creado_en)"
+            + " VALUES (?, ?, ?, ?, 'Texto', now())",
+        id,
+        hilo,
+        ESTUDIANTE_ID,
+        ref);
+    return id;
+  }
+
+  private static void assertFiltroInvalido(
+      org.assertj.core.api.ThrowableAssert.ThrowingCallable accion, String campo) {
+    assertThatThrownBy(accion)
+        .isInstanceOfSatisfying(
+            ApiException.class,
+            e -> {
+              assertThat(e.getStatus()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+              assertThat(e.getCode()).isEqualTo("filtro_invalido");
+              assertThat(e.getErrores()).extracting(error -> error.get("campo")).contains(campo);
+            });
+  }
 
   private UUID hiloDeInspeccionPublicada(UUID version) {
     UUID inspeccion = insertarInspeccion(version, "PUBLICADA");

@@ -7,6 +7,7 @@ import gt.usac.cunoc.sgp.foro.dto.CrearComentarioRequest;
 import gt.usac.cunoc.sgp.foro.dto.CrearHiloRequest;
 import gt.usac.cunoc.sgp.foro.dto.HiloInspeccionResponse;
 import gt.usac.cunoc.sgp.foro.dto.HiloResponse;
+import gt.usac.cunoc.sgp.foro.service.FiltroComentarios;
 import gt.usac.cunoc.sgp.foro.service.ForoInspeccionService;
 import gt.usac.cunoc.sgp.foro.service.ForoInspeccionService.Apertura;
 import gt.usac.cunoc.sgp.foro.service.ForoService;
@@ -119,16 +120,24 @@ public class ForoController {
       description =
           "Público. Comentarios y respuestas en una sola lista, de los más antiguos a los más "
               + "nuevos; una respuesta lleva el padreId de su comentario principal y llega siempre "
-              + "después de él. Con elementoRef solo los anclados a ese campo o elemento (sin "
-              + "instanciaElementoId, los del elemento sin instancia). Página desde 0, tamaño "
-              + "entre 1 y 100 (20 por defecto).")
+              + "después de él. Se puede filtrar por un campo o elemento (elementoRef, y sin "
+              + "instanciaElementoId los del elemento sin instancia), por una sección entera "
+              + "(seccion, su clave sin barras, con todo lo que contiene) o por los generales "
+              + "(soloGenerales, los que no están anclados); dos filtros a la vez dan 422. Página "
+              + "desde 0, tamaño entre 1 y 100 (20 por defecto).")
   public Page<ComentarioResponse> listarComentarios(
       @PathVariable UUID hiloId,
       @RequestParam(defaultValue = "0") int pagina,
       @RequestParam(defaultValue = "20") int tamanio,
       @RequestParam(required = false) String elementoRef,
-      @RequestParam(required = false) UUID instanciaElementoId) {
-    return foro.listarComentarios(hiloId, pagina, tamanio, elementoRef, instanciaElementoId);
+      @RequestParam(required = false) UUID instanciaElementoId,
+      @RequestParam(required = false) String seccion,
+      @RequestParam(defaultValue = "false") boolean soloGenerales) {
+    return foro.listarComentarios(
+        hiloId,
+        pagina,
+        tamanio,
+        new FiltroComentarios(elementoRef, instanciaElementoId, seccion, soloGenerales));
   }
 
   @PostMapping("/hilos/{hiloId}/comentarios")
