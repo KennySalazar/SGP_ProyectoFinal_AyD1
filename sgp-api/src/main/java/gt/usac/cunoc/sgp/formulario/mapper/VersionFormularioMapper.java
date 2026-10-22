@@ -41,10 +41,19 @@ public interface VersionFormularioMapper {
   @Mapping(target = "version", source = "version.version")
   @Mapping(target = "pesos", source = "pesos")
   @Mapping(target = "mapeos", source = "mapeos")
+  @Mapping(target = "aprobacionCalibracion", ignore = true)
   VersionFormularioResponse toResponse(
       VersionFormulario version,
       List<ConfiguracionIcElementoResponse> pesos,
       List<MapeoCampoResponse> mapeos);
+
+  default VersionFormularioResponse toResponse(
+      VersionFormulario version,
+      List<ConfiguracionIcElementoResponse> pesos,
+      List<MapeoCampoResponse> mapeos,
+      gt.usac.cunoc.sgp.formulario.dto.AprobacionCalibracionResponse aprobacion) {
+    return toResponse(version, pesos, mapeos).conAprobacion(aprobacion);
+  }
 
   FormularioActivoResponse toActivoResponse(VersionFormulario version);
 

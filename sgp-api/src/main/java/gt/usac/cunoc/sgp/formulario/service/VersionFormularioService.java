@@ -6,6 +6,7 @@ import gt.usac.cunoc.sgp.common.audit.aspect.Auditable;
 import gt.usac.cunoc.sgp.common.audit.model.AccionAuditoria;
 import gt.usac.cunoc.sgp.common.exception.ApiException;
 import gt.usac.cunoc.sgp.formulario.dto.AnalisisMapeoResponse;
+import gt.usac.cunoc.sgp.formulario.dto.AprobacionCalibracionResponse;
 import gt.usac.cunoc.sgp.formulario.dto.ConfiguracionIcElementoRequest;
 import gt.usac.cunoc.sgp.formulario.dto.ConfiguracionIcElementoResponse;
 import gt.usac.cunoc.sgp.formulario.dto.CrearVersionRequest;
@@ -21,6 +22,7 @@ import gt.usac.cunoc.sgp.formulario.entity.VersionFormulario;
 import gt.usac.cunoc.sgp.formulario.mapper.VersionFormularioMapper;
 import gt.usac.cunoc.sgp.formulario.model.EstadoVersionFormulario;
 import gt.usac.cunoc.sgp.formulario.model.TipoMapeoCampo;
+import gt.usac.cunoc.sgp.formulario.repository.AprobacionCalibracionRepository;
 import gt.usac.cunoc.sgp.formulario.repository.ConfiguracionIcElementoRepository;
 import gt.usac.cunoc.sgp.formulario.repository.MapeoCampoFormularioRepository;
 import gt.usac.cunoc.sgp.formulario.repository.VersionFormularioRepository;
@@ -54,6 +56,7 @@ public class VersionFormularioService {
   private final CampoSchemaExtractor campoExtractor;
   private final ObjectMapper objectMapper;
   private final Clock clock;
+  private final AprobacionCalibracionRepository aprobaciones;
 
   public VersionFormularioService(
       VersionFormularioRepository versiones,
@@ -63,7 +66,8 @@ public class VersionFormularioService {
       JsonSchemaValidatorService schemaValidator,
       CampoSchemaExtractor campoExtractor,
       ObjectMapper objectMapper,
-      Clock clock) {
+      Clock clock,
+      AprobacionCalibracionRepository aprobaciones) {
     this.versiones = versiones;
     this.mapeos = mapeos;
     this.configuracionesIc = configuracionesIc;
@@ -72,6 +76,7 @@ public class VersionFormularioService {
     this.campoExtractor = campoExtractor;
     this.objectMapper = objectMapper;
     this.clock = clock;
+    this.aprobaciones = aprobaciones;
   }
 
   @Transactional(readOnly = true)
@@ -924,7 +929,12 @@ public class VersionFormularioService {
                 .toList()
             : Collections.emptyList();
 
-    return mapper.toResponse(version, listaPesos, listaMapeos);
+    var aprobacion =
+        aprobaciones
+            .findByVersionFormularioId(version.getId())
+            .map(AprobacionCalibracionResponse::de)
+            .orElse(null);
+    return mapper.toResponse(version, listaPesos, listaMapeos, aprobacion);
   }
 
   @Transactional

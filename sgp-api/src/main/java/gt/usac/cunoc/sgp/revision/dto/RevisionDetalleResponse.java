@@ -25,4 +25,11 @@ public record RevisionDetalleResponse(
     IndiceCondicionPreliminarResponse icPreliminar,
     String fotografiasEndpoint,
     boolean fotografiasCongeladas,
-    String observacionesEndpoint) {}
+    String observacionesEndpoint) {
+  @com.fasterxml.jackson.annotation.JsonProperty(
+      value = "calibracionEndpoint",
+      access = com.fasterxml.jackson.annotation.JsonProperty.Access.READ_ONLY)
+  public String calibracionEndpoint() {
+    return "/api/v1/formularios/" + versionFormularioId + "/estado-calibracion";
+  }
+}
