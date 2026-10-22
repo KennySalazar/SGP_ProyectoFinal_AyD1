@@ -17,7 +17,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 @RestController
 @RequestMapping("/api/v1/formularios/{id}/acta-calibracion")
-@PreAuthorize("hasRole('ADMINISTRADOR')")
+@PreAuthorize("hasAnyRole('ADMINISTRADOR', 'CATEDRATICO')")
 public class ActaCalibracionController {
   private final ActaCalibracionService service;
 
@@ -34,6 +34,7 @@ public class ActaCalibracionController {
   public EstadoActaCalibracionResponse adjuntar(
       @PathVariable UUID id,
       @RequestPart("archivo") MultipartFile archivo,
+      @RequestHeader(value = "If-Match", required = false) String versionEsperada,
       Authentication authentication) {
     if (authentication == null || !(authentication.getDetails() instanceof JwtData datos)) {
       throw new ApiException(
@@ -42,7 +43,11 @@ public class ActaCalibracionController {
           "Autenticacion requerida",
           "Se requiere una sesion valida.");
     }
-    return service.adjuntar(id, archivo, datos.userId());
+    return service.adjuntar(
+        id,
+        archivo,
+        datos.userId(),
+        gt.usac.cunoc.sgp.formulario.validation.VersionCalibracionHttp.exigir(versionEsperada));
   }
 
   @GetMapping("/contenido")

@@ -171,11 +171,15 @@ class ActaCalibracionServiceTest {
   }
 
   @Test
-  void versionPublicadaPermiteAdjuntarActaSinModificarPesosNiReglas() {
-    prepararCarga();
+  void versionPublicadaRechazaAdjuntarActaSinModificarPesosNiReglas() {
+    when(versiones.findByIdForUpdate(id)).thenReturn(Optional.of(version));
     version.setEstado(EstadoVersionFormulario.PUBLICADA);
     var reglas = version.getReglasEvaluacionIc().deepCopy();
-    service.adjuntar(id, fichero, usuario);
+    assertThatThrownBy(() -> service.adjuntar(id, fichero, usuario))
+        .isInstanceOf(ApiException.class)
+        .extracting("code")
+        .isEqualTo("version_inmutable");
+    verifyNoInteractions(almacenamiento, archivos, actas, auditoria);
     assertThat(version.getEstado()).isEqualTo(EstadoVersionFormulario.PUBLICADA);
     assertThat(version.getReglasEvaluacionIc()).isEqualTo(reglas);
     verify(pesos, never()).save(any());
@@ -278,5 +282,15 @@ class ActaCalibracionServiceTest {
         null,
         usuario,
         ahora);
+  }
+
+  @Test
+  void hu053ActaObsoletaNoEscribeArchivosNiAuditoria() {
+    when(versiones.findByIdForUpdate(id)).thenReturn(Optional.of(version));
+    assertThatThrownBy(() -> service.adjuntar(id, fichero, usuario, version.getVersion() + 1))
+        .isInstanceOf(ApiException.class)
+        .extracting("code")
+        .isEqualTo("concurrencia_conflicto");
+    verifyNoInteractions(almacenamiento, archivos, actas, auditoria);
   }
 }
