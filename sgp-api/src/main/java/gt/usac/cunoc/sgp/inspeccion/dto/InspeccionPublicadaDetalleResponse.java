@@ -32,6 +32,12 @@ public record InspeccionPublicadaDetalleResponse(
     UUID superadaPorId,
     String vigencia,
     RelacionVersionActivaResponse relacionVersionActiva) {
+  @com.fasterxml.jackson.annotation.JsonProperty(
+      value = "calibracionEndpoint",
+      access = com.fasterxml.jackson.annotation.JsonProperty.Access.READ_ONLY)
+  public String calibracionEndpoint() {
+    return "/api/v1/formularios/" + versionFormularioId + "/estado-calibracion";
+  }
 
   public InspeccionPublicadaDetalleResponse(
       UUID id,
