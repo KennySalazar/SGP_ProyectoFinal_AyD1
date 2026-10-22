@@ -79,6 +79,29 @@ export interface HiloInspeccionForo {
   anclas: AnclaConTotal[];
 }
 
+/**
+ * Qué comentarios del hilo de una inspección se piden además de un elemento: los de una sección
+ * (su clave, sin barras: «subestructura») o los que no están anclados. Se usa uno solo a la vez.
+ */
+export interface FiltroSeccion {
+  seccion?: string;
+  soloGenerales?: boolean;
+}
+
+/** Cuántos comentarios tiene una sección del formulario, respuestas incluidas. */
+export interface SeccionConTotal {
+  clave: string;
+  titulo: string;
+  total: number;
+}
+
+/** Lo que ofrece el selector del hilo de una inspección: todos, los generales o una sección. */
+export interface OpcionesFiltroForo {
+  todos: number;
+  generales: number;
+  secciones: SeccionConTotal[];
+}
+
 export function mismaAncla(a: AnclaForo, b: AnclaForo): boolean {
   return a.elementoRef === b.elementoRef && a.instanciaElementoId === b.instanciaElementoId;
 }

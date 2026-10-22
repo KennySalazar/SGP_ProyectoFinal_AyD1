@@ -7,6 +7,7 @@ import {
   ComentarioForo,
   CrearComentarioRequest,
   CrearHiloRequest,
+  FiltroSeccion,
   HiloForo,
   HiloInspeccionForo,
 } from '../models/foro.models';
@@ -40,15 +41,19 @@ export class ForoApiService {
 
   /**
    * Comentarios y respuestas en una sola lista, de los más antiguos a los más nuevos. Con `ancla`
-   * solo los de ese campo o elemento.
+   * solo los de ese campo o elemento; con `filtro`, los de una sección o los generales. El servidor
+   * admite un filtro a la vez: si hay ancla, el filtro no se envía.
    */
   listarComentarios(
     hiloId: string,
     pagina: number,
     tamanio: number,
     ancla: AnclaForo | null = null,
+    filtro: FiltroSeccion | null = null,
   ): Observable<PaginaResponse<ComentarioForo>> {
     let params = this.paginacion(pagina, tamanio);
+    if (!ancla && filtro?.seccion) params = params.set('seccion', filtro.seccion);
+    if (!ancla && filtro?.soloGenerales) params = params.set('soloGenerales', true);
     if (ancla) {
       params = params.set('elementoRef', ancla.elementoRef);
       if (ancla.instanciaElementoId)

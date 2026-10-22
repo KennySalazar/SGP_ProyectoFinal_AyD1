@@ -106,6 +106,41 @@ describe('ForoApiService', () => {
     request.flush({ content: [] });
   });
 
+  it('filtra los comentarios por sección', () => {
+    service.listarComentarios('hilo-1', 0, 100, null, { seccion: 'subestructura' }).subscribe();
+
+    const request = http.expectOne((r) => r.url === '/api/v1/hilos/hilo-1/comentarios');
+    expect(request.request.params.get('seccion')).toBe('subestructura');
+    expect(request.request.params.has('soloGenerales')).toBe(false);
+    request.flush({ content: [] });
+  });
+
+  it('pide solo los comentarios generales', () => {
+    service.listarComentarios('hilo-1', 0, 100, null, { soloGenerales: true }).subscribe();
+
+    const request = http.expectOne((r) => r.url === '/api/v1/hilos/hilo-1/comentarios');
+    expect(request.request.params.get('soloGenerales')).toBe('true');
+    expect(request.request.params.has('seccion')).toBe(false);
+    request.flush({ content: [] });
+  });
+
+  it('con un elemento elegido no manda el filtro de sección: el servidor admite uno solo', () => {
+    service
+      .listarComentarios(
+        'hilo-1',
+        0,
+        100,
+        { elementoRef: '/subestructura/pilas', instanciaElementoId: null },
+        { seccion: 'subestructura' },
+      )
+      .subscribe();
+
+    const request = http.expectOne((r) => r.url === '/api/v1/hilos/hilo-1/comentarios');
+    expect(request.request.params.get('elementoRef')).toBe('/subestructura/pilas');
+    expect(request.request.params.has('seccion')).toBe(false);
+    request.flush({ content: [] });
+  });
+
   it('comenta un elemento enviando su ancla', () => {
     const cuerpo = {
       contenido: 'Se ve expuesta',
