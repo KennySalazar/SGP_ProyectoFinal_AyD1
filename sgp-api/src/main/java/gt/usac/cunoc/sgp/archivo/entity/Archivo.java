@@ -128,6 +128,17 @@ public class Archivo implements org.springframework.data.domain.Persistable<UUID
     this.creadoEn = confirmadoEn;
   }
 
+  /**
+   * Marca el archivo como purgado tras eliminar sus objetos del almacenamiento (RN-ARC-06). El
+   * registro se conserva; solo deja de existir el contenido.
+   */
+  public void purgar(Instant ahora) {
+    if (estado != EstadoArchivo.PURGADO) {
+      estado = EstadoArchivo.PURGADO;
+      purgadoEn = ahora;
+    }
+  }
+
   public void retirar(Instant ahora) {
     if (estado == EstadoArchivo.DISPONIBLE) {
       estado = EstadoArchivo.RETIRADO;

@@ -218,7 +218,11 @@ export class NotificacionesStore implements OnDestroy {
         ? ['/observaciones', entidadId]
         : ['/revisiones'];
     }
-    if (entidadUpper === 'ORDEN' || entidadUpper === 'MANTENIMIENTO') {
+    if (
+      entidadUpper === 'ORDEN' ||
+      entidadUpper === 'ORDEN_MANTENIMIENTO' ||
+      entidadUpper === 'MANTENIMIENTO'
+    ) {
       return ['/mantenimiento', 'ordenes', entidadId];
     }
     if (entidadUpper === 'PROPUESTA' || entidadUpper === 'PROPUESTA_MANTENIMIENTO') {
