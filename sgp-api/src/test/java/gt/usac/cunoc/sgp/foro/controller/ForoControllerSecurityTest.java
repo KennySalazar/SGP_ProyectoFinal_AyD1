@@ -100,7 +100,8 @@ class ForoControllerSecurityTest {
   void unVisitanteLeeLosHilosElHiloYSusComentarios() throws Exception {
     when(foro.listarHilosDePuente(eq(PUENTE_ID), eq(0), eq(20))).thenReturn(paginaVacia());
     when(foro.obtenerHilo(HILO_ID)).thenReturn(hilo());
-    when(foro.listarComentarios(eq(HILO_ID), eq(0), eq(20), any(FiltroComentarios.class)))
+    when(foro.listarComentariosPara(
+            eq(HILO_ID), eq(0), eq(20), any(FiltroComentarios.class), any()))
         .thenReturn(paginaVacia());
 
     mockMvc.perform(get(HILOS)).andExpect(status().isOk());
@@ -120,23 +121,37 @@ class ForoControllerSecurityTest {
     mockMvc.perform(get(HILOS).principal(autenticar(rol))).andExpect(status().isOk());
   }
 
+  /** Del rol depende si se ve el texto de un comentario oculto (HU-065, RN-FOR-08). */
+  @ParameterizedTest
+  @EnumSource(RoleName.class)
+  void elRolDeQuienLeeLosComentariosLlegaAlServicio(RoleName rol) throws Exception {
+    when(foro.listarComentariosPara(any(), eq(0), eq(20), any(FiltroComentarios.class), any()))
+        .thenReturn(paginaVacia());
+
+    mockMvc
+        .perform(get(HILO + "/comentarios").principal(autenticar(rol)))
+        .andExpect(status().isOk());
+
+    verify(foro).listarComentariosPara(HILO_ID, 0, 20, FiltroComentarios.NINGUNO, rol);
+  }
+
   @Test
   void laPaginacionTomaLosValoresDeLaPeticionOLosPredeterminados() throws Exception {
     when(foro.listarHilosDePuente(any(), eq(2), eq(50))).thenReturn(paginaVacia());
-    when(foro.listarComentarios(any(), eq(0), eq(20), any(FiltroComentarios.class)))
+    when(foro.listarComentariosPara(any(), eq(0), eq(20), any(FiltroComentarios.class), any()))
         .thenReturn(paginaVacia());
 
     mockMvc.perform(get(HILOS).param("pagina", "2").param("tamanio", "50"));
     mockMvc.perform(get(HILO + "/comentarios"));
 
     verify(foro).listarHilosDePuente(PUENTE_ID, 2, 50);
-    verify(foro).listarComentarios(HILO_ID, 0, 20, FiltroComentarios.NINGUNO);
+    verify(foro).listarComentariosPara(HILO_ID, 0, 20, FiltroComentarios.NINGUNO, null);
   }
 
   @Test
   void elFiltroPorElementoLlegaAlServicio() throws Exception {
     UUID instancia = UUID.fromString("019a0000-0000-7000-8000-000000006315");
-    when(foro.listarComentarios(any(), eq(0), eq(20), any(FiltroComentarios.class)))
+    when(foro.listarComentariosPara(any(), eq(0), eq(20), any(FiltroComentarios.class), any()))
         .thenReturn(paginaVacia());
 
     mockMvc
@@ -147,13 +162,13 @@ class ForoControllerSecurityTest {
         .andExpect(status().isOk());
 
     verify(foro)
-        .listarComentarios(
-            HILO_ID, 0, 20, FiltroComentarios.porElemento("/subestructura/pilas", instancia));
+        .listarComentariosPara(
+            HILO_ID, 0, 20, FiltroComentarios.porElemento("/subestructura/pilas", instancia), null);
   }
 
   @Test
   void elFiltroPorSeccionYPorGeneralesLlegaAlServicio() throws Exception {
-    when(foro.listarComentarios(any(), eq(0), eq(20), any(FiltroComentarios.class)))
+    when(foro.listarComentariosPara(any(), eq(0), eq(20), any(FiltroComentarios.class), any()))
         .thenReturn(paginaVacia());
 
     mockMvc
@@ -164,9 +179,10 @@ class ForoControllerSecurityTest {
         .andExpect(status().isOk());
 
     verify(foro)
-        .listarComentarios(
-            HILO_ID, 0, 20, new FiltroComentarios(null, null, "subestructura", false));
-    verify(foro).listarComentarios(HILO_ID, 0, 20, new FiltroComentarios(null, null, null, true));
+        .listarComentariosPara(
+            HILO_ID, 0, 20, new FiltroComentarios(null, null, "subestructura", false), null);
+    verify(foro)
+        .listarComentariosPara(HILO_ID, 0, 20, new FiltroComentarios(null, null, null, true), null);
   }
 
   @Test
@@ -316,6 +332,7 @@ class ForoControllerSecurityTest {
         ahora,
         ahora,
         false,
+        null,
         1);
   }
 
@@ -330,7 +347,12 @@ class ForoControllerSecurityTest {
         "Ana",
         "ESTUDIANTE",
         "Texto",
-        OffsetDateTime.parse("2026-10-20T09:00:00-06:00"));
+        OffsetDateTime.parse("2026-10-20T09:00:00-06:00"),
+        null,
+        OffsetDateTime.parse("2026-10-20T09:15:00-06:00"),
+        false,
+        false,
+        null);
   }
 
   private UsernamePasswordAuthenticationToken autenticar(RoleName rol) {

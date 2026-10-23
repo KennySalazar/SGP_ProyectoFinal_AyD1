@@ -20,6 +20,7 @@ import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { ButtonModule } from 'primeng/button';
+import { DialogModule } from 'primeng/dialog';
 import { SkeletonModule } from 'primeng/skeleton';
 import { TagModule } from 'primeng/tag';
 import { TextareaModule } from 'primeng/textarea';
@@ -33,12 +34,19 @@ import {
   FiltroSeccion,
   HiloForo,
   LIMITE_COMENTARIO,
+  LIMITE_MOTIVO_MODERACION,
   OpcionesFiltroForo,
+  ROLES_MODERADORES,
 } from '../../models/foro.models';
 import { ForoApiService } from '../../services/foro-api.service';
 import { etiquetaPorOmision } from '../../utils/etiqueta-ancla';
 import { leerProblema, severidadCategoria } from '../../utils/errores-foro';
 import { ZONA_GUATEMALA } from '../../utils/fechas-foro';
+
+/** Eliminar no pide motivo; ocultar y cerrar sí (RN-FOR-05, RN-FOR-08). */
+type AccionPendiente =
+  | { tipo: 'eliminar' | 'ocultar'; comentario: ComentarioForo }
+  | { tipo: 'cerrar'; comentario: null };
 
 /** Comentarios que se piden por página; es el máximo que admite el servidor. */
 const TAMANIO_COMENTARIOS = 100;
@@ -59,6 +67,10 @@ const LINEAS_PARA_RECORTAR = 4;
  *
  * Para que un hilo largo no ocupe la página, muestra los comentarios de a diez («Mostrar más») y
  * recorta los muy largos («Ver más»).
+ *
+ * El autor edita su comentario dentro del plazo que fija el servidor y lo elimina dejando la marca;
+ * el Catedrático y el Administrador ocultan comentarios y cierran el hilo con un motivo (HU-065).
+ * Lo irreversible se confirma en un diálogo.
  */
 @Component({
   selector: 'app-hilo-foro',
@@ -70,6 +82,7 @@ const LINEAS_PARA_RECORTAR = 4;
     RouterLink,
     TranslocoPipe,
     ButtonModule,
+    DialogModule,
     SkeletonModule,
     TagModule,
     TextareaModule,
@@ -105,8 +118,11 @@ export class HiloForoComponent {
 
   readonly zona = ZONA_GUATEMALA;
   readonly limite = LIMITE_COMENTARIO;
+  readonly limiteMotivo = LIMITE_MOTIVO_MODERACION;
   readonly severidad = severidadCategoria;
   readonly autenticado = this.auth.authenticated;
+  private readonly usuarioId = computed(() => this.auth.user()?.id ?? null);
+  readonly esModerador = computed(() => ROLES_MODERADORES.includes(this.auth.user()?.role ?? ''));
 
   readonly hilo = signal<HiloForo | null>(null);
   readonly comentarios = signal<ComentarioForo[]>([]);
@@ -132,6 +148,18 @@ export class HiloForoComponent {
   readonly textoRespuesta = signal('');
   readonly publicandoRespuesta = signal(false);
   readonly errorRespuesta = signal<string | null>(null);
+
+  readonly editandoId = signal<string | null>(null);
+  readonly textoEdicion = signal('');
+  readonly guardandoEdicion = signal(false);
+  readonly errorEdicion = signal<string | null>(null);
+
+  /** La acción irreversible que espera confirmación en el diálogo. */
+  readonly accion = signal<AccionPendiente | null>(null);
+  readonly motivo = signal('');
+  readonly procesandoAccion = signal(false);
+  readonly errorAccion = signal<string | null>(null);
+  readonly pideMotivo = computed(() => this.accion()?.tipo !== 'eliminar');
 
   readonly principales = computed(() => this.comentarios().filter((c) => c.padreId === null));
   readonly respuestasPorPadre = computed(() => {
@@ -303,9 +331,9 @@ export class HiloForoComponent {
   }
 
   esLargo(comentario: ComentarioForo): boolean {
+    const contenido = comentario.contenido ?? '';
     return (
-      comentario.contenido.length > LARGO_PARA_RECORTAR ||
-      comentario.contenido.split('\n').length > LINEAS_PARA_RECORTAR
+      contenido.length > LARGO_PARA_RECORTAR || contenido.split('\n').length > LINEAS_PARA_RECORTAR
     );
   }
 
@@ -392,6 +420,148 @@ export class HiloForoComponent {
       });
   }
 
+  private esAutor(comentario: ComentarioForo): boolean {
+    return this.autenticado() && comentario.autorId === this.usuarioId();
+  }
+
+  /** Modificable por su autor: no eliminado, no oculto y en un hilo abierto. */
+  private modificable(comentario: ComentarioForo): boolean {
+    return (
+      this.esAutor(comentario) &&
+      !comentario.eliminado &&
+      !comentario.oculto &&
+      this.hilo()?.cerrado === false
+    );
+  }
+
+  /** El plazo lo decide el servidor; aquí solo se evita ofrecer lo que ya venció. */
+  puedeEditar(comentario: ComentarioForo): boolean {
+    return this.modificable(comentario) && Date.now() <= Date.parse(comentario.editableHasta);
+  }
+
+  puedeEliminar(comentario: ComentarioForo): boolean {
+    return this.modificable(comentario);
+  }
+
+  puedeOcultar(comentario: ComentarioForo): boolean {
+    return this.esModerador() && !comentario.eliminado && !comentario.oculto;
+  }
+
+  abrirEdicion(comentario: ComentarioForo): void {
+    this.editandoId.set(comentario.id);
+    this.textoEdicion.set(comentario.contenido ?? '');
+    this.errorEdicion.set(null);
+    this.enfocar('.edicion-formulario textarea');
+  }
+
+  cancelarEdicion(): void {
+    if (this.guardandoEdicion()) return;
+    const comentarioId = this.editandoId();
+    this.editandoId.set(null);
+    this.enfocar(`article[data-comentario-id="${comentarioId}"]`);
+  }
+
+  guardarEdicion(): void {
+    const comentarioId = this.editandoId();
+    const contenido = this.textoEdicion().trim();
+    if (!comentarioId || !contenido || this.guardandoEdicion()) return;
+    this.guardandoEdicion.set(true);
+    this.errorEdicion.set(null);
+    this.api
+      .editarComentario(comentarioId, contenido)
+      .pipe(
+        takeUntilDestroyed(this.destroyRef),
+        finalize(() => this.guardandoEdicion.set(false)),
+      )
+      .subscribe({
+        next: (editado) => {
+          this.reemplazar(editado);
+          this.editandoId.set(null);
+        },
+        error: (err: HttpErrorResponse) => this.errorEdicion.set(this.mensajeDe(err)),
+      });
+  }
+
+  pedirEliminar(comentario: ComentarioForo): void {
+    this.abrirAccion({ tipo: 'eliminar', comentario });
+  }
+
+  pedirOcultar(comentario: ComentarioForo): void {
+    this.abrirAccion({ tipo: 'ocultar', comentario });
+  }
+
+  pedirCerrar(): void {
+    this.abrirAccion({ tipo: 'cerrar', comentario: null });
+  }
+
+  cancelarAccion(): void {
+    if (this.procesandoAccion()) return;
+    this.accion.set(null);
+  }
+
+  confirmarAccion(): void {
+    const accion = this.accion();
+    const motivo = this.motivo().trim();
+    if (!accion || this.procesandoAccion() || (this.pideMotivo() && !motivo)) return;
+    this.procesandoAccion.set(true);
+    this.errorAccion.set(null);
+    const error = (err: HttpErrorResponse) => {
+      this.apiErrors.clear();
+      const problema = leerProblema(err);
+      this.errorAccion.set(
+        problema.campos['motivo'] ??
+          problema.mensaje ??
+          this.transloco.translate('foro.moderacion.error'),
+      );
+    };
+    if (accion.tipo === 'cerrar') {
+      this.api
+        .cerrarHilo(this.hiloId(), motivo)
+        .pipe(
+          takeUntilDestroyed(this.destroyRef),
+          finalize(() => this.procesandoAccion.set(false)),
+        )
+        .subscribe({
+          next: (hilo) => {
+            this.hilo.set(hilo);
+            this.accion.set(null);
+          },
+          error,
+        });
+      return;
+    }
+    const comentarioId = accion.comentario.id;
+    const solicitud =
+      accion.tipo === 'eliminar'
+        ? this.api.eliminarComentario(comentarioId)
+        : this.api.ocultarComentario(comentarioId, motivo);
+    solicitud
+      .pipe(
+        takeUntilDestroyed(this.destroyRef),
+        finalize(() => this.procesandoAccion.set(false)),
+      )
+      .subscribe({
+        next: (actualizado) => {
+          this.reemplazar(actualizado);
+          this.accion.set(null);
+        },
+        error,
+      });
+  }
+
+  private abrirAccion(accion: AccionPendiente): void {
+    this.accion.set(accion);
+    this.motivo.set('');
+    this.errorAccion.set(null);
+  }
+
+  /** Actualiza un comentario en la lista sin recargarla: no se pierde lo que ya se mostraba. */
+  private reemplazar(actualizado: ComentarioForo): void {
+    this.comentarios.update((lista) =>
+      lista.map((c) => (c.id === actualizado.id ? actualizado : c)),
+    );
+  }
+
   /** Lleva el foco al control que acaba de aparecer, para quien navega con teclado. */
   private enfocar(selector: string): void {
     afterNextRender(
@@ -406,6 +576,13 @@ export class HiloForoComponent {
     const problema = leerProblema(err);
     if (problema.codigo === 'hilo_cerrado') {
       this.hilo.update((h) => (h ? { ...h, cerrado: true } : h));
+    }
+    if (problema.codigo === 'plazo_edicion_vencido') {
+      // Pasado el plazo el comentario queda fijo: se deja de ofrecer la edición.
+      const vencido = new Date(0).toISOString();
+      this.comentarios.update((lista) =>
+        lista.map((c) => (c.id === this.editandoId() ? { ...c, editableHasta: vencido } : c)),
+      );
     }
     return (
       problema.campos['contenido'] ??

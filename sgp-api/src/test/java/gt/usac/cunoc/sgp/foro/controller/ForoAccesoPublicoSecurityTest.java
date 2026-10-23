@@ -1,8 +1,11 @@
 package gt.usac.cunoc.sgp.foro.controller;
 
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import gt.usac.cunoc.sgp.common.config.SecurityConfiguration;
@@ -14,6 +17,7 @@ import gt.usac.cunoc.sgp.common.security.ProblemAccessDeniedHandler;
 import gt.usac.cunoc.sgp.common.security.ProblemAuthenticationEntryPoint;
 import gt.usac.cunoc.sgp.foro.service.FiltroComentarios;
 import gt.usac.cunoc.sgp.foro.service.ForoInspeccionService;
+import gt.usac.cunoc.sgp.foro.service.ForoModeracionService;
 import gt.usac.cunoc.sgp.foro.service.ForoService;
 import gt.usac.cunoc.sgp.usuario.repository.UserAccountRepository;
 import java.time.Clock;
@@ -34,9 +38,9 @@ import org.springframework.test.web.servlet.MockMvc;
 
 /**
  * La cadena de seguridad real: el visitante puede leer el foro pero no participar (RN-FOR-09,
- * HU-063).
+ * HU-063) ni editar o moderar (HU-065).
  */
-@WebMvcTest(ForoController.class)
+@WebMvcTest({ForoController.class, ForoModeracionController.class})
 @Import({
   SecurityConfiguration.class,
   JwtAuthenticationFilter.class,
@@ -54,6 +58,7 @@ class ForoAccesoPublicoSecurityTest {
   @Autowired private MockMvc mockMvc;
   @MockBean private ForoService foro;
   @MockBean private ForoInspeccionService foroInspeccion;
+  @MockBean private ForoModeracionService moderacion;
   @MockBean private JwtService jwtService;
   @MockBean private UserAccountRepository usuarios;
 
@@ -61,7 +66,7 @@ class ForoAccesoPublicoSecurityTest {
   void elVisitanteLeeLosHilosElHiloYSusComentariosSinSesion() throws Exception {
     when(foro.listarHilosDePuente(ID, 0, 20))
         .thenReturn(new PageImpl<>(List.of(), PageRequest.of(0, 20), 0));
-    when(foro.listarComentarios(ID, 0, 20, FiltroComentarios.NINGUNO))
+    when(foro.listarComentariosPara(ID, 0, 20, FiltroComentarios.NINGUNO, null))
         .thenReturn(new PageImpl<>(List.of(), PageRequest.of(0, 20), 0));
 
     mockMvc.perform(get("/api/v1/puentes/" + ID + "/hilos")).andExpect(status().isOk());
@@ -93,6 +98,35 @@ class ForoAccesoPublicoSecurityTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"contenido\":\"x\"}"))
         .andExpect(status().isUnauthorized());
+  }
+
+  @Test
+  void elVisitanteNoPuedeEditarEliminarNiModerar() throws Exception {
+    String motivo = "{\"motivo\":\"Spam\"}";
+    mockMvc
+        .perform(
+            put("/api/v1/comentarios/" + ID)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"contenido\":\"x\"}"))
+        .andExpect(status().isUnauthorized());
+    mockMvc.perform(delete("/api/v1/comentarios/" + ID)).andExpect(status().isUnauthorized());
+    mockMvc
+        .perform(
+            post("/api/v1/comentarios/" + ID + "/ocultar")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(motivo))
+        .andExpect(status().isUnauthorized());
+    mockMvc
+        .perform(
+            post("/api/v1/hilos/" + ID + "/cerrar")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(motivo))
+        .andExpect(status().isUnauthorized());
+    mockMvc
+        .perform(get("/api/v1/moderacion/inspecciones-sin-revision"))
+        .andExpect(status().isUnauthorized());
+
+    verifyNoInteractions(moderacion);
   }
 
   @Test

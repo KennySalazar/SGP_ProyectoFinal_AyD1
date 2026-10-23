@@ -11,6 +11,7 @@ import gt.usac.cunoc.sgp.foro.service.FiltroComentarios;
 import gt.usac.cunoc.sgp.foro.service.ForoInspeccionService;
 import gt.usac.cunoc.sgp.foro.service.ForoInspeccionService.Apertura;
 import gt.usac.cunoc.sgp.foro.service.ForoService;
+import gt.usac.cunoc.sgp.usuario.model.RoleName;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -124,7 +125,9 @@ public class ForoController {
               + "instanciaElementoId los del elemento sin instancia), por una sección entera "
               + "(seccion, su clave sin barras, con todo lo que contiene) o por los generales "
               + "(soloGenerales, los que no están anclados); dos filtros a la vez dan 422. Página "
-              + "desde 0, tamaño entre 1 y 100 (20 por defecto).")
+              + "desde 0, tamaño entre 1 y 100 (20 por defecto). Un comentario eliminado llega "
+              + "sin texto con eliminado=true; uno oculto llega sin texto con oculto=true, salvo "
+              + "para el Catedrático y el Administrador, que ven el texto y el motivo.")
   public Page<ComentarioResponse> listarComentarios(
       @PathVariable UUID hiloId,
       @RequestParam(defaultValue = "0") int pagina,
@@ -132,12 +135,14 @@ public class ForoController {
       @RequestParam(required = false) String elementoRef,
       @RequestParam(required = false) UUID instanciaElementoId,
       @RequestParam(required = false) String seccion,
-      @RequestParam(defaultValue = "false") boolean soloGenerales) {
-    return foro.listarComentarios(
+      @RequestParam(defaultValue = "false") boolean soloGenerales,
+      Authentication authentication) {
+    return foro.listarComentariosPara(
         hiloId,
         pagina,
         tamanio,
-        new FiltroComentarios(elementoRef, instanciaElementoId, seccion, soloGenerales));
+        new FiltroComentarios(elementoRef, instanciaElementoId, seccion, soloGenerales),
+        rolLector(authentication));
   }
 
   @PostMapping("/hilos/{hiloId}/comentarios")
@@ -159,6 +164,13 @@ public class ForoController {
       Authentication authentication) {
     return ResponseEntity.status(HttpStatus.CREATED)
         .body(foro.crearComentario(hiloId, request, usuarioId(authentication)));
+  }
+
+  /** El rol de quien lee, o nulo si es un visitante sin sesión. */
+  private RoleName rolLector(Authentication authentication) {
+    return authentication != null && authentication.getDetails() instanceof JwtData jwtData
+        ? jwtData.role()
+        : null;
   }
 
   private UUID usuarioId(Authentication authentication) {

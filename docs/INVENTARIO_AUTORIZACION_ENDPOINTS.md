@@ -107,12 +107,18 @@ Este documento forma parte del manual técnico del Sistema de Gestión de Puente
 | | POST | `/api/v1/mantenimiento/ordenes` | `hasRole('ADMINISTRADOR')` | `OrdenMantenimientoControllerSecurityTest` |
 | | GET | `/api/v1/mantenimiento/ordenes/{id}` | `hasAnyRole('ADMINISTRADOR', 'CATEDRATICO')` | `OrdenMantenimientoControllerSecurityTest` |
 | | PUT | `/api/v1/mantenimiento/ordenes/{id}` | `hasRole('ADMINISTRADOR')` | `OrdenMantenimientoControllerSecurityTest` |
-| **Foro Comunitario** (`ForoController`) | GET | `/api/v1/foro/hilos` | `permitAll()` | `ForoAccesoPublicoSecurityTest` |
-| | GET | `/api/v1/foro/hilos/{id}` | `permitAll()` | `ForoAccesoPublicoSecurityTest` |
-| | POST | `/api/v1/foro/hilos` | `isAuthenticated()` | `ForoControllerSecurityTest` |
-| | POST | `/api/v1/foro/hilos/{id}/respuestas` | `isAuthenticated()` | `ForoControllerSecurityTest` |
-| | DELETE | `/api/v1/foro/hilos/{id}` | `hasRole('ADMINISTRADOR')` | `ForoControllerSecurityTest` |
-| | DELETE | `/api/v1/foro/respuestas/{id}` | `hasRole('ADMINISTRADOR')` | `ForoControllerSecurityTest` |
+| **Foro Comunitario** (`ForoController`) | GET | `/api/v1/puentes/{puenteId}/hilos` | `permitAll()` | `ForoAccesoPublicoSecurityTest` |
+| | POST | `/api/v1/puentes/{puenteId}/hilos` | `isAuthenticated()` | `ForoControllerSecurityTest` |
+| | GET | `/api/v1/hilos/{hiloId}` | `permitAll()` | `ForoAccesoPublicoSecurityTest` |
+| | GET | `/api/v1/inspecciones/{inspeccionId}/hilo` | `permitAll()` | `ForoAccesoPublicoSecurityTest` |
+| | POST | `/api/v1/inspecciones/{inspeccionId}/hilo` | `isAuthenticated()` | `ForoControllerSecurityTest` |
+| | GET | `/api/v1/hilos/{hiloId}/comentarios` | `permitAll()` (el texto oculto solo lo ven `CATEDRATICO` y `ADMINISTRADOR`) | `ForoAccesoPublicoSecurityTest`, `ForoControllerSecurityTest` |
+| | POST | `/api/v1/hilos/{hiloId}/comentarios` | `isAuthenticated()` | `ForoControllerSecurityTest` |
+| **Moderación del Foro** (`ForoModeracionController`) | PUT | `/api/v1/comentarios/{comentarioId}` | `isAuthenticated()` + solo el autor (403) | `ForoModeracionControllerSecurityTest`, `ForoModeracionIntegrationTest` |
+| | DELETE | `/api/v1/comentarios/{comentarioId}` | `isAuthenticated()` + solo el autor (403) | `ForoModeracionControllerSecurityTest`, `ForoModeracionIntegrationTest` |
+| | POST | `/api/v1/comentarios/{comentarioId}/ocultar` | `hasAnyRole('CATEDRATICO','ADMINISTRADOR')` | `ForoModeracionControllerSecurityTest` |
+| | POST | `/api/v1/hilos/{hiloId}/cerrar` | `hasAnyRole('CATEDRATICO','ADMINISTRADOR')` | `ForoModeracionControllerSecurityTest` |
+| | GET | `/api/v1/moderacion/inspecciones-sin-revision` | `hasAnyRole('CATEDRATICO','ADMINISTRADOR')` | `ForoModeracionControllerSecurityTest` |
 | **Notificaciones** (`NotificacionController`) | GET | `/api/v1/notificaciones` | `isAuthenticated()` | `NotificacionControllerSecurityTest` |
 | | POST | `/api/v1/notificaciones/{id}/leer` | `isAuthenticated()` | `NotificacionControllerSecurityTest` |
 | **Salidas de Campo** (`SalidaCampoController`) | GET | `/api/v1/salidas-campo` | `hasRole('CATEDRATICO')` | `SalidaCampoControllerSecurityTest` |

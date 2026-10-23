@@ -67,7 +67,13 @@ describe('ForoPuenteComponent', () => {
         provideHttpClientTesting(),
         provideRouter([]),
         provideNoopAnimations(),
-        { provide: AuthStore, useValue: { authenticated: signal(autenticado) } },
+        {
+          provide: AuthStore,
+          useValue: {
+            authenticated: signal(autenticado),
+            user: signal(autenticado ? { id: 'lector-1', role: 'ESTUDIANTE' } : null),
+          },
+        },
         { provide: TranslocoService, useValue: { translate: (clave: string) => clave } },
       ],
     })

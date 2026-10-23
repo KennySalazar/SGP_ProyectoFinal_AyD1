@@ -42,10 +42,25 @@ public interface ForoHiloRepository extends JpaRepository<ForoHilo, UUID> {
       @Param("ahora") Instant ahora);
 
   /**
-   * Marca la actividad de un hilo sin leerlo ni versionarlo, para que dos comentarios simultáneos
-   * no choquen entre sí.
+   * Marca la actividad de un hilo abierto sin leerlo ni versionarlo, para que dos comentarios
+   * simultáneos no choquen entre sí. Devuelve 0 si el hilo ya está cerrado: la fila bloqueada hace
+   * que un comentario y un cierre simultáneos nunca dejen un comentario después del cierre.
    */
   @Modifying
-  @Query("UPDATE ForoHilo h SET h.actualizadoEn = :ahora WHERE h.id = :id")
-  void registrarActividad(@Param("id") UUID id, @Param("ahora") Instant ahora);
+  @Query("UPDATE ForoHilo h SET h.actualizadoEn = :ahora WHERE h.id = :id AND h.cerradoEn IS NULL")
+  int registrarActividad(@Param("id") UUID id, @Param("ahora") Instant ahora);
+
+  /**
+   * Cierra un hilo abierto con su motivo (RN-FOR-08) y devuelve cuántas filas cambió: 0 si ya
+   * estaba cerrado. No toca la actividad ni la versión del hilo.
+   */
+  @Modifying(flushAutomatically = true, clearAutomatically = true)
+  @Query(
+      "UPDATE ForoHilo h SET h.cerradoEn = :ahora, h.cerradoPorId = :moderador,"
+          + " h.motivoCierre = :motivo WHERE h.id = :id AND h.cerradoEn IS NULL")
+  int cerrar(
+      @Param("id") UUID id,
+      @Param("moderador") UUID moderador,
+      @Param("motivo") String motivo,
+      @Param("ahora") Instant ahora);
 }

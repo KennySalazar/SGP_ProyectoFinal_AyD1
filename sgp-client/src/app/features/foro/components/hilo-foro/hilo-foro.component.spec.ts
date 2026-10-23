@@ -71,7 +71,12 @@ describe('HiloForoComponent', () => {
   let componente: HiloForoComponent;
   let http: HttpTestingController;
 
-  async function crear(autenticado: boolean): Promise<void> {
+  async function crear(
+    autenticado: boolean,
+    usuario: { id: string; role: string } | null = autenticado
+      ? { id: 'lector-1', role: 'ESTUDIANTE' }
+      : null,
+  ): Promise<void> {
     await TestBed.configureTestingModule({
       imports: [HiloForoComponent],
       providers: [
@@ -79,7 +84,10 @@ describe('HiloForoComponent', () => {
         provideHttpClientTesting(),
         provideRouter([]),
         provideNoopAnimations(),
-        { provide: AuthStore, useValue: { authenticated: signal(autenticado) } },
+        {
+          provide: AuthStore,
+          useValue: { authenticated: signal(autenticado), user: signal(usuario) },
+        },
         { provide: TranslocoService, useValue: { translate: (clave: string) => clave } },
       ],
     })
@@ -924,6 +932,181 @@ describe('HiloForoComponent', () => {
       const request = http.expectOne((r) => r.url === RUTA_COMENTARIOS && r.method === 'GET');
       expect(request.request.params.has('seccion')).toBe(false);
       request.flush(pagina([{ ...PRINCIPAL, id: 'nuevo' }]));
+    });
+  });
+
+  describe('edición, eliminación y moderación (HU-065)', () => {
+    const FUTURO = '2999-01-01T00:00:00Z';
+    const PASADO = '2000-01-01T00:00:00Z';
+    const AUTORA = { id: 'usuario-1', role: 'ESTUDIANTE' };
+    const CATEDRATICO = { id: 'cat-1', role: 'CATEDRATICO' };
+    const PROPIO = {
+      ...PRINCIPAL,
+      contenido: 'Texto con erorr',
+      editadoEn: null,
+      editableHasta: FUTURO,
+      eliminado: false,
+      oculto: false,
+      motivoOcultamiento: null,
+    };
+    const RUTA_COMENTARIO = '/api/v1/comentarios/comentario-1';
+
+    const botones = (texto: string) =>
+      Array.from(elemento().querySelectorAll<HTMLButtonElement>('button')).filter((b) =>
+        b.textContent?.includes(texto),
+      );
+
+    it('el autor edita su comentario dentro del plazo y queda marcado como editado', async () => {
+      await crear(true, AUTORA);
+      cargar(HILO, [PROPIO]);
+
+      botones('foro.comentario.editar')[0].click();
+      fixture.detectChanges();
+      expect(componente.textoEdicion()).toBe('Texto con erorr');
+      componente.textoEdicion.set('Texto corregido');
+      componente.guardarEdicion();
+      const request = http.expectOne(RUTA_COMENTARIO);
+      expect(request.request.method).toBe('PUT');
+      expect(request.request.body).toEqual({ contenido: 'Texto corregido' });
+      request.flush({ ...PROPIO, contenido: 'Texto corregido', editadoEn: PROPIO.creadoEn });
+      fixture.detectChanges();
+
+      expect(componente.editandoId()).toBeNull();
+      expect(elemento().querySelector('.contenido')?.textContent).toBe('Texto corregido');
+      expect(elemento().textContent).toContain('foro.comentario.editado');
+    });
+
+    it('pasado el plazo no se ofrece editar, y si el servidor lo rechaza lo explica', async () => {
+      await crear(true, AUTORA);
+      cargar(HILO, [{ ...PROPIO, editableHasta: PASADO }]);
+
+      expect(botones('foro.comentario.editar')).toHaveLength(0);
+      expect(botones('foro.comentario.eliminar')).toHaveLength(1);
+
+      // El reloj del cliente puede ir atrasado: decide el servidor.
+      componente.comentarios.set([PROPIO]);
+      componente.abrirEdicion(PROPIO);
+      componente.textoEdicion.set('Tarde');
+      componente.guardarEdicion();
+      http.expectOne(RUTA_COMENTARIO).flush(
+        {
+          detail: 'Un comentario solo se puede editar en los 15 minutos siguientes a publicarlo.',
+          code: 'plazo_edicion_vencido',
+        },
+        { status: 409, statusText: 'Conflict' },
+      );
+      fixture.detectChanges();
+
+      expect(componente.errorEdicion()).toContain('15 minutos');
+      expect(componente.puedeEditar(componente.comentarios()[0])).toBe(false);
+    });
+
+    it('nadie más que el autor ve las acciones de editar o eliminar', async () => {
+      await crear(true, { id: 'otra', role: 'ESTUDIANTE' });
+      cargar(HILO, [PROPIO]);
+
+      expect(botones('foro.comentario.editar')).toHaveLength(0);
+      expect(botones('foro.comentario.eliminar')).toHaveLength(0);
+      expect(botones('foro.comentario.ocultar')).toHaveLength(0);
+      expect(botones('foro.moderacion.cerrarHilo')).toHaveLength(0);
+    });
+
+    it('eliminar se confirma y deja la marca sin perder las respuestas', async () => {
+      await crear(true, AUTORA);
+      cargar(HILO, [PROPIO, { ...RESPUESTA, editableHasta: FUTURO }]);
+
+      componente.pedirEliminar(PROPIO);
+      fixture.detectChanges();
+      expect(componente.pideMotivo()).toBe(false);
+      componente.confirmarAccion();
+      const request = http.expectOne(RUTA_COMENTARIO);
+      expect(request.request.method).toBe('DELETE');
+      request.flush({ ...PROPIO, contenido: null, eliminado: true });
+      fixture.detectChanges();
+
+      expect(componente.accion()).toBeNull();
+      expect(elemento().textContent).toContain('foro.comentario.eliminado');
+      expect(elemento().textContent).not.toContain('Texto con erorr');
+      expect(elemento().querySelector('.respuestas')?.textContent).toContain('Sí, mide 3 mm.');
+    });
+
+    it('un usuario común ve «Oculto por moderación» en lugar del texto', async () => {
+      await crear(true, { id: 'otra', role: 'PROFESIONAL_EXTERNO' });
+      cargar(HILO, [{ ...PROPIO, contenido: null, oculto: true }]);
+
+      expect(elemento().textContent).toContain('foro.comentario.oculto');
+      expect(elemento().querySelector('.contenido')).toBeNull();
+    });
+
+    it('un moderador ve el texto oculto y su motivo', async () => {
+      await crear(true, CATEDRATICO);
+      cargar(HILO, [{ ...PROPIO, oculto: true, motivoOcultamiento: 'Lenguaje ofensivo' }]);
+
+      expect(elemento().querySelector('.moderado')?.textContent).toContain('Lenguaje ofensivo');
+      expect(elemento().querySelector('.contenido')?.textContent).toBe('Texto con erorr');
+      expect(botones('foro.comentario.ocultar')).toHaveLength(0);
+    });
+
+    it('un moderador oculta un comentario indicando el motivo', async () => {
+      await crear(true, { id: 'admin-1', role: 'ADMINISTRADOR' });
+      cargar(HILO, [PROPIO]);
+
+      botones('foro.comentario.ocultar')[0].click();
+      fixture.detectChanges();
+      expect(componente.pideMotivo()).toBe(true);
+      // Sin motivo no se envía nada.
+      componente.confirmarAccion();
+      http.expectNone(RUTA_COMENTARIO + '/ocultar');
+
+      componente.motivo.set('  Lenguaje ofensivo ');
+      componente.confirmarAccion();
+      const request = http.expectOne(RUTA_COMENTARIO + '/ocultar');
+      expect(request.request.method).toBe('POST');
+      expect(request.request.body).toEqual({ motivo: 'Lenguaje ofensivo' });
+      request.flush({ ...PROPIO, oculto: true, motivoOcultamiento: 'Lenguaje ofensivo' });
+      fixture.detectChanges();
+
+      expect(componente.accion()).toBeNull();
+      expect(elemento().querySelector('.moderado')?.textContent).toContain('Lenguaje ofensivo');
+    });
+
+    it('el error del servidor se muestra dentro del diálogo', async () => {
+      await crear(true, CATEDRATICO);
+      cargar(HILO, [PROPIO]);
+
+      componente.pedirOcultar(PROPIO);
+      componente.motivo.set('x');
+      componente.confirmarAccion();
+      http.expectOne(RUTA_COMENTARIO + '/ocultar').flush(
+        {
+          detail: 'Motivo requerido',
+          errores: [{ campo: 'motivo', mensaje: 'Indica el motivo de la moderación.' }],
+        },
+        { status: 422, statusText: 'Unprocessable Entity' },
+      );
+
+      expect(componente.errorAccion()).toBe('Indica el motivo de la moderación.');
+      expect(componente.accion()).not.toBeNull();
+    });
+
+    it('un moderador cierra el hilo con motivo y queda visible para lectura', async () => {
+      await crear(true, CATEDRATICO);
+      cargar(HILO, [PROPIO]);
+
+      botones('foro.moderacion.cerrarHilo')[0].click();
+      componente.motivo.set('Tema resuelto');
+      componente.confirmarAccion();
+      const request = http.expectOne('/api/v1/hilos/hilo-1/cerrar');
+      expect(request.request.method).toBe('POST');
+      expect(request.request.body).toEqual({ motivo: 'Tema resuelto' });
+      request.flush({ ...HILO, cerrado: true, motivoCierre: 'Tema resuelto' });
+      fixture.detectChanges();
+
+      expect(elemento().textContent).toContain('foro.hilo.avisoCerrado');
+      expect(elemento().textContent).toContain('Tema resuelto');
+      expect(elemento().querySelector('.contenido')?.textContent).toBe('Texto con erorr');
+      expect(elemento().querySelector('form:not(.respuesta-formulario) textarea')).toBeNull();
+      expect(botones('foro.moderacion.cerrarHilo')).toHaveLength(0);
     });
   });
 });

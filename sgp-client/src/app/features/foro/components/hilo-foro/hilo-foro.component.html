@@ -48,12 +48,28 @@
       />
       · {{ h.creadoEn | date: 'dd/MM/yyyy HH:mm' : zona }}
     </p>
+    @if (esModerador() && !h.cerrado) {
+      <button
+        pButton
+        type="button"
+        class="boton-cerrar"
+        severity="danger"
+        [outlined]="true"
+        (click)="pedirCerrar()"
+      >
+        <i class="pi pi-lock" aria-hidden="true"></i
+        ><span>{{ 'foro.moderacion.cerrarHilo' | transloco }}</span>
+      </button>
+    }
   </header>
 
   @if (h.cerrado) {
     <p class="aviso" role="status">
       <i class="pi pi-lock" aria-hidden="true"></i>
       {{ 'foro.hilo.avisoCerrado' | transloco }}
+      @if (h.motivoCierre) {
+        <span>{{ 'foro.comentario.motivo' | transloco: { motivo: h.motivoCierre } }}</span>
+      }
     </p>
   }
 
@@ -146,17 +162,120 @@
     }
   </ng-template>
 
-  <!-- El texto de un comentario o respuesta; si es muy largo se recorta con «Ver más». -->
+  <!--
+    El texto de un comentario o respuesta; si es muy largo se recorta con «Ver más». Uno eliminado
+    deja la marca; uno oculto, el aviso de moderación (y su texto y motivo para los moderadores).
+  -->
   <ng-template #textoComentario let-c>
-    <p class="contenido" [class.recortado]="estaRecortado(c)">{{ c.contenido }}</p>
-    @if (esLargo(c)) {
+    @if (c.eliminado) {
+      <p class="marca">
+        <i class="pi pi-trash" aria-hidden="true"></i>
+        {{ 'foro.comentario.eliminado' | transloco }}
+      </p>
+    } @else if (c.oculto && c.contenido === null) {
+      <p class="marca">
+        <i class="pi pi-eye-slash" aria-hidden="true"></i>
+        {{ 'foro.comentario.oculto' | transloco }}
+      </p>
+    } @else if (editandoId() === c.id) {
+      <form class="formulario edicion-formulario" (ngSubmit)="guardarEdicion()">
+        <label>
+          <span>{{ 'foro.comentario.editarTexto' | transloco }}</span>
+          <textarea
+            pTextarea
+            name="edicion"
+            rows="3"
+            [attr.maxlength]="limite"
+            [ngModel]="textoEdicion()"
+            (ngModelChange)="textoEdicion.set($event)"
+          ></textarea>
+          <small class="contador-texto">{{ textoEdicion().length }} / {{ limite }}</small>
+        </label>
+        @if (errorEdicion(); as error) {
+          <p class="error-formulario" role="alert">{{ error }}</p>
+        }
+        <div class="acciones">
+          <button
+            pButton
+            type="button"
+            severity="secondary"
+            [outlined]="true"
+            [disabled]="guardandoEdicion()"
+            (click)="cancelarEdicion()"
+          >
+            <span>{{ 'common.cancel' | transloco }}</span>
+          </button>
+          <button pButton type="submit" [disabled]="guardandoEdicion() || !textoEdicion().trim()">
+            <i class="pi pi-check" aria-hidden="true"></i
+            ><span>{{
+              (guardandoEdicion() ? 'foro.comentario.guardando' : 'foro.comentario.guardar')
+                | transloco
+            }}</span>
+          </button>
+        </div>
+      </form>
+    } @else {
+      @if (c.oculto) {
+        <p class="moderado" role="note">
+          <i class="pi pi-eye-slash" aria-hidden="true"></i>
+          <strong>{{ 'foro.comentario.oculto' | transloco }}</strong>
+          <span>{{ 'foro.comentario.motivo' | transloco: { motivo: c.motivoOcultamiento } }}</span>
+        </p>
+      }
+      <p class="contenido" [class.recortado]="estaRecortado(c)">{{ c.contenido }}</p>
+      @if (esLargo(c)) {
+        <button
+          type="button"
+          class="ver-mas"
+          [attr.aria-expanded]="!estaRecortado(c)"
+          (click)="alternarTexto(c.id)"
+        >
+          {{ (estaRecortado(c) ? 'foro.hilo.verMas' : 'foro.hilo.verMenos') | transloco }}
+        </button>
+      }
+    }
+  </ng-template>
+
+  <!-- Lo que puede hacer quien lee con un comentario: su autor editarlo o eliminarlo; un
+  moderador, ocultarlo. -->
+  <ng-template #accionesComentario let-c>
+    @if (puedeEditar(c) && editandoId() !== c.id) {
       <button
+        pButton
         type="button"
-        class="ver-mas"
-        [attr.aria-expanded]="!estaRecortado(c)"
-        (click)="alternarTexto(c.id)"
+        class="boton-accion"
+        severity="secondary"
+        [text]="true"
+        (click)="abrirEdicion(c)"
       >
-        {{ (estaRecortado(c) ? 'foro.hilo.verMas' : 'foro.hilo.verMenos') | transloco }}
+        <i class="pi pi-pencil" aria-hidden="true"></i
+        ><span>{{ 'foro.comentario.editar' | transloco }}</span>
+      </button>
+    }
+    @if (puedeEliminar(c)) {
+      <button
+        pButton
+        type="button"
+        class="boton-accion"
+        severity="danger"
+        [text]="true"
+        (click)="pedirEliminar(c)"
+      >
+        <i class="pi pi-trash" aria-hidden="true"></i
+        ><span>{{ 'foro.comentario.eliminar' | transloco }}</span>
+      </button>
+    }
+    @if (puedeOcultar(c)) {
+      <button
+        pButton
+        type="button"
+        class="boton-accion"
+        severity="danger"
+        [text]="true"
+        (click)="pedirOcultar(c)"
+      >
+        <i class="pi pi-eye-slash" aria-hidden="true"></i
+        ><span>{{ 'foro.comentario.ocultar' | transloco }}</span>
       </button>
     }
   </ng-template>
@@ -220,30 +339,39 @@
               }"
             />
             · {{ comentario.creadoEn | date: 'dd/MM/yyyy HH:mm' : zona }}
+            @if (comentario.editadoEn && !comentario.eliminado) {
+              <span>· {{ 'foro.comentario.editado' | transloco }}</span>
+            }
           </p>
-          @if (puedeParticipar() && respondiendoA() !== comentario.id) {
-            <button
-              pButton
-              type="button"
-              class="boton-responder"
-              [attr.data-comentario]="comentario.id"
-              severity="secondary"
-              [text]="true"
-              [attr.aria-label]="
-                'foro.hilo.responderA'
-                  | transloco
-                    : {
-                        autor: comentario.autorUsuario
-                          ? '@' + comentario.autorUsuario
-                          : ('foro.roles.' + comentario.autorRol | transloco),
-                      }
-              "
-              (click)="abrirRespuesta(comentario.id)"
-            >
-              <i class="pi pi-reply" aria-hidden="true"></i
-              ><span>{{ 'foro.hilo.responder' | transloco }}</span>
-            </button>
-          }
+          <div class="acciones-comentario">
+            <ng-container
+              [ngTemplateOutlet]="accionesComentario"
+              [ngTemplateOutletContext]="{ $implicit: comentario }"
+            />
+            @if (puedeParticipar() && respondiendoA() !== comentario.id) {
+              <button
+                pButton
+                type="button"
+                class="boton-responder"
+                [attr.data-comentario]="comentario.id"
+                severity="secondary"
+                [text]="true"
+                [attr.aria-label]="
+                  'foro.hilo.responderA'
+                    | transloco
+                      : {
+                          autor: comentario.autorUsuario
+                            ? '@' + comentario.autorUsuario
+                            : ('foro.roles.' + comentario.autorRol | transloco),
+                        }
+                "
+                (click)="abrirRespuesta(comentario.id)"
+              >
+                <i class="pi pi-reply" aria-hidden="true"></i
+                ><span>{{ 'foro.hilo.responder' | transloco }}</span>
+              </button>
+            }
+          </div>
         </div>
         @if (comentario.elementoRef && !ancla()) {
           <button
@@ -269,18 +397,33 @@
         @if (respuestasPorPadre().get(comentario.id); as respuestas) {
           <div class="respuestas">
             @for (respuesta of respuestas; track respuesta.id) {
-              <article class="comentario respuesta">
-                <p class="comentario-meta">
-                  <i class="pi pi-reply" aria-hidden="true"></i>
-                  <ng-container
-                    [ngTemplateOutlet]="autor"
-                    [ngTemplateOutletContext]="{
-                      usuario: respuesta.autorUsuario,
-                      rol: respuesta.autorRol,
-                    }"
-                  />
-                  · {{ respuesta.creadoEn | date: 'dd/MM/yyyy HH:mm' : zona }}
-                </p>
+              <article
+                class="comentario respuesta"
+                tabindex="-1"
+                [attr.data-comentario-id]="respuesta.id"
+              >
+                <div class="comentario-cabecera">
+                  <p class="comentario-meta">
+                    <i class="pi pi-reply" aria-hidden="true"></i>
+                    <ng-container
+                      [ngTemplateOutlet]="autor"
+                      [ngTemplateOutletContext]="{
+                        usuario: respuesta.autorUsuario,
+                        rol: respuesta.autorRol,
+                      }"
+                    />
+                    · {{ respuesta.creadoEn | date: 'dd/MM/yyyy HH:mm' : zona }}
+                    @if (respuesta.editadoEn && !respuesta.eliminado) {
+                      <span>· {{ 'foro.comentario.editado' | transloco }}</span>
+                    }
+                  </p>
+                  <div class="acciones-comentario">
+                    <ng-container
+                      [ngTemplateOutlet]="accionesComentario"
+                      [ngTemplateOutletContext]="{ $implicit: respuesta }"
+                    />
+                  </div>
+                </div>
                 <ng-container
                   [ngTemplateOutlet]="textoComentario"
                   [ngTemplateOutletContext]="{ $implicit: respuesta }"
@@ -366,3 +509,66 @@
     <ng-container [ngTemplateOutlet]="compositor" />
   }
 }
+
+<p-dialog
+  [header]="'foro.moderacion.' + (accion()?.tipo ?? 'cerrar') + '.titulo' | transloco"
+  [visible]="accion() !== null"
+  (visibleChange)="!$event && cancelarAccion()"
+  [modal]="true"
+  [style]="{ width: 'min(520px, 95vw)' }"
+  [draggable]="false"
+  [resizable]="false"
+>
+  @if (accion(); as a) {
+    <div class="dialogo">
+      <p class="dialogo-texto">{{ 'foro.moderacion.' + a.tipo + '.texto' | transloco }}</p>
+      @if (a.comentario; as c) {
+        @if (c.contenido) {
+          <p class="cita">{{ c.contenido }}</p>
+        }
+      } @else if (hilo(); as h) {
+        <p class="cita">{{ h.titulo }}</p>
+      }
+      @if (pideMotivo()) {
+        <label class="campo-motivo">
+          <span>{{ 'foro.moderacion.motivo' | transloco }}</span>
+          <textarea
+            pTextarea
+            rows="3"
+            [attr.maxlength]="limiteMotivo"
+            [ngModel]="motivo()"
+            (ngModelChange)="motivo.set($event)"
+          ></textarea>
+          <small class="contador-texto">{{ motivo().length }} / {{ limiteMotivo }}</small>
+        </label>
+      }
+      @if (errorAccion(); as error) {
+        <p class="error-formulario" role="alert">{{ error }}</p>
+      }
+      <div class="acciones">
+        <button
+          pButton
+          type="button"
+          severity="secondary"
+          [outlined]="true"
+          [disabled]="procesandoAccion()"
+          (click)="cancelarAccion()"
+        >
+          <span>{{ 'common.cancel' | transloco }}</span>
+        </button>
+        <button
+          pButton
+          type="button"
+          severity="danger"
+          [disabled]="procesandoAccion() || (pideMotivo() && !motivo().trim())"
+          (click)="confirmarAccion()"
+        >
+          <span>{{
+            'foro.moderacion.' + a.tipo + (procesandoAccion() ? '.procesando' : '.confirmar')
+              | transloco
+          }}</span>
+        </button>
+      </div>
+    </div>
+  }
+</p-dialog>
