@@ -1,3 +1,4 @@
+import { AprobacionCalibracionComponent } from '../../../formulario/components/aprobacion-calibracion/aprobacion-calibracion.component';
 import { DatePipe, JsonPipe, KeyValuePipe } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import {
@@ -68,6 +69,7 @@ import { ResultadoRevisionComponent } from '../../components/resultado-revision/
   selector: 'app-detalle-revision-page',
   standalone: true,
   imports: [
+    AprobacionCalibracionComponent,
     ResultadoRevisionComponent,
     DatePipe,
     JsonPipe,

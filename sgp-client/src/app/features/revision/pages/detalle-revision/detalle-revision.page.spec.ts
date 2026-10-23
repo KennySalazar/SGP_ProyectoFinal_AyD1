@@ -1,3 +1,6 @@
+import { AprobacionCalibracionComponent } from '../../../formulario/components/aprobacion-calibracion/aprobacion-calibracion.component';
+import { AprobacionCalibracionApiService } from '../../../formulario/services/aprobacion-calibracion-api.service';
+import { of as estadoRespaldo } from 'rxjs';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { signal } from '@angular/core';
@@ -41,7 +44,9 @@ const esquema = {
           type: 'object',
           title: 'Estribo',
           'x-sgp-evaluable': true,
-          properties: { fisura: { type: 'boolean', title: 'Fisura', 'x-sgp-sin-danos': false } },
+          properties: {
+            fisura: { type: 'boolean', title: 'Fisura', 'x-sgp-sin-danos': false },
+          },
         },
       },
     },
@@ -111,7 +116,10 @@ describe('Detalle de revisión HU-037', () => {
   let fixture: ComponentFixture<DetalleRevisionPage>;
   let http: HttpTestingController;
   let params: BehaviorSubject<ReturnType<typeof convertToParamMap>>;
-  const user = signal<{ id: string; role: string } | null>({ id: 'revisor', role: 'CATEDRATICO' });
+  const user = signal<{ id: string; role: string } | null>({
+    id: 'revisor',
+    role: 'CATEDRATICO',
+  });
   const fotos = { listarFotografias: vi.fn(), contenidoFotografia: vi.fn() };
   const locales = { guardarContexto: vi.fn(), pendientes: vi.fn() };
   beforeEach(async () => {
@@ -119,9 +127,24 @@ describe('Detalle de revisión HU-037', () => {
     params = new BehaviorSubject(convertToParamMap({ revisionId: 'r' }));
     fotos.listarFotografias.mockReturnValue(of([]));
     fotos.contenidoFotografia.mockReturnValue(of(new Blob()));
+    TestBed.overrideComponent(AprobacionCalibracionComponent, {
+      set: { template: '', imports: [] },
+    });
     TestBed.configureTestingModule({
       imports: [DetalleRevisionPage, traduccionesDePrueba()],
       providers: [
+        {
+          provide: AprobacionCalibracionApiService,
+          useValue: {
+            actualizada: estadoRespaldo(),
+            estado: () =>
+              estadoRespaldo({
+                estado: 'SIN_APROBAR',
+                rotuloCalibracion: 'Calibracion provisional · sin aprobar',
+              }),
+            consultar: () => estadoRespaldo(null),
+          },
+        },
         provideRouter([]),
         provideHttpClient(),
         provideHttpClientTesting(),
@@ -328,7 +351,11 @@ describe('Detalle de revisión HU-037', () => {
     page().guardar({
       modo: 'CREAR',
       texto: 'Falta vista',
-      destino: { tipo: 'CATEGORIA_FOTOGRAFICA', categoriaFotografica: 'CAUCE', etiqueta: 'Cauce' },
+      destino: {
+        tipo: 'CATEGORIA_FOTOGRAFICA',
+        categoriaFotografica: 'CAUCE',
+        etiqueta: 'Cauce',
+      },
     });
     const req = http.expectOne('/api/v1/revisiones/r/observaciones');
     expect(req.request.body.destino).toEqual({

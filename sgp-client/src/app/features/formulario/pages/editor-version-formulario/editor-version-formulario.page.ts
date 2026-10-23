@@ -1,3 +1,5 @@
+import { AprobacionCalibracionComponent } from '../../components/aprobacion-calibracion/aprobacion-calibracion.component';
+import { AprobacionCalibracion } from '../../models/aprobacion-calibracion.models';
 import { mensajeCalibracion } from '../../utils/error-calibracion';
 import { AuthStore } from '../../../../core/services/auth.store';
 import { etiquetaMapeo, nombresMapeo } from '../../utils/nombres-mapeo';
@@ -75,6 +77,7 @@ export interface InfoVinculoDestino {
   standalone: true,
   imports: [
     ReglasIcComponent,
+    AprobacionCalibracionComponent,
     CalibracionAdicionalComponent,
     FormsModule,
     ReactiveFormsModule,
@@ -103,6 +106,18 @@ export class EditorVersionFormularioPage implements OnInit {
   private readonly transloco = inject(TranslocoService);
   private readonly fb = inject(FormBuilder);
   private readonly destroyRef = inject(DestroyRef);
+  registrarAprobacion(aprobacion: AprobacionCalibracion): void {
+    this.version.update((version) =>
+      version && version.id === aprobacion.versionFormularioId
+        ? {
+            ...version,
+            aprobacionCalibracion: aprobacion,
+            rotuloCalibracion: aprobacion.rotuloCalibracion,
+          }
+        : version,
+    );
+  }
+
   readonly versionId = signal<string>('');
   readonly version = signal<VersionFormulario | null>(null);
   readonly analisisMapeo = signal<AnalisisMapeo | null>(null);

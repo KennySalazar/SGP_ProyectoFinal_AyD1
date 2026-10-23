@@ -1,3 +1,4 @@
+import { SincronizacionService } from '../../../../offline/services/sincronizacion.service';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { Pipe, PipeTransform, signal } from '@angular/core';
@@ -29,6 +30,7 @@ describe('Base compartida del catálogo HU014', () => {
     vi.spyOn(MapaPuentesComponent.prototype, 'ngAfterViewInit').mockResolvedValue();
     TestBed.configureTestingModule({
       providers: [
+        { provide: SincronizacionService, useValue: { iniciar: () => undefined } },
         provideHttpClient(),
         provideHttpClientTesting(),
         provideRouter([]),
@@ -623,6 +625,7 @@ describe('Baja lógica y reactivación de puentes por administrador', () => {
     TestBed.resetTestingModule();
     TestBed.configureTestingModule({
       providers: [
+        { provide: SincronizacionService, useValue: { iniciar: () => undefined } },
         provideHttpClient(),
         provideHttpClientTesting(),
         provideRouter([]),

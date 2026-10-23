@@ -1,3 +1,4 @@
+import { SincronizacionService } from '../../offline/services/sincronizacion.service';
 import { Component, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
@@ -21,6 +22,7 @@ describe('Característica: acceso a la bitácora HU007', () => {
     usuario.set(null);
     TestBed.configureTestingModule({
       providers: [
+        { provide: SincronizacionService, useValue: { iniciar: () => undefined } },
         provideRouter([
           { path: 'login', component: DestinoTest },
           { path: '', pathMatch: 'full', component: DestinoTest },

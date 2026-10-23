@@ -1,0 +1,105 @@
+<section class="respaldo" [attr.aria-label]="'formulario.hu054.titulo' | transloco">
+  <strong>{{ 'formulario.hu054.titulo' | transloco }}</strong>
+  @if (estadoVersion() !== 'PUBLICADA') {
+    <p>{{ 'formulario.hu054.soloPublicada' | transloco }}</p>
+  } @else if (offline()) {
+    <p role="status">{{ 'formulario.hu054.offline' | transloco }}</p>
+  } @else {
+    @if (cargando()) {
+      <p role="status">{{ 'formulario.hu054.cargando' | transloco }}</p>
+    }
+    @if (estado(); as respaldo) {
+      <p role="status" [class.aprobada]="respaldo.estado === 'APROBADA'">
+        {{ respaldo.rotuloCalibracion }}
+      </p>
+    }
+    @if (puedeVerHistorial()) {
+      @if (aprobacion(); as registro) {
+        <dl>
+          <dt>{{ 'formulario.hu054.responsable' | transloco }}</dt>
+          <dd>{{ registro.aprobadoPorNombre }}</dd>
+          <dt>{{ 'formulario.hu054.fecha' | transloco }} (Guatemala)</dt>
+          <dd>{{ fecha(registro.aprobadoEn) }}</dd>
+          <dt>{{ 'formulario.hu054.observaciones' | transloco }}</dt>
+          <dd class="notas">
+            {{ registro.observaciones || ('formulario.hu054.sinObservaciones' | transloco) }}
+          </dd>
+        </dl>
+      }
+      <p>{{ 'formulario.hu054.pdfOpcional' | transloco }}</p>
+    }
+    @if (exito()) {
+      <p role="status">{{ 'formulario.hu054.exito' | transloco }}</p>
+    }
+    @if (error(); as mensaje) {
+      <p role="alert">{{ mensaje }}</p>
+    }
+    <div class="acciones">
+      @if (puedeAprobar()) {
+        <button pButton type="button" (click)="abrir()">
+          {{ 'formulario.hu054.aprobar' | transloco }}
+        </button>
+      }
+      <button
+        pButton
+        type="button"
+        severity="secondary"
+        [outlined]="true"
+        [disabled]="cargando() || guardando()"
+        (click)="reintentar()"
+      >
+        {{ 'formulario.hu054.actualizar' | transloco }}
+      </button>
+    </div>
+  }
+</section>
+<p-dialog
+  [header]="'formulario.hu054.aprobar' | transloco"
+  [visible]="dialogo()"
+  (visibleChange)="!$event && cancelar()"
+  [modal]="true"
+  [closable]="!guardando()"
+  [closeOnEscape]="!guardando()"
+  [dismissableMask]="false"
+  [style]="{ width: '34rem', maxWidth: '95vw' }"
+>
+  <p>{{ 'formulario.hu054.confirmacion' | transloco }}</p>
+  <label class="observaciones"
+    >{{ 'formulario.hu054.observacionesOpcionales' | transloco }}
+    <textarea
+      pTextarea
+      [formControl]="observaciones"
+      rows="4"
+      maxlength="2000"
+      [readonly]="guardando()"
+    ></textarea>
+  </label>
+  <small>{{ observaciones.value.length }} / 2000</small>
+  @if (observaciones.invalid) {
+    <p role="alert">{{ 'formulario.hu054.limite' | transloco }}</p>
+  }
+  @if (error(); as mensaje) {
+    <p role="alert">{{ mensaje }}</p>
+  }
+  <div class="acciones">
+    <button
+      pButton
+      type="button"
+      severity="secondary"
+      [outlined]="true"
+      [disabled]="guardando()"
+      (click)="cancelar()"
+    >
+      {{ 'common.cancel' | transloco }}
+    </button>
+    <button
+      pButton
+      type="button"
+      [disabled]="!puedeAprobar() || observaciones.invalid"
+      [loading]="guardando()"
+      (click)="confirmar()"
+    >
+      {{ 'formulario.hu054.confirmar' | transloco }}
+    </button>
+  </div>
+</p-dialog>

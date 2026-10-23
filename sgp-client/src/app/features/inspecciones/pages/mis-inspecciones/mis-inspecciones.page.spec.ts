@@ -1,3 +1,4 @@
+import { InspeccionesLocalesService } from '../../../../offline/services/inspecciones-locales.service';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { Component, EventEmitter, Input, Output, Pipe, PipeTransform, signal } from '@angular/core';
@@ -63,6 +64,10 @@ describe('MisInspeccionesPage', () => {
     await TestBed.configureTestingModule({
       imports: [MisInspeccionesPage],
       providers: [
+        {
+          provide: InspeccionesLocalesService,
+          useValue: { listarPorUsuario: vi.fn().mockResolvedValue([]) },
+        },
         provideHttpClient(),
         provideHttpClientTesting(),
         provideRouter([]),
@@ -80,9 +85,13 @@ describe('MisInspeccionesPage', () => {
     fixture = TestBed.createComponent(MisInspeccionesPage);
     page = fixture.componentInstance;
     http = TestBed.inject(HttpTestingController);
+    await Promise.resolve();
   });
 
-  afterEach(() => http.verify());
+  afterEach(() => {
+    fixture.destroy();
+    http.verify();
+  });
 
   function cargarListado(contenido: InspeccionResumenResponse[]): void {
     http.expectOne(LISTADO).flush({
