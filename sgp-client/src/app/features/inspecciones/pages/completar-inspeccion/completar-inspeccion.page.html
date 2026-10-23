@@ -235,6 +235,10 @@
     [inspeccion]="b"
     [soloLectura]="confirmandoAccion() || ejecutandoAccion()"
   />
+  <app-documentos-inspeccion
+    [inspeccion]="b"
+    [soloLectura]="confirmandoAccion() || ejecutandoAccion()"
+  />
 
   <p-dialog
     [header]="'inspecciones.transicion.' + (accionFinal() ?? 'publicar') + 'Titulo' | transloco"

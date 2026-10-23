@@ -17,6 +17,7 @@ import {
   ExportacionInspeccionResponse,
   OrdenMantenimientoDetalleItem,
   EstadoInspeccion,
+  DocumentoInspeccionResponse,
 } from '../models/inspeccion.models';
 import { PuenteResponse, PaginaResponse } from '../../puentes/models/puente.models';
 @Injectable({ providedIn: 'root' })
@@ -206,6 +207,34 @@ export class InspeccionApiService {
       `/api/v1/inspecciones/${inspeccionId}/fotografias/${fotoId}/${miniatura ? 'miniatura' : 'contenido'}`,
       { responseType: 'blob' },
     );
+  }
+
+  /** Documentos PDF (HU-070): se adjuntan con conexión y el servidor valida el tipo real. */
+  adjuntarDocumento(inspeccionId: string, archivo: File): Observable<DocumentoInspeccionResponse> {
+    const datos = new FormData();
+    datos.append('archivo', archivo, archivo.name);
+    return this.http.post<DocumentoInspeccionResponse>(this.urlDocumentos(inspeccionId), datos);
+  }
+
+  listarDocumentos(inspeccionId: string): Observable<DocumentoInspeccionResponse[]> {
+    return this.http.get<DocumentoInspeccionResponse[]>(this.urlDocumentos(inspeccionId));
+  }
+
+  descargarDocumento(inspeccionId: string, documentoId: string): Observable<Blob> {
+    return this.http.get(
+      `${this.urlDocumentos(inspeccionId)}/${encodeURIComponent(documentoId)}/contenido`,
+      { responseType: 'blob' },
+    );
+  }
+
+  retirarDocumento(inspeccionId: string, documentoId: string): Observable<void> {
+    return this.http.delete<void>(
+      `${this.urlDocumentos(inspeccionId)}/${encodeURIComponent(documentoId)}`,
+    );
+  }
+
+  private urlDocumentos(inspeccionId: string): string {
+    return `/api/v1/inspecciones/${encodeURIComponent(inspeccionId)}/documentos`;
   }
 
   listarPublicadasPorPuente(

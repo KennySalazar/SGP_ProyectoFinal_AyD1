@@ -41,6 +41,7 @@ import {
 import { ConnectivityService } from '../../../../offline/services/connectivity.service';
 
 import { ReporteFotograficoComponent } from '../../components/reporte-fotografico/reporte-fotografico.component';
+import { DocumentosInspeccionComponent } from '../../components/documentos-inspeccion/documentos-inspeccion.component';
 
 import { ConfirmacionEstadoIcComponent } from '../../components/confirmacion-estado-ic/confirmacion-estado-ic.component';
 type AccionFinal = 'enviar' | 'publicar';
@@ -71,6 +72,7 @@ import { ResultadoRevisionComponent } from '../../../revision/components/resulta
     InputTextModule,
     FormularioDinamicoComponent,
     ReporteFotograficoComponent,
+    DocumentosInspeccionComponent,
     ConfirmacionEstadoIcComponent,
   ],
   templateUrl: './completar-inspeccion.page.html',

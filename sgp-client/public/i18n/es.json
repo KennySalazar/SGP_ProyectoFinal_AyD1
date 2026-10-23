@@ -2008,6 +2008,30 @@
       "indicadorPendiente": "Completa la evaluacion pendiente en: {{recorrido}}. Guarda el borrador y vuelve a consultar el IC.",
       "datosPendientes": "Completa los datos de evaluacion y guarda el borrador antes de consultar el IC.",
       "seccionPendiente": "Completa la seccion {{seccion}} y guarda el borrador antes de consultar el IC."
+    },
+    "documentos": {
+      "titulo": "Documentos PDF",
+      "descripcion": "Respalda tus observaciones con informes o planos en PDF. Se adjuntan con conexión.",
+      "contador": "{{total}} de {{maximo}}",
+      "adjuntar": "Adjuntar documento PDF",
+      "subiendo": "Subiendo…",
+      "nota": "Solo PDF, hasta 20 MB por documento y 10 por inspección.",
+      "sinConexion": "Los documentos PDF se adjuntan con conexión. Vuelve a intentarlo cuando estés en línea.",
+      "cargando": "Cargando documentos…",
+      "reintentar": "Reintentar",
+      "vacio": "Esta inspección todavía no tiene documentos.",
+      "descargar": "Descargar",
+      "descargando": "Descargando…",
+      "retirar": "Retirar",
+      "retirando": "Retirando…",
+      "retirarTitulo": "Retirar documento",
+      "retirarTexto": "El documento «{{nombre}}» dejará de formar parte de la inspección.",
+      "errores": {
+        "limite": "La inspección ya tiene los 10 documentos permitidos. Retira uno para adjuntar otro.",
+        "tamano": "El documento supera los 20 MB permitidos.",
+        "general": "No fue posible completar la operación con el documento. Intenta nuevamente.",
+        "carga": "No fue posible cargar los documentos de la inspección."
+      }
     }
   }
 }

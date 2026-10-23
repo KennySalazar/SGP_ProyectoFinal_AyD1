@@ -341,3 +341,13 @@ export interface OrdenMantenimientoDetalleItem {
   prioridadConfirmada: string;
   creadoEn: string;
 }
+
+/** Documento PDF de una inspección (HU-070); nunca expone la ruta del almacenamiento. */
+export interface DocumentoInspeccionResponse {
+  id: string;
+  inspeccionId: string;
+  nombreOriginal: string;
+  tamanoBytes: number;
+  subidoPorId: string;
+  subidoEn: string;
+}

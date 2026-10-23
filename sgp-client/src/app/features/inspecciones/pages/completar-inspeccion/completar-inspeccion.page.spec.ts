@@ -2,7 +2,7 @@ import { AprobacionCalibracionComponent } from '../../../formulario/components/a
 import { AprobacionCalibracionApiService } from '../../../formulario/services/aprobacion-calibracion-api.service';
 import { of as estadoRespaldo } from 'rxjs';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { Pipe, PipeTransform, signal } from '@angular/core';
+import { Pipe, PipeTransform, signal, Component, input } from '@angular/core';
 import { ActivatedRoute, Router, convertToParamMap } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
 import { of, throwError } from 'rxjs';
@@ -14,6 +14,7 @@ import { FormularioDinamicoComponent } from '../../../formulario/components/form
 import { FormularioApiService } from '../../../formulario/services/formulario-api.service';
 import { GuardarBorradorRequest, InspeccionBorradorResponse } from '../../models/inspeccion.models';
 import { InspeccionApiService } from '../../services/inspeccion-api.service';
+import { DocumentosInspeccionComponent } from '../../components/documentos-inspeccion/documentos-inspeccion.component';
 import { ReporteFotograficoComponent } from '../../components/reporte-fotografico/reporte-fotografico.component';
 import { FotografiasLocalesService } from '../../../../offline/services/fotografias-locales.service';
 import { ProcesadorFotografiasService } from '../../services/procesador-fotografias.service';
@@ -32,6 +33,14 @@ class MockTranslocoPipe implements PipeTransform {
     return key;
   }
 }
+
+/** Los documentos PDF tienen su propia prueba; aquí no deben pedir nada al servidor. */
+@Component({ selector: 'app-documentos-inspeccion', standalone: true, template: '' })
+class DocumentosInspeccionStubComponent {
+  readonly inspeccion = input<unknown>();
+  readonly soloLectura = input(false);
+}
+
 describe('CompletarInspeccionPage', () => {
   let fixture: ComponentFixture<CompletarInspeccionPage>;
   let component: CompletarInspeccionPage;
@@ -236,8 +245,8 @@ describe('CompletarInspeccionPage', () => {
       ],
     });
     TestBed.overrideComponent(CompletarInspeccionPage, {
-      remove: { imports: [TranslocoPipe] },
-      add: { imports: [MockTranslocoPipe] },
+      remove: { imports: [TranslocoPipe, DocumentosInspeccionComponent] },
+      add: { imports: [MockTranslocoPipe, DocumentosInspeccionStubComponent] },
     });
     TestBed.overrideComponent(ResultadoRevisionComponent, { set: { template: '' } });
     TestBed.overrideComponent(FormularioDinamicoComponent, { set: { template: '' } });
