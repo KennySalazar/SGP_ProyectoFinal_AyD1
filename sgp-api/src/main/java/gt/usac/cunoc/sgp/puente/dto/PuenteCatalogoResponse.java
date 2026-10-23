@@ -15,4 +15,33 @@ public record PuenteCatalogoResponse(
     boolean activo,
     String estadoActual,
     BigDecimal indiceCondicionActual,
-    LocalDate fechaUltimaInspeccion) {}
+    LocalDate fechaUltimaInspeccion,
+    UUID versionFormularioIdIcVigente) {
+
+  public PuenteCatalogoResponse(
+      UUID id,
+      String codigo,
+      String nombre,
+      DepartamentoResponse departamento,
+      MunicipioResponse municipio,
+      Double latitud,
+      Double longitud,
+      boolean activo,
+      String estadoActual,
+      BigDecimal indiceCondicionActual,
+      LocalDate fechaUltimaInspeccion) {
+    this(
+        id,
+        codigo,
+        nombre,
+        departamento,
+        municipio,
+        latitud,
+        longitud,
+        activo,
+        estadoActual,
+        indiceCondicionActual,
+        fechaUltimaInspeccion,
+        null);
+  }
+}

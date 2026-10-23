@@ -13,13 +13,15 @@ public record AprobacionCalibracionResponse(
     String aprobadoPorNombre,
     Instant aprobadoEn,
     String observaciones) {
+  public static final String ROTULO_SIN_APROBAR = "Calibracion provisional · sin aprobar";
+
   public static AprobacionCalibracionResponse de(AprobacionCalibracion aprobacion) {
     if (aprobacion == null) return null;
     return new AprobacionCalibracionResponse(
         aprobacion.getId(),
         aprobacion.getVersionFormulario().getId(),
         aprobacion.getAprobadoPorId(),
-        aprobacion.getAprobadoPorNombre(),
+        aprobacion.getNombreAprobadorVisible(),
         aprobacion.getAprobadoEn(),
         aprobacion.getObservaciones());
   }

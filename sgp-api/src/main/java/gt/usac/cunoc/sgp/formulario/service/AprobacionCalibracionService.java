@@ -138,16 +138,7 @@ public class AprobacionCalibracionService {
             .findByVersionFormularioId(versionId)
             .map(AprobacionCalibracionResponse::de)
             .orElse(null);
-    return aprobacion == null
-        ? new EstadoCalibracionResponse(
-            versionId, "SIN_APROBAR", "Calibracion provisional · sin aprobar", null, null, null)
-        : new EstadoCalibracionResponse(
-            versionId,
-            "APROBADA",
-            aprobacion.rotulo(),
-            aprobacion.aprobadoPorId(),
-            aprobacion.aprobadoPorNombre(),
-            aprobacion.aprobadoEn());
+    return EstadoCalibracionResponse.de(versionId, aprobacion);
   }
 
   private ApiException noEncontrada() {
