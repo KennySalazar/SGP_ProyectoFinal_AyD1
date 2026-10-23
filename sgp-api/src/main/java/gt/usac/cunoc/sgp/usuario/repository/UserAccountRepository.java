@@ -3,6 +3,7 @@ package gt.usac.cunoc.sgp.usuario.repository;
 import gt.usac.cunoc.sgp.usuario.entity.UserAccount;
 import gt.usac.cunoc.sgp.usuario.model.RoleName;
 import jakarta.persistence.LockModeType;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -55,4 +56,15 @@ public interface UserAccountRepository extends JpaRepository<UserAccount, UUID> 
           """)
   Page<UserAccount> findByRolYEstado(
       @Param("rol") RoleName rol, @Param("estado") String estado, Pageable pageable);
+
+  /** Usuarios activos y con la cuenta activada de un rol: destinatarios de avisos (HU-069). */
+  @Query(
+      "select u.id from UserAccount u where u.role.name = :rol"
+          + " and u.active = true and u.activated = true order by u.email")
+  List<UUID> findIdsActivosPorRol(@Param("rol") RoleName rol);
+
+  /** De los indicados, los que siguen activos y con la cuenta activada. */
+  @Query(
+      "select u.id from UserAccount u where u.id in :ids and u.active = true and u.activated = true")
+  List<UUID> filtrarActivos(@Param("ids") Collection<UUID> ids);
 }

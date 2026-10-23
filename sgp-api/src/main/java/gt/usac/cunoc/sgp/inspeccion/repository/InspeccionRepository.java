@@ -3,6 +3,7 @@ package gt.usac.cunoc.sgp.inspeccion.repository;
 import gt.usac.cunoc.sgp.inspeccion.dto.InspeccionPublicadaResumenResponse;
 import gt.usac.cunoc.sgp.inspeccion.entity.Inspeccion;
 import jakarta.persistence.LockModeType;
+import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -136,4 +137,17 @@ public interface InspeccionRepository extends JpaRepository<Inspeccion, UUID> {
       "SELECT i.supersedeAId, i.id FROM Inspeccion i WHERE i.supersedeAId IN :ids"
           + " AND i.estado = 'PUBLICADA' AND i.eliminadoEn IS NULL")
   List<Object[]> findCorreccionesPublicadas(@Param("ids") Collection<UUID> ids);
+
+  /**
+   * Borradores vigentes sin actividad desde el límite (RN-ARC-06): id, autor, nombre del puente y
+   * última actividad.
+   */
+  @Query(
+      value =
+          "SELECT i.id, i.autor_id, p.nombre, i.ultima_actividad_en FROM inspeccion i"
+              + " JOIN puente p ON p.id = i.puente_id"
+              + " WHERE i.estado = 'BORRADOR' AND i.eliminado_en IS NULL"
+              + " AND i.ultima_actividad_en <= :limite ORDER BY i.ultima_actividad_en",
+      nativeQuery = true)
+  List<Object[]> findBorradoresInactivosDesde(@Param("limite") Instant limite);
 }

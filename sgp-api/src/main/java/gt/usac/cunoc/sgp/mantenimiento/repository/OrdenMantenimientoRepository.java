@@ -6,6 +6,7 @@ import gt.usac.cunoc.sgp.mantenimiento.model.PrioridadOrden;
 import gt.usac.cunoc.sgp.mantenimiento.model.TipoOrden;
 import jakarta.persistence.LockModeType;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -85,4 +86,12 @@ public interface OrdenMantenimientoRepository extends Repository<OrdenMantenimie
       @Param("puenteId") UUID puenteId,
       @Param("elementoRef") String elementoRef,
       @Param("estados") Collection<EstadoOrden> estados);
+
+  /** Órdenes en un estado con la fecha programada dentro del rango, ambos incluidos (HU-069). */
+  List<OrdenMantenimiento> findByEstadoAndFechaProgramadaBetween(
+      EstadoOrden estado, LocalDate desde, LocalDate hasta);
+
+  /** Órdenes en un estado cuya fecha programada ya pasó (HU-069). */
+  List<OrdenMantenimiento> findByEstadoAndFechaProgramadaBefore(
+      EstadoOrden estado, LocalDate fecha);
 }

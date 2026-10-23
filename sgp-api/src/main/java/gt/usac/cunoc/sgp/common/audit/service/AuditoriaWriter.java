@@ -46,6 +46,16 @@ public class AuditoriaWriter {
     guardar(usuarioId, accion, entidad, entidadId, valoresAnteriores, valoresPosteriores, proceso);
   }
 
+  /**
+   * Resumen de una ejecución de un proceso programado: sin usuario y con el nombre del proceso como
+   * proceso automático (HU-069, RN-USR-09).
+   */
+  @Transactional(propagation = Propagation.REQUIRES_NEW)
+  public void registrarProceso(String proceso, JsonNode resumen) {
+    guardar(
+        null, AccionAuditoria.EJECUTAR_PROCESO, "proceso_programado", null, null, resumen, proceso);
+  }
+
   private void guardar(
       UUID usuarioId,
       AccionAuditoria accion,
