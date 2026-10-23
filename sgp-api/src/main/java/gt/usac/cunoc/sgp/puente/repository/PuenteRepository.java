@@ -2,6 +2,8 @@ package gt.usac.cunoc.sgp.puente.repository;
 
 import gt.usac.cunoc.sgp.puente.entity.Puente;
 import jakarta.persistence.LockModeType;
+import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.domain.Page;
@@ -264,4 +266,19 @@ public interface PuenteRepository extends JpaRepository<Puente, UUID> {
 
     Double getNorte();
   }
+
+  /**
+   * Puentes activos cuya última inspección publicada (o su alta, si nunca se inspeccionaron) es
+   * anterior al límite (RN-MTO-08): id, código, nombre y fecha de referencia.
+   */
+  @Query(
+      value =
+          "SELECT p.id, p.codigo, p.nombre, COALESCE(MAX(i.publicado_en), p.creado_en)"
+              + " FROM puente p LEFT JOIN inspeccion i ON i.puente_id = p.id"
+              + " AND i.estado = 'PUBLICADA' AND i.eliminado_en IS NULL"
+              + " WHERE p.activo GROUP BY p.id, p.codigo, p.nombre, p.creado_en"
+              + " HAVING COALESCE(MAX(i.publicado_en), p.creado_en) <= :limite"
+              + " ORDER BY p.codigo",
+      nativeQuery = true)
+  List<Object[]> findActivosSinInspeccionDesde(@Param("limite") Instant limite);
 }

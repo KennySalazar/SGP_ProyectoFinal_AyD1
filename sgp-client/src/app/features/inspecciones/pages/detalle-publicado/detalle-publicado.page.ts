@@ -33,6 +33,7 @@ import { FormularioDinamicoComponent } from '../../../formulario/components/form
 import { AnclajeFormulario } from '../../../formulario/utils/anclaje-formulario';
 import { crearEtiquetadorAncla } from '../../../formulario/utils/etiquetas-ancla';
 import { ReporteFotograficoComponent } from '../../components/reporte-fotografico/reporte-fotografico.component';
+import { DocumentosInspeccionComponent } from '../../components/documentos-inspeccion/documentos-inspeccion.component';
 import {
   InspeccionPublicadaDetalleResponse,
   OrdenMantenimientoDetalleItem,
@@ -53,6 +54,7 @@ import { InspeccionApiService } from '../../services/inspeccion-api.service';
     TableModule,
     FormularioDinamicoComponent,
     ReporteFotograficoComponent,
+    DocumentosInspeccionComponent,
     ForoInspeccionComponent,
   ],
   providers: [

@@ -89,6 +89,10 @@ Este documento forma parte del manual técnico del Sistema de Gestión de Puente
 | **Fotografías Inspección** (`FotografiaInspeccionController`) | GET | `/api/v1/inspecciones/{inspeccionId}/fotografias` | `isAuthenticated()` | `FotografiaInspeccionControllerSecurityTest` |
 | | POST | `/api/v1/inspecciones/{inspeccionId}/fotografias` | `hasRole('ESTUDIANTE')` | `FotografiaInspeccionControllerSecurityTest` |
 | | DELETE | `/api/v1/inspecciones/{inspeccionId}/fotografias/{fotoId}` | `hasRole('ESTUDIANTE')` | `FotografiaInspeccionControllerSecurityTest` |
+| **Documentos Inspección** (`DocumentoInspeccionController`) | GET | `/api/v1/inspecciones/{id}/documentos` | `isAuthenticated()` + lectura del autor, Catedrático asignado o inspección publicada | `DocumentoInspeccionControllerSecurityTest` |
+| | POST | `/api/v1/inspecciones/{id}/documentos` | `isAuthenticated()` + solo el autor, en borrador | `DocumentoInspeccionControllerSecurityTest` |
+| | GET | `/api/v1/inspecciones/{id}/documentos/{documentoId}/contenido` | `isAuthenticated()` + mismas reglas de lectura | `DocumentoInspeccionControllerSecurityTest` |
+| | DELETE | `/api/v1/inspecciones/{id}/documentos/{documentoId}` | `isAuthenticated()` + solo el autor, en borrador | `DocumentoInspeccionControllerSecurityTest` |
 | **Bandeja de Revisión** (`BandejaRevisionController`) | GET | `/api/v1/revision/bandeja` | `hasRole('CATEDRATICO')` | `BandejaRevisionControllerSecurityTest` |
 | | POST | `/api/v1/revision/bandeja/{inspeccionId}/aprobar` | `hasRole('CATEDRATICO')` | `BandejaRevisionControllerSecurityTest` |
 | | POST | `/api/v1/revision/bandeja/{inspeccionId}/observar` | `hasRole('CATEDRATICO')` | `BandejaRevisionControllerSecurityTest` |

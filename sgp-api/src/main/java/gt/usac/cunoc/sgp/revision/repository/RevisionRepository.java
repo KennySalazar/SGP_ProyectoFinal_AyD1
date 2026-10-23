@@ -4,6 +4,7 @@ import gt.usac.cunoc.sgp.revision.entity.Revision;
 import jakarta.persistence.LockModeType;
 import jakarta.persistence.QueryHint;
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.domain.Page;
@@ -219,4 +220,19 @@ public interface RevisionRepository extends JpaRepository<Revision, UUID> {
 
     Instant getUltimaActividadEn();
   }
+
+  /**
+   * Revisiones sin resolver enviadas antes del límite (RN-REV-08): id de la revisión, inspección,
+   * revisor y nombre del puente.
+   */
+  @Query(
+      value =
+          "SELECT r.id, r.inspeccion_id, r.revisor_id, p.nombre FROM revision r"
+              + " JOIN inspeccion i ON i.id = r.inspeccion_id"
+              + " JOIN puente p ON p.id = i.puente_id"
+              + " WHERE r.estado IN ('PENDIENTE', 'EN_CURSO') AND r.enviada_en <= :limite"
+              + " AND i.eliminado_en IS NULL AND i.estado IN ('ENVIADA', 'EN_REVISION')"
+              + " ORDER BY r.enviada_en",
+      nativeQuery = true)
+  List<Object[]> findSinRevisarDesde(@Param("limite") Instant limite);
 }

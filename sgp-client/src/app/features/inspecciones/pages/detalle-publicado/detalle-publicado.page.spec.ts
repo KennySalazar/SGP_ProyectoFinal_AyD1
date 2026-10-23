@@ -15,6 +15,7 @@ import { FotografiasLocalesService } from '../../../../offline/services/fotograf
 import { FormularioDinamicoComponent } from '../../../formulario/components/formulario-dinamico/formulario-dinamico.component';
 import { traduccionesDePrueba } from '../../../formulario/motor/testing/traducciones';
 import { FormularioApiService } from '../../../formulario/services/formulario-api.service';
+import { DocumentosInspeccionComponent } from '../../components/documentos-inspeccion/documentos-inspeccion.component';
 import { ReporteFotograficoComponent } from '../../components/reporte-fotografico/reporte-fotografico.component';
 import { InspeccionPublicadaDetalleResponse } from '../../models/inspeccion.models';
 import { InspeccionApiService } from '../../services/inspeccion-api.service';
@@ -85,6 +86,13 @@ class ForoInspeccionStubComponent {
   enfocarFormulario(): void {
     this.enfocados++;
   }
+}
+
+/** Los documentos PDF tienen su propia prueba; aquí no deben pedir nada al servidor. */
+@Component({ selector: 'app-documentos-inspeccion', standalone: true, template: '' })
+class DocumentosInspeccionStubComponent {
+  readonly inspeccion = input<unknown>();
+  readonly soloLectura = input(false);
 }
 
 describe('Detalle publicado de HU-030', () => {
@@ -165,8 +173,8 @@ describe('Detalle publicado de HU-030', () => {
       ],
     })
       .overrideComponent(DetallePublicadoPage, {
-        remove: { imports: [ForoInspeccionComponent] },
-        add: { imports: [ForoInspeccionStubComponent] },
+        remove: { imports: [ForoInspeccionComponent, DocumentosInspeccionComponent] },
+        add: { imports: [ForoInspeccionStubComponent, DocumentosInspeccionStubComponent] },
       })
       .compileComponents();
   });

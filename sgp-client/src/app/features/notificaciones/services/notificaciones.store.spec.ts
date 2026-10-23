@@ -33,4 +33,13 @@ describe('Destinos privados de los avisos de revisión', () => {
     expect(store.obtenerRutaEntidad('INSPECCION', 'i')).toEqual(['/inspecciones', 'i']);
     expect(store.obtenerRutaEntidad('ORDEN', 'o')).toEqual(['/mantenimiento', 'ordenes', 'o']);
   });
+  it('abre el detalle de una orden desde los avisos de mantenimiento (HU-047, HU-069)', () => {
+    user.set({ id: 'catedratico', role: 'CATEDRATICO' });
+    expect(store.obtenerRutaEntidad('orden_mantenimiento', 'o')).toEqual([
+      '/mantenimiento',
+      'ordenes',
+      'o',
+    ]);
+    expect(store.obtenerRutaEntidad('puente', 'p')).toEqual(['/puentes', 'p']);
+  });
 });
