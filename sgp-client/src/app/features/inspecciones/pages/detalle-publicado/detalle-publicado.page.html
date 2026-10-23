@@ -173,6 +173,7 @@
 
 <section class="surface-card condicion">
   <h2>{{ 'inspecciones.consulta.icDefinitivo' | transloco }}</h2>
+  <app-aprobacion-calibracion [versionId]="d.versionFormularioId" />
   @if (d.ic; as ic) {
   <div class="ic-resumen-fila">
     <p class="indice">{{ ic.indiceCalculado | number: '1.2-5' }}</p>

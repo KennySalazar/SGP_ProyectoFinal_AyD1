@@ -1,3 +1,4 @@
+import { AprobacionCalibracionComponent } from '../../../formulario/components/aprobacion-calibracion/aprobacion-calibracion.component';
 import { mensajeCampo } from '../../utils/nombre-campo';
 import { esResultadoIncierto } from '../../services/operacion-idempotente.service';
 import {
@@ -57,6 +58,7 @@ import { ResultadoRevisionComponent } from '../../../revision/components/resulta
   selector: 'app-completar-inspeccion-page',
   standalone: true,
   imports: [
+    AprobacionCalibracionComponent,
     ResultadoRevisionComponent,
     CommonModule,
     FormsModule,
@@ -585,7 +587,10 @@ export class CompletarInspeccionPage implements OnInit {
           numeroColegiado: a.numeroColegiado ?? a.colegiado,
         })) ?? null,
     };
-    this.guardadoPendiente = { request: structuredClone(request), revision: revisionSolicitud };
+    this.guardadoPendiente = {
+      request: structuredClone(request),
+      revision: revisionSolicitud,
+    };
     this.guardando.set(true);
     this.estadoAutoguardado.set('guardando');
     // Si no hay red o es un borrador que solo existe localmente (no sincronizado en servidor)
@@ -599,7 +604,11 @@ export class CompletarInspeccionPage implements OnInit {
             estado: b.estado,
             actualizadoEn: new Date().toISOString(),
             payload: {
-              borrador: { ...b, datos: valorActual, fechaInspeccion: fecha || b.fechaInspeccion },
+              borrador: {
+                ...b,
+                datos: valorActual,
+                fechaInspeccion: fecha || b.fechaInspeccion,
+              },
               versionFormularioId: b.versionFormularioId,
               dispositivoId: b.dispositivoId,
               autorId: b.autorId,
@@ -632,7 +641,11 @@ export class CompletarInspeccionPage implements OnInit {
           estado: b.estado,
           actualizadoEn: new Date().toISOString(),
           payload: {
-            borrador: { ...b, datos: valorActual, fechaInspeccion: fecha || b.fechaInspeccion },
+            borrador: {
+              ...b,
+              datos: valorActual,
+              fechaInspeccion: fecha || b.fechaInspeccion,
+            },
             versionFormularioId: b.versionFormularioId,
             dispositivoId: b.dispositivoId,
             autorId: b.autorId,

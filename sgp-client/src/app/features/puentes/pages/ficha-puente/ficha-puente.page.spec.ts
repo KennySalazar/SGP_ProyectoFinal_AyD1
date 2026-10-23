@@ -1,3 +1,4 @@
+import { SincronizacionService } from '../../../../offline/services/sincronizacion.service';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { Component, EventEmitter, Input, Output, Pipe, PipeTransform, signal } from '@angular/core';
@@ -124,6 +125,7 @@ describe('FichaPuentePage', () => {
 
     TestBed.configureTestingModule({
       providers: [
+        { provide: SincronizacionService, useValue: { iniciar: () => undefined } },
         provideHttpClient(),
         provideHttpClientTesting(),
         provideRouter([{ path: 'inspecciones/:id/publicada', component: DetalleStubComponent }]),

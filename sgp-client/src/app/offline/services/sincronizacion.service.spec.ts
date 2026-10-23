@@ -58,7 +58,11 @@ describe('SincronizacionService autenticación previa', () => {
 
     expect(refresh).toHaveBeenCalledOnce();
     expect(loadMe).toHaveBeenCalledOnce();
-    expect(leerCola).toHaveBeenCalledOnce();
+    expect(leerCola).toHaveBeenCalled();
+    expect(loadMe.mock.invocationCallOrder[0]).toBeGreaterThan(refresh.mock.invocationCallOrder[0]);
+    for (const orden of leerCola.mock.invocationCallOrder) {
+      expect(orden).toBeGreaterThan(loadMe.mock.invocationCallOrder[0]);
+    }
     injector.destroy();
   });
 });

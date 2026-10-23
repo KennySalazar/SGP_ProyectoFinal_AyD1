@@ -1,3 +1,6 @@
+import { AprobacionCalibracionComponent } from '../../../formulario/components/aprobacion-calibracion/aprobacion-calibracion.component';
+import { AprobacionCalibracionApiService } from '../../../formulario/services/aprobacion-calibracion-api.service';
+import { of as estadoRespaldo } from 'rxjs';
 import { provideRouter } from '@angular/router';
 import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
@@ -29,7 +32,10 @@ const lista = {
   general: { revisionId: 'r', texto: null },
 };
 describe('Veredicto privado HU-038', () => {
-  const user = signal<{ id: string; role: string } | null>({ id: 'revisor', role: 'CATEDRATICO' });
+  const user = signal<{ id: string; role: string } | null>({
+    id: 'revisor',
+    role: 'CATEDRATICO',
+  });
   const api = {
     historial: vi.fn(),
     observaciones: vi.fn(),
@@ -46,7 +52,11 @@ describe('Veredicto privado HU-038', () => {
     api.observaciones.mockReturnValue(of(lista));
     api.estadoRevision.mockReturnValue(
       of({
-        calculo: { estadoCalculado: 'REGULAR', hashEntrada: 'a'.repeat(64), indiceCalculado: 50 },
+        calculo: {
+          estadoCalculado: 'REGULAR',
+          hashEntrada: 'a'.repeat(64),
+          indiceCalculado: 50,
+        },
       }),
     );
     api.emitirVeredicto.mockReturnValue(
@@ -58,9 +68,24 @@ describe('Veredicto privado HU-038', () => {
         calificacion: 90,
       }),
     );
+    TestBed.overrideComponent(AprobacionCalibracionComponent, {
+      set: { template: '', imports: [] },
+    });
     TestBed.configureTestingModule({
       imports: [ResultadoRevisionComponent, traduccionesDePrueba()],
       providers: [
+        {
+          provide: AprobacionCalibracionApiService,
+          useValue: {
+            actualizada: estadoRespaldo(),
+            estado: () =>
+              estadoRespaldo({
+                estado: 'SIN_APROBAR',
+                rotuloCalibracion: 'Calibracion provisional · sin aprobar',
+              }),
+            consultar: () => estadoRespaldo(null),
+          },
+        },
         provideRouter([]),
         { provide: AuthStore, useValue: { user } },
         { provide: RevisionApiService, useValue: api },
@@ -106,7 +131,11 @@ describe('Veredicto privado HU-038', () => {
     expect(c.calculo()).toBeNull();
     expect(c.valido()).toBe(false);
     actualizacion.next({
-      calculo: { estadoCalculado: 'BUENO', hashEntrada: 'b'.repeat(64), indiceCalculado: 80 },
+      calculo: {
+        estadoCalculado: 'BUENO',
+        hashEntrada: 'b'.repeat(64),
+        indiceCalculado: 80,
+      },
     });
     expect(c.valido()).toBe(true);
     expect(c.calculo()?.calculo.hashEntrada).toBe('b'.repeat(64));
@@ -164,7 +193,14 @@ describe('Veredicto privado HU-038', () => {
   });
   it('cambiar de sesión cancela peticiones y elimina la calificación visible', () => {
     api.historial.mockReturnValue(
-      of([{ ...ciclo, estadoRevision: 'RESUELTA', veredicto: 'APROBADA', calificacion: 87.65 }]),
+      of([
+        {
+          ...ciclo,
+          estadoRevision: 'RESUELTA',
+          veredicto: 'APROBADA',
+          calificacion: 87.65,
+        },
+      ]),
     );
     abrir();
     expect(fixture.nativeElement.textContent).toContain('87.65');

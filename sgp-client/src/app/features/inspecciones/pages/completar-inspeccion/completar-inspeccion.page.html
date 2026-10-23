@@ -171,6 +171,7 @@
       </div>
       <p-progressBar [value]="b.progreso.porcentajeTotal" [showValue]="false" />
     </div>
+    <app-aprobacion-calibracion [versionId]="b.versionFormularioId" />
     @if (b.icPreliminar; as ic) {
     <div class="ic-preliminar-card">
       <div class="ic-cabecera">

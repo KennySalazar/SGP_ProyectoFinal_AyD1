@@ -1,3 +1,6 @@
+import { AprobacionCalibracionComponent } from '../../components/aprobacion-calibracion/aprobacion-calibracion.component';
+import { AprobacionCalibracionApiService } from '../../services/aprobacion-calibracion-api.service';
+import { of as estadoRespaldo } from 'rxjs';
 import { AuthStore } from '../../../../core/services/auth.store';
 import { CalibracionAdicionalApiService } from '../../services/calibracion-adicional-api.service';
 import { CalibracionAdicionalComponent } from './calibracion-adicional/calibracion-adicional.component';
@@ -91,9 +94,24 @@ describe('EditorVersionFormularioPage', () => {
       publicar: vi.fn().mockReturnValue(of({ ...mockVersion, estado: 'PUBLICADA', activa: true })),
       crear: vi.fn().mockReturnValue(of({ ...mockVersion, id: 'v-2', codigo: 'SIECA-v2' })),
     };
+    TestBed.overrideComponent(AprobacionCalibracionComponent, {
+      set: { template: '', imports: [] },
+    });
     TestBed.configureTestingModule({
       imports: [EditorVersionFormularioPage],
       providers: [
+        {
+          provide: AprobacionCalibracionApiService,
+          useValue: {
+            actualizada: estadoRespaldo(),
+            estado: () =>
+              estadoRespaldo({
+                estado: 'SIN_APROBAR',
+                rotuloCalibracion: 'Calibracion provisional · sin aprobar',
+              }),
+            consultar: () => estadoRespaldo(null),
+          },
+        },
         {
           provide: AuthStore,
           useValue: { user: () => ({ role: 'ADMINISTRADOR' }) },
@@ -648,5 +666,25 @@ describe('EditorVersionFormularioPage', () => {
     component.confirmarRecarga();
     expect(apiMock.obtenerPorId).not.toHaveBeenCalled();
     expect(component.dialogoRecargar()).toBe(true);
+  });
+  it('incorpora la aprobacion sin cambiar los valores ni la version publicada', () => {
+    const publicada = { ...mockVersion, estado: 'PUBLICADA' as const, activa: true };
+    component.version.set(publicada);
+    const aprobacion = {
+      id: 'a',
+      versionFormularioId: publicada.id,
+      aprobadoPorId: 'c',
+      aprobadoPorNombre: 'Mario',
+      aprobadoEn: '2026-10-23T02:30:00Z',
+      observaciones: null,
+      rotuloCalibracion: 'Aprobada por Mario el 22/10/2026',
+    };
+    component.registrarAprobacion(aprobacion);
+    expect(component.version()?.aprobacionCalibracion).toEqual(aprobacion);
+    expect(component.version()?.version).toBe(publicada.version);
+    expect(component.version()?.reglasEvaluacionIc).toBe(publicada.reglasEvaluacionIc);
+    expect(component.version()?.pesos).toBe(publicada.pesos);
+    expect(apiMock.actualizarBorrador).not.toHaveBeenCalled();
+    expect(apiMock.publicar).not.toHaveBeenCalled();
   });
 });

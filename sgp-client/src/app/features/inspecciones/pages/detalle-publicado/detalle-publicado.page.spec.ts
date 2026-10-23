@@ -1,3 +1,6 @@
+import { AprobacionCalibracionComponent } from '../../../formulario/components/aprobacion-calibracion/aprobacion-calibracion.component';
+import { AprobacionCalibracionApiService } from '../../../formulario/services/aprobacion-calibracion-api.service';
+import { of as estadoRespaldo } from 'rxjs';
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component, input, output, signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
@@ -134,9 +137,24 @@ describe('Detalle publicado de HU-030', () => {
       },
     );
     vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined);
+    TestBed.overrideComponent(AprobacionCalibracionComponent, {
+      set: { template: '', imports: [] },
+    });
     await TestBed.configureTestingModule({
       imports: [DetallePublicadoPage, traduccionesDePrueba()],
       providers: [
+        {
+          provide: AprobacionCalibracionApiService,
+          useValue: {
+            actualizada: estadoRespaldo(),
+            estado: () =>
+              estadoRespaldo({
+                estado: 'SIN_APROBAR',
+                rotuloCalibracion: 'Calibracion provisional · sin aprobar',
+              }),
+            consultar: () => estadoRespaldo(null),
+          },
+        },
         provideRouter([]),
         { provide: ActivatedRoute, useValue: { paramMap: parametros } },
         { provide: AuthStore, useValue: { user: usuario, authenticated: autenticado } },
@@ -298,7 +316,12 @@ describe('Detalle publicado de HU-030', () => {
 
   it('carga la corrección al cambiar el id en la misma ruta', async () => {
     await abrir();
-    respuesta = { ...respuesta, id: 'correccion', superadaPorId: null, vigencia: 'VIGENTE' };
+    respuesta = {
+      ...respuesta,
+      id: 'correccion',
+      superadaPorId: null,
+      vigencia: 'VIGENTE',
+    };
     parametros.next(convertToParamMap({ id: 'correccion' }));
     fixture.detectChanges();
     await fixture.whenStable();
@@ -542,7 +565,10 @@ describe('Detalle publicado de HU-030', () => {
         const html = await abrir();
         expect(encabezado(html)).toBe('Identificación versión 1');
 
-        foro().irAElemento.emit({ elementoRef: '/datos_generales', instanciaElementoId: null });
+        foro().irAElemento.emit({
+          elementoRef: '/datos_generales',
+          instanciaElementoId: null,
+        });
         fixture.detectChanges();
         await fixture.whenStable();
         fixture.detectChanges();
@@ -606,7 +632,10 @@ describe('Detalle publicado de HU-030', () => {
       it('no falla si el elemento ya no está en el formulario', async () => {
         const html = await abrir();
 
-        foro().irAElemento.emit({ elementoRef: '/no_existe/elemento', instanciaElementoId: null });
+        foro().irAElemento.emit({
+          elementoRef: '/no_existe/elemento',
+          instanciaElementoId: null,
+        });
         fixture.detectChanges();
         await fixture.whenStable();
 

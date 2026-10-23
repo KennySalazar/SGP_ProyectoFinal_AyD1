@@ -19,7 +19,9 @@
     }
     @if (ciclo(); as c) {
       @if (c.veredicto) {
-        <p role="status">{{ 'revision.resultado.veredictos.' + c.veredicto | transloco }}</p>
+        <p role="status">
+          {{ 'revision.resultado.veredictos.' + c.veredicto | transloco }}
+        </p>
         <p>{{ 'revision.resultado.general' | transloco }}: {{ c.observacionGeneral }}</p>
         @if (c.calificacion !== null) {
           <p>
@@ -73,6 +75,7 @@
               <p role="alert">{{ 'revision.resultado.pendientes' | transloco }}</p>
             }
             @if (calculo(); as ic) {
+              <app-aprobacion-calibracion [versionId]="ic.calculo.versionFormularioId" />
               <p>
                 {{ 'revision.resultado.ic' | transloco }}: {{ ic.calculo.indiceCalculado }} ·
                 {{ ic.calculo.estadoCalculado }}

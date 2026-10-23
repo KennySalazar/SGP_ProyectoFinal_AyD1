@@ -1,8 +1,11 @@
+import { AprobacionCalibracionComponent } from '../../../formulario/components/aprobacion-calibracion/aprobacion-calibracion.component';
+import { AprobacionCalibracionApiService } from '../../../formulario/services/aprobacion-calibracion-api.service';
+import { of as estadoRespaldo } from 'rxjs';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { Pipe, PipeTransform } from '@angular/core';
-import { TranslocoPipe } from '@jsverse/transloco';
+import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { ConfirmacionEstadoIcComponent } from './confirmacion-estado-ic.component';
 import { ConfirmacionEstadoIcResponse } from '../../models/inspeccion.models';
@@ -45,8 +48,27 @@ describe('Confirmacion del estado calculado HU032', () => {
   const url = '/api/v1/inspecciones/inspeccion-1/confirmacion-estado';
 
   beforeEach(() => {
+    TestBed.overrideComponent(AprobacionCalibracionComponent, {
+      set: { template: '', imports: [] },
+    });
     TestBed.configureTestingModule({
-      providers: [provideHttpClient(), provideHttpClientTesting()],
+      providers: [
+        { provide: TranslocoService, useValue: { translate: (clave: string) => clave } },
+        {
+          provide: AprobacionCalibracionApiService,
+          useValue: {
+            actualizada: estadoRespaldo(),
+            estado: () =>
+              estadoRespaldo({
+                estado: 'SIN_APROBAR',
+                rotuloCalibracion: 'Calibracion provisional · sin aprobar',
+              }),
+            consultar: () => estadoRespaldo(null),
+          },
+        },
+        provideHttpClient(),
+        provideHttpClientTesting(),
+      ],
     });
     TestBed.overrideComponent(ConfirmacionEstadoIcComponent, {
       remove: { imports: [TranslocoPipe] },

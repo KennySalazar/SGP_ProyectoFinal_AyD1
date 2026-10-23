@@ -43,6 +43,7 @@
     <strong>{{ 'revision.detalle.icNoDisponible' | transloco }}</strong>
     }
   </p>
+  <app-aprobacion-calibracion [versionId]="d.versionFormularioId" />
   @if (d.identificacionCapturada; as identificacion) {
   <h3>{{ 'revision.detalle.identificacion' | transloco }}</h3>
   <dl>

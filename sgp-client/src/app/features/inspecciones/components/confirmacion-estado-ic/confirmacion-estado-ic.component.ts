@@ -1,3 +1,4 @@
+import { AprobacionCalibracionComponent } from '../../../formulario/components/aprobacion-calibracion/aprobacion-calibracion.component';
 import { CommonModule } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import {
@@ -25,6 +26,7 @@ import { ConnectivityService } from '../../../../offline/services/connectivity.s
   selector: 'app-confirmacion-estado-ic',
   standalone: true,
   imports: [
+    AprobacionCalibracionComponent,
     CommonModule,
     ReactiveFormsModule,
     TranslocoPipe,

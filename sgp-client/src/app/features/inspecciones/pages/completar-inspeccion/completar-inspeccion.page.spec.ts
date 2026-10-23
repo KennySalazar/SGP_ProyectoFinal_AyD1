@@ -1,10 +1,13 @@
+import { AprobacionCalibracionComponent } from '../../../formulario/components/aprobacion-calibracion/aprobacion-calibracion.component';
+import { AprobacionCalibracionApiService } from '../../../formulario/services/aprobacion-calibracion-api.service';
+import { of as estadoRespaldo } from 'rxjs';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { Pipe, PipeTransform, signal } from '@angular/core';
 import { ActivatedRoute, Router, convertToParamMap } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
 import { of, throwError } from 'rxjs';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
-import { describe, beforeEach, it, expect, vi } from 'vitest';
+import { describe, beforeEach, afterEach, it, expect, vi } from 'vitest';
 import { ApiErrorService } from '../../../../core/services/api-error.service';
 import { AuthStore } from '../../../../core/services/auth.store';
 import { FormularioDinamicoComponent } from '../../../formulario/components/formulario-dinamico/formulario-dinamico.component';
@@ -175,13 +178,50 @@ describe('CompletarInspeccionPage', () => {
         publicadoEn: '2026-01-01T00:00:00Z',
       }),
     );
+    TestBed.overrideComponent(AprobacionCalibracionComponent, {
+      set: { template: '', imports: [] },
+    });
     TestBed.configureTestingModule({
       imports: [CompletarInspeccionPage],
       providers: [
+        {
+          provide: InspeccionesLocalesService,
+          useValue: {
+            guardarBorradorEnCache: vi.fn().mockResolvedValue(undefined),
+            guardarBorradorLocal: vi
+              .fn()
+              .mockResolvedValue({ id: 'op1', idempotencyKey: 'clave-test' }),
+            guardarEsquemaLocal: vi.fn().mockResolvedValue(undefined),
+            marcarOperacionPendiente: vi.fn().mockResolvedValue(undefined),
+            marcarOperacionParaIntervencion: vi.fn().mockResolvedValue(undefined),
+            confirmarGuardado: vi.fn().mockResolvedValue(undefined),
+            cachearBorradorCanonico: vi.fn().mockResolvedValue(undefined),
+            tieneConflictoConcurrencia: vi.fn().mockResolvedValue(false),
+            obtenerInspeccionLocal: vi.fn().mockResolvedValue(undefined),
+            obtenerEsquemaActivoLocal: vi.fn().mockResolvedValue(undefined),
+            obtenerEsquemaLocal: vi.fn().mockResolvedValue(undefined),
+            actualizarBorradorCanonicoSiSinPendientes: vi.fn().mockResolvedValue(true),
+          },
+        },
+        {
+          provide: AprobacionCalibracionApiService,
+          useValue: {
+            actualizada: estadoRespaldo(),
+            estado: () =>
+              estadoRespaldo({
+                estado: 'SIN_APROBAR',
+                rotuloCalibracion: 'Calibracion provisional · sin aprobar',
+              }),
+            consultar: () => estadoRespaldo(null),
+          },
+        },
         { provide: InspeccionApiService, useValue: mockInspeccionApi },
         { provide: FormularioApiService, useValue: mockFormularioApi },
         { provide: ActivatedRoute, useValue: mockActivatedRoute },
-        { provide: AuthStore, useValue: { colegiadoPendiente, user: signal({ id: 'usr-1' }) } },
+        {
+          provide: AuthStore,
+          useValue: { colegiadoPendiente, user: signal({ id: 'usr-1' }) },
+        },
         { provide: ApiErrorService, useValue: mockApiErrors },
         { provide: ConnectivityService, useValue: { online: signal(true) } },
         {
@@ -208,7 +248,15 @@ describe('CompletarInspeccionPage', () => {
     fixture = TestBed.createComponent(CompletarInspeccionPage);
     component = fixture.componentInstance;
   });
-  it('carga la información del borrador y restaura datos previamente guardados', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+    fixture.destroy();
+  });
+
+  it('carga la información del borrador y restaura datos previamente guardados', async () => {
+    fixture.detectChanges();
+    await Promise.resolve();
+    await Promise.resolve();
     fixture.detectChanges();
     expect(mockInspeccionApi.obtenerBorrador).toHaveBeenCalledWith('inspeccion-123', true);
     expect(component.borrador()).toEqual(mockBorrador);
@@ -221,12 +269,15 @@ describe('CompletarInspeccionPage', () => {
     expect(component.borrador()?.icPreliminar?.indice).toBe(82.5);
   });
 
-  it('renderiza borradores nuevos o reanudados que todavía no incluyen progreso', () => {
+  it('renderiza borradores nuevos o reanudados que todavía no incluyen progreso', async () => {
     mockInspeccionApi.obtenerBorrador.mockReturnValue(
       of({ ...mockBorrador, progreso: undefined } as unknown as InspeccionBorradorResponse),
     );
 
     expect(() => fixture.detectChanges()).not.toThrow();
+    await Promise.resolve();
+    await Promise.resolve();
+    fixture.detectChanges();
     expect(component.borrador()?.progreso).toEqual({
       totalCamposRequeridos: 0,
       totalCamposCompletados: 0,
@@ -237,6 +288,9 @@ describe('CompletarInspeccionPage', () => {
 
   it('integra el reporte del borrador reanudado y bloquea la transición durante cargas', async () => {
     fixture.detectChanges();
+    await Promise.resolve();
+    await Promise.resolve();
+    fixture.detectChanges();
     await fixture.whenStable();
     const reporte = fixture.debugElement.query(By.directive(ReporteFotograficoComponent))
       .componentInstance as ReporteFotograficoComponent;
@@ -244,16 +298,28 @@ describe('CompletarInspeccionPage', () => {
     expect(mockInspeccionApi.listarFotografias).toHaveBeenCalledWith('inspeccion-123');
     reporte.ocupado.set(true);
     fixture.detectChanges();
+    await Promise.resolve();
+    await Promise.resolve();
+    fixture.detectChanges();
     component.abrirConfirmacion();
     expect(component.confirmandoAccion()).toBe(false);
     reporte.ocupado.set(false);
     fixture.detectChanges();
+    await Promise.resolve();
+    await Promise.resolve();
+    fixture.detectChanges();
     component.abrirConfirmacion();
+    fixture.detectChanges();
+    await Promise.resolve();
+    await Promise.resolve();
     fixture.detectChanges();
     expect(reporte.soloLectura()).toBe(true);
   });
 
-  it('guarda parcialmente el borrador y actualiza versión y última actividad', () => {
+  it('guarda parcialmente el borrador y actualiza versión y última actividad', async () => {
+    fixture.detectChanges();
+    await Promise.resolve();
+    await Promise.resolve();
     fixture.detectChanges();
     const borradorActualizado: InspeccionBorradorResponse = {
       ...mockBorrador,
@@ -267,23 +333,33 @@ describe('CompletarInspeccionPage', () => {
     };
     mockInspeccionApi.guardarBorrador.mockReturnValue(of(borradorActualizado));
     component.guardarBorrador();
+    await Promise.resolve();
+    await Promise.resolve();
+    fixture.detectChanges();
     expect(mockInspeccionApi.guardarBorrador).toHaveBeenCalledWith(
       'inspeccion-123',
       expect.objectContaining<Partial<GuardarBorradorRequest>>({
         version: 1,
         fechaInspeccion: '2026-10-15',
       }),
+      'clave-test',
     );
     expect(component.borrador()?.version).toBe(2);
     expect(component.borrador()?.progreso.totalCamposCompletados).toBe(18);
     expect(component.mensajeExito()).toBe('Borrador guardado en el servidor.');
     expect(component.errorGuardado()).toBeNull();
   });
-  it('guarda automáticamente los cambios después de la pausa de escritura', () => {
+  it('guarda automáticamente los cambios después de la pausa de escritura', async () => {
     vi.useFakeTimers();
+    fixture.detectChanges();
+    await Promise.resolve();
+    await Promise.resolve();
     fixture.detectChanges();
     expect(fixture.nativeElement.querySelector('.btn-guardar')).toBeNull();
     component.esquema.set(null);
+    fixture.detectChanges();
+    await Promise.resolve();
+    await Promise.resolve();
     fixture.detectChanges();
     mockInspeccionApi.guardarBorrador.mockReturnValue(of(mockBorrador));
     component.onValorChange(mockBorrador.datos!);
@@ -291,35 +367,51 @@ describe('CompletarInspeccionPage', () => {
     vi.advanceTimersByTime(1199);
     expect(mockInspeccionApi.guardarBorrador).not.toHaveBeenCalled();
     vi.advanceTimersByTime(1);
+    await Promise.resolve();
+    await Promise.resolve();
+    fixture.detectChanges();
     expect(mockInspeccionApi.guardarBorrador).toHaveBeenCalledWith(
       'inspeccion-123',
       expect.objectContaining({
         version: 1,
         datos: {
-          identificacion: { nombre_puente: 'Puente actualizado', fecha_inspeccion: '2026-10-15' },
+          identificacion: {
+            nombre_puente: 'Puente actualizado',
+            fecha_inspeccion: '2026-10-15',
+          },
         },
       }),
+      'clave-test',
     );
     expect(component.estadoAutoguardado()).toBe('guardado');
     vi.useRealTimers();
   });
-  it('maneja error 404 al cargar si el borrador no existe o no tiene permisos', () => {
+  it('maneja error 404 al cargar si el borrador no existe o no tiene permisos', async () => {
     mockInspeccionApi.obtenerBorrador.mockReturnValue(
       throwError(() => new HttpErrorResponse({ status: 404 })),
     );
     fixture.detectChanges();
+    await Promise.resolve();
+    await Promise.resolve();
+    fixture.detectChanges();
     expect(component.cargando()).toBe(false);
     expect(component.errorCarga()).toContain('no tiene permisos para acceder');
   });
-  it('maneja error 403 si el usuario no es el autor del borrador', () => {
+  it('maneja error 403 si el usuario no es el autor del borrador', async () => {
     mockInspeccionApi.obtenerBorrador.mockReturnValue(
       throwError(() => new HttpErrorResponse({ status: 403 })),
     );
     fixture.detectChanges();
+    await Promise.resolve();
+    await Promise.resolve();
+    fixture.detectChanges();
     expect(component.cargando()).toBe(false);
     expect(component.errorCarga()).toContain('Solo el autor');
   });
-  it('maneja conflicto 409 de concurrencia al guardar y preserva datos locales', () => {
+  it('maneja conflicto 409 de concurrencia al guardar y preserva datos locales', async () => {
+    fixture.detectChanges();
+    await Promise.resolve();
+    await Promise.resolve();
     fixture.detectChanges();
     mockInspeccionApi.guardarBorrador.mockReturnValue(
       throwError(
@@ -334,6 +426,9 @@ describe('CompletarInspeccionPage', () => {
       ),
     );
     component.guardarBorrador();
+    await Promise.resolve();
+    await Promise.resolve();
+    fixture.detectChanges();
     expect(component.guardando()).toBe(false);
     expect(component.errorGuardado()).toContain('Conflicto de concurrencia');
     expect(component.borrador()?.version).toBe(1);
@@ -350,6 +445,9 @@ describe('CompletarInspeccionPage', () => {
     const guardarCache = vi.spyOn(locales, 'cachearBorradorCanonico').mockResolvedValue();
     const leerLocal = vi.spyOn(locales, 'obtenerInspeccionLocal');
 
+    fixture.detectChanges();
+    await Promise.resolve();
+    await Promise.resolve();
     fixture.detectChanges();
     await vi.waitFor(() => expect(component.borrador()?.version).toBe(2));
 
@@ -386,16 +484,25 @@ describe('CompletarInspeccionPage', () => {
       .mockResolvedValue(true);
 
     fixture.detectChanges();
+    await Promise.resolve();
+    await Promise.resolve();
+    fixture.detectChanges();
     await vi.waitFor(() => expect(component.borrador()?.version).toBe(2));
 
     expect(mockInspeccionApi.obtenerBorrador).toHaveBeenCalledWith('inspeccion-123', true);
     expect(refrescar).toHaveBeenCalledWith(borradorServidor, 'usr-1');
     expect(component.borrador()?.datos).toEqual(borradorServidor.datos);
   });
-  it('maneja error 422 de fecha futura', () => {
+  it('maneja error 422 de fecha futura', async () => {
+    fixture.detectChanges();
+    await Promise.resolve();
+    await Promise.resolve();
     fixture.detectChanges();
     component.fechaInspeccion.set('2099-01-01');
     component.guardarBorrador();
+    await Promise.resolve();
+    await Promise.resolve();
+    fixture.detectChanges();
     expect(component.errorGuardado()).toContain('posterior a la fecha actual');
     expect(mockInspeccionApi.guardarBorrador).not.toHaveBeenCalled();
   });
@@ -403,10 +510,13 @@ describe('CompletarInspeccionPage', () => {
     function boton(): HTMLButtonElement | null {
       return fixture.nativeElement.querySelector('.btn-accion-final');
     }
-    it('el Catedrático publica tras confirmar y ve el resultado', () => {
+    it('el Catedrático publica tras confirmar y ve el resultado', async () => {
       mockInspeccionApi.publicar.mockReturnValue(
         of({ id: 'inspeccion-123', puenteId: 'puente-456', estado: 'PUBLICADA' }),
       );
+      fixture.detectChanges();
+      await Promise.resolve();
+      await Promise.resolve();
       fixture.detectChanges();
       expect(component.accionFinal()).toBe('publicar');
       expect(boton()?.textContent).toContain('inspecciones.transicion.publicar');
@@ -414,6 +524,9 @@ describe('CompletarInspeccionPage', () => {
       expect(component.confirmandoAccion()).toBe(true);
       expect(mockInspeccionApi.publicar).not.toHaveBeenCalled();
       component.confirmarAccion();
+      fixture.detectChanges();
+      await Promise.resolve();
+      await Promise.resolve();
       fixture.detectChanges();
       expect(mockInspeccionApi.publicar).toHaveBeenCalledWith('inspeccion-123');
       expect(TestBed.inject(Router).navigate).toHaveBeenCalledWith(['/puentes', 'puente-456'], {
@@ -423,7 +536,7 @@ describe('CompletarInspeccionPage', () => {
       expect(component.confirmandoAccion()).toBe(false);
       expect(fixture.nativeElement.textContent).toContain('inspecciones.transicion.publicada');
     });
-    it('el Estudiante envía a revisión', () => {
+    it('el Estudiante envía a revisión', async () => {
       mockInspeccionApi.obtenerBorrador.mockReturnValue(
         of({ ...mockBorrador, rolAutor: 'ESTUDIANTE' }),
       );
@@ -431,14 +544,20 @@ describe('CompletarInspeccionPage', () => {
         of({ id: 'inspeccion-123', puenteId: 'puente-456', estado: 'ENVIADA' }),
       );
       fixture.detectChanges();
+      await Promise.resolve();
+      await Promise.resolve();
+      fixture.detectChanges();
       expect(component.accionFinal()).toBe('enviar');
       component.abrirConfirmacion();
       component.confirmarAccion();
       fixture.detectChanges();
+      await Promise.resolve();
+      await Promise.resolve();
+      fixture.detectChanges();
       expect(mockInspeccionApi.enviar).toHaveBeenCalledWith('inspeccion-123');
       expect(fixture.nativeElement.textContent).toContain('inspecciones.transicion.enviada');
     });
-    it('un 422 detalla por separado los campos y las fotografías que faltan', () => {
+    it('un 422 detalla por separado los campos y las fotografías que faltan', async () => {
       mockInspeccionApi.publicar.mockReturnValue(
         throwError(
           () =>
@@ -448,7 +567,10 @@ describe('CompletarInspeccionPage', () => {
                 code: 'inspeccion_incompleta',
                 detail: 'Faltan 1 campos obligatorios y 2 categorias de fotografia.',
                 errores: [
-                  { campo: 'subestructura', mensaje: 'El campo subestructura es obligatorio' },
+                  {
+                    campo: 'subestructura',
+                    mensaje: 'El campo subestructura es obligatorio',
+                  },
                   { campo: 'fotografias.ACCESO', mensaje: 'Falta foto' },
                   { campo: 'fotografias.CAUCE', mensaje: 'Falta foto' },
                 ],
@@ -457,8 +579,14 @@ describe('CompletarInspeccionPage', () => {
         ),
       );
       fixture.detectChanges();
+      await Promise.resolve();
+      await Promise.resolve();
+      fixture.detectChanges();
       component.abrirConfirmacion();
       component.confirmarAccion();
+      fixture.detectChanges();
+      await Promise.resolve();
+      await Promise.resolve();
       fixture.detectChanges();
       expect(component.errorAccion()).toEqual({
         mensaje: 'Faltan 1 campos obligatorios y 2 categorias de fotografia.',
@@ -469,19 +597,28 @@ describe('CompletarInspeccionPage', () => {
       expect(component.resultadoAccion()).toBeNull();
       expect(mockApiErrors.clear).toHaveBeenCalled();
     });
-    it('no permite la acción mientras hay cambios sin guardar', () => {
+    it('no permite la acción mientras hay cambios sin guardar', async () => {
+      fixture.detectChanges();
+      await Promise.resolve();
+      await Promise.resolve();
       fixture.detectChanges();
       component.estadoAutoguardado.set('pendiente');
+      fixture.detectChanges();
+      await Promise.resolve();
+      await Promise.resolve();
       fixture.detectChanges();
       expect(boton()?.disabled).toBe(true);
       component.abrirConfirmacion();
       expect(component.confirmandoAccion()).toBe(false);
     });
-    it('el Profesional externo con colegiado pendiente no puede publicar', () => {
+    it('el Profesional externo con colegiado pendiente no puede publicar', async () => {
       mockInspeccionApi.obtenerBorrador.mockReturnValue(
         of({ ...mockBorrador, rolAutor: 'PROFESIONAL_EXTERNO' }),
       );
       colegiadoPendiente.set(true);
+      fixture.detectChanges();
+      await Promise.resolve();
+      await Promise.resolve();
       fixture.detectChanges();
       expect(component.colegiadoPendiente()).toBe(true);
       expect(boton()?.disabled).toBe(true);
@@ -491,14 +628,20 @@ describe('CompletarInspeccionPage', () => {
       component.abrirConfirmacion();
       expect(component.confirmandoAccion()).toBe(false);
     });
-    it('una inspección que ya no está en borrador no ofrece la acción', () => {
+    it('una inspección que ya no está en borrador no ofrece la acción', async () => {
       mockInspeccionApi.obtenerBorrador.mockReturnValue(of({ ...mockBorrador, estado: 'ENVIADA' }));
+      fixture.detectChanges();
+      await Promise.resolve();
+      await Promise.resolve();
       fixture.detectChanges();
       expect(component.accionFinal()).toBeNull();
       expect(boton()).toBeNull();
     });
   });
-  it('bloquea publicacion mientras se confirma el IC', () => {
+  it('bloquea publicacion mientras se confirma el IC', async () => {
+    fixture.detectChanges();
+    await Promise.resolve();
+    await Promise.resolve();
     fixture.detectChanges();
     component.operandoIc.set(true);
     component.abrirConfirmacion();
@@ -506,14 +649,20 @@ describe('CompletarInspeccionPage', () => {
     expect(component.confirmandoAccion()).toBe(false);
     expect(mockInspeccionApi.publicar).not.toHaveBeenCalled();
   });
-  it('vuelve a comprobar cambios pendientes despues de abrir el dialogo', () => {
+  it('vuelve a comprobar cambios pendientes despues de abrir el dialogo', async () => {
+    fixture.detectChanges();
+    await Promise.resolve();
+    await Promise.resolve();
     fixture.detectChanges();
     component.abrirConfirmacion();
     component.estadoAutoguardado.set('pendiente');
     component.confirmarAccion();
     expect(mockInspeccionApi.publicar).not.toHaveBeenCalled();
   });
-  it('invalida la confirmacion ante conflicto de calculo durante publicacion', () => {
+  it('invalida la confirmacion ante conflicto de calculo durante publicacion', async () => {
+    fixture.detectChanges();
+    await Promise.resolve();
+    await Promise.resolve();
     fixture.detectChanges();
     component.abrirConfirmacion();
     mockInspeccionApi.publicar.mockReturnValue(
@@ -534,7 +683,10 @@ describe('CompletarInspeccionPage', () => {
     expect(component.resultadoAccion()).toBeNull();
     expect(component.borrador()?.estado).toBe('BORRADOR');
   });
-  it('no guarda el borrador despues de una publicacion correcta', () => {
+  it('no guarda el borrador despues de una publicacion correcta', async () => {
+    fixture.detectChanges();
+    await Promise.resolve();
+    await Promise.resolve();
     fixture.detectChanges();
     component.abrirConfirmacion();
     mockInspeccionApi.publicar.mockReturnValue(
@@ -542,16 +694,22 @@ describe('CompletarInspeccionPage', () => {
     );
     component.confirmarAccion();
     component.guardarBorrador();
+    await Promise.resolve();
+    await Promise.resolve();
+    fixture.detectChanges();
     expect(component.borrador()?.estado).toBe('PUBLICADA');
     expect(mockInspeccionApi.guardarBorrador).not.toHaveBeenCalled();
   });
-  it('conserva la fecha principal al cargar una identificacion con fecha distinta', () => {
+  it('conserva la fecha principal al cargar una identificacion con fecha distinta', async () => {
     mockInspeccionApi.obtenerBorrador.mockReturnValue(
       of({
         ...mockBorrador,
         datos: { identificacion: { fecha_inspeccion: '2026-10-18', ruta: 'P01' } },
       }),
     );
+    fixture.detectChanges();
+    await Promise.resolve();
+    await Promise.resolve();
     fixture.detectChanges();
     expect(component.valoresIniciales()?.['identificacion']).toEqual(
       expect.objectContaining({
@@ -560,13 +718,24 @@ describe('CompletarInspeccionPage', () => {
       }),
     );
   });
-  it('guarda la misma fecha en datos, identificacion y encabezado', () => {
+  it('guarda la misma fecha en datos, identificacion y encabezado', async () => {
+    fixture.detectChanges();
+    await Promise.resolve();
+    await Promise.resolve();
     fixture.detectChanges();
     component.esquema.set(null);
     fixture.detectChanges();
+    await Promise.resolve();
+    await Promise.resolve();
+    fixture.detectChanges();
     mockInspeccionApi.guardarBorrador.mockReturnValue(of(mockBorrador));
-    component.onValorChange({ identificacion: { fecha_inspeccion: '2026-10-14', ruta: 'P01' } });
+    component.onValorChange({
+      identificacion: { fecha_inspeccion: '2026-10-14', ruta: 'P01' },
+    });
     component.guardarBorrador();
+    await Promise.resolve();
+    await Promise.resolve();
+    fixture.detectChanges();
     expect(mockInspeccionApi.guardarBorrador).toHaveBeenCalledWith(
       'inspeccion-123',
       expect.objectContaining({
@@ -579,9 +748,13 @@ describe('CompletarInspeccionPage', () => {
           identificacion: expect.objectContaining({ fecha_inspeccion: '2026-10-14' }),
         }),
       }),
+      'clave-test',
     );
   });
   it('integra la confirmacion del IC y el reporte fotografico para el autor', async () => {
+    fixture.detectChanges();
+    await Promise.resolve();
+    await Promise.resolve();
     fixture.detectChanges();
     await fixture.whenStable();
     const confirmacion = fixture.debugElement.query(By.directive(ConfirmacionEstadoIcComponent))
@@ -592,6 +765,9 @@ describe('CompletarInspeccionPage', () => {
     expect(reporte.inspeccion()!.id).toBe(mockBorrador.id);
     confirmacion.ocupado.emit(true);
     fixture.detectChanges();
+    await Promise.resolve();
+    await Promise.resolve();
+    fixture.detectChanges();
     expect(component.operandoIc()).toBe(true);
     const boton = fixture.nativeElement.querySelector('.btn-accion-final') as HTMLButtonElement;
     expect(boton.disabled).toBe(true);
@@ -599,10 +775,16 @@ describe('CompletarInspeccionPage', () => {
     expect(component.confirmandoAccion()).toBe(false);
     confirmacion.ocupado.emit(false);
     fixture.detectChanges();
+    await Promise.resolve();
+    await Promise.resolve();
+    fixture.detectChanges();
     expect(boton.disabled).toBe(false);
   });
 
   it('vuelve a comprobar cargas fotograficas antes de ejecutar la publicacion', async () => {
+    fixture.detectChanges();
+    await Promise.resolve();
+    await Promise.resolve();
     fixture.detectChanges();
     await fixture.whenStable();
     component.abrirConfirmacion();
@@ -614,10 +796,13 @@ describe('CompletarInspeccionPage', () => {
     expect(mockInspeccionApi.publicar).not.toHaveBeenCalled();
     expect(mockInspeccionApi.enviar).not.toHaveBeenCalled();
   });
-  it('conserva el editor si la publicacion es rechazada', () => {
+  it('conserva el editor si la publicacion es rechazada', async () => {
     mockInspeccionApi.publicar.mockReturnValue(
       throwError(() => new HttpErrorResponse({ status: 422, error: { detail: 'Faltan datos' } })),
     );
+    fixture.detectChanges();
+    await Promise.resolve();
+    await Promise.resolve();
     fixture.detectChanges();
     component.abrirConfirmacion();
     component.confirmarAccion();
@@ -625,15 +810,24 @@ describe('CompletarInspeccionPage', () => {
     expect(component.borrador()?.estado).toBe('BORRADOR');
     expect(component.errorAccion()?.mensaje).toBe('Faltan datos');
   });
-  it('reintenta el guardado incierto con el cuerpo original aunque haya nuevas ediciones', () => {
+  it('reintenta el guardado incierto con el cuerpo original aunque haya nuevas ediciones', async () => {
+    fixture.detectChanges();
+    await Promise.resolve();
+    await Promise.resolve();
     fixture.detectChanges();
     mockInspeccionApi.guardarBorrador.mockReturnValue(
       throwError(() => new HttpErrorResponse({ status: 0 })),
     );
     component.guardarBorrador();
+    await Promise.resolve();
+    await Promise.resolve();
+    fixture.detectChanges();
     const primera = structuredClone(mockInspeccionApi.guardarBorrador.mock.calls.at(-1)![1]);
     component.fechaInspeccion.set('2026-10-14');
     component.guardarBorrador();
+    await Promise.resolve();
+    await Promise.resolve();
+    fixture.detectChanges();
     expect(mockInspeccionApi.guardarBorrador.mock.calls.at(-1)![1]).toEqual(primera);
     expect(component.fechaInspeccion()).toBe('2026-10-14');
   });

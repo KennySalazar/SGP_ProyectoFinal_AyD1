@@ -30,7 +30,7 @@
     <div class="heading-badges">
       <p-tag
         [value]="ver.rotuloCalibracion || ('formulario.hu050.sinRegistro' | transloco)"
-        severity="warn"
+        [severity]="ver.aprobacionCalibracion ? 'success' : 'warn'"
       ></p-tag>
       <p-tag
         [value]="ver.estado"
@@ -47,7 +47,14 @@
   </div>
 </header>
 
-@if (ver.reglasEvaluacionIc['calibracion']) {
+<app-aprobacion-calibracion
+  [versionId]="ver.id"
+  [estadoVersion]="ver.estado"
+  [gestion]="true"
+  (aprobada)="registrarAprobacion($event)"
+/>
+
+@if (ver.reglasEvaluacionIc['calibracion'] && !ver.aprobacionCalibracion) {
 <div class="aviso-activa" role="status">
   <span>{{ 'formulario.hu050.nota' | transloco }}</span>
 </div>

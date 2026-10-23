@@ -1,0 +1,45 @@
+.respaldo {
+  padding: 1rem;
+  margin-block: 0.75rem;
+  border: 1px solid var(--surface-border, #dce4ec);
+  border-radius: 0.75rem;
+  background: var(--surface-card, #fff);
+}
+.aprobada {
+  color: var(--green-700, #17643d);
+  font-weight: 600;
+}
+dl {
+  display: grid;
+  grid-template-columns: minmax(7rem, auto) minmax(0, 1fr);
+  gap: 0.5rem 1rem;
+}
+dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.notas {
+  white-space: pre-wrap;
+}
+.observaciones {
+  display: grid;
+  gap: 0.5rem;
+}
+textarea {
+  width: 100%;
+  box-sizing: border-box;
+}
+.acciones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-block-start: 1rem;
+}
+[role='alert'] {
+  color: var(--red-700, #b42318);
+}
+@media (max-width: 480px) {
+  dl {
+    grid-template-columns: 1fr;
+  }
+}
