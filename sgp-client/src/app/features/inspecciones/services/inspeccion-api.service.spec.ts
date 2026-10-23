@@ -146,4 +146,28 @@ describe('InspeccionApiService', () => {
     expect(request.request.body).toEqual(cuerpo);
     request.flush({ inspeccionId: 'inspeccion/1' });
   });
+
+  it('adjunta, lista, descarga y retira documentos PDF de una inspección (HU-070)', () => {
+    const base = '/api/v1/inspecciones/inspeccion%2F1/documentos';
+    const archivo = new File(['%PDF-1.7'], 'Plano.pdf', { type: 'application/pdf' });
+
+    service.adjuntarDocumento('inspeccion/1', archivo).subscribe();
+    const subida = http.expectOne(base);
+    expect(subida.request.method).toBe('POST');
+    expect((subida.request.body as FormData).get('archivo')).toBeInstanceOf(File);
+    subida.flush({});
+
+    service.listarDocumentos('inspeccion/1').subscribe();
+    http.expectOne(base).flush([]);
+
+    service.descargarDocumento('inspeccion/1', 'doc/1').subscribe();
+    const descarga = http.expectOne(`${base}/doc%2F1/contenido`);
+    expect(descarga.request.responseType).toBe('blob');
+    descarga.flush(new Blob());
+
+    service.retirarDocumento('inspeccion/1', 'doc/1').subscribe();
+    const retiro = http.expectOne(`${base}/doc%2F1`);
+    expect(retiro.request.method).toBe('DELETE');
+    retiro.flush(null);
+  });
 });
