@@ -3,6 +3,7 @@ package gt.usac.cunoc.sgp.formulario.entity;
 import jakarta.persistence.*;
 import java.time.Instant;
 import java.util.UUID;
+import org.hibernate.annotations.Formula;
 import org.hibernate.annotations.Immutable;
 
 @Entity
@@ -20,6 +21,15 @@ public class AprobacionCalibracion {
 
   @Column(name = "aprobado_por_nombre", nullable = false, length = 320, updatable = false)
   private String aprobadoPorNombre;
+
+  @Formula(
+      """
+          (case when position('@' in aprobado_por_nombre) > 0 then
+            coalesce((select nullif(trim(u.nombre_completo), '') from usuario u
+                      where u.id = aprobado_por_id), aprobado_por_nombre)
+            else aprobado_por_nombre end)
+          """)
+  private String nombreAprobadorVisible;
 
   @Column(name = "aprobado_en", nullable = false, updatable = false)
   private Instant aprobadoEn;
@@ -58,6 +68,12 @@ public class AprobacionCalibracion {
 
   public String getAprobadoPorNombre() {
     return aprobadoPorNombre;
+  }
+
+  public String getNombreAprobadorVisible() {
+    return nombreAprobadorVisible == null || nombreAprobadorVisible.isBlank()
+        ? aprobadoPorNombre
+        : nombreAprobadorVisible;
   }
 
   public Instant getAprobadoEn() {

@@ -106,9 +106,6 @@ public record VersionFormularioResponse(
   @com.fasterxml.jackson.annotation.JsonProperty("rotuloCalibracion")
   public String rotuloCalibracion() {
     if (aprobacionCalibracion != null) return aprobacionCalibracion.rotulo();
-    return reglasEvaluacionIc != null
-            && reglasEvaluacionIc.path("calibracion").path("provisional").asBoolean(false)
-        ? "Calibracion provisional · sin aprobar"
-        : "Calibracion sin aprobacion registrada";
+    return AprobacionCalibracionResponse.ROTULO_SIN_APROBAR;
   }
 }

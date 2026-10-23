@@ -72,6 +72,7 @@ public class SecurityConfiguration {
                       HttpMethod.GET,
                       "/api/v1/puentes",
                       "/api/v1/puentes/*",
+                      "/api/v1/puentes/*/estado-calibracion",
                       "/api/v1/catalogos/departamentos")
                   .permitAll()
                   // El visitante puede leer el foro pero no participar (RN-FOR-09).

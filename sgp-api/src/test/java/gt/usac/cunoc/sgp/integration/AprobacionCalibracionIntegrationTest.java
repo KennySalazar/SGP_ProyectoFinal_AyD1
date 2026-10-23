@@ -149,6 +149,92 @@ class AprobacionCalibracionIntegrationTest {
   }
 
   @Test
+  void completaNombreVisibleDeAprobacionAnteriorSinAlterarRegistroNiVersion() {
+    jdbc.update("UPDATE usuario SET nombre_completo = NULL WHERE id = ?", catedratico);
+    var original = servicio.aprobar(version, catedratico, "Respaldo original");
+    assertThat(original.aprobadoPorNombre()).contains("@");
+    var registro =
+        jdbc.queryForMap("SELECT * FROM aprobacion_calibracion_ic WHERE id = ?", original.id());
+    var formulario = jdbc.queryForMap("SELECT * FROM version_formulario WHERE id = ?", version);
+    var bitacora = jdbc.queryForList("SELECT * FROM auditoria WHERE entidad_id = ?", original.id());
+    jdbc.update(
+        "UPDATE usuario SET nombre_completo = '  Kenny Salazar  ' WHERE id = ?", catedratico);
+
+    var consulta = servicio.consultar(version);
+    assertThat(consulta.aprobadoPorNombre()).isEqualTo("Kenny Salazar");
+    assertThat(consulta.rotulo()).isEqualTo("Aprobada por Kenny Salazar el 22/10/2026");
+    assertThat(consulta.id()).isEqualTo(original.id());
+    assertThat(consulta.aprobadoPorId()).isEqualTo(original.aprobadoPorId());
+    assertThat(consulta.aprobadoEn()).isEqualTo(original.aprobadoEn());
+    assertThat(consulta.observaciones()).isEqualTo(original.observaciones());
+    assertThat(servicio.estado(version).aprobadoPorNombre()).isEqualTo("Kenny Salazar");
+    new TransactionTemplate(transacciones)
+        .executeWithoutResult(
+            estado -> {
+              var detalle =
+                  mapper.toResponse(
+                      versiones.findById(version).orElseThrow(),
+                      List.of(),
+                      List.of(),
+                      AprobacionCalibracionResponse.de(
+                          aprobaciones.findByVersionFormularioId(version).orElseThrow()));
+              assertThat(detalle.aprobacionCalibracion().aprobadoPorNombre())
+                  .isEqualTo("Kenny Salazar");
+              assertThat(detalle.rotuloCalibracion()).isEqualTo(consulta.rotulo());
+            });
+    assertThat(
+            jdbc.queryForMap("SELECT * FROM aprobacion_calibracion_ic WHERE id = ?", original.id()))
+        .isEqualTo(registro);
+    assertThat(jdbc.queryForMap("SELECT * FROM version_formulario WHERE id = ?", version))
+        .isEqualTo(formulario);
+    assertThat(jdbc.queryForList("SELECT * FROM auditoria WHERE entidad_id = ?", original.id()))
+        .isEqualTo(bitacora);
+  }
+
+  @Test
+  void conservaNombreCapturadoAunqueCambieElPerfil() {
+    servicio.aprobar(version, catedratico, null);
+    jdbc.update("UPDATE usuario SET nombre_completo = 'Nombre nuevo' WHERE id = ?", catedratico);
+    assertThat(servicio.consultar(version).aprobadoPorNombre()).isEqualTo("Kenny");
+  }
+
+  @Test
+  void conservaCorreoSiElPerfilHistoricoAunNoTieneNombre() {
+    jdbc.update("UPDATE usuario SET nombre_completo = NULL WHERE id = ?", catedratico);
+    var original = servicio.aprobar(version, catedratico, null);
+    assertThat(servicio.consultar(version).aprobadoPorNombre())
+        .isEqualTo(original.aprobadoPorNombre());
+    jdbc.update("UPDATE usuario SET nombre_completo = '   ' WHERE id = ?", catedratico);
+    assertThat(servicio.estado(version).aprobadoPorNombre())
+        .isEqualTo(original.aprobadoPorNombre());
+  }
+
+  @Test
+  void rotuloSinAprobarCoincideEnVersionYEstadoAunqueNoExistaMarcaProvisional() {
+    for (String reglas :
+        List.of(
+            "{}",
+            "{\"calibracion\":{\"provisional\":false}}",
+            "{\"calibracion\":{\"provisional\":true}}")) {
+      jdbc.update(
+          "UPDATE version_formulario SET reglas_evaluacion_ic = ?::jsonb WHERE id = ?",
+          reglas,
+          version);
+      new TransactionTemplate(transacciones)
+          .executeWithoutResult(
+              estado -> {
+                var detalle =
+                    mapper.toResponse(
+                        versiones.findById(version).orElseThrow(), List.of(), List.of());
+                assertThat(detalle.rotuloCalibracion())
+                    .isEqualTo("Calibracion provisional · sin aprobar");
+                assertThat(detalle.rotuloCalibracion())
+                    .isEqualTo(servicio.estado(version).rotuloCalibracion());
+              });
+    }
+  }
+
+  @Test
   void rechazaBorradorSinRegistrarEfectos() {
     UUID borrador = version("BORRADOR", false, null);
     assertThatThrownBy(() -> servicio.aprobar(borrador, catedratico, null))
