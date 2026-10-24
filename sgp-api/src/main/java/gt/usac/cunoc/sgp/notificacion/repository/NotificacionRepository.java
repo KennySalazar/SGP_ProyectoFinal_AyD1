@@ -13,6 +13,20 @@ import org.springframework.data.repository.query.Param;
 
 public interface NotificacionRepository extends JpaRepository<Notificacion, UUID> {
 
+  @Modifying
+  @Query(
+      value =
+          """
+              INSERT INTO notificacion
+              (id, usuario_id, tipo, titulo, mensaje, entidad, entidad_id, clave_evento, creado_en)
+              VALUES (:#{#aviso.id}, :#{#aviso.usuarioId}, :#{#aviso.tipo}, :#{#aviso.titulo},
+                      :#{#aviso.mensaje}, :#{#aviso.entidad}, :#{#aviso.entidadId},
+                      :#{#aviso.claveEvento}, :#{#aviso.creadoEn})
+              ON CONFLICT (usuario_id, clave_evento) DO NOTHING
+              """,
+      nativeQuery = true)
+  int insertarSiNoExiste(@Param("aviso") Notificacion aviso);
+
   boolean existsByUsuarioIdAndClaveEvento(UUID usuarioId, String claveEvento);
 
   Page<Notificacion> findByUsuarioIdOrderByCreadoEnDesc(UUID usuarioId, Pageable pageable);

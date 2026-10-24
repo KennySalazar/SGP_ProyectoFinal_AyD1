@@ -24,7 +24,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 
 @ExtendWith(MockitoExtension.class)
@@ -59,7 +58,7 @@ class NotificacionServiceTest {
     service.notificar(usuarioId, tipo, titulo, mensaje, entidad, entidadId, claveEvento);
 
     ArgumentCaptor<Notificacion> captor = ArgumentCaptor.forClass(Notificacion.class);
-    verify(notificaciones).save(captor.capture());
+    verify(notificaciones).insertarSiNoExiste(captor.capture());
     Notificacion guardada = captor.getValue();
 
     assertThat(guardada.getUsuarioId()).isEqualTo(usuarioId);
@@ -83,7 +82,7 @@ class NotificacionServiceTest {
 
     service.notificar(usuarioId, "TIPO", "Titulo", "Mensaje", null, null, claveEvento);
 
-    verify(notificaciones, never()).save(any());
+    verify(notificaciones, never()).insertarSiNoExiste(any());
   }
 
   @Test
@@ -93,9 +92,7 @@ class NotificacionServiceTest {
     String claveEvento = "evento:concurrente";
 
     when(notificaciones.existsByUsuarioIdAndClaveEvento(usuarioId, claveEvento)).thenReturn(false);
-    when(notificaciones.save(any(Notificacion.class)))
-        .thenThrow(
-            new DataIntegrityViolationException("duplicate key value violates unique constraint"));
+    when(notificaciones.insertarSiNoExiste(any(Notificacion.class))).thenReturn(0);
 
     // No debe lanzar excepción
     service.notificar(usuarioId, "TIPO", "Titulo", "Mensaje", null, null, claveEvento);

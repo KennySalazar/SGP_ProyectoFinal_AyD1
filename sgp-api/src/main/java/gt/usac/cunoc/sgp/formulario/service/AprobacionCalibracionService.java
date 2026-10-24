@@ -102,10 +102,10 @@ public class AprobacionCalibracionService {
         null,
         json.valueToTree(respuesta),
         "HU-054: aprobacion academica de calibracion IC");
-    for (var admin : usuarios.findByRole_NameAndActiveTrueOrderByEmailAsc(RoleName.ADMINISTRADOR)) {
+    for (var admin : usuarios.findIdsActivosPorRol(RoleName.ADMINISTRADOR)) {
       notificaciones.notificar(
-          admin.getId(),
-          "CALIBRACION_IC_APROBADA",
+          admin,
+          "CALIBRACION_APROBADA",
           "Calibracion del IC aprobada",
           "Se registro una aprobacion academica del IC. Consulte el detalle de la version.",
           "version_formulario",

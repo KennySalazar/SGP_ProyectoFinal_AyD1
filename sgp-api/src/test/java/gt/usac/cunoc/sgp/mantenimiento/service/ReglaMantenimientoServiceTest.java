@@ -74,7 +74,9 @@ class ReglaMantenimientoServiceTest {
             mapper,
             validador,
             objectMapper,
-            clock);
+            clock,
+            org.mockito.Mockito.mock(
+                gt.usac.cunoc.sgp.notificacion.service.AvisosAcademicosService.class));
 
     try (InputStream is =
         new ClassPathResource("formulario/sieca-v1/esquema.schema.json").getInputStream()) {

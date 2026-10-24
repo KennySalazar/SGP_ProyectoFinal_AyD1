@@ -52,6 +52,8 @@ import org.testcontainers.utility.DockerImageName;
     properties = {"app.formulario.siembra.enabled=true", "spring.jpa.hibernate.ddl-auto=validate"})
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @Import({
+  gt.usac.cunoc.sgp.notificacion.service.AvisosAcademicosService.class,
+  gt.usac.cunoc.sgp.notificacion.service.NotificacionService.class,
   VersionFormularioService.class,
   VersionFormularioMapperImpl.class,
   JsonSchemaValidatorService.class,

@@ -41,6 +41,14 @@ public interface ReglaMantenimientoRepository
   int desactivarTodasLasRevisiones(
       @Param("codigo") String codigo, @Param("versionId") UUID versionId);
 
+  @Query(
+      "SELECT DISTINCT r.versionFormulario.id FROM ReglaMantenimiento r WHERE r.activa = true AND (r.validadoPorId IS NULL OR r.validadoEn IS NULL)")
+  List<UUID> findVersionesConReglasPendientes();
+
+  @Query(
+      "SELECT COUNT(r) > 0 FROM ReglaMantenimiento r WHERE r.versionFormulario.id = :versionId AND r.activa = true AND (r.validadoPorId IS NULL OR r.validadoEn IS NULL)")
+  boolean tieneReglasPendientes(@Param("versionId") UUID versionId);
+
   boolean existsByVersionFormularioId(UUID versionFormularioId);
 
   boolean existsByVersionFormularioIdAndActivaTrue(UUID versionFormularioId);
