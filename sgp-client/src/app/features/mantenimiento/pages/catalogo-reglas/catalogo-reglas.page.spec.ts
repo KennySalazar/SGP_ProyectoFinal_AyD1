@@ -3,6 +3,8 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { Pipe, PipeTransform, signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
+import { ActivatedRoute, convertToParamMap } from '@angular/router';
+import { BehaviorSubject } from 'rxjs';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { RoleName, UserSession } from '../../../../core/models/auth.models';
@@ -81,7 +83,10 @@ describe('Catalogo de reglas HU055', () => {
     });
   }
 
+  const parametros = new BehaviorSubject(convertToParamMap({}));
+
   beforeEach(async () => {
+    parametros.next(convertToParamMap({}));
     vi.stubGlobal(
       'ResizeObserver',
       class {
@@ -95,6 +100,7 @@ describe('Catalogo de reglas HU055', () => {
     await TestBed.configureTestingModule({
       imports: [CatalogoReglasPage],
       providers: [
+        { provide: ActivatedRoute, useValue: { queryParamMap: parametros } },
         provideHttpClient(),
         provideHttpClientTesting(),
         provideNoopAnimations(),
@@ -134,6 +140,31 @@ describe('Catalogo de reglas HU055', () => {
       .flush({ content: reglas, totalElements: reglas.length, totalPages: 1, size: 10, number: 0 });
     http.expectOne((r) => r.url === BASE + '/resumen').flush(resumen);
   }
+
+  it('abre la version del aviso aunque no sea la activa y atiende otro aviso en la misma pagina', () => {
+    parametros.next(convertToParamMap({ versionId: 'v2' }));
+    const reglas = http.expectOne((r) => r.url === BASE);
+    expect(reglas.request.params.get('versionId')).toBe('v2');
+    reglas.flush({ content: [], totalElements: 0 });
+    const resumen = http.expectOne((r) => r.url === BASE + '/resumen');
+    expect(resumen.request.params.get('versionId')).toBe('v2');
+    resumen.flush(RESUMEN);
+    expect(page.versionSeleccionadaId()).toBe('v2');
+    parametros.next(convertToParamMap({ versionId: 'v1' }));
+    refrescar();
+    expect(page.versionSeleccionadaId()).toBe('v1');
+  });
+
+  it('no sustituye una version inexistente por la activa', () => {
+    parametros.next(convertToParamMap({ versionId: 'inexistente' }));
+    expect(page.versionSeleccionadaId()).toBeNull();
+    expect(page.reglas()).toEqual([]);
+    expect(page.errorValidacion()).toContain('no esta disponible');
+    http.expectNone((r) => r.url === BASE);
+    page.cambiarVersion('v2');
+    refrescar();
+    expect(page.errorValidacion()).toBeNull();
+  });
 
   function botonValidar(): HTMLButtonElement | null {
     return (fixture.nativeElement as HTMLElement).querySelector(

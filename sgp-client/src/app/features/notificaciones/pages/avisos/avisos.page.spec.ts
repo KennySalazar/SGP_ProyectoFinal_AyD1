@@ -26,6 +26,8 @@ describe('AvisosPage', () => {
   let component: AvisosPage;
 
   const mockStore = {
+    errorLectura: signal(false),
+    abriendoAviso: signal(false),
     unreadCount: signal(2),
     avisos: signal<NotificacionResponse[]>([
       {

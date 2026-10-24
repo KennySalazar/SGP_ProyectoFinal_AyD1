@@ -509,14 +509,21 @@ export class EditorVersionFormularioPage implements OnInit {
     { label: 'NUEVO', value: 'NUEVO' },
     { label: 'ELIMINADO', value: 'ELIMINADO' },
   ];
+  private solicitudDetalle = 0;
   ngOnInit(): void {
-    const id = this.route.snapshot.paramMap.get('id');
-    if (id) {
+    this.route.paramMap.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((params) => {
+      const id = params.get('id');
+      if (!id || id === this.versionId()) return;
       this.versionId.set(id);
+      this.version.set(null);
+      this.analisisMapeo.set(null);
+      this.mapeosEditables.set([]);
+      this.esquemaOrigenMapeo.set(null);
       this.cargarDetalle(id);
-    }
+    });
   }
   cargarDetalle(id: string): void {
+    const solicitud = ++this.solicitudDetalle;
     this.cargando.set(true);
     this.mensajeExito.set(null);
     this.errorValidacion.set(null);
@@ -524,10 +531,13 @@ export class EditorVersionFormularioPage implements OnInit {
       .obtenerPorId(id)
       .pipe(
         takeUntilDestroyed(this.destroyRef),
-        finalize(() => this.cargando.set(false)),
+        finalize(() => {
+          if (solicitud === this.solicitudDetalle) this.cargando.set(false);
+        }),
       )
       .subscribe({
         next: (ver) => {
+          if (solicitud !== this.solicitudDetalle) return;
           this.version.set(ver);
           this.esquemaTexto.set(JSON.stringify(ver.esquema ?? {}, null, 2));
           this.vinculosTexto.set(JSON.stringify(ver.vinculosAlmacenamiento ?? {}, null, 2));
@@ -550,15 +560,20 @@ export class EditorVersionFormularioPage implements OnInit {
               .pipe(takeUntilDestroyed(this.destroyRef))
               .subscribe({
                 next: (anterior) => {
-                  if (this.version()?.id === id) this.esquemaOrigenMapeo.set(anterior.esquema);
+                  if (solicitud === this.solicitudDetalle)
+                    this.esquemaOrigenMapeo.set(anterior.esquema);
                 },
-                error: () => this.esquemaOrigenMapeo.set(null),
+                error: () => {
+                  if (solicitud === this.solicitudDetalle) this.esquemaOrigenMapeo.set(null);
+                },
               });
             this.cargarAnalisisMapeos(id);
           }
         },
-        error: (err) =>
-          this.errorValidacion.set(mensajeCalibracion(err, (k) => this.transloco.translate(k))),
+        error: (err) => {
+          if (solicitud === this.solicitudDetalle)
+            this.errorValidacion.set(mensajeCalibracion(err, (k) => this.transloco.translate(k)));
+        },
       });
   }
   cargarAnalisisMapeos(id: string): void {
@@ -567,6 +582,7 @@ export class EditorVersionFormularioPage implements OnInit {
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (analisis) => {
+          if (this.versionId() !== id) return;
           this.analisisMapeo.set(analisis);
           this.mapeosEditables.set(
             analisis.mapeosDeclarados.map((m) => ({

@@ -12,7 +12,9 @@
     <p class="page-description">{{ 'avisos.description' | transloco }}</p>
   </header>
 
-  @if (store.sinConexionAviso()) {
+  @if (store.errorLectura()) {
+  <div role="alert">{{ 'avisos.readError' | transloco }}</div>
+  } @if (store.sinConexionAviso()) {
   <div class="offline-alert" role="status">
     <i class="pi pi-wifi" aria-hidden="true"></i>
     <span>{{ 'avisos.offlineNotice' | transloco }}</span>
@@ -56,6 +58,7 @@
           type="button"
           class="aviso-row"
           [class.no-leido]="!aviso.leido"
+          [disabled]="store.abriendoAviso()"
           role="listitem"
           (click)="onAvisoClick(aviso)"
         >

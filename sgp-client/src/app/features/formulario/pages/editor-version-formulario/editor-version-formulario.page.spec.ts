@@ -7,9 +7,9 @@ import { CalibracionAdicionalComponent } from './calibracion-adicional/calibraci
 import { ReglasIcComponent } from './reglas-ic/reglas-ic.component';
 import { Pipe, PipeTransform } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { ActivatedRoute, provideRouter, Router } from '@angular/router';
+import { ActivatedRoute, convertToParamMap, provideRouter, Router } from '@angular/router';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
-import { of, throwError, Subject } from 'rxjs';
+import { BehaviorSubject, of, throwError, Subject } from 'rxjs';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiErrorService } from '../../../../core/services/api-error.service';
 import { VersionFormulario } from '../../models/formulario.models';
@@ -73,7 +73,9 @@ describe('EditorVersionFormularioPage', () => {
     ],
     mapeos: [],
   };
+  const parametros = new BehaviorSubject(convertToParamMap({ id: 'v-1' }));
   beforeEach(async () => {
+    parametros.next(convertToParamMap({ id: 'v-1' }));
     apiMock = {
       obtenerPorId: vi.fn().mockReturnValue(of(mockVersion)),
       actualizarBorrador: vi.fn().mockReturnValue(of(mockVersion)),
@@ -125,7 +127,7 @@ describe('EditorVersionFormularioPage', () => {
         },
         {
           provide: ActivatedRoute,
-          useValue: { snapshot: { paramMap: { get: () => 'v-1' } } },
+          useValue: { paramMap: parametros },
         },
         { provide: FormularioApiService, useValue: apiMock },
         {
@@ -156,6 +158,25 @@ describe('EditorVersionFormularioPage', () => {
     component = fixture.componentInstance;
     fixture.detectChanges();
   });
+  it('carga otra version al abrir un aviso desde el mismo editor', () => {
+    apiMock.obtenerPorId.mockReturnValue(of({ ...mockVersion, id: 'v-2' }));
+    parametros.next(convertToParamMap({ id: 'v-2' }));
+    expect(apiMock.obtenerPorId).toHaveBeenLastCalledWith('v-2');
+    expect(component.versionId()).toBe('v-2');
+    expect(component.version()?.id).toBe('v-2');
+  });
+
+  it('ignora una respuesta tardia de la version del aviso anterior', () => {
+    const anterior = new Subject<VersionFormulario>();
+    apiMock.obtenerPorId.mockReturnValueOnce(anterior);
+    parametros.next(convertToParamMap({ id: 'v-lenta' }));
+    apiMock.obtenerPorId.mockReturnValue(of({ ...mockVersion, id: 'v-2' }));
+    parametros.next(convertToParamMap({ id: 'v-2' }));
+    anterior.next({ ...mockVersion, id: 'v-lenta' });
+    anterior.complete();
+    expect(component.version()?.id).toBe('v-2');
+  });
+
   it('debe crearse y cargar el detalle de la versión', () => {
     expect(component).toBeTruthy();
     expect(apiMock.obtenerPorId).toHaveBeenCalledWith('v-1');
@@ -353,7 +374,7 @@ describe('EditorVersionFormularioPage', () => {
   });
   it('muestra elementos del catalogo aunque no tengan pesos guardados', () => {
     apiMock.obtenerPorId.mockReturnValue(of({ ...mockVersion, pesos: [] }));
-    component.ngOnInit();
+    component.cargarDetalle('v-1');
     expect(component.pesosEditables()).toEqual([
       { elementoRef: '/vigas', descripcion: 'Vigas', peso: null },
     ]);
