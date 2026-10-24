@@ -11,6 +11,8 @@
     <i class="pi pi-check-circle" aria-hidden="true"></i>
     <span>{{ mensajeExito() }}</span>
   </div>
+  } @if (errorValidacion() && !reglaPorValidar()) {
+  <div class="alert-warning" role="alert">{{ errorValidacion() }}</div>
   }
 
   <!-- Advertencia de versión sin reglas activas -->
@@ -255,11 +257,14 @@
                 <span>Provisional</span>
               </span>
               } @else {
-              <span class="badge-validacion validada" title="Validada por catedrático">
+              <span class="badge-validacion validada" [title]="regla.rotuloValidacion">
                 <i class="pi pi-check-circle" aria-hidden="true"></i>
                 <span>Validada</span>
               </span>
               }
+              <span class="rotulo-validacion"
+                >{{ regla.rotuloValidacion || regla.estadoValidacion }}</span
+              >
             </td>
             <td class="col-estado-celda text-center">
               <p-tag
@@ -282,7 +287,7 @@
                   <i class="pi pi-eye" aria-hidden="true"></i>
                 </button>
 
-                @if (esAdmin) { @if (regla.provisional) {
+                @if (puedeValidar(regla)) {
                 <button
                   pButton
                   type="button"
@@ -291,12 +296,12 @@
                   class="btn-accion"
                   [attr.aria-label]="'mantenimiento.validar' | transloco"
                   [title]="'mantenimiento.validar' | transloco"
+                  [disabled]="validando()"
                   (click)="abrirValidar(regla)"
                 >
                   <i class="pi pi-check" aria-hidden="true"></i>
                 </button>
-                }
-
+                } @if (esAdmin) {
                 <button
                   pButton
                   type="button"
@@ -398,9 +403,7 @@
     <div class="detalle-campo full">
       <span class="label">Estado de Validación</span>
       <p-tag [value]="regla.estadoValidacion" [severity]="regla.provisional ? 'warn' : 'success'" />
-      @if (regla.validadoEn) {
-      <small class="block mt-1 text-gray-500">Validado en: {{ regla.validadoEn }}</small>
-      }
+      <p class="rotulo-validacion">{{ regla.rotuloValidacion || regla.estadoValidacion }}</p>
     </div>
     <div class="detalle-campo">
       <span class="label">Estado Operativo</span>
@@ -662,11 +665,15 @@
 <p-dialog
   [header]="'mantenimiento.dialogValidarTitulo' | transloco"
   [visible]="reglaPorValidar() !== null"
-  (visibleChange)="reglaPorValidar.set(null)"
+  (visibleChange)="cerrarValidar()"
+  [closable]="!validando()"
+  [closeOnEscape]="!validando()"
   [modal]="true"
   [style]="{ width: '500px', maxWidth: '95vw' }"
 >
-  @if (reglaPorValidar(); as regla) {
+  @if (reglaPorValidar(); as regla) { @if (errorValidacion()) {
+  <div class="alert-warning" role="alert">{{ errorValidacion() }}</div>
+  }
   <p>
     ¿Desea marcar como validada la regla
     <strong>{{ regla.codigo }} (Rev. {{ regla.numeroRevision }})</strong>?
@@ -681,7 +688,8 @@
       pButton
       type="button"
       class="p-button-outlined p-button-secondary"
-      (click)="reglaPorValidar.set(null)"
+      [disabled]="validando()"
+      (click)="cerrarValidar()"
     >
       <span>{{ 'mantenimiento.cancelar' | transloco }}</span>
     </button>
@@ -689,7 +697,7 @@
       pButton
       type="button"
       class="p-button-success"
-      [disabled]="guardando()"
+      [disabled]="validando() || !esCatedratico"
       (click)="confirmarValidar()"
     >
       <i class="pi pi-check" aria-hidden="true"></i>

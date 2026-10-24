@@ -16,7 +16,13 @@ describe('Característica: API de catálogo de reglas de mantenimiento', () => {
     http = TestBed.inject(HttpTestingController);
   });
 
-  afterEach(() => http.verify());
+  afterEach(() => {
+    try {
+      http.verify();
+    } finally {
+      TestBed.resetTestingModule();
+    }
+  });
 
   it('Escenario: listar combina tipo, elemento, activa y paginación', () => {
     api
@@ -42,11 +48,23 @@ describe('Característica: API de catálogo de reglas de mantenimiento', () => {
   });
 
   it('Escenario: validar regla ejecuta POST al endpoint de validación', () => {
-    api.validar('regla-123').subscribe();
+    const respuesta = {
+      id: 'regla-123',
+      provisional: false,
+      estadoValidacion: 'Validada',
+      validadoPorId: 'docente-1',
+      validadoPorNombre: 'Kenny Salazar',
+      validadoEn: '2026-10-24T02:30:00Z',
+      rotuloValidacion: 'Validada por Kenny Salazar el 23/10/2026',
+    };
+    let resultado: unknown;
+    api.validar('regla-123').subscribe((regla) => (resultado = regla));
 
     const req = http.expectOne('/api/v1/reglas-mantenimiento/regla-123/validar');
     expect(req.request.method).toBe('POST');
-    req.flush({ id: 'regla-123', provisional: false, estadoValidacion: 'Validada' });
+    expect(req.request.body).toBeNull();
+    req.flush(respuesta);
+    expect(resultado).toEqual(respuesta);
   });
 
   it('Escenario: cambiar estado ejecuta PATCH con valor booleano', () => {
@@ -82,5 +100,13 @@ describe('Característica: API de catálogo de reglas de mantenimiento', () => {
       totalValidadas: 0,
       advertenciaSinReglasActivas: null,
     });
+  });
+  it('validar codifica el ID y propaga el conflicto de revision no vigente', () => {
+    let estado: number | undefined;
+    api.validar('regla/1').subscribe({ error: (err) => (estado = err.status) });
+    http
+      .expectOne('/api/v1/reglas-mantenimiento/regla%2F1/validar')
+      .flush({ code: 'regla_no_vigente' }, { status: 409, statusText: 'Conflict' });
+    expect(estado).toBe(409);
   });
 });

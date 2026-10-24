@@ -112,6 +112,10 @@ export class CatalogoReglasPage implements OnInit {
   readonly cargando = signal(false);
   readonly guardando = signal(false);
   readonly sembrando = signal(false);
+  readonly validando = signal(false);
+  readonly errorValidacion = signal<string | null>(null);
+  private solicitudReglas = 0;
+  private solicitudResumen = 0;
   readonly mensajeExito = signal<string | null>(null);
   readonly errorOperacion = signal<string | null>(null);
 
@@ -203,17 +207,23 @@ export class CatalogoReglasPage implements OnInit {
   }
 
   cargarResumen(): void {
+    const solicitud = ++this.solicitudResumen;
     const vId = this.versionSeleccionadaId();
     this.api
       .obtenerResumen(vId || undefined)
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
-        next: (data) => this.resumen.set(data),
-        error: () => this.resumen.set(null),
+        next: (data) => {
+          if (solicitud === this.solicitudResumen) this.resumen.set(data);
+        },
+        error: () => {
+          if (solicitud === this.solicitudResumen) this.resumen.set(null);
+        },
       });
   }
 
   cargarReglas(): void {
+    const solicitud = ++this.solicitudReglas;
     this.cargando.set(true);
     this.errorOperacion.set(null);
 
@@ -227,15 +237,19 @@ export class CatalogoReglasPage implements OnInit {
         tamanio: this.tamanioPagina(),
       })
       .pipe(
-        finalize(() => this.cargando.set(false)),
+        finalize(() => {
+          if (solicitud === this.solicitudReglas) this.cargando.set(false);
+        }),
         takeUntilDestroyed(this.destroyRef),
       )
       .subscribe({
         next: (pagina) => {
+          if (solicitud !== this.solicitudReglas) return;
           this.reglas.set(pagina.content);
           this.totalElementos.set(pagina.totalElements);
         },
         error: (err) => {
+          if (solicitud !== this.solicitudReglas) return;
           this.apiErrors.normalize(err);
         },
       });
@@ -274,6 +288,7 @@ export class CatalogoReglasPage implements OnInit {
   }
 
   abrirCrear(): void {
+    if (!this.esAdmin || this.guardando()) return;
     this.errorOperacion.set(null);
     this.formCrear.reset({
       codigo: '',
@@ -291,6 +306,7 @@ export class CatalogoReglasPage implements OnInit {
   }
 
   guardarCrear(): void {
+    if (!this.esAdmin || this.guardando()) return;
     if (this.formCrear.invalid) {
       this.formCrear.markAllAsTouched();
       return;
@@ -349,6 +365,7 @@ export class CatalogoReglasPage implements OnInit {
   }
 
   abrirEditar(regla: ReglaMantenimiento): void {
+    if (!this.esAdmin || this.guardando()) return;
     this.reglaPorEditar.set(regla);
     this.errorOperacion.set(null);
 
@@ -370,6 +387,7 @@ export class CatalogoReglasPage implements OnInit {
   }
 
   guardarEditar(): void {
+    if (!this.esAdmin || this.guardando()) return;
     const regla = this.reglaPorEditar();
     if (!regla || this.formEditar.invalid) {
       this.formEditar.markAllAsTouched();
@@ -430,40 +448,61 @@ export class CatalogoReglasPage implements OnInit {
       });
   }
 
+  puedeValidar(regla: ReglaMantenimiento): boolean {
+    return this.esCatedratico && regla.activa && regla.provisional;
+  }
+
   abrirValidar(regla: ReglaMantenimiento): void {
+    if (!this.puedeValidar(regla) || this.validando()) return;
+    this.errorValidacion.set(null);
+    this.mensajeExito.set(null);
     this.reglaPorValidar.set(regla);
+  }
+
+  cerrarValidar(): void {
+    if (!this.validando()) this.reglaPorValidar.set(null);
   }
 
   confirmarValidar(): void {
     const regla = this.reglaPorValidar();
-    if (!regla) return;
+    if (!regla || !this.puedeValidar(regla) || this.validando()) return;
 
-    this.guardando.set(true);
+    this.validando.set(true);
+    this.errorValidacion.set(null);
     this.api
       .validar(regla.id)
       .pipe(
-        finalize(() => {
-          this.guardando.set(false);
-          this.reglaPorValidar.set(null);
-        }),
+        finalize(() => this.validando.set(false)),
         takeUntilDestroyed(this.destroyRef),
       )
       .subscribe({
         next: (validada) => {
-          this.mensajeExito.set(`Regla ${validada.codigo} validada exitosamente`);
+          this.reglas.update((reglas) => reglas.map((r) => (r.id === validada.id ? validada : r)));
+          if (this.reglaDetalle()?.id === validada.id) this.reglaDetalle.set(validada);
+          this.reglaPorValidar.set(null);
+          this.mensajeExito.set(validada.rotuloValidacion || validada.estadoValidacion);
           this.cargarReglas();
           this.cargarResumen();
-          setTimeout(() => this.mensajeExito.set(null), 5000);
         },
-        error: (err) => this.apiErrors.normalize(err),
+        error: (err) => {
+          this.errorValidacion.set(this.apiErrors.normalize(err));
+          if (err.status === 409 || err.status === 404) {
+            this.reglaPorValidar.set(null);
+            if (this.reglaDetalle()?.id === regla.id) this.reglaDetalle.set(null);
+            this.cargarReglas();
+            this.cargarResumen();
+          }
+        },
       });
   }
 
   abrirCambiarEstado(regla: ReglaMantenimiento): void {
+    if (!this.esAdmin || this.guardando()) return;
     this.reglaPorCambiarEstado.set(regla);
   }
 
   confirmarCambiarEstado(): void {
+    if (!this.esAdmin || this.guardando()) return;
     const regla = this.reglaPorCambiarEstado();
     if (!regla) return;
 
@@ -493,6 +532,7 @@ export class CatalogoReglasPage implements OnInit {
   }
 
   sembrarCatalogo(): void {
+    if (!this.esAdmin || this.sembrando()) return;
     const vId = this.versionSeleccionadaId();
     if (!vId) return;
 

@@ -307,8 +307,8 @@
   }
 
   .col-validacion {
-    width: 8.5rem;
-    min-width: 8.5rem;
+    width: 14rem;
+    min-width: 14rem;
     text-align: center;
   }
 
@@ -649,4 +649,12 @@
       grid-column: span 1;
     }
   }
+}
+
+.rotulo-validacion {
+  display: block;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  margin-top: 0.35rem;
+  font-size: 0.75rem;
 }
