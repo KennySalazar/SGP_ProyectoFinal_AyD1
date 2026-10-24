@@ -94,6 +94,7 @@
               {{ p.indiceCondicionActual !== null ? p.indiceCondicionActual :
               ('puentes.ficha.notAvailable' | transloco) }}
             </span>
+            <app-respaldo-ic [puente]="p" />
           </div>
           <div class="condicion-bloque">
             <span class="dato-etiqueta">{{ 'puentes.ficha.lastInspection' | transloco }}</span>

@@ -1,3 +1,4 @@
+import { RespaldoIcComponent } from '../../components/respaldo-ic/respaldo-ic.component';
 import { SincronizacionService } from '../../../../offline/services/sincronizacion.service';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
@@ -146,6 +147,10 @@ describe('FichaPuentePage', () => {
       ],
     });
 
+    TestBed.overrideComponent(RespaldoIcComponent, {
+      remove: { imports: [TranslocoPipe] },
+      add: { imports: [TraduccionTestPipe] },
+    });
     TestBed.overrideComponent(FichaPuentePage, {
       remove: {
         imports: [
