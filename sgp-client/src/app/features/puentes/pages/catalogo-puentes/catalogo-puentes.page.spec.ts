@@ -1,3 +1,4 @@
+import { RespaldoIcComponent } from '../../components/respaldo-ic/respaldo-ic.component';
 import { SincronizacionService } from '../../../../offline/services/sincronizacion.service';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
@@ -36,6 +37,10 @@ describe('Base compartida del catálogo HU014', () => {
         provideRouter([]),
         { provide: TranslocoService, useValue: { translate: (key: string) => key } },
       ],
+    });
+    TestBed.overrideComponent(RespaldoIcComponent, {
+      remove: { imports: [TranslocoPipe] },
+      add: { imports: [TraduccionTestPipe] },
     });
     TestBed.overrideComponent(MapaPuentesComponent, { set: { template: '', imports: [] } });
     TestBed.overrideComponent(CatalogoPuentesPage, {
@@ -639,6 +644,10 @@ describe('Baja lógica y reactivación de puentes por administrador', () => {
           },
         },
       ],
+    });
+    TestBed.overrideComponent(RespaldoIcComponent, {
+      remove: { imports: [TranslocoPipe] },
+      add: { imports: [TraduccionTestPipe] },
     });
     TestBed.overrideComponent(CatalogoPuentesPage, {
       remove: { imports: [TranslocoPipe] },

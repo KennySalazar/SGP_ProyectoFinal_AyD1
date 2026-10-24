@@ -1,5 +1,10 @@
+import { RespaldoIcComponent } from '../../../components/respaldo-ic/respaldo-ic.component';
 import {
   AfterViewInit,
+  ApplicationRef,
+  ComponentRef,
+  EnvironmentInjector,
+  createComponent,
   ChangeDetectionStrategy,
   Component,
   ElementRef,
@@ -40,6 +45,9 @@ export class MapaPuentesComponent implements AfterViewInit, OnChanges, OnDestroy
     Malo: 'pi-times',
     'Sin evaluar': 'pi-question',
   };
+  private readonly aplicacion = inject(ApplicationRef);
+  private readonly entorno = inject(EnvironmentInjector);
+  private readonly respaldos = new Set<ComponentRef<RespaldoIcComponent>>();
   private readonly traducciones = inject(TranslocoService);
   @ViewChild('contenedor', { static: true }) private contenedor!: ElementRef<HTMLDivElement>;
   private mapa?: Map;
@@ -124,9 +132,28 @@ export class MapaPuentesComponent implements AfterViewInit, OnChanges, OnDestroy
       icono.className = `pi ${this.iconos[puente.estadoActual]}`;
       icono.setAttribute('aria-hidden', 'true');
       boton.append(icono);
+      const contenido = this.contenidoPopup(puente);
       const popup = new this.libreria.Popup({ offset: 24, maxWidth: '280px' }).setDOMContent(
-        this.contenidoPopup(puente),
+        contenido,
       );
+      if (puente.indiceCondicionActual != null) {
+        let respaldo: ComponentRef<RespaldoIcComponent> | null = null;
+        popup.on('open', () => {
+          if (respaldo || this.destruido) return;
+          respaldo = createComponent(RespaldoIcComponent, { environmentInjector: this.entorno });
+          respaldo.setInput('puente', puente);
+          this.aplicacion.attachView(respaldo.hostView);
+          contenido.append(respaldo.location.nativeElement);
+          this.respaldos.add(respaldo);
+        });
+        popup.on('close', () => {
+          if (!respaldo) return;
+          this.aplicacion.detachView(respaldo.hostView);
+          this.respaldos.delete(respaldo);
+          respaldo.destroy();
+          respaldo = null;
+        });
+      }
       const marcador = new this.libreria.Marker({ element: boton })
         .setLngLat([longitud, latitud])
         .setPopup(popup)
@@ -171,6 +198,11 @@ export class MapaPuentesComponent implements AfterViewInit, OnChanges, OnDestroy
   private limpiarMarcadores(): void {
     this.popups.forEach((popup) => popup.remove());
     this.marcadores.forEach((marcador) => marcador.remove());
+    for (const respaldo of this.respaldos) {
+      this.aplicacion.detachView(respaldo.hostView);
+      respaldo.destroy();
+    }
+    this.respaldos.clear();
     this.popups = [];
     this.marcadores = [];
   }

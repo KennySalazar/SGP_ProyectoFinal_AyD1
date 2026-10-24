@@ -1,3 +1,4 @@
+import { RespaldoIcComponent } from '../../components/respaldo-ic/respaldo-ic.component';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -31,6 +32,7 @@ import { PuenteApiService } from '../../services/puente-api.service';
   selector: 'app-ficha-puente-page',
   standalone: true,
   imports: [
+    RespaldoIcComponent,
     NgTemplateOutlet,
     DatePipe,
     PaginatorModule,

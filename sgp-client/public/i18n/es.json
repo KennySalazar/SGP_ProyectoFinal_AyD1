@@ -1014,6 +1014,13 @@
       "note": "Al guardar correctamente volveras al catalogo de puentes.",
       "cancel": "Seguir editando",
       "confirm": "Si, guardar cambios"
+    },
+    "respaldo": {
+      "unavailable": "Respaldo de calibracion no disponible.",
+      "refresh": "El IC vigente cambio. Recargue el puente para consultar su respaldo.",
+      "loading": "Consultando respaldo de calibracion...",
+      "error": "No se pudo consultar el respaldo de calibracion.",
+      "retry": "Reintentar"
     }
   },
   "auditoria": {

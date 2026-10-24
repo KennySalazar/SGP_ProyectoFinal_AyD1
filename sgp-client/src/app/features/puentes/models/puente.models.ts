@@ -106,6 +106,7 @@ export interface PuenteResponse {
   activo: boolean;
   estadoActual: string;
   indiceCondicionActual: number | null;
+  versionFormularioIdIcVigente?: string | null;
   fechaUltimaInspeccion: string | null;
   creadoEn: string;
 }
@@ -123,6 +124,7 @@ export interface PuenteCatalogoResponse {
   activo: boolean;
   estadoActual: EstadoPuente;
   indiceCondicionActual?: number | null;
+  versionFormularioIdIcVigente?: string | null;
   fechaUltimaInspeccion?: string | null;
 }
 
