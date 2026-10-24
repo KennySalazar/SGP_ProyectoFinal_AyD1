@@ -1,3 +1,5 @@
+import { TestBed } from '@angular/core/testing';
+import { AuthStore } from '../core/services/auth.store';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { sgpDb, LocalInspection, LocalFormSchema, SyncQueueItem } from './db/sgp-db';
 import {
@@ -76,9 +78,11 @@ describe('HU-042: Inspecciones Locales y Recuperación tras Recarga', () => {
       () => Promise.resolve([...esquemasMemoria.values()]) as never,
     );
     vi.spyOn(sgpDb.esquemas_formulario, 'toCollection').mockReturnValue({
-      modify: async (changes: Partial<LocalFormSchema>) => {
-        for (const [id, schema] of esquemasMemoria)
-          esquemasMemoria.set(id, { ...schema, ...changes });
+      modify: async (changes: Partial<LocalFormSchema> | ((schema: LocalFormSchema) => void)) => {
+        for (const [id, schema] of esquemasMemoria) {
+          if (typeof changes === 'function') changes(schema);
+          else esquemasMemoria.set(id, { ...schema, ...changes });
+        }
         return esquemasMemoria.size;
       },
     } as never);
@@ -109,7 +113,10 @@ describe('HU-042: Inspecciones Locales y Recuperación tras Recarga', () => {
       } as never;
     }) as never);
 
-    service = new InspeccionesLocalesService();
+    TestBed.configureTestingModule({
+      providers: [{ provide: AuthStore, useValue: { user: () => ({ id: 'user-1' }) } }],
+    });
+    service = TestBed.inject(InspeccionesLocalesService);
   });
 
   afterEach(() => {
@@ -131,7 +138,7 @@ describe('HU-042: Inspecciones Locales y Recuperación tras Recarga', () => {
 
     const res = await service.iniciarInspeccionLocal(
       req,
-      'user-uuid-1',
+      'user-1',
       'ESTUDIANTE',
       'Inspector Local',
       'Puente Los Altos',
@@ -153,9 +160,9 @@ describe('HU-042: Inspecciones Locales y Recuperación tras Recarga', () => {
     expect(local?.sincronizado).toBe(false);
     const operacion = [...colaMemoria.values()][0];
     expect(operacion?.operacion).toBe('CREAR_INSPECCION');
-    expect(operacion?.propietarioId).toBe('user-uuid-1');
+    expect(operacion?.propietarioId).toBe('user-1');
     expect(operacion?.idempotencyKey).toBe(req.id);
-    expect(local?.propietarioId).toBe('user-uuid-1');
+    expect(local?.propietarioId).toBe('user-1');
 
     const payload = local?.payload as BorradorLocalPayload;
     expect(payload.borrador.version).toBe(0);
@@ -170,7 +177,7 @@ describe('HU-042: Inspecciones Locales y Recuperación tras Recarga', () => {
     const initialItem: LocalInspection = {
       id: inspeccionId,
       puenteId: 'bridge-123',
-      propietarioId: 'user-uuid-1',
+      propietarioId: 'user-1',
       estado: 'BORRADOR',
       actualizadoEn: new Date().toISOString(),
       sincronizado: false,
@@ -182,7 +189,7 @@ describe('HU-042: Inspecciones Locales y Recuperación tras Recarga', () => {
           nombrePuente: 'Puente Los Altos',
           versionFormularioId: 'v1',
           codigoVersionFormulario: 'v1',
-          autorId: 'user-uuid-1',
+          autorId: 'user-1',
           rolAutor: 'ESTUDIANTE',
           nombreAutor: 'Estudiante 1',
           estado: 'BORRADOR',
@@ -204,7 +211,7 @@ describe('HU-042: Inspecciones Locales y Recuperación tras Recarga', () => {
         },
         versionFormularioId: 'v1',
         dispositivoId: 'dev-1',
-        autorId: 'user-uuid-1',
+        autorId: 'user-1',
       },
     };
 
@@ -578,7 +585,7 @@ describe('HU-042: Inspecciones Locales y Recuperación tras Recarga', () => {
 
     await service.guardarEsquemaLocal({ ...esquema, id: 'version-sieca-4', version: '4.0' });
     expect((await service.obtenerEsquemaLocal(esquema.id))?.activo).toBe(false);
-    expect((await service.obtenerEsquemaActivoLocal())?.id).toBe('version-sieca-4');
+    expect((await service.obtenerEsquemaActivoLocal())?.origenId).toBe('version-sieca-4');
   });
 
   it('guarda puentes consultados para volver a seleccionarlos sin conexión', async () => {
@@ -589,7 +596,13 @@ describe('HU-042: Inspecciones Locales y Recuperación tras Recarga', () => {
     });
 
     expect(await service.obtenerPuentesPreparados()).toEqual([
-      { id: 'bridge-local', codigo: 'P-001', payload: { nombre: 'Puente local' } },
+      {
+        id: 'cache:user-1:bridge-local',
+        origenId: 'bridge-local',
+        propietarioId: 'user-1',
+        codigo: 'P-001',
+        payload: { nombre: 'Puente local' },
+      },
     ]);
   });
 

@@ -1,5 +1,7 @@
+import { LocalInspection } from '../../../../offline/db/sgp-db';
+import { SincronizacionService } from '../../../../offline/services/sincronizacion.service';
+import { TranslocoService } from '@jsverse/transloco';
 import { AprobacionCalibracionComponent } from '../../../formulario/components/aprobacion-calibracion/aprobacion-calibracion.component';
-import { mensajeCampo } from '../../utils/nombre-campo';
 import { esResultadoIncierto } from '../../services/operacion-idempotente.service';
 import {
   ChangeDetectionStrategy,
@@ -7,6 +9,7 @@ import {
   DestroyRef,
   OnInit,
   computed,
+  effect,
   inject,
   signal,
   viewChild,
@@ -80,6 +83,10 @@ import { ResultadoRevisionComponent } from '../../../revision/components/resulta
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class CompletarInspeccionPage implements OnInit {
+  private readonly sync = inject(SincronizacionService);
+  private readonly i18n = inject(TranslocoService);
+  readonly intencionFinal = signal<LocalInspection['intencionFinal']>(undefined);
+  private escrituraLocal: Promise<unknown> = Promise.resolve();
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly inspeccionApi = inject(InspeccionApiService);
@@ -113,11 +120,18 @@ export class CompletarInspeccionPage implements OnInit {
   readonly fechaInspeccion = signal<string>('');
   readonly esSoloLocal = signal(false);
   readonly errorAlmacenamiento = signal<string | null>(null);
+  readonly icVisible = computed(() => (this.esOffline() ? null : this.borrador()?.icPreliminar));
   readonly esOffline = computed(() => !this.connectivity.online());
   readonly hoy = new Date().toISOString().slice(0, 10);
   readonly soloLectura = computed(() => {
     const borrador = this.borrador();
-    return !!borrador && borrador.autorId !== this.auth.user()?.id;
+    return (
+      !!borrador &&
+      (borrador.autorId !== this.auth.user()?.id ||
+        borrador.estado !== 'BORRADOR' ||
+        this.intencionFinal()?.estado === 'PENDIENTE' ||
+        this.intencionFinal()?.estado === 'CONFIRMADA')
+    );
   });
 
   readonly confirmandoAccion = signal(false);
@@ -173,6 +187,28 @@ export class CompletarInspeccionPage implements OnInit {
     return iniciales;
   });
   constructor() {
+    effect(() => {
+      const usuario = this.auth.user()?.id;
+      if (this.borrador() && this.borrador()?.autorId !== usuario) {
+        this.borrador.set(null);
+        this.datosIniciales.set(null);
+        this.esquema.set(null);
+        this.intencionFinal.set(undefined);
+        this.resultadoAccion.set(null);
+        this.errorAccion.set(null);
+      }
+    });
+    this.inspeccionesLocales
+      .observarInspeccion(this.route.snapshot.paramMap.get('id') ?? '')
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe((local) => {
+        if (local?.propietarioId !== this.auth.user()?.id) return;
+        this.intencionFinal.set(local?.intencionFinal);
+        if (local?.intencionFinal?.estado === 'CONFIRMADA') {
+          this.resultadoAccion.set(local.intencionFinal.resultado ?? null);
+          this.borrador.update((b) => (b ? { ...b, estado: local.estado } : b));
+        }
+      });
     this.cambios.pipe(debounceTime(1200), takeUntilDestroyed(this.destroyRef)).subscribe(() => {
       this.guardarBorrador(false);
     });
@@ -212,6 +248,7 @@ export class CompletarInspeccionPage implements OnInit {
     local: Awaited<ReturnType<InspeccionesLocalesService['obtenerInspeccionLocal']>>,
   ): void {
     if (local && local.payload) {
+      this.intencionFinal.set(local.intencionFinal);
       if (!local.sincronizado) {
         this.esSoloLocal.set(true);
       }
@@ -260,6 +297,11 @@ export class CompletarInspeccionPage implements OnInit {
       }
     }
 
+    if (!this.connectivity.online()) {
+      this.cargando.set(false);
+      this.errorCarga.set(this.i18n.translate('offline.hu061.noLocal'));
+      return;
+    }
     // Si no está local o no hay Dexie disponible, acudir a la API
     this.inspeccionApi
       .obtenerBorrador(id, true)
@@ -335,16 +377,8 @@ export class CompletarInspeccionPage implements OnInit {
             this.esquema.set(localSchema.schema as EsquemaJson);
             this.cargando.set(false);
           } else {
-            this.inspeccionesLocales.obtenerEsquemaActivoLocal().then((activo) => {
-              if (activo && activo.schema) {
-                this.esquema.set(activo.schema as EsquemaJson);
-              } else {
-                this.errorCarga.set(
-                  'No fue posible obtener el esquema del formulario para esta inspección.',
-                );
-              }
-              this.cargando.set(false);
-            });
+            this.errorCarga.set(this.i18n.translate('offline.hu061.noSchema'));
+            this.cargando.set(false);
           }
         },
         () => {
@@ -378,27 +412,8 @@ export class CompletarInspeccionPage implements OnInit {
               this.cargando.set(false);
               return;
             }
-            this.formularioApi
-              .obtenerActiva()
-              .pipe(takeUntilDestroyed(this.destroyRef))
-              .subscribe({
-                next: (activa) => {
-                  this.esquema.set(activa.esquema as EsquemaJson);
-                  void this.inspeccionesLocales.guardarEsquemaLocal({
-                    id: activa.id,
-                    version: String(activa.version),
-                    schema: activa.esquema,
-                    activo: true,
-                  });
-                  this.cargando.set(false);
-                },
-                error: () => {
-                  this.cargando.set(false);
-                  this.errorCarga.set(
-                    'No fue posible obtener el esquema del formulario para esta inspección.',
-                  );
-                },
-              });
+            this.errorCarga.set(this.i18n.translate('offline.hu061.noSchema'));
+            this.cargando.set(false);
           });
         },
       });
@@ -501,7 +516,7 @@ export class CompletarInspeccionPage implements OnInit {
       this.connectivity.online() && !this.esSoloLocal()
         ? this.inspeccionesLocales.guardarBorradorEnCache(local)
         : this.inspeccionesLocales.guardarBorradorLocal(local, request);
-    void guardadoLocal
+    this.escrituraLocal = guardadoLocal
       .then(() => {
         this.errorAlmacenamiento.set(null);
         if (!this.connectivity.online() || this.esSoloLocal()) {
@@ -510,7 +525,11 @@ export class CompletarInspeccionPage implements OnInit {
         }
       })
       .catch((err: Error) => {
-        this.errorAlmacenamiento.set(err.message || 'Almacenamiento local insuficiente.');
+        this.errorAlmacenamiento.set(
+          err.message?.startsWith('offline.')
+            ? this.i18n.translate(err.message)
+            : err.message || 'Almacenamiento local insuficiente.',
+        );
       });
   }
   onFechaInspeccionChange(fecha: string): void {
@@ -629,7 +648,11 @@ export class CompletarInspeccionPage implements OnInit {
         .catch((err: Error) => {
           this.guardando.set(false);
           this.estadoAutoguardado.set(null);
-          this.errorAlmacenamiento.set(err.message || 'Almacenamiento local insuficiente.');
+          this.errorAlmacenamiento.set(
+            err.message?.startsWith('offline.')
+              ? this.i18n.translate(err.message)
+              : err.message || 'Almacenamiento local insuficiente.',
+          );
         });
       return;
     }
@@ -676,6 +699,7 @@ export class CompletarInspeccionPage implements OnInit {
               b.autorId,
               actualizada,
             );
+            if (this.auth.user()?.id !== b.autorId) return;
             this.guardadoPendiente = null;
             this.guardando.set(false);
             this.borrador.set(this.conProgreso(actualizada));
@@ -732,24 +756,42 @@ export class CompletarInspeccionPage implements OnInit {
   }
   abrirConfirmacion(): void {
     if (
-      !this.connectivity.online() ||
-      this.esSoloLocal() ||
       !this.accionFinal() ||
-      this.cambiosSinGuardar() ||
-      this.errorGuardado() ||
+      this.guardando() ||
       this.operandoIc() ||
       this.colegiadoPendiente() ||
       this.fotografiasOcupadas()
     )
       return;
     this.errorAccion.set(null);
+    if (!this.formulario()?.revisar()) {
+      this.errorAccion.set({
+        mensaje: this.i18n.translate('offline.hu061.incomplete'),
+        campos: [],
+        fotografias: [],
+      });
+      return;
+    }
+    const faltantes = this.reporteFotos()?.faltantes() ?? [
+      'ACCESO',
+      'SUPERESTRUCTURA',
+      'SUBESTRUCTURA',
+      'CAUCE',
+    ];
+    if (faltantes.length) {
+      this.errorAccion.set({
+        mensaje: this.i18n.translate('offline.hu061.missingPhotos'),
+        campos: [],
+        fotografias: faltantes,
+      });
+      return;
+    }
     this.confirmandoAccion.set(true);
   }
   cancelarConfirmacion(): void {
-    if (this.ejecutandoAccion()) return;
-    this.confirmandoAccion.set(false);
+    if (!this.ejecutandoAccion()) this.confirmandoAccion.set(false);
   }
-  confirmarAccion(): void {
+  async confirmarAccion(): Promise<void> {
     const b = this.borrador();
     const accion = this.accionFinal();
     if (
@@ -757,65 +799,59 @@ export class CompletarInspeccionPage implements OnInit {
       !accion ||
       !this.confirmandoAccion() ||
       this.ejecutandoAccion() ||
-      this.cambiosSinGuardar() ||
-      this.errorGuardado() ||
+      this.guardando() ||
       this.operandoIc() ||
       this.colegiadoPendiente() ||
       this.fotografiasOcupadas()
     )
       return;
+    if (!this.formulario()?.revisar()) {
+      this.confirmandoAccion.set(false);
+      return;
+    }
     this.ejecutandoAccion.set(true);
     this.errorAccion.set(null);
-    this.apiErrors.clear();
-    const peticion =
-      accion === 'publicar' ? this.inspeccionApi.publicar(b.id) : this.inspeccionApi.enviar(b.id);
-    peticion.pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
-      next: (resultado) => {
-        this.ejecutandoAccion.set(false);
-        this.confirmandoAccion.set(false);
-        this.resultadoAccion.set(resultado);
-        this.borrador.update((actual) =>
-          actual ? { ...actual, estado: resultado.estado } : actual,
-        );
-        if (resultado.estado === 'PUBLICADA') {
-          void this.router.navigate(['/puentes', resultado.puenteId], { replaceUrl: true });
-        }
-      },
-      error: (err: HttpErrorResponse) => {
-        this.ejecutandoAccion.set(false);
-        this.errorAccion.set(this.errorDeAccion(err));
-        if (
-          err.status === 409 &&
-          ['confirmacion_ic_desactualizada', 'calculo_ic_desactualizado'].includes(err.error?.code)
-        ) {
-          this.confirmandoAccion.set(false);
-          this.revisionIc.update((revision) => revision + 1);
-        }
-        this.apiErrors.clear();
-      },
-    });
-  }
-  private errorDeAccion(err: HttpErrorResponse): ErrorAccion {
-    const problema = err.error as {
-      detail?: string;
-      errores?: {
-        campo?: string;
-        mensaje?: string;
-      }[];
-    } | null;
-    const errores = problema?.errores ?? [];
-    return {
-      mensaje: problema?.detail ?? 'No fue posible completar la acción sobre la inspección.',
-      campos: errores
-        .filter((e) => e.campo && !e.campo.startsWith('fotografias.'))
-        .map((e) => ({
-          campo: e.campo ?? '',
-          mensaje: mensajeCampo(e.campo ?? '', e.mensaje ?? '', this.esquema()),
-        })),
-      fotografias: errores
-        .filter((e) => e.campo?.startsWith('fotografias.'))
-        .map((e) => (e.campo ?? '').replace('fotografias.', '')),
-    };
+    try {
+      await this.escrituraLocal;
+      if (this.auth.user()?.id !== b.autorId || this.errorAlmacenamiento())
+        throw new Error(this.i18n.translate('offline.hu061.storageError'));
+      const datos = this.formulario()!.valor();
+      const fecha = this.fechaInspeccion() || b.fechaInspeccion;
+      if (
+        fecha > this.hoy ||
+        (b.datosPermanentes?.anioConstruccion &&
+          Number(fecha.slice(0, 4)) < b.datosPermanentes.anioConstruccion)
+      )
+        throw new Error(this.i18n.translate('offline.hu061.invalidDate'));
+      // El borrador remoto también necesita una copia local antes de encolar su intención.
+      await this.inspeccionesLocales.actualizarBorradorCanonicoSiSinPendientes(b, b.autorId);
+      await this.inspeccionesLocales.encolarAccionFinal(b.id, accion, {
+        version: b.version,
+        datos,
+        fechaInspeccion: fecha,
+        identificacionCapturada:
+          (datos['identificacion'] as Record<string, unknown>) ?? b.identificacionCapturada,
+        acompanantes: b.acompanantes,
+      });
+      this.intencionFinal.set({ accion, estado: 'PENDIENTE' });
+      this.confirmandoAccion.set(false);
+      this.estadoAutoguardado.set('guardado');
+      this.revisionGuardada = this.revisionDatos;
+      void this.sync.sincronizarAhora();
+    } catch (error) {
+      this.errorAccion.set({
+        mensaje:
+          error instanceof Error
+            ? error.message.startsWith('offline.')
+              ? this.i18n.translate(error.message)
+              : error.message
+            : this.i18n.translate('offline.hu061.storageError'),
+        campos: [],
+        fotografias: [],
+      });
+    } finally {
+      this.ejecutandoAccion.set(false);
+    }
   }
   severidadIc(estado: string | null | undefined): 'success' | 'warn' | 'danger' | 'secondary' {
     switch (estado?.toUpperCase()) {

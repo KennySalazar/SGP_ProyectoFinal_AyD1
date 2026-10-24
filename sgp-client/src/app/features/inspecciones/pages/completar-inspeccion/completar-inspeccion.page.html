@@ -95,8 +95,8 @@
         type="button"
         severity="success"
         class="btn-accion-final"
-        [disabled]="esOffline() || cambiosSinGuardar() || !!errorGuardado() || operandoIc() || colegiadoPendiente() || fotografiasOcupadas()"
-        [attr.title]="esOffline() ? ('common.offlineNoAction' | transloco) : cambiosSinGuardar() ? ('inspecciones.transicion.guardaPrimero' | transloco) : null"
+        [disabled]="guardando() || operandoIc() || colegiadoPendiente() || fotografiasOcupadas()"
+        [attr.title]="esOffline() ? ('offline.hu061.queueHint' | transloco) : null"
         (click)="abrirConfirmacion()"
       >
         <i [class]="accion === 'publicar' ? 'pi pi-verified' : 'pi pi-send'" aria-hidden="true"></i>
@@ -105,7 +105,18 @@
       }
     </div>
   </header>
-  @if (soloLectura()) {
+  @if (intencionFinal(); as intencion) { @if (intencion.estado === 'PENDIENTE') {
+  <div class="alerta-autoguardado surface-card" role="status">
+    <i class="pi pi-clock" aria-hidden="true"></i>
+    <span>{{ 'offline.hu061.pending' | transloco }}</span>
+    <a routerLink="/offline">{{ 'offline.queueTitle' | transloco }}</a>
+  </div>
+  } @else if (intencion.estado === 'RECHAZADA') {
+  <div class="estado-error surface-card" role="alert">
+    <p>{{ 'offline.hu061.rejected' | transloco }}</p>
+    <p>{{ intencion.error }}</p>
+  </div>
+  } } @if (soloLectura()) {
   <div class="alerta-autoguardado surface-card" role="status">
     <i class="pi pi-eye" aria-hidden="true"></i>
     <span>{{ 'inspecciones.borrador.soloLectura' | transloco }}</span>
@@ -118,7 +129,7 @@
   <app-confirmacion-estado-ic
     [inspeccionId]="b.id"
     [revision]="revisionIc()"
-    [bloqueado]="cambiosSinGuardar() || !!errorGuardado() || confirmandoAccion() || ejecutandoAccion()"
+    [bloqueado]="soloLectura() || cambiosSinGuardar() || !!errorGuardado() || confirmandoAccion() || ejecutandoAccion()"
     (ocupado)="operandoIc.set($event)"
   />
   } @if (colegiadoPendiente()) {
@@ -172,7 +183,7 @@
       <p-progressBar [value]="b.progreso.porcentajeTotal" [showValue]="false" />
     </div>
     <app-aprobacion-calibracion [versionId]="b.versionFormularioId" />
-    @if (b.icPreliminar; as ic) {
+    @if (icVisible(); as ic) {
     <div class="ic-preliminar-card">
       <div class="ic-cabecera">
         <span class="ic-titulo"
@@ -233,11 +244,11 @@
 
   <app-reporte-fotografico
     [inspeccion]="b"
-    [soloLectura]="confirmandoAccion() || ejecutandoAccion()"
+    [soloLectura]="soloLectura() || confirmandoAccion() || ejecutandoAccion()"
   />
   <app-documentos-inspeccion
     [inspeccion]="b"
-    [soloLectura]="confirmandoAccion() || ejecutandoAccion()"
+    [soloLectura]="soloLectura() || confirmandoAccion() || ejecutandoAccion()"
   />
 
   <p-dialog
@@ -250,7 +261,8 @@
     [resizable]="false"
   >
     <p class="dialogo-texto">
-      {{ 'inspecciones.transicion.' + (accionFinal() ?? 'publicar') + 'Texto' | transloco }}
+      {{ 'inspecciones.transicion.' + (accionFinal() ?? 'publicar') + 'Texto' | transloco }} @if
+      (esOffline()) { {{ 'offline.hu061.queueHint' | transloco }} }
     </p>
     <dl class="dialogo-datos">
       <div>

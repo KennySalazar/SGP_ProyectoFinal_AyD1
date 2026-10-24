@@ -566,7 +566,37 @@
     "persistentStorage": "Almacenamiento persistente",
     "localStorage": "ALMACENAMIENTO LOCAL",
     "controls": "Controles de diagnostico",
-    "basePrepared": "Base preparada"
+    "basePrepared": "Base preparada",
+    "hu061": {
+      "noLocal": "No hay una copia de esta inspección preparada para tu cuenta en este dispositivo.",
+      "noSchema": "No está disponible el formulario original de esta inspección. Prepáralo con conexión antes de continuar.",
+      "incomplete": "Completa los campos señalados antes de confirmar la inspección.",
+      "missingPhotos": "Adjunta al menos una fotografía de acceso, superestructura, subestructura y cauce.",
+      "storageError": "No fue posible guardar la operación en el dispositivo. Conserva esta pantalla y vuelve a intentar.",
+      "invalidDate": "La fecha de inspección debe estar entre el año de construcción y la fecha actual.",
+      "queueHint": "La acción quedará pendiente y se ejecutará al sincronizar los datos y las fotografías con una sesión válida.",
+      "pending": "Envío o publicación pendiente de confirmación. El contenido queda protegido hasta recibir la respuesta del servidor.",
+      "rejected": "El servidor no aceptó la acción. Revisa el motivo, corrige la inspección y confirma nuevamente.",
+      "updateReady": "Hay una nueva versión. Guarda tus cambios y cierra la cámara antes de actualizar. Los datos pendientes se conservarán.",
+      "reload": "Actualizar aplicación",
+      "later": "Más tarde",
+      "ENVIAR_INSPECCION": "Enviar inspección",
+      "PUBLICAR_INSPECCION": "Publicar inspección",
+      "CREAR_INSPECCION": "Crear inspección",
+      "GUARDAR_BORRADOR": "Guardar borrador",
+      "FOTO": "Subir fotografía",
+      "resume": "Continuar inspección",
+      "lastAttempt": "Último intento",
+      "processing": "Sincronizando",
+      "locked": "La inspección tiene una acción pendiente o pertenece a otra cuenta.",
+      "forbidden": "La cuenta no puede realizar esta acción.",
+      "notEditable": "Inspección no editable.",
+      "invalidPhotos": "Falta evidencia fotográfica obligatoria o se excede el límite de 60 fotografías.",
+      "resolveErrors": "Resuelva los errores de sincronización antes de confirmar.",
+      "prepareFirst": "Prepare el formulario antes de iniciar sin conexión.",
+      "versionMismatch": "La versión confirmada difiere del formulario capturado. Conserva la copia local y revisa la preparación.",
+      "unknownOperation": "Esta operación no se reconoce. Conserva los datos y solicita revisión."
+    }
   },
   "studentActivation": {
     "kicker": "GESTION ACADÉMICA",
@@ -1822,7 +1852,7 @@
       "advertenciaGps500m": "El dispositivo se encuentra a más de 500 metros de la ubicación guardada del puente. La inspección se creará con advertencia."
     },
     "fotos": {
-      "offlineSprint4Aviso": "La captura y subida de fotografías se habilita con conexión hasta Sprint 4.",
+      "offlineSprint4Aviso": "Las fotografías se guardan en este dispositivo y se subirán al recuperar conexión. Conserva los datos pendientes.",
       "titulo": "Fotografías de la inspección",
       "descripcion": "Capture una fotografía con ubicación o seleccione una imagen con GPS y fecha EXIF con zona horaria o fecha UTC de GPS. Las cargas fallidas se conservan para reintentar.",
       "galeria": "Seleccionar desde galería",
@@ -1974,7 +2004,7 @@
     },
     "confirmacionIc": {
       "titulo": "Confirmacion del estado del IC",
-      "icPreliminarOffline": "El IC preliminar se calcula en el servidor y estará disponible al sincronizar",
+      "icPreliminarOffline": "IC disponible al sincronizar. El cálculo se realiza en el servidor.",
       "nota": "Consulte el calculo actualizado antes de confirmar el estado. Si selecciona un estado distinto del calculado, debe justificar su criterio profesional. El ajuste no modifica el valor numerico del IC.",
       "guardarPrimero": "Guarde los cambios de la inspeccion antes de consultar o confirmar el calculo.",
       "consultar": "Consultar calculo actualizado",

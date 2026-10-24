@@ -1,3 +1,4 @@
+import { PwaUpdateService } from '../../core/services/pwa-update.service';
 import { AsyncPipe } from '@angular/common';
 import { AvisoSalidaComponent } from '../../features/salida/components/aviso-salida.component';
 import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
@@ -29,6 +30,7 @@ import { SincronizacionService } from '../../offline/services/sincronizacion.ser
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class AppShellComponent {
+  readonly actualizacion = inject(PwaUpdateService);
   readonly auth = inject(AuthStore);
   readonly puedePrepararSalida = () => {
     const usuario = this.auth.user();
@@ -73,8 +75,12 @@ export class AppShellComponent {
 
   cantidadPendiente(items: SyncQueueItem[], tipo: 'INSPECCION' | 'FOTO'): number {
     const propietarioId = this.auth.user()?.id;
-    return items.filter((item) => item.propietarioId === propietarioId && item.tipo === tipo)
-      .length;
+    const propios = items.filter(
+      (item) => item.propietarioId === propietarioId && item.tipo === tipo,
+    );
+    return tipo === 'INSPECCION'
+      ? new Set(propios.map((item) => item.entityId)).size
+      : propios.length;
   }
 
   logout(): void {

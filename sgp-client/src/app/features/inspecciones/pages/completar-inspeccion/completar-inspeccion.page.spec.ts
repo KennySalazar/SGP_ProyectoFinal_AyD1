@@ -1,3 +1,6 @@
+import { SincronizacionService } from '../../../../offline/services/sincronizacion.service';
+import { EMPTY, Subject } from 'rxjs';
+import { LocalInspection } from '../../../../offline/db/sgp-db';
 import { AprobacionCalibracionComponent } from '../../../formulario/components/aprobacion-calibracion/aprobacion-calibracion.component';
 import { AprobacionCalibracionApiService } from '../../../formulario/services/aprobacion-calibracion-api.service';
 import { of as estadoRespaldo } from 'rxjs';
@@ -157,18 +160,30 @@ describe('CompletarInspeccionPage', () => {
     obtenerEsquemaPublicado: vi.fn(),
     obtenerActiva: vi.fn(),
   };
+  let observacionLocal: Subject<LocalInspection>;
+  const sync = { sincronizarAhora: vi.fn().mockResolvedValue(undefined) };
   const mockActivatedRoute = {
     snapshot: {
       paramMap: convertToParamMap({ id: 'inspeccion-123' }),
     },
   };
   beforeEach(() => {
+    observacionLocal = new Subject<LocalInspection>();
+    sync.sincronizarAhora.mockClear();
+    vi.spyOn(FormularioDinamicoComponent.prototype, 'revisar').mockReturnValue(true);
     mockInspeccionApi.obtenerBorrador.mockReset();
     mockInspeccionApi.guardarBorrador.mockReset();
     mockInspeccionApi.enviar.mockReset();
     mockInspeccionApi.publicar.mockReset();
     mockApiErrors.clear.mockReset();
-    mockInspeccionApi.listarFotografias.mockReturnValue(of([]));
+    mockInspeccionApi.listarFotografias.mockReturnValue(
+      of(
+        ['ACCESO', 'SUPERESTRUCTURA', 'SUBESTRUCTURA', 'CAUCE'].map((categoria) => ({
+          id: categoria,
+          categoria,
+        })),
+      ),
+    );
     colegiadoPendiente.set(false);
     mockFormularioApi.obtenerEsquemaPublicado.mockReset();
     mockFormularioApi.obtenerActiva.mockReset();
@@ -193,9 +208,12 @@ describe('CompletarInspeccionPage', () => {
     TestBed.configureTestingModule({
       imports: [CompletarInspeccionPage],
       providers: [
+        { provide: SincronizacionService, useValue: sync },
         {
           provide: InspeccionesLocalesService,
           useValue: {
+            observarInspeccion: () => observacionLocal,
+            encolarAccionFinal: vi.fn().mockResolvedValue(undefined),
             guardarBorradorEnCache: vi.fn().mockResolvedValue(undefined),
             guardarBorradorLocal: vi
               .fn()
@@ -236,6 +254,9 @@ describe('CompletarInspeccionPage', () => {
         {
           provide: FotografiasLocalesService,
           useValue: {
+            observarInventario: () => EMPTY,
+            inventario: vi.fn().mockResolvedValue([]),
+            guardarInventario: vi.fn().mockResolvedValue(undefined),
             guardarContexto: vi.fn().mockResolvedValue(undefined),
             pendientes: vi.fn().mockResolvedValue([]),
           },
@@ -260,7 +281,17 @@ describe('CompletarInspeccionPage', () => {
   afterEach(() => {
     vi.useRealTimers();
     fixture.destroy();
+    vi.restoreAllMocks();
   });
+
+  async function cargar() {
+    fixture.detectChanges();
+    await vi.waitFor(() => {
+      fixture.detectChanges();
+      expect(component.cargando()).toBe(false);
+    });
+    fixture.detectChanges();
+  }
 
   it('carga la información del borrador y restaura datos previamente guardados', async () => {
     fixture.detectChanges();
@@ -519,106 +550,57 @@ describe('CompletarInspeccionPage', () => {
     function boton(): HTMLButtonElement | null {
       return fixture.nativeElement.querySelector('.btn-accion-final');
     }
-    it('el Catedrático publica tras confirmar y ve el resultado', async () => {
-      mockInspeccionApi.publicar.mockReturnValue(
-        of({ id: 'inspeccion-123', puenteId: 'puente-456', estado: 'PUBLICADA' }),
-      );
-      fixture.detectChanges();
-      await Promise.resolve();
-      await Promise.resolve();
-      fixture.detectChanges();
-      expect(component.accionFinal()).toBe('publicar');
-      expect(boton()?.textContent).toContain('inspecciones.transicion.publicar');
+    it('el Catedrático confirma una publicación pendiente sin adelantar el estado remoto', async () => {
+      await cargar();
       component.abrirConfirmacion();
       expect(component.confirmandoAccion()).toBe(true);
+      await component.confirmarAccion();
+      fixture.detectChanges();
+      expect(TestBed.inject(InspeccionesLocalesService).encolarAccionFinal).toHaveBeenCalledWith(
+        'inspeccion-123',
+        'publicar',
+        expect.objectContaining({ version: 1 }),
+      );
       expect(mockInspeccionApi.publicar).not.toHaveBeenCalled();
-      component.confirmarAccion();
-      fixture.detectChanges();
-      await Promise.resolve();
-      await Promise.resolve();
-      fixture.detectChanges();
-      expect(mockInspeccionApi.publicar).toHaveBeenCalledWith('inspeccion-123');
-      expect(TestBed.inject(Router).navigate).toHaveBeenCalledWith(['/puentes', 'puente-456'], {
-        replaceUrl: true,
-      });
-      expect(mockInspeccionApi.enviar).not.toHaveBeenCalled();
-      expect(component.confirmandoAccion()).toBe(false);
-      expect(fixture.nativeElement.textContent).toContain('inspecciones.transicion.publicada');
+      expect(component.intencionFinal()?.estado).toBe('PENDIENTE');
+      expect(component.borrador()?.estado).toBe('BORRADOR');
+      expect(component.soloLectura()).toBe(true);
+      expect(fixture.nativeElement.textContent).toContain('offline.hu061.pending');
     });
-    it('el Estudiante envía a revisión', async () => {
+    it('el Estudiante encola el envío a revisión', async () => {
       mockInspeccionApi.obtenerBorrador.mockReturnValue(
         of({ ...mockBorrador, rolAutor: 'ESTUDIANTE' }),
       );
-      mockInspeccionApi.enviar.mockReturnValue(
-        of({ id: 'inspeccion-123', puenteId: 'puente-456', estado: 'ENVIADA' }),
-      );
-      fixture.detectChanges();
-      await Promise.resolve();
-      await Promise.resolve();
-      fixture.detectChanges();
-      expect(component.accionFinal()).toBe('enviar');
+      await cargar();
       component.abrirConfirmacion();
-      component.confirmarAccion();
-      fixture.detectChanges();
-      await Promise.resolve();
-      await Promise.resolve();
-      fixture.detectChanges();
-      expect(mockInspeccionApi.enviar).toHaveBeenCalledWith('inspeccion-123');
-      expect(fixture.nativeElement.textContent).toContain('inspecciones.transicion.enviada');
-    });
-    it('un 422 detalla por separado los campos y las fotografías que faltan', async () => {
-      mockInspeccionApi.publicar.mockReturnValue(
-        throwError(
-          () =>
-            new HttpErrorResponse({
-              status: 422,
-              error: {
-                code: 'inspeccion_incompleta',
-                detail: 'Faltan 1 campos obligatorios y 2 categorias de fotografia.',
-                errores: [
-                  {
-                    campo: 'subestructura',
-                    mensaje: 'El campo subestructura es obligatorio',
-                  },
-                  { campo: 'fotografias.ACCESO', mensaje: 'Falta foto' },
-                  { campo: 'fotografias.CAUCE', mensaje: 'Falta foto' },
-                ],
-              },
-            }),
-        ),
+      await component.confirmarAccion();
+      expect(TestBed.inject(InspeccionesLocalesService).encolarAccionFinal).toHaveBeenCalledWith(
+        'inspeccion-123',
+        'enviar',
+        expect.anything(),
       );
-      fixture.detectChanges();
-      await Promise.resolve();
-      await Promise.resolve();
-      fixture.detectChanges();
-      component.abrirConfirmacion();
-      component.confirmarAccion();
-      fixture.detectChanges();
-      await Promise.resolve();
-      await Promise.resolve();
-      fixture.detectChanges();
-      expect(component.errorAccion()).toEqual({
-        mensaje: 'Faltan 1 campos obligatorios y 2 categorias de fotografia.',
-        campos: [{ campo: 'subestructura', mensaje: 'El campo Subestructura es obligatorio' }],
-        fotografias: ['ACCESO', 'CAUCE'],
-      });
-      expect(component.confirmandoAccion()).toBe(true);
       expect(component.resultadoAccion()).toBeNull();
-      expect(mockApiErrors.clear).toHaveBeenCalled();
+      expect(mockInspeccionApi.enviar).not.toHaveBeenCalled();
     });
-    it('no permite la acción mientras hay cambios sin guardar', async () => {
-      fixture.detectChanges();
-      await Promise.resolve();
-      await Promise.resolve();
-      fixture.detectChanges();
-      component.estadoAutoguardado.set('pendiente');
-      fixture.detectChanges();
-      await Promise.resolve();
-      await Promise.resolve();
-      fixture.detectChanges();
-      expect(boton()?.disabled).toBe(true);
+    it('no encola cuando la revisión del formulario detecta campos pendientes', async () => {
+      await cargar();
+      const formulario = fixture.debugElement.query(
+        By.directive(FormularioDinamicoComponent),
+      ).componentInstance;
+      vi.spyOn(formulario, 'revisar').mockReturnValue(false);
       component.abrirConfirmacion();
       expect(component.confirmandoAccion()).toBe(false);
+      expect(component.errorAccion()?.mensaje).toBe('offline.hu061.incomplete');
+      expect(TestBed.inject(InspeccionesLocalesService).encolarAccionFinal).not.toHaveBeenCalled();
+    });
+    it('incluye los cambios locales en la confirmación sin exigir conexión', async () => {
+      await cargar();
+      component.estadoAutoguardado.set('pendiente');
+      vi.spyOn(TestBed.inject(ConnectivityService), 'online').mockReturnValue(false);
+      component.abrirConfirmacion();
+      await component.confirmarAccion();
+      expect(component.intencionFinal()?.estado).toBe('PENDIENTE');
+      expect(TestBed.inject(InspeccionesLocalesService).encolarAccionFinal).toHaveBeenCalled();
     });
     it('el Profesional externo con colegiado pendiente no puede publicar', async () => {
       mockInspeccionApi.obtenerBorrador.mockReturnValue(
@@ -668,44 +650,33 @@ describe('CompletarInspeccionPage', () => {
     component.confirmarAccion();
     expect(mockInspeccionApi.publicar).not.toHaveBeenCalled();
   });
-  it('invalida la confirmacion ante conflicto de calculo durante publicacion', async () => {
+  it('muestra el rechazo persistido por el sincronizador y permite revisar el IC', async () => {
+    await cargar();
+    observacionLocal.next({
+      propietarioId: 'usr-1',
+      intencionFinal: {
+        accion: 'publicar',
+        estado: 'RECHAZADA',
+        error: 'Revisa el calculo actualizado',
+      },
+    } as LocalInspection);
     fixture.detectChanges();
-    await Promise.resolve();
-    await Promise.resolve();
-    fixture.detectChanges();
-    component.abrirConfirmacion();
-    mockInspeccionApi.publicar.mockReturnValue(
-      throwError(
-        () =>
-          new HttpErrorResponse({
-            status: 409,
-            error: {
-              code: 'confirmacion_ic_desactualizada',
-              detail: 'Revisa el calculo actualizado',
-            },
-          }),
-      ),
-    );
-    component.confirmarAccion();
-    expect(component.revisionIc()).toBe(1);
-    expect(component.confirmandoAccion()).toBe(false);
+    expect(component.intencionFinal()?.error).toBe('Revisa el calculo actualizado');
+    expect(component.soloLectura()).toBe(false);
     expect(component.resultadoAccion()).toBeNull();
-    expect(component.borrador()?.estado).toBe('BORRADOR');
   });
-  it('no guarda el borrador despues de una publicacion correcta', async () => {
-    fixture.detectChanges();
-    await Promise.resolve();
-    await Promise.resolve();
-    fixture.detectChanges();
-    component.abrirConfirmacion();
-    mockInspeccionApi.publicar.mockReturnValue(
-      of({ id: 'inspeccion-123', puenteId: 'puente-456', estado: 'PUBLICADA' }),
-    );
-    component.confirmarAccion();
+  it('no guarda el borrador despues de la confirmación remota de publicación', async () => {
+    await cargar();
+    observacionLocal.next({
+      propietarioId: 'usr-1',
+      estado: 'PUBLICADA',
+      intencionFinal: {
+        accion: 'publicar',
+        estado: 'CONFIRMADA',
+        resultado: { id: 'inspeccion-123', puenteId: 'puente-456', estado: 'PUBLICADA' },
+      },
+    } as LocalInspection);
     component.guardarBorrador();
-    await Promise.resolve();
-    await Promise.resolve();
-    fixture.detectChanges();
     expect(component.borrador()?.estado).toBe('PUBLICADA');
     expect(mockInspeccionApi.guardarBorrador).not.toHaveBeenCalled();
   });
@@ -791,11 +762,7 @@ describe('CompletarInspeccionPage', () => {
   });
 
   it('vuelve a comprobar cargas fotograficas antes de ejecutar la publicacion', async () => {
-    fixture.detectChanges();
-    await Promise.resolve();
-    await Promise.resolve();
-    fixture.detectChanges();
-    await fixture.whenStable();
+    await cargar();
     component.abrirConfirmacion();
     expect(component.confirmandoAccion()).toBe(true);
     const reporte = fixture.debugElement.query(By.directive(ReporteFotograficoComponent))
@@ -805,16 +772,13 @@ describe('CompletarInspeccionPage', () => {
     expect(mockInspeccionApi.publicar).not.toHaveBeenCalled();
     expect(mockInspeccionApi.enviar).not.toHaveBeenCalled();
   });
-  it('conserva el editor si la publicacion es rechazada', async () => {
-    mockInspeccionApi.publicar.mockReturnValue(
-      throwError(() => new HttpErrorResponse({ status: 422, error: { detail: 'Faltan datos' } })),
+  it('conserva el editor si no se puede persistir la acción final', async () => {
+    await cargar();
+    vi.mocked(TestBed.inject(InspeccionesLocalesService).encolarAccionFinal).mockRejectedValue(
+      new Error('Faltan datos'),
     );
-    fixture.detectChanges();
-    await Promise.resolve();
-    await Promise.resolve();
-    fixture.detectChanges();
     component.abrirConfirmacion();
-    component.confirmarAccion();
+    await component.confirmarAccion();
     expect(TestBed.inject(Router).navigate).not.toHaveBeenCalled();
     expect(component.borrador()?.estado).toBe('BORRADOR');
     expect(component.errorAccion()?.mensaje).toBe('Faltan datos');

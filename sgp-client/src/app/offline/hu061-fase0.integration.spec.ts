@@ -1,3 +1,9 @@
+import { Blob as BlobNode } from 'node:buffer';
+import { ReferenciasLocalesService } from './services/referencias-locales.service';
+import {
+  CATEGORIAS_FOTO,
+  FotografiaResponse,
+} from '../features/inspecciones/models/fotografia.models';
 import { IDBKeyRange, indexedDB } from 'fake-indexeddb';
 import Dexie from 'dexie';
 import { TestBed } from '@angular/core/testing';
@@ -18,7 +24,6 @@ import { MisInspeccionesPage } from '../features/inspecciones/pages/mis-inspecci
 import {
   GuardarBorradorRequest,
   IniciarInspeccionRequest,
-  InspeccionBorradorResponse,
 } from '../features/inspecciones/models/inspeccion.models';
 import { LocalInspection, sgpDb } from './db/sgp-db';
 import {
@@ -29,7 +34,7 @@ import { FotografiasLocalesService } from './services/fotografias-locales.servic
 import { ConnectivityService } from './services/connectivity.service';
 import { SincronizacionService } from './services/sincronizacion.service';
 
-// Caracterización de fase 0: los casos llamados «reproduce» documentan defectos actuales.
+// Regresiones de fase 0 y flujo final de HU-061 sobre IndexedDB real en memoria.
 // Se conserva el singleton de producción, con todas sus tablas y transacciones reales.
 // Dexie usa exclusivamente fake-indexeddb en memoria; no se accede a datos del navegador.
 
@@ -203,7 +208,7 @@ describe('HU-061 fase 0: integración local y contratos HTTP', () => {
     expect(colaAntes[0].idempotencyKey).toBe(INSPECCION);
   });
 
-  it('E12: reproduce que guardarContexto reemplaza el borrador editado, aunque la cola conserva los datos', async () => {
+  it('E12: guardarContexto conserva el borrador editado y su cola', async () => {
     const anterior = await iniciar();
     const { datos } = await editar(anterior);
     const contextoAnterior = {
@@ -212,21 +217,19 @@ describe('HU-061 fase 0: integración local y contratos HTTP', () => {
     };
     await fotos.guardarContexto(AUTOR, INSPECCION, PUENTE, 'BORRADOR', contextoAnterior);
     const registro = (await sgpDb.inspecciones.get(INSPECCION))!;
-    expect(registro.payload).toEqual(contextoAnterior);
-    expect((registro.payload as BorradorLocalPayload).borrador).toBeUndefined();
-    expect((registro.payload as InspeccionBorradorResponse).datos).not.toEqual(datos);
-    expect(registro.sincronizado).toBe(true);
-    expect(registro.actualizacionLocalPendiente).toBeUndefined();
+    expect((registro.payload as BorradorLocalPayload).borrador.datos).toEqual(datos);
+    expect(registro.sincronizado).toBe(false);
+    expect(registro.actualizacionLocalPendiente).toBe(true);
     const guardado = (await sgpDb.cola_sync.toArray()).find(
       (op) => op.operacion === 'GUARDAR_BORRADOR',
     );
     expect((guardado?.payload as GuardarBorradorRequest).datos).toEqual(datos);
     const visible = (await locales.obtenerInspeccionLocal(INSPECCION))!;
-    expect((visible.payload as InspeccionBorradorResponse).datos).toEqual(contextoAnterior.datos);
+    expect((visible.payload as BorradorLocalPayload).borrador.datos).toEqual(datos);
     expect(await locales.liberarInspeccionesSincronizadas(AUTOR)).toBe(0);
   });
 
-  it('E12: reproduce pérdida de edición solo en caché al guardar contexto y liberar espacio', async () => {
+  it('E12: conserva la edición solo en caché al guardar contexto y liberar espacio', async () => {
     const anterior = await iniciar();
     await sgpDb.cola_sync.clear();
     const payload = anterior.payload as BorradorLocalPayload;
@@ -236,23 +239,21 @@ describe('HU-061 fase 0: integración local y contratos HTTP', () => {
       payload: { ...payload, borrador: { ...payload.borrador, datos: { campo: 'nuevo' } } },
     });
     await fotos.guardarContexto(AUTOR, INSPECCION, PUENTE, 'BORRADOR', payload.borrador);
-    expect(await locales.liberarInspeccionesSincronizadas(AUTOR)).toBe(1);
-    expect(await sgpDb.inspecciones.get(INSPECCION)).toBeUndefined();
+    expect(await locales.liberarInspeccionesSincronizadas(AUTOR)).toBe(0);
+    expect(await sgpDb.inspecciones.get(INSPECCION)).toBeDefined();
   });
 
-  it('E12: montar el reporte real reemplaza el payload de una edición encolada', async () => {
+  it('E12: montar el reporte real conserva el payload de una edición encolada', async () => {
     const anterior = await iniciar();
     const { datos } = await editar(anterior);
     const contexto = (anterior.payload as BorradorLocalPayload).borrador;
     const fixture = TestBed.createComponent(ReporteFotograficoComponent);
     fixture.componentRef.setInput('inspeccion', contexto);
     fixture.detectChanges();
-    await vi.waitFor(() =>
-      http
-        .expectOne(`/api/v1/inspecciones/${INSPECCION}/fotografias`)
-        .error(new ProgressEvent('error')),
-    );
-    expect((await sgpDb.inspecciones.get(INSPECCION))?.payload).toEqual(contexto);
+    await vi.waitFor(() => expect(fixture.componentInstance.inventarioCargado()).toBe(true));
+    expect(
+      ((await sgpDb.inspecciones.get(INSPECCION))?.payload as BorradorLocalPayload).borrador.datos,
+    ).toEqual(datos);
     const guardado = (await sgpDb.cola_sync.toArray()).find(
       (op) => op.operacion === 'GUARDAR_BORRADOR',
     );
@@ -260,44 +261,43 @@ describe('HU-061 fase 0: integración local y contratos HTTP', () => {
     fixture.destroy();
   });
 
-  it('E12: reproduce que liberar espacio ignora actualizacionLocalPendiente aun sin reporte fotográfico', async () => {
+  it('E12: liberar espacio protege actualizacionLocalPendiente aun sin reporte fotográfico', async () => {
     const local = await iniciar();
     await sgpDb.cola_sync.clear();
     await locales.guardarBorradorEnCache({ ...local, actualizacionLocalPendiente: true });
     expect(await sgpDb.inspecciones.get(INSPECCION)).toMatchObject({
-      sincronizado: true,
+      sincronizado: false,
       actualizacionLocalPendiente: true,
     });
-    expect(await locales.liberarInspeccionesSincronizadas(AUTOR)).toBe(1);
-    expect(await sgpDb.inspecciones.get(INSPECCION)).toBeUndefined();
+    expect(await locales.liberarInspeccionesSincronizadas(AUTOR)).toBe(0);
+    expect(await sgpDb.inspecciones.get(INSPECCION)).toBeDefined();
   });
 
-  it('E13: listado aísla B, pero lectura directa por ID devuelve el borrador de A', async () => {
+  it('E13: listado y lectura directa por ID aíslan el borrador de A', async () => {
     await iniciar();
     auth.setUser(usuario(OTRO));
     expect(await locales.listarPorUsuario(auth.user()!.id)).toEqual([]);
     const ajeno = await locales.obtenerInspeccionLocal(INSPECCION);
-    expect(ajeno?.propietarioId).toBe(AUTOR);
-    expect((ajeno?.payload as BorradorLocalPayload).borrador.autorId).toBe(AUTOR);
+    expect(ajeno).toBeUndefined();
   });
 
-  it('E13: reproduce referencias de A devueltas por lecturas locales bajo sesión de B', async () => {
+  it('E13: lecturas locales no devuelven referencias de A bajo sesión de B', async () => {
     await TestBed.inject(SalidaLocalService).guardar(AUTOR, paquete());
     auth.setUser(usuario(OTRO));
     expect(await TestBed.inject(SalidaLocalService).ultima(OTRO)).toBeUndefined();
-    expect((await locales.obtenerPuentesPreparados())[0].propietarioId).toBe(AUTOR);
-    expect((await locales.obtenerEsquemaActivoLocal())?.propietarioId).toBe(AUTOR);
+    expect(await locales.obtenerPuentesPreparados()).toEqual([]);
+    expect(await locales.obtenerEsquemaActivoLocal()).toBeUndefined();
   });
 
-  it('E13: página real muestra autor de A al abrir su ID sin red bajo sesión B', async () => {
+  it('E13: página real impide leer A al abrir su ID sin red bajo sesión B', async () => {
     await iniciar();
     auth.setUser(usuario(OTRO));
     const fixture = TestBed.createComponent(CompletarInspeccionPage);
     fixture.detectChanges();
-    await vi.waitFor(() => expect(fixture.componentInstance.borrador()?.autorId).toBe(AUTOR));
+    await vi.waitFor(() => expect(fixture.componentInstance.cargando()).toBe(false));
     fixture.detectChanges();
-    expect(fixture.componentInstance.soloLectura()).toBe(true);
-    expect(fixture.nativeElement.textContent).toContain(AUTOR);
+    expect(fixture.componentInstance.borrador()).toBeNull();
+    expect(fixture.nativeElement.textContent).not.toContain(AUTOR);
     http.expectNone(`/api/v1/inspecciones/${INSPECCION}/borrador`);
     fixture.destroy();
   });
@@ -337,7 +337,7 @@ describe('HU-061 fase 0: integración local y contratos HTTP', () => {
     expect(await sgpDb.cola_sync.toArray()).toEqual(colaAntes);
   });
 
-  it('preparación: conserva origenId, pero diálogo offline usa la clave local como versión y puente', async () => {
+  it('preparación: diálogo offline usa origenId para versión y puente', async () => {
     await TestBed.inject(SalidaLocalService).guardar(AUTOR, paquete());
     const [puenteLocal] = await locales.obtenerPuentesPreparados();
     expect(puenteLocal.origenId).toBe(PUENTE);
@@ -355,16 +355,16 @@ describe('HU-061 fase 0: integración local y contratos HTTP', () => {
     dialogo.iniciarInspeccion();
     await vi.waitFor(() => expect(dialogo.resultado()).not.toBeNull());
     const resultado = dialogo.resultado()!;
-    expect(resultado.versionFormularioId).toBe(`salida:${AUTOR}:${FORMULARIO}`);
-    expect(resultado.puenteId).toBe(puenteLocal.id);
+    expect(resultado.versionFormularioId).toBe(FORMULARIO);
+    expect(resultado.puenteId).toBe(PUENTE);
     const [operacion] = await sgpDb.cola_sync.toArray();
-    expect((operacion.payload as IniciarInspeccionRequest).puenteId).toBe(puenteLocal.id);
-    expect(operacion.payload).not.toHaveProperty('versionFormularioId');
+    expect((operacion.payload as IniciarInspeccionRequest).puenteId).toBe(PUENTE);
+    expect(operacion.payload).toHaveProperty('versionFormularioId', FORMULARIO);
     fixture.destroy();
     listado.destroy();
   });
 
-  it('sincronización: conserva UUID y orden, pero descarta la versión canónica devuelta al crear', async () => {
+  it('sincronización: conserva UUID, orden y versión preparada al crear', async () => {
     const local = await iniciar();
     online.set(true);
     const corrida = TestBed.inject(SincronizacionService).sincronizarAhora();
@@ -373,11 +373,11 @@ describe('HU-061 fase 0: integración local y contratos HTTP', () => {
       const req = http.expectOne('/api/v1/inspecciones');
       expect(req.request.method).toBe('POST');
       expect(req.request.headers.get('Idempotency-Key')).toBe(INSPECCION);
-      expect(req.request.body).toEqual(solicitud());
-      expect(req.request.body).not.toHaveProperty('versionFormularioId');
+      expect(req.request.body).toEqual({ ...solicitud(), versionFormularioId: FORMULARIO });
+      expect(req.request.body).toHaveProperty('versionFormularioId', FORMULARIO);
       req.flush({
         ...(local.payload as BorradorLocalPayload).borrador,
-        versionFormularioId: '0199a000-0000-7000-8000-000000000099',
+        versionFormularioId: FORMULARIO,
       });
     });
     await corrida;
@@ -410,5 +410,310 @@ describe('HU-061 fase 0: integración local y contratos HTTP', () => {
     expect((await sgpDb.inspecciones.get(INSPECCION))?.payload).toMatchObject({
       borrador: { datos, version: 1 },
     });
+  });
+  async function evidencia(local: LocalInspection, pendientes = false) {
+    const inventario: FotografiaResponse[] = CATEGORIAS_FOTO.filter((c) => c !== 'OTRA').map(
+      (categoria) => ({
+        id: categoria,
+        inspeccionId: INSPECCION,
+        categoria,
+        latitud: 14,
+        longitud: -90,
+        capturadoEn: FECHA,
+        mimeReal: 'image/jpeg',
+        tamanoBytes: 100,
+        anchoPx: 10,
+        altoPx: 10,
+      }),
+    );
+    if (pendientes) {
+      for (const foto of inventario)
+        await fotos.guardar({
+          id: foto.id,
+          inspeccionId: INSPECCION,
+          propietarioId: AUTOR,
+          blob: new BlobNode(['imagen']) as unknown as Blob,
+          mime: 'image/jpeg',
+          sincronizado: false,
+          idempotencyKey: 'foto-' + foto.id,
+          metadatos: foto,
+        });
+    } else await sgpDb.inspecciones.put({ ...local, fotosConfirmadas: inventario });
+    return inventario;
+  }
+
+  it('encola una sola intención durable, mantiene BORRADOR y bloquea cambios posteriores', async () => {
+    const local = await iniciar();
+    await evidencia(local);
+    await locales.encolarAccionFinal(INSPECCION, 'publicar', {
+      version: 0,
+      datos: { campo: 'confirmado' },
+    });
+    await locales.encolarAccionFinal(INSPECCION, 'publicar', {
+      version: 0,
+      datos: { campo: 'duplicado' },
+    });
+    const cola = await sgpDb.cola_sync.toArray();
+    expect(cola.filter((op) => op.operacion === 'PUBLICAR_INSPECCION')).toHaveLength(1);
+    const final = cola.find((op) => op.operacion === 'PUBLICAR_INSPECCION')!;
+    sgpDb.close();
+    await sgpDb.open();
+    expect(await sgpDb.cola_sync.get(final.id)).toEqual(final);
+    const actual = (await sgpDb.inspecciones.get(INSPECCION))!;
+    expect(actual.estado).toBe('BORRADOR');
+    expect(actual.intencionFinal?.estado).toBe('PENDIENTE');
+    await expect(
+      locales.guardarBorradorLocal(actual, { version: 0, datos: { campo: 'otra edición' } }),
+    ).rejects.toThrow();
+    expect(await locales.liberarInspeccionesSincronizadas(AUTOR)).toBe(0);
+  });
+
+  it('no encola sin evidencia mínima ni permite publicar a un estudiante', async () => {
+    const local = await iniciar();
+    await expect(
+      locales.encolarAccionFinal(INSPECCION, 'publicar', { version: 0, datos: {} }),
+    ).rejects.toThrow();
+    await evidencia(local);
+    auth.setUser({ ...usuario(), role: 'ESTUDIANTE' });
+    await expect(
+      locales.encolarAccionFinal(INSPECCION, 'publicar', { version: 0, datos: {} }),
+    ).rejects.toThrow();
+    await locales.encolarAccionFinal(INSPECCION, 'enviar', {
+      version: 0,
+      datos: { campo: 'estudiante' },
+    });
+    expect(
+      (await sgpDb.cola_sync.toArray()).some((op) => op.operacion === 'ENVIAR_INSPECCION'),
+    ).toBe(true);
+  });
+
+  it('sincroniza crear, datos, cuatro fotos y publicación en ese orden con claves estables', async () => {
+    const local = await iniciar();
+    const inventario = await evidencia(local, true);
+    const datos = { campo: 'inspección completa' };
+    await locales.encolarAccionFinal(INSPECCION, 'publicar', { version: 0, datos });
+    const final = (await sgpDb.cola_sync.toArray()).find(
+      (op) => op.operacion === 'PUBLICAR_INSPECCION',
+    )!;
+    online.set(true);
+    // FormData de jsdom solo admite Blob de su propio realm.
+    const append = FormData.prototype.append;
+    vi.spyOn(FormData.prototype, 'append').mockImplementation(function (
+      this: FormData,
+      nombre: string,
+      valor: string | Blob,
+      archivo?: string,
+    ) {
+      if (typeof valor !== 'string' && !(valor instanceof Blob))
+        valor = new Blob(['imagen'], { type: 'image/jpeg' });
+      Reflect.apply(
+        append,
+        this,
+        typeof valor === 'string' ? [nombre, valor] : [nombre, valor, archivo],
+      );
+    });
+    const corrida = TestBed.inject(SincronizacionService).sincronizarAhora();
+    await autenticarSincronizacion();
+    await vi.waitFor(() =>
+      http
+        .expectOne('/api/v1/inspecciones')
+        .flush((local.payload as BorradorLocalPayload).borrador),
+    );
+    await vi.waitFor(() => {
+      const req = http.expectOne(`/api/v1/inspecciones/${INSPECCION}/borrador`);
+      expect(req.request.body.datos).toEqual(datos);
+      req.flush({ ...(local.payload as BorradorLocalPayload).borrador, datos, version: 1 });
+    });
+    for (const foto of inventario)
+      await vi.waitFor(() => {
+        http.expectNone(`/api/v1/inspecciones/${INSPECCION}/publicar`);
+        const req = http.expectOne(`/api/v1/inspecciones/${INSPECCION}/fotografias`);
+        expect(req.request.headers.get('Idempotency-Key')).toBe('foto-' + foto.id);
+        req.flush(foto);
+      });
+    await vi.waitFor(() => {
+      const req = http.expectOne(`/api/v1/inspecciones/${INSPECCION}/publicar`);
+      expect(req.request.headers.get('Idempotency-Key')).toBe(final.idempotencyKey);
+      req.flush({ id: INSPECCION, puenteId: PUENTE, estado: 'PUBLICADA' });
+    });
+    await corrida;
+    expect(await sgpDb.cola_sync.count()).toBe(0);
+    expect(await sgpDb.fotos.count()).toBe(0);
+    expect((await sgpDb.inspecciones.get(INSPECCION))?.intencionFinal?.estado).toBe('CONFIRMADA');
+    expect((await sgpDb.inspecciones.get(INSPECCION))?.fotosConfirmadas).toHaveLength(4);
+  });
+
+  it('un rechazo final conserva respuestas y permite una nueva intención corregida con otra clave', async () => {
+    const local = await iniciar();
+    await sgpDb.cola_sync.clear();
+    await evidencia(local);
+    await locales.encolarAccionFinal(INSPECCION, 'publicar', {
+      version: 0,
+      datos: { campo: 'original' },
+    });
+    const primera = (await sgpDb.cola_sync.toArray()).find(
+      (op) => op.operacion === 'PUBLICAR_INSPECCION',
+    )!;
+    // Aislar el resultado final; creación/guardado se cubren en el recorrido anterior.
+    await sgpDb.cola_sync
+      .where('entityId')
+      .equals(INSPECCION)
+      .filter((op) => op.id !== primera.id)
+      .delete();
+    online.set(true);
+    const corrida = TestBed.inject(SincronizacionService).sincronizarAhora();
+    await autenticarSincronizacion();
+    await vi.waitFor(() =>
+      http
+        .expectOne(`/api/v1/inspecciones/${INSPECCION}/publicar`)
+        .flush(
+          { detail: 'Falta evidencia en el servidor' },
+          { status: 422, statusText: 'Unprocessable Entity' },
+        ),
+    );
+    await corrida;
+    const rechazada = (await sgpDb.inspecciones.get(INSPECCION))!;
+    expect(rechazada.intencionFinal).toMatchObject({
+      estado: 'RECHAZADA',
+      error: 'Falta evidencia en el servidor',
+    });
+    expect((rechazada.payload as BorradorLocalPayload).borrador.datos).toEqual({
+      campo: 'original',
+    });
+    await locales.encolarAccionFinal(INSPECCION, 'publicar', {
+      version: 0,
+      datos: { campo: 'corregido' },
+    });
+    const segunda = (await sgpDb.cola_sync.toArray()).find(
+      (op) => op.operacion === 'PUBLICAR_INSPECCION',
+    )!;
+    expect(segunda.idempotencyKey).not.toBe(primera.idempotencyKey);
+  });
+
+  it('una foto en intervención impide ejecutar la acción final y conserva el blob', async () => {
+    const local = await iniciar();
+    await evidencia(local, true);
+    await locales.encolarAccionFinal(INSPECCION, 'publicar', {
+      version: 0,
+      datos: { campo: 'completo' },
+    });
+    const cola = await sgpDb.cola_sync.toArray();
+    for (const op of cola)
+      if (!['PUBLICAR_INSPECCION', undefined].includes(op.operacion))
+        await sgpDb.cola_sync.delete(op.id);
+    for (const op of cola)
+      if (op.tipo === 'FOTO') await sgpDb.cola_sync.update(op.id, { estado: 'INTERVENCION' });
+    online.set(true);
+    const corrida = TestBed.inject(SincronizacionService).sincronizarAhora();
+    await autenticarSincronizacion();
+    await corrida;
+    http.expectNone(`/api/v1/inspecciones/${INSPECCION}/publicar`);
+    expect(await sgpDb.fotos.count()).toBe(4);
+    expect((await sgpDb.inspecciones.get(INSPECCION))?.intencionFinal?.estado).toBe('PENDIENTE');
+  });
+
+  it('SWR de asignaciones entrega caché propia, revalida y oculta datos al cambiar cuenta', async () => {
+    const servicio = TestBed.inject(ReferenciasLocalesService);
+    await sgpDb.asignaciones_usuario.put({ propietarioId: AUTOR, datos: [] });
+    online.set(true);
+    const vistas: unknown[] = [];
+    servicio.misPuentesAsignados().subscribe((datos) => vistas.push(datos));
+    await vi.waitFor(() => expect(vistas).toEqual([[]]));
+    auth.setUser(usuario(OTRO));
+    http.expectOne('/api/v1/asignaciones-puentes/mis-puentes').flush([{ id: 'de-A' }]);
+    await vi.waitFor(async () =>
+      expect((await sgpDb.asignaciones_usuario.get(AUTOR))?.datos).toEqual([{ id: 'de-A' }]),
+    );
+    expect(vistas).toEqual([[]]);
+    expect(await sgpDb.asignaciones_usuario.get(OTRO)).toBeUndefined();
+  });
+  it('dos cuentas conservan copias independientes de la misma versión de formulario', async () => {
+    await locales.guardarEsquemaLocal({
+      id: FORMULARIO,
+      version: '1',
+      schema: { de: 'A' },
+      activo: true,
+    });
+    auth.setUser(usuario(OTRO));
+    await locales.guardarEsquemaLocal({
+      id: FORMULARIO,
+      version: '1',
+      schema: { de: 'B' },
+      activo: true,
+    });
+    expect((await locales.obtenerEsquemaLocal(FORMULARIO))?.schema).toEqual({ de: 'B' });
+    auth.setUser(usuario());
+    expect((await locales.obtenerEsquemaActivoLocal())?.schema).toEqual({ de: 'A' });
+  });
+  it('una operación desconocida queda para intervención y nunca se elimina silenciosamente', async () => {
+    await sgpDb.cola_sync.put({
+      id: 'desconocida',
+      entityId: INSPECCION,
+      propietarioId: AUTOR,
+      tipo: 'INSPECCION',
+      operacion: 'DESCONOCIDA' as never,
+      idempotencyKey: 'clave-desconocida',
+      intentos: 0,
+      creadoEn: FECHA,
+      estado: 'PENDIENTE',
+    });
+    online.set(true);
+    const corrida = TestBed.inject(SincronizacionService).sincronizarAhora();
+    await autenticarSincronizacion();
+    await corrida;
+    expect((await sgpDb.cola_sync.get('desconocida'))?.estado).toBe('INTERVENCION');
+  });
+
+  it('fija la versión y el cuerpo antes del primer envío y conserva ambos tras un resultado incierto', async () => {
+    const local = await iniciar();
+    const { datos } = await editar(local);
+    await sgpDb.cola_sync.filter((op) => op.operacion === 'CREAR_INSPECCION').delete();
+    online.set(true);
+    const sync = TestBed.inject(SincronizacionService);
+    const primera = sync.sincronizarAhora();
+    await autenticarSincronizacion();
+    let clave: string | null = null;
+    await vi.waitFor(() => {
+      const req = http.expectOne(`/api/v1/inspecciones/${INSPECCION}/borrador`);
+      clave = req.request.headers.get('Idempotency-Key');
+      expect(req.request.body.version).toBe(0);
+      req.flush({}, { status: 401, statusText: 'Unauthorized' });
+    });
+    await primera;
+    const guardado = (await sgpDb.inspecciones.get(INSPECCION))!;
+    const payload = guardado.payload as BorradorLocalPayload;
+    await sgpDb.inspecciones.update(INSPECCION, {
+      payload: { ...payload, borrador: { ...payload.borrador, version: 9 } },
+    });
+    const segunda = sync.sincronizarAhora();
+    await autenticarSincronizacion();
+    await vi.waitFor(() => {
+      const req = http.expectOne(`/api/v1/inspecciones/${INSPECCION}/borrador`);
+      expect(req.request.headers.get('Idempotency-Key')).toBe(clave);
+      expect(req.request.body).toMatchObject({ version: 0, datos });
+      req.flush({ ...payload.borrador, datos, version: 1 });
+    });
+    await segunda;
+    expect(await sgpDb.cola_sync.count()).toBe(0);
+  });
+  it('recupera una operación interrumpida que agotó intentos como intervención manual', async () => {
+    await sgpDb.cola_sync.put({
+      id: 'interrumpida',
+      entityId: INSPECCION,
+      propietarioId: AUTOR,
+      tipo: 'INSPECCION',
+      operacion: 'GUARDAR_BORRADOR',
+      idempotencyKey: 'clave-interrumpida',
+      intentos: 5,
+      creadoEn: FECHA,
+      iniciadoEn: FECHA,
+      estado: 'ENVIANDO',
+    });
+    online.set(true);
+    const corrida = TestBed.inject(SincronizacionService).sincronizarAhora();
+    await autenticarSincronizacion();
+    await corrida;
+    expect((await sgpDb.cola_sync.get('interrumpida'))?.estado).toBe('INTERVENCION');
+    http.expectNone(`/api/v1/inspecciones/${INSPECCION}/borrador`);
   });
 });

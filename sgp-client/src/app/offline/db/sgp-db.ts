@@ -1,3 +1,6 @@
+import type { AsignacionPuenteResponse } from '../../features/puentes/models/puente.models';
+import type { FotografiaResponse } from '../../features/inspecciones/models/fotografia.models';
+import type { InspeccionResumenResponse } from '../../features/inspecciones/models/inspeccion.models';
 import type {
   ResumenSalida,
   SolicitudSalidaLocal,
@@ -24,6 +27,13 @@ export interface LocalInspection {
   payload: unknown;
   sincronizado: boolean;
   actualizacionLocalPendiente?: boolean;
+  fotosConfirmadas?: FotografiaResponse[];
+  intencionFinal?: {
+    accion: 'enviar' | 'publicar';
+    estado: 'PENDIENTE' | 'RECHAZADA' | 'CONFIRMADA';
+    error?: string;
+    resultado?: InspeccionResumenResponse;
+  };
 }
 export interface LocalPhoto {
   propietarioId?: string;
@@ -58,7 +68,9 @@ export interface SyncQueueItem {
   entityId: string;
   idempotencyKey: string;
   propietarioId?: string;
-  operacion?: 'CREAR_INSPECCION' | 'GUARDAR_BORRADOR';
+  operacion?: 'CREAR_INSPECCION' | 'GUARDAR_BORRADOR' | 'ENVIAR_INSPECCION' | 'PUBLICAR_INSPECCION';
+  peticionFijada?: boolean;
+  iniciadoEn?: string;
   payload?: unknown;
   intentos: number;
   creadoEn: string;
@@ -85,6 +97,10 @@ export interface LocalNotificacionMeta {
 }
 
 export class SgpDatabase extends Dexie {
+  asignaciones_usuario!: Table<
+    { propietarioId: string; datos: AsignacionPuenteResponse[] },
+    string
+  >;
   puentes!: Table<LocalBridge, string>;
   inspecciones!: Table<LocalInspection, string>;
   fotos!: Table<LocalPhoto, string>;
@@ -113,6 +129,7 @@ export class SgpDatabase extends Dexie {
       preparaciones_salida: 'propietarioId',
       solicitudes_salida: 'propietarioId',
     });
+    this.version(4).stores({ asignaciones_usuario: 'propietarioId' });
   }
 }
 

@@ -1,3 +1,5 @@
+import { SincronizacionService } from '../../../../offline/services/sincronizacion.service';
+import { EMPTY } from 'rxjs';
 import { TestBed, ComponentFixture } from '@angular/core/testing';
 import { signal } from '@angular/core';
 import { By } from '@angular/platform-browser';
@@ -20,17 +22,29 @@ describe('Reporte fotográfico', () => {
     adjuntarFotografia: vi.fn(),
     retirarFotografia: vi.fn(),
   };
+  const sync = {
+    sincronizarAhora: vi.fn().mockResolvedValue(undefined),
+    reintentar: vi.fn().mockResolvedValue(undefined),
+  };
   const locales = {
+    observarInventario: vi.fn(),
+    inventario: vi.fn(),
+    guardarInventario: vi.fn(),
     guardarContexto: vi.fn(),
     guardar: vi.fn(),
     pendientes: vi.fn(),
     confirmar: vi.fn(),
   };
   beforeEach(async () => {
+    sync.sincronizarAhora.mockClear();
+    sync.reintentar.mockClear();
     auth.user.set({ id: 'autor' });
     Object.values(api).forEach((f) => f.mockReset());
     Object.values(locales).forEach((f) => f.mockReset());
     api.listarFotografias.mockReturnValue(of([]));
+    locales.observarInventario.mockReturnValue(EMPTY);
+    locales.inventario.mockResolvedValue([]);
+    locales.guardarInventario.mockResolvedValue(undefined);
     locales.pendientes.mockResolvedValue([]);
     locales.guardar.mockResolvedValue(undefined);
     locales.confirmar.mockResolvedValue(undefined);
@@ -47,6 +61,7 @@ describe('Reporte fotográfico', () => {
         }),
       ],
       providers: [
+        { provide: SincronizacionService, useValue: sync },
         { provide: AuthStore, useValue: auth },
         { provide: InspeccionApiService, useValue: api },
         { provide: FotografiasLocalesService, useValue: locales },
@@ -146,27 +161,23 @@ describe('Reporte fotográfico', () => {
     fixture.detectChanges();
     expect(api.retirarFotografia).toHaveBeenCalledWith('galeria', 'foto');
     expect(c.confirmadas()).toEqual([]);
-    expect(c.faltantes()).toContain('ACCESO');
-    expect(c.conteos().find((conteo) => conteo.categoria === 'ACCESO')?.cantidad).toBe(0);
+    expect(c.faltantes()).not.toContain('ACCESO');
+    expect(c.conteos().find((conteo) => conteo.categoria === 'ACCESO')?.cantidad).toBe(1);
     expect(c.pendientes()).toEqual([pendiente]);
     expect(locales.confirmar).not.toHaveBeenCalled();
     expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:prueba');
     expect(fixture.nativeElement.querySelectorAll('.fotografias figure')).toHaveLength(0);
   });
-  it('informa el 422 del límite y conserva blob, metadatos y operación para reintentar', async () => {
+  it('conserva la fotografía local y delega su reintento al sincronizador', async () => {
     const c = prepararAdjunto();
-    api.adjuntarFotografia.mockReturnValue(
-      throwError(() => ({ status: 422, error: { code: 'limite_fotografias_excedido' } })),
-    );
     await c.adjuntar();
-    expect(c.error()).toBe('limite');
     const pendiente = c.pendientes()[0];
     expect(pendiente.blob.size).toBe(4);
     await c.reintentar(pendiente);
-    expect(api.adjuntarFotografia.mock.calls[0]).toEqual(api.adjuntarFotografia.mock.calls[1]);
+    expect(sync.reintentar).toHaveBeenCalledWith(pendiente.id);
     expect(locales.guardar).toHaveBeenCalledWith(pendiente);
     expect(locales.confirmar).not.toHaveBeenCalled();
-    expect(c.pendientes()).toEqual([pendiente]);
+    expect(api.adjuntarFotografia).not.toHaveBeenCalled();
   });
   it('impide adjuntar una nueva al alcanzar 60 confirmadas', async () => {
     const c = prepararAdjunto();
@@ -178,25 +189,14 @@ describe('Reporte fotográfico', () => {
     expect(locales.guardar).not.toHaveBeenCalled();
     expect(api.adjuntarFotografia).not.toHaveBeenCalled();
   });
-  it('reintenta la misma operación pendiente aunque ya haya 60 confirmadas', async () => {
+  it('permite reintentar una pendiente aunque el inventario ya alcance 60', async () => {
     const c = prepararAdjunto();
-    api.adjuntarFotografia.mockReturnValue(throwError(() => ({ status: 0 })));
     await c.adjuntar();
     const pendiente = c.pendientes()[0];
-    const fotos = Array.from({ length: 60 }, (_, i) => ({
-      ...foto,
-      id: String(i),
-      inspeccionId: 'inspeccion',
-    }));
-    c.confirmadas.set(fotos);
-    api.adjuntarFotografia.mockReturnValue(of({ ...foto, id: pendiente.id }));
-    api.listarFotografias.mockReturnValue(of(fotos));
-    api.contenidoFotografia.mockReturnValue(of(new Blob(['imagen'])));
+    c.confirmadas.set(Array.from({ length: 60 }, (_, i) => ({ ...foto, id: String(i) })));
     await c.reintentar(pendiente);
-    expect(api.adjuntarFotografia.mock.calls[0]).toEqual(api.adjuntarFotografia.mock.calls[1]);
-    expect(locales.confirmar).toHaveBeenCalledWith(pendiente.id, 'autor');
-    expect(c.pendientes()).toEqual([]);
-    expect(c.limiteAlcanzado()).toBe(true);
+    expect(sync.reintentar).toHaveBeenCalledWith(pendiente.id);
+    expect(locales.confirmar).not.toHaveBeenCalled();
   });
   it('un 409 de retirada conserva la foto y bloquea nuevas modificaciones', async () => {
     await cargarGaleria();
@@ -257,29 +257,17 @@ describe('Reporte fotográfico', () => {
     expect(api.listarFotografias).toHaveBeenCalledTimes(llamadas);
     expect(fixture.componentInstance.confirmadas()).toHaveLength(1);
   });
-  it('persiste antes de enviar y reintenta con exactamente la misma operación', async () => {
-    const c = fixture.componentInstance;
-    const blob = new Blob(['jpeg'], { type: 'image/jpeg' });
-    c.borrador.set({
-      blob,
-      latitud: 14,
-      longitud: -90,
-      capturadoEn: '2026-10-14T12:00:00Z',
-      orientacion: 1,
-    });
-    c.categoria.setValue('ACCESO');
-    api.adjuntarFotografia.mockReturnValue(throwError(() => ({ status: 0 })));
+  it('persiste antes de solicitar sincronización y mantiene la identidad al reintentar', async () => {
+    const c = prepararAdjunto();
     await c.adjuntar();
-    expect(c.pendientes()).toHaveLength(1);
     const pendiente = c.pendientes()[0];
     expect(pendiente.id[14]).toBe('7');
     expect(locales.guardar.mock.invocationCallOrder[0]).toBeLessThan(
-      api.adjuntarFotografia.mock.invocationCallOrder[0],
+      sync.sincronizarAhora.mock.invocationCallOrder[0],
     );
-    api.adjuntarFotografia.mockReturnValue(of({ id: pendiente.id }));
     await c.reintentar(pendiente);
-    expect(api.adjuntarFotografia.mock.calls[0]).toEqual(api.adjuntarFotografia.mock.calls[1]);
-    expect(locales.confirmar).toHaveBeenCalledWith(pendiente.id, 'autor');
+    expect(sync.reintentar).toHaveBeenCalledWith(pendiente.id);
+    expect(api.adjuntarFotografia).not.toHaveBeenCalled();
   });
   it('no envía una fotografía sin categoría', async () => {
     fixture.componentInstance.borrador.set({
