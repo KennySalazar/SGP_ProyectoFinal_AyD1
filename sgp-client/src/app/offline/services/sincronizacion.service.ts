@@ -282,8 +282,11 @@ export class SincronizacionService implements OnDestroy {
             http.error?.code,
           )
         ) {
+          let borradorEditable = false;
+          let rechazoConfirmado = false;
           try {
             const canonica = await firstValueFrom(this.api.obtenerBorrador(item.entityId, true));
+            borradorEditable = canonica.autorId === propietarioId && canonica.estado === 'BORRADOR';
             if (
               canonica.autorId === propietarioId &&
               (canonica.estado === 'PUBLICADA' ||
@@ -311,15 +314,20 @@ export class SincronizacionService implements OnDestroy {
               await this.marcarConfirmada(item.entityId, propietarioId);
               return;
             }
-          } catch {
+          } catch (errorConsulta) {
             /* Un estado incierto conserva la intención y sus datos. */
+            rechazoConfirmado =
+              borradorEditable && (errorConsulta as HttpErrorResponse).status === 404;
           }
-          await sgpDb.cola_sync.update(item.id, {
-            estado: 'INTERVENCION',
-            codigoError: http.error?.code,
-            ultimoError: http.error?.detail ?? http.message,
-          });
-          return;
+          if (!rechazoConfirmado) {
+            await sgpDb.cola_sync.update(item.id, {
+              estado: 'INTERVENCION',
+              codigoError: http.error?.code,
+              ultimoError: http.error?.detail ?? http.message,
+            });
+            return;
+          }
+          // Borrador propio confirmado y sin publicación: reutilizar el rechazo definitivo.
         }
         if (this.esFinal(item) && !incierto && http.status !== undefined) {
           // Un rechazo definitivo libera la edición. La siguiente confirmación obtiene otra clave.

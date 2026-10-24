@@ -662,6 +662,9 @@ describe('CompletarInspeccionPage', () => {
     } as LocalInspection);
     fixture.detectChanges();
     expect(component.intencionFinal()?.error).toBe('Revisa el calculo actualizado');
+    expect(fixture.nativeElement.querySelector('[role="alert"]')?.textContent).toContain(
+      'Revisa el calculo actualizado',
+    );
     expect(component.soloLectura()).toBe(false);
     expect(component.resultadoAccion()).toBeNull();
   });

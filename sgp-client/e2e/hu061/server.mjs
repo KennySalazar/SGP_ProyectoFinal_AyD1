@@ -1,12 +1,15 @@
 import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { resolve, extname, sep } from 'node:path';
+import { gzipSync } from 'node:zlib';
 import { fixture, user, schema, photos } from './fixture.mjs';
 const root = resolve('dist/sgp-client/browser');
 let publicaciones = [];
 let estado = 'BORRADOR';
 let referencia = 'Guatemala';
 let version = 1;
+let sesionActiva = true;
+let usuario = user;
 const tipos = {
   '.html': 'text/html',
   '.js': 'application/javascript',
@@ -31,7 +34,14 @@ createServer(async (req, res) => {
   if (url.pathname === '/__e2e/reset') {
     publicaciones = [];
     estado = 'BORRADOR';
+    sesionActiva = true;
+    usuario = { ...user, role: url.searchParams.get('rol') ?? user.role };
     json({ ok: true });
+    return;
+  }
+  if (url.pathname === '/__e2e/sesion') {
+    sesionActiva = url.searchParams.get('activa') === 'true';
+    json({ sesionActiva });
     return;
   }
   if (url.pathname === '/__e2e/referencia') {
@@ -49,16 +59,33 @@ createServer(async (req, res) => {
     return;
   }
   if (url.pathname === '/api/v1/auth/refresh') {
-    json({ accessToken: 'token-de-prueba-e2e' });
+    json(
+      sesionActiva ? { accessToken: 'token-de-prueba-e2e' } : { code: 'sesion_expirada' },
+      sesionActiva ? 200 : 401,
+    );
+    return;
+  }
+  if (url.pathname === '/api/v1/auth/login') {
+    sesionActiva = true;
+    json({ accessToken: 'token-de-prueba-e2e', requiresTwoFactor: false });
+    return;
+  }
+  if (url.pathname === '/api/v1/auth/logout') {
+    sesionActiva = false;
+    json({});
     return;
   }
   if (url.pathname === '/api/v1/auth/me') {
-    json(user);
+    json(sesionActiva ? usuario : { code: 'sesion_expirada' }, sesionActiva ? 200 : 401);
     return;
   }
   if (url.pathname === '/api/v1/catalogos/departamentos') {
     await new Promise((resolve) => setTimeout(resolve, 200));
     json([{ id: 'd', nombre: referencia }]);
+    return;
+  }
+  if (url.pathname === '/api/v1/catalogos/departamentos/d/municipios') {
+    json([{ id: 'm', nombre: 'Amatitlan' }]);
     return;
   }
   if (url.pathname === '/api/v1/formularios/activo' || url.pathname.endsWith('/esquema')) {
@@ -71,17 +98,21 @@ createServer(async (req, res) => {
         /* consumir JSON */
       }
     }
-    json({ ...fixture, estado, version: req.method === 'PUT' ? 1 : 0 });
+    json({ ...fixture, rolAutor: usuario.role, estado, version: req.method === 'PUT' ? 1 : 0 });
     return;
   }
-  if (url.pathname.startsWith('/api/') && url.pathname.endsWith('/publicar')) {
+  if (url.pathname.startsWith('/api/') && /\/(publicar|enviar)$/.test(url.pathname)) {
+    if (!sesionActiva) {
+      json({ code: 'sesion_expirada' }, 401);
+      return;
+    }
     const clave = req.headers['idempotency-key'];
     if (!clave) {
       json({ detail: 'Falta clave' }, 400);
       return;
     }
     if (!publicaciones.includes(clave)) publicaciones.push(clave);
-    estado = 'PUBLICADA';
+    estado = url.pathname.endsWith('/enviar') ? 'ENVIADA' : 'PUBLICADA';
     json({ ...fixture, estado });
     return;
   }
@@ -117,8 +148,14 @@ createServer(async (req, res) => {
       manifest.appData = { versionPrueba: version };
       bytes = Buffer.from(JSON.stringify(manifest));
     }
+    // Misma compresión gzip nivel 6 que nginx.conf para medir transferencia 3G.
+    const comprimir =
+      /\bgzip\b/.test(req.headers['accept-encoding'] ?? '') &&
+      ['text/html', 'application/javascript', 'text/css', 'application/json'].includes(tipo);
+    if (comprimir) bytes = gzipSync(bytes, { level: 6 });
     res.writeHead(200, {
       'Content-Type': tipo ?? 'application/octet-stream',
+      ...(comprimir ? { 'Content-Encoding': 'gzip', Vary: 'Accept-Encoding' } : {}),
       'Cache-Control':
         tipo === 'text/html' || url.pathname.includes('ngsw')
           ? 'no-store'

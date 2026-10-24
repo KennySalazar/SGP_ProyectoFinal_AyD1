@@ -190,6 +190,21 @@ describe('HU-061 fase 0: integración local y contratos HTTP', () => {
     await vi.waitFor(() => http.expectOne('/api/v1/auth/me').flush(usuario(id)));
   }
 
+  async function prepararPublicacionPendiente() {
+    const local = await iniciar();
+    await evidencia(local);
+    const datos = {
+      campo: 'original',
+      identificacion: { ruta: 'RN-1', departamento: 'Guatemala', municipio: 'Amatitlan' },
+    };
+    await locales.encolarAccionFinal(INSPECCION, 'publicar', { version: 0, datos });
+    const final = (await sgpDb.cola_sync.toArray()).find(
+      (op) => op.operacion === 'PUBLICAR_INSPECCION',
+    )!;
+    await sgpDb.cola_sync.filter((op) => op.id !== final.id).delete();
+    return { final, borrador: { ...(local.payload as BorradorLocalPayload).borrador, datos } };
+  }
+
   it('control: conserva UUID, versión, datos y claves tras cerrar y abrir IndexedDB', async () => {
     const local = await iniciar();
     const { datos } = await editar(local);
@@ -588,6 +603,197 @@ describe('HU-061 fase 0: integración local y contratos HTTP', () => {
       (op) => op.operacion === 'PUBLICAR_INSPECCION',
     )!;
     expect(segunda.idempotencyKey).not.toBe(primera.idempotencyKey);
+  });
+
+  it('HU-061 aceptación: un rechazo 409 definitivo permite corregir un borrador no publicado', async () => {
+    const local = await iniciar();
+    await evidencia(local);
+    const datos = {
+      campo: 'original',
+      identificacion: { ruta: 'RN-1', departamento: 'Guatemala', municipio: 'Amatitlan' },
+    };
+    await locales.encolarAccionFinal(INSPECCION, 'publicar', { version: 0, datos });
+    const final = (await sgpDb.cola_sync.toArray()).find(
+      (op) => op.operacion === 'PUBLICAR_INSPECCION',
+    )!;
+    // Las dependencias se prueban en el recorrido anterior; aquí solo se verifica el rechazo.
+    await sgpDb.cola_sync.filter((op) => op.id !== final.id).delete();
+    online.set(true);
+    const corrida = TestBed.inject(SincronizacionService).sincronizarAhora();
+    await autenticarSincronizacion();
+    const motivo =
+      'La inspeccion original ya tiene una correccion publicada; corrija esa correccion.';
+    await vi.waitFor(() =>
+      http
+        .expectOne(`/api/v1/inspecciones/${INSPECCION}/publicar`)
+        .flush(
+          { code: 'correccion_ya_publicada', detail: motivo },
+          { status: 409, statusText: 'Conflict' },
+        ),
+    );
+    await vi.waitFor(() =>
+      http.expectOne(`/api/v1/inspecciones/${INSPECCION}/borrador`).flush({
+        ...(local.payload as BorradorLocalPayload).borrador,
+        datos,
+        estado: 'BORRADOR',
+      }),
+    );
+    await vi.waitFor(() =>
+      http
+        .expectOne(`/api/v1/inspecciones/${INSPECCION}/publicada`)
+        .flush({ code: 'inspeccion_no_publicada' }, { status: 404, statusText: 'Not Found' }),
+    );
+    await corrida;
+    const rechazada = (await sgpDb.inspecciones.get(INSPECCION))!;
+    // Comprobar conservación antes de exigir que se libere la edición.
+    expect((rechazada.payload as BorradorLocalPayload).borrador.datos).toEqual(datos);
+    expect(rechazada.fotosConfirmadas).toHaveLength(4);
+    expect(rechazada.estado).toBe('BORRADOR');
+    expect.soft(rechazada.intencionFinal).toMatchObject({ estado: 'RECHAZADA', error: motivo });
+    await expect(
+      locales.guardarBorradorLocal(rechazada, {
+        version: 0,
+        datos: { ...datos, campo: 'corregido' },
+      }),
+    ).resolves.toMatchObject({ id: expect.any(String), idempotencyKey: expect.any(String) });
+    expect(await sgpDb.cola_sync.get(final.id)).toBeUndefined();
+    await locales.encolarAccionFinal(INSPECCION, 'publicar', {
+      version: 0,
+      datos: { ...datos, campo: 'corregido' },
+    });
+    const nueva = (await sgpDb.cola_sync.toArray()).find(
+      (op) => op.operacion === 'PUBLICAR_INSPECCION',
+    )!;
+    expect(nueva.idempotencyKey).not.toBe(final.idempotencyKey);
+    expect((await sgpDb.inspecciones.get(INSPECCION))?.intencionFinal?.estado).toBe('PENDIENTE');
+    expect((await sgpDb.inspecciones.get(INSPECCION))?.payload).toMatchObject({
+      borrador: { datos: { ...datos, campo: 'corregido' } },
+    });
+  });
+
+  it.each([
+    { caso: 'no se confirma el borrador', borradorDisponible: false, autor: AUTOR, status: 404 },
+    {
+      caso: 'la consulta publicada falla con 503',
+      borradorDisponible: true,
+      autor: AUTOR,
+      status: 503,
+    },
+    {
+      caso: 'se pierde la conexión al consultar publicada',
+      borradorDisponible: true,
+      autor: AUTOR,
+      status: 0,
+    },
+    {
+      caso: 'el borrador pertenece a otro usuario',
+      borradorDisponible: true,
+      autor: OTRO,
+      status: 404,
+    },
+  ])(
+    'D1: conserva la intención y clave si $caso',
+    async ({ borradorDisponible, autor, status }) => {
+      const { final, borrador } = await prepararPublicacionPendiente();
+      online.set(true);
+      const corrida = TestBed.inject(SincronizacionService).sincronizarAhora();
+      await autenticarSincronizacion();
+      await vi.waitFor(() =>
+        http
+          .expectOne(`/api/v1/inspecciones/${INSPECCION}/publicar`)
+          .flush(
+            { code: 'correccion_ya_publicada', detail: 'Conflicto de publicación' },
+            { status: 409, statusText: 'Conflict' },
+          ),
+      );
+      await vi.waitFor(() => {
+        const req = http.expectOne(`/api/v1/inspecciones/${INSPECCION}/borrador`);
+        if (borradorDisponible) req.flush({ ...borrador, autorId: autor });
+        else req.flush({}, { status: 404, statusText: 'Not Found' });
+      });
+      await vi.waitFor(() => {
+        const req = http.expectOne(`/api/v1/inspecciones/${INSPECCION}/publicada`);
+        if (status === 0) req.error(new ProgressEvent('error'));
+        else req.flush({}, { status, statusText: 'Consulta sin resultado publicado' });
+      });
+      await corrida;
+      expect(await sgpDb.cola_sync.get(final.id)).toMatchObject({
+        estado: 'INTERVENCION',
+        idempotencyKey: final.idempotencyKey,
+      });
+      const local = (await sgpDb.inspecciones.get(INSPECCION))!;
+      expect(local.intencionFinal?.estado).toBe('PENDIENTE');
+      expect(local.payload).toMatchObject({ borrador: { datos: borrador.datos } });
+      expect(local.fotosConfirmadas).toHaveLength(4);
+      await expect(locales.guardarBorradorLocal(local, { version: 0, datos: {} })).rejects.toThrow(
+        'offline.hu061.locked',
+      );
+    },
+  );
+
+  it('D1: reconcilia una publicación confirmada sin volver a BORRADOR ni permitir edición', async () => {
+    const { final, borrador } = await prepararPublicacionPendiente();
+    online.set(true);
+    const corrida = TestBed.inject(SincronizacionService).sincronizarAhora();
+    await autenticarSincronizacion();
+    await vi.waitFor(() =>
+      http
+        .expectOne(`/api/v1/inspecciones/${INSPECCION}/publicar`)
+        .flush({ code: 'transicion_no_permitida' }, { status: 409, statusText: 'Conflict' }),
+    );
+    await vi.waitFor(() =>
+      http
+        .expectOne(`/api/v1/inspecciones/${INSPECCION}/borrador`)
+        .flush({}, { status: 404, statusText: 'Not Found' }),
+    );
+    await vi.waitFor(() =>
+      http.expectOne(`/api/v1/inspecciones/${INSPECCION}/publicada`).flush({
+        ...borrador,
+        estado: 'PUBLICADA',
+      }),
+    );
+    await corrida;
+    const local = (await sgpDb.inspecciones.get(INSPECCION))!;
+    expect(local.estado).toBe('PUBLICADA');
+    expect(local.payload).toMatchObject({ borrador: { estado: 'PUBLICADA' } });
+    expect(local.intencionFinal?.estado).toBe('CONFIRMADA');
+    expect(await sgpDb.cola_sync.get(final.id)).toBeUndefined();
+    await expect(locales.guardarBorradorLocal(local, { version: 0, datos: {} })).rejects.toThrow(
+      'offline.hu061.locked',
+    );
+  });
+
+  it('D1: una publicación todavía en proceso conserva pendiente y reintenta con la misma clave', async () => {
+    const { final } = await prepararPublicacionPendiente();
+    online.set(true);
+    const sync = TestBed.inject(SincronizacionService);
+    const primera = sync.sincronizarAhora();
+    await autenticarSincronizacion();
+    await vi.waitFor(() =>
+      http
+        .expectOne(`/api/v1/inspecciones/${INSPECCION}/publicar`)
+        .flush(
+          { code: 'operacion_en_proceso' },
+          { status: 409, statusText: 'Conflict', headers: { 'Retry-After': '60' } },
+        ),
+    );
+    await primera;
+    http.expectNone(`/api/v1/inspecciones/${INSPECCION}/borrador`);
+    http.expectNone(`/api/v1/inspecciones/${INSPECCION}/publicada`);
+    expect(await sgpDb.cola_sync.get(final.id)).toMatchObject({
+      estado: 'PENDIENTE',
+      idempotencyKey: final.idempotencyKey,
+    });
+    expect((await sgpDb.inspecciones.get(INSPECCION))?.intencionFinal?.estado).toBe('PENDIENTE');
+    const segunda = sync.sincronizarAhora();
+    await autenticarSincronizacion();
+    await vi.waitFor(() => {
+      const req = http.expectOne(`/api/v1/inspecciones/${INSPECCION}/publicar`);
+      expect(req.request.headers.get('Idempotency-Key')).toBe(final.idempotencyKey);
+      req.flush({ id: INSPECCION, puenteId: PUENTE, estado: 'PUBLICADA' });
+    });
+    await segunda;
+    expect((await sgpDb.inspecciones.get(INSPECCION))?.intencionFinal?.estado).toBe('CONFIRMADA');
   });
 
   it('una foto en intervención impide ejecutar la acción final y conserva el blob', async () => {
