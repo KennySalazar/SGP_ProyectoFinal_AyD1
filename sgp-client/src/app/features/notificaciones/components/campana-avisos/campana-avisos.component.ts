@@ -39,9 +39,9 @@ export class CampanaAvisosComponent {
     this.abierto.set(false);
   }
 
-  onAvisoClick(aviso: NotificacionResponse): void {
-    this.cerrar();
-    void this.store.marcarLeida(aviso);
+  async onAvisoClick(aviso: NotificacionResponse): Promise<void> {
+    await this.store.marcarLeida(aviso);
+    if (!this.store.errorLectura()) this.cerrar();
   }
 
   onMarcarTodas(): void {

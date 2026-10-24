@@ -5,6 +5,7 @@ export interface NotificacionResponse {
   mensaje: string;
   entidad?: string;
   entidadId?: string;
+  rutaDestino?: string | null;
   claveEvento: string;
   leidoEn?: string;
   creadoEn: string;

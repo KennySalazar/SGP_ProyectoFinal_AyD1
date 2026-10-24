@@ -1,6 +1,6 @@
 import { effect, inject, Injectable, OnDestroy, signal } from '@angular/core';
 import { NavigationEnd, Router } from '@angular/router';
-import { filter, Subscription, timer } from 'rxjs';
+import { filter, firstValueFrom, Subscription, timer } from 'rxjs';
 import { AuthStore } from '../../../core/services/auth.store';
 import { ConnectivityService } from '../../../offline/services/connectivity.service';
 import { NotificacionOfflineService } from '../../../offline/services/notificacion-offline.service';
@@ -14,6 +14,9 @@ export class NotificacionesStore implements OnDestroy {
   private readonly connectivity = inject(ConnectivityService);
   private readonly auth = inject(AuthStore);
   private readonly router = inject(Router);
+
+  readonly errorLectura = signal(false);
+  readonly abriendoAviso = signal(false);
 
   readonly unreadCount = signal<number>(0);
   readonly avisos = signal<NotificacionResponse[]>([]);
@@ -126,6 +129,7 @@ export class NotificacionesStore implements OnDestroy {
           mensaje: n.mensaje,
           entidad: n.entidad,
           entidadId: n.entidadId,
+          rutaDestino: n.rutaDestino,
           claveEvento: n.claveEvento,
           leidoEn: n.leidoEn,
           creadoEn: n.creadoEn,
@@ -159,27 +163,46 @@ export class NotificacionesStore implements OnDestroy {
   }
 
   async marcarLeida(aviso: NotificacionResponse): Promise<void> {
-    if (!aviso.leido) {
-      // Actualización optimista local
-      const actualizados = this.avisos().map((a) =>
-        a.id === aviso.id ? { ...a, leido: true, leidoEn: new Date().toISOString() } : a,
-      );
-      this.avisos.set(actualizados);
-      this.unreadCount.update((c) => Math.max(0, c - 1));
-      void this.offline.marcarLeidaLocal(aviso.id);
-
-      if (this.connectivity.online()) {
-        this.api.marcarLeida(aviso.id).subscribe({
-          error: () => {
-            // Se mantiene el estado optimista y local
-          },
-        });
+    if (this.abriendoAviso()) return;
+    this.abriendoAviso.set(true);
+    this.errorLectura.set(false);
+    try {
+      const actual = this.avisos().find((a) => a.id === aviso.id) || aviso;
+      if (!actual.leido) {
+        if (
+          !this.connectivity.online() &&
+          ['VERSION_FORMULARIO', 'CATALOGO_REGLAS'].includes(aviso.entidad?.toUpperCase() || '')
+        ) {
+          this.sinConexionAviso.set(true);
+          this.errorLectura.set(true);
+          return;
+        }
+        let leidoEn = new Date().toISOString();
+        if (this.connectivity.online()) {
+          try {
+            const respuesta = await firstValueFrom(this.api.marcarLeida(aviso.id));
+            leidoEn = respuesta.leidoEn || leidoEn;
+          } catch {
+            this.errorLectura.set(true);
+            return;
+          }
+        }
+        this.avisos.update((avisos) =>
+          avisos.map((a) => (a.id === aviso.id ? { ...a, leido: true, leidoEn } : a)),
+        );
+        this.unreadCount.update((c) => Math.max(0, c - 1));
+        await this.offline.marcarLeidaLocal(aviso.id).catch(() => undefined);
       }
-    }
-
-    const destino = this.obtenerRutaEntidad(aviso.entidad, aviso.entidadId);
-    if (destino) {
-      await this.router.navigate(destino);
+      if (aviso.entidad?.toUpperCase() === 'CATALOGO_REGLAS' && aviso.entidadId) {
+        await this.router.navigate(['/mantenimiento', 'reglas'], {
+          queryParams: { versionId: aviso.entidadId },
+        });
+      } else {
+        const destino = this.obtenerRutaEntidad(aviso.entidad, aviso.entidadId);
+        if (destino) await this.router.navigate(destino);
+      }
+    } finally {
+      this.abriendoAviso.set(false);
     }
   }
 
@@ -208,6 +231,9 @@ export class NotificacionesStore implements OnDestroy {
       return null;
     }
     const entidadUpper = entidad.toUpperCase();
+    if (entidadUpper === 'VERSION_FORMULARIO') {
+      return ['/admin/formularios', entidadId];
+    }
     if (entidadUpper === 'INSPECCION') {
       return ['/inspecciones', entidadId];
     }

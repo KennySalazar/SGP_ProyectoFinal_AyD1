@@ -7,6 +7,7 @@ import {
   OnInit,
   signal,
 } from '@angular/core';
+import { ActivatedRoute } from '@angular/router';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { JsonPipe } from '@angular/common';
 import { FormBuilder, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
@@ -75,6 +76,9 @@ const OPERADORES = [
 })
 export class CatalogoReglasPage implements OnInit {
   readonly auth = inject(AuthStore);
+  private readonly route = inject(ActivatedRoute);
+  private versionSolicitada: string | null = null;
+  private versionesCargadas = false;
   private readonly api = inject(ReglaMantenimientoApiService);
   private readonly formularioApi = inject(FormularioApiService);
   private readonly apiErrors = inject(ApiErrorService);
@@ -170,6 +174,10 @@ export class CatalogoReglasPage implements OnInit {
   }
 
   ngOnInit(): void {
+    this.route.queryParamMap.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((params) => {
+      this.versionSolicitada = params.get('versionId');
+      if (this.versionesCargadas) this.seleccionarVersionSolicitada();
+    });
     this.cargarVersiones();
   }
 
@@ -180,23 +188,46 @@ export class CatalogoReglasPage implements OnInit {
       .subscribe({
         next: (lista) => {
           this.versiones.set(lista);
-          const activa = lista.find((v) => v.activa);
-          const versionId = activa ? activa.id : lista.length > 0 ? lista[0].id : null;
-          this.versionSeleccionadaId.set(versionId);
-          if (versionId) {
-            this.formCrear.patchValue({ versionFormularioId: versionId });
-            this.cargarReglas();
-            this.cargarResumen();
-          }
+          this.versionesCargadas = true;
+          this.seleccionarVersionSolicitada();
         },
         error: () => {
+          if (this.versionSolicitada) {
+            this.errorValidacion.set(
+              'No se pudo cargar la version del aviso. Recarga para reintentar.',
+            );
+            return;
+          }
           this.cargarReglas();
           this.cargarResumen();
         },
       });
   }
 
+  private seleccionarVersionSolicitada(): void {
+    const lista = this.versiones();
+    if (this.versionSolicitada && !lista.some((v) => v.id === this.versionSolicitada)) {
+      this.versionSeleccionadaId.set(null);
+      this.reglas.set([]);
+      this.resumen.set(null);
+      this.totalElementos.set(0);
+      ++this.solicitudReglas;
+      ++this.solicitudResumen;
+      this.cargando.set(false);
+      this.errorValidacion.set('La version del aviso no esta disponible. Selecciona otra version.');
+      return;
+    }
+    const versionId = this.versionSolicitada || lista.find((v) => v.activa)?.id || lista[0]?.id;
+    if (versionId) this.cambiarVersion(versionId);
+  }
+
   cambiarVersion(versionId: string | null): void {
+    this.errorValidacion.set(null);
+    this.reglaDetalle.set(null);
+    this.reglaPorValidar.set(null);
+    this.filtroTipo.set(null);
+    this.filtroElemento.set('');
+    this.filtroActiva.set(null);
     this.versionSeleccionadaId.set(versionId);
     if (versionId) {
       this.formCrear.patchValue({ versionFormularioId: versionId });

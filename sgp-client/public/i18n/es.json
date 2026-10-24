@@ -385,6 +385,7 @@
     "notaPublico": "Tu nombre de usuario es lo que verán los demás en el foro y lo que se escribe tras la arroba para mencionarte. Tu nombre completo no se muestra públicamente."
   },
   "avisos": {
+    "readError": "No se pudo marcar el aviso como leído. Intenta abrirlo de nuevo.",
     "title": "Avisos",
     "kicker": "Notificaciones",
     "description": "Avisos y novedades dentro de la aplicación que requieren tu atención.",
