@@ -2,18 +2,24 @@ package gt.usac.cunoc.sgp.integration;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import gt.usac.cunoc.sgp.common.audit.service.AuditoriaWriter;
 import gt.usac.cunoc.sgp.common.exception.ApiException;
+import gt.usac.cunoc.sgp.common.exception.ApiExceptionHandler;
 import gt.usac.cunoc.sgp.common.security.JwtData;
 import gt.usac.cunoc.sgp.formulario.validation.JsonSchemaValidatorService;
+import gt.usac.cunoc.sgp.inspeccion.controller.TransicionInspeccionController;
 import gt.usac.cunoc.sgp.inspeccion.dto.ConfirmarEstadoIcRequest;
 import gt.usac.cunoc.sgp.inspeccion.mapper.InspeccionMapperImpl;
 import gt.usac.cunoc.sgp.inspeccion.model.EstadoCondicion;
 import gt.usac.cunoc.sgp.inspeccion.model.InspeccionPublicadaEvent;
 import gt.usac.cunoc.sgp.inspeccion.service.*;
+import gt.usac.cunoc.sgp.sync.http.IdempotenciaHttpFilter;
+import gt.usac.cunoc.sgp.sync.repository.OperacionHttpRepository;
+import gt.usac.cunoc.sgp.sync.service.IdempotenciaHttpService;
 import gt.usac.cunoc.sgp.usuario.model.RoleName;
 import java.math.BigDecimal;
 import java.time.Clock;
@@ -44,6 +50,8 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.validation.beanvalidation.LocalValidatorFactoryBean;
@@ -59,6 +67,8 @@ import org.testcontainers.utility.DockerImageName;
     })
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @Import({
+  IdempotenciaHttpService.class,
+  OperacionHttpRepository.class,
   TransicionInspeccionService.class,
   ReglasEvidenciaFotografica.class,
   PublicacionIndiceCondicionService.class,
@@ -102,6 +112,8 @@ class PublicacionRealIcIntegrationTest {
     registry.add("spring.flyway.password", postgres::getPassword);
   }
 
+  @Autowired private IdempotenciaHttpService idempotencia;
+  @Autowired private PlatformTransactionManager tm;
   @Autowired private JdbcTemplate jdbc;
   @Autowired private ObjectMapper json;
   @Autowired private TransicionInspeccionService transiciones;
@@ -261,6 +273,37 @@ class PublicacionRealIcIntegrationTest {
                 "SELECT count(*) FROM auditoria WHERE entidad='inspeccion' AND entidad_id=?",
                 inspeccionId))
         .isEqualTo(2);
+  }
+
+  @Test
+  void hu061RepetirPublicacionHttpConservaRespuestaIcHistorialYEvento() throws Exception {
+    var mvc =
+        MockMvcBuilders.standaloneSetup(new TransicionInspeccionController(transiciones))
+            .setControllerAdvice(new ApiExceptionHandler())
+            .addFilters(new IdempotenciaHttpFilter(idempotencia, json, tm))
+            .build();
+    var ruta = "/api/v1/inspecciones/" + inspeccionId + "/publicar";
+    var primera =
+        mvc.perform(
+                post(ruta)
+                    .servletPath(ruta)
+                    .principal(SecurityContextHolder.getContext().getAuthentication())
+                    .header("Idempotency-Key", "publicacion-hu061"))
+            .andReturn();
+    var repetida =
+        mvc.perform(
+                post(ruta)
+                    .servletPath(ruta)
+                    .principal(SecurityContextHolder.getContext().getAuthentication())
+                    .header("Idempotency-Key", "publicacion-hu061"))
+            .andReturn();
+    assertThat(primera.getResponse().getStatus()).isEqualTo(200);
+    assertThat(repetida.getResponse().getStatus()).isEqualTo(200);
+    assertThat(repetida.getResponse().getHeader("Idempotent-Replay")).isEqualTo("true");
+    assertThat(repetida.getResponse().getContentAsByteArray())
+        .isEqualTo(primera.getResponse().getContentAsByteArray());
+    comprobarPublicacion("50", "Regular", 2);
+    assertThat(eventosDePublicacion.recibidos).hasSize(1);
   }
 
   @Test

@@ -35,7 +35,7 @@ public class IdempotenciaHttpFilter extends OncePerRequestFilter {
     if ("POST".equals(metodo)) {
       return ruta.equals("/api/v1/inspecciones")
           || ruta.equals("/api/v1/inspecciones/iniciar")
-          || ruta.matches("/api/v1/inspecciones/[^/]+/(enviar|reenviar)")
+          || ruta.matches("/api/v1/inspecciones/[^/]+/(enviar|reenviar|publicar)")
           || ruta.equals("/api/v1/preparaciones-salida");
     }
     return "PUT".equals(metodo) && ruta.matches("/api/v1/inspecciones/[^/]+(/(borrador|datos))?");

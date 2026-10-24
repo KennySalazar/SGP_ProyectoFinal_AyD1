@@ -415,27 +415,28 @@ class Hu061Fase0IntegrationTest {
   }
 
   @Test
-  void preparacionConservaVersionPeroCrearUsaLaActivaPosterior() throws Exception {
+  void preparacionConservaVersionAunqueCambieLaActiva() throws Exception {
     var preparada =
         salidas.preparar(autor, new PrepararSalidaRequest("fase0-equipo", List.of(puente)));
     assertThat(preparada.paquete().formulario().id()).isEqualTo(formulario);
     assertThat(preparada.paquete().puentes().getFirst().id()).isEqualTo(puente);
-    UUID posterior = versionActiva();
+    versionActiva();
     UUID id = UUID.randomUUID();
-    // Sin clave/filtro, para aislar el contrato de versión del conflicto E10 ya reproducido.
+    var cuerpo = json.valueToTree(solicitud(id));
+    ((com.fasterxml.jackson.databind.node.ObjectNode) cuerpo)
+        .put("versionFormularioId", formulario.toString());
     var respuesta =
-        pedir(sinFiltro, "/api/v1/inspecciones", solicitud(id), null, autor, RoleName.CATEDRATICO);
+        pedir(sinFiltro, "/api/v1/inspecciones", cuerpo, null, autor, RoleName.CATEDRATICO);
     assertThat(respuesta.getResponse().getStatus()).isEqualTo(201);
     assertThat(
             json.readTree(respuesta.getResponse().getContentAsString())
                 .path("versionFormularioId")
                 .asText())
-        .isEqualTo(posterior.toString());
+        .isEqualTo(formulario.toString());
     assertThat(
             jdbc.queryForObject(
                 "select version_formulario_id from inspeccion where id=?", UUID.class, id))
-        .isEqualTo(posterior)
-        .isNotEqualTo(formulario);
+        .isEqualTo(formulario);
     assertThat(
             jdbc.queryForObject(
                 "select version_formulario_id from preparacion_salida where id=?",
