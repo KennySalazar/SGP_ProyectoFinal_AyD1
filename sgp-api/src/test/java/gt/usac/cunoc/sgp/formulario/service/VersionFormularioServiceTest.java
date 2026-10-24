@@ -86,7 +86,9 @@ class VersionFormularioServiceTest {
             campoExtractor,
             objectMapper,
             clock,
-            aprobaciones);
+            aprobaciones,
+            org.mockito.Mockito.mock(
+                gt.usac.cunoc.sgp.notificacion.service.AvisosAcademicosService.class));
   }
 
   @Test
@@ -383,26 +385,26 @@ class VersionFormularioServiceTest {
     JsonNode esquemaV1 =
         objectMapper.readTree(
             """
-                                                    {
-                                                      "type": "object",
-                                                      "properties": {
-                                                        "campo1": { "type": "string" },
-                                                        "campo2": { "type": "string" }
-                                                      }
-                                                    }
-                                                    """);
+                                                            {
+                                                              "type": "object",
+                                                              "properties": {
+                                                                "campo1": { "type": "string" },
+                                                                "campo2": { "type": "string" }
+                                                              }
+                                                            }
+                                                            """);
 
     JsonNode esquemaV2 =
         objectMapper.readTree(
             """
-                                                    {
-                                                      "type": "object",
-                                                      "properties": {
-                                                        "campo1": { "type": "string" },
-                                                        "campo3": { "type": "string" }
-                                                      }
-                                                    }
-                                                    """);
+                                                            {
+                                                              "type": "object",
+                                                              "properties": {
+                                                                "campo1": { "type": "string" },
+                                                                "campo3": { "type": "string" }
+                                                              }
+                                                            }
+                                                            """);
 
     VersionFormulario v1 = crearEntidad(v1Id, "v1", EstadoVersionFormulario.PUBLICADA, true);
     v1.setEsquema(esquemaV1);
@@ -439,13 +441,13 @@ class VersionFormularioServiceTest {
     JsonNode esquemaV1 =
         objectMapper.readTree(
             """
-                                                    {
-                                                      "type": "object",
-                                                      "properties": {
-                                                        "campo1": { "type": "string" }
-                                                      }
-                                                    }
-                                                    """);
+                                                            {
+                                                              "type": "object",
+                                                              "properties": {
+                                                                "campo1": { "type": "string" }
+                                                              }
+                                                            }
+                                                            """);
     JsonNode esquemaV2 = objectMapper.readTree("{\"type\":\"object\"}");
 
     VersionFormulario v1 = crearEntidad(v1Id, "v1", EstadoVersionFormulario.PUBLICADA, true);
@@ -554,37 +556,37 @@ class VersionFormularioServiceTest {
       JsonNode reglas =
           objectMapper.readTree(
               """
-                                                      {
-                                                        "elementos": [
-                                                          {
-                                                            "elemento_ref": "/vigas",
-                                                            "nombre": "Vigas",
-                                                            "peso": null
-                                                          }
-                                                        ],
-                                                        "reglas_evaluacion_ic": {
-                                                          "version_algoritmo": "ic-sieca-v1-prueba",
-                                                          "reglas_anulacion": [],
-                                                          "escala_severidad": {
-                                                            "NO_PRESENTA": 0,
-                                                            "LEVE": 1,
-                                                            "MODERADO": 2,
-                                                            "SEVERO": 4
-                                                          },
-                                                          "agregacion": {
-                                                            "indicadores_de_un_elemento": "MAXIMO",
-                                                            "instancias_repetibles": "MAXIMO",
-                                                            "elementos_ausentes_portantes": 4,
-                                                            "elementos_ausentes_no_portantes": 4
-                                                          },
-                                                          "rangos_estado": {
-                                                            "BUENO": 75,
-                                                            "REGULAR": 50,
-                                                            "MALO": 0
-                                                          }
-                                                        }
-                                                      }
-                                                      """);
+                                                              {
+                                                                "elementos": [
+                                                                  {
+                                                                    "elemento_ref": "/vigas",
+                                                                    "nombre": "Vigas",
+                                                                    "peso": null
+                                                                  }
+                                                                ],
+                                                                "reglas_evaluacion_ic": {
+                                                                  "version_algoritmo": "ic-sieca-v1-prueba",
+                                                                  "reglas_anulacion": [],
+                                                                  "escala_severidad": {
+                                                                    "NO_PRESENTA": 0,
+                                                                    "LEVE": 1,
+                                                                    "MODERADO": 2,
+                                                                    "SEVERO": 4
+                                                                  },
+                                                                  "agregacion": {
+                                                                    "indicadores_de_un_elemento": "MAXIMO",
+                                                                    "instancias_repetibles": "MAXIMO",
+                                                                    "elementos_ausentes_portantes": 4,
+                                                                    "elementos_ausentes_no_portantes": 4
+                                                                  },
+                                                                  "rangos_estado": {
+                                                                    "BUENO": 75,
+                                                                    "REGULAR": 50,
+                                                                    "MALO": 0
+                                                                  }
+                                                                }
+                                                              }
+                                                              """);
 
       return new VersionFormulario(
           id, codigo, estado, activa, esquema, vinculos, reglas, null, usuarioId, fija, fija);
@@ -601,13 +603,13 @@ class VersionFormularioServiceTest {
     borrador.setReglasEvaluacionIc(
         objectMapper.readTree(
             """
-                                                            {
-                                                              "elementos": [
-                                                                {"elemento_ref": "/vigas"},
-                                                                {"elemento_ref": "/apoyos"}
-                                                              ]
-                                                            }
-                                                            """));
+                                                                    {
+                                                                      "elementos": [
+                                                                        {"elemento_ref": "/vigas"},
+                                                                        {"elemento_ref": "/apoyos"}
+                                                                      ]
+                                                                    }
+                                                                    """));
 
     ConfiguracionIcElemento peso =
         new ConfiguracionIcElemento(
@@ -640,14 +642,14 @@ class VersionFormularioServiceTest {
     JsonNode original =
         objectMapper.readTree(
             """
-                                        {
-                                          "elementos": [{"elemento_ref": "/vigas"}],
-                                          "reglas_evaluacion_ic": {
-                                            "agregacion": {"instancias_repetibles": "MAX"},
-                                            "escala_severidad": {"NO_PRESENTA": 0, "LEVE": null, "MODERADO": null, "SEVERO": null}
-                                          }
-                                        }
-                                        """);
+                                                {
+                                                  "elementos": [{"elemento_ref": "/vigas"}],
+                                                  "reglas_evaluacion_ic": {
+                                                    "agregacion": {"instancias_repetibles": "MAX"},
+                                                    "escala_severidad": {"NO_PRESENTA": 0, "LEVE": null, "MODERADO": null, "SEVERO": null}
+                                                  }
+                                                }
+                                                """);
     borrador.setReglasEvaluacionIc(original);
     when(versiones.findById(id)).thenReturn(Optional.of(borrador));
     when(versiones.save(any(VersionFormulario.class)))
@@ -799,13 +801,13 @@ class VersionFormularioServiceTest {
         "elementos",
         objectMapper.readTree(
             """
-                                                    [
-                                                      {
-                                                        "elemento_ref": "/otros/senalizacion/informativa",
-                                                        "indicadores": ["existe"]
-                                                      }
-                                                    ]
-                                                    """));
+                                                            [
+                                                              {
+                                                                "elemento_ref": "/otros/senalizacion/informativa",
+                                                                "indicadores": ["existe"]
+                                                              }
+                                                            ]
+                                                            """));
 
     com.fasterxml.jackson.databind.node.ObjectNode reglas =
         (com.fasterxml.jackson.databind.node.ObjectNode) configuracion.get("reglas_evaluacion_ic");
@@ -814,12 +816,12 @@ class VersionFormularioServiceTest {
         "conversion_indicadores",
         objectMapper.readTree(
             """
-                                                    {
-                                                      "booleanos": {
-                                                        "senal.existe=false": 4
-                                                      }
-                                                    }
-                                                    """));
+                                                            {
+                                                              "booleanos": {
+                                                                "senal.existe=false": 4
+                                                              }
+                                                            }
+                                                            """));
 
     ConfiguracionIcElemento peso =
         new ConfiguracionIcElemento(
@@ -859,13 +861,13 @@ class VersionFormularioServiceTest {
         "elementos",
         objectMapper.readTree(
             """
-                                                    [
-                                                      {
-                                                        "elemento_ref": "/elementos_no_estructurales/pasamanos_barandal",
-                                                        "indicadores": ["golpeado_longitud_m"]
-                                                      }
-                                                    ]
-                                                    """));
+                                                            [
+                                                              {
+                                                                "elemento_ref": "/elementos_no_estructurales/pasamanos_barandal",
+                                                                "indicadores": ["golpeado_longitud_m"]
+                                                              }
+                                                            ]
+                                                            """));
 
     com.fasterxml.jackson.databind.node.ObjectNode reglas =
         (com.fasterxml.jackson.databind.node.ObjectNode) configuracion.get("reglas_evaluacion_ic");
@@ -874,18 +876,18 @@ class VersionFormularioServiceTest {
         "conversion_indicadores",
         objectMapper.readTree(
             """
-                                                    {
-                                                      "numericos": {
-                                                        "golpeado_longitud_m": {
-                                                          "umbrales_m": {
-                                                            "LEVE": 2,
-                                                            "MODERADO": 1,
-                                                            "SEVERO": 3
-                                                          }
-                                                        }
-                                                      }
-                                                    }
-                                                    """));
+                                                            {
+                                                              "numericos": {
+                                                                "golpeado_longitud_m": {
+                                                                  "umbrales_m": {
+                                                                    "LEVE": 2,
+                                                                    "MODERADO": 1,
+                                                                    "SEVERO": 3
+                                                                  }
+                                                                }
+                                                              }
+                                                            }
+                                                            """));
 
     ConfiguracionIcElemento peso =
         new ConfiguracionIcElemento(
@@ -928,17 +930,17 @@ class VersionFormularioServiceTest {
         "elementos",
         objectMapper.readTree(
             """
-                                                    [
-                                                      {
-                                                        "elemento_ref": "/otros/senalizacion/informativa",
-                                                        "indicadores": ["existe", "estado"]
-                                                      },
-                                                      {
-                                                        "elemento_ref": "/elementos_no_estructurales/pasamanos_barandal",
-                                                        "indicadores": ["golpeado_longitud_m"]
-                                                      }
-                                                    ]
-                                                    """));
+                                                            [
+                                                              {
+                                                                "elemento_ref": "/otros/senalizacion/informativa",
+                                                                "indicadores": ["existe", "estado"]
+                                                              },
+                                                              {
+                                                                "elemento_ref": "/elementos_no_estructurales/pasamanos_barandal",
+                                                                "indicadores": ["golpeado_longitud_m"]
+                                                              }
+                                                            ]
+                                                            """));
 
     com.fasterxml.jackson.databind.node.ObjectNode reglas =
         (com.fasterxml.jackson.databind.node.ObjectNode) configuracion.get("reglas_evaluacion_ic");
@@ -947,28 +949,28 @@ class VersionFormularioServiceTest {
         "conversion_indicadores",
         objectMapper.readTree(
             """
-                                                    {
-                                                      "booleanos": {
-                                                        "senal.existe=true": 0,
-                                                        "senal.existe=false": 4
-                                                      },
-                                                      "enumerados": {
-                                                        "estado_bueno_malo": {
-                                                          "BUENO": 0,
-                                                          "MALO": 4
-                                                        }
-                                                      },
-                                                      "numericos": {
-                                                        "golpeado_longitud_m": {
-                                                          "umbrales_m": {
-                                                            "LEVE": 1,
-                                                            "MODERADO": 2,
-                                                            "SEVERO": 3
-                                                          }
-                                                        }
-                                                      }
-                                                    }
-                                                    """));
+                                                            {
+                                                              "booleanos": {
+                                                                "senal.existe=true": 0,
+                                                                "senal.existe=false": 4
+                                                              },
+                                                              "enumerados": {
+                                                                "estado_bueno_malo": {
+                                                                  "BUENO": 0,
+                                                                  "MALO": 4
+                                                                }
+                                                              },
+                                                              "numericos": {
+                                                                "golpeado_longitud_m": {
+                                                                  "umbrales_m": {
+                                                                    "LEVE": 1,
+                                                                    "MODERADO": 2,
+                                                                    "SEVERO": 3
+                                                                  }
+                                                                }
+                                                              }
+                                                            }
+                                                            """));
 
     List<ConfiguracionIcElemento> pesos =
         List.of(
@@ -1044,9 +1046,9 @@ class VersionFormularioServiceTest {
     JsonNode reglas =
         objectMapper.readTree(
             """
-                                        [{"id":"ausencia","descripcion":"Ausencia de viga","estado_resultante":"MALO",
-                                          "pendiente":null,"elementos":["/vigas"],"condicion":{"campo":"existencia","igual_a":"AUSENTE"}}]
-                                        """);
+                                                [{"id":"ausencia","descripcion":"Ausencia de viga","estado_resultante":"MALO",
+                                                  "pendiente":null,"elementos":["/vigas"],"condicion":{"campo":"existencia","igual_a":"AUSENTE"}}]
+                                                """);
     when(versiones.findById(id)).thenReturn(Optional.of(borrador));
     when(versiones.save(any(VersionFormulario.class)))
         .thenAnswer(invocacion -> invocacion.getArgument(0));

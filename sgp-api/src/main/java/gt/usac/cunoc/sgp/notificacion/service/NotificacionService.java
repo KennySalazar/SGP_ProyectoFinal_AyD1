@@ -12,7 +12,6 @@ import java.util.UUID;
 import java.util.regex.Pattern;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
@@ -85,30 +84,22 @@ public class NotificacionService {
     validarEntidadCoherente(entidad, entidadId);
     validarSinDatosSensibles(titulo, mensaje);
 
-    if (notificaciones.existsByUsuarioIdAndClaveEvento(usuarioId, claveEvento)) {
+    if (notificaciones.existsByUsuarioIdAndClaveEvento(usuarioId, claveEvento.strip())) {
       log.debug("Aviso ya existente para usuarioId={} claveEvento={}", usuarioId, claveEvento);
       return;
     }
 
-    try {
-      notificaciones.save(
-          new Notificacion(
-              UuidV7Generator.generate(),
-              usuarioId,
-              tipo.strip(),
-              titulo.strip(),
-              mensaje.strip(),
-              entidad != null ? entidad.strip() : null,
-              entidadId,
-              claveEvento.strip(),
-              clock.instant()));
-    } catch (DataIntegrityViolationException ex) {
-      log.warn(
-          "Aviso duplicado por concurrencia para usuarioId={} claveEvento={}, ignorando para no fallar: {}",
-          usuarioId,
-          claveEvento,
-          ex.getMessage());
-    }
+    notificaciones.insertarSiNoExiste(
+        new Notificacion(
+            UuidV7Generator.generate(),
+            usuarioId,
+            tipo.strip(),
+            titulo.strip(),
+            mensaje.strip(),
+            entidad != null ? entidad.strip() : null,
+            entidadId,
+            claveEvento.strip(),
+            clock.instant()));
   }
 
   /** Alias para compatibilidad con código existente. */

@@ -76,11 +76,8 @@ class AprobacionCalibracionServiceTest {
   @Test
   void apruebaSinPdfSinGuardarVersionYAvisaAdministradores() {
     prepararAprobacion();
-    var admin = mock(UserAccount.class);
     UUID adminId = UUID.randomUUID();
-    when(admin.getId()).thenReturn(adminId);
-    when(usuarios.findByRole_NameAndActiveTrueOrderByEmailAsc(RoleName.ADMINISTRADOR))
-        .thenReturn(List.of(admin));
+    when(usuarios.findIdsActivosPorRol(RoleName.ADMINISTRADOR)).thenReturn(List.of(adminId));
     var respuesta = servicio.aprobar(id, autor, "  Conforme  ");
     assertThat(respuesta.observaciones()).isEqualTo("Conforme");
     assertThat(respuesta.aprobadoPorId()).isEqualTo(autor);
@@ -99,7 +96,7 @@ class AprobacionCalibracionServiceTest {
     verify(notificaciones)
         .notificar(
             eq(adminId),
-            eq("CALIBRACION_IC_APROBADA"),
+            eq("CALIBRACION_APROBADA"),
             anyString(),
             anyString(),
             eq("version_formulario"),

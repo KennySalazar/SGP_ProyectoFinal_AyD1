@@ -15,6 +15,7 @@ import gt.usac.cunoc.sgp.mantenimiento.entity.ReglaMantenimiento;
 import gt.usac.cunoc.sgp.mantenimiento.mapper.ReglaMantenimientoMapper;
 import gt.usac.cunoc.sgp.mantenimiento.model.TipoOrden;
 import gt.usac.cunoc.sgp.mantenimiento.repository.ReglaMantenimientoRepository;
+import gt.usac.cunoc.sgp.notificacion.service.AvisosAcademicosService;
 import gt.usac.cunoc.sgp.usuario.entity.UserAccount;
 import gt.usac.cunoc.sgp.usuario.model.RoleName;
 import gt.usac.cunoc.sgp.usuario.repository.UserAccountRepository;
@@ -49,6 +50,7 @@ public class ReglaMantenimientoService {
   private final ValidadorReglaMantenimiento validadorReglaMantenimiento;
   private final ObjectMapper objectMapper;
   private final Clock clock;
+  private final AvisosAcademicosService avisosAcademicos;
 
   public ReglaMantenimientoService(
       ReglaMantenimientoRepository reglaMantenimientoRepository,
@@ -57,7 +59,8 @@ public class ReglaMantenimientoService {
       ReglaMantenimientoMapper reglaMantenimientoMapper,
       ValidadorReglaMantenimiento validadorReglaMantenimiento,
       ObjectMapper objectMapper,
-      Clock clock) {
+      Clock clock,
+      AvisosAcademicosService avisosAcademicos) {
     this.reglaMantenimientoRepository = reglaMantenimientoRepository;
     this.versionFormularioRepository = versionFormularioRepository;
     this.userAccountRepository = userAccountRepository;
@@ -65,6 +68,7 @@ public class ReglaMantenimientoService {
     this.validadorReglaMantenimiento = validadorReglaMantenimiento;
     this.objectMapper = objectMapper;
     this.clock = clock;
+    this.avisosAcademicos = avisosAcademicos;
   }
 
   @Transactional
@@ -141,6 +145,7 @@ public class ReglaMantenimientoService {
     }
 
     reglaMantenimientoRepository.saveAll(sembradas);
+    avisosAcademicos.reglasPendientes(versionFormularioId);
     log.info(
         "Sembradas exitosamente {} reglas de mantenimiento para versión {}",
         sembradas.size(),
@@ -269,6 +274,7 @@ public class ReglaMantenimientoService {
             ahora);
 
     ReglaMantenimiento guardada = reglaMantenimientoRepository.save(regla);
+    avisosAcademicos.reglasPendientes(version.getId());
     return reglaMantenimientoMapper.toResponse(guardada);
   }
 
@@ -325,6 +331,7 @@ public class ReglaMantenimientoService {
             ahora);
 
     ReglaMantenimiento guardada = reglaMantenimientoRepository.save(nuevaRevision);
+    avisosAcademicos.reglasPendientes(version.getId());
     return reglaMantenimientoMapper.toResponse(guardada);
   }
 
@@ -354,6 +361,7 @@ public class ReglaMantenimientoService {
     }
 
     ReglaMantenimiento guardada = reglaMantenimientoRepository.save(regla);
+    if (activa) avisosAcademicos.reglasPendientes(guardada.getVersionFormulario().getId());
     return reglaMantenimientoMapper.toResponse(guardada);
   }
 

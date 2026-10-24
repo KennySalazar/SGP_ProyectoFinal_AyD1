@@ -68,6 +68,8 @@ import org.testcontainers.utility.DockerImageName;
     })
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @Import({
+  gt.usac.cunoc.sgp.notificacion.service.AvisosAcademicosService.class,
+  gt.usac.cunoc.sgp.notificacion.service.NotificacionService.class,
   AuditoriaAspect.class,
   AuditoriaWriter.class,
   AuditoriaSnapshotService.class,
@@ -136,16 +138,16 @@ class VersionFormularioIntegrationTest {
 
     jdbc.update(
         """
-                        INSERT INTO usuario (
-                          id, email, password_hash, rol_id,
-                          verificado, activado, activo, nombre_completo
-                        )
-                        SELECT ?, 'admin@cunoc.edu.gt', 'hash-de-prueba', id,
-                               true, true, true, 'Administrador de prueba'
-                        FROM rol
-                        WHERE nombre = 'ADMINISTRADOR'
-                        ON CONFLICT (id) DO NOTHING
-                        """,
+                            INSERT INTO usuario (
+                              id, email, password_hash, rol_id,
+                              verificado, activado, activo, nombre_completo
+                            )
+                            SELECT ?, 'admin@cunoc.edu.gt', 'hash-de-prueba', id,
+                                   true, true, true, 'Administrador de prueba'
+                            FROM rol
+                            WHERE nombre = 'ADMINISTRADOR'
+                            ON CONFLICT (id) DO NOTHING
+                            """,
         ADMINISTRADOR_ID);
   }
 
@@ -449,19 +451,19 @@ class VersionFormularioIntegrationTest {
     JsonNode esquemaV2 =
         objectMapper.readTree(
             """
-                                            {
-                                              "$schema": "https://json-schema.org/draft/2020-12/schema",
-                                              "type": "object",
-                                              "properties": {
-                                                "datos_generales": {
-                                                  "type": "object",
-                                                  "properties": {
-                                                    "nombre": { "type": "string" }
-                                                  }
-                                                }
-                                              }
-                                            }
-                                            """);
+                                                    {
+                                                      "$schema": "https://json-schema.org/draft/2020-12/schema",
+                                                      "type": "object",
+                                                      "properties": {
+                                                        "datos_generales": {
+                                                          "type": "object",
+                                                          "properties": {
+                                                            "nombre": { "type": "string" }
+                                                          }
+                                                        }
+                                                      }
+                                                    }
+                                                    """);
 
     CrearVersionRequest crearV2Req =
         new CrearVersionRequest("SIECA-v2", v1.id(), false, esquemaV2, null, null);
@@ -687,82 +689,82 @@ class VersionFormularioIntegrationTest {
         "agregacion",
         objectMapper.readTree(
             """
-                                            {
-                                              "indicadores_de_un_elemento": "MAXIMO",
-                                              "instancias_repetibles": "MAXIMO",
-                                              "elementos_ausentes_portantes": 4,
-                                              "elementos_ausentes_no_portantes": 4
-                                            }
-                                            """));
+                                                    {
+                                                      "indicadores_de_un_elemento": "MAXIMO",
+                                                      "instancias_repetibles": "MAXIMO",
+                                                      "elementos_ausentes_portantes": 4,
+                                                      "elementos_ausentes_no_portantes": 4
+                                                    }
+                                                    """));
 
     reglas.set(
         "rangos_estado",
         objectMapper.readTree(
             """
-                                            {
-                                              "BUENO": 75,
-                                              "REGULAR": 50,
-                                              "MALO": 0
-                                            }
-                                            """));
+                                                    {
+                                                      "BUENO": 75,
+                                                      "REGULAR": 50,
+                                                      "MALO": 0
+                                                    }
+                                                    """));
 
     reglas.set(
         "conversion_indicadores",
         objectMapper.readTree(
             """
-                                            {
-                                              "booleanos": {
-                                                "junta.falta_elemento=true": 4,
-                                                "junta.falta_elemento=false": 0,
-                                                "junta.junta_limpia=true": 0,
-                                                "junta.junta_limpia=false": 4,
-                                                "losa.buen_estado=true": 0,
-                                                "losa.buen_estado=false": 4,
-                                                "senal.existe=true": 0,
-                                                "senal.existe=false": 4,
-                                                "drenaje_aledano.existe=true": 0,
-                                                "drenaje_aledano.existe=false": 4
-                                              },
-                                              "enumerados": {
-                                                "drenaje.estado": {
-                                                  "LIMPIOS": 0,
-                                                  "OBSTRUIDOS": 4
-                                                },
-                                                "socavacion.nivel": {
-                                                  "NO_HAY": 0,
-                                                  "SIN_EXPOSICION": 1,
-                                                  "CON_EXPOSICION": 2,
-                                                  "ASENTAMIENTO_ESTRUCTURA": 4
-                                                },
-                                                "condicionesCauce": {
-                                                  "LIMPIO": 0,
-                                                  "ASOLVADO_SEDIMENTADO": 1,
-                                                  "EROSIONADO": 2,
-                                                  "OTRO": 4
-                                                },
-                                                "estado_bueno_malo": {
-                                                  "BUENO": 0,
-                                                  "MALO": 4
-                                                }
-                                              },
-                                              "numericos": {
-                                                "golpeado_longitud_m": {
-                                                  "umbrales_m": {
-                                                    "LEVE": 1,
-                                                    "MODERADO": 2,
-                                                    "SEVERO": 3
-                                                  }
-                                                },
-                                                "golpeados_cantidad": {
-                                                  "umbrales": {
-                                                    "LEVE": 1,
-                                                    "MODERADO": 2,
-                                                    "SEVERO": 3
-                                                  }
-                                                }
-                                              }
-                                            }
-                                            """));
+                                                    {
+                                                      "booleanos": {
+                                                        "junta.falta_elemento=true": 4,
+                                                        "junta.falta_elemento=false": 0,
+                                                        "junta.junta_limpia=true": 0,
+                                                        "junta.junta_limpia=false": 4,
+                                                        "losa.buen_estado=true": 0,
+                                                        "losa.buen_estado=false": 4,
+                                                        "senal.existe=true": 0,
+                                                        "senal.existe=false": 4,
+                                                        "drenaje_aledano.existe=true": 0,
+                                                        "drenaje_aledano.existe=false": 4
+                                                      },
+                                                      "enumerados": {
+                                                        "drenaje.estado": {
+                                                          "LIMPIOS": 0,
+                                                          "OBSTRUIDOS": 4
+                                                        },
+                                                        "socavacion.nivel": {
+                                                          "NO_HAY": 0,
+                                                          "SIN_EXPOSICION": 1,
+                                                          "CON_EXPOSICION": 2,
+                                                          "ASENTAMIENTO_ESTRUCTURA": 4
+                                                        },
+                                                        "condicionesCauce": {
+                                                          "LIMPIO": 0,
+                                                          "ASOLVADO_SEDIMENTADO": 1,
+                                                          "EROSIONADO": 2,
+                                                          "OTRO": 4
+                                                        },
+                                                        "estado_bueno_malo": {
+                                                          "BUENO": 0,
+                                                          "MALO": 4
+                                                        }
+                                                      },
+                                                      "numericos": {
+                                                        "golpeado_longitud_m": {
+                                                          "umbrales_m": {
+                                                            "LEVE": 1,
+                                                            "MODERADO": 2,
+                                                            "SEVERO": 3
+                                                          }
+                                                        },
+                                                        "golpeados_cantidad": {
+                                                          "umbrales": {
+                                                            "LEVE": 1,
+                                                            "MODERADO": 2,
+                                                            "SEVERO": 3
+                                                          }
+                                                        }
+                                                      }
+                                                    }
+                                                    """));
 
     service.actualizarBorrador(
         versionId, version.esquema(), null, configuracion, null, ADMINISTRADOR_ID);

@@ -29,6 +29,7 @@ import gt.usac.cunoc.sgp.formulario.repository.VersionFormularioRepository;
 import gt.usac.cunoc.sgp.formulario.validation.CampoSchemaExtractor;
 import gt.usac.cunoc.sgp.formulario.validation.JsonSchemaValidatorService;
 import gt.usac.cunoc.sgp.formulario.validation.ValidadorReglasCriticasIc;
+import gt.usac.cunoc.sgp.notificacion.service.AvisosAcademicosService;
 import java.io.InputStream;
 import java.security.MessageDigest;
 import java.time.Clock;
@@ -56,6 +57,7 @@ public class VersionFormularioService {
   private final CampoSchemaExtractor campoExtractor;
   private final ObjectMapper objectMapper;
   private final Clock clock;
+  private final AvisosAcademicosService avisosAcademicos;
   private final AprobacionCalibracionRepository aprobaciones;
 
   public VersionFormularioService(
@@ -67,7 +69,8 @@ public class VersionFormularioService {
       CampoSchemaExtractor campoExtractor,
       ObjectMapper objectMapper,
       Clock clock,
-      AprobacionCalibracionRepository aprobaciones) {
+      AprobacionCalibracionRepository aprobaciones,
+      AvisosAcademicosService avisosAcademicos) {
     this.versiones = versiones;
     this.mapeos = mapeos;
     this.configuracionesIc = configuracionesIc;
@@ -77,6 +80,7 @@ public class VersionFormularioService {
     this.objectMapper = objectMapper;
     this.clock = clock;
     this.aprobaciones = aprobaciones;
+    this.avisosAcademicos = avisosAcademicos;
   }
 
   @Transactional(readOnly = true)
@@ -768,6 +772,7 @@ public class VersionFormularioService {
     version.setActualizadoEn(ahora);
 
     VersionFormulario publicada = versiones.saveAndFlush(version);
+    avisosAcademicos.calibracionPendiente(publicada.getId());
     return construirRespuestaDetallada(publicada);
   }
 

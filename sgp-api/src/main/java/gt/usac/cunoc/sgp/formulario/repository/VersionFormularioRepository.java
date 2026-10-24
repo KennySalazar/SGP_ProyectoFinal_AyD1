@@ -23,6 +23,10 @@ public interface VersionFormularioRepository extends JpaRepository<VersionFormul
   int incrementarVersionCalibracion(
       @Param("id") UUID id, @Param("versionEsperada") long versionEsperada);
 
+  @Query(
+      "SELECT v FROM VersionFormulario v WHERE v.estado = gt.usac.cunoc.sgp.formulario.model.EstadoVersionFormulario.PUBLICADA AND NOT EXISTS (SELECT a.id FROM AprobacionCalibracion a WHERE a.versionFormulario.id = v.id)")
+  List<VersionFormulario> findPublicadasSinAprobacion();
+
   Optional<VersionFormulario> findByActivaTrue();
 
   Optional<VersionFormulario> findByCodigo(String codigo);

@@ -43,6 +43,8 @@ import org.testcontainers.utility.DockerImageName;
 @DataJpaTest(properties = "spring.jpa.hibernate.ddl-auto=validate")
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @Import({
+  gt.usac.cunoc.sgp.notificacion.service.AvisosAcademicosService.class,
+  gt.usac.cunoc.sgp.notificacion.service.NotificacionService.class,
   ReglaMantenimientoService.class,
   ReglaMantenimientoMapperImpl.class,
   ValidadorReglaMantenimiento.class,

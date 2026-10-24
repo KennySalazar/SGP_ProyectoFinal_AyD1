@@ -127,7 +127,7 @@ class AprobacionCalibracionIntegrationTest {
         .isEqualTo(1);
     assertThat(
             jdbc.queryForObject(
-                "SELECT count(*) FROM notificacion WHERE usuario_id = ? AND entidad_id = ? AND tipo = 'CALIBRACION_IC_APROBADA'",
+                "SELECT count(*) FROM notificacion WHERE usuario_id = ? AND entidad_id = ? AND tipo = 'CALIBRACION_APROBADA'",
                 Integer.class,
                 admin,
                 version))
@@ -341,7 +341,7 @@ class AprobacionCalibracionIntegrationTest {
   @Test
   void falloDelAvisoRevierteAprobacionYAuditoria() {
     jdbc.execute(
-        "ALTER TABLE notificacion ADD CONSTRAINT fallo_hu054 CHECK (tipo <> 'CALIBRACION_IC_APROBADA')");
+        "ALTER TABLE notificacion ADD CONSTRAINT fallo_hu054 CHECK (tipo <> 'CALIBRACION_APROBADA')");
     try {
       assertThatThrownBy(() -> servicio.aprobar(version, catedratico, null))
           .isInstanceOf(RuntimeException.class);
