@@ -139,11 +139,11 @@ public class ReglaMantenimientoController {
   }
 
   @PostMapping("/{id}/validar")
-  @PreAuthorize("hasRole('ADMINISTRADOR')")
+  @PreAuthorize("hasRole('CATEDRATICO')")
   @Operation(
       summary = "Validar regla de mantenimiento",
       description =
-          "Marca una regla como validada por el Administrador, registrando quién y cuándo.")
+          "Valida la revision activa por el Catedratico, conservando una validacion previa.")
   public ResponseEntity<ReglaMantenimientoResponse> validar(
       @PathVariable UUID id, Authentication authentication) {
     return ResponseEntity.ok(reglaMantenimientoService.validarRegla(id, usuarioId(authentication)));

@@ -8,7 +8,9 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -141,17 +143,17 @@ class ReglaMantenimientoControllerSecurityTest {
 
     String body =
         """
-        {
-          "codigo": "RM-001",
-          "versionFormularioId": "019a0000-0000-7000-8000-000000000002",
-          "elementoRef": "/elementos_no_estructurales/junta_entrada",
-          "condicion": {"indicador": "junta_limpia", "operador": "IGUAL", "umbral": false},
-          "tipoMantenimiento": "RUTINARIO",
-          "intervencionSugerida": "Limpieza",
-          "reglaPrioridad": {"prioridad_base": "BAJA"},
-          "activa": true
-        }
-        """;
+            {
+              "codigo": "RM-001",
+              "versionFormularioId": "019a0000-0000-7000-8000-000000000002",
+              "elementoRef": "/elementos_no_estructurales/junta_entrada",
+              "condicion": {"indicador": "junta_limpia", "operador": "IGUAL", "umbral": false},
+              "tipoMantenimiento": "RUTINARIO",
+              "intervencionSugerida": "Limpieza",
+              "reglaPrioridad": {"prioridad_base": "BAJA"},
+              "activa": true
+            }
+            """;
 
     mockMvc
         .perform(
@@ -171,17 +173,17 @@ class ReglaMantenimientoControllerSecurityTest {
 
     String body =
         """
-        {
-          "codigo": "RM-001",
-          "versionFormularioId": "019a0000-0000-7000-8000-000000000002",
-          "elementoRef": "/elementos_no_estructurales/junta_entrada",
-          "condicion": {"indicador": "junta_limpia", "operador": "IGUAL", "umbral": false},
-          "tipoMantenimiento": "RUTINARIO",
-          "intervencionSugerida": "Limpieza",
-          "reglaPrioridad": {"prioridad_base": "BAJA"},
-          "activa": true
-        }
-        """;
+            {
+              "codigo": "RM-001",
+              "versionFormularioId": "019a0000-0000-7000-8000-000000000002",
+              "elementoRef": "/elementos_no_estructurales/junta_entrada",
+              "condicion": {"indicador": "junta_limpia", "operador": "IGUAL", "umbral": false},
+              "tipoMantenimiento": "RUTINARIO",
+              "intervencionSugerida": "Limpieza",
+              "reglaPrioridad": {"prioridad_base": "BAJA"},
+              "activa": true
+            }
+            """;
 
     ReglaMantenimientoResponse response =
         new ReglaMantenimientoResponse(
@@ -217,9 +219,9 @@ class ReglaMantenimientoControllerSecurityTest {
   }
 
   @Test
-  @DisplayName("Permite al Administrador validar una regla")
-  void permiteAdministradorValidarRegla() throws Exception {
-    var auth = autenticar(RoleName.ADMINISTRADOR);
+  @DisplayName("Permite al Catedratico validar una regla")
+  void permiteCatedraticoValidarRegla() throws Exception {
+    var auth = autenticar(RoleName.CATEDRATICO);
     UUID id = UUID.randomUUID();
 
     ReglaMantenimientoResponse response =
@@ -251,16 +253,49 @@ class ReglaMantenimientoControllerSecurityTest {
     verify(service).validarRegla(eq(id), eq(USUARIO_ID));
   }
 
-  @Test
-  @DisplayName("Rechaza al Catedrático validar una regla con 403 Forbidden")
-  void rechazaCatedraticoValidarRegla() throws Exception {
-    var auth = autenticar(RoleName.CATEDRATICO);
-    UUID id = UUID.randomUUID();
-
+  @ParameterizedTest
+  @EnumSource(value = RoleName.class, names = "CATEDRATICO", mode = EnumSource.Mode.EXCLUDE)
+  void rechazaOtrosRolesValidarRegla(RoleName rol) throws Exception {
+    var auth = autenticar(rol);
     mockMvc
-        .perform(post("/api/v1/reglas-mantenimiento/" + id + "/validar").principal(auth))
+        .perform(
+            post("/api/v1/reglas-mantenimiento/" + UUID.randomUUID() + "/validar").principal(auth))
         .andExpect(status().isForbidden());
+    verifyNoInteractions(service);
+  }
 
+  @Test
+  void rechazaAnonimoValidarRegla() throws Exception {
+    mockMvc
+        .perform(post("/api/v1/reglas-mantenimiento/" + UUID.randomUUID() + "/validar"))
+        .andExpect(status().isUnauthorized());
+    verifyNoInteractions(service);
+  }
+
+  @Test
+  void rechazaCatedraticoEditarDesactivarYSembrar() throws Exception {
+    var auth = autenticar(RoleName.CATEDRATICO);
+    String ruta = "/api/v1/reglas-mantenimiento/" + UUID.randomUUID();
+    String body =
+        """
+            {"elementoRef":"/superestructura/apoyos",
+             "condicion":{"indicador":"tipo","operador":"IGUAL","umbral":"FIJO"},
+             "tipoMantenimiento":"PREVENTIVO","intervencionSugerida":"Mantenimiento",
+             "reglaPrioridad":{"prioridad_base":"MEDIA"},"activa":true}
+            """;
+    mockMvc
+        .perform(put(ruta).principal(auth).contentType(MediaType.APPLICATION_JSON).content(body))
+        .andExpect(status().isForbidden());
+    mockMvc
+        .perform(
+            patch(ruta + "/estado")
+                .principal(auth)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"activa\":false}"))
+        .andExpect(status().isForbidden());
+    mockMvc
+        .perform(post("/api/v1/reglas-mantenimiento/sembrar").principal(auth))
+        .andExpect(status().isForbidden());
     verifyNoInteractions(service);
   }
 

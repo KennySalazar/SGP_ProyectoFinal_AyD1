@@ -8,6 +8,7 @@ import org.mapstruct.Mapping;
 @Mapper(componentModel = "spring")
 public interface ReglaMantenimientoMapper {
 
+  @Mapping(target = "conNombreValidador", ignore = true)
   @Mapping(target = "versionFormularioId", source = "versionFormulario.id")
   @Mapping(target = "versionFormularioCodigo", source = "versionFormulario.codigo")
   @Mapping(target = "provisional", expression = "java(regla.isProvisional())")

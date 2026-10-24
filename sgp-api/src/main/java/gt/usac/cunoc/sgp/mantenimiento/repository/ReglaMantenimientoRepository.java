@@ -1,17 +1,23 @@
 package gt.usac.cunoc.sgp.mantenimiento.repository;
 
 import gt.usac.cunoc.sgp.mantenimiento.entity.ReglaMantenimiento;
+import jakarta.persistence.LockModeType;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 public interface ReglaMantenimientoRepository
     extends JpaRepository<ReglaMantenimiento, UUID>, JpaSpecificationExecutor<ReglaMantenimiento> {
+
+  @Lock(LockModeType.PESSIMISTIC_WRITE)
+  @Query("SELECT r FROM ReglaMantenimiento r WHERE r.id = :id")
+  Optional<ReglaMantenimiento> findByIdForUpdate(@Param("id") UUID id);
 
   Optional<ReglaMantenimiento> findByCodigoAndVersionFormularioIdAndActivaTrue(
       String codigo, UUID versionFormularioId);
