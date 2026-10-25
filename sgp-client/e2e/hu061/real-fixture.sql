@@ -22,7 +22,7 @@ WHERE u.email='admin-hu061@example.test' AND r.nombre='ESTUDIANTE';
 INSERT INTO version_formulario(id,codigo,estado,activa,esquema,reglas_evaluacion_ic,
  hash_contenido,version_algoritmo_ic,creado_por_id,publicado_por_id,publicado_en)
 VALUES ('0199a000-0000-7000-8000-000000000004','HU061-REAL','PUBLICADA',true,
- '{"type":"object","required":["vigas"],"properties":{"vigas":{"type":"object","title":"Vigas","required":["existencia","dano"],"properties":{"existencia":{"enum":["PRESENTE","AUSENTE","NO_APLICA"]},"dano":{"enum":["NO_PRESENTA","LEVE","MODERADO","SEVERO"]}}}}}',
+ '{"type":"object","required":["vigas"],"properties":{"vigas":{"type":"object","title":"Vigas","required":["existencia","dano"],"properties":{"existencia":{"enum":["PRESENTE","AUSENTE","NO_APLICA"]},"dano":{"enum":["NO_PRESENTA","LEVE","MODERADO","SEVERO"]},"cortado":{"enum":["SI","NO"]}}}}}',
  '{"formulario":"sieca-v1","elementos":[{"elemento_ref":"/vigas","repetible":false,"portante":true,"indicadores":["dano"]}],"reglas_evaluacion_ic":{"version_algoritmo":"ic-integracion-prueba-v1","escala_severidad":{"NO_PRESENTA":0,"LEVE":1,"MODERADO":2,"SEVERO":4},"agregacion":{"indicadores_de_un_elemento":"MAXIMO","instancias_repetibles":"MAXIMO","elementos_ausentes_no_portantes":4,"elementos_ausentes_portantes":4},"rangos_estado":{"BUENO":75,"REGULAR":50,"MALO":0},"conversion_indicadores":{"booleanos":{},"enumerados":{},"numericos":{}},"reglas_anulacion":[{"id":"portante-cortado","descripcion":"Elemento portante cortado","estado_resultante":"MALO","elementos":["/vigas"],"condicion":{"campo":"cortado","igual_a":"SI"}}]}}',
  repeat('a',64),'ic-integracion-prueba-v1','0199a000-0000-7000-8000-000000000001',
  '0199a000-0000-7000-8000-000000000001',now());

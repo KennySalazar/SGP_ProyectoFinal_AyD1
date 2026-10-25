@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { randomUUID } from 'node:crypto';
+import { uuidV7 } from '../../src/app/offline/services/uuid-v7.ts';
 import { readFile } from 'node:fs/promises';
 import { execFileSync } from 'node:child_process';
 
@@ -96,7 +96,7 @@ for (const rol of ['CATEDRATICO', 'ESTUDIANTE']) {
         (await context.cookies()).some((c) => c.name === 'SGP_REFRESH_TOKEN' && c.httpOnly),
       ).toBe(true);
       const headers = { Authorization: `Bearer ${ultimoToken}` };
-      const id = randomUUID();
+      const id = uuidV7();
       let res = await context.request.post('/api/v1/inspecciones', {
         headers: { ...headers, 'Idempotency-Key': id },
         data: {
@@ -104,7 +104,9 @@ for (const rol of ['CATEDRATICO', 'ESTUDIANTE']) {
           puenteId,
           versionFormularioId: versionId,
           dispositivoId: 'hu061-real',
-          fechaInspeccion: new Date().toISOString().slice(0, 10),
+          fechaInspeccion: new Intl.DateTimeFormat('en-CA', {
+            timeZone: 'America/Guatemala',
+          }).format(new Date()),
           latitud: 14.481,
           longitud: -90.615,
           confirmarDatosPermanentes: false,
@@ -112,13 +114,13 @@ for (const rol of ['CATEDRATICO', 'ESTUDIANTE']) {
       });
       expect(res.status(), await res.text()).toBe(201);
       res = await context.request.put(`/api/v1/inspecciones/${id}/borrador`, {
-        headers: { ...headers, 'Idempotency-Key': randomUUID() },
+        headers: { ...headers, 'Idempotency-Key': uuidV7() },
         data: { version: 0, datos },
       });
       expect(res.status(), await res.text()).toBe(200);
-      const imagen = await readFile('public/icons/icon-192.png');
+      const imagen = await readFile('../sgp-api/src/test/resources/archivo/imagen.webp');
       for (const categoria of ['ACCESO', 'SUPERESTRUCTURA', 'SUBESTRUCTURA', 'CAUCE']) {
-        const fotoId = randomUUID();
+        const fotoId = uuidV7();
         res = await context.request.post(`/api/v1/inspecciones/${id}/fotografias`, {
           headers: { ...headers, 'Idempotency-Key': fotoId },
           multipart: {
@@ -135,7 +137,7 @@ for (const rol of ['CATEDRATICO', 'ESTUDIANTE']) {
                 }),
               ),
             },
-            archivo: { name: 'foto.png', mimeType: 'image/png', buffer: imagen },
+            archivo: { name: 'foto.webp', mimeType: 'image/webp', buffer: imagen },
           },
         });
         expect(res.status(), await res.text()).toBe(201);
