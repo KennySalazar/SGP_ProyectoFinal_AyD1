@@ -7,4 +7,10 @@ public record LoginRequest(
     @NotBlank(message = "El correo electronico es obligatorio")
         @Email(message = "El correo electronico no es valido")
         String email,
-    @NotBlank(message = "La contraseña es obligatoria") String password) {}
+    @NotBlank(message = "La contraseña es obligatoria") String password) {
+
+  @Override
+  public String toString() {
+    return "LoginRequest[email=" + email + ", password=[PROTEGIDO]]";
+  }
+}

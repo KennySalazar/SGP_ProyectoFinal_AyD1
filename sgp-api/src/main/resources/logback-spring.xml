@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration scan="true">
+  <springProperty scope="context" name="appName" source="spring.application.name" defaultValue="sgp-api"/>
+  <property name="LOG_PATH" value="${LOG_PATH:-target/logs}"/>
+
+  <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+    <encoder class="ch.qos.logback.core.encoder.LayoutWrappingEncoder">
+      <layout class="gt.usac.cunoc.sgp.common.logging.MaskingJsonLayout"/>
+    </encoder>
+  </appender>
+
+  <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+    <file>${LOG_PATH}/${appName}.log</file>
+    <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+      <fileNamePattern>${LOG_PATH}/${appName}-%d{yyyy-MM-dd}.%i.log.gz</fileNamePattern>
+      <!-- Conservar al menos 90 días (DT-DEP-09) -->
+      <maxHistory>90</maxHistory>
+      <maxFileSize>50MB</maxFileSize>
+      <totalSizeCap>10GB</totalSizeCap>
+    </rollingPolicy>
+    <encoder class="ch.qos.logback.core.encoder.LayoutWrappingEncoder">
+      <layout class="gt.usac.cunoc.sgp.common.logging.MaskingJsonLayout"/>
+    </encoder>
+  </appender>
+
+  <root level="INFO">
+    <appender-ref ref="CONSOLE"/>
+    <appender-ref ref="FILE"/>
+  </root>
+</configuration>
