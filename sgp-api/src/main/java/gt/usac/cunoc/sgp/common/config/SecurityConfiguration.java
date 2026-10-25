@@ -64,7 +64,10 @@ public class SecurityConfiguration {
                             referrer.policy(
                                 org.springframework.security.web.header.writers
                                     .ReferrerPolicyHeaderWriter.ReferrerPolicy
-                                    .STRICT_ORIGIN_WHEN_CROSS_ORIGIN)))
+                                    .STRICT_ORIGIN_WHEN_CROSS_ORIGIN))
+                    .contentTypeOptions(contentType -> {})
+                    .httpStrictTransportSecurity(
+                        hsts -> hsts.includeSubDomains(true).maxAgeInSeconds(31536000)))
         .authorizeHttpRequests(
             authorize -> {
               authorize
@@ -115,7 +118,7 @@ public class SecurityConfiguration {
   }
 
   @Bean
-  CorsConfigurationSource corsConfigurationSource(
+  public CorsConfigurationSource corsConfigurationSource(
       @Value("${app.cors.allowed-origins}") String allowedOrigins) {
     CorsConfiguration configuration = new CorsConfiguration();
     List<String> origins =
@@ -123,6 +126,10 @@ public class SecurityConfiguration {
             .map(String::trim)
             .filter(value -> !value.isBlank())
             .toList();
+    if (origins.isEmpty() || origins.stream().anyMatch(o -> o.equals("*") || o.contains("*"))) {
+      throw new IllegalArgumentException(
+          "CORS no permite el comodin '*' por directriz de seguridad DT-SEC-06");
+    }
     configuration.setAllowedOrigins(origins);
     configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
     configuration.setAllowedHeaders(

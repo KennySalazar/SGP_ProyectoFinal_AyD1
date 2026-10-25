@@ -13,4 +13,10 @@ public record VerifyRecoveryRequest(
     @NotBlank(message = "La nueva contraseña es obligatoria")
         @Size(min = 10, max = 72)
         @ValidPassword
-        String newPassword) {}
+        String newPassword) {
+
+  @Override
+  public String toString() {
+    return "VerifyRecoveryRequest[email=" + email + ", otp=[PROTEGIDO], newPassword=[PROTEGIDO]]";
+  }
+}

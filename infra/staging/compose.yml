@@ -3,8 +3,8 @@ name: sgp-staging
 x-logging: &default-logging
   driver: json-file
   options:
-    max-size: "10m"
-    max-file: "5"
+    max-size: "50m"
+    max-file: "90"
 
 services:
   backend:
@@ -38,9 +38,12 @@ services:
       REFRESH_COOKIE_SECURE: ${REFRESH_COOKIE_SECURE:-true}
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-https://3.235.197.36}
       OPENAPI_PUBLIC: "false"
+      LOG_PATH: /var/log/sgp
       JAVA_TOOL_OPTIONS: ${JAVA_TOOL_OPTIONS:--XX:MaxRAMPercentage=65 -XX:InitialRAMPercentage=20 -Djava.security.egd=file:/dev/urandom}
     networks:
       - proxy
+    volumes:
+      - sgp-staging-logs:/var/log/sgp
     read_only: true
     tmpfs:
       - /tmp:size=64m,mode=1777
@@ -81,3 +84,7 @@ services:
 networks:
   proxy:
     name: sgp_staging_proxy
+
+volumes:
+  sgp-staging-logs:
+    name: sgp_staging_logs
