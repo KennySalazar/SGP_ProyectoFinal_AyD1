@@ -1,9 +1,11 @@
-import { createServer } from 'node:http';
+import { createServer, request as proxyRequest } from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { resolve, extname, sep } from 'node:path';
 import { gzipSync } from 'node:zlib';
 import { fixture, user, schema, photos } from './fixture.mjs';
 const root = resolve('dist/sgp-client/browser');
+// Modo de aceptación contra Spring Boot aislado: ninguna API se simula.
+const apiReal = process.env.HU061_API_ORIGIN;
 let publicaciones = [];
 let estado = 'BORRADOR';
 let referencia = 'Guatemala';
@@ -25,6 +27,22 @@ createServer(async (req, res) => {
   function json(body, status = 200) {
     res.writeHead(status, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
     res.end(JSON.stringify(body));
+  }
+  if (apiReal && url.pathname.startsWith('/api/')) {
+    const proxy = proxyRequest(
+      new URL(req.url, apiReal),
+      {
+        method: req.method,
+        headers: req.headers,
+      },
+      (respuesta) => {
+        res.writeHead(respuesta.statusCode, respuesta.headers);
+        respuesta.pipe(res);
+      },
+    );
+    proxy.on('error', () => json({ detail: 'Backend de prueba no disponible' }, 502));
+    req.pipe(proxy);
+    return;
   }
   if (url.pathname === '/__e2e/setup') {
     res.writeHead(200, { 'Content-Type': 'text/html' });
