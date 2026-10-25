@@ -14,6 +14,7 @@ import gt.usac.cunoc.sgp.common.audit.service.AuditoriaConsultaService;
 import gt.usac.cunoc.sgp.common.audit.service.AuditoriaSnapshotService;
 import gt.usac.cunoc.sgp.common.audit.service.AuditoriaWriter;
 import gt.usac.cunoc.sgp.common.exception.ApiException;
+import gt.usac.cunoc.sgp.mantenimiento.service.PlanMantenimientoService;
 import gt.usac.cunoc.sgp.common.security.JwtData;
 import gt.usac.cunoc.sgp.puente.dto.ActualizarPuenteRequest;
 import gt.usac.cunoc.sgp.puente.dto.CrearPuenteRequest;
@@ -38,6 +39,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.EnableAspectJAutoProxy;
 import org.springframework.context.annotation.Import;
@@ -111,6 +113,8 @@ class PuenteEdicionIntegrationTest {
   @Autowired private AuditoriaRepository auditoriaRepository;
 
   @Autowired private JdbcTemplate jdbc;
+
+  @MockBean private PlanMantenimientoService planesMantenimiento;
 
   private UUID departamentoId;
   private UUID municipioId;

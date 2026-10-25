@@ -22,6 +22,7 @@ import gt.usac.cunoc.sgp.common.audit.service.AuditoriaSnapshotService;
 import gt.usac.cunoc.sgp.common.audit.service.AuditoriaWriter;
 import gt.usac.cunoc.sgp.common.exception.ApiException;
 import gt.usac.cunoc.sgp.common.security.JwtData;
+import gt.usac.cunoc.sgp.mantenimiento.service.PlanMantenimientoService;
 import gt.usac.cunoc.sgp.common.security.JwtService;
 import gt.usac.cunoc.sgp.puente.dto.CrearPuenteRequest;
 import gt.usac.cunoc.sgp.puente.entity.Puente;
@@ -104,6 +105,8 @@ import org.testcontainers.utility.DockerImageName;
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 @Testcontainers
 class AuditoriaRegistroIntegrationTest {
+
+  @MockBean private PlanMantenimientoService planesMantenimiento;
 
   private static final UUID ADMINISTRADOR_ID =
       UUID.fromString("019a0000-0000-7000-8000-000000000006");

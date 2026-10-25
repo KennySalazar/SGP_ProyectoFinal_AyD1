@@ -8,6 +8,7 @@ import static org.mockito.Mockito.when;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import gt.usac.cunoc.sgp.common.audit.service.AuditoriaWriter;
 import gt.usac.cunoc.sgp.common.exception.ApiException;
+import gt.usac.cunoc.sgp.mantenimiento.service.PlanMantenimientoService;
 import gt.usac.cunoc.sgp.inspeccion.model.EstadoCondicion;
 import gt.usac.cunoc.sgp.inspeccion.model.ResultadoCalculoIc;
 import gt.usac.cunoc.sgp.inspeccion.service.CalculoIndiceCondicionService;
@@ -102,6 +103,8 @@ class PublicacionIndiceCondicionIntegrationTest {
   @Autowired private PuenteService puenteService;
   @Autowired private gt.usac.cunoc.sgp.puente.service.EstadoCalibracionPuenteService respaldo;
   @MockBean private CalculoIndiceCondicionService calculador;
+
+  @MockBean private PlanMantenimientoService planesMantenimiento;
 
   private UUID usuarioId;
   private UUID puenteId;
