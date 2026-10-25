@@ -593,9 +593,10 @@
   [header]="'mantenimiento.ordenes.editarPrioridad' | transloco"
 >
   <p>{{ 'mantenimiento.ordenes.prioridadEditTexto' | transloco }}</p>
-  <label class="campo-dialogo">
+  <label class="campo-dialogo" for="prioridad-confirmada">
     <span>{{ 'mantenimiento.ordenes.prioridadConfirmada' | transloco }}</span>
     <p-select
+      inputId="prioridad-confirmada"
       [options]="opcionesPrioridad"
       [ngModel]="prioridadNueva()"
       (ngModelChange)="prioridadNueva.set($event)"

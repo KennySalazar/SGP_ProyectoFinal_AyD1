@@ -27,10 +27,11 @@
     }
     @if (editando()) {
       <form [formGroup]="formulario" (ngSubmit)="guardar()" class="formulario">
-        <label>
+        <label for="plan-periodicidad">
           <span>{{ 'mantenimiento.plan.periodicidad' | transloco }}</span>
           <p-inputnumber
             formControlName="periodicidadMeses"
+            inputId="plan-periodicidad"
             [min]="1"
             [max]="12"
             [showButtons]="true"
