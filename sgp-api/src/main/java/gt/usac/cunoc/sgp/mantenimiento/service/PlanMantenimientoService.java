@@ -7,11 +7,10 @@ import gt.usac.cunoc.sgp.common.audit.model.AccionAuditoria;
 import gt.usac.cunoc.sgp.common.audit.service.AuditoriaWriter;
 import gt.usac.cunoc.sgp.common.exception.ApiException;
 import gt.usac.cunoc.sgp.common.util.UuidV7Generator;
-import gt.usac.cunoc.sgp.mantenimiento.dto.ActualizarPlanMantenimientoRequest;
 import gt.usac.cunoc.sgp.mantenimiento.dto.ActividadPlanMantenimientoResponse;
+import gt.usac.cunoc.sgp.mantenimiento.dto.ActualizarPlanMantenimientoRequest;
 import gt.usac.cunoc.sgp.mantenimiento.dto.PlanMantenimientoResponse;
 import gt.usac.cunoc.sgp.mantenimiento.entity.PlanMantenimientoRutinario;
-import gt.usac.cunoc.sgp.mantenimiento.entity.PlanMantenimientoRutinarioActividad;
 import gt.usac.cunoc.sgp.mantenimiento.repository.PlanMantenimientoRutinarioRepository;
 import gt.usac.cunoc.sgp.puente.entity.Puente;
 import gt.usac.cunoc.sgp.puente.repository.PuenteRepository;
@@ -59,17 +58,14 @@ public class PlanMantenimientoService {
   @Transactional
   public PlanMantenimientoRutinario crearPorDefecto(Puente puente, UUID actorId) {
     if (!puente.isActivo()) return null;
-    return planes
-        .findByPuenteId(puente.getId())
-        .orElseGet(() -> crear(puente, actorId, null));
+    return planes.findByPuenteId(puente.getId()).orElseGet(() -> crear(puente, actorId, null));
   }
 
   /** Reconciliación idempotente de puentes activos antiguos, también usada al arrancar el job. */
   @Transactional
   public void crearPlanesFaltantes() {
     for (UUID puenteId : planes.findActiveBridgesWithoutPlan()) {
-      Puente puente =
-          puentes.findByIdForUpdate(puenteId).orElse(null);
+      Puente puente = puentes.findByIdForUpdate(puenteId).orElse(null);
       if (puente == null || !puente.isActivo() || planes.existsByPuente_Id(puenteId)) continue;
       crear(puente, null, PROCESO_BACKFILL);
     }
@@ -159,13 +155,7 @@ public class PlanMantenimientoService {
                 LocalDate.now(clock.withZone(ZONA_GUATEMALA)),
                 ahora));
     auditoria.registrarEnTransaccion(
-        actorId,
-        AccionAuditoria.CREAR,
-        ENTIDAD,
-        plan.getId(),
-        null,
-        snapshot(plan),
-        proceso);
+        actorId, AccionAuditoria.CREAR, ENTIDAD, plan.getId(), null, snapshot(plan), proceso);
     return plan;
   }
 

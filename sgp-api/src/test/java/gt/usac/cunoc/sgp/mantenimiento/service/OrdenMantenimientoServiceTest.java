@@ -17,8 +17,8 @@ import gt.usac.cunoc.sgp.common.audit.model.AccionAuditoria;
 import gt.usac.cunoc.sgp.common.audit.service.AuditoriaWriter;
 import gt.usac.cunoc.sgp.common.exception.ApiException;
 import gt.usac.cunoc.sgp.inspeccion.repository.InspeccionRepository;
-import gt.usac.cunoc.sgp.mantenimiento.dto.CrearOrdenMantenimientoRequest;
 import gt.usac.cunoc.sgp.mantenimiento.dto.CambiarPrioridadOrdenRequest;
+import gt.usac.cunoc.sgp.mantenimiento.dto.CrearOrdenMantenimientoRequest;
 import gt.usac.cunoc.sgp.mantenimiento.dto.FiltroOrdenesRequest;
 import gt.usac.cunoc.sgp.mantenimiento.dto.OrdenMantenimientoResponse;
 import gt.usac.cunoc.sgp.mantenimiento.dto.TotalesOrdenesResponse;
@@ -419,7 +419,9 @@ class OrdenMantenimientoServiceTest {
 
     var response =
         service.cambiarPrioridad(
-            ORDEN_ID, new CambiarPrioridadOrdenRequest("ALTA", "Requiere atención inmediata"), USUARIO_ID);
+            ORDEN_ID,
+            new CambiarPrioridadOrdenRequest("ALTA", "Requiere atención inmediata"),
+            USUARIO_ID);
 
     assertThat(response.prioridadSugerida()).isEqualTo(PrioridadOrden.BAJA);
     assertThat(response.prioridadConfirmada()).isEqualTo(PrioridadOrden.ALTA);
@@ -444,7 +446,9 @@ class OrdenMantenimientoServiceTest {
   @Test
   void cambiarPrioridadSinJustificacionResponde422() {
     assertCodigo(
-        () -> service.cambiarPrioridad(ORDEN_ID, new CambiarPrioridadOrdenRequest("ALTA", " "), USUARIO_ID),
+        () ->
+            service.cambiarPrioridad(
+                ORDEN_ID, new CambiarPrioridadOrdenRequest("ALTA", " "), USUARIO_ID),
         HttpStatus.UNPROCESSABLE_ENTITY,
         "prioridad_invalida");
     verifyNoInteractions(ordenes);
@@ -460,7 +464,9 @@ class OrdenMantenimientoServiceTest {
     when(ordenes.findById(ORDEN_ID)).thenReturn(Optional.of(orden));
 
     assertCodigo(
-        () -> service.cambiarPrioridad(ORDEN_ID, new CambiarPrioridadOrdenRequest("ALTA", "Motivo"), USUARIO_ID),
+        () ->
+            service.cambiarPrioridad(
+                ORDEN_ID, new CambiarPrioridadOrdenRequest("ALTA", "Motivo"), USUARIO_ID),
         HttpStatus.CONFLICT,
         "orden_terminal");
     verify(ordenes, never()).saveAndFlush(any());

@@ -66,15 +66,18 @@ public class PuenteController {
     Page<PuenteCatalogoResponse> resultado;
     if (busqueda != null && !busqueda.isBlank()) {
       if (esAdmin && (activo != null || todos)) {
-        resultado = puenteService.listarCatalogo(
-            departamentoId, estado, todos ? null : activo, busqueda, pagina, tamanio);
+        resultado =
+            puenteService.listarCatalogo(
+                departamentoId, estado, todos ? null : activo, busqueda, pagina, tamanio);
       } else {
-        resultado = puenteService.listarCatalogo(
-            departamentoId, estado, Boolean.TRUE, busqueda, pagina, tamanio);
+        resultado =
+            puenteService.listarCatalogo(
+                departamentoId, estado, Boolean.TRUE, busqueda, pagina, tamanio);
       }
     } else if (esAdmin && (activo != null || todos)) {
-      resultado = puenteService.listarCatalogo(
-          departamentoId, estado, todos ? null : activo, pagina, tamanio);
+      resultado =
+          puenteService.listarCatalogo(
+              departamentoId, estado, todos ? null : activo, pagina, tamanio);
     } else {
       resultado = puenteService.listarCatalogo(departamentoId, estado, pagina, tamanio);
     }
@@ -135,17 +138,37 @@ public class PuenteController {
   private static PuenteCatalogoResponse ocultarCoordenadasSiMalo(PuenteCatalogoResponse puente) {
     if (!"Malo".equals(puente.estadoActual())) return puente;
     return new PuenteCatalogoResponse(
-        puente.id(), puente.codigo(), puente.nombre(), puente.departamento(), puente.municipio(),
-        null, null, puente.activo(), puente.estadoActual(), puente.indiceCondicionActual(),
+        puente.id(),
+        puente.codigo(),
+        puente.nombre(),
+        puente.departamento(),
+        puente.municipio(),
+        null,
+        null,
+        puente.activo(),
+        puente.estadoActual(),
+        puente.indiceCondicionActual(),
         puente.fechaUltimaInspeccion());
   }
 
   private static PuenteResponse ocultarCoordenadasSiMalo(PuenteResponse puente) {
     if (!"Malo".equals(puente.estadoActual())) return puente;
     return new PuenteResponse(
-        puente.id(), puente.codigo(), puente.nombre(), puente.departamento(), puente.municipio(),
-        puente.ruta(), puente.kilometraje(), null, null, null, puente.activo(), puente.estadoActual(),
-        puente.indiceCondicionActual(), puente.fechaUltimaInspeccion(), puente.creadoEn());
+        puente.id(),
+        puente.codigo(),
+        puente.nombre(),
+        puente.departamento(),
+        puente.municipio(),
+        puente.ruta(),
+        puente.kilometraje(),
+        null,
+        null,
+        null,
+        puente.activo(),
+        puente.estadoActual(),
+        puente.indiceCondicionActual(),
+        puente.fechaUltimaInspeccion(),
+        puente.creadoEn());
   }
 
   @PutMapping("/{id}")

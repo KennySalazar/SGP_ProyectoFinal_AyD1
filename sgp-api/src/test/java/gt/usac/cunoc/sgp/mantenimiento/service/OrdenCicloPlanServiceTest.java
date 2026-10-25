@@ -65,8 +65,7 @@ class OrdenCicloPlanServiceTest {
     Puente puente = mock(Puente.class);
     when(puente.getId()).thenReturn(puenteId);
     PlanMantenimientoRutinario plan =
-        new PlanMantenimientoRutinario(
-            planId, puente, LocalDate.parse("2025-10-01"), ahora);
+        new PlanMantenimientoRutinario(planId, puente, LocalDate.parse("2025-10-01"), ahora);
     when(ciclos.existsByPlanMantenimientoRutinarioIdAndCicloPlan(planId, 12)).thenReturn(false);
     when(ordenes.saveAndFlush(any(OrdenMantenimiento.class)))
         .thenAnswer(invocation -> invocation.getArgument(0));

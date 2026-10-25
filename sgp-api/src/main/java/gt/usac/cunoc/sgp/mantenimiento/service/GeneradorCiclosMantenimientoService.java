@@ -14,9 +14,7 @@ public class GeneradorCiclosMantenimientoService {
   }
 
   @Scheduled(fixedDelayString = "${app.mantenimiento.ciclos-intervalo-ms:86400000}")
-  @SchedulerLock(
-      name = "generar-ciclos-mantenimiento-rutinario",
-      lockAtMostFor = "PT10M")
+  @SchedulerLock(name = "generar-ciclos-mantenimiento-rutinario", lockAtMostFor = "PT10M")
   public void generarCiclosVencidos() {
     planes.generarCiclosVencidos();
   }

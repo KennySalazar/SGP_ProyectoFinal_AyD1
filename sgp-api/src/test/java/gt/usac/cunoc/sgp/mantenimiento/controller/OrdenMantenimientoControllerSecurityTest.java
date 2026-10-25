@@ -149,7 +149,9 @@ class OrdenMantenimientoControllerSecurityTest {
   }
 
   @ParameterizedTest
-  @EnumSource(value = RoleName.class, names = {"CATEDRATICO", "ADMINISTRADOR"})
+  @EnumSource(
+      value = RoleName.class,
+      names = {"CATEDRATICO", "ADMINISTRADOR"})
   void catedraticoYAdministradorPuedenCambiarPrioridad(RoleName rol) throws Exception {
     mockMvc
         .perform(
@@ -158,13 +160,13 @@ class OrdenMantenimientoControllerSecurityTest {
                 .content("{\"prioridad\":\"ALTA\",\"justificacion\":\"Motivo\"}")
                 .principal(autenticar(rol)))
         .andExpect(status().isOk());
-    verify(ordenes)
-        .cambiarPrioridad(
-            eq(ORDEN_ID), any(), eq(USUARIO_ID));
+    verify(ordenes).cambiarPrioridad(eq(ORDEN_ID), any(), eq(USUARIO_ID));
   }
 
   @ParameterizedTest
-  @EnumSource(value = RoleName.class, names = {"PROFESIONAL_EXTERNO", "ESTUDIANTE"})
+  @EnumSource(
+      value = RoleName.class,
+      names = {"PROFESIONAL_EXTERNO", "ESTUDIANTE"})
   void estudianteYProfesionalExternoNoCambianPrioridad(RoleName rol) throws Exception {
     mockMvc
         .perform(

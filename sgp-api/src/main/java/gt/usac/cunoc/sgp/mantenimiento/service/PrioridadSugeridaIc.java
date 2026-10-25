@@ -100,7 +100,8 @@ final class PrioridadSugeridaIc {
       case 1 -> PrioridadOrden.MEDIA;
       case 2 -> PrioridadOrden.ALTA;
       case 3 -> PrioridadOrden.CRITICA;
-      default -> throw new IllegalArgumentException("Indice de prioridad fuera de rango: " + indice);
+      default ->
+          throw new IllegalArgumentException("Indice de prioridad fuera de rango: " + indice);
     };
   }
 

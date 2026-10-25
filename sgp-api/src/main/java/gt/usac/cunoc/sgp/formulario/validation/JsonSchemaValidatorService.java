@@ -90,9 +90,7 @@ public class JsonSchemaValidatorService {
     JsonNode tipo = esquema.get("type");
     if (esquema.has("properties") && !declaraTipo(tipo, "object")) {
       throw esquemaInvalido(
-          "El nodo '"
-              + ruta
-              + "' define properties, por lo que su tipo debe incluir 'object'.");
+          "El nodo '" + ruta + "' define properties, por lo que su tipo debe incluir 'object'.");
     }
     if (esquema.has("items") && !declaraTipo(tipo, "array")) {
       throw esquemaInvalido(
@@ -113,8 +111,7 @@ public class JsonSchemaValidatorService {
         while (campos.hasNext()) {
           var campo = campos.next();
           validarConsistenciaEstructural(
-              campo.getValue(),
-              ruta + "/" + keyword + "/" + escaparPuntero(campo.getKey()));
+              campo.getValue(), ruta + "/" + keyword + "/" + escaparPuntero(campo.getKey()));
         }
       }
     }
@@ -168,10 +165,7 @@ public class JsonSchemaValidatorService {
 
   private ApiException esquemaInvalido(String mensaje) {
     return new ApiException(
-        HttpStatus.UNPROCESSABLE_ENTITY,
-        "esquema_invalido",
-        "Esquema inválido",
-        mensaje);
+        HttpStatus.UNPROCESSABLE_ENTITY, "esquema_invalido", "Esquema inválido", mensaje);
   }
 
   private String escaparPuntero(String segmento) {

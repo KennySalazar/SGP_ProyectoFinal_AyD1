@@ -11,7 +11,6 @@ import static org.mockito.Mockito.when;
 
 import gt.usac.cunoc.sgp.common.exception.ApiException;
 import gt.usac.cunoc.sgp.mantenimiento.service.PlanMantenimientoService;
-import gt.usac.cunoc.sgp.mantenimiento.service.PlanMantenimientoService;
 import gt.usac.cunoc.sgp.puente.dto.DarBajaPuenteRequest;
 import gt.usac.cunoc.sgp.puente.entity.Puente;
 import gt.usac.cunoc.sgp.puente.mapper.PuenteMapper;

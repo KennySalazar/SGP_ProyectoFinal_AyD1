@@ -356,11 +356,15 @@ public class GeneradorPropuestasMantenimientoService {
     fundamento.put("prioridadBase", regla.getPrioridadBase().name());
     fundamento.put("prioridadSugerida", calculo.prioridad().name());
     if (calculo.ic() != null) fundamento.put("indiceCondicion", calculo.ic().toPlainString());
-    if (calculo.pesoElemento() != null) fundamento.put("pesoElemento", calculo.pesoElemento().toPlainString());
-    if (calculo.pesoMaximo() != null) fundamento.put("pesoMaximoVersion", calculo.pesoMaximo().toPlainString());
-    if (calculo.pesoRelativo() != null) fundamento.put("pesoRelativo", calculo.pesoRelativo().toPlainString());
+    if (calculo.pesoElemento() != null)
+      fundamento.put("pesoElemento", calculo.pesoElemento().toPlainString());
+    if (calculo.pesoMaximo() != null)
+      fundamento.put("pesoMaximoVersion", calculo.pesoMaximo().toPlainString());
+    if (calculo.pesoRelativo() != null)
+      fundamento.put("pesoRelativo", calculo.pesoRelativo().toPlainString());
     fundamento.put("formulaPrioridad", "HU-067-OPCION-3");
-    if (calculo.motivoFallback() != null) fundamento.put("motivoFallbackPrioridad", calculo.motivoFallback());
+    if (calculo.motivoFallback() != null)
+      fundamento.put("motivoFallbackPrioridad", calculo.motivoFallback());
     if (elemento.instanciaId() != null) {
       fundamento.put("instanciaElementoId", elemento.instanciaId().toString());
     }

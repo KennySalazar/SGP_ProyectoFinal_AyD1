@@ -42,6 +42,7 @@ import {
   BorradorLocalPayload,
 } from '../../../../offline/services/inspecciones-locales.service';
 import { ConnectivityService } from '../../../../offline/services/connectivity.service';
+import { mensajeCampo } from '../../utils/nombre-campo';
 
 import { ReporteFotograficoComponent } from '../../components/reporte-fotografico/reporte-fotografico.component';
 import { DocumentosInspeccionComponent } from '../../components/documentos-inspeccion/documentos-inspeccion.component';

@@ -41,21 +41,31 @@ class PrioridadSugeridaIcTest {
 
   @Test
   void datosAusentesOInvalidosConservanLaPrioridadBaseYExplicanElFallback() {
-    var sinIc = PrioridadSugeridaIc.calcular(PrioridadOrden.MEDIA, null, VERSION, "/a", List.of(peso("/a", "1")));
-    var sinPeso = PrioridadSugeridaIc.calcular(PrioridadOrden.ALTA, resultado("80"), VERSION, "/a", List.of());
+    var sinIc =
+        PrioridadSugeridaIc.calcular(
+            PrioridadOrden.MEDIA, null, VERSION, "/a", List.of(peso("/a", "1")));
+    var sinPeso =
+        PrioridadSugeridaIc.calcular(
+            PrioridadOrden.ALTA, resultado("80"), VERSION, "/a", List.of());
     var icInvalido = calcular(PrioridadOrden.BAJA, "101", "1", "1");
     var pesoInvalido = calcular(PrioridadOrden.MEDIA, "20", "0", "1");
     var sinPesoMaximo =
         PrioridadSugeridaIc.calcular(
+            PrioridadOrden.ALTA, resultado("50"), VERSION, "/a", List.of(peso("/a", "0")));
+    var versionInconsistente =
+        PrioridadSugeridaIc.calcular(
             PrioridadOrden.ALTA,
-            resultado("50"),
+            resultado("50", UUID.randomUUID()),
             VERSION,
             "/a",
-            List.of(peso("/a", "0")));
-    var versionInconsistente = PrioridadSugeridaIc.calcular(
-        PrioridadOrden.ALTA, resultado("50", UUID.randomUUID()), VERSION, "/a", List.of(peso("/a", "1")));
-    var versionEICInvalidos = PrioridadSugeridaIc.calcular(
-        PrioridadOrden.MEDIA, resultado("101", UUID.randomUUID()), VERSION, "/a", List.of(peso("/a", "1")));
+            List.of(peso("/a", "1")));
+    var versionEICInvalidos =
+        PrioridadSugeridaIc.calcular(
+            PrioridadOrden.MEDIA,
+            resultado("101", UUID.randomUUID()),
+            VERSION,
+            "/a",
+            List.of(peso("/a", "1")));
 
     assertThat(sinIc.prioridad()).isEqualTo(PrioridadOrden.MEDIA);
     assertThat(sinIc.motivoFallback()).contains("IC publicado");
@@ -69,18 +79,13 @@ class PrioridadSugeridaIcTest {
     assertThat(sinPesoMaximo.motivoFallback()).contains("peso máximo positivo");
     assertThat(versionInconsistente.prioridad()).isEqualTo(PrioridadOrden.ALTA);
     assertThat(versionInconsistente.motivoFallback()).contains("no coincide");
-    assertThat(versionEICInvalidos.motivoFallback())
-        .contains("no coincide", "fuera del rango");
+    assertThat(versionEICInvalidos.motivoFallback()).contains("no coincide", "fuera del rango");
   }
 
   private static PrioridadSugeridaIc.Calculo calcular(
       PrioridadOrden base, String ic, String peso, String maximo) {
     return PrioridadSugeridaIc.calcular(
-        base,
-        resultado(ic),
-        VERSION,
-        "/a",
-        List.of(peso("/a", peso), peso("/otra", maximo)));
+        base, resultado(ic), VERSION, "/a", List.of(peso("/a", peso), peso("/otra", maximo)));
   }
 
   private static ResultadoIc resultado(String ic) {
