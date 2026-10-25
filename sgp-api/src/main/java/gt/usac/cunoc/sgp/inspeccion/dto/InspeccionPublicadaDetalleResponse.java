@@ -33,6 +33,13 @@ public record InspeccionPublicadaDetalleResponse(
     String vigencia,
     RelacionVersionActivaResponse relacionVersionActiva) {
   @com.fasterxml.jackson.annotation.JsonProperty(
+      value = "resultadosIcEndpoint",
+      access = com.fasterxml.jackson.annotation.JsonProperty.Access.READ_ONLY)
+  public String resultadosIcEndpoint() {
+    return "/api/v1/inspecciones/" + id + "/resultados-ic";
+  }
+
+  @com.fasterxml.jackson.annotation.JsonProperty(
       value = "calibracionEndpoint",
       access = com.fasterxml.jackson.annotation.JsonProperty.Access.READ_ONLY)
   public String calibracionEndpoint() {

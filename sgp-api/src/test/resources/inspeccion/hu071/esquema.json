@@ -1,0 +1,57 @@
+{
+  "type": "object",
+  "required": [
+    "vigas",
+    "losa"
+  ],
+  "properties": {
+    "vigas": {
+      "type": "object",
+      "required": [
+        "existencia",
+        "dano"
+      ],
+      "properties": {
+        "existencia": {
+          "enum": [
+            "PRESENTE",
+            "AUSENTE",
+            "NO_APLICA"
+          ]
+        },
+        "dano": {
+          "enum": [
+            "NO_PRESENTA",
+            "LEVE",
+            "MODERADO",
+            "SEVERO"
+          ]
+        }
+      }
+    },
+    "losa": {
+      "type": "object",
+      "required": [
+        "existencia",
+        "dano"
+      ],
+      "properties": {
+        "existencia": {
+          "enum": [
+            "PRESENTE",
+            "AUSENTE",
+            "NO_APLICA"
+          ]
+        },
+        "dano": {
+          "enum": [
+            "NO_PRESENTA",
+            "LEVE",
+            "MODERADO",
+            "SEVERO"
+          ]
+        }
+      }
+    }
+  }
+}
