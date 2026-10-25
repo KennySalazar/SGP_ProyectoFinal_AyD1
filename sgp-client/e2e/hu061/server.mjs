@@ -6,6 +6,7 @@ import { fixture, user, schema, photos } from './fixture.mjs';
 const root = resolve('dist/sgp-client/browser');
 // Modo de aceptación contra Spring Boot aislado: ninguna API se simula.
 const apiReal = process.env.HU061_API_ORIGIN;
+const escriturasReales = [];
 let publicaciones = [];
 let estado = 'BORRADOR';
 let referencia = 'Guatemala';
@@ -29,6 +30,16 @@ createServer(async (req, res) => {
     res.end(JSON.stringify(body));
   }
   if (apiReal && url.pathname.startsWith('/api/')) {
+    if (
+      ['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method) &&
+      url.pathname.startsWith('/api/v1/inspecciones')
+    ) {
+      escriturasReales.push({
+        metodo: req.method,
+        ruta: url.pathname,
+        clave: req.headers['idempotency-key'],
+      });
+    }
     const proxy = proxyRequest(
       new URL(req.url, apiReal),
       {
@@ -42,6 +53,10 @@ createServer(async (req, res) => {
     );
     proxy.on('error', () => json({ detail: 'Backend de prueba no disponible' }, 502));
     req.pipe(proxy);
+    return;
+  }
+  if (apiReal && url.pathname === '/__e2e/real-writes') {
+    json(escriturasReales);
     return;
   }
   if (url.pathname === '/__e2e/setup') {
