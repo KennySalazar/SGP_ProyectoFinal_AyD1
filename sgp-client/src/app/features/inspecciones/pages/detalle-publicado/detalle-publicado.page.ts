@@ -1,3 +1,4 @@
+import { RecalculoIcComponent } from '../../components/recalculo-ic/recalculo-ic.component';
 import { AprobacionCalibracionComponent } from '../../../formulario/components/aprobacion-calibracion/aprobacion-calibracion.component';
 import { DatePipe, DecimalPipe } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
@@ -44,6 +45,7 @@ import { InspeccionApiService } from '../../services/inspeccion-api.service';
   selector: 'app-detalle-publicado-page',
   standalone: true,
   imports: [
+    RecalculoIcComponent,
     AprobacionCalibracionComponent,
     DatePipe,
     DecimalPipe,

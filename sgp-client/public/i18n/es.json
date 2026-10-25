@@ -2040,6 +2040,27 @@
         "general": "No fue posible completar la operación con el documento. Intenta nuevamente.",
         "carga": "No fue posible cargar los documentos de la inspección."
       }
+    },
+    "recalculo": {
+      "titulo": "Comparacion del IC",
+      "ayuda": "Recalcule con la configuracion vigente. El IC original y el estado vigente del puente se conservan. Las fechas se muestran en hora de Guatemala.",
+      "accion": "Recalcular con configuracion vigente",
+      "procesando": "Recalculando...",
+      "cargando": "Cargando resultados del IC...",
+      "reintentar": "Reintentar consulta",
+      "creado": "Resultado disponible para comparar. Se conserva la fecha y el solicitante registrados.",
+      "existente": "Este recalculo ya estaba registrado. Se conserva su fecha y solicitante originales.",
+      "comparacion": "IC original y recalculos registrados",
+      "resultado": "Resultado",
+      "version": "Version de configuracion",
+      "calculado": "Estado calculado",
+      "confirmado": "Estado confirmado al publicar",
+      "fecha": "Fecha de calculo",
+      "solicitante": "Solicitado por",
+      "original": "IC original",
+      "recalculado": "Recalculo del IC",
+      "noAplica": "No aplica",
+      "vacio": "Todavia no hay recalculos registrados."
     }
   }
 }

@@ -1,3 +1,4 @@
+import { RecalculoIcComponent } from '../../components/recalculo-ic/recalculo-ic.component';
 import { AprobacionCalibracionComponent } from '../../../formulario/components/aprobacion-calibracion/aprobacion-calibracion.component';
 import { AprobacionCalibracionApiService } from '../../../formulario/services/aprobacion-calibracion-api.service';
 import { of as estadoRespaldo } from 'rxjs';
@@ -95,6 +96,11 @@ class DocumentosInspeccionStubComponent {
   readonly soloLectura = input(false);
 }
 
+@Component({ selector: 'app-recalculo-ic', standalone: true, template: '' })
+class RecalculoIcStubComponent {
+  readonly inspeccionId = input.required<string>();
+}
+
 describe('Detalle publicado de HU-030', () => {
   let fixture: ComponentFixture<DetallePublicadoPage>;
   let parametros: BehaviorSubject<ReturnType<typeof convertToParamMap>>;
@@ -173,10 +179,26 @@ describe('Detalle publicado de HU-030', () => {
       ],
     })
       .overrideComponent(DetallePublicadoPage, {
-        remove: { imports: [ForoInspeccionComponent, DocumentosInspeccionComponent] },
-        add: { imports: [ForoInspeccionStubComponent, DocumentosInspeccionStubComponent] },
+        remove: {
+          imports: [ForoInspeccionComponent, DocumentosInspeccionComponent, RecalculoIcComponent],
+        },
+        add: {
+          imports: [
+            ForoInspeccionStubComponent,
+            DocumentosInspeccionStubComponent,
+            RecalculoIcStubComponent,
+          ],
+        },
       })
       .compileComponents();
+  });
+
+  it('entrega la inspeccion publicada al comparador sin cambiar el IC original', async () => {
+    await abrir();
+    const comparador = fixture.debugElement.query(By.directive(RecalculoIcStubComponent))
+      .componentInstance as RecalculoIcStubComponent;
+    expect(comparador.inspeccionId()).toBe('original');
+    expect(fixture.componentInstance.detalle()?.ic).toEqual(historica.ic);
   });
 
   async function abrir() {
