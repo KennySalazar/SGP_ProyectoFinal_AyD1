@@ -208,6 +208,8 @@
   }
 </section>
 
+<app-recalculo-ic [inspeccionId]="d.id" />
+
 @if (ordenesMantenimiento().length > 0) {
 <section class="surface-card propuestas-mantenimiento">
   <h2>{{ 'inspecciones.consulta.propuestasMantenimiento' | transloco }}</h2>
