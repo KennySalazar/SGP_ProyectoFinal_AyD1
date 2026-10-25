@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# Solo HU-062 fase 1 y regresión HU-061. Sin instalaciones ni bases persistentes.
+# HU-062 fases 1/2 y regresión HU-061. Sin instalaciones ni bases persistentes.
 set -euo pipefail
 raiz=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)
 modo=${1:-todo}
-case "$modo" in fase1|regresion|todo) ;; *) echo 'Uso: bash e2e/hu061/run-hu062-fase1.sh [fase1|regresion|todo]' >&2; exit 2 ;; esac
+case "$modo" in fase1|fase2|regresion|todo) ;; *) echo 'Uso: bash e2e/hu061/run-hu062-fase1.sh [fase1|fase2|regresion|todo]' >&2; exit 2 ;; esac
 cd "$raiz"
 node -e 'if (Number(process.versions.node.split(".")[0]) < 24) throw Error("Selecciona Node 24 antes de ejecutar")'
 java -XshowSettings:properties -version 2>&1 | rg -q 'java.specification.version = 21$'
@@ -15,7 +15,9 @@ if docker container inspect "$pg" >/dev/null 2>&1; then
   exit 1
 fi
 node --input-type=module -e 'import net from "node:net"; for (const port of [18090,4173]) { const s=net.createServer(); await new Promise((ok,no)=>s.once("error",no).listen(port,"127.0.0.1",ok)); await new Promise(ok=>s.close(ok)); }'
-evidencias=$(mktemp -d /tmp/hu062-fase1.XXXXXX)
+prefijo=fase1
+if [[ "$modo" == fase2 ]]; then prefijo=fase2; fi
+evidencias=$(mktemp -d "/tmp/hu062-$prefijo.XXXXXX")
 echo "Evidencias: $evidencias"
 api_pid=
 pg_id=
@@ -97,6 +99,22 @@ until [[ $(docker exec "$pg_id" psql -U hu061_test -d hu061_aceptacion -Atc \
 done
 docker exec -i "$pg_id" psql -U hu061_test -d hu061_aceptacion -v ON_ERROR_STOP=1 \
   <e2e/hu061/real-fixture.sql >"$evidencias/fixture.log"
+if [[ "$modo" == fase2 ]]; then
+  # Diagnóstico solamente: no se ejecuta tc ni se toca una interfaz del anfitrión.
+  {
+    command -v tc nsenter unshare
+    tc -V
+    capsh --print | head -5
+    sudo -n -l
+    unshare --net true
+  } >"$evidencias/netem-preflight.log" 2>&1 || true
+  echo 'Pérdida real NO VERIFICADA: consultar bloqueo y requisitos en FASE_2_HU062_RESULTADOS.md.' | tee -a "$evidencias/netem-preflight.log"
+  for corrida in 1 2; do
+    HU062_FASE2=true HU061_API_ORIGIN=http://127.0.0.1:18090 HU062_ARCHIVOS="$evidencias/archivos" \
+      PLAYWRIGHT_JSON_OUTPUT_FILE="$evidencias/fase2-$corrida.json" \
+      npm run test:pwa -- --grep 'HU-062 fase 2' --reporter=list,json --output "$evidencias/fase2-$corrida"
+  done
+fi
 if [[ "$modo" != regresion ]]; then
   HU062_FASE1=true HU061_API_ORIGIN=http://127.0.0.1:18090 HU062_ARCHIVOS="$evidencias/archivos" \
     PLAYWRIGHT_JSON_OUTPUT_FILE="$evidencias/fase1.json" \
