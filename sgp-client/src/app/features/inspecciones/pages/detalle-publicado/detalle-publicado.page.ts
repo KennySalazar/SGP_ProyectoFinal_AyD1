@@ -69,6 +69,8 @@ import { InspeccionApiService } from '../../services/inspeccion-api.service';
 export class DetallePublicadoPage implements ContextoComentariosFormulario {
   private readonly api = inject(InspeccionApiService);
   private readonly route = inject(ActivatedRoute);
+  /** Comentario del foro al que lleva un aviso de mención (HU-066). */
+  readonly comentarioDelAviso = this.route.snapshot.queryParamMap.get('comentario') ?? null;
   private readonly errores = inject(ApiErrorService);
   private readonly destroyRef = inject(DestroyRef);
   private readonly injector = inject(Injector);

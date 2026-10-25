@@ -1,6 +1,7 @@
+import { RouterLink } from '@angular/router';
 import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
 import { liveQuery } from 'dexie';
-import { AsyncPipe, DecimalPipe } from '@angular/common';
+import { AsyncPipe, DecimalPipe, DatePipe } from '@angular/common';
 import { sgpDb, SyncQueueItem } from '../../db/sgp-db';
 import { StorageService } from '../../services/storage.service';
 import { TranslocoPipe } from '@jsverse/transloco';
@@ -10,7 +11,7 @@ import { InspeccionesLocalesService } from '../../services/inspecciones-locales.
 @Component({
   selector: 'app-diagnostics-page',
   standalone: true,
-  imports: [AsyncPipe, DecimalPipe, TranslocoPipe],
+  imports: [AsyncPipe, DecimalPipe, DatePipe, RouterLink, TranslocoPipe],
   templateUrl: './diagnostics.page.html',
   styleUrl: './diagnostics.page.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,

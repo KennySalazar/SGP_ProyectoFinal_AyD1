@@ -14,7 +14,7 @@
           <a class="connectivity" [class.offline]="!connectivity.online()" routerLink="/offline">
             <span class="dot"></span>
             @if (cantidadPendiente(cola, 'INSPECCION') + cantidadPendiente(cola, 'FOTO') === 0) {
-              {{ 'offline.synced' | transloco }}
+              {{ (connectivity.online() ? 'offline.synced' : 'connectivity.offline') | transloco }}
             } @else {
               {{
                 (connectivity.online() ? 'connectivity.online' : 'connectivity.offline') | transloco
@@ -38,6 +38,25 @@
     </header>
 
     <section class="route-content">
+      @if (actualizacion.disponible() && !actualizacion.pospuesta()) {
+        <div class="aviso-perfil" role="status">
+          <span>{{ 'offline.hu061.updateReady' | transloco }}</span>
+          <button
+            type="button"
+            (click)="actualizacion.recargar()"
+            [disabled]="actualizacion.preparando() || sincronizacion.sincronizando()"
+          >
+            {{ 'offline.hu061.reload' | transloco }}
+          </button>
+          <button type="button" (click)="actualizacion.pospuesta.set(true)">
+            {{ 'offline.hu061.later' | transloco }}
+          </button>
+          @if (actualizacion.error()) {
+            <span role="alert">{{ 'offline.hu061.storageError' | transloco }}</span>
+          }
+        </div>
+      }
+
       @if (avisarPerfil()) {
         <p class="aviso-perfil" role="status">
           <i class="pi pi-id-card" aria-hidden="true"></i>
@@ -123,6 +142,10 @@
           </a>
           <a routerLink="/mantenimiento/ordenes" routerLinkActive="active">
             <i class="pi pi-briefcase"></i><span>{{ 'nav.maintenanceOrders' | transloco }}</span>
+          </a>
+          <a routerLink="/foro/moderacion" routerLinkActive="active">
+            <i class="pi pi-flag" aria-hidden="true"></i
+            ><span>{{ 'nav.forumModeration' | transloco }}</span>
           </a>
         }
         @if (auth.user()?.role === 'ADMINISTRADOR') {

@@ -23,6 +23,7 @@ import gt.usac.cunoc.sgp.inspeccion.entity.Inspeccion;
 import gt.usac.cunoc.sgp.inspeccion.repository.InspeccionRepository;
 import gt.usac.cunoc.sgp.puente.entity.Puente;
 import gt.usac.cunoc.sgp.puente.repository.PuenteRepository;
+import gt.usac.cunoc.sgp.usuario.model.RoleName;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -48,6 +49,9 @@ import org.springframework.transaction.annotation.Transactional;
  * <p>Los comentarios del hilo de una inspección publicada pueden anclarse a un campo o elemento
  * (HU-064, RN-FOR-02). Ese hilo solo existe para inspecciones PUBLICADAS (RN-FOR-03), un estado
  * terminal que la base de datos no deja borrar.
+ *
+ * <p>Lo que se ve de un comentario eliminado u oculto depende de quién lee: el Catedrático y el
+ * Administrador moderan el foro y ven el texto oculto con su motivo (HU-065, RN-FOR-08).
  */
 @Service
 public class ForoService {
@@ -58,6 +62,8 @@ public class ForoService {
   private final PuenteRepository puentes;
   private final InspeccionRepository inspecciones;
   private final AnclajeComentarioForo anclajes;
+  private final LimiteTasaForo limites;
+  private final AvisosForo avisos;
   private final AuditoriaWriter auditoria;
   private final ForoMapper mapper;
   private final ObjectMapper json;
@@ -70,6 +76,8 @@ public class ForoService {
       PuenteRepository puentes,
       InspeccionRepository inspecciones,
       AnclajeComentarioForo anclajes,
+      LimiteTasaForo limites,
+      AvisosForo avisos,
       AuditoriaWriter auditoria,
       ForoMapper mapper,
       ObjectMapper json,
@@ -80,6 +88,8 @@ public class ForoService {
     this.puentes = puentes;
     this.inspecciones = inspecciones;
     this.anclajes = anclajes;
+    this.limites = limites;
+    this.avisos = avisos;
     this.auditoria = auditoria;
     this.mapper = mapper;
     this.json = json;
@@ -111,11 +121,13 @@ public class ForoService {
 
   /**
    * Abre un hilo en un puente activo con su primer comentario. Valida todo y responde un único 422
-   * con el detalle.
+   * con el detalle. Respeta el límite de tasa (429) y avisa a los mencionados y, si es una alerta
+   * sobre un puente en estado Malo, a los Catedráticos y Administradores (HU-066).
    */
   @Transactional
   public HiloResponse crearHilo(UUID puenteId, CrearHiloRequest request, UUID usuarioId) {
-    puenteActivo(puenteId);
+    Puente puente = puenteActivo(puenteId);
+    limites.exigirParaHilo(usuarioId);
     List<Map<String, String>> errores = new ArrayList<>();
     String titulo = ContenidoForo.limpiarTitulo(request.titulo());
     if (titulo == null) {
@@ -147,8 +159,32 @@ public class ForoService {
                 UuidV7Generator.generate(), puenteId, null, usuarioId, categoria, titulo, ahora));
     auditoria.registrarEnTransaccion(
         usuarioId, AccionAuditoria.CREAR, "foro_hilo", hilo.getId(), null, instantanea(hilo), null);
-    registrarComentario(hilo, comentario, null, usuarioId);
+    avisos.avisarMenciones(hilo, registrarComentario(hilo, comentario, null, usuarioId));
+    avisos.avisarAlerta(hilo, puente);
     return mapper.toHiloResponse(hilo, autoresDe(List.of(usuarioId)).get(usuarioId), 1L);
+  }
+
+  /**
+   * Un comentario, visto por quien lee: lo usa quien abre el aviso de una mención para llegar a su
+   * hilo (HU-066). 404 si no existe o su puente está inactivo.
+   */
+  @Transactional(readOnly = true)
+  public ComentarioResponse obtenerComentario(UUID comentarioId, RoleName lector) {
+    ForoComentario comentario =
+        comentarios
+            .findById(comentarioId)
+            .orElseThrow(
+                () ->
+                    new ApiException(
+                        HttpStatus.NOT_FOUND,
+                        "comentario_no_encontrado",
+                        "Comentario no encontrado",
+                        "El comentario no existe."));
+    hiloVisible(comentario.getHiloId());
+    return mapper.toComentarioResponse(
+        comentario,
+        autoresDe(List.of(comentario.getAutorId())).get(comentario.getAutorId()),
+        esModerador(lector));
   }
 
   @Transactional(readOnly = true)
@@ -171,6 +207,11 @@ public class ForoService {
     return listarComentarios(hiloId, pagina, tamanio, FiltroComentarios.NINGUNO);
   }
 
+  /** Si quien lee modera el foro: ve los comentarios ocultos y su motivo (RN-FOR-08). */
+  private static boolean esModerador(RoleName rol) {
+    return rol == RoleName.CATEDRATICO || rol == RoleName.ADMINISTRADOR;
+  }
+
   /** Los comentarios de un campo o elemento; sin {@code elementoRef}, todos los del hilo. */
   public Page<ComentarioResponse> listarComentarios(
       UUID hiloId, int pagina, int tamanio, String elementoRef, UUID instanciaElementoId) {
@@ -178,15 +219,24 @@ public class ForoService {
         hiloId, pagina, tamanio, FiltroComentarios.porElemento(elementoRef, instanciaElementoId));
   }
 
+  /** Los comentarios con el filtro pedido, vistos por alguien que no modera el foro. */
+  public Page<ComentarioResponse> listarComentarios(
+      UUID hiloId, int pagina, int tamanio, FiltroComentarios filtro) {
+    return listarComentariosPara(hiloId, pagina, tamanio, filtro, null);
+  }
+
   /**
    * Los comentarios de un hilo, más antiguos primero, con el filtro pedido. Con {@code elementoRef}
    * solo los anclados a ese campo o elemento: sin instancia, los del elemento sin instancia; con
    * ella, los de esa instancia. Con {@code seccion} los de esa sección y todo lo que contiene; con
    * {@code soloGenerales}, los que no están anclados. Dos filtros a la vez se rechazan con 422.
+   *
+   * <p>{@code lector} es el rol de quien lee, o nulo si es un visitante. Los eliminados y ocultos
+   * siguen en la lista para no romper el hilo, sin su texto salvo los ocultos para un moderador.
    */
   @Transactional(readOnly = true)
-  public Page<ComentarioResponse> listarComentarios(
-      UUID hiloId, int pagina, int tamanio, FiltroComentarios filtro) {
+  public Page<ComentarioResponse> listarComentariosPara(
+      UUID hiloId, int pagina, int tamanio, FiltroComentarios filtro, RoleName lector) {
     ContenidoForo.validarPaginacion(pagina, tamanio);
     String ref = ContenidoForo.limpiarReferencia(filtro.elementoRef());
     String seccion = ContenidoForo.limpiarReferencia(filtro.seccion());
@@ -215,7 +265,9 @@ public class ForoService {
     }
     Map<UUID, Autor> autoresPorId =
         autoresDe(resultado.getContent().stream().map(ForoComentario::getAutorId).toList());
-    return resultado.map(c -> mapper.toComentarioResponse(c, autoresPorId.get(c.getAutorId())));
+    boolean moderador = esModerador(lector);
+    return resultado.map(
+        c -> mapper.toComentarioResponse(c, autoresPorId.get(c.getAutorId()), moderador));
   }
 
   private void validarFiltro(String ref, UUID instancia, String seccion, boolean soloGenerales) {
@@ -255,6 +307,7 @@ public class ForoService {
   public ComentarioResponse crearComentario(
       UUID hiloId, CrearComentarioRequest request, UUID usuarioId) {
     ForoHilo hilo = hiloVisible(hiloId);
+    limites.exigirParaComentario(usuarioId);
     List<Map<String, String>> errores = new ArrayList<>();
     String contenido = ContenidoForo.limpiarComentario(request.contenido());
     validarComentario(contenido, "contenido", errores);
@@ -292,17 +345,13 @@ public class ForoService {
           "El comentario contiene datos inválidos.",
           errores);
     }
-    if (hilo.getCerradoEn() != null) {
-      throw new ApiException(
-          HttpStatus.CONFLICT,
-          "hilo_cerrado",
-          "Hilo cerrado",
-          "El hilo está cerrado y ya no admite comentarios.");
-    }
+    if (hilo.getCerradoEn() != null) throw hiloCerrado();
     ForoComentario comentario =
         registrarComentario(
             hilo, contenido, request.padreId(), elementoRef, instanciaElementoId, usuarioId);
-    return mapper.toComentarioResponse(comentario, autoresDe(List.of(usuarioId)).get(usuarioId));
+    avisos.avisarMenciones(hilo, comentario);
+    return mapper.toComentarioResponse(
+        comentario, autoresDe(List.of(usuarioId)).get(usuarioId), false);
   }
 
   /**
@@ -346,6 +395,8 @@ public class ForoService {
       UUID instanciaElementoId,
       UUID usuarioId) {
     Instant ahora = clock.instant();
+    // Si un moderador lo cerró después de leerlo, el hilo ya no admite el comentario (RN-FOR-08).
+    if (hilos.registrarActividad(hilo.getId(), ahora) == 0) throw hiloCerrado();
     ForoComentario comentario =
         comentarios.save(
             new ForoComentario(
@@ -357,7 +408,6 @@ public class ForoService {
                 instanciaElementoId,
                 contenido,
                 ahora));
-    hilos.registrarActividad(hilo.getId(), ahora);
     auditoria.registrarEnTransaccion(
         usuarioId,
         AccionAuditoria.CREAR,
@@ -420,6 +470,14 @@ public class ForoService {
     ForoHilo hilo = hilos.findById(hiloId).orElseThrow(ForoService::hiloNoEncontrado);
     puenteActivo(hilo.getPuenteId());
     return hilo;
+  }
+
+  private static ApiException hiloCerrado() {
+    return new ApiException(
+        HttpStatus.CONFLICT,
+        "hilo_cerrado",
+        "Hilo cerrado",
+        "El hilo está cerrado y ya no admite comentarios.");
   }
 
   private static ApiException hiloNoEncontrado() {

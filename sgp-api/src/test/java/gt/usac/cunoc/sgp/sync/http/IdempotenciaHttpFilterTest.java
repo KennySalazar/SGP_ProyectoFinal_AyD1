@@ -183,6 +183,8 @@ class IdempotenciaHttpFilterTest {
     verifyNoInteractions(operaciones);
     assertThat(IdempotenciaHttpFilter.protegida("POST", "/api/v1/inspecciones/1/fotografias"))
         .isFalse();
+    assertThat(IdempotenciaHttpFilter.protegida("POST", "/api/v1/inspecciones/1/publicar"))
+        .isTrue();
     assertThat(IdempotenciaHttpFilter.protegida("PUT", "/api/v1/inspecciones/1/borrador")).isTrue();
     assertThat(IdempotenciaHttpFilter.protegida("POST", "/api/v1/inspecciones/1/reenviar"))
         .isTrue();

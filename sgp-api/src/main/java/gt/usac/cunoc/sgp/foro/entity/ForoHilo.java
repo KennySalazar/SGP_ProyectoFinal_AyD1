@@ -38,9 +38,18 @@ public class ForoHilo {
   @Column(nullable = false, length = 250, updatable = false)
   private String titulo;
 
-  /** El cierre de hilos lo gestiona la moderación (HU-065); aquí solo se lee. */
+  /**
+   * Un moderador cierra el hilo con un motivo (HU-065, RN-FOR-08) mediante {@code
+   * ForoHiloRepository#cerrar}; aquí solo se lee. Cerrado sigue visible para lectura.
+   */
   @Column(name = "cerrado_en", insertable = false, updatable = false)
   private Instant cerradoEn;
+
+  @Column(name = "cerrado_por_id", insertable = false, updatable = false)
+  private UUID cerradoPorId;
+
+  @Column(name = "motivo_cierre", insertable = false, updatable = false, columnDefinition = "text")
+  private String motivoCierre;
 
   @Column(name = "creado_en", nullable = false, updatable = false)
   private Instant creadoEn;
@@ -96,6 +105,14 @@ public class ForoHilo {
 
   public Instant getCerradoEn() {
     return cerradoEn;
+  }
+
+  public UUID getCerradoPorId() {
+    return cerradoPorId;
+  }
+
+  public String getMotivoCierre() {
+    return motivoCierre;
   }
 
   public Instant getCreadoEn() {

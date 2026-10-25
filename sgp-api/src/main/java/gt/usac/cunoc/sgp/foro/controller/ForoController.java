@@ -11,6 +11,7 @@ import gt.usac.cunoc.sgp.foro.service.FiltroComentarios;
 import gt.usac.cunoc.sgp.foro.service.ForoInspeccionService;
 import gt.usac.cunoc.sgp.foro.service.ForoInspeccionService.Apertura;
 import gt.usac.cunoc.sgp.foro.service.ForoService;
+import gt.usac.cunoc.sgp.usuario.model.RoleName;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -69,13 +70,30 @@ public class ForoController {
           "Cualquier usuario autenticado y activo. Exige título (hasta 120 caracteres), categoría "
               + "(DISCUSION_TECNICA, PROPUESTA_INTERVENCION, CONSULTA, REFERENCIA_DOCUMENTAL o "
               + "ALERTA) y primer comentario (hasta 2000 caracteres); 422 con el detalle de lo "
-              + "que falte o exceda, sin crear nada.")
+              + "que falte o exceda, sin crear nada. Cada usuario abre hasta 3 hilos y publica "
+              + "hasta 10 comentarios por minuto; si lo supera, 429 con Retry-After. Las menciones "
+              + "@usuario avisan al mencionado y una Alerta sobre un puente en estado Malo avisa "
+              + "a Catedráticos y Administradores.")
   public ResponseEntity<HiloResponse> crearHilo(
       @PathVariable UUID puenteId,
       @RequestBody CrearHiloRequest request,
       Authentication authentication) {
     return ResponseEntity.status(HttpStatus.CREATED)
         .body(foro.crearHilo(puenteId, request, usuarioId(authentication)));
+  }
+
+  @GetMapping("/comentarios/{comentarioId}")
+  @PreAuthorize("isAuthenticated()")
+  @SecurityRequirement(name = "bearerAuth")
+  @Operation(
+      summary = "Consultar un comentario",
+      description =
+          "Con sesión. Lleva al hilo de un comentario, por ejemplo desde el aviso de una mención. "
+              + "Se ve como en la lista de comentarios: sin texto si se eliminó, y si está oculto "
+              + "solo el Catedrático y el Administrador ven el texto y el motivo. 404 si no existe.")
+  public ComentarioResponse obtenerComentario(
+      @PathVariable UUID comentarioId, Authentication authentication) {
+    return foro.obtenerComentario(comentarioId, rolLector(authentication));
   }
 
   @GetMapping("/hilos/{hiloId}")
@@ -124,7 +142,9 @@ public class ForoController {
               + "instanciaElementoId los del elemento sin instancia), por una sección entera "
               + "(seccion, su clave sin barras, con todo lo que contiene) o por los generales "
               + "(soloGenerales, los que no están anclados); dos filtros a la vez dan 422. Página "
-              + "desde 0, tamaño entre 1 y 100 (20 por defecto).")
+              + "desde 0, tamaño entre 1 y 100 (20 por defecto). Un comentario eliminado llega "
+              + "sin texto con eliminado=true; uno oculto llega sin texto con oculto=true, salvo "
+              + "para el Catedrático y el Administrador, que ven el texto y el motivo.")
   public Page<ComentarioResponse> listarComentarios(
       @PathVariable UUID hiloId,
       @RequestParam(defaultValue = "0") int pagina,
@@ -132,12 +152,14 @@ public class ForoController {
       @RequestParam(required = false) String elementoRef,
       @RequestParam(required = false) UUID instanciaElementoId,
       @RequestParam(required = false) String seccion,
-      @RequestParam(defaultValue = "false") boolean soloGenerales) {
-    return foro.listarComentarios(
+      @RequestParam(defaultValue = "false") boolean soloGenerales,
+      Authentication authentication) {
+    return foro.listarComentariosPara(
         hiloId,
         pagina,
         tamanio,
-        new FiltroComentarios(elementoRef, instanciaElementoId, seccion, soloGenerales));
+        new FiltroComentarios(elementoRef, instanciaElementoId, seccion, soloGenerales),
+        rolLector(authentication));
   }
 
   @PostMapping("/hilos/{hiloId}/comentarios")
@@ -152,13 +174,22 @@ public class ForoController {
               + "elementoRef (y instanciaElementoId si el elemento es repetible) ancla el "
               + "comentario a un campo o elemento que debe existir en el formulario con que se "
               + "levantó la inspección (422 si no); una respuesta toma el ancla de su comentario. "
-              + "Un hilo cerrado responde 409.")
+              + "Un hilo cerrado responde 409. Hasta 10 comentarios por minuto por usuario; si lo "
+              + "supera, 429 con Retry-After. Las menciones @usuario avisan una sola vez a cada "
+              + "mencionado activo, salvo a uno mismo.")
   public ResponseEntity<ComentarioResponse> crearComentario(
       @PathVariable UUID hiloId,
       @RequestBody CrearComentarioRequest request,
       Authentication authentication) {
     return ResponseEntity.status(HttpStatus.CREATED)
         .body(foro.crearComentario(hiloId, request, usuarioId(authentication)));
+  }
+
+  /** El rol de quien lee, o nulo si es un visitante sin sesión. */
+  private RoleName rolLector(Authentication authentication) {
+    return authentication != null && authentication.getDetails() instanceof JwtData jwtData
+        ? jwtData.role()
+        : null;
   }
 
   private UUID usuarioId(Authentication authentication) {

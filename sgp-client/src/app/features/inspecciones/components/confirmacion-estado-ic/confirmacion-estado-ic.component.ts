@@ -69,6 +69,7 @@ export class ConfirmacionEstadoIcComponent {
       validators: Validators.maxLength(10000),
     }),
   });
+  readonly calculoVisible = computed(() => (this.esOffline() ? null : this.calculo()));
   readonly calculo = computed(() => this.respuesta()?.calculo ?? null);
 
   constructor() {
@@ -111,7 +112,8 @@ export class ConfirmacionEstadoIcComponent {
 
   guardar(): void {
     const res = this.respuesta();
-    if (!res || this.bloqueado() || this.procesando() || this.restringido()) return;
+    if (!res || this.esOffline() || this.bloqueado() || this.procesando() || this.restringido())
+      return;
     this.form.markAllAsTouched();
     const { estado, justificacion } = this.form.getRawValue();
     if (this.form.invalid || (estado !== res.calculo.estadoCalculado && !justificacion.trim())) {

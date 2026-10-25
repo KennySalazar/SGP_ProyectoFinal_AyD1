@@ -315,7 +315,7 @@
         @if (error()) {
           <div class="alerta-error" role="alert">
             <i class="pi pi-exclamation-circle" aria-hidden="true"></i>
-            <span>{{ error() }}</span>
+            <span>{{ error()?.startsWith('offline.') ? (error()! | transloco) : error() }}</span>
           </div>
         }
 

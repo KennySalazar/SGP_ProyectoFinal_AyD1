@@ -15,6 +15,7 @@ export interface AcompananteResponse {
 }
 
 export interface IniciarInspeccionRequest {
+  versionFormularioId?: string;
   id?: string | null;
   puenteId: string;
   fechaInspeccion: string;

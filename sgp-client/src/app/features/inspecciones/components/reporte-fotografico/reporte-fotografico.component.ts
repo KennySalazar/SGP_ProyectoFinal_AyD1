@@ -1,3 +1,4 @@
+import { SincronizacionService } from '../../../../offline/services/sincronizacion.service';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -35,7 +36,6 @@ import {
   CategoriaFoto,
   FotografiaResponse,
   ImagenPreparada,
-  MetadatosFotografia,
 } from '../../models/fotografia.models';
 import { InspeccionApiService } from '../../services/inspeccion-api.service';
 import { ProcesadorFotografiasService } from '../../services/procesador-fotografias.service';
@@ -85,6 +85,7 @@ export class ReporteFotograficoComponent implements OnDestroy {
   readonly contextoElemento = input<{ elementoRef: string; instanciaElementoId?: string } | null>(
     null,
   );
+  private readonly sync = inject(SincronizacionService);
   private readonly api = inject(InspeccionApiService);
   private readonly auth = inject(AuthStore);
   private readonly locales = inject(FotografiasLocalesService);
@@ -120,11 +121,21 @@ export class ReporteFotograficoComponent implements OnDestroy {
   confirmadasPorCategoria(categoria: CategoriaFoto) {
     return this.confirmadas().filter((foto) => foto.categoria === categoria);
   }
-  readonly limiteAlcanzado = computed(() => this.confirmadas().length >= 60);
+  readonly inventario = computed(() => {
+    const fotos = new Map(this.confirmadas().map((foto) => [foto.id, foto]));
+    for (const foto of this.pendientes())
+      if (!fotos.has(foto.id))
+        fotos.set(foto.id, {
+          id: foto.id,
+          categoria: foto.metadatos.categoria,
+        } as FotografiaResponse);
+    return [...fotos.values()];
+  });
+  readonly limiteAlcanzado = computed(() => this.inventario().length >= 60);
   readonly conteos = computed(() =>
     CATEGORIAS_FOTO.map((categoria) => ({
       categoria,
-      cantidad: this.confirmadas().filter((foto) => foto.categoria === categoria).length,
+      cantidad: this.inventario().filter((foto) => foto.categoria === categoria).length,
     })),
   );
   readonly faltantes = computed(() =>
@@ -133,7 +144,7 @@ export class ReporteFotograficoComponent implements OnDestroy {
       .map((conteo) => conteo.categoria),
   );
   constructor() {
-    effect(() => {
+    effect((onCleanup) => {
       const inspeccion = this.contexto();
       const usuario = this.auth.user();
       untracked(() => {
@@ -141,6 +152,30 @@ export class ReporteFotograficoComponent implements OnDestroy {
         if (contexto === this.contextoActual) return;
         this.contextoActual = contexto;
         this.limpiar();
+        if (
+          usuario &&
+          usuario.id === inspeccion.autorId &&
+          inspeccion.estado === 'BORRADOR' &&
+          !this.revisionSoloLectura()
+        ) {
+          const subscription = this.locales
+            .observarInventario(usuario.id, inspeccion.id)
+            .subscribe((inventario) => {
+              if (this.auth.user()?.id !== usuario.id || this.contexto().id !== inspeccion.id)
+                return;
+              this.pendientes.set(inventario.pendientes);
+              const anteriores = new Map(
+                this.confirmadas().map((foto) => [foto.id, foto.miniatura]),
+              );
+              this.confirmadas.set(
+                inventario.confirmadas.map((foto) => ({
+                  ...foto,
+                  miniatura: anteriores.get(foto.id),
+                })),
+              );
+            });
+          onCleanup(() => subscription.unsubscribe());
+        }
         if (usuario) void this.recargar(usuario.id, inspeccion.id, this.revision);
       });
     });
@@ -179,11 +214,19 @@ export class ReporteFotograficoComponent implements OnDestroy {
       }
     }
     if (!vigente()) return;
+    const propias =
+      usuario === contexto.autorId && contexto.estado === 'BORRADOR' && !this.revisionSoloLectura();
+    const conocidas = propias ? await this.locales.inventario(usuario, id) : [];
+    if (!vigente()) return;
+    this.confirmadas.set(conocidas);
+    this.inventarioCargado.set(true);
+    if (!this.connectivity.online()) return;
     try {
       const fotos = await firstValueFrom(this.api.listarFotografias(id));
       if (!vigente()) return;
       this.confirmadas().forEach((foto) => this.revocar(foto.miniatura));
       this.confirmadas.set(fotos);
+      if (propias) await this.locales.guardarInventario(usuario, id, fotos);
       this.inventarioCargado.set(true);
       for (const foto of fotos) {
         try {
@@ -317,7 +360,7 @@ export class ReporteFotograficoComponent implements OnDestroy {
       this.revocar(this.previsualizacion());
       this.previsualizacion.set(null);
       this.categoria.reset();
-      await this.enviar(foto, revision);
+      void this.sync.sincronizarAhora();
     } catch {
       if (revision === this.revision) this.error.set('persistencia');
     } finally {
@@ -327,53 +370,11 @@ export class ReporteFotograficoComponent implements OnDestroy {
   async reintentar(foto: FotografiaPendiente) {
     if (
       !this.editable() ||
-      this.ocupado() ||
       this.auth.user()?.id !== foto.propietarioId ||
       foto.inspeccionId !== this.contexto().id
     )
       return;
-    const revision = this.revision;
-    this.ocupado.set(true);
-    try {
-      await this.enviar(foto, revision);
-    } finally {
-      if (revision === this.revision) this.ocupado.set(false);
-    }
-  }
-  private async enviar(foto: FotografiaPendiente, revision: number) {
-    this.error.set(null);
-    this.aviso.set(false);
-    try {
-      await firstValueFrom(
-        this.api.adjuntarFotografia(
-          foto.inspeccionId,
-          foto.blob,
-          foto.metadatos as MetadatosFotografia,
-          foto.idempotencyKey,
-        ),
-      );
-      await this.locales.confirmar(foto.id, foto.propietarioId);
-      if (!this.vigente(foto.propietarioId, foto.inspeccionId, revision)) return;
-      this.pendientes.update((lista) => lista.filter((f) => f.id !== foto.id));
-      this.aviso.set(true);
-      await this.recargar(foto.propietarioId, foto.inspeccionId, revision);
-    } catch (e) {
-      if (!this.vigente(foto.propietarioId, foto.inspeccionId, revision)) return;
-      const codigo = (e as { error?: { code?: string } })?.error?.code;
-      const errores: Record<string, string> = {
-        estado_inspeccion_no_permite_archivos: 'estado',
-        limite_fotografias_excedido: 'limite',
-        idempotencia_solicitud_distinta: 'conflicto',
-        fotografia_identidad_conflictiva: 'conflicto',
-        fotografia_metadatos_invalidos: 'metadatos',
-        categoria_fotografia_invalida: 'metadatos',
-        contenido_fotografico_invalido: 'formato',
-        anclaje_fotografico_invalido: 'anclaje',
-        carga_demasiado_grande: 'tamano',
-      };
-      if (codigo === 'estado_inspeccion_no_permite_archivos') this.bloqueada.set(true);
-      this.error.set(codigo ? (errores[codigo] ?? 'carga') : 'carga');
-    }
+    await this.sync.reintentar(foto.id);
   }
   solicitarRetirada(foto: FotografiaResponse) {
     if (

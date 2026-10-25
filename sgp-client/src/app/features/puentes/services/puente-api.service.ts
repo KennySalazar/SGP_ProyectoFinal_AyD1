@@ -1,3 +1,4 @@
+import { ReferenciasLocalesService } from '../../../offline/services/referencias-locales.service';
 import { HttpClient } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
 import { Observable, forkJoin, map, of, switchMap } from 'rxjs';
@@ -23,6 +24,7 @@ const MAX_PAGINAS_MAPA = 10;
 @Injectable({ providedIn: 'root' })
 export class PuenteApiService {
   private readonly http = inject(HttpClient);
+  private readonly referencias = inject(ReferenciasLocalesService);
 
   resolverUbicacion(latitud: number, longitud: number): Observable<UbicacionTerritorialResponse> {
     return this.http.get<UbicacionTerritorialResponse>('/api/v1/catalogos/ubicacion', {
@@ -151,6 +153,6 @@ export class PuenteApiService {
   }
 
   listarMisPuentesAsignados(): Observable<AsignacionPuenteResponse[]> {
-    return this.http.get<AsignacionPuenteResponse[]>('/api/v1/asignaciones-puentes/mis-puentes');
+    return this.referencias.misPuentesAsignados();
   }
 }

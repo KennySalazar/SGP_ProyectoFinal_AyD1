@@ -15,3 +15,7 @@
 *.log
 enunciado_ayd1.md
 manual_centro_americano.md
+
+# Artefactos de pruebas PWA en navegador
+sgp-client/test-results/
+sgp-client/playwright-report/

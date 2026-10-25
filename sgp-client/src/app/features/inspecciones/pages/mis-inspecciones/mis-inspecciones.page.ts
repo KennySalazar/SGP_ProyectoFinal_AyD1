@@ -246,7 +246,7 @@ export class MisInspeccionesPage {
               activo?: boolean;
             };
             return {
-              id: p.id,
+              id: p.origenId ?? p.id,
               codigo: p.codigo || '',
               nombre: payload.nombre || '',
               departamento: payload.departamento || { id: '', codigoIne: '', nombre: '' },
@@ -286,11 +286,11 @@ export class MisInspeccionesPage {
     if (!this.connectivity.online()) {
       this.inspeccionesLocales.obtenerPuentesPreparados().then((puentes) => {
         this.cargandoPuente.set(false);
-        const encontrado = puentes.find((p) => p.id === puente.id);
+        const encontrado = puentes.find((p) => (p.origenId ?? p.id) === puente.id);
         if (encontrado) {
           const payload = (encontrado.payload || {}) as unknown as PuenteResponse;
           this.puenteSeleccionado.set({
-            id: encontrado.id,
+            id: encontrado.origenId ?? encontrado.id,
             codigo: encontrado.codigo || puente.codigo,
             nombre: payload.nombre || puente.nombre,
             departamento: payload.departamento || puente.departamento,

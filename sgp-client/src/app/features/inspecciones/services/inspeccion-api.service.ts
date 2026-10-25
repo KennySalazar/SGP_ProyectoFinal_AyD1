@@ -150,10 +150,12 @@ export class InspeccionApiService {
       idempotencyKey,
     );
   }
-  publicar(id: string): Observable<InspeccionResumenResponse> {
-    return this.http.post<InspeccionResumenResponse>(
+  publicar(id: string, idempotencyKey?: string): Observable<InspeccionResumenResponse> {
+    return this.operaciones.ejecutar<InspeccionResumenResponse>(
+      'POST',
       `/api/v1/inspecciones/${encodeURIComponent(id)}/publicar`,
       null,
+      idempotencyKey,
     );
   }
   crearCorreccion(id: string, motivo: string): Observable<InspeccionResumenResponse> {

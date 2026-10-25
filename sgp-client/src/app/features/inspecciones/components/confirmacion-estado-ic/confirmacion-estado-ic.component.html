@@ -36,7 +36,7 @@
       }}
     </p>
   }
-  @if (calculo(); as c) {
+  @if (calculoVisible(); as c) {
     <app-aprobacion-calibracion [versionId]="c.versionFormularioId" />
     <dl>
       <dt>{{ 'inspecciones.confirmacionIc.indice' | transloco }}</dt>

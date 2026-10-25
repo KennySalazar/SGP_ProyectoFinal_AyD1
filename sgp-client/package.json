@@ -9,7 +9,8 @@
     "test": "ng test --watch=false",
     "lint": "eslint \"src/**/*.{ts,html}\"",
     "format": "prettier --write \"src/**/*.{ts,html,scss,json}\" \"*.{json,md}\"",
-    "format:check": "prettier --check \"src/**/*.{ts,html,scss,json}\" \"public/i18n/*.json\" \"package.json\""
+    "format:check": "prettier --check \"src/**/*.{ts,html,scss,json}\" \"public/i18n/*.json\" \"package.json\"",
+    "test:pwa": "playwright test"
   },
   "dependencies": {
     "@angular/animations": "^21.2.0",
@@ -35,6 +36,7 @@
     "@angular/cli": "^21.2.15",
     "@angular/compiler-cli": "^21.2.0",
     "@eslint/js": "^9.39.1",
+    "@playwright/test": "^1.64.1",
     "@types/geojson": "^7946.0.16",
     "@types/node": "^22.20.5",
     "angular-eslint": "^21.0.1",
