@@ -10,6 +10,8 @@ const root = resolve('dist/sgp-client/browser');
 const apiReal = process.env.HU061_API_ORIGIN;
 const escriturasReales = [];
 const fase2 = process.env.HU062_FASE2 === 'true';
+const fase3 = process.env.HU062_FASE3 === 'true';
+const redHabilitada = fase2 || fase3;
 let red = { perfil: 'normal' };
 const barreras = new Map();
 const cuerpo = async (stream) => {
@@ -51,24 +53,114 @@ async function barrera(perfil, nombre, operacion) {
   });
 }
 
+// Parser acotado al FormData existente (metadatos JSON + archivo). No reescribe el multipart.
+function describirFoto(bytes, contentType) {
+  const limite = /boundary=(?:"([^"]+)"|([^;]+))/.exec(contentType);
+  if (!limite) throw new Error('Multipart sin boundary');
+  const separador = Buffer.from(`\r\n--${limite[1] ?? limite[2]}`);
+  function parte(nombre) {
+    const cabecera = bytes.indexOf(Buffer.from(`name="${nombre}"`));
+    const inicio = bytes.indexOf(Buffer.from('\r\n\r\n'), cabecera) + 4;
+    const fin = bytes.indexOf(separador, inicio);
+    if (cabecera < 0 || inicio < cabecera || fin <= inicio)
+      throw new Error(`Parte inválida: ${nombre}`);
+    return { inicio, fin, bytes: bytes.subarray(inicio, fin) };
+  }
+  const archivo = parte('archivo');
+  const meta = parte('metadatos').bytes;
+  const metadatos = JSON.parse(meta.toString());
+  return {
+    inicio: archivo.inicio,
+    fotoId: metadatos.id,
+    fotoBytes: archivo.bytes.length,
+    fotoSha256: hash(archivo.bytes),
+    metadatosSha256: hash(meta),
+    metadatos,
+  };
+}
+
+async function enviarFotoParcial(req, res, perfil, op, bytes, descripcion) {
+  const binariosEnviados = Math.floor(descripcion.fotoBytes / 2);
+  const prefijo = bytes.subarray(0, descripcion.inicio + binariosEnviados);
+  const proxy = proxyRequest(new URL(req.url, apiReal), {
+    method: req.method,
+    agent: false,
+    headers: { ...req.headers, 'content-length': String(bytes.length) },
+  });
+  let errorUpstream;
+  proxy.on('error', (error) => {
+    errorUpstream = error;
+  });
+  try {
+    await new Promise((resolve, reject) => {
+      proxy.once('error', reject);
+      proxy.write(prefijo, resolve);
+    });
+    // Callback de escritura + TCP_INFO leído por el test prueban recepción en el peer.
+    const transmision = {
+      ...op,
+      binariosEnviados,
+      multipartEnviado: prefijo.length,
+      multipartTotal: bytes.length,
+      wireEnviado: proxy.socket.bytesWritten,
+      puertoProxy: proxy.socket.localPort,
+      puertoBackend: proxy.socket.remotePort,
+    };
+    await barrera(perfil, 'foto-parcial', transmision);
+    if (errorUpstream) throw errorUpstream;
+    const cierre = new Promise((resolve) => proxy.once('close', resolve));
+    proxy.destroy();
+    await cierre;
+    registrar(perfil, 'corte-subida', transmision);
+    // Permite pasar el navegador a offline después del corte real de upstream.
+    await barrera(perfil, 'red-cortada', transmision);
+    if (!res.destroyed)
+      interrumpirRespuesta(res, 200, { 'content-type': 'application/json' }, Buffer.from('{}'));
+  } finally {
+    proxy.destroy();
+  }
+}
+
 // Solo tráfico mutante de un UUID preparado offline; nunca auth, recursos PWA ni lecturas.
 async function reenviarDegradada(req, res, url, perfil) {
   const clave = req.headers['idempotency-key'];
   const intento = (perfil.intentos.get(clave) ?? 0) + 1;
   perfil.intentos.set(clave, intento);
   const json = req.headers['content-type']?.startsWith('application/json');
-  const bytes = json ? await cuerpo(req) : undefined;
+  const foto = url.pathname.endsWith('/fotografias');
+  const fotoFase3 = fase3 && foto && ['corte-foto', 'confirmacion-foto'].includes(perfil.perfil);
+  const bytes = json || fotoFase3 ? await cuerpo(req) : undefined;
+  const descripcion = fotoFase3 ? describirFoto(bytes, req.headers['content-type']) : undefined;
   const op = {
     metodo: req.method,
     ruta: url.pathname,
     clave,
     intento,
     huella: bytes && hash(bytes),
+    ...(descripcion
+      ? {
+          fotoId: descripcion.fotoId,
+          fotoBytes: descripcion.fotoBytes,
+          fotoSha256: descripcion.fotoSha256,
+          metadatosSha256: descripcion.metadatosSha256,
+          metadatos: descripcion.metadatos,
+        }
+      : {}),
   };
   const creacion = url.pathname === '/api/v1/inspecciones';
-  const foto = url.pathname.endsWith('/fotografias');
   if (foto && !perfil.primeraFoto) perfil.primeraFoto = clave;
   registrar(perfil, 'recibida', op);
+  if (fotoFase3 && clave === perfil.primeraFoto && intento === 2)
+    await barrera(perfil, 'reintento-foto', op);
+  if (
+    fotoFase3 &&
+    clave === perfil.primeraFoto &&
+    intento === 1 &&
+    perfil.perfil === 'corte-foto'
+  ) {
+    await enviarFotoParcial(req, res, perfil, op, bytes, descripcion);
+    return;
+  }
   if (perfil.perfil === 'antes' && creacion) {
     await barrera(perfil, `antes-${intento}`, op);
     if (intento <= 2) {
@@ -88,7 +180,7 @@ async function reenviarDegradada(req, res, url, perfil) {
   const respuesta = await new Promise((resolve, reject) => {
     const proxy = proxyRequest(
       new URL(req.url, apiReal),
-      { method: req.method, headers: req.headers },
+      { method: req.method, headers: req.headers, ...(fotoFase3 ? { agent: false } : {}) },
       resolve,
     );
     proxy.on('error', reject);
@@ -102,6 +194,19 @@ async function reenviarDegradada(req, res, url, perfil) {
     respuestaSha256: hash(contenido),
   };
   registrar(perfil, 'backend-confirmado', op, resultado);
+  if (
+    fotoFase3 &&
+    clave === perfil.primeraFoto &&
+    intento === 1 &&
+    perfil.perfil === 'confirmacion-foto'
+  ) {
+    if (respuesta.statusCode !== 201)
+      throw new Error(`Foto real rechazada: ${respuesta.statusCode}`);
+    await barrera(perfil, 'confirmacion-foto', op);
+    registrar(perfil, 'confirmacion-foto-perdida', op, resultado);
+    interrumpirRespuesta(res, respuesta.statusCode, respuesta.headers, contenido);
+    return;
+  }
   if (perfil.perfil === 'respuesta' && creacion && intento === 1) {
     if (respuesta.statusCode !== 201)
       throw new Error(`Creación real rechazada: ${respuesta.statusCode}`);
@@ -141,11 +246,17 @@ createServer(async (req, res) => {
     res.writeHead(status, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
     res.end(JSON.stringify(body));
   }
-  if (apiReal && fase2 && url.pathname === '/__e2e/red') {
+  if (apiReal && redHabilitada && url.pathname === '/__e2e/red') {
     if (req.method === 'POST') {
       const config = JSON.parse((await cuerpo(req)).toString());
       if (
-        !['normal', 'latencia', 'antes', 'respuesta'].includes(config.perfil) ||
+        ![
+          'normal',
+          'latencia',
+          'antes',
+          'respuesta',
+          ...(fase3 ? ['corte-foto', 'confirmacion-foto'] : []),
+        ].includes(config.perfil) ||
         (config.perfil !== 'normal' && !/^[0-9a-f-]{36}$/.test(config.id ?? ''))
       ) {
         json({ error: 'Perfil o UUID inválido' }, 400);
@@ -170,7 +281,7 @@ createServer(async (req, res) => {
     });
     return;
   }
-  if (apiReal && fase2 && url.pathname === '/__e2e/red/liberar' && req.method === 'POST') {
+  if (apiReal && redHabilitada && url.pathname === '/__e2e/red/liberar' && req.method === 'POST') {
     const { nombre } = JSON.parse((await cuerpo(req)).toString());
     const espera = barreras.get(nombre);
     if (!espera) {
@@ -193,7 +304,7 @@ createServer(async (req, res) => {
       });
     }
     if (
-      fase2 &&
+      redHabilitada &&
       red.perfil !== 'normal' &&
       ['POST', 'PUT'].includes(req.method) &&
       (url.pathname.startsWith(`/api/v1/inspecciones/${red.id}/`) ||

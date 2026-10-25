@@ -1,6 +1,14 @@
 import { test, expect } from '@playwright/test';
 import { consulta, locales, datos } from './real-helpers.mjs';
-import { validarEntorno, prepararOffline, verificarSincronizacion } from './hu062-helpers.mjs';
+import {
+  validarEntorno,
+  prepararOffline,
+  verificarSincronizacion,
+  estadoRed,
+  configurar,
+  esperarBarrera,
+  liberar,
+} from './hu062-helpers.mjs';
 
 test.use({
   serviceWorkers: 'allow',
@@ -10,25 +18,6 @@ test.use({
   permissions: ['geolocation'],
   timezoneId: 'America/Guatemala',
 });
-
-async function estadoRed(request) {
-  const res = await request.get('/__e2e/red');
-  expect(res.status()).toBe(200);
-  return res.json();
-}
-async function configurar(request, perfil, id) {
-  const res = await request.post('/__e2e/red', { data: { perfil, id } });
-  expect(res.status()).toBe(200);
-}
-async function esperarBarrera(request, nombre) {
-  await expect
-    .poll(async () => (await estadoRed(request)).barreras.includes(nombre), { timeout: 60000 })
-    .toBe(true);
-}
-async function liberar(request, nombre) {
-  const res = await request.post('/__e2e/red/liberar', { data: { nombre } });
-  expect(res.status()).toBe(200);
-}
 
 // Solo excluye campos que legítimamente cambian con el intento; no escribe en Dexie.
 async function comprobarPendientes(page, estado, clave) {

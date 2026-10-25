@@ -255,3 +255,22 @@ export async function verificarSincronizacion(
   });
   return { enviadas, sincronizada, conteos: antesReplay };
 }
+
+export async function estadoRed(request) {
+  const res = await request.get('/__e2e/red');
+  expect(res.status()).toBe(200);
+  return res.json();
+}
+export async function configurar(request, perfil, id) {
+  const res = await request.post('/__e2e/red', { data: { perfil, id } });
+  expect(res.status()).toBe(200);
+}
+export async function esperarBarrera(request, nombre) {
+  await expect
+    .poll(async () => (await estadoRed(request)).barreras.includes(nombre), { timeout: 60000 })
+    .toBe(true);
+}
+export async function liberar(request, nombre) {
+  const res = await request.post('/__e2e/red/liberar', { data: { nombre } });
+  expect(res.status()).toBe(200);
+}
