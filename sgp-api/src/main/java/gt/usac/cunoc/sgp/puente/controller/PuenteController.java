@@ -168,7 +168,8 @@ public class PuenteController {
         puente.estadoActual(),
         puente.indiceCondicionActual(),
         puente.fechaUltimaInspeccion(),
-        puente.creadoEn());
+        puente.creadoEn(),
+        puente.versionFormularioIdIcVigente());
   }
 
   @PutMapping("/{id}")
