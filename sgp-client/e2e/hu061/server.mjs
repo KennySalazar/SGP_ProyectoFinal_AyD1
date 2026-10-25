@@ -11,7 +11,8 @@ const apiReal = process.env.HU061_API_ORIGIN;
 const escriturasReales = [];
 const fase2 = process.env.HU062_FASE2 === 'true';
 const fase3 = process.env.HU062_FASE3 === 'true';
-const redHabilitada = fase2 || fase3;
+const paquetes = process.env.HU062_PAQUETES === 'true';
+const redHabilitada = fase2 || fase3 || paquetes;
 let red = { perfil: 'normal' };
 const barreras = new Map();
 const cuerpo = async (stream) => {
@@ -150,6 +151,8 @@ async function reenviarDegradada(req, res, url, perfil) {
   const creacion = url.pathname === '/api/v1/inspecciones';
   if (foto && !perfil.primeraFoto) perfil.primeraFoto = clave;
   registrar(perfil, 'recibida', op);
+  if (paquetes && perfil.perfil === 'paquetes' && creacion && intento === 1)
+    await barrera(perfil, 'antes-paquetes', op);
   if (fotoFase3 && clave === perfil.primeraFoto && intento === 2)
     await barrera(perfil, 'reintento-foto', op);
   if (
@@ -256,6 +259,7 @@ createServer(async (req, res) => {
           'antes',
           'respuesta',
           ...(fase3 ? ['corte-foto', 'confirmacion-foto'] : []),
+          ...(paquetes ? ['paquetes'] : []),
         ].includes(config.perfil) ||
         (config.perfil !== 'normal' && !/^[0-9a-f-]{36}$/.test(config.id ?? ''))
       ) {

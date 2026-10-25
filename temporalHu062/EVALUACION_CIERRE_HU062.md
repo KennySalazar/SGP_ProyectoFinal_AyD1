@@ -2,6 +2,8 @@
 
 Fecha de referencia: 24 de octubre de 2026, America/Guatemala.
 
+**Actualización QA posterior:** el perfil de pérdida literal ya fue ejecutado: **2/2 casos y 1/1 regresión aprobados**. Se cerraron CA4/6/7/8; el único pendiente es la ratificación documental de CA10. Ver [resultados y matriz vigente](QA_PENDIENTES_HU062_RESULTADOS.md). Los apartados 1–5 y 7–8 siguientes conservan la evaluación histórica anterior a esa ejecución; sus bloqueos operativos fueron resueltos por el modo `paquetes` y las aprobaciones del entorno. La matriz del apartado 6 se actualiza con la nueva evidencia.
+
 ## 1. Dictamen y evidencia utilizada
 
 **HU-062 todavía no está apta para merge como historia completamente aceptada.** La solución mínima es ejecutar únicamente el perfil de pérdida literal pendiente en un entorno autorizado, reutilizando el harness, y obtener la decisión documental del responsable sobre Playwright/ADR-0008. No corresponde volver a implementar las fases ni cambiar a Cypress.
@@ -89,23 +91,23 @@ Para cerrar CA10, el responsable debe aportar la Decisión 6 vinculante y verifi
 
 ## 6. Matriz final de aceptación
 
-Fuente del alcance: CA1–CA11 del plan, no una historia original localizada. **CUMPLE**: evidencia del escenario exigido en su alcance probado; **PARCIAL**: parte verificada, falta comprobarla en otro perfil obligatorio; **BLOQUEADO**: no puede cerrarse sin habilitación/decisión externa. Estos estados evalúan cierre; no representan defectos de producción. Por eso CA4 y CA10, antes descritos como parcialmente cubiertos, figuran ahora BLOQUEADO conservando sus partes verificadas.
+Fuente de numeración: CA1–CA11 del plan. La revisión QA localizó además HU-062 y decisión 6 en `.context/sprints/sprint_4_SGP.md` y comprobó su concordancia con los escenarios exigidos. **CUMPLE**: evidencia del escenario exigido; **PARCIAL**: falta otro perfil obligatorio; **BLOQUEADO**: falta una decisión externa. Estos estados evalúan cierre; no representan defectos de producción. La evidencia nueva se detalla en [QA de pendientes](QA_PENDIENTES_HU062_RESULTADOS.md).
 
 | CA | Estado | Evidencia específica y condición pendiente |
 |---|---|---|
 | CA1 — Red normal | **CUMPLE** | Fase 1 y regresión fase 3: inspección/respuestas/cuatro fotos originalmente pendientes, publicación real, cola vacía y sin duplicados. No se deduce de HU-061 con fotos precargadas. |
 | CA2 — Sin conexión | **CUMPLE** | Fase 1 y regresión fase 3: creación offline, conservación en Dexie de respuestas/Blobs/hash/claves, recarga desde Service Worker y cero escrituras de la aplicación para el caso. |
 | CA3 — Latencia alta | **CUMPLE** | Dos corridas fase 2 y regresión fase 3 del perfil 1500 ms antes de reenviar + 1500 ms antes de entregar; pendientes durante espera y resultado remoto íntegro. |
-| CA4 — Pérdida/fallos | **BLOQUEADO** | Fallos previos al procesamiento y respuesta de creación perdida/reintentos comprobados en fase 2. Falta pérdida literal con contador de descartes, restauración y resultado real. Requiere entorno/operador autorizados. |
+| CA4 — Pérdida/fallos | **CUMPLE** | Dos casos de pérdida literal aprobados, 36 y 33 descartes, retirada independiente de netem y recuperación completa; regresión de confirmación perdida aprobada. |
 | CA5 — Corte fotográfico | **CUMPLE** | Fase 3: recepción TCP del multipart con media imagen, Blob/clave conservados, recuperación única; variante de pérdida de 201 persistido con respuesta idéntica y sin duplicados. |
-| CA6 — Pendientes | **PARCIAL** | Verificado en normal/offline/latencia/fallos/cortes, incluidas operaciones FOTO, bytes/metadatos y claves. Falta snapshot y recuperación en el perfil de paquetes; no se extrapola desde otros fallos. |
-| CA7 — Servidor | **PARCIAL** | SQL/API/disco e integridad de cuatro originales/miniaturas y publicación única en perfiles ejecutados. Falta el mismo oráculo tras descartes reales. |
-| CA8 — Reproducibilidad | **PARCIAL** | Perfiles por UUID/ordinal, barreras y limpieza documentados para escenarios existentes. Falta ejecutar P dos veces con parámetros fijos, contadores, restauración y limpieza verificadas. |
+| CA6 — Pendientes | **CUMPLE** | Dos snapshots durante descartes con respuestas, cuatro Blobs/SHA-256/metadatos y claves conservadas; recuperación PUBLICADA/CONFIRMADA y cola vacía. |
+| CA7 — Servidor | **CUMPLE** | Oráculo SQL/API/disco aprobado tras descartes: cuatro originales/miniaturas íntegros, publicación y replay sin duplicados ni objetos parciales. |
+| CA8 — Reproducibilidad | **CUMPLE** | Perfil P ejecutado dos veces con preparaciones independientes, parámetros fijos, contadores, watchdog, restauración a noqueue y limpieza verificadas. |
 | CA9 — Evidencias | **CUMPLE** | Fase 3 probó una aserción deliberada tras éxito remoto: PNG 1280×720, ZIP íntegro con eventos de traza/red, logs/diagnóstico local-remoto y restauración seguida de 12/12. No acredita paquetes. |
-| CA10 — Herramienta/ejecución | **BLOQUEADO** | Playwright, guía y ejecución manual real disponibles; justificación técnica lista. Falta ratificación trazable del responsable sobre ADR-0008/Decisión 6 y alcance documental. |
+| CA10 — Herramienta/ejecución | **BLOQUEADO documentalmente** | HU-062 y decisión 6 localizadas: Cypress es recomendación, no mandato. Playwright, guía y ejecución manual probados; falta ratificación trazable del responsable sobre ADR-0008. |
 | CA11 — Documentación | **CUMPLE** | Guía única HU-062 enlazada desde README, ADR e informes con resultados y límites. El registro del futuro caso P deberá agregarse al ejecutarlo. |
 
-Resultado: **6 CUMPLE, 3 PARCIAL, 2 BLOQUEADO**. Los dos bloqueos principales son operativos (paquetes) y documentales (autoridad). No hay evidencia para declarar todos los criterios cumplidos.
+Resultado actualizado: **10 CUMPLE, 0 PARCIAL, 1 BLOQUEADO documentalmente**. El bloqueo técnico de paquetes quedó resuelto; falta únicamente la ratificación del responsable para declarar todos los criterios cumplidos.
 
 ## 7. Condiciones exactas para estar apta para merge
 

@@ -7,6 +7,7 @@ export default defineConfig({
     ...(process.env.HU062_FASE1 === 'true' ? [] : ['**/hu062-fase1.spec.mjs']),
     ...(process.env.HU062_FASE2 === 'true' ? [] : ['**/hu062-fase2.spec.mjs']),
     ...(process.env.HU062_FASE3 === 'true' ? [] : ['**/hu062-fase3.spec.mjs']),
+    ...(process.env.HU062_PAQUETES === 'true' ? [] : ['**/hu062-paquetes.spec.mjs']),
   ],
   timeout: 90000,
   workers: 1,

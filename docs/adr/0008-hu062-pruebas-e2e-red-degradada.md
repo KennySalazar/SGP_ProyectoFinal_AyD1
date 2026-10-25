@@ -4,7 +4,7 @@ Fecha: 24 de octubre de 2026.
 
 ## Estado y autoridad
 
-**Propuesto para ratificación formal; implementado en el harness de HU-062.** Las instrucciones de implementación de las fases autorizan expresamente reutilizar Playwright. La «Decisión 6 del responsable» y el archivo original `HUS/HU-062.md` no se localizaron: no se afirma aprobación de esa decisión ni se sustituye su autoridad. La aceptación integral sigue condicionada a verificar los criterios obligatorios pendientes.
+**Propuesto para ratificación formal; implementado en el harness de HU-062.** Las instrucciones de implementación de las fases autorizan expresamente reutilizar Playwright. La revisión QA posterior localizó la HU-062 y la decisión 6 en `.context/sprints/sprint_4_SGP.md`: Cypress es una recomendación de partida, expresamente «no como mandato»; el responsable elige la herramienta y registra su decisión en un ADR. DT-CAL-04 permite Playwright o Cypress. Localizar esta fuente aclara el requisito, pero no constituye ratificación del responsable.
 
 Este ADR complementa el [ADR-0007](0007-hu061-publicacion-offline-y-cache-privada.md), aceptado para HU-061, sin modificarlo ni cambiar sincronización, persistencia o contratos de negocio.
 
@@ -26,10 +26,10 @@ El repositorio ya tiene `@playwright/test`, configuración, navegador PWA, prueb
 
 Un error HTTP, la latencia o el corte de un flujo no acreditan pérdida de paquetes IP/TCP. El parámetro CDP `packetLoss` localizado describe WebRTC, no certifica este REST. Para acreditar descartes reales se requiere un mecanismo como `tc/netem`, en el namespace desechable del backend, con filtro acotado, contadores y restauración comprobada.
 
-Ese escenario sigue **NO VERIFICADO** por las condiciones documentadas en la [fase 2](../../FASE_2_HU062_RESULTADOS.md). Esta fase no concede capacidades, instala herramientas, cambia interfaces del anfitrión ni vuelve a intentar forzarlo.
+La [revisión QA de pendientes](../../temporalHu062/QA_PENDIENTES_HU062_RESULTADOS.md) resolvió el bloqueo histórico de la [fase 2](../../temporalHu062/FASE_2_HU062_RESULTADOS.md): dos casos con contadores de descartes, snapshots locales, restauración independiente y oráculos remotos completos pasaron. El modo `paquetes` del runner utiliza backend/PostGIS en red desechable y un operador con solo `NET_ADMIN` en la red del backend, sin capacidades adicionales en Java. Monta herramientas locales y el JAR actual de solo lectura, registra su hash y limpia los IDs creados. No aplica qdisc a interfaces del anfitrión. Un watchdog externo a Playwright retira la pérdida a los nueve segundos, antes del tope de diez segundos del perfil P.
 
 La elección actual reduce cambios y permite verificar los perfiles implementados con un solo ejecutor. Sus resultados quedan acotados a Chromium, backend real y proveedor local; no certifican S3/staging, otras redes o sincronización con la aplicación cerrada. La autonomía manual de ocho horas se mantiene fuera de la automatización.
 
 ## Ejecución y consecuencias
 
-Procedimiento único en [docs/testing/HU-062.md](../testing/HU-062.md), con requisitos, comandos, evidencias y matriz actualizada. La ejecución manual reproducible utiliza el script existente; no se modifica CI. La ausencia de Decisión 6 queda explícita para ratificación, y la pérdida literal de paquetes impide declarar HU-062 completamente aprobada.
+Procedimiento único en [docs/testing/HU-062.md](../testing/HU-062.md), con requisitos, comandos, evidencias y matriz actualizada. La ejecución manual reproducible utiliza el script existente; no se modifica CI. La ratificación del responsable sobre este ADR sigue pendiente; los resultados técnicos no sustituyen esa decisión.
