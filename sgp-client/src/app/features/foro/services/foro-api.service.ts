@@ -10,11 +10,13 @@ import {
   FiltroSeccion,
   HiloForo,
   HiloInspeccionForo,
+  InspeccionSinRevision,
 } from '../models/foro.models';
 
 /**
  * Foro por puente (HU-063) y por inspección publicada (HU-064). Leer es público; abrir hilos y
- * comentar exige sesión.
+ * comentar exige sesión. El autor edita y elimina sus comentarios; el Catedrático y el
+ * Administrador moderan (HU-065).
  */
 @Injectable({ providedIn: 'root' })
 export class ForoApiService {
@@ -33,6 +35,11 @@ export class ForoApiService {
 
   crearHilo(puenteId: string, request: CrearHiloRequest): Observable<HiloForo> {
     return this.http.post<HiloForo>(`${this.baseUrl}/puentes/${puenteId}/hilos`, request);
+  }
+
+  /** Con sesión. Lleva al hilo de un comentario, por ejemplo desde el aviso de una mención. */
+  obtenerComentario(comentarioId: string): Observable<ComentarioForo> {
+    return this.http.get<ComentarioForo>(`${this.baseUrl}/comentarios/${comentarioId}`);
   }
 
   obtenerHilo(hiloId: string): Observable<HiloForo> {
@@ -80,6 +87,41 @@ export class ForoApiService {
 
   crearComentario(hiloId: string, request: CrearComentarioRequest): Observable<ComentarioForo> {
     return this.http.post<ComentarioForo>(`${this.baseUrl}/hilos/${hiloId}/comentarios`, request);
+  }
+
+  /** Solo su autor y dentro del plazo de edición que decide el servidor (409 si venció). */
+  editarComentario(comentarioId: string, contenido: string): Observable<ComentarioForo> {
+    return this.http.put<ComentarioForo>(`${this.baseUrl}/comentarios/${comentarioId}`, {
+      contenido,
+    });
+  }
+
+  /** Solo su autor. Queda la marca de comentario eliminado y se conservan sus respuestas. */
+  eliminarComentario(comentarioId: string): Observable<ComentarioForo> {
+    return this.http.delete<ComentarioForo>(`${this.baseUrl}/comentarios/${comentarioId}`);
+  }
+
+  /** Catedrático o Administrador, con un motivo obligatorio (RN-FOR-08). */
+  ocultarComentario(comentarioId: string, motivo: string): Observable<ComentarioForo> {
+    return this.http.post<ComentarioForo>(`${this.baseUrl}/comentarios/${comentarioId}/ocultar`, {
+      motivo,
+    });
+  }
+
+  /** Catedrático o Administrador, con un motivo obligatorio (RN-FOR-08). */
+  cerrarHilo(hiloId: string, motivo: string): Observable<HiloForo> {
+    return this.http.post<HiloForo>(`${this.baseUrl}/hilos/${hiloId}/cerrar`, { motivo });
+  }
+
+  /** Catedrático o Administrador: publicadas sin revisión, de la más reciente a la más antigua. */
+  listarInspeccionesSinRevision(
+    pagina: number,
+    tamanio: number,
+  ): Observable<PaginaResponse<InspeccionSinRevision>> {
+    return this.http.get<PaginaResponse<InspeccionSinRevision>>(
+      `${this.baseUrl}/moderacion/inspecciones-sin-revision`,
+      { params: this.paginacion(pagina, tamanio) },
+    );
   }
 
   private paginacion(pagina: number, tamanio: number): HttpParams {

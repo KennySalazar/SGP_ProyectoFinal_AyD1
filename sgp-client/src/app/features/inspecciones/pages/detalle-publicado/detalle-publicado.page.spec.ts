@@ -78,6 +78,7 @@ const historica: InspeccionPublicadaDetalleResponse = {
 class ForoInspeccionStubComponent {
   readonly inspeccionId = input.required<string>();
   readonly ancla = input<AnclaForo | null>(null);
+  readonly comentarioDestacado = input<string | null>(null);
   readonly etiquetaDeAncla = input<(a: AnclaForo) => string>();
   readonly anclaQuitada = output<void>();
   readonly anclasCambian = output<AnclaConTotal[]>();
@@ -164,7 +165,10 @@ describe('Detalle publicado de HU-030', () => {
           },
         },
         provideRouter([]),
-        { provide: ActivatedRoute, useValue: { paramMap: parametros } },
+        {
+          provide: ActivatedRoute,
+          useValue: { paramMap: parametros, snapshot: { queryParamMap: convertToParamMap({}) } },
+        },
         { provide: AuthStore, useValue: { user: usuario, authenticated: autenticado } },
         { provide: InspeccionApiService, useValue: api },
         { provide: FormularioApiService, useValue: formularios },

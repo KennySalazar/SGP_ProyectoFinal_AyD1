@@ -143,6 +143,10 @@
           <a routerLink="/mantenimiento/ordenes" routerLinkActive="active">
             <i class="pi pi-briefcase"></i><span>{{ 'nav.maintenanceOrders' | transloco }}</span>
           </a>
+          <a routerLink="/foro/moderacion" routerLinkActive="active">
+            <i class="pi pi-flag" aria-hidden="true"></i
+            ><span>{{ 'nav.forumModeration' | transloco }}</span>
+          </a>
         }
         @if (auth.user()?.role === 'ADMINISTRADOR') {
           <a

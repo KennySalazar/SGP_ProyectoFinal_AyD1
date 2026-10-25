@@ -21,6 +21,7 @@ class TraduccionTestPipe implements PipeTransform {
 @Component({ selector: 'app-hilo-foro', standalone: true, template: '' })
 class HiloForoStubComponent {
   @Input() hiloId = '';
+  @Input() comentarioDestacado: string | null = null;
   @Output() volver = new EventEmitter<void>();
 }
 
@@ -59,7 +60,10 @@ describe('ForoPuenteComponent', () => {
   let componente: ForoPuenteComponent;
   let http: HttpTestingController;
 
-  async function crear(autenticado: boolean): Promise<void> {
+  async function crear(
+    autenticado: boolean,
+    entradas: Record<string, string | null> = {},
+  ): Promise<void> {
     await TestBed.configureTestingModule({
       imports: [ForoPuenteComponent],
       providers: [
@@ -67,7 +71,13 @@ describe('ForoPuenteComponent', () => {
         provideHttpClientTesting(),
         provideRouter([]),
         provideNoopAnimations(),
-        { provide: AuthStore, useValue: { authenticated: signal(autenticado) } },
+        {
+          provide: AuthStore,
+          useValue: {
+            authenticated: signal(autenticado),
+            user: signal(autenticado ? { id: 'lector-1', role: 'ESTUDIANTE' } : null),
+          },
+        },
         { provide: TranslocoService, useValue: { translate: (clave: string) => clave } },
       ],
     })
@@ -81,6 +91,9 @@ describe('ForoPuenteComponent', () => {
     componente = fixture.componentInstance;
     http = TestBed.inject(HttpTestingController);
     fixture.componentRef.setInput('puente', PUENTE);
+    for (const [nombre, valor] of Object.entries(entradas)) {
+      fixture.componentRef.setInput(nombre, valor);
+    }
     fixture.detectChanges();
   }
 
@@ -260,5 +273,29 @@ describe('ForoPuenteComponent', () => {
     listado([{ ...HILO, totalComentarios: 4 }]);
     expect(componente.hiloAbierto()).toBeNull();
     expect(texto()).toContain('Socavación en la pila 2');
+  });
+
+  it('al llegar desde un aviso abre el hilo y le pasa el comentario a destacar (HU-066)', async () => {
+    await crear(true, { hiloInicial: 'hilo-1', comentarioDestacado: 'comentario-9' });
+    listado([HILO]);
+
+    expect(componente.hiloAbierto()).toBe('hilo-1');
+    const hijo = fixture.debugElement.query(
+      (nodo) => nodo.componentInstance instanceof HiloForoStubComponent,
+    );
+    expect((hijo.componentInstance as HiloForoStubComponent).comentarioDestacado).toBe(
+      'comentario-9',
+    );
+
+    // Al volver a la lista y abrir otro hilo ya no se destaca nada.
+    componente.volverALista();
+    fixture.detectChanges();
+    listado([HILO]);
+    componente.abrirHilo('hilo-2');
+    fixture.detectChanges();
+    const otro = fixture.debugElement.query(
+      (nodo) => nodo.componentInstance instanceof HiloForoStubComponent,
+    );
+    expect((otro.componentInstance as HiloForoStubComponent).comentarioDestacado).toBeNull();
   });
 });

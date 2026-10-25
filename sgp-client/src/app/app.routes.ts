@@ -74,6 +74,10 @@ export const routes: Routes = [
         loadChildren: () => import('./features/admin/admin.routes').then((m) => m.adminRoutes),
       },
       {
+        path: 'foro',
+        loadChildren: () => import('./features/foro/foro.routes').then((m) => m.foroRoutes),
+      },
+      {
         path: 'mantenimiento',
         canActivate: [roleGuard('ADMINISTRADOR', 'CATEDRATICO')],
         loadChildren: () =>

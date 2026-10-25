@@ -6,7 +6,8 @@ import java.util.UUID;
 
 /**
  * Hilo del foro. {@code autorUsuario} es nulo si la cuenta aún no tiene nombre de usuario; entonces
- * se muestra su rol. Ni el correo ni el nombre completo se exponen.
+ * se muestra su rol. Ni el correo ni el nombre completo se exponen. Un hilo cerrado lleva el motivo
+ * del cierre, que es público (RN-FOR-08).
  */
 public record HiloResponse(
     UUID id,
@@ -20,4 +21,5 @@ public record HiloResponse(
     OffsetDateTime creadoEn,
     OffsetDateTime actualizadoEn,
     boolean cerrado,
+    String motivoCierre,
     long totalComentarios) {}

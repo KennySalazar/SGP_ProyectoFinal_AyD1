@@ -56,6 +56,8 @@ export class ForoInspeccionComponent {
   readonly inspeccionId = input.required<string>();
   /** Elemento sobre el que se ven y se dejan los comentarios; nulo para todo el hilo. */
   readonly ancla = input<AnclaForo | null>(null);
+  /** Comentario que se deja a la vista, por ejemplo al llegar desde un aviso (HU-066). */
+  readonly comentarioDestacado = input<string | null>(null);
   readonly etiquetaDeAncla = input<(ancla: AnclaForo) => string>(etiquetaPorOmision);
   /** Quien lo usa decide qué hacer al dejar de filtrar por un elemento. */
   readonly anclaQuitada = output<void>();

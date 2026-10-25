@@ -260,6 +260,13 @@ export class NotificacionesStore implements OnDestroy {
     if (entidadUpper === 'PUENTE') {
       return ['/puentes', entidadId];
     }
+    // Una mención lleva al comentario y una alerta del foro a su hilo (HU-066).
+    if (entidadUpper === 'FORO_COMENTARIO') {
+      return ['/foro', 'comentarios', entidadId];
+    }
+    if (entidadUpper === 'FORO_HILO') {
+      return ['/foro', 'hilos', entidadId];
+    }
     return null;
   }
 }

@@ -66,7 +66,8 @@
     "pendingReviewsCount": "{{count}} inspecciones por revisar",
     "avisos": "Avisos",
     "maintenanceRules": "Catálogo de mantenimiento",
-    "maintenanceOrders": "Mantenimiento"
+    "maintenanceOrders": "Mantenimiento",
+    "forumModeration": "Moderación del foro"
   },
   "mantenimiento": {
     "kicker": "Mantenimiento",
@@ -349,7 +350,8 @@
       "mostrando": "Mostrando {{mostrados}} de {{total}} comentarios",
       "mostrandoSinTotal": "Mostrando {{mostrados}} comentarios",
       "verEnFormulario": "Ver en el formulario",
-      "irAlElemento": "Ir a {{elemento}} en el formulario"
+      "irAlElemento": "Ir a {{elemento}} en el formulario",
+      "ayudaMenciones": "Para avisar a alguien, menciónalo con @ y su nombre de usuario."
     },
     "ancla": {
       "camposAlternar": "Comentarios por campo",
@@ -364,6 +366,61 @@
       "descripcion": "Discusión abierta sobre esta inspección publicada. Elige un elemento del formulario para comentar un dato concreto.",
       "error": "No se pudo abrir el foro de la inspección.",
       "sinHilo": "Esta inspección aún no tiene discusión."
+    },
+    "comentario": {
+      "editar": "Editar",
+      "eliminar": "Eliminar",
+      "ocultar": "Ocultar",
+      "editado": "editado",
+      "eliminado": "Comentario eliminado",
+      "oculto": "Oculto por moderación",
+      "motivo": "Motivo: {{motivo}}",
+      "editarTexto": "Edita tu comentario",
+      "guardar": "Guardar cambios",
+      "guardando": "Guardando..."
+    },
+    "moderacion": {
+      "cerrarHilo": "Cerrar hilo",
+      "motivo": "Motivo",
+      "error": "No fue posible completar la acción.",
+      "eliminar": {
+        "titulo": "Eliminar comentario",
+        "texto": "El comentario quedará marcado como eliminado y sus respuestas se conservarán. Esta acción no se puede deshacer.",
+        "confirmar": "Eliminar comentario",
+        "procesando": "Eliminando..."
+      },
+      "ocultar": {
+        "titulo": "Ocultar comentario",
+        "texto": "Los demás usuarios verán «Oculto por moderación» en su lugar; los moderadores conservarán el texto y el motivo. Quedará registrado en la bitácora.",
+        "confirmar": "Ocultar comentario",
+        "procesando": "Ocultando..."
+      },
+      "cerrar": {
+        "titulo": "Cerrar hilo",
+        "texto": "El hilo seguirá visible para lectura, pero ya no admitirá comentarios. El motivo será visible para todos y quedará registrado en la bitácora.",
+        "confirmar": "Cerrar hilo",
+        "procesando": "Cerrando..."
+      },
+      "pagina": {
+        "kicker": "Moderación del foro",
+        "titulo": "Inspecciones publicadas sin revisión",
+        "descripcion": "Inspecciones que un Catedrático o un Profesional externo publicó sin revisión previa, de la más reciente a la más antigua. Abre su foro para moderarlo a posteriori.",
+        "puente": "Puente",
+        "fecha": "Fecha de inspección",
+        "publicada": "Publicada",
+        "autor": "Autor",
+        "foro": "Foro",
+        "sinHilo": "Sin discusión",
+        "abrirForo": "Abrir foro de la inspección de {{puente}}",
+        "verForo": "Ver foro",
+        "vacia": "No hay inspecciones publicadas sin revisión.",
+        "error": "No se pudo cargar la lista."
+      }
+    },
+    "irA": {
+      "abriendo": "Abriendo el foro...",
+      "error": "No se encontró el comentario o el hilo de este aviso. Puede que ya no esté disponible.",
+      "volver": "Volver a los avisos"
     }
   },
   "perfil": {
