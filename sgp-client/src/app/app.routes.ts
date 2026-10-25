@@ -75,7 +75,6 @@ export const routes: Routes = [
       },
       {
         path: 'foro',
-        canActivate: [roleGuard('ADMINISTRADOR', 'CATEDRATICO')],
         loadChildren: () => import('./features/foro/foro.routes').then((m) => m.foroRoutes),
       },
       {

@@ -28,6 +28,7 @@ class HiloForoStubComponent {
   readonly mostrarVolver = input(true);
   readonly compositorArriba = input(false);
   readonly filtros = input<OpcionesFiltroForo | null>(null);
+  readonly comentarioDestacado = input<string | null>(null);
   readonly anclaQuitada = output<void>();
   readonly comentarioPublicado = output<void>();
   readonly irAElemento = output<AnclaForo>();

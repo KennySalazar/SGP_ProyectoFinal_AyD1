@@ -37,6 +37,11 @@ export class ForoApiService {
     return this.http.post<HiloForo>(`${this.baseUrl}/puentes/${puenteId}/hilos`, request);
   }
 
+  /** Con sesión. Lleva al hilo de un comentario, por ejemplo desde el aviso de una mención. */
+  obtenerComentario(comentarioId: string): Observable<ComentarioForo> {
+    return this.http.get<ComentarioForo>(`${this.baseUrl}/comentarios/${comentarioId}`);
+  }
+
   obtenerHilo(hiloId: string): Observable<HiloForo> {
     return this.http.get<HiloForo>(`${this.baseUrl}/hilos/${hiloId}`);
   }

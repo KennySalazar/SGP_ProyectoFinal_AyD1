@@ -77,6 +77,10 @@ export class ForoPuenteComponent {
   private solicitud: Subscription | null = null;
 
   readonly puente = input.required<PuenteResponse>();
+  /** Hilo que se abre de entrada, por ejemplo al llegar desde un aviso (HU-066). */
+  readonly hiloInicial = input<string | null>(null);
+  /** Comentario de ese hilo que se deja a la vista. */
+  readonly comentarioDestacado = input<string | null>(null);
 
   readonly categorias = CATEGORIAS_HILO;
   readonly tamanio = TAMANIO;
@@ -113,7 +117,7 @@ export class ForoPuenteComponent {
     effect(() => {
       this.puente();
       untracked(() => {
-        this.hiloAbierto.set(null);
+        this.hiloAbierto.set(this.hiloInicial());
         this.cargar(0);
       });
     });

@@ -106,6 +106,11 @@ export class HiloForoComponent {
   readonly mostrarVolver = input(true);
   /** Cuántos comentarios tiene cada sección; con ello se ofrece el selector de sección. */
   readonly filtros = input<OpcionesFiltroForo | null>(null);
+  /**
+   * Comentario que se deja a la vista y con el foco, por ejemplo al llegar desde el aviso de una
+   * mención (HU-066). Si está más allá de lo que se muestra o de lo cargado, se busca.
+   */
+  readonly comentarioDestacado = input<string | null>(null);
   /** Pone el cuadro para comentar antes de la lista en lugar de después. */
   readonly compositorArriba = input(false);
   readonly volver = output<void>();
@@ -136,6 +141,10 @@ export class HiloForoComponent {
   /** Comentarios principales a la vista; el resto espera a «Mostrar más». */
   readonly visibles = signal(COMENTARIOS_POR_VISTA);
   private readonly textosAbiertos = signal<ReadonlySet<string>>(new Set());
+  /** El comentario destacado una vez encontrado; se resalta en la lista. */
+  readonly destacadoId = signal<string | null>(null);
+  /** El comentario destacado que todavía no se encontró en lo cargado. */
+  private destacadoPendiente: string | null = null;
   /** El último comentario principal que publicó quien lo usa, para llevarlo a verlo. */
   readonly ultimoPublicadoId = signal<string | null>(null);
 
@@ -203,6 +212,9 @@ export class HiloForoComponent {
 
   constructor() {
     effect(() => {
+      this.destacadoPendiente = this.comentarioDestacado();
+    });
+    effect(() => {
       this.hiloId();
       this.ancla();
       this.filtro();
@@ -235,6 +247,7 @@ export class HiloForoComponent {
           this.hilo.set(hilo);
           this.comentarios.set(pagina.content);
           this.ultimaPagina.set(pagina);
+          this.buscarDestacado();
         },
         error: () => this.error.set(true),
       });
@@ -260,6 +273,7 @@ export class HiloForoComponent {
         this.comentarios.update((lista) => [...lista, ...pagina.content]);
         this.ultimaPagina.set(pagina);
         this.visibles.update((visibles) => visibles + COMENTARIOS_POR_VISTA);
+        this.buscarDestacado();
       });
   }
 
@@ -314,6 +328,27 @@ export class HiloForoComponent {
     } else {
       this.cargarMas();
     }
+  }
+
+  /**
+   * Deja a la vista el comentario destacado: muestra su comentario principal aunque la paginación
+   * lo esconda y le pasa el foco. Si aún no está cargado, pide la página siguiente.
+   */
+  private buscarDestacado(): void {
+    const id = this.destacadoPendiente;
+    if (id === null) return;
+    const comentario = this.comentarios().find((c) => c.id === id);
+    if (!comentario) {
+      if (this.hayMas()) this.cargarMas();
+      else this.destacadoPendiente = null;
+      return;
+    }
+    this.destacadoPendiente = null;
+    const principalId = comentario.padreId ?? comentario.id;
+    const posicion = this.principales().findIndex((c) => c.id === principalId);
+    if (posicion >= this.visibles()) this.visibles.set(posicion + 1);
+    this.destacadoId.set(id);
+    this.enfocar(`article[data-comentario-id="${id}"]`);
   }
 
   /** Lleva a quien acaba de comentar a su comentario, aunque la paginación lo esconda. */

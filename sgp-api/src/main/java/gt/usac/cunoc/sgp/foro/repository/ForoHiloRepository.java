@@ -2,6 +2,7 @@ package gt.usac.cunoc.sgp.foro.repository;
 
 import gt.usac.cunoc.sgp.foro.entity.ForoHilo;
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.domain.Page;
@@ -15,6 +16,16 @@ public interface ForoHiloRepository extends JpaRepository<ForoHilo, UUID> {
 
   /** Hilos propios del puente, sin los hilos de sus inspecciones. */
   Page<ForoHilo> findByPuenteIdAndInspeccionIdIsNull(UUID puenteId, Pageable pageable);
+
+  /**
+   * Cuándo abrió un usuario sus hilos más recientes desde un instante, del más nuevo al más viejo.
+   * No cuenta los hilos de inspección, que abre el sistema (DT-SEC-07).
+   */
+  @Query(
+      "SELECT h.creadoEn FROM ForoHilo h WHERE h.autorId = :autor AND h.inspeccionId IS NULL"
+          + " AND h.creadoEn > :desde ORDER BY h.creadoEn DESC")
+  List<Instant> abiertosDesde(
+      @Param("autor") UUID autor, @Param("desde") Instant desde, Pageable limite);
 
   /** El hilo de una inspección, si ya se abrió. */
   Optional<ForoHilo> findByInspeccionId(UUID inspeccionId);

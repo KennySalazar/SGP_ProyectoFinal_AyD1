@@ -110,6 +110,7 @@ Este documento forma parte del manual técnico del Sistema de Gestión de Puente
 | **Foro Comunitario** (`ForoController`) | GET | `/api/v1/puentes/{puenteId}/hilos` | `permitAll()` | `ForoAccesoPublicoSecurityTest` |
 | | POST | `/api/v1/puentes/{puenteId}/hilos` | `isAuthenticated()` | `ForoControllerSecurityTest` |
 | | GET | `/api/v1/hilos/{hiloId}` | `permitAll()` | `ForoAccesoPublicoSecurityTest` |
+| | GET | `/api/v1/comentarios/{comentarioId}` | `isAuthenticated()` | `ForoControllerSecurityTest` |
 | | GET | `/api/v1/inspecciones/{inspeccionId}/hilo` | `permitAll()` | `ForoAccesoPublicoSecurityTest` |
 | | POST | `/api/v1/inspecciones/{inspeccionId}/hilo` | `isAuthenticated()` | `ForoControllerSecurityTest` |
 | | GET | `/api/v1/hilos/{hiloId}/comentarios` | `permitAll()` (el texto oculto solo lo ven `CATEDRATICO` y `ADMINISTRADOR`) | `ForoAccesoPublicoSecurityTest`, `ForoControllerSecurityTest` |

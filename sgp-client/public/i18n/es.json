@@ -350,7 +350,8 @@
       "mostrando": "Mostrando {{mostrados}} de {{total}} comentarios",
       "mostrandoSinTotal": "Mostrando {{mostrados}} comentarios",
       "verEnFormulario": "Ver en el formulario",
-      "irAlElemento": "Ir a {{elemento}} en el formulario"
+      "irAlElemento": "Ir a {{elemento}} en el formulario",
+      "ayudaMenciones": "Para avisar a alguien, menciónalo con @ y su nombre de usuario."
     },
     "ancla": {
       "camposAlternar": "Comentarios por campo",
@@ -415,6 +416,11 @@
         "vacia": "No hay inspecciones publicadas sin revisión.",
         "error": "No se pudo cargar la lista."
       }
+    },
+    "irA": {
+      "abriendo": "Abriendo el foro...",
+      "error": "No se encontró el comentario o el hilo de este aviso. Puede que ya no esté disponible.",
+      "volver": "Volver a los avisos"
     }
   },
   "perfil": {

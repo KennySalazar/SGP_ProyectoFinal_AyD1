@@ -3,13 +3,14 @@ import { TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
 import { TranslocoService } from '@jsverse/transloco';
-import { of } from 'rxjs';
+import { NEVER, of } from 'rxjs';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { routes } from '../../app.routes';
 import { AuthStore } from '../../core/services/auth.store';
 import { AppShellComponent } from '../../layouts/app-shell/app-shell.component';
 import { ConnectivityService } from '../../offline/services/connectivity.service';
 import { SincronizacionService } from '../../offline/services/sincronizacion.service';
+import { IrAForoPage } from './pages/ir-a-foro/ir-a-foro.page';
 import { ModeracionForoPage } from './pages/moderacion/moderacion.page';
 import { ForoApiService } from './services/foro-api.service';
 
@@ -37,6 +38,8 @@ describe('Característica: acceso a la moderación del foro HU065', () => {
         {
           provide: ForoApiService,
           useValue: {
+            // La consulta queda pendiente: aquí solo importa que la ruta se abra para todos.
+            obtenerComentario: () => NEVER,
             listarInspeccionesSinRevision: () =>
               of({ content: [], number: 0, size: 20, totalElements: 0, totalPages: 0 }),
           },
@@ -44,6 +47,7 @@ describe('Característica: acceso a la moderación del foro HU065', () => {
       ],
     });
     TestBed.overrideComponent(ModeracionForoPage, { set: { template: '' } });
+    TestBed.overrideComponent(IrAForoPage, { set: { template: '' } });
     TestBed.overrideComponent(AppShellComponent, { set: { template: '<router-outlet />' } });
   });
 
@@ -66,6 +70,17 @@ describe('Característica: acceso a la moderación del foro HU065', () => {
       const harness = await RouterTestingHarness.create();
       await harness.navigateByUrl('/foro/moderacion');
       expect(TestBed.inject(Router).url).toBe('/');
+    },
+  );
+
+  it.each(['ESTUDIANTE', 'PROFESIONAL_EXTERNO', 'CATEDRATICO', 'ADMINISTRADOR'])(
+    'Escenario: el rol %s abre el comentario de un aviso del foro (HU-066)',
+    async (role) => {
+      usuario.set({ role });
+      const harness = await RouterTestingHarness.create();
+      await harness.navigateByUrl('/foro/comentarios/c');
+      expect(TestBed.inject(Router).url).toBe('/foro/comentarios/c');
+      expect(harness.routeNativeElement?.querySelector('app-ir-a-foro')).not.toBeNull();
     },
   );
 });

@@ -45,6 +45,21 @@
 .comentario:focus {
   outline: none;
 }
+/* El comentario al que llevó un aviso: se resalta además de recibir el foco. */
+.comentario.destacado {
+  padding-inline: 0.6rem;
+  background: #eff6ff;
+  border-left: 3px solid var(--sgp-blue-600);
+  border-radius: 8px;
+}
+.ayuda-menciones {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0;
+  color: var(--sgp-steel-700);
+  font-size: 0.85rem;
+}
 .comentario:focus-visible {
   outline: 3px solid var(--sgp-blue-600);
   outline-offset: 2px;

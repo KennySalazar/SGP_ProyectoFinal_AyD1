@@ -1109,4 +1109,90 @@ describe('HiloForoComponent', () => {
       expect(botones('foro.moderacion.cerrarHilo')).toHaveLength(0);
     });
   });
+
+  describe('menciones, avisos y límite de tasa (HU-066)', () => {
+    function principales(cantidad: number) {
+      return Array.from({ length: cantidad }, (_, i) => ({
+        ...PRINCIPAL,
+        id: `principal-${i}`,
+        contenido: `Comentario ${i}`,
+      }));
+    }
+
+    it('el cuadro para comentar explica cómo mencionar a alguien', async () => {
+      await crear(true);
+      cargar(HILO, []);
+
+      expect(elemento().textContent).toContain('foro.hilo.ayudaMenciones');
+    });
+
+    it('al llegar desde un aviso muestra, resalta y enfoca el comentario aunque esté oculto por la paginación', async () => {
+      await crear(true);
+      fixture.componentRef.setInput('comentarioDestacado', 'principal-14');
+      fixture.detectChanges();
+      cargar(HILO, principales(20));
+      await fixture.whenStable();
+
+      const destacado = elemento().querySelector<HTMLElement>(
+        'article[data-comentario-id="principal-14"]',
+      );
+      expect(destacado).not.toBeNull();
+      expect(destacado?.classList).toContain('destacado');
+      expect(document.activeElement).toBe(destacado);
+    });
+
+    it('si el comentario está en otra página la pide hasta encontrarlo', async () => {
+      await crear(true);
+      fixture.componentRef.setInput('comentarioDestacado', 'respuesta-lejana');
+      fixture.detectChanges();
+      cargar(HILO, principales(3), false);
+
+      const siguiente = http.expectOne(
+        (r) => r.url === RUTA_COMENTARIOS && r.params.get('pagina') === '1',
+      );
+      siguiente.flush(
+        pagina(
+          [{ ...RESPUESTA, id: 'respuesta-lejana', padreId: 'principal-0', contenido: 'Aquí' }],
+          1,
+        ),
+      );
+      fixture.detectChanges();
+
+      expect(componente.destacadoId()).toBe('respuesta-lejana');
+      expect(
+        elemento().querySelector('article[data-comentario-id="respuesta-lejana"]')?.classList,
+      ).toContain('destacado');
+    });
+
+    it('si el comentario ya no está, muestra el hilo sin insistir', async () => {
+      await crear(true);
+      fixture.componentRef.setInput('comentarioDestacado', 'no-existe');
+      fixture.detectChanges();
+      cargar(HILO, [PRINCIPAL]);
+
+      expect(componente.destacadoId()).toBeNull();
+      expect(elemento().querySelectorAll('article.comentario')).toHaveLength(1);
+    });
+
+    it('al superar el límite de tasa muestra el mensaje del servidor junto al formulario', async () => {
+      await crear(true);
+      cargar(HILO, [PRINCIPAL]);
+
+      componente.texto.set('Otro más');
+      componente.publicar();
+      http
+        .expectOne((r) => r.url === RUTA_COMENTARIOS && r.method === 'POST')
+        .flush(
+          {
+            detail: 'Publicaste demasiados comentarios en poco tiempo. Espera un momento.',
+            code: 'limite_foro_excedido',
+          },
+          { status: 429, statusText: 'Too Many Requests', headers: { 'Retry-After': '30' } },
+        );
+      fixture.detectChanges();
+
+      expect(componente.errorPublicar()).toContain('Espera un momento');
+      expect(componente.texto()).toBe('Otro más');
+    });
+  });
 });

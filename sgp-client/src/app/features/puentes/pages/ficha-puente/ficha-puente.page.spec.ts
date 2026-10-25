@@ -4,7 +4,7 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { Component, EventEmitter, Input, Output, Pipe, PipeTransform, signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
-import { ActivatedRoute, Router, provideRouter } from '@angular/router';
+import { ActivatedRoute, Router, convertToParamMap, provideRouter } from '@angular/router';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { AuthStore } from '../../../../core/services/auth.store';
@@ -44,6 +44,8 @@ class MantenimientoPuenteStubComponent {
 @Component({ selector: 'app-foro-puente', standalone: true, template: '' })
 class ForoPuenteStubComponent {
   @Input() puente: PuenteResponse | null = null;
+  @Input() hiloInicial: string | null = null;
+  @Input() comentarioDestacado: string | null = null;
 }
 
 describe('FichaPuentePage', () => {
@@ -136,6 +138,7 @@ describe('FichaPuentePage', () => {
               paramMap: {
                 get: () => paramMapId,
               },
+              queryParamMap: convertToParamMap({}),
             },
           },
         },

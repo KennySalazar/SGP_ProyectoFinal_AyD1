@@ -10,11 +10,13 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import gt.usac.cunoc.sgp.common.exception.ApiException;
 import gt.usac.cunoc.sgp.common.exception.ApiExceptionHandler;
+import gt.usac.cunoc.sgp.common.exception.DemasiadasSolicitudesException;
 import gt.usac.cunoc.sgp.common.security.JwtData;
 import gt.usac.cunoc.sgp.foro.dto.AnclaResponse;
 import gt.usac.cunoc.sgp.foro.dto.ComentarioResponse;
@@ -312,6 +314,52 @@ class ForoControllerSecurityTest {
         .andExpect(status().isUnprocessableEntity())
         .andExpect(jsonPath("$.code").value("hilo_invalido"))
         .andExpect(jsonPath("$.errores[0].campo").value("titulo"));
+  }
+
+  /** Límite de tasa (HU-066, DT-SEC-07): 429 con Retry-After y un mensaje claro. */
+  @Test
+  void superarElLimiteDeTasaDa429ConRetryAfter() throws Exception {
+    when(foro.crearComentario(eq(HILO_ID), any(CrearComentarioRequest.class), eq(USUARIO_ID)))
+        .thenThrow(
+            new DemasiadasSolicitudesException(
+                "limite_foro_excedido",
+                "Publicaste demasiados comentarios en poco tiempo. Espera un momento.",
+                42));
+
+    mockMvc
+        .perform(
+            post(HILO + "/comentarios")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(CUERPO_COMENTARIO)
+                .principal(autenticar(RoleName.ESTUDIANTE)))
+        .andExpect(status().isTooManyRequests())
+        .andExpect(header().string("Retry-After", "42"))
+        .andExpect(jsonPath("$.code").value("limite_foro_excedido"))
+        .andExpect(jsonPath("$.detail").value(org.hamcrest.Matchers.containsString("Espera")));
+  }
+
+  /** El aviso de una mención lleva al comentario: con sesión se consulta como en la lista. */
+  @ParameterizedTest
+  @EnumSource(RoleName.class)
+  void conSesionSeConsultaUnComentarioSegunElRol(RoleName rol) throws Exception {
+    UUID comentarioId = UUID.fromString("019a0000-0000-7000-8000-000000006317");
+    when(foro.obtenerComentario(comentarioId, rol)).thenReturn(comentario());
+
+    mockMvc
+        .perform(get("/api/v1/comentarios/" + comentarioId).principal(autenticar(rol)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.hiloId").value(HILO_ID.toString()));
+
+    verify(foro).obtenerComentario(comentarioId, rol);
+  }
+
+  @Test
+  void sinSesionNoSeConsultaUnComentario() throws Exception {
+    mockMvc
+        .perform(get("/api/v1/comentarios/" + UUID.randomUUID()))
+        .andExpect(status().isUnauthorized());
+
+    verifyNoInteractions(foro);
   }
 
   private static <T> Page<T> paginaVacia() {

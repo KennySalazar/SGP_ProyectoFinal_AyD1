@@ -18,12 +18,15 @@ import gt.usac.cunoc.sgp.foro.dto.HiloResponse;
 import gt.usac.cunoc.sgp.foro.mapper.ForoMapperImpl;
 import gt.usac.cunoc.sgp.foro.model.CategoriaHilo;
 import gt.usac.cunoc.sgp.foro.service.AnclajeComentarioForo;
+import gt.usac.cunoc.sgp.foro.service.AvisosForo;
 import gt.usac.cunoc.sgp.foro.service.FiltroComentarios;
 import gt.usac.cunoc.sgp.foro.service.ForoInspeccionService;
 import gt.usac.cunoc.sgp.foro.service.ForoInspeccionService.Apertura;
 import gt.usac.cunoc.sgp.foro.service.ForoService;
 import gt.usac.cunoc.sgp.foro.service.HiloInspeccionAlPublicarListener;
+import gt.usac.cunoc.sgp.foro.service.LimiteTasaForo;
 import gt.usac.cunoc.sgp.inspeccion.model.InspeccionPublicadaEvent;
+import gt.usac.cunoc.sgp.notificacion.service.NotificacionService;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -40,6 +43,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.boot.test.mock.mockito.SpyBean;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.annotation.Bean;
@@ -73,6 +77,8 @@ import org.testcontainers.utility.DockerImageName;
   ForoInspeccionService.class,
   HiloInspeccionAlPublicarListener.class,
   AnclajeComentarioForo.class,
+  AvisosForo.class,
+  NotificacionService.class,
   ValidadorAnclajeFormulario.class,
   AuditoriaWriter.class,
   ForoMapperImpl.class,
@@ -135,6 +141,10 @@ class ForoInspeccionIntegrationTest {
   }
 
   @Autowired private ForoService foro;
+
+  /** El límite de tasa (HU-066) tiene su propia prueba; aquí se publica sin esperar. */
+  @MockBean private LimiteTasaForo limites;
+
   @Autowired private HiloInspeccionAlPublicarListener listener;
   @Autowired private JdbcTemplate jdbc;
   @Autowired private PlatformTransactionManager transacciones;

@@ -118,6 +118,10 @@
           ></textarea>
           <small class="contador-texto">{{ texto().length }} / {{ limite }}</small>
         </label>
+        <p class="ayuda-menciones">
+          <i class="pi pi-at" aria-hidden="true"></i>
+          {{ 'foro.hilo.ayudaMenciones' | transloco }}
+        </p>
         @if (errorPublicar(); as error) {
           <p class="error-formulario" role="alert">{{ error }}</p>
         }
@@ -326,6 +330,7 @@
       <article
         class="comentario"
         tabindex="-1"
+        [class.destacado]="destacadoId() === comentario.id"
         [attr.data-comentario-id]="comentario.id"
         [attr.data-posicion]="i"
       >
@@ -400,6 +405,7 @@
               <article
                 class="comentario respuesta"
                 tabindex="-1"
+                [class.destacado]="destacadoId() === respuesta.id"
                 [attr.data-comentario-id]="respuesta.id"
               >
                 <div class="comentario-cabecera">

@@ -62,6 +62,8 @@ public class ForoService {
   private final PuenteRepository puentes;
   private final InspeccionRepository inspecciones;
   private final AnclajeComentarioForo anclajes;
+  private final LimiteTasaForo limites;
+  private final AvisosForo avisos;
   private final AuditoriaWriter auditoria;
   private final ForoMapper mapper;
   private final ObjectMapper json;
@@ -74,6 +76,8 @@ public class ForoService {
       PuenteRepository puentes,
       InspeccionRepository inspecciones,
       AnclajeComentarioForo anclajes,
+      LimiteTasaForo limites,
+      AvisosForo avisos,
       AuditoriaWriter auditoria,
       ForoMapper mapper,
       ObjectMapper json,
@@ -84,6 +88,8 @@ public class ForoService {
     this.puentes = puentes;
     this.inspecciones = inspecciones;
     this.anclajes = anclajes;
+    this.limites = limites;
+    this.avisos = avisos;
     this.auditoria = auditoria;
     this.mapper = mapper;
     this.json = json;
@@ -115,11 +121,13 @@ public class ForoService {
 
   /**
    * Abre un hilo en un puente activo con su primer comentario. Valida todo y responde un único 422
-   * con el detalle.
+   * con el detalle. Respeta el límite de tasa (429) y avisa a los mencionados y, si es una alerta
+   * sobre un puente en estado Malo, a los Catedráticos y Administradores (HU-066).
    */
   @Transactional
   public HiloResponse crearHilo(UUID puenteId, CrearHiloRequest request, UUID usuarioId) {
-    puenteActivo(puenteId);
+    Puente puente = puenteActivo(puenteId);
+    limites.exigirParaHilo(usuarioId);
     List<Map<String, String>> errores = new ArrayList<>();
     String titulo = ContenidoForo.limpiarTitulo(request.titulo());
     if (titulo == null) {
@@ -151,8 +159,32 @@ public class ForoService {
                 UuidV7Generator.generate(), puenteId, null, usuarioId, categoria, titulo, ahora));
     auditoria.registrarEnTransaccion(
         usuarioId, AccionAuditoria.CREAR, "foro_hilo", hilo.getId(), null, instantanea(hilo), null);
-    registrarComentario(hilo, comentario, null, usuarioId);
+    avisos.avisarMenciones(hilo, registrarComentario(hilo, comentario, null, usuarioId));
+    avisos.avisarAlerta(hilo, puente);
     return mapper.toHiloResponse(hilo, autoresDe(List.of(usuarioId)).get(usuarioId), 1L);
+  }
+
+  /**
+   * Un comentario, visto por quien lee: lo usa quien abre el aviso de una mención para llegar a su
+   * hilo (HU-066). 404 si no existe o su puente está inactivo.
+   */
+  @Transactional(readOnly = true)
+  public ComentarioResponse obtenerComentario(UUID comentarioId, RoleName lector) {
+    ForoComentario comentario =
+        comentarios
+            .findById(comentarioId)
+            .orElseThrow(
+                () ->
+                    new ApiException(
+                        HttpStatus.NOT_FOUND,
+                        "comentario_no_encontrado",
+                        "Comentario no encontrado",
+                        "El comentario no existe."));
+    hiloVisible(comentario.getHiloId());
+    return mapper.toComentarioResponse(
+        comentario,
+        autoresDe(List.of(comentario.getAutorId())).get(comentario.getAutorId()),
+        esModerador(lector));
   }
 
   @Transactional(readOnly = true)
@@ -275,6 +307,7 @@ public class ForoService {
   public ComentarioResponse crearComentario(
       UUID hiloId, CrearComentarioRequest request, UUID usuarioId) {
     ForoHilo hilo = hiloVisible(hiloId);
+    limites.exigirParaComentario(usuarioId);
     List<Map<String, String>> errores = new ArrayList<>();
     String contenido = ContenidoForo.limpiarComentario(request.contenido());
     validarComentario(contenido, "contenido", errores);
@@ -316,6 +349,7 @@ public class ForoService {
     ForoComentario comentario =
         registrarComentario(
             hilo, contenido, request.padreId(), elementoRef, instanciaElementoId, usuarioId);
+    avisos.avisarMenciones(hilo, comentario);
     return mapper.toComentarioResponse(
         comentario, autoresDe(List.of(usuarioId)).get(usuarioId), false);
   }

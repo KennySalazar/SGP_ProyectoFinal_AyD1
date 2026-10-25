@@ -42,4 +42,8 @@ describe('Destinos privados de los avisos de revisión', () => {
     ]);
     expect(store.obtenerRutaEntidad('puente', 'p')).toEqual(['/puentes', 'p']);
   });
+  it('una mención lleva al comentario y una alerta del foro a su hilo (HU-066)', () => {
+    expect(store.obtenerRutaEntidad('foro_comentario', 'c')).toEqual(['/foro', 'comentarios', 'c']);
+    expect(store.obtenerRutaEntidad('foro_hilo', 'h')).toEqual(['/foro', 'hilos', 'h']);
+  });
 });

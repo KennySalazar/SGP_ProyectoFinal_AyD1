@@ -48,6 +48,7 @@ public class ForoModeracionService {
   private final ForoAutorRepository autores;
   private final ForoModeracionRepository moderacion;
   private final ForoService foro;
+  private final AvisosForo avisos;
   private final AuditoriaWriter auditoria;
   private final ForoMapper mapper;
   private final ObjectMapper json;
@@ -59,6 +60,7 @@ public class ForoModeracionService {
       ForoAutorRepository autores,
       ForoModeracionRepository moderacion,
       ForoService foro,
+      AvisosForo avisos,
       AuditoriaWriter auditoria,
       ForoMapper mapper,
       ObjectMapper json,
@@ -68,6 +70,7 @@ public class ForoModeracionService {
     this.autores = autores;
     this.moderacion = moderacion;
     this.foro = foro;
+    this.avisos = avisos;
     this.auditoria = auditoria;
     this.mapper = mapper;
     this.json = json;
@@ -76,7 +79,8 @@ public class ForoModeracionService {
 
   /**
    * El autor cambia el texto de su comentario. Solo dentro de los 15 minutos siguientes a
-   * publicarlo, contados con la hora del servidor: la del cliente no cuenta (RN-FOR-05).
+   * publicarlo, contados con la hora del servidor: la del cliente no cuenta (RN-FOR-05). Si la
+   * edición agrega menciones, solo se avisa a los nuevos mencionados (RN-FOR-10).
    */
   @Transactional
   public ComentarioResponse editar(
@@ -119,6 +123,7 @@ public class ForoModeracionService {
         antes,
         json.createObjectNode().put("contenido", contenido),
         null);
+    avisos.avisarMenciones(hilos.findById(comentario.getHiloId()).orElseThrow(), comentario);
     return respuesta(comentario, false);
   }
 

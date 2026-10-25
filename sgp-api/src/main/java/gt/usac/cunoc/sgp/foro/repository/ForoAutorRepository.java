@@ -33,4 +33,18 @@ public interface ForoAutorRepository extends Repository<UserAccount, UUID> {
           """,
       nativeQuery = true)
   List<Autor> buscarPorIds(@Param("ids") Collection<UUID> ids);
+
+  /**
+   * Los usuarios que pueden recibir una mención (RN-FOR-10): su nombre de usuario coincide sin
+   * distinguir mayúsculas y su cuenta está activa. {@code nombres} va en minúsculas.
+   */
+  @Query(
+      value =
+          """
+          SELECT u.id FROM usuario u
+          WHERE lower(u.nombre_usuario) IN (:nombres)
+            AND u.activo AND u.activado AND u.verificado
+          """,
+      nativeQuery = true)
+  List<UUID> buscarMencionables(@Param("nombres") Collection<String> nombres);
 }

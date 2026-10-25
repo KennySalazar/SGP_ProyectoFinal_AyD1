@@ -294,7 +294,11 @@
 
       <!-- Seccion 6: Foro del puente (HU-063): lo puede leer cualquiera -->
       <section class="surface-card ficha-seccion">
-        <app-foro-puente [puente]="p" />
+        <app-foro-puente
+          [puente]="p"
+          [hiloInicial]="hiloDelAviso"
+          [comentarioDestacado]="comentarioDelAviso"
+        />
       </section>
     </div>
 

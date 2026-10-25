@@ -211,4 +211,11 @@ describe('ForoApiService', () => {
     expect(request.request.params.get('tamanio')).toBe('50');
     request.flush({ content: [] });
   });
+  it('consulta un comentario para llegar a su hilo desde un aviso', () => {
+    service.obtenerComentario('comentario-1').subscribe();
+
+    const request = http.expectOne('/api/v1/comentarios/comentario-1');
+    expect(request.request.method).toBe('GET');
+    request.flush({});
+  });
 });

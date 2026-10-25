@@ -16,9 +16,12 @@ import gt.usac.cunoc.sgp.foro.dto.InspeccionSinRevisionResponse;
 import gt.usac.cunoc.sgp.foro.dto.MotivoModeracionRequest;
 import gt.usac.cunoc.sgp.foro.mapper.ForoMapperImpl;
 import gt.usac.cunoc.sgp.foro.service.AnclajeComentarioForo;
+import gt.usac.cunoc.sgp.foro.service.AvisosForo;
 import gt.usac.cunoc.sgp.foro.service.FiltroComentarios;
 import gt.usac.cunoc.sgp.foro.service.ForoModeracionService;
 import gt.usac.cunoc.sgp.foro.service.ForoService;
+import gt.usac.cunoc.sgp.foro.service.LimiteTasaForo;
+import gt.usac.cunoc.sgp.notificacion.service.NotificacionService;
 import gt.usac.cunoc.sgp.usuario.model.RoleName;
 import java.sql.Timestamp;
 import java.time.Clock;
@@ -41,6 +44,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpStatus;
@@ -69,6 +73,8 @@ import org.testcontainers.utility.DockerImageName;
   ForoService.class,
   ForoModeracionService.class,
   AnclajeComentarioForo.class,
+  AvisosForo.class,
+  NotificacionService.class,
   ValidadorAnclajeFormulario.class,
   AuditoriaWriter.class,
   ForoMapperImpl.class,
@@ -108,6 +114,10 @@ class ForoModeracionIntegrationTest {
   }
 
   @Autowired private ForoService foro;
+
+  /** El límite de tasa (HU-066) tiene su propia prueba; aquí se publica sin esperar. */
+  @MockBean private LimiteTasaForo limites;
+
   @Autowired private ForoModeracionService moderacion;
   @Autowired private JdbcTemplate jdbc;
   @Autowired private RelojMutable reloj;

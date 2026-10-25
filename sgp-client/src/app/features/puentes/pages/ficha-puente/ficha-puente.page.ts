@@ -51,6 +51,9 @@ import { PuenteApiService } from '../../services/puente-api.service';
 export class FichaPuentePage implements OnInit {
   readonly auth = inject(AuthStore);
   private readonly route = inject(ActivatedRoute);
+  /** Un aviso del foro (HU-066) abre aquí un hilo y deja a la vista uno de sus comentarios. */
+  readonly hiloDelAviso = this.route.snapshot.queryParamMap.get('hilo') ?? null;
+  readonly comentarioDelAviso = this.route.snapshot.queryParamMap.get('comentario') ?? null;
   private readonly api = inject(PuenteApiService);
   private readonly inspeccionesApi = inject(InspeccionApiService);
   private readonly destroyRef = inject(DestroyRef);

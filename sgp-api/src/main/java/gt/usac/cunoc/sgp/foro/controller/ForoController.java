@@ -70,13 +70,30 @@ public class ForoController {
           "Cualquier usuario autenticado y activo. Exige título (hasta 120 caracteres), categoría "
               + "(DISCUSION_TECNICA, PROPUESTA_INTERVENCION, CONSULTA, REFERENCIA_DOCUMENTAL o "
               + "ALERTA) y primer comentario (hasta 2000 caracteres); 422 con el detalle de lo "
-              + "que falte o exceda, sin crear nada.")
+              + "que falte o exceda, sin crear nada. Cada usuario abre hasta 3 hilos y publica "
+              + "hasta 10 comentarios por minuto; si lo supera, 429 con Retry-After. Las menciones "
+              + "@usuario avisan al mencionado y una Alerta sobre un puente en estado Malo avisa "
+              + "a Catedráticos y Administradores.")
   public ResponseEntity<HiloResponse> crearHilo(
       @PathVariable UUID puenteId,
       @RequestBody CrearHiloRequest request,
       Authentication authentication) {
     return ResponseEntity.status(HttpStatus.CREATED)
         .body(foro.crearHilo(puenteId, request, usuarioId(authentication)));
+  }
+
+  @GetMapping("/comentarios/{comentarioId}")
+  @PreAuthorize("isAuthenticated()")
+  @SecurityRequirement(name = "bearerAuth")
+  @Operation(
+      summary = "Consultar un comentario",
+      description =
+          "Con sesión. Lleva al hilo de un comentario, por ejemplo desde el aviso de una mención. "
+              + "Se ve como en la lista de comentarios: sin texto si se eliminó, y si está oculto "
+              + "solo el Catedrático y el Administrador ven el texto y el motivo. 404 si no existe.")
+  public ComentarioResponse obtenerComentario(
+      @PathVariable UUID comentarioId, Authentication authentication) {
+    return foro.obtenerComentario(comentarioId, rolLector(authentication));
   }
 
   @GetMapping("/hilos/{hiloId}")
@@ -157,7 +174,9 @@ public class ForoController {
               + "elementoRef (y instanciaElementoId si el elemento es repetible) ancla el "
               + "comentario a un campo o elemento que debe existir en el formulario con que se "
               + "levantó la inspección (422 si no); una respuesta toma el ancla de su comentario. "
-              + "Un hilo cerrado responde 409.")
+              + "Un hilo cerrado responde 409. Hasta 10 comentarios por minuto por usuario; si lo "
+              + "supera, 429 con Retry-After. Las menciones @usuario avisan una sola vez a cada "
+              + "mencionado activo, salvo a uno mismo.")
   public ResponseEntity<ComentarioResponse> crearComentario(
       @PathVariable UUID hiloId,
       @RequestBody CrearComentarioRequest request,
