@@ -91,10 +91,18 @@ export class CompletarInspeccionPage implements OnInit {
   private ultimaHuellaDatos: string | null = null;
   private guardadoForzadoDuranteSolicitud = false;
   private guardadoPendiente: { request: GuardarBorradorRequest; revision: number } | null = null;
+  private publicarTrasGuardar = false;
 
   protected readonly reporteFotos = viewChild(ReporteFotograficoComponent);
   readonly fotografiasOcupadas = computed(() => this.reporteFotos()?.ocupado() ?? false);
   protected readonly formulario = viewChild(FormularioDinamicoComponent);
+  readonly valoresInicialesIncompatibles = computed(
+    () => this.formulario()?.valoresInicialesIncompatibles() ?? [],
+  );
+  readonly revisionInicialConfirmada = signal(false);
+  readonly requiereRevisionInicial = computed(
+    () => this.valoresInicialesIncompatibles().length > 0 && !this.revisionInicialConfirmada(),
+  );
   readonly revisionIc = signal(0);
   readonly operandoIc = signal(false);
   readonly esAutor = computed(() => this.auth.user()?.id === this.borrador()?.autorId);
@@ -133,7 +141,7 @@ export class CompletarInspeccionPage implements OnInit {
     () => this.guardando() || this.estadoAutoguardado() === 'pendiente',
   );
   private readonly datosEnMemoria = signal<Record<string, unknown>>({});
-  private readonly datosIniciales = signal<InspeccionBorradorResponse | null>(null);
+  readonly datosIniciales = signal<InspeccionBorradorResponse | null>(null);
   readonly valoresIniciales = computed<Record<string, unknown> | null>(() => {
     const b = this.datosIniciales();
     if (!b) return null;
@@ -317,6 +325,7 @@ export class CompletarInspeccionPage implements OnInit {
 
   private aplicarBorrador(borrador: InspeccionBorradorResponse): void {
     this.ultimaHuellaDatos = null;
+    this.revisionInicialConfirmada.set(false);
     this.borrador.set(this.conProgreso(borrador));
     this.datosIniciales.set(borrador);
     this.fechaInspeccion.set(borrador.fechaInspeccion || this.hoy);
@@ -532,7 +541,7 @@ export class CompletarInspeccionPage implements OnInit {
   }
   guardarBorrador(forzar = true): void {
     const b = this.borrador();
-    if (this.ejecutandoAccion() || this.resultadoAccion()) return;
+    if ((this.ejecutandoAccion() && !this.publicarTrasGuardar) || this.resultadoAccion()) return;
     if (!b || this.soloLectura() || (!forzar && this.revisionDatos <= this.revisionGuardada))
       return;
     if (this.guardando()) {
@@ -559,7 +568,22 @@ export class CompletarInspeccionPage implements OnInit {
       }
     }
     const formulario = this.formulario();
-    const valores = formulario?.construido() ? formulario.valor() : this.datosEnMemoria();
+    if (!formulario?.disponible()) {
+      const error = new HttpErrorResponse({
+        status: 0,
+        error: {
+          detail:
+            'El formulario de inspección todavía no está listo. Espere a que cargue para guardar.',
+        },
+      });
+      if (this.publicarTrasGuardar) this.abortarPublicacionPorGuardado(error);
+      else {
+        this.errorGuardado.set(error.error.detail);
+        this.estadoAutoguardado.set('pendiente');
+      }
+      return;
+    }
+    const valores = formulario.valor();
     const valorActual = {
       ...valores,
       identificacion: {
@@ -590,6 +614,15 @@ export class CompletarInspeccionPage implements OnInit {
     this.estadoAutoguardado.set('guardando');
     // Si no hay red o es un borrador que solo existe localmente (no sincronizado en servidor)
     if (!this.connectivity.online() || this.esSoloLocal()) {
+      if (this.publicarTrasGuardar) {
+        this.abortarPublicacionPorGuardado(
+          new HttpErrorResponse({
+            status: 0,
+            error: { detail: 'Se requiere conexión para guardar el borrador antes de publicar.' },
+          }),
+        );
+        return;
+      }
       void this.inspeccionesLocales
         .guardarBorradorLocal(
           {
@@ -651,6 +684,14 @@ export class CompletarInspeccionPage implements OnInit {
           this.guardando.set(false);
           this.estadoAutoguardado.set('guardado');
           this.mensajeExito.set(this.mensajeGuardadoEnDispositivo(new Date()));
+          if (this.publicarTrasGuardar) {
+            this.abortarPublicacionPorGuardado(
+              new HttpErrorResponse({
+                status: 403,
+                error: { detail: 'La sesión actual no corresponde al propietario del borrador.' },
+              }),
+            );
+          }
           return;
         }
         this.inspeccionApi.guardarBorrador(b.id, request, operacion.idempotencyKey).subscribe({
@@ -678,8 +719,18 @@ export class CompletarInspeccionPage implements OnInit {
             const guardarCambiosPendientes =
               this.guardadoForzadoDuranteSolicitud && hayCambiosNuevos;
             this.guardadoForzadoDuranteSolicitud = false;
-            if (guardarCambiosPendientes) {
+            const publicar = this.publicarTrasGuardar;
+            if (publicar && hayCambiosNuevos) {
               this.guardarBorrador(false);
+            } else if (guardarCambiosPendientes) {
+              this.publicarTrasGuardar = false;
+              this.guardarBorrador(false);
+            } else if (publicar) {
+              this.publicarTrasGuardar = false;
+              this.datosIniciales.set(actualizada);
+              this.ejecutarAccionFinal('publicar');
+            } else {
+              this.publicarTrasGuardar = false;
             }
           },
           error: (err: HttpErrorResponse) => {
@@ -711,15 +762,32 @@ export class CompletarInspeccionPage implements OnInit {
               this.estadoAutoguardado.set(null);
             }
             this.procesarErrorGuardado(err);
+            if (this.publicarTrasGuardar) this.abortarPublicacionPorGuardado(err);
           },
         });
+      })
+      .catch((err: unknown) => {
+        if (this.publicarTrasGuardar) {
+          this.abortarPublicacionPorGuardado(
+            err instanceof HttpErrorResponse
+              ? err
+              : new HttpErrorResponse({
+                  status: 0,
+                  error: { detail: 'No fue posible preparar el guardado.' },
+                }),
+          );
+        }
       });
+  }
+  confirmarRevisionInicial(): void {
+    if (this.valoresInicialesIncompatibles().length > 0) this.revisionInicialConfirmada.set(true);
   }
   abrirConfirmacion(): void {
     if (
       !this.connectivity.online() ||
       this.esSoloLocal() ||
       !this.accionFinal() ||
+      this.requiereRevisionInicial() ||
       this.cambiosSinGuardar() ||
       this.errorGuardado() ||
       this.operandoIc() ||
@@ -740,6 +808,7 @@ export class CompletarInspeccionPage implements OnInit {
     if (
       !b ||
       !accion ||
+      this.requiereRevisionInicial() ||
       !this.confirmandoAccion() ||
       this.ejecutandoAccion() ||
       this.cambiosSinGuardar() ||
@@ -752,6 +821,26 @@ export class CompletarInspeccionPage implements OnInit {
     this.ejecutandoAccion.set(true);
     this.errorAccion.set(null);
     this.apiErrors.clear();
+    if (accion === 'publicar') {
+      if (!this.connectivity.online() || this.esSoloLocal()) {
+        this.ejecutandoAccion.set(false);
+        this.errorAccion.set({
+          mensaje:
+            'Se requiere conexión y un borrador sincronizado para guardar antes de publicar.',
+          campos: [],
+          fotografias: [],
+        });
+        return;
+      }
+      this.publicarTrasGuardar = true;
+      this.guardarBorrador(true);
+      return;
+    }
+    this.ejecutarAccionFinal(accion);
+  }
+  private ejecutarAccionFinal(accion: AccionFinal): void {
+    const b = this.borrador();
+    if (!b) return;
     const peticion =
       accion === 'publicar' ? this.inspeccionApi.publicar(b.id) : this.inspeccionApi.enviar(b.id);
     peticion.pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
@@ -779,6 +868,14 @@ export class CompletarInspeccionPage implements OnInit {
         this.apiErrors.clear();
       },
     });
+  }
+  private abortarPublicacionPorGuardado(err: HttpErrorResponse): void {
+    this.publicarTrasGuardar = false;
+    this.guardando.set(false);
+    this.estadoAutoguardado.set(this.revisionDatos > this.revisionGuardada ? 'pendiente' : null);
+    this.ejecutandoAccion.set(false);
+    this.confirmandoAccion.set(false);
+    this.errorAccion.set(this.errorDeAccion(err));
   }
   private errorDeAccion(err: HttpErrorResponse): ErrorAccion {
     const problema = err.error as {

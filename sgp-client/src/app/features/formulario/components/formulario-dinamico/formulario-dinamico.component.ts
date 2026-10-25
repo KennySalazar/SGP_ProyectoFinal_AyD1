@@ -15,7 +15,7 @@ import {
 } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { ButtonModule } from 'primeng/button';
-import { EsquemaJson, NodoArreglo, NodoObjeto } from '../../motor/esquema/modelos';
+import { EsquemaJson, NodoArreglo, NodoFormulario, NodoObjeto } from '../../motor/esquema/modelos';
 import { resolverEsquema } from '../../motor/esquema/resolutor';
 import { Avance, calcularAvance } from '../../motor/formulario/avance';
 import { FormularioConstruido } from '../../motor/formulario/constructor';
@@ -73,6 +73,8 @@ export class FormularioDinamicoComponent {
   readonly esquema = input.required<EsquemaJson>();
   /** Valores con los que se llena el formulario: datos precargados o una inspección guardada. */
   readonly valoresIniciales = input<Record<string, unknown> | null>(null);
+  /** Datos originales antes de añadir los campos precargados del borrador. */
+  readonly valoresOriginalesParaRevision = input<Record<string, unknown> | null>(null);
   /** Muestra la inspección sin permitir cambios, con la estructura de su versión original. */
   readonly soloLectura = input(false);
   /** Secciones que no vienen del esquema (por ejemplo, el reporte fotográfico), tras las del esquema. */
@@ -82,6 +84,13 @@ export class FormularioDinamicoComponent {
   readonly seccionCambiando = output<void>();
   /** `false` mientras algún campo visible incumple una regla del esquema. */
   readonly validoChange = output<boolean>();
+
+  /** Valores iniciales cuyo tipo no coincide con la estructura del esquema y que no se cargaron. */
+  readonly valoresInicialesIncompatibles = computed(() => {
+    const construido = this.construido();
+    const iniciales = this.valoresOriginalesParaRevision() ?? this.valoresIniciales();
+    return construido && iniciales ? incompatibilidades(construido.esquema.raiz, iniciales) : [];
+  });
 
   protected readonly resultado = signal<Resultado>(null);
   protected readonly indiceActivo = signal(0);
@@ -93,6 +102,7 @@ export class FormularioDinamicoComponent {
     const resultado = this.resultado();
     return resultado && 'construido' in resultado ? resultado.construido : null;
   });
+  readonly disponible = computed(() => this.construido() !== null);
   protected readonly error = computed(() => {
     const resultado = this.resultado();
     return resultado && 'error' in resultado ? resultado.error : null;
@@ -247,6 +257,38 @@ export class FormularioDinamicoComponent {
   valor(): Record<string, unknown> {
     return this.construido()?.valor() ?? {};
   }
+}
+
+export interface ValorInicialIncompatible {
+  ruta: string;
+  valorOriginal: string;
+}
+
+function incompatibilidades(nodo: NodoFormulario, valor: unknown): ValorInicialIncompatible[] {
+  if (valor === null || valor === undefined) return [];
+
+  if (nodo.clase === 'objeto') {
+    if (typeof valor !== 'object' || Array.isArray(valor)) {
+      return [{ ruta: nodo.ruta || '/', valorOriginal: describir(valor) }];
+    }
+    const objeto = valor as Record<string, unknown>;
+    return nodo.hijos.flatMap((hijo) => incompatibilidades(hijo, objeto[hijo.clave]));
+  }
+
+  if (nodo.clase === 'arreglo') {
+    if (!Array.isArray(valor)) {
+      return [{ ruta: nodo.ruta || '/', valorOriginal: describir(valor) }];
+    }
+    return valor.flatMap((instancia, indice) =>
+      incompatibilidades({ ...nodo.elemento, ruta: `${nodo.elemento.ruta}[${indice}]` }, instancia),
+    );
+  }
+
+  return [];
+}
+
+function describir(valor: unknown): string {
+  return typeof valor === 'string' ? valor : (JSON.stringify(valor) ?? '[valor no serializable]');
 }
 
 function construir(

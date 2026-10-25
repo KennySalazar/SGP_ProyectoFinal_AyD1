@@ -83,7 +83,7 @@ class PlanMantenimientoServiceTest {
 
     PlanMantenimientoRutinario plan = service.crearPorDefecto(puente, adminId);
 
-    assertThat(plan.getPeriodicidadMeses()).isEqualTo(12);
+    assertThat(plan.getPeriodicidadMeses()).isEqualTo((short) 12);
     verify(auditoria)
         .registrarEnTransaccion(
             eq(adminId),

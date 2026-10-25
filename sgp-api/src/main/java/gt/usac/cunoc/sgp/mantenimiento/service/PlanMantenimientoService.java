@@ -110,7 +110,7 @@ public class PlanMantenimientoService {
 
     ObjectNode antes = snapshot(plan);
     List<String> actividades = request.actividades().stream().map(String::strip).toList();
-    plan.actualizar(request.periodicidadMeses(), actividades, clock.instant());
+    plan.actualizar(request.periodicidadMeses().shortValue(), actividades, clock.instant());
     PlanMantenimientoRutinario guardado = planes.saveAndFlush(plan);
     auditoria.registrarEnTransaccion(
         actorId,

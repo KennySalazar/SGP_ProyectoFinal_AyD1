@@ -1304,7 +1304,7 @@
     "inactive": "Inactiva",
     "algorithm": "Algoritmo IC",
     "baseVersion": "Versión base (opcional)",
-    "noBase": "Ninguna (desde cero)",
+    "noBase": "Plantilla canónica SIECA (sin copiar otra versión)",
     "created": "Fecha creación",
     "published": "Fecha publicación",
     "actions": "Acciones",
@@ -1674,7 +1674,7 @@
       },
       "pendientes": "Complete y guarde las reglas de calculo del IC antes de publicar esta version."
     },
-    "crearSinBaseNota": "Si no selecciona una version base, se cargara la plantilla inicial SIECA. Configure y calibre sus reglas antes de publicarla."
+    "crearSinBaseNota": "Esta opción carga el esquema canónico SIECA. Si elige una versión base, se copian su esquema, vínculos y reglas; no la use para corregir una versión con esquema inconsistente. Configure y calibre las reglas antes de publicar."
   },
   "inspecciones": {
     "historial": {
@@ -1833,6 +1833,9 @@
       "formulario": "Versión del formulario",
       "ultimaActividad": "Última actividad",
       "soloLectura": "Estás consultando el borrador de tu estudiante en modo de solo lectura.",
+      "valoresInicialesIncompatibles": "Al cargar el borrador se encontraron valores con un tipo incompatible con el esquema. La interfaz los descartó al construir los controles; revisa estas rutas y sus valores originales, vuelve a ingresar lo que corresponda y confirma la revisión antes de publicar:",
+      "confirmarRevisionInicial": "Ya revisé los valores originales y corregí lo necesario",
+      "revisionInicialConfirmada": "Revisión confirmada. Antes de publicar se guardarán los valores actuales del formulario.",
       "progresoTitulo": "Progreso general de la inspección",
       "progresoResumen": "{{completados}} de {{total}} campos obligatorios completados ({{porcentaje}}%)",
       "seccionesTitulo": "Progreso por sección (8 secciones)",

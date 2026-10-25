@@ -30,7 +30,7 @@ public class PlanMantenimientoRutinario {
   private Puente puente;
 
   @Column(name = "periodicidad_meses", nullable = false)
-  private int periodicidadMeses;
+  private short periodicidadMeses;
 
   @Column(name = "fecha_inicio", nullable = false)
   private LocalDate fechaInicio;
@@ -79,7 +79,7 @@ public class PlanMantenimientoRutinario {
     this.actualizadoEn = ahora;
   }
 
-  public void actualizar(int periodicidadMeses, List<String> descripciones, Instant ahora) {
+  public void actualizar(short periodicidadMeses, List<String> descripciones, Instant ahora) {
     this.periodicidadMeses = periodicidadMeses;
     this.actualizadoEn = ahora;
     this.actividades.clear();
@@ -98,7 +98,7 @@ public class PlanMantenimientoRutinario {
     return puente;
   }
 
-  public int getPeriodicidadMeses() {
+  public short getPeriodicidadMeses() {
     return periodicidadMeses;
   }
 

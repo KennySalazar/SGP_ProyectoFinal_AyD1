@@ -68,6 +68,8 @@ public class JsonSchemaValidatorService {
             "Error en la ruta '" + ruta + "': " + motivo);
       }
 
+      validarConsistenciaEstructural(esquema, "$");
+
       // Probar compilación del esquema
       factory.getSchema(esquema);
     } catch (ApiException e) {
@@ -79,6 +81,101 @@ public class JsonSchemaValidatorService {
           "Esquema inválido",
           "Error de estructura JSON Schema: " + e.getMessage());
     }
+  }
+
+  private void validarConsistenciaEstructural(JsonNode esquema, String ruta) {
+    // Boolean schemas are valid JSON Schema subschemas and have no structural keywords.
+    if (esquema == null || !esquema.isObject()) return;
+
+    JsonNode tipo = esquema.get("type");
+    if (esquema.has("properties") && !declaraTipo(tipo, "object")) {
+      throw esquemaInvalido(
+          "El nodo '"
+              + ruta
+              + "' define properties, por lo que su tipo debe incluir 'object'.");
+    }
+    if (esquema.has("items") && !declaraTipo(tipo, "array")) {
+      throw esquemaInvalido(
+          "El nodo '" + ruta + "' define items, por lo que su tipo debe incluir 'array'.");
+    }
+
+    for (String keyword :
+        List.of(
+            "$defs",
+            "definitions",
+            "properties",
+            "patternProperties",
+            "dependentSchemas",
+            "dependencies")) {
+      JsonNode subschemas = esquema.get(keyword);
+      if (subschemas != null && subschemas.isObject()) {
+        Iterator<Map.Entry<String, JsonNode>> campos = subschemas.fields();
+        while (campos.hasNext()) {
+          var campo = campos.next();
+          validarConsistenciaEstructural(
+              campo.getValue(),
+              ruta + "/" + keyword + "/" + escaparPuntero(campo.getKey()));
+        }
+      }
+    }
+
+    for (String keyword :
+        List.of(
+            "items",
+            "additionalItems",
+            "additionalProperties",
+            "unevaluatedProperties",
+            "unevaluatedItems",
+            "contains",
+            "not",
+            "if",
+            "then",
+            "else",
+            "propertyNames",
+            "contentSchema")) {
+      JsonNode subschema = esquema.get(keyword);
+      if (subschema != null && subschema.isObject()) {
+        validarConsistenciaEstructural(subschema, ruta + "/" + keyword);
+      } else if (subschema != null && subschema.isArray()) {
+        for (int indice = 0; indice < subschema.size(); indice++) {
+          validarConsistenciaEstructural(
+              subschema.get(indice), ruta + "/" + keyword + "/" + indice);
+        }
+      }
+    }
+
+    for (String keyword : List.of("allOf", "anyOf", "oneOf", "prefixItems")) {
+      JsonNode subschemas = esquema.get(keyword);
+      if (subschemas != null && subschemas.isArray()) {
+        for (int indice = 0; indice < subschemas.size(); indice++) {
+          validarConsistenciaEstructural(
+              subschemas.get(indice), ruta + "/" + keyword + "/" + indice);
+        }
+      }
+    }
+  }
+
+  private boolean declaraTipo(JsonNode tipo, String esperado) {
+    if (tipo == null || tipo.isNull()) return true;
+    if (tipo.isTextual()) return esperado.equals(tipo.asText());
+    if (tipo.isArray()) {
+      for (JsonNode alternativa : tipo) {
+        if (alternativa.isTextual() && esperado.equals(alternativa.asText())) return true;
+      }
+    }
+    return false;
+  }
+
+  private ApiException esquemaInvalido(String mensaje) {
+    return new ApiException(
+        HttpStatus.UNPROCESSABLE_ENTITY,
+        "esquema_invalido",
+        "Esquema inválido",
+        mensaje);
+  }
+
+  private String escaparPuntero(String segmento) {
+    return segmento.replace("~", "~0").replace("/", "~1");
   }
 
   public List<ErrorValidacionCampo> obtenerErroresValidacion(

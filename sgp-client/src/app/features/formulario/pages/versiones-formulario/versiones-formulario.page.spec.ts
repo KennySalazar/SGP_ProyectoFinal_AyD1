@@ -106,11 +106,11 @@ describe('VersionesFormularioPage', () => {
     });
     expect(router.navigate).toHaveBeenCalledWith(['/admin/formularios', '2']);
   });
-  it('sin version base solicita la plantilla inicial con el codigo indicado', () => {
-    component.nuevoForm.setValue({ codigo: ' SIECA-prueba ', versionBaseId: null });
+  it('al elegir la plantilla canónica no envía base y solicita la plantilla SIECA', () => {
+    component.nuevoForm.setValue({ codigo: ' SIECA-v2 ', versionBaseId: null });
     component.crearVersion();
     expect(apiMock.crear).toHaveBeenCalledWith({
-      codigo: 'SIECA-prueba',
+      codigo: 'SIECA-v2',
       versionBaseId: null,
       cargarPlantillaInicial: true,
     });

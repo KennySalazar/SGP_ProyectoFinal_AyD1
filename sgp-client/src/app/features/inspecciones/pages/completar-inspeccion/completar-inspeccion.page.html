@@ -95,7 +95,7 @@
         type="button"
         severity="success"
         class="btn-accion-final"
-        [disabled]="esOffline() || cambiosSinGuardar() || !!errorGuardado() || operandoIc() || colegiadoPendiente() || fotografiasOcupadas()"
+        [disabled]="esOffline() || cambiosSinGuardar() || !!errorGuardado() || requiereRevisionInicial() || operandoIc() || colegiadoPendiente() || fotografiasOcupadas()"
         [attr.title]="esOffline() ? ('common.offlineNoAction' | transloco) : cambiosSinGuardar() ? ('inspecciones.transicion.guardaPrimero' | transloco) : null"
         (click)="abrirConfirmacion()"
       >
@@ -105,7 +105,35 @@
       }
     </div>
   </header>
-  @if (soloLectura()) {
+  @if (valoresInicialesIncompatibles().length > 0) {
+  <section
+    class="alerta-autoguardado surface-card"
+    [attr.role]="requiereRevisionInicial() ? 'alert' : 'status'"
+  >
+    <i class="pi pi-exclamation-triangle" aria-hidden="true"></i>
+    <div>
+      <p>{{ 'inspecciones.borrador.valoresInicialesIncompatibles' | transloco }}</p>
+      <ul>
+        @for (valor of valoresInicialesIncompatibles(); track valor.ruta) {
+        <li><code>{{ valor.ruta }}</code>: <q>{{ valor.valorOriginal }}</q></li>
+        }
+      </ul>
+      @if (requiereRevisionInicial()) {
+      <button
+        pButton
+        type="button"
+        severity="secondary"
+        [outlined]="true"
+        (click)="confirmarRevisionInicial()"
+      >
+        {{ 'inspecciones.borrador.confirmarRevisionInicial' | transloco }}
+      </button>
+      } @else {
+      <p>{{ 'inspecciones.borrador.revisionInicialConfirmada' | transloco }}</p>
+      }
+    </div>
+  </section>
+  } @if (soloLectura()) {
   <div class="alerta-autoguardado surface-card" role="status">
     <i class="pi pi-eye" aria-hidden="true"></i>
     <span>{{ 'inspecciones.borrador.soloLectura' | transloco }}</span>
@@ -223,6 +251,7 @@
     <app-formulario-dinamico
       [esquema]="esq"
       [valoresIniciales]="valoresIniciales()"
+      [valoresOriginalesParaRevision]="datosIniciales()?.datos ?? null"
       [soloLectura]="soloLectura()"
       (valorChange)="onValorChange($event)"
       (seccionCambiando)="onSeccionCambiando()"
@@ -294,7 +323,7 @@
         pButton
         type="button"
         severity="success"
-        [disabled]="ejecutandoAccion()"
+        [disabled]="ejecutandoAccion() || requiereRevisionInicial()"
         (click)="confirmarAccion()"
       >
         <i
