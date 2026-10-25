@@ -37,7 +37,7 @@ class DatabaseMigrationIntegrationTest {
             .load();
 
     var result = flyway.migrate();
-    assertEquals(24, result.migrationsExecuted);
+    assertEquals(25, result.migrationsExecuted);
 
     flyway.validate();
 
