@@ -1,3 +1,6 @@
+import { AprobacionCalibracionComponent } from '../../../formulario/components/aprobacion-calibracion/aprobacion-calibracion.component';
+import { AprobacionCalibracionApiService } from '../../../formulario/services/aprobacion-calibracion-api.service';
+import { of as estadoRespaldo } from 'rxjs';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { signal } from '@angular/core';
@@ -41,7 +44,9 @@ const esquema = {
           type: 'object',
           title: 'Estribo',
           'x-sgp-evaluable': true,
-          properties: { fisura: { type: 'boolean', title: 'Fisura', 'x-sgp-sin-danos': false } },
+          properties: {
+            fisura: { type: 'boolean', title: 'Fisura', 'x-sgp-sin-danos': false },
+          },
         },
       },
     },
@@ -111,7 +116,10 @@ describe('Detalle de revisión HU-037', () => {
   let fixture: ComponentFixture<DetalleRevisionPage>;
   let http: HttpTestingController;
   let params: BehaviorSubject<ReturnType<typeof convertToParamMap>>;
-  const user = signal<{ id: string; role: string } | null>({ id: 'revisor', role: 'CATEDRATICO' });
+  const user = signal<{ id: string; role: string } | null>({
+    id: 'revisor',
+    role: 'CATEDRATICO',
+  });
   const fotos = { listarFotografias: vi.fn(), contenidoFotografia: vi.fn() };
   const locales = { guardarContexto: vi.fn(), pendientes: vi.fn() };
   beforeEach(async () => {
@@ -119,9 +127,24 @@ describe('Detalle de revisión HU-037', () => {
     params = new BehaviorSubject(convertToParamMap({ revisionId: 'r' }));
     fotos.listarFotografias.mockReturnValue(of([]));
     fotos.contenidoFotografia.mockReturnValue(of(new Blob()));
+    TestBed.overrideComponent(AprobacionCalibracionComponent, {
+      set: { template: '', imports: [] },
+    });
     TestBed.configureTestingModule({
       imports: [DetalleRevisionPage, traduccionesDePrueba()],
       providers: [
+        {
+          provide: AprobacionCalibracionApiService,
+          useValue: {
+            actualizada: estadoRespaldo(),
+            estado: () =>
+              estadoRespaldo({
+                estado: 'SIN_APROBAR',
+                rotuloCalibracion: 'Calibracion provisional · sin aprobar',
+              }),
+            consultar: () => estadoRespaldo(null),
+          },
+        },
         provideRouter([]),
         provideHttpClient(),
         provideHttpClientTesting(),
@@ -170,6 +193,67 @@ describe('Detalle de revisión HU-037', () => {
     expect(fotos.listarFotografias).toHaveBeenLastCalledWith('i');
     expect(locales.guardarContexto).not.toHaveBeenCalled();
     http.expectNone((req) => req.url.includes('formulario') || req.url.includes('/borrador'));
+  });
+  it('sin IC abre el detalle historico con formulario, fotos y observaciones', async () => {
+    await responder({ ...detalle, icPreliminar: null });
+    expect(html().textContent).toContain('IC no disponible');
+    expect(html().textContent).not.toContain('IC PRELIMINAR:');
+    expect(page().error()).toBeFalsy();
+    expect(page().detalle()?.datos).toEqual(detalle.datos);
+    expect(html().querySelector<HTMLInputElement>('input')?.value).toBe('Capturado');
+    expect(html().querySelectorAll('[data-categoria-fotografica]')).toHaveLength(5);
+    expect(fotos.listarFotografias).toHaveBeenLastCalledWith('i');
+    expect(html().textContent).toContain('Comentario del ciclo');
+    expect(html().textContent).toContain('Total: 2 · Pendientes: 1');
+    page().abrirPanel();
+    fixture.detectChanges();
+    await fixture.whenStable();
+    expect(html().textContent).toContain('Comprobar longitud.');
+    expect(page().puedeEscribir()).toBe(true);
+    expect(locales.guardarContexto).not.toHaveBeenCalled();
+    http.expectNone((req) => req.url.includes('/borrador'));
+  });
+  it('sin IC permite observar el elemento enviado sin cambiar los datos del formulario', async () => {
+    await responder({ ...detalle, icPreliminar: null });
+    page().seleccionarElemento(destino());
+    page().guardar({ modo: 'CREAR', texto: 'Revisar tramo', destino: destino() });
+    const req = http.expectOne('/api/v1/revisiones/r/observaciones');
+    expect(req.request.body.texto).toBe('Revisar tramo');
+    req.flush(observacion);
+    await responder({ ...detalle, icPreliminar: null });
+    expect(page().detalle()?.datos).toEqual(detalle.datos);
+    expect(html().textContent).toContain('IC no disponible');
+  });
+  it('un IC de valor cero sigue disponible y rotulado PRELIMINAR', async () => {
+    await responder({
+      ...detalle,
+      icPreliminar: { indice: 0, estado: 'MALO', etiqueta: 'PRELIMINAR' },
+    });
+    expect(html().textContent).toContain('IC PRELIMINAR: 0');
+    expect(html().textContent).toContain('MALO');
+    expect(html().textContent).not.toContain('IC no disponible');
+  });
+  it('al cambiar de revision no conserva el IC disponible de la anterior', async () => {
+    await responder();
+    params.next(convertToParamMap({ revisionId: 'r2' }));
+    http.expectOne('/api/v1/revisiones/r2').flush({
+      ...detalle,
+      revisionId: 'r2',
+      icPreliminar: null,
+    });
+    http.expectOne('/api/v1/revisiones/r2/observaciones').flush({
+      ...lista,
+      revisionId: 'r2',
+      observaciones: [],
+      total: 0,
+      pendientes: 0,
+      general: { revisionId: 'r2', texto: null },
+    });
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+    expect(html().textContent).toContain('IC no disponible');
+    expect(html().textContent).not.toContain('IC PRELIMINAR: 12.5');
   });
   it('muestra fotografías agrupadas y acciones explícitas por categoría', async () => {
     await responder();
@@ -267,7 +351,11 @@ describe('Detalle de revisión HU-037', () => {
     page().guardar({
       modo: 'CREAR',
       texto: 'Falta vista',
-      destino: { tipo: 'CATEGORIA_FOTOGRAFICA', categoriaFotografica: 'CAUCE', etiqueta: 'Cauce' },
+      destino: {
+        tipo: 'CATEGORIA_FOTOGRAFICA',
+        categoriaFotografica: 'CAUCE',
+        etiqueta: 'Cauce',
+      },
     });
     const req = http.expectOne('/api/v1/revisiones/r/observaciones');
     expect(req.request.body.destino).toEqual({

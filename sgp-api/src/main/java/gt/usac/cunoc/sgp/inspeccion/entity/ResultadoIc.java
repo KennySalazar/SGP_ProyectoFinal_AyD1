@@ -167,6 +167,37 @@ public class ResultadoIc {
     this.creadoEn = ahora;
   }
 
+  public static ResultadoIc recalculo(
+      UUID id,
+      UUID inspeccionId,
+      UUID versionConfiguracionId,
+      BigDecimal indiceCalculado,
+      EstadoCondicion estadoPorRango,
+      EstadoCondicion estadoCalculado,
+      JsonNode condicionesAnulacion,
+      JsonNode desglose,
+      String hashEntrada,
+      String versionAlgoritmo,
+      UUID solicitadoPorId,
+      Instant ahora) {
+    ResultadoIc resultado =
+        new ResultadoIc(
+            id,
+            inspeccionId,
+            versionConfiguracionId,
+            indiceCalculado,
+            estadoPorRango,
+            estadoCalculado,
+            condicionesAnulacion,
+            desglose,
+            hashEntrada,
+            versionAlgoritmo,
+            solicitadoPorId,
+            ahora);
+    resultado.tipo = "RECALCULO";
+    return resultado;
+  }
+
   public UUID getId() {
     return id;
   }

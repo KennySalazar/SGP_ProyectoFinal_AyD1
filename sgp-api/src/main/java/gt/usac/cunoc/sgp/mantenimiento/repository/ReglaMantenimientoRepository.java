@@ -1,17 +1,23 @@
 package gt.usac.cunoc.sgp.mantenimiento.repository;
 
 import gt.usac.cunoc.sgp.mantenimiento.entity.ReglaMantenimiento;
+import jakarta.persistence.LockModeType;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 public interface ReglaMantenimientoRepository
     extends JpaRepository<ReglaMantenimiento, UUID>, JpaSpecificationExecutor<ReglaMantenimiento> {
+
+  @Lock(LockModeType.PESSIMISTIC_WRITE)
+  @Query("SELECT r FROM ReglaMantenimiento r WHERE r.id = :id")
+  Optional<ReglaMantenimiento> findByIdForUpdate(@Param("id") UUID id);
 
   Optional<ReglaMantenimiento> findByCodigoAndVersionFormularioIdAndActivaTrue(
       String codigo, UUID versionFormularioId);
@@ -34,6 +40,14 @@ public interface ReglaMantenimientoRepository
       "UPDATE ReglaMantenimiento r SET r.activa = false WHERE r.codigo = :codigo AND r.versionFormulario.id = :versionId")
   int desactivarTodasLasRevisiones(
       @Param("codigo") String codigo, @Param("versionId") UUID versionId);
+
+  @Query(
+      "SELECT DISTINCT r.versionFormulario.id FROM ReglaMantenimiento r WHERE r.activa = true AND (r.validadoPorId IS NULL OR r.validadoEn IS NULL)")
+  List<UUID> findVersionesConReglasPendientes();
+
+  @Query(
+      "SELECT COUNT(r) > 0 FROM ReglaMantenimiento r WHERE r.versionFormulario.id = :versionId AND r.activa = true AND (r.validadoPorId IS NULL OR r.validadoEn IS NULL)")
+  boolean tieneReglasPendientes(@Param("versionId") UUID versionId);
 
   boolean existsByVersionFormularioId(UUID versionFormularioId);
 

@@ -37,10 +37,13 @@
       <dd>{{ d.versionFormularioCodigo }}</dd>
     </div>
   </dl>
-  <p class="ic">
-    <strong>IC {{ d.icPreliminar.etiqueta }}: {{ d.icPreliminar.indice }}</strong> · {{
-    d.icPreliminar.estado }}
+  <p class="ic" role="status">
+    @if (d.icPreliminar; as ic) {
+    <strong>IC {{ ic.etiqueta }}: {{ ic.indice }}</strong> · {{ ic.estado }} } @else {
+    <strong>{{ 'revision.detalle.icNoDisponible' | transloco }}</strong>
+    }
   </p>
+  <app-aprobacion-calibracion [versionId]="d.versionFormularioId" />
   @if (d.identificacionCapturada; as identificacion) {
   <h3>{{ 'revision.detalle.identificacion' | transloco }}</h3>
   <dl>

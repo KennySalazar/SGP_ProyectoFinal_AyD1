@@ -94,6 +94,7 @@
               {{ p.indiceCondicionActual !== null ? p.indiceCondicionActual :
               ('puentes.ficha.notAvailable' | transloco) }}
             </span>
+            <app-respaldo-ic [puente]="p" />
           </div>
           <div class="condicion-bloque">
             <span class="dato-etiqueta">{{ 'puentes.ficha.lastInspection' | transloco }}</span>
@@ -294,7 +295,11 @@
 
       <!-- Seccion 6: Foro del puente (HU-063): lo puede leer cualquiera -->
       <section class="surface-card ficha-seccion">
-        <app-foro-puente [puente]="p" />
+        <app-foro-puente
+          [puente]="p"
+          [hiloInicial]="hiloDelAviso"
+          [comentarioDestacado]="comentarioDelAviso"
+        />
       </section>
     </div>
 

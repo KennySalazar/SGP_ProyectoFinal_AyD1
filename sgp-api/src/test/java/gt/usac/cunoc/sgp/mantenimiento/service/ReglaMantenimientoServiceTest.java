@@ -3,6 +3,7 @@ package gt.usac.cunoc.sgp.mantenimiento.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -73,7 +74,9 @@ class ReglaMantenimientoServiceTest {
             mapper,
             validador,
             objectMapper,
-            clock);
+            clock,
+            org.mockito.Mockito.mock(
+                gt.usac.cunoc.sgp.notificacion.service.AvisosAcademicosService.class));
 
     try (InputStream is =
         new ClassPathResource("formulario/sieca-v1/esquema.schema.json").getInputStream()) {
@@ -270,7 +273,8 @@ class ReglaMantenimientoServiceTest {
             null,
             AHORA);
 
-    when(reglaRepository.findById(reglaOriginalId)).thenReturn(Optional.of(original));
+    original.validar(UUID.randomUUID(), AHORA.minusSeconds(3600));
+    when(reglaRepository.findByIdForUpdate(reglaOriginalId)).thenReturn(Optional.of(original));
     when(reglaRepository.findMaxNumeroRevision("RM-VIGA-001", VERSION_ID))
         .thenReturn(Optional.of(1));
 
@@ -294,6 +298,9 @@ class ReglaMantenimientoServiceTest {
     assertThat(response.numeroRevision()).isEqualTo(2);
     assertThat(response.tipoMantenimiento()).isEqualTo(TipoOrden.CORRECTIVO);
     assertThat(response.provisional()).isTrue();
+    assertThat(response.validadoPorId()).isNull();
+    assertThat(response.validadoEn()).isNull();
+    assertThat(original.isProvisional()).isFalse();
   }
 
   @Test
@@ -318,15 +325,20 @@ class ReglaMantenimientoServiceTest {
             null,
             AHORA);
 
-    when(reglaRepository.findById(reglaId)).thenReturn(Optional.of(regla));
+    when(reglaRepository.findByIdForUpdate(reglaId)).thenReturn(Optional.of(regla));
     when(reglaRepository.save(any(ReglaMantenimiento.class))).thenAnswer(inv -> inv.getArgument(0));
 
+    UserAccount docente = org.mockito.Mockito.mock(UserAccount.class);
+    when(docente.getNombreCompleto()).thenReturn("Kenny Salazar");
+    when(userRepository.findById(USUARIO_ADMIN_ID)).thenReturn(Optional.of(docente));
     ReglaMantenimientoResponse response = service.validarRegla(reglaId, USUARIO_ADMIN_ID);
 
     assertThat(response.provisional()).isFalse();
     assertThat(response.validadoPorId()).isEqualTo(USUARIO_ADMIN_ID);
     assertThat(response.validadoEn()).isEqualTo(AHORA);
     assertThat(response.estadoValidacion()).isEqualTo("Validada");
+    assertThat(response.validadoPorNombre()).isEqualTo("Kenny Salazar");
+    assertThat(response.rotuloValidacion()).isEqualTo("Validada por Kenny Salazar el 18/10/2026");
   }
 
   @Test
@@ -343,5 +355,89 @@ class ReglaMantenimientoServiceTest {
     assertThat(resumen.tieneReglasActivas()).isFalse();
     assertThat(resumen.advertenciaSinReglasActivas())
         .isEqualTo("Esta versión no tiene reglas de mantenimiento activas");
+  }
+
+  @Test
+  void validacionRepetidaConservaAutorYFecha() {
+    UUID autor = UUID.randomUUID();
+    ReglaMantenimiento regla = reglaValidable(true, autor, AHORA.minusSeconds(60));
+    when(reglaRepository.findByIdForUpdate(regla.getId())).thenReturn(Optional.of(regla));
+    var response = service.validarRegla(regla.getId(), UUID.randomUUID());
+    assertThat(response.validadoPorId()).isEqualTo(autor);
+    assertThat(response.validadoEn()).isEqualTo(AHORA.minusSeconds(60));
+    verify(reglaRepository, never()).save(any());
+    org.mockito.Mockito.verifyNoInteractions(userRepository);
+  }
+
+  @Test
+  void revisionInactivaNoSeValidaAunqueYaEstuvieraValidada() {
+    ReglaMantenimiento regla = reglaValidable(false, UUID.randomUUID(), AHORA);
+    when(reglaRepository.findByIdForUpdate(regla.getId())).thenReturn(Optional.of(regla));
+    assertThatThrownBy(() -> service.validarRegla(regla.getId(), UUID.randomUUID()))
+        .isInstanceOfSatisfying(
+            ApiException.class, ex -> assertThat(ex.getStatus()).isEqualTo(HttpStatus.CONFLICT));
+    verify(reglaRepository, never()).save(any());
+  }
+
+  @Test
+  void reglaInexistenteNoSeValida() {
+    UUID id = UUID.randomUUID();
+    when(reglaRepository.findByIdForUpdate(id)).thenReturn(Optional.empty());
+    assertThatThrownBy(() -> service.validarRegla(id, UUID.randomUUID()))
+        .isInstanceOfSatisfying(
+            ApiException.class, ex -> assertThat(ex.getStatus()).isEqualTo(HttpStatus.NOT_FOUND));
+  }
+
+  @Test
+  void nombreVacioUsaCorreoYFechaDeGuatemala() {
+    ReglaMantenimiento regla = reglaValidable(true, null, null);
+    when(reglaRepository.findByIdForUpdate(regla.getId())).thenReturn(Optional.of(regla));
+    when(reglaRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+    UserAccount docente = org.mockito.Mockito.mock(UserAccount.class);
+    when(docente.getNombreCompleto()).thenReturn("  ");
+    when(docente.getEmail()).thenReturn("docente@cunoc.edu.gt");
+    when(userRepository.findById(USUARIO_ADMIN_ID)).thenReturn(Optional.of(docente));
+    var response = service.validarRegla(regla.getId(), USUARIO_ADMIN_ID);
+    assertThat(response.validadoPorNombre()).isEqualTo("docente@cunoc.edu.gt");
+    var madrugada = response.conNombreValidador("Docente");
+    var dto =
+        new ReglaMantenimientoResponse(
+            madrugada.id(),
+            madrugada.codigo(),
+            1,
+            VERSION_ID,
+            "SIECA-v1",
+            "elemento",
+            null,
+            TipoOrden.PREVENTIVO,
+            "Pintura",
+            null,
+            true,
+            false,
+            "Validada",
+            USUARIO_ADMIN_ID,
+            USUARIO_ADMIN_ID,
+            Instant.parse("2026-10-24T02:30:00Z"),
+            AHORA,
+            "Docente");
+    assertThat(dto.rotuloValidacion()).isEqualTo("Validada por Docente el 23/10/2026");
+  }
+
+  private ReglaMantenimiento reglaValidable(boolean activa, UUID autor, Instant fecha) {
+    return new ReglaMantenimiento(
+        UUID.randomUUID(),
+        "RM-TEST",
+        1,
+        versionSieca,
+        "/superestructura/elemento_portante_acero",
+        objectMapper.createObjectNode(),
+        TipoOrden.PREVENTIVO,
+        "Pintura",
+        objectMapper.createObjectNode(),
+        activa,
+        USUARIO_ADMIN_ID,
+        autor,
+        fecha,
+        AHORA);
   }
 }

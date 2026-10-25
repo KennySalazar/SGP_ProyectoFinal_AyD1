@@ -1,0 +1,14 @@
+@if (tieneIc()) {
+  <div aria-live="polite" data-testid="respaldo-ic">
+    @if (resultado().rotulo; as rotulo) {
+      <p>{{ rotulo }}</p>
+    } @else if (resultado().mensaje; as mensaje) {
+      <p>{{ mensaje | transloco }}</p>
+    }
+    @if (reintentable()) {
+      <button type="button" (click)="reintentar()">
+        {{ 'puentes.respaldo.retry' | transloco }}
+      </button>
+    }
+  </div>
+}

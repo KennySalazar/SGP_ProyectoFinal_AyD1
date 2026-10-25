@@ -6,10 +6,11 @@ import { VersionFormulario } from '../models/formulario.models';
 @Injectable({ providedIn: 'root' })
 export class CalibracionAdicionalApiService {
   private readonly http = inject(HttpClient);
-  guardarReglas(id: string, reglasAnulacion: unknown[]) {
+  guardarReglas(id: string, reglasAnulacion: unknown[], version: number) {
     return this.http.put<VersionFormulario>(
       `/api/v1/formularios/${encodeURIComponent(id)}/reglas-criticas`,
       { reglasAnulacion },
+      { headers: { 'If-Match': String(version) } },
     );
   }
   consultarActa(id: string) {
@@ -17,12 +18,13 @@ export class CalibracionAdicionalApiService {
       `/api/v1/formularios/${encodeURIComponent(id)}/acta-calibracion`,
     );
   }
-  adjuntarActa(id: string, archivo: File) {
+  adjuntarActa(id: string, archivo: File, version: number) {
     const datos = new FormData();
     datos.append('archivo', archivo);
     return this.http.put<EstadoActa>(
       `/api/v1/formularios/${encodeURIComponent(id)}/acta-calibracion`,
       datos,
+      { headers: { 'If-Match': String(version) } },
     );
   }
   descargarActa(id: string) {

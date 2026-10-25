@@ -7,10 +7,17 @@ export interface AnclaEtiquetable {
   readonly instanciaElementoId?: string | null;
 }
 
+/** Separa los niveles de la ruta de un dato: «Sub-estructura › Estribo de entrada › Columnas». */
+export const SEPARADOR_RUTA = ' › ';
+
 /**
- * Nombra un ancla como la ve quien llena el formulario: el título del esquema y, en un elemento
- * repetible, qué instancia es («Pilas · Pila 2»). Si el esquema no tiene la ruta, humaniza su
- * último segmento en lugar de mostrar la referencia técnica.
+ * Nombra un ancla con su ruta completa, como la ve quien llena el formulario: de la sección hasta
+ * el dato, con los títulos del esquema y, en un elemento repetible, qué instancia es («Sub-estructura
+ * › Pilas · Pila 2 › Columnas › Existencia del elemento»). El nombre del último nivel casi nunca
+ * basta: en el formulario real «Existencia del elemento» se repite 37 veces y «Hay» o «Descripción»
+ * decenas, así que sin sus niveles de arriba no dicen a qué dato se refieren.
+ *
+ * Si el esquema no conoce un nivel, humaniza su clave en lugar de mostrar la referencia técnica.
  */
 export function crearEtiquetadorAncla(
   esquema: EsquemaJson | null | undefined,
@@ -25,16 +32,25 @@ export function crearEtiquetadorAncla(
     }
   }
   return (ancla) => {
-    const base =
-      nodos.get(ancla.elementoRef)?.titulo ?? humanizar(ultimoSegmento(ancla.elementoRef));
-    if (!ancla.instanciaElementoId) return base;
-    const instancia = ordinalDeInstancia(
-      ancla.elementoRef,
-      ancla.instanciaElementoId,
-      nodos,
-      datos,
-    );
-    return instancia ? `${base} · ${instancia.nombre} ${instancia.numero}` : base;
+    const instancia = ancla.instanciaElementoId ?? null;
+    const partes: string[] = [];
+    let ruta = '';
+    let dato: unknown = datos;
+    for (const segmento of segmentos(ancla.elementoRef)) {
+      ruta += '/' + segmento;
+      dato = hijoDe(dato, segmento);
+      const nodo = nodos.get(ruta);
+      let titulo = nodo?.titulo ?? humanizar(segmento);
+      if (nodo?.clase === 'arreglo' && instancia) {
+        const indice = indiceDeInstancia(dato, instancia);
+        if (indice >= 0) titulo = `${titulo} · ${nodo.nombreElemento} ${indice + 1}`;
+        // Lo que sigue en la ruta pertenece a esa instancia.
+        dato = indice >= 0 ? (dato as unknown[])[indice] : undefined;
+      }
+      // Un nodo y su instancia comparten título: no se repite.
+      if (partes.at(-1) !== titulo) partes.push(titulo);
+    }
+    return partes.join(SEPARADOR_RUTA);
   };
 }
 
@@ -54,33 +70,19 @@ function segmentos(referencia: string): string[] {
     .map((segmento) => segmento.replace(/~1/g, '/').replace(/~0/g, '~'));
 }
 
-function ultimoSegmento(referencia: string): string {
-  return segmentos(referencia).at(-1) ?? referencia;
+function hijoDe(dato: unknown, clave: string): unknown {
+  return dato !== null && typeof dato === 'object' && !Array.isArray(dato)
+    ? (dato as Record<string, unknown>)[clave]
+    : undefined;
 }
 
-/** Qué número de instancia es (la 2.ª pila…), según el orden en que se capturó. */
-function ordinalDeInstancia(
-  referencia: string,
-  instanciaId: string,
-  nodos: Map<string, NodoFormulario>,
-  datos: unknown,
-): { nombre: string; numero: number } | null {
-  let actual = datos;
-  let ruta = '';
-  for (const segmento of segmentos(referencia)) {
-    if (actual === null || typeof actual !== 'object') return null;
-    ruta += '/' + segmento;
-    actual = (actual as Record<string, unknown>)[segmento];
-    const nodo = nodos.get(ruta);
-    if (Array.isArray(actual) && nodo?.clase === 'arreglo') {
-      const indice = actual.findIndex(
-        (item) =>
-          typeof item === 'object' &&
-          item !== null &&
-          (item as Record<string, unknown>)['instancia_id'] === instanciaId,
-      );
-      return indice >= 0 ? { nombre: nodo.nombreElemento, numero: indice + 1 } : null;
-    }
-  }
-  return null;
+/** Posición de una instancia en su lista, según el orden en que se capturó; -1 si no está. */
+function indiceDeInstancia(lista: unknown, instanciaId: string): number {
+  if (!Array.isArray(lista)) return -1;
+  return lista.findIndex(
+    (item) =>
+      typeof item === 'object' &&
+      item !== null &&
+      (item as Record<string, unknown>)['instancia_id'] === instanciaId,
+  );
 }

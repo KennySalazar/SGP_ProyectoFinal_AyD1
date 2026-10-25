@@ -6,6 +6,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.OptimisticLockingFailureException;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ProblemDetail;
@@ -34,6 +35,18 @@ public class ApiExceptionHandler {
       problem.setProperty("errores", exception.getErrores());
     }
     return response(problem, exception.getStatus());
+  }
+
+  @ExceptionHandler(DemasiadasSolicitudesException.class)
+  ResponseEntity<ProblemDetail> handleDemasiadasSolicitudes(
+      DemasiadasSolicitudesException exception, HttpServletRequest request) {
+    ProblemDetail problem =
+        ProblemDetails.create(
+            429, exception.getTitle(), exception.getMessage(), exception.getCode(), request);
+    return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+        .header(HttpHeaders.RETRY_AFTER, Long.toString(exception.getReintentarEnSegundos()))
+        .contentType(MediaType.APPLICATION_PROBLEM_JSON)
+        .body(problem);
   }
 
   @ExceptionHandler(MethodArgumentNotValidException.class)

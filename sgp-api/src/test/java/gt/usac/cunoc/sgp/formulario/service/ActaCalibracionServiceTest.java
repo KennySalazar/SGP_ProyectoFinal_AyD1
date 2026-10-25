@@ -15,6 +15,8 @@ import gt.usac.cunoc.sgp.formulario.entity.*;
 import gt.usac.cunoc.sgp.formulario.model.EstadoVersionFormulario;
 import gt.usac.cunoc.sgp.formulario.repository.*;
 import gt.usac.cunoc.sgp.formulario.validation.ValidadorActaPdf;
+import gt.usac.cunoc.sgp.usuario.entity.UserAccount;
+import gt.usac.cunoc.sgp.usuario.repository.UserAccountRepository;
 import java.io.*;
 import java.math.BigDecimal;
 import java.security.MessageDigest;
@@ -36,6 +38,7 @@ class ActaCalibracionServiceTest {
   @Mock private AlmacenamientoArchivos almacenamiento;
   @Mock private ValidadorActaPdf validador;
   @Mock private AuditoriaWriter auditoria;
+  @Mock private UserAccountRepository usuarios;
   private final ObjectMapper json = new ObjectMapper().findAndRegisterModules();
   private final UUID id = UUID.randomUUID();
   private final UUID usuario = UUID.randomUUID();
@@ -71,7 +74,8 @@ class ActaCalibracionServiceTest {
             validador,
             auditoria,
             json,
-            Clock.fixed(ahora, ZoneOffset.UTC));
+            Clock.fixed(ahora, ZoneOffset.UTC),
+            usuarios);
   }
 
   @AfterEach
@@ -99,16 +103,19 @@ class ActaCalibracionServiceTest {
     assertThat(respuesta.estado()).isEqualTo("SIN_ACTA");
     assertThat(respuesta.mensaje()).isEqualTo("Sin acta de calibracion");
     assertThat(respuesta.acta()).isNull();
-    verifyNoInteractions(almacenamiento);
+    verifyNoInteractions(almacenamiento, usuarios);
   }
 
   @Test
   void adjuntaObjetoPrivadoYRegistraAuditoria() throws Exception {
     prepararCarga();
+    prepararResponsable();
     var respuesta = service.adjuntar(id, fichero, usuario);
     assertThat(respuesta.estado()).isEqualTo("CON_ACTA");
     assertThat(respuesta.acta().nombreOriginal()).isEqualTo("acta.pdf");
     assertThat(respuesta.acta().subidoPorId()).isEqualTo(usuario);
+    assertThat(respuesta.acta().subidoPorNombre()).isEqualTo("Kenny Salazar");
+    assertThat(respuesta.acta().subidoPorEmail()).isEqualTo("kenny@ejemplo.com");
     assertThat(respuesta.acta().subidoEn()).isEqualTo(ahora);
     verify(almacenamiento)
         .guardar(
@@ -171,11 +178,15 @@ class ActaCalibracionServiceTest {
   }
 
   @Test
-  void versionPublicadaPermiteAdjuntarActaSinModificarPesosNiReglas() {
-    prepararCarga();
+  void versionPublicadaRechazaAdjuntarActaSinModificarPesosNiReglas() {
+    when(versiones.findByIdForUpdate(id)).thenReturn(Optional.of(version));
     version.setEstado(EstadoVersionFormulario.PUBLICADA);
     var reglas = version.getReglasEvaluacionIc().deepCopy();
-    service.adjuntar(id, fichero, usuario);
+    assertThatThrownBy(() -> service.adjuntar(id, fichero, usuario))
+        .isInstanceOf(ApiException.class)
+        .extracting("code")
+        .isEqualTo("version_inmutable");
+    verifyNoInteractions(almacenamiento, archivos, actas, auditoria);
     assertThat(version.getEstado()).isEqualTo(EstadoVersionFormulario.PUBLICADA);
     assertThat(version.getReglasEvaluacionIc()).isEqualTo(reglas);
     verify(pesos, never()).save(any());
@@ -246,7 +257,8 @@ class ActaCalibracionServiceTest {
             validador,
             auditoria,
             json,
-            Clock.fixed(ahora, ZoneOffset.UTC));
+            Clock.fixed(ahora, ZoneOffset.UTC),
+            usuarios);
     var respuesta = service.adjuntar(id, fichero, usuario);
     String clave = "acta-" + id + "-" + respuesta.acta().archivoId() + ".pdf";
     assertThat(local.existe(clave)).isTrue();
@@ -258,6 +270,59 @@ class ActaCalibracionServiceTest {
             sincronizacion ->
                 sincronizacion.afterCompletion(TransactionSynchronization.STATUS_ROLLED_BACK));
     assertThat(local.existe(clave)).isFalse();
+  }
+
+  private void prepararResponsable() {
+    var responsable = mock(UserAccount.class);
+    when(responsable.getNombreCompleto()).thenReturn("Kenny Salazar");
+    when(responsable.getEmail()).thenReturn("kenny@ejemplo.com");
+    when(usuarios.findById(usuario)).thenReturn(Optional.of(responsable));
+  }
+
+  @Test
+  void consultaIncluyeDatosDelAutorDelArchivo() throws Exception {
+    when(versiones.findById(id)).thenReturn(Optional.of(version));
+    version.setCalibradoPorId(UUID.randomUUID());
+    when(actas.findFirstByVersionFormularioIdAndArchivoEstadoOrderByCreadoEnDescArchivoIdDesc(
+            id, EstadoArchivo.DISPONIBLE))
+        .thenReturn(Optional.of(new ArchivoActaCalibracion(archivo(), version, ahora)));
+    prepararResponsable();
+    var respuesta = service.consultar(id);
+    assertThat(respuesta.acta().subidoPorId()).isEqualTo(usuario);
+    assertThat(respuesta.acta().subidoPorNombre()).isEqualTo("Kenny Salazar");
+    assertThat(respuesta.acta().subidoPorEmail()).isEqualTo("kenny@ejemplo.com");
+    var nodo = json.valueToTree(respuesta).path("acta");
+    assertThat(nodo.path("subidoPorNombre").asText()).isEqualTo("Kenny Salazar");
+    assertThat(nodo.path("subidoPorEmail").asText()).isEqualTo("kenny@ejemplo.com");
+    verify(usuarios).findById(usuario);
+    verifyNoInteractions(almacenamiento);
+  }
+
+  @Test
+  void consultaConUsuarioNoDisponibleConservaIdentificadorYActa() throws Exception {
+    when(versiones.findById(id)).thenReturn(Optional.of(version));
+    when(actas.findFirstByVersionFormularioIdAndArchivoEstadoOrderByCreadoEnDescArchivoIdDesc(
+            id, EstadoArchivo.DISPONIBLE))
+        .thenReturn(Optional.of(new ArchivoActaCalibracion(archivo(), version, ahora)));
+    var respuesta = service.consultar(id);
+    assertThat(respuesta.estado()).isEqualTo("CON_ACTA");
+    assertThat(respuesta.acta().subidoPorId()).isEqualTo(usuario);
+    assertThat(respuesta.acta().subidoPorNombre()).isNull();
+    assertThat(respuesta.acta().subidoPorEmail()).isNull();
+  }
+
+  @Test
+  void consultaConUsuarioSinNombreConservaCorreo() throws Exception {
+    when(versiones.findById(id)).thenReturn(Optional.of(version));
+    when(actas.findFirstByVersionFormularioIdAndArchivoEstadoOrderByCreadoEnDescArchivoIdDesc(
+            id, EstadoArchivo.DISPONIBLE))
+        .thenReturn(Optional.of(new ArchivoActaCalibracion(archivo(), version, ahora)));
+    var responsable = mock(UserAccount.class);
+    when(responsable.getEmail()).thenReturn("kenny@ejemplo.com");
+    when(usuarios.findById(usuario)).thenReturn(Optional.of(responsable));
+    var respuesta = service.consultar(id);
+    assertThat(respuesta.acta().subidoPorNombre()).isNull();
+    assertThat(respuesta.acta().subidoPorEmail()).isEqualTo("kenny@ejemplo.com");
   }
 
   private Archivo archivo() throws Exception {
@@ -278,5 +343,15 @@ class ActaCalibracionServiceTest {
         null,
         usuario,
         ahora);
+  }
+
+  @Test
+  void hu053ActaObsoletaNoEscribeArchivosNiAuditoria() {
+    when(versiones.findByIdForUpdate(id)).thenReturn(Optional.of(version));
+    assertThatThrownBy(() -> service.adjuntar(id, fichero, usuario, version.getVersion() + 1))
+        .isInstanceOf(ApiException.class)
+        .extracting("code")
+        .isEqualTo("concurrencia_conflicto");
+    verifyNoInteractions(almacenamiento, archivos, actas, auditoria);
   }
 }

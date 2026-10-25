@@ -2,6 +2,7 @@ import {
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
+  computed,
   effect,
   inject,
   input,
@@ -18,7 +19,12 @@ import { ButtonModule } from 'primeng/button';
 import { SkeletonModule } from 'primeng/skeleton';
 import { ApiErrorService } from '../../../../core/services/api-error.service';
 import { AuthStore } from '../../../../core/services/auth.store';
-import { AnclaConTotal, AnclaForo } from '../../models/foro.models';
+import {
+  AnclaConTotal,
+  AnclaForo,
+  HiloInspeccionForo,
+  OpcionesFiltroForo,
+} from '../../models/foro.models';
 import { ForoApiService } from '../../services/foro-api.service';
 import { etiquetaPorOmision } from '../../utils/etiqueta-ancla';
 import { HiloForoComponent } from '../hilo-foro/hilo-foro.component';
@@ -29,7 +35,8 @@ type Estado = 'cargando' | 'listo' | 'sinHilo' | 'error';
  * Foro de una inspección publicada (HU-064, RN-FOR-02, RN-FOR-03). Quien tiene sesión abre el hilo
  * si todavía no existe (las inspecciones publicadas antes de esta función no lo tienen); un
  * visitante solo lo consulta y nunca lo crea (RN-FOR-09). Informa los totales por elemento para
- * que el formulario dibuje sus marcadores.
+ * que el formulario dibuje sus marcadores, y con esos mismos totales ofrece filtrar los comentarios
+ * por sección o ver solo los generales, que es lo que hace manejable un hilo largo.
  */
 @Component({
   selector: 'app-foro-inspeccion',
@@ -49,6 +56,8 @@ export class ForoInspeccionComponent {
   readonly inspeccionId = input.required<string>();
   /** Elemento sobre el que se ven y se dejan los comentarios; nulo para todo el hilo. */
   readonly ancla = input<AnclaForo | null>(null);
+  /** Comentario que se deja a la vista, por ejemplo al llegar desde un aviso (HU-066). */
+  readonly comentarioDestacado = input<string | null>(null);
   readonly etiquetaDeAncla = input<(ancla: AnclaForo) => string>(etiquetaPorOmision);
   /** Quien lo usa decide qué hacer al dejar de filtrar por un elemento. */
   readonly anclaQuitada = output<void>();
@@ -60,6 +69,30 @@ export class ForoInspeccionComponent {
   readonly autenticado = this.auth.authenticated;
   readonly hiloId = signal<string | null>(null);
   readonly estado = signal<Estado>('cargando');
+  private readonly anclas = signal<readonly AnclaConTotal[]>([]);
+  private readonly totalComentarios = signal(0);
+
+  /** Cuántos comentarios tiene cada sección del formulario, y cuántos son generales. */
+  readonly filtros = computed<OpcionesFiltroForo>(() => {
+    const porSeccion = new Map<string, number>();
+    let anclados = 0;
+    for (const ancla of this.anclas()) {
+      const clave = ancla.elementoRef.split('/')[1];
+      if (!clave) continue;
+      porSeccion.set(clave, (porSeccion.get(clave) ?? 0) + ancla.total);
+      anclados += ancla.total;
+    }
+    const etiqueta = this.etiquetaDeAncla();
+    const secciones = [...porSeccion].map(([clave, total]) => ({
+      clave,
+      total,
+      titulo: etiqueta({ elementoRef: '/' + clave, instanciaElementoId: null }),
+    }));
+    // «1. …», «2. …», «10. …»: por su número, como están en el formulario.
+    secciones.sort((a, b) => a.titulo.localeCompare(b.titulo, 'es', { numeric: true }));
+    const todos = this.totalComentarios();
+    return { todos, generales: Math.max(0, todos - anclados), secciones };
+  });
 
   constructor() {
     effect(() => {
@@ -77,6 +110,7 @@ export class ForoInspeccionComponent {
     peticion.pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: (respuesta) => {
         this.hiloId.set(respuesta.hilo.id);
+        this.recordar(respuesta);
         this.anclasCambian.emit(respuesta.anclas);
         this.estado.set('listo');
       },
@@ -94,9 +128,17 @@ export class ForoInspeccionComponent {
       .obtenerHiloDeInspeccion(this.inspeccionId())
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
-        next: (respuesta) => this.anclasCambian.emit(respuesta.anclas),
+        next: (respuesta) => {
+          this.recordar(respuesta);
+          this.anclasCambian.emit(respuesta.anclas);
+        },
         error: () => this.apiErrors.clear(),
       });
+  }
+
+  private recordar(respuesta: HiloInspeccionForo): void {
+    this.anclas.set(respuesta.anclas);
+    this.totalComentarios.set(respuesta.hilo.totalComentarios);
   }
 
   /** Lleva el foco al formulario de comentario, por ejemplo tras elegir un elemento. */

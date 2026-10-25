@@ -1,0 +1,155 @@
+<section
+  class="documentos surface-card"
+  [attr.aria-label]="'inspecciones.documentos.titulo' | transloco"
+  [attr.aria-busy]="cargando() || subiendo()"
+>
+  <div class="cabecera">
+    <div>
+      <h3>{{ 'inspecciones.documentos.titulo' | transloco }}</h3>
+      <p>{{ 'inspecciones.documentos.descripcion' | transloco }}</p>
+    </div>
+    <span class="contador">
+      {{ 'inspecciones.documentos.contador' | transloco: { total: documentos().length, maximo } }}
+    </span>
+  </div>
+
+  @if (editable()) {
+    @if (sinConexion()) {
+      <p class="aviso" role="status">
+        <i class="pi pi-wifi" aria-hidden="true"></i>
+        {{ 'inspecciones.documentos.sinConexion' | transloco }}
+      </p>
+    } @else if (limiteAlcanzado()) {
+      <p class="aviso" role="status">
+        <i class="pi pi-info-circle" aria-hidden="true"></i>
+        {{ 'inspecciones.documentos.errores.limite' | transloco }}
+      </p>
+    } @else {
+      <label class="boton-archivo" [class.deshabilitado]="subiendo()">
+        <input
+          type="file"
+          accept="application/pdf,.pdf"
+          [disabled]="subiendo()"
+          (change)="seleccionar($event)"
+        />
+        <i [class]="subiendo() ? 'pi pi-spin pi-spinner' : 'pi pi-upload'" aria-hidden="true"></i>
+        <span>{{
+          (subiendo() ? 'inspecciones.documentos.subiendo' : 'inspecciones.documentos.adjuntar')
+            | transloco
+        }}</span>
+      </label>
+      <small class="nota">{{ 'inspecciones.documentos.nota' | transloco }}</small>
+    }
+  }
+
+  @if (error(); as error) {
+    <p class="mensaje-error" role="alert">
+      {{
+        error === 'limite' || error === 'tamano' || error === 'general'
+          ? ('inspecciones.documentos.errores.' + error | transloco)
+          : error
+      }}
+    </p>
+  }
+
+  @if (cargando() && documentos().length === 0) {
+    <p role="status">{{ 'inspecciones.documentos.cargando' | transloco }}</p>
+  } @else if (errorCarga()) {
+    <div class="estado-error" role="alert">
+      <p>{{ 'inspecciones.documentos.errores.carga' | transloco }}</p>
+      <button pButton type="button" severity="secondary" [outlined]="true" (click)="cargar()">
+        <i class="pi pi-refresh" aria-hidden="true"></i
+        ><span>{{ 'inspecciones.documentos.reintentar' | transloco }}</span>
+      </button>
+    </div>
+  } @else {
+    <ul class="lista">
+      @for (documento of documentos(); track documento.id) {
+        <li>
+          <i class="pi pi-file-pdf icono" aria-hidden="true"></i>
+          <div class="datos">
+            <span class="nombre">{{ documento.nombreOriginal }}</span>
+            <small
+              >{{ tamano(documento.tamanoBytes) }} ·
+              {{ documento.subidoEn | date: 'dd/MM/yyyy HH:mm' : '-0600' }}</small
+            >
+          </div>
+          <div class="acciones">
+            <button
+              pButton
+              type="button"
+              severity="secondary"
+              [outlined]="true"
+              [disabled]="descargando() === documento.id"
+              [attr.aria-label]="
+                ('inspecciones.documentos.descargar' | transloco) + ': ' + documento.nombreOriginal
+              "
+              (click)="descargar(documento)"
+            >
+              <i class="pi pi-download" aria-hidden="true"></i
+              ><span>{{
+                (descargando() === documento.id
+                  ? 'inspecciones.documentos.descargando'
+                  : 'inspecciones.documentos.descargar'
+                ) | transloco
+              }}</span>
+            </button>
+            @if (editable()) {
+              <button
+                pButton
+                type="button"
+                severity="danger"
+                [outlined]="true"
+                [attr.aria-label]="
+                  ('inspecciones.documentos.retirar' | transloco) + ': ' + documento.nombreOriginal
+                "
+                (click)="confirmarRetiro(documento)"
+              >
+                <i class="pi pi-trash" aria-hidden="true"></i
+                ><span>{{ 'inspecciones.documentos.retirar' | transloco }}</span>
+              </button>
+            }
+          </div>
+        </li>
+      } @empty {
+        <li class="vacio" role="status">{{ 'inspecciones.documentos.vacio' | transloco }}</li>
+      }
+    </ul>
+  }
+
+  <p-dialog
+    [visible]="!!documentoARetirar()"
+    (visibleChange)="!$event && cancelarRetiro()"
+    [modal]="true"
+    [draggable]="false"
+    [resizable]="false"
+    [style]="{ width: 'min(32rem, 94vw)' }"
+    [header]="'inspecciones.documentos.retirarTitulo' | transloco"
+  >
+    <p>
+      {{
+        'inspecciones.documentos.retirarTexto'
+          | transloco: { nombre: documentoARetirar()?.nombreOriginal }
+      }}
+    </p>
+    <div class="dialog-acciones">
+      <button
+        pButton
+        type="button"
+        severity="secondary"
+        [outlined]="true"
+        [disabled]="retirando()"
+        (click)="cancelarRetiro()"
+      >
+        <span>{{ 'common.cancel' | transloco }}</span>
+      </button>
+      <button pButton type="button" severity="danger" [disabled]="retirando()" (click)="retirar()">
+        <i class="pi pi-trash" aria-hidden="true"></i
+        ><span>{{
+          (retirando() ? 'inspecciones.documentos.retirando' : 'inspecciones.documentos.retirar')
+            | transloco
+        }}</span>
+      </button>
+    </div>
+  </p-dialog>
+</section>

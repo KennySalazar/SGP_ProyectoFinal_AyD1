@@ -1,3 +1,4 @@
+import { AnclajeComentariosComponent } from '../comentarios/anclaje-comentarios.component';
 import { AnclajeObservacionesComponent } from '../observaciones/anclaje-observaciones.component';
 import { ChangeDetectionStrategy, Component, computed, inject, input, signal } from '@angular/core';
 import { AbstractControl, FormControl, ReactiveFormsModule } from '@angular/forms';
@@ -26,6 +27,7 @@ let secuencia = 0;
   standalone: true,
   imports: [
     AnclajeObservacionesComponent,
+    AnclajeComentariosComponent,
     ReactiveFormsModule,
     TranslocoPipe,
     InputTextModule,

@@ -15,6 +15,7 @@ export interface AcompananteResponse {
 }
 
 export interface IniciarInspeccionRequest {
+  versionFormularioId?: string;
   id?: string | null;
   puenteId: string;
   fechaInspeccion: string;
@@ -250,6 +251,7 @@ export interface InspeccionPublicadaDetalleResponse {
   motivoCorreccion: string | null;
   superadaPorId: string | null;
   vigencia: 'VIGENTE' | 'SUPERADA';
+  relacionVersionActiva?: RelacionVersionActivaResponse | null;
 }
 
 export interface InspeccionPublicadaResumenResponse {
@@ -262,4 +264,91 @@ export interface InspeccionPublicadaResumenResponse {
   estado: 'PUBLICADA';
   superadaPorId?: string | null;
   vigencia?: 'VIGENTE' | 'SUPERADA';
+}
+
+export interface MapeoCampoRelacion {
+  id: string;
+  elementoRefOrigen: string | null;
+  elementoRefDestino: string | null;
+  tipo: 'EQUIVALENTE' | 'NUEVO' | 'ELIMINADO';
+  observacion: string | null;
+}
+
+export interface RelacionVersionActivaResponse {
+  esVersionActiva: boolean;
+  codigoVersionInspeccion: string;
+  codigoVersionActiva: string | null;
+  versionActivaId: string | null;
+  mapeosDeclarados: boolean;
+  totalEquivalentes: number;
+  totalNuevos: number;
+  totalEliminados: number;
+  mapeos: MapeoCampoRelacion[];
+}
+
+export interface FotografiaExportacion {
+  id: string;
+  categoria: string | null;
+  elementoRef: string | null;
+  capturadoEn: string | null;
+}
+
+export interface PropuestaMantenimientoExportacion {
+  id: string;
+  tipo: string;
+  estado: string;
+  descripcion: string;
+  prioridadSugerida: string | null;
+}
+
+export interface ExportacionInspeccionResponse {
+  id: string;
+  fechaInspeccion: string;
+  puente: {
+    id: string;
+    codigo: string;
+    nombre: string;
+    departamento?: string | null;
+    municipio?: string | null;
+  };
+  versionFormulario: {
+    id: string;
+    codigo: string;
+    esquema: Record<string, unknown> | null;
+  };
+  relacionVersionActiva?: RelacionVersionActivaResponse | null;
+  estado: string;
+  vigencia: string;
+  identificacionCapturada?: Record<string, unknown> | null;
+  datos?: Record<string, unknown> | null;
+  datosPermanentes?: DatosPermanentesResponse | null;
+  ic?: {
+    indiceCalculado: number;
+    estadoCalculado: string;
+    estadoConfirmado: string;
+    justificacionAjuste: string | null;
+  } | null;
+  fotografias: FotografiaExportacion[];
+  propuestasMantenimiento: PropuestaMantenimientoExportacion[];
+  exportadoEn: string;
+}
+
+export interface OrdenMantenimientoDetalleItem {
+  id: string;
+  tipo: string;
+  estado: string;
+  descripcion: string;
+  prioridadSugerida: string;
+  prioridadConfirmada: string;
+  creadoEn: string;
+}
+
+/** Documento PDF de una inspección (HU-070); nunca expone la ruta del almacenamiento. */
+export interface DocumentoInspeccionResponse {
+  id: string;
+  inspeccionId: string;
+  nombreOriginal: string;
+  tamanoBytes: number;
+  subidoPorId: string;
+  subidoEn: string;
 }

@@ -20,4 +20,41 @@ public record PuenteResponse(
     String estadoActual,
     BigDecimal indiceCondicionActual,
     LocalDate fechaUltimaInspeccion,
-    OffsetDateTime creadoEn) {}
+    OffsetDateTime creadoEn,
+    UUID versionFormularioIdIcVigente) {
+
+  public PuenteResponse(
+      UUID id,
+      String codigo,
+      String nombre,
+      DepartamentoResponse departamento,
+      MunicipioResponse municipio,
+      String ruta,
+      BigDecimal kilometraje,
+      double latitud,
+      double longitud,
+      CoordenadaUtmResponse utm,
+      boolean activo,
+      String estadoActual,
+      BigDecimal indiceCondicionActual,
+      LocalDate fechaUltimaInspeccion,
+      OffsetDateTime creadoEn) {
+    this(
+        id,
+        codigo,
+        nombre,
+        departamento,
+        municipio,
+        ruta,
+        kilometraje,
+        latitud,
+        longitud,
+        utm,
+        activo,
+        estadoActual,
+        indiceCondicionActual,
+        fechaUltimaInspeccion,
+        creadoEn,
+        null);
+  }
+}

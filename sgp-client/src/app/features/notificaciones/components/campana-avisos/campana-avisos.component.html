@@ -46,6 +46,9 @@
         </label>
       </div>
 
+      @if (store.errorLectura()) {
+        <div role="alert">{{ 'avisos.readError' | transloco }}</div>
+      }
       @if (store.sinConexionAviso()) {
         <div class="offline-banner" role="status">
           <i class="pi pi-wifi" aria-hidden="true"></i>
@@ -69,6 +72,7 @@
               type="button"
               class="aviso-item"
               [class.no-leido]="!aviso.leido"
+              [disabled]="store.abriendoAviso()"
               (click)="onAvisoClick(aviso)"
             >
               <div class="aviso-indicador" aria-hidden="true">

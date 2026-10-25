@@ -27,6 +27,8 @@ describe('CampanaAvisosComponent', () => {
   let component: CampanaAvisosComponent;
 
   const mockStore = {
+    errorLectura: signal(false),
+    abriendoAviso: signal(false),
     unreadCount: signal(3),
     avisos: signal<NotificacionResponse[]>([
       {
@@ -90,13 +92,14 @@ describe('CampanaAvisosComponent', () => {
     expect(dropdown).not.toBeNull();
   });
 
-  it('permite marcar un aviso y navega', () => {
+  it('permite marcar un aviso y navega', async () => {
     component.abierto.set(true);
     fixture.detectChanges();
 
     const avisoItem = fixture.nativeElement.querySelector('.aviso-item') as HTMLButtonElement;
     expect(avisoItem).not.toBeNull();
     avisoItem.click();
+    await fixture.whenStable();
 
     expect(mockStore.marcarLeida).toHaveBeenCalledWith(mockStore.avisos()[0]);
     expect(component.abierto()).toBe(false);

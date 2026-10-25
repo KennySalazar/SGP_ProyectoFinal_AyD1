@@ -1,3 +1,4 @@
+import { AprobacionCalibracionComponent } from '../../../formulario/components/aprobacion-calibracion/aprobacion-calibracion.component';
 import { CommonModule } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import {
@@ -25,6 +26,7 @@ import { ConnectivityService } from '../../../../offline/services/connectivity.s
   selector: 'app-confirmacion-estado-ic',
   standalone: true,
   imports: [
+    AprobacionCalibracionComponent,
     CommonModule,
     ReactiveFormsModule,
     TranslocoPipe,
@@ -67,6 +69,7 @@ export class ConfirmacionEstadoIcComponent {
       validators: Validators.maxLength(10000),
     }),
   });
+  readonly calculoVisible = computed(() => (this.esOffline() ? null : this.calculo()));
   readonly calculo = computed(() => this.respuesta()?.calculo ?? null);
 
   constructor() {
@@ -109,7 +112,8 @@ export class ConfirmacionEstadoIcComponent {
 
   guardar(): void {
     const res = this.respuesta();
-    if (!res || this.bloqueado() || this.procesando() || this.restringido()) return;
+    if (!res || this.esOffline() || this.bloqueado() || this.procesando() || this.restringido())
+      return;
     this.form.markAllAsTouched();
     const { estado, justificacion } = this.form.getRawValue();
     if (this.form.invalid || (estado !== res.calculo.estadoCalculado && !justificacion.trim())) {

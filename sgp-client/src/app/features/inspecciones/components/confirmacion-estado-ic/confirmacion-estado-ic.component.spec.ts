@@ -1,11 +1,15 @@
+import { AprobacionCalibracionComponent } from '../../../formulario/components/aprobacion-calibracion/aprobacion-calibracion.component';
+import { AprobacionCalibracionApiService } from '../../../formulario/services/aprobacion-calibracion-api.service';
+import { of as estadoRespaldo } from 'rxjs';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { Pipe, PipeTransform } from '@angular/core';
-import { TranslocoPipe } from '@jsverse/transloco';
+import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { ConfirmacionEstadoIcComponent } from './confirmacion-estado-ic.component';
 import { ConfirmacionEstadoIcResponse } from '../../models/inspeccion.models';
+import { ConnectivityService } from '../../../../offline/services/connectivity.service';
 
 @Pipe({ name: 'transloco' })
 class TraduccionTestPipe implements PipeTransform {
@@ -45,8 +49,27 @@ describe('Confirmacion del estado calculado HU032', () => {
   const url = '/api/v1/inspecciones/inspeccion-1/confirmacion-estado';
 
   beforeEach(() => {
+    TestBed.overrideComponent(AprobacionCalibracionComponent, {
+      set: { template: '', imports: [] },
+    });
     TestBed.configureTestingModule({
-      providers: [provideHttpClient(), provideHttpClientTesting()],
+      providers: [
+        { provide: TranslocoService, useValue: { translate: (clave: string) => clave } },
+        {
+          provide: AprobacionCalibracionApiService,
+          useValue: {
+            actualizada: estadoRespaldo(),
+            estado: () =>
+              estadoRespaldo({
+                estado: 'SIN_APROBAR',
+                rotuloCalibracion: 'Calibracion provisional · sin aprobar',
+              }),
+            consultar: () => estadoRespaldo(null),
+          },
+        },
+        provideHttpClient(),
+        provideHttpClientTesting(),
+      ],
     });
     TestBed.overrideComponent(ConfirmacionEstadoIcComponent, {
       remove: { imports: [TranslocoPipe] },
@@ -77,6 +100,20 @@ describe('Confirmacion del estado calculado HU032', () => {
     expect(fixture.nativeElement.textContent).toContain('80');
     expect(fixture.nativeElement.textContent).toContain('SIECA-v1 / IC-v1');
     expect(component.form.controls.estado.value).toBe('REGULAR');
+  });
+
+  it('HU-061 aceptación: sin red oculta el IC anterior y muestra disponible al sincronizar', () => {
+    consultar();
+    TestBed.inject(ConnectivityService).online.set(false);
+    fixture.detectChanges();
+    expect(component.calculoVisible()).toBeNull();
+    expect(fixture.nativeElement.querySelector('dl')).toBeNull();
+    expect(fixture.nativeElement.textContent).toContain(
+      'inspecciones.confirmacionIc.icPreliminarOffline',
+    );
+    component.consultar();
+    component.guardar();
+    http.expectNone(url);
   });
 
   it('confirma el estado automatico sin exigir justificacion ni enviar identidad', () => {

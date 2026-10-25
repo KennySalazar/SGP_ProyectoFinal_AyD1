@@ -37,7 +37,6 @@ export const routes: Routes = [
       },
       {
         path: 'inspecciones',
-        canActivate: [roleGuard('CATEDRATICO', 'PROFESIONAL_EXTERNO', 'ESTUDIANTE')],
         loadChildren: () =>
           import('./features/inspecciones/inspecciones.routes').then((m) => m.inspeccionesRoutes),
       },
@@ -64,9 +63,19 @@ export const routes: Routes = [
           ),
       },
       {
+        path: 'admin/formularios',
+        canActivate: [roleGuard('ADMINISTRADOR', 'CATEDRATICO')],
+        loadChildren: () =>
+          import('./features/formulario/formulario.routes').then((m) => m.formularioRoutes),
+      },
+      {
         path: 'admin',
         canActivate: [roleGuard('ADMINISTRADOR')],
         loadChildren: () => import('./features/admin/admin.routes').then((m) => m.adminRoutes),
+      },
+      {
+        path: 'foro',
+        loadChildren: () => import('./features/foro/foro.routes').then((m) => m.foroRoutes),
       },
       {
         path: 'mantenimiento',

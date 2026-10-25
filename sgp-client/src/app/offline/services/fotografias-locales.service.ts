@@ -1,11 +1,30 @@
+import { from } from 'rxjs';
+import { liveQuery } from 'dexie';
+import { FotografiaResponse } from '../../features/inspecciones/models/fotografia.models';
 import { Injectable } from '@angular/core';
 import { sgpDb, LocalPhoto } from '../db/sgp-db';
 export type FotografiaPendiente = LocalPhoto &
   Required<Pick<LocalPhoto, 'propietarioId' | 'idempotencyKey' | 'metadatos'>>;
 @Injectable({ providedIn: 'root' })
 export class FotografiasLocalesService {
+  observarInventario(propietarioId: string, inspeccionId: string) {
+    return from(
+      liveQuery(async () => ({
+        pendientes: await this.pendientes(propietarioId, inspeccionId),
+        confirmadas: await this.inventario(propietarioId, inspeccionId),
+      })),
+    );
+  }
   async guardar(foto: FotografiaPendiente): Promise<void> {
-    await sgpDb.transaction('rw', sgpDb.fotos, sgpDb.cola_sync, async () => {
+    await sgpDb.transaction('rw', sgpDb.fotos, sgpDb.cola_sync, sgpDb.inspecciones, async () => {
+      const local = await sgpDb.inspecciones.get(foto.inspeccionId);
+      if (
+        local &&
+        (local.propietarioId !== foto.propietarioId ||
+          local.intencionFinal?.estado === 'PENDIENTE' ||
+          local.intencionFinal?.estado === 'CONFIRMADA')
+      )
+        throw new Error('offline.hu061.notEditable');
       const anterior = await sgpDb.fotos.get(foto.id);
       if (anterior && anterior.propietarioId !== foto.propietarioId) throw new Error('propietario');
       await sgpDb.fotos.put(foto);
@@ -34,15 +53,44 @@ export class FotografiasLocalesService {
         !!foto.idempotencyKey,
     );
   }
-  async confirmar(id: string, propietarioId: string): Promise<void> {
-    await sgpDb.transaction('rw', sgpDb.fotos, sgpDb.cola_sync, async () => {
+  async confirmar(
+    id: string,
+    propietarioId: string,
+    respuesta?: FotografiaResponse,
+  ): Promise<void> {
+    await sgpDb.transaction('rw', sgpDb.fotos, sgpDb.cola_sync, sgpDb.inspecciones, async () => {
       const foto = await sgpDb.fotos.get(id);
       if (foto?.propietarioId !== propietarioId) throw new Error('propietario');
+      if (respuesta) {
+        const local = await sgpDb.inspecciones.get(foto.inspeccionId);
+        if (local?.propietarioId === propietarioId)
+          await sgpDb.inspecciones.update(local.id, {
+            fotosConfirmadas: [
+              ...(local.fotosConfirmadas ?? []).filter((item) => item.id !== respuesta.id),
+              respuesta,
+            ],
+          });
+      }
       await sgpDb.fotos.delete(id);
       await sgpDb.cola_sync.delete(id);
     });
   }
 
+  async inventario(propietarioId: string, inspeccionId: string): Promise<FotografiaResponse[]> {
+    const local = await sgpDb.inspecciones.get(inspeccionId);
+    return local?.propietarioId === propietarioId ? (local.fotosConfirmadas ?? []) : [];
+  }
+  async guardarInventario(
+    propietarioId: string,
+    inspeccionId: string,
+    fotos: FotografiaResponse[],
+  ): Promise<void> {
+    await sgpDb.transaction('rw', sgpDb.inspecciones, async () => {
+      const local = await sgpDb.inspecciones.get(inspeccionId);
+      if (local?.propietarioId === propietarioId)
+        await sgpDb.inspecciones.update(inspeccionId, { fotosConfirmadas: fotos });
+    });
+  }
   async guardarContexto(
     propietarioId: string,
     inspeccionId: string,
@@ -50,16 +98,24 @@ export class FotografiasLocalesService {
     estado: string,
     payload: unknown,
   ): Promise<void> {
-    await sgpDb.inspecciones.put({
-      id: inspeccionId,
-      propietarioId,
-      puenteId,
-      estado,
-      payload,
-      actualizadoEn: new Date().toISOString(),
-      sincronizado: true,
+    await sgpDb.transaction('rw', sgpDb.inspecciones, async () => {
+      const existente = await sgpDb.inspecciones.get(inspeccionId);
+      if (existente) {
+        if (existente.propietarioId !== propietarioId) throw new Error('propietario');
+        return; // El contexto visual nunca sustituye las respuestas ni confirma una edición.
+      }
+      await sgpDb.inspecciones.put({
+        id: inspeccionId,
+        propietarioId,
+        puenteId,
+        estado,
+        payload,
+        actualizadoEn: new Date().toISOString(),
+        sincronizado: true,
+      });
     });
   }
+
   async contextoPendiente(propietarioId: string, puenteId: string): Promise<unknown | null> {
     const contextos = await sgpDb.inspecciones.where('puenteId').equals(puenteId).toArray();
     for (const contexto of contextos

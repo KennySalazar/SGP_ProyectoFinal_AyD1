@@ -8,6 +8,12 @@ import { AnclajeFormulario } from '../../utils/anclaje-formulario';
  */
 export interface ContextoComentariosFormulario {
   readonly puedeComentar: Signal<boolean>;
+  /**
+   * Muestra el icono de todos los campos. Por omisión un campo solo lo muestra al pasar el puntero o
+   * al enfocarlo, o si ya tiene comentarios; este interruptor lo deja a la vista en todos, que es lo
+   * que necesita una pantalla táctil.
+   */
+  readonly camposVisibles: Signal<boolean>;
   /** Comentarios del ancla, respuestas incluidas; 0 si no tiene. */
   totalDe(anclaje: AnclajeFormulario): number;
   /** Cómo se nombra el campo o elemento, con su instancia si es repetible («Pilas · Pila 2»). */

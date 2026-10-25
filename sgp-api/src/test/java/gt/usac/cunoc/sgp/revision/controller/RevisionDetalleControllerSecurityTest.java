@@ -112,4 +112,39 @@ class RevisionDetalleControllerSecurityTest {
     mvc.perform(get(ruta).with(authentication(auth))).andExpect(status().isUnauthorized());
     verifyNoInteractions(servicio);
   }
+
+  @Test
+  void indiceNoDisponibleSeEntregaComoNullConDetalleY200() throws Exception {
+    var json = new com.fasterxml.jackson.databind.ObjectMapper();
+    when(servicio.obtener(ciclo, actor))
+        .thenReturn(
+            new gt.usac.cunoc.sgp.revision.dto.RevisionDetalleResponse(
+                ciclo,
+                UUID.randomUUID(),
+                "EN_CURSO",
+                actor,
+                1,
+                java.time.Instant.now(),
+                UUID.randomUUID(),
+                UUID.randomUUID(),
+                java.time.LocalDate.of(2026, 10, 21),
+                UUID.randomUUID(),
+                "SIECA-v1",
+                json.createObjectNode().put("type", "object"),
+                json.createObjectNode().put("campo", "enviado"),
+                json.nullNode(),
+                null,
+                "/fotografias",
+                false,
+                "/observaciones"));
+    mvc.perform(get(ruta).with(authentication(sesion(RoleName.CATEDRATICO))))
+        .andExpect(status().isOk())
+        .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+        .andExpect(jsonPath("$.icPreliminar").value(org.hamcrest.Matchers.nullValue()))
+        .andExpect(jsonPath("$.datos.campo").value("enviado"))
+        .andExpect(jsonPath("$.fotografiasEndpoint").value("/fotografias"))
+        .andExpect(jsonPath("$.observacionesEndpoint").value("/observaciones"))
+        .andExpect(jsonPath("$.code").doesNotExist())
+        .andExpect(jsonPath("$.detail").doesNotExist());
+  }
 }

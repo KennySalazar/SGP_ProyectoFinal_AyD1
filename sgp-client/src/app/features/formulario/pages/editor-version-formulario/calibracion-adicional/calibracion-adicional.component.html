@@ -45,7 +45,9 @@
           </div>
           @if (version().estado === 'BORRADOR') {
             <details class="edicion">
-              <summary>{{ 'formulario.adicional.editarCondiciones' | transloco }}</summary>
+              <summary>
+                {{ 'formulario.adicional.editarCondiciones' | transloco }}
+              </summary>
               <p>{{ 'formulario.adicional.editarAyuda' | transloco }}</p>
               @for (campo of vista.campos; track $index; let j = $index) {
                 <label>
@@ -111,15 +113,29 @@
   @if (acta(); as estadoActa) {
     @if (estadoActa.acta; as documento) {
       <p role="status">
-        {{ 'formulario.adicional.conActa' | transloco }}: {{ documento.nombreOriginal }}
+        {{ 'formulario.adicional.conActa' | transloco }}:
+        {{ documento.nombreOriginal }}
       </p>
       <dl>
         <dt>{{ 'formulario.adicional.fecha' | transloco }} (Guatemala)</dt>
         <dd>{{ fechaLegible(documento.subidoEn) }}</dd>
         <dt>{{ 'formulario.adicional.usuario' | transloco }}</dt>
         <dd>
+          @if (documento.subidoPorNombre?.trim(); as nombre) {
+            <p>{{ nombre }}</p>
+          }
+          @if (documento.subidoPorEmail?.trim(); as correo) {
+            <p>{{ correo }}</p>
+          }
+          @if (!documento.subidoPorNombre?.trim() && !documento.subidoPorEmail?.trim()) {
+            <p>
+              {{ 'formulario.adicional.responsableNoDisponible' | transloco }}
+            </p>
+          }
           <details>
-            <summary>{{ 'formulario.adicional.verRegistro' | transloco }}</summary>
+            <summary>
+              {{ 'formulario.adicional.verRegistro' | transloco }}
+            </summary>
             <code>{{ documento.subidoPorId }}</code>
           </details>
         </dd>
@@ -131,26 +147,29 @@
       <p role="status">{{ 'formulario.adicional.sinActa' | transloco }}</p>
     }
   }
-  <label class="selector-pdf"
-    ><span>{{ 'formulario.adicional.elegirPdf' | transloco }}</span>
-    <input
-      type="file"
-      accept="application/pdf,.pdf"
-      [disabled]="operando() || bloqueado() || cambio()"
-      (change)="seleccionar($event)"
-    />
-  </label>
-  @if (archivo(); as seleccionado) {
-    <p>{{ seleccionado.name }}</p>
+  @if (version().estado === 'BORRADOR') {
+    <label class="selector-pdf"
+      ><span>{{ 'formulario.adicional.elegirPdf' | transloco }}</span>
+      <input
+        type="file"
+        accept="application/pdf,.pdf"
+        [disabled]="operando() || bloqueado() || cambio()"
+        (change)="seleccionar($event)"
+      />
+    </label>
+    @if (archivo(); as seleccionado) {
+      <p>{{ seleccionado.name }}</p>
+    }
+    <button
+      pButton
+      type="button"
+      [disabled]="!archivo() || operando() || bloqueado() || cambio()"
+      (click)="adjuntar()"
+    >
+      {{
+        (operando() ? 'formulario.adicional.procesando' : 'formulario.adicional.adjuntar')
+          | transloco
+      }}
+    </button>
   }
-  <button
-    pButton
-    type="button"
-    [disabled]="!archivo() || operando() || bloqueado() || cambio()"
-    (click)="adjuntar()"
-  >
-    {{
-      (operando() ? 'formulario.adicional.procesando' : 'formulario.adicional.adjuntar') | transloco
-    }}
-  </button>
 </section>

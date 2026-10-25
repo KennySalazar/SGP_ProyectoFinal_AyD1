@@ -59,7 +59,10 @@ export class MisPuentesAsignadosPage {
       .listarMisPuentesAsignados()
       .pipe(finalize(() => this.cargando.set(false)))
       .subscribe({
-        next: (puentes) => this.puentes.set(puentes),
+        next: (puentes) => {
+          this.puentes.set(puentes);
+          this.cargando.set(false);
+        },
         error: (error) => this.apiErrors.normalize(error),
       });
   }

@@ -12,7 +12,11 @@
 </div>
 
 @if (hiloAbierto(); as hiloId) {
-  <app-hilo-foro [hiloId]="hiloId" (volver)="volverALista()" />
+  <app-hilo-foro
+    [hiloId]="hiloId"
+    [comentarioDestacado]="hiloId === hiloInicial() ? comentarioDestacado() : null"
+    (volver)="volverALista()"
+  />
 } @else {
   <p class="descripcion">{{ 'foro.descripcion' | transloco }}</p>
 

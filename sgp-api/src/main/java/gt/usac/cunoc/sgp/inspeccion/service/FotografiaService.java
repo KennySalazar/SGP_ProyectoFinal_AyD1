@@ -348,7 +348,12 @@ public class FotografiaService {
     return new ApiException(status, code, "Fotografía de inspección", detail);
   }
 
-  private void autorizarLectura(UUID id, UUID actor, RoleName rol) {
+  /**
+   * Quién puede consultar los archivos de una inspección (RN-INS-05, RN-USR-10): su autor,
+   * cualquier cuenta si está publicada y el Catedrático asignado mientras no lo esté. También lo
+   * usan los documentos PDF (HU-070).
+   */
+  void autorizarLectura(UUID id, UUID actor, RoleName rol) {
     if (actor == null)
       throw error(
           HttpStatus.UNAUTHORIZED, "autenticacion_requerida", "Se requiere una sesión válida.");

@@ -16,6 +16,7 @@ import jakarta.persistence.Table;
 import java.time.Instant;
 import java.util.Objects;
 import java.util.UUID;
+import org.hibernate.annotations.Formula;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
@@ -66,6 +67,10 @@ public class ReglaMantenimiento {
   @Column(name = "validado_por_id")
   private UUID validadoPorId;
 
+  @Formula(
+      "(SELECT COALESCE(NULLIF(TRIM(u.nombre_completo), ''), u.email) FROM usuario u WHERE u.id = validado_por_id)")
+  private String validadoPorNombre;
+
   @Column(name = "validado_en")
   private Instant validadoEn;
 
@@ -110,6 +115,7 @@ public class ReglaMantenimiento {
   }
 
   public void validar(UUID usuarioId, Instant ahora) {
+    if (!isProvisional()) return;
     this.validadoPorId = Objects.requireNonNull(usuarioId, "usuarioId no puede ser nulo");
     this.validadoEn = Objects.requireNonNull(ahora, "fecha de validación no puede ser nula");
   }
@@ -183,6 +189,10 @@ public class ReglaMantenimiento {
 
   public UUID getValidadoPorId() {
     return validadoPorId;
+  }
+
+  public String getValidadoPorNombre() {
+    return validadoPorNombre;
   }
 
   public Instant getValidadoEn() {

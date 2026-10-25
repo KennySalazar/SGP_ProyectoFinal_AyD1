@@ -11,6 +11,7 @@ import { AuthStore } from '../../core/services/auth.store';
 import { ApiErrorService } from '../../core/services/api-error.service';
 import { AppShellComponent } from '../../layouts/app-shell/app-shell.component';
 import { ConnectivityService } from '../../offline/services/connectivity.service';
+import { SincronizacionService } from '../../offline/services/sincronizacion.service';
 import { ObservacionesRecibidasPage } from './pages/observaciones-recibidas/observaciones-recibidas.page';
 import { RevisionApiService } from './services/revision-api.service';
 
@@ -37,6 +38,7 @@ describe('Ruta de observaciones del autor', () => {
           useValue: { user: usuario, authenticated: () => usuario() !== null },
         },
         { provide: ConnectivityService, useValue: { online: signal(true) } },
+        { provide: SincronizacionService, useValue: { iniciar: vi.fn() } },
         { provide: RevisionApiService, useValue: { recibidas } },
         { provide: ApiErrorService, useValue: {} },
       ],

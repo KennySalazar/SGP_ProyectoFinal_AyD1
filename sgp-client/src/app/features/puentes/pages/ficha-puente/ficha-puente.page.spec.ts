@@ -1,9 +1,11 @@
+import { RespaldoIcComponent } from '../../components/respaldo-ic/respaldo-ic.component';
+import { SincronizacionService } from '../../../../offline/services/sincronizacion.service';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { Component, EventEmitter, Input, Output, Pipe, PipeTransform, signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
-import { ActivatedRoute, Router, provideRouter } from '@angular/router';
+import { ActivatedRoute, Router, convertToParamMap, provideRouter } from '@angular/router';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { AuthStore } from '../../../../core/services/auth.store';
@@ -43,6 +45,8 @@ class MantenimientoPuenteStubComponent {
 @Component({ selector: 'app-foro-puente', standalone: true, template: '' })
 class ForoPuenteStubComponent {
   @Input() puente: PuenteResponse | null = null;
+  @Input() hiloInicial: string | null = null;
+  @Input() comentarioDestacado: string | null = null;
 }
 
 describe('FichaPuentePage', () => {
@@ -124,6 +128,7 @@ describe('FichaPuentePage', () => {
 
     TestBed.configureTestingModule({
       providers: [
+        { provide: SincronizacionService, useValue: { iniciar: () => undefined } },
         provideHttpClient(),
         provideHttpClientTesting(),
         provideRouter([{ path: 'inspecciones/:id/publicada', component: DetalleStubComponent }]),
@@ -134,6 +139,7 @@ describe('FichaPuentePage', () => {
               paramMap: {
                 get: () => paramMapId,
               },
+              queryParamMap: convertToParamMap({}),
             },
           },
         },
@@ -144,6 +150,10 @@ describe('FichaPuentePage', () => {
       ],
     });
 
+    TestBed.overrideComponent(RespaldoIcComponent, {
+      remove: { imports: [TranslocoPipe] },
+      add: { imports: [TraduccionTestPipe] },
+    });
     TestBed.overrideComponent(FichaPuentePage, {
       remove: {
         imports: [

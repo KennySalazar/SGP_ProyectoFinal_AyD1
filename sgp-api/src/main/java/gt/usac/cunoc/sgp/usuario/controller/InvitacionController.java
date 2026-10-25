@@ -86,6 +86,7 @@ public class InvitacionController {
   }
 
   @PostMapping("/validacion")
+  @PreAuthorize("permitAll()")
   @Operation(
       summary = "Validar un enlace de invitación",
       description =
@@ -96,6 +97,7 @@ public class InvitacionController {
   }
 
   @PostMapping("/aceptacion")
+  @PreAuthorize("permitAll()")
   @Operation(
       summary = "Aceptar una invitación",
       description =

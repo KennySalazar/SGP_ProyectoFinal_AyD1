@@ -50,12 +50,13 @@ describe('FormularioApiService', () => {
       },
     ];
 
-    service.calibrarPesos('version-1', pesos).subscribe();
+    service.calibrarPesos('version-1', pesos, 0).subscribe();
 
     const request = http.expectOne('/api/v1/formularios/version-1/pesos');
 
     expect(request.request.method).toBe('PUT');
     expect(request.request.body).toEqual(pesos);
+    expect(request.request.headers.get('If-Match')).toBe('0');
 
     request.flush([
       {
@@ -76,12 +77,13 @@ describe('FormularioApiService', () => {
       },
     };
 
-    service.configurarEscala('version-1', body).subscribe();
+    service.configurarEscala('version-1', body, 3).subscribe();
 
     const request = http.expectOne('/api/v1/formularios/version-1/escala');
 
     expect(request.request.method).toBe('PUT');
     expect(request.request.body).toEqual(body);
+    expect(request.request.headers.get('If-Match')).toBe('3');
 
     request.flush({});
   });
@@ -95,5 +97,12 @@ describe('FormularioApiService', () => {
     expect(request.request.body).toEqual({ mapeos: [] });
 
     request.flush({});
+  });
+
+  it('envia la version cero del borrador sin descartarla', () => {
+    service.actualizarBorrador('v0', { esquema: {} }, 0).subscribe();
+    const req = http.expectOne('/api/v1/formularios/v0');
+    expect(req.request.headers.get('If-Match')).toBe('0');
+    req.flush({});
   });
 });

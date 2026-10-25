@@ -7,11 +7,16 @@ import { anclajeDeControl } from '../observaciones/contexto-observaciones';
 import { CONTEXTO_COMENTARIOS } from './contexto-comentarios';
 
 /**
- * Un solo botón de icono junto al dato de un elemento de la inspección (RN-FOR-02): con el icono de
- * comentario para comentarlo y, si ya tiene comentarios, además su número. Al pulsarlo se lleva al
- * foro, a los comentarios de ese elemento o a escribir uno nuevo. Es solo un icono para no cargar
- * un formulario ya extenso, así que su nombre accesible dice qué hace y sobre qué elemento; el
+ * Un solo botón de icono junto al dato de un campo o elemento de la inspección (RN-FOR-02): con el
+ * icono de comentario para comentarlo y, si ya tiene comentarios, además su número. Al pulsarlo se
+ * lleva al foro, a los comentarios de ese dato o a escribir uno nuevo. Es solo un icono para no
+ * cargar un formulario ya extenso, así que su nombre accesible dice qué hace y sobre qué dato; el
  * conteo es texto, no solo color (DT-FE-13). Sin contexto no dibuja nada.
+ *
+ * En un campo suelto el icono no está siempre a la vista, porque serían cientos: aparece al pasar
+ * el puntero sobre el campo o al enfocarlo, se queda fijo si el campo ya tiene comentarios y el
+ * contexto puede dejarlo a la vista en todos. Sigue siendo alcanzable con el teclado aunque esté
+ * oculto, y al recibir el foco se muestra.
  */
 @Component({
   selector: 'app-anclaje-comentarios',
@@ -24,6 +29,8 @@ import { CONTEXTO_COMENTARIOS } from './contexto-comentarios';
         <div
           class="anclaje"
           [class.en-titulo]="enTitulo()"
+          [class.en-campo]="enCampo()"
+          [class.fijo]="fijo()"
           [attr.data-elemento-ref]="a.elementoRef"
           [attr.data-instancia-id]="a.instanciaElementoId ?? ''"
         >
@@ -65,6 +72,21 @@ import { CONTEXTO_COMENTARIOS } from './contexto-comentarios';
       align-items: center;
       justify-content: flex-start;
       vertical-align: middle;
+    }
+    /* Un campo suelto lo muestra al pasar el puntero o al enfocarlo; sin eso, solo si tiene comentarios. */
+    .anclaje.en-campo:not(.fijo) {
+      opacity: 0;
+      transition: opacity 0.12s;
+    }
+    :host-context(.campo:hover) .anclaje.en-campo,
+    :host-context(.campo:focus-within) .anclaje.en-campo,
+    .anclaje.en-campo:focus-within {
+      opacity: 1;
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .anclaje.en-campo {
+        transition: none;
+      }
     }
     /* El área pulsable mide 44 px; la parte visible es compacta. */
     .boton {
@@ -121,6 +143,8 @@ export class AnclajeComentariosComponent {
   readonly control = input.required<AbstractControl>();
   /** Va pegado al nombre del elemento, en su misma línea, en lugar de en una fila aparte. */
   readonly enTitulo = input(false);
+  /** Es el botón de un campo suelto: se muestra al pasar el puntero o al enfocarlo. */
+  readonly enCampo = input(false);
   readonly anclaje = computed<AnclajeFormulario | null>(() =>
     this.contexto ? anclajeDeControl(this.control()) : null,
   );
@@ -129,6 +153,10 @@ export class AnclajeComentariosComponent {
     const anclaje = this.anclaje();
     return anclaje && this.contexto ? this.contexto.etiquetaDe(anclaje) : this.nodo().titulo;
   });
+  /** Con comentarios, o con los iconos de los campos a la vista, no se esconde. */
+  protected readonly fijo = computed(
+    () => this.total() > 0 || (this.contexto?.camposVisibles() ?? false),
+  );
   readonly total = computed(() => {
     const anclaje = this.anclaje();
     return anclaje && this.contexto ? this.contexto.totalDe(anclaje) : 0;

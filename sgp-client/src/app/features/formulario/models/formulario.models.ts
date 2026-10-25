@@ -1,3 +1,4 @@
+import { AprobacionCalibracion } from './aprobacion-calibracion.models';
 export type EstadoVersionFormulario = 'BORRADOR' | 'PUBLICADA';
 export type TipoMapeoCampo = 'EQUIVALENTE' | 'RENOMBRADO' | 'NUEVO' | 'ELIMINADO';
 export interface VersionFormularioResumen {
@@ -37,6 +38,8 @@ export interface VersionFormulario {
   esquema: Record<string, unknown>;
   vinculosAlmacenamiento: Record<string, unknown>;
   reglasEvaluacionIc: Record<string, unknown>;
+  rotuloCalibracion?: string | null;
+  aprobacionCalibracion?: AprobacionCalibracion | null;
   hashContenido?: string | null;
   versionAlgoritmoIc: string;
   versionAnteriorId?: string | null;
@@ -69,6 +72,7 @@ export interface AnalisisMapeo {
   camposDestino: string[];
   mapeosDeclarados: MapeoCampo[];
   camposOrigenSinMapeo: string[];
+  camposDestinoSinMapeo?: string[];
   mapeoCompleto: boolean;
 }
 export interface CrearVersionRequest {

@@ -1,0 +1,130 @@
+.documentos {
+  padding: 1rem;
+  margin-top: 1rem;
+  color: var(--sgp-steel-700);
+}
+.cabecera {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+h3 {
+  margin: 0 0 0.25rem;
+  color: var(--sgp-navy-900);
+}
+.cabecera p {
+  margin: 0;
+}
+.contador {
+  padding: 0.2rem 0.65rem;
+  color: var(--sgp-navy-900);
+  font-size: 0.82rem;
+  font-weight: 800;
+  background: var(--sgp-surface-soft);
+  border: 1px solid var(--sgp-border);
+  border-radius: 999px;
+}
+.boton-archivo {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 44px;
+  padding: 0 1.1rem;
+  margin-top: 1rem;
+  color: #ffffff;
+  font-weight: 700;
+  background: var(--sgp-blue-600);
+  border-radius: 10px;
+  cursor: pointer;
+}
+.boton-archivo input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+.boton-archivo:focus-within {
+  outline: 3px solid rgba(37, 99, 235, 0.35);
+  outline-offset: 2px;
+}
+.boton-archivo.deshabilitado {
+  opacity: 0.6;
+  cursor: progress;
+}
+.nota {
+  display: block;
+  margin-top: 0.4rem;
+  color: var(--sgp-steel-500);
+}
+.aviso {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  margin: 1rem 0 0;
+}
+.mensaje-error {
+  margin: 0.75rem 0 0;
+  color: #b91c1c;
+}
+.estado-error {
+  display: grid;
+  justify-items: start;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+.lista {
+  display: grid;
+  gap: 0.6rem;
+  padding: 0;
+  margin: 1rem 0 0;
+  list-style: none;
+}
+.lista li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  border: 1px solid var(--sgp-border);
+  border-radius: 12px;
+}
+.lista li.vacio {
+  color: var(--sgp-steel-500);
+  border-style: dashed;
+}
+.icono {
+  color: #b91c1c;
+  font-size: 1.4rem;
+}
+.datos {
+  display: grid;
+  flex: 1;
+  min-width: 10rem;
+  gap: 0.15rem;
+}
+.nombre {
+  color: var(--sgp-navy-900);
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+.acciones,
+.dialog-acciones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+.dialog-acciones {
+  justify-content: flex-end;
+  margin-top: 1.25rem;
+}
+@media (max-width: 600px) {
+  .acciones,
+  .acciones button,
+  .boton-archivo {
+    width: 100%;
+    justify-content: center;
+  }
+}

@@ -229,4 +229,14 @@ public interface AsignacionPuenteRepository extends JpaRepository<AsignacionPuen
 
     UUID getCatedraticoId();
   }
+
+  /** Catedráticos que tienen asignado el puente a algún estudiante (HU-069). */
+  @Query(
+      value =
+          "SELECT DISTINCT a.asignado_por_id FROM asignacion_puente a"
+              + " JOIN usuario u ON u.id = a.asignado_por_id JOIN rol r ON r.id = u.rol_id"
+              + " WHERE a.puente_id = :puenteId AND a.revocado_en IS NULL"
+              + " AND r.nombre = 'CATEDRATICO'",
+      nativeQuery = true)
+  List<UUID> findCatedraticosConAsignacionVigente(@Param("puenteId") UUID puenteId);
 }

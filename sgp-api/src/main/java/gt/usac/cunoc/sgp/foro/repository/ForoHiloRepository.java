@@ -2,6 +2,7 @@ package gt.usac.cunoc.sgp.foro.repository;
 
 import gt.usac.cunoc.sgp.foro.entity.ForoHilo;
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.domain.Page;
@@ -15,6 +16,16 @@ public interface ForoHiloRepository extends JpaRepository<ForoHilo, UUID> {
 
   /** Hilos propios del puente, sin los hilos de sus inspecciones. */
   Page<ForoHilo> findByPuenteIdAndInspeccionIdIsNull(UUID puenteId, Pageable pageable);
+
+  /**
+   * Cuándo abrió un usuario sus hilos más recientes desde un instante, del más nuevo al más viejo.
+   * No cuenta los hilos de inspección, que abre el sistema (DT-SEC-07).
+   */
+  @Query(
+      "SELECT h.creadoEn FROM ForoHilo h WHERE h.autorId = :autor AND h.inspeccionId IS NULL"
+          + " AND h.creadoEn > :desde ORDER BY h.creadoEn DESC")
+  List<Instant> abiertosDesde(
+      @Param("autor") UUID autor, @Param("desde") Instant desde, Pageable limite);
 
   /** El hilo de una inspección, si ya se abrió. */
   Optional<ForoHilo> findByInspeccionId(UUID inspeccionId);
@@ -42,10 +53,25 @@ public interface ForoHiloRepository extends JpaRepository<ForoHilo, UUID> {
       @Param("ahora") Instant ahora);
 
   /**
-   * Marca la actividad de un hilo sin leerlo ni versionarlo, para que dos comentarios simultáneos
-   * no choquen entre sí.
+   * Marca la actividad de un hilo abierto sin leerlo ni versionarlo, para que dos comentarios
+   * simultáneos no choquen entre sí. Devuelve 0 si el hilo ya está cerrado: la fila bloqueada hace
+   * que un comentario y un cierre simultáneos nunca dejen un comentario después del cierre.
    */
   @Modifying
-  @Query("UPDATE ForoHilo h SET h.actualizadoEn = :ahora WHERE h.id = :id")
-  void registrarActividad(@Param("id") UUID id, @Param("ahora") Instant ahora);
+  @Query("UPDATE ForoHilo h SET h.actualizadoEn = :ahora WHERE h.id = :id AND h.cerradoEn IS NULL")
+  int registrarActividad(@Param("id") UUID id, @Param("ahora") Instant ahora);
+
+  /**
+   * Cierra un hilo abierto con su motivo (RN-FOR-08) y devuelve cuántas filas cambió: 0 si ya
+   * estaba cerrado. No toca la actividad ni la versión del hilo.
+   */
+  @Modifying(flushAutomatically = true, clearAutomatically = true)
+  @Query(
+      "UPDATE ForoHilo h SET h.cerradoEn = :ahora, h.cerradoPorId = :moderador,"
+          + " h.motivoCierre = :motivo WHERE h.id = :id AND h.cerradoEn IS NULL")
+  int cerrar(
+      @Param("id") UUID id,
+      @Param("moderador") UUID moderador,
+      @Param("motivo") String motivo,
+      @Param("ahora") Instant ahora);
 }

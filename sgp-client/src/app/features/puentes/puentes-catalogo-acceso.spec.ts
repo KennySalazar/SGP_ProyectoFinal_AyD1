@@ -1,3 +1,4 @@
+import { SincronizacionService } from '../../offline/services/sincronizacion.service';
 import { provideHttpClient, withInterceptors } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { Component, Pipe, PipeTransform, signal } from '@angular/core';
@@ -41,6 +42,7 @@ describe('Rutas públicas y protegidas de puentes', () => {
     usuario.set(null);
     TestBed.configureTestingModule({
       providers: [
+        { provide: SincronizacionService, useValue: { iniciar: () => undefined } },
         provideRouter([
           { path: 'login', component: DestinoTest },
           { path: '', pathMatch: 'full', component: DestinoTest },
@@ -130,6 +132,7 @@ describe('Lista integrada en el catálogo público sin sesión', () => {
     usuario.set(null);
     TestBed.configureTestingModule({
       providers: [
+        { provide: SincronizacionService, useValue: { iniciar: () => undefined } },
         provideRouter(routes),
         provideHttpClient(withInterceptors([authInterceptor])),
         provideHttpClientTesting(),

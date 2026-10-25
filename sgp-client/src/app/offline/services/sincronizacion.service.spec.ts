@@ -8,6 +8,7 @@ import { InspeccionApiService } from '../../features/inspecciones/services/inspe
 import { sgpDb } from '../db/sgp-db';
 import { ConnectivityService } from './connectivity.service';
 import { InspeccionesLocalesService } from './inspecciones-locales.service';
+import { FotografiasLocalesService } from './fotografias-locales.service';
 import { SincronizacionService } from './sincronizacion.service';
 
 describe('SincronizacionService autenticación previa', () => {
@@ -22,6 +23,7 @@ describe('SincronizacionService autenticación previa', () => {
         { provide: ConnectivityService, useValue: { online: () => true } },
         { provide: InspeccionApiService, useValue: {} },
         { provide: InspeccionesLocalesService, useValue: {} },
+        { provide: FotografiasLocalesService, useValue: { confirmar: vi.fn() } },
       ],
     });
     return {
@@ -56,7 +58,11 @@ describe('SincronizacionService autenticación previa', () => {
 
     expect(refresh).toHaveBeenCalledOnce();
     expect(loadMe).toHaveBeenCalledOnce();
-    expect(leerCola).toHaveBeenCalledOnce();
+    expect(leerCola).toHaveBeenCalled();
+    expect(loadMe.mock.invocationCallOrder[0]).toBeGreaterThan(refresh.mock.invocationCallOrder[0]);
+    for (const orden of leerCola.mock.invocationCallOrder) {
+      expect(orden).toBeGreaterThan(loadMe.mock.invocationCallOrder[0]);
+    }
     injector.destroy();
   });
 });

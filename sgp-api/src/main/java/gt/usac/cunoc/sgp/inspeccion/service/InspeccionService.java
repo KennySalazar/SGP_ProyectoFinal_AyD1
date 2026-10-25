@@ -3,17 +3,25 @@ package gt.usac.cunoc.sgp.inspeccion.service;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import gt.usac.cunoc.sgp.archivo.model.TipoUsoArchivo;
+import gt.usac.cunoc.sgp.archivo.repository.ArchivoInspeccionRepository;
 import gt.usac.cunoc.sgp.common.audit.model.AccionAuditoria;
 import gt.usac.cunoc.sgp.common.audit.service.AuditoriaWriter;
 import gt.usac.cunoc.sgp.common.exception.ApiException;
 import gt.usac.cunoc.sgp.common.util.UuidV7Generator;
+import gt.usac.cunoc.sgp.formulario.dto.MapeoCampoResponse;
+import gt.usac.cunoc.sgp.formulario.entity.MapeoCampoFormulario;
 import gt.usac.cunoc.sgp.formulario.entity.VersionFormulario;
 import gt.usac.cunoc.sgp.formulario.model.EstadoVersionFormulario;
+import gt.usac.cunoc.sgp.formulario.model.TipoMapeoCampo;
+import gt.usac.cunoc.sgp.formulario.repository.MapeoCampoFormularioRepository;
 import gt.usac.cunoc.sgp.formulario.repository.VersionFormularioRepository;
 import gt.usac.cunoc.sgp.formulario.validation.JsonSchemaValidatorService;
 import gt.usac.cunoc.sgp.inspeccion.dto.AcompananteRequest;
 import gt.usac.cunoc.sgp.inspeccion.dto.AcompananteResponse;
+import gt.usac.cunoc.sgp.inspeccion.dto.ConflictoSincronizacionResponse;
 import gt.usac.cunoc.sgp.inspeccion.dto.DatosPermanentesResponse;
+import gt.usac.cunoc.sgp.inspeccion.dto.ExportacionInspeccionResponse;
 import gt.usac.cunoc.sgp.inspeccion.dto.GuardarBorradorRequest;
 import gt.usac.cunoc.sgp.inspeccion.dto.GuardarRespuestasRequest;
 import gt.usac.cunoc.sgp.inspeccion.dto.IndiceCondicionPreliminarResponse;
@@ -26,6 +34,8 @@ import gt.usac.cunoc.sgp.inspeccion.dto.InspeccionPublicadaDetalleResponse;
 import gt.usac.cunoc.sgp.inspeccion.dto.InspeccionPublicadaResumenResponse;
 import gt.usac.cunoc.sgp.inspeccion.dto.InspeccionResumenResponse;
 import gt.usac.cunoc.sgp.inspeccion.dto.ProgresoBorradorResponse;
+import gt.usac.cunoc.sgp.inspeccion.dto.RelacionVersionActivaResponse;
+import gt.usac.cunoc.sgp.inspeccion.dto.ResultadoIcPublicadoResponse;
 import gt.usac.cunoc.sgp.inspeccion.entity.Inspeccion;
 import gt.usac.cunoc.sgp.inspeccion.entity.InspeccionAcompanante;
 import gt.usac.cunoc.sgp.inspeccion.entity.InspeccionDatoTecnico;
@@ -35,10 +45,13 @@ import gt.usac.cunoc.sgp.inspeccion.model.ResultadoCalculoIc;
 import gt.usac.cunoc.sgp.inspeccion.repository.InspeccionDatoTecnicoRepository;
 import gt.usac.cunoc.sgp.inspeccion.repository.InspeccionRepository;
 import gt.usac.cunoc.sgp.inspeccion.repository.ResultadoIcRepository;
+import gt.usac.cunoc.sgp.mantenimiento.repository.OrdenMantenimientoRepository;
 import gt.usac.cunoc.sgp.puente.entity.Puente;
 import gt.usac.cunoc.sgp.puente.repository.AsignacionPuenteRepository;
 import gt.usac.cunoc.sgp.puente.repository.PuenteRepository;
+import gt.usac.cunoc.sgp.sync.entity.ConflictoSincronizacion;
 import gt.usac.cunoc.sgp.sync.model.SolicitudOperacion;
+import gt.usac.cunoc.sgp.sync.repository.ConflictoSincronizacionRepository;
 import gt.usac.cunoc.sgp.sync.service.HuellaSolicitud;
 import gt.usac.cunoc.sgp.sync.service.OperacionIdempotenteService;
 import gt.usac.cunoc.sgp.usuario.entity.UserAccount;
@@ -55,6 +68,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HexFormat;
 import java.util.List;
@@ -102,6 +116,12 @@ public class InspeccionService {
   private final InspeccionMapper inspeccionMapper;
   private AsignacionPuenteRepository asignaciones;
   private final ResultadoIcRepository resultadoIcRepository;
+  private MapeoCampoFormularioRepository mapeoCampoFormularioRepository;
+  private ArchivoInspeccionRepository archivoInspeccionRepository;
+  private OrdenMantenimientoRepository ordenMantenimientoRepository;
+
+  @Autowired(required = false)
+  private ConflictoSincronizacionRepository conflictosSincronizacion;
 
   public InspeccionService(
       InspeccionRepository inspeccionRepository,
@@ -274,6 +294,24 @@ public class InspeccionService {
     this.asignaciones = asignaciones;
   }
 
+  @Autowired(required = false)
+  public void setMapeoCampoFormularioRepository(
+      MapeoCampoFormularioRepository mapeoCampoFormularioRepository) {
+    this.mapeoCampoFormularioRepository = mapeoCampoFormularioRepository;
+  }
+
+  @Autowired(required = false)
+  public void setArchivoInspeccionRepository(
+      ArchivoInspeccionRepository archivoInspeccionRepository) {
+    this.archivoInspeccionRepository = archivoInspeccionRepository;
+  }
+
+  @Autowired(required = false)
+  public void setOrdenMantenimientoRepository(
+      OrdenMantenimientoRepository ordenMantenimientoRepository) {
+    this.ordenMantenimientoRepository = ordenMantenimientoRepository;
+  }
+
   /** Conserva el contrato de HU-024 utilizado por los consumidores de HU-028. */
   @Transactional
   public IniciarInspeccionResponse iniciarInspeccion(
@@ -385,7 +423,8 @@ public class InspeccionService {
                         HttpStatus.UNPROCESSABLE_ENTITY,
                         "version_no_utilizable",
                         "Versión de formulario no utilizable",
-                        "Solo se pueden iniciar inspecciones con versiones de formulario publicadas"));
+                        "Solo se pueden iniciar inspecciones con versiones de formulario"
+                            + " publicadas"));
 
     JsonNode datos = request.datos();
     if (datos == null || datos.isNull() || datos.isEmpty()) {
@@ -479,6 +518,16 @@ public class InspeccionService {
   @Transactional
   public InspeccionBorradorResponse guardarBorrador(
       UUID id, GuardarBorradorRequest request, UUID usuarioId) {
+    return guardarBorrador(id, request, usuarioId, false, null);
+  }
+
+  @Transactional
+  public InspeccionBorradorResponse guardarBorrador(
+      UUID id,
+      GuardarBorradorRequest request,
+      UUID usuarioId,
+      boolean clientePrevalece,
+      UUID operacionIdempotenteId) {
     Inspeccion inspeccion =
         inspeccionRepository
             .findConDetallesById(id)
@@ -520,11 +569,35 @@ public class InspeccionService {
     if (request != null
         && request.version() != null
         && !Objects.equals(request.version(), inspeccion.getVersion())) {
-      throw new ApiException(
-          HttpStatus.CONFLICT,
-          "concurrencia_conflicto",
-          "Conflicto de concurrencia",
-          "La inspección fue modificada concurrentemente por otra sesión o dispositivo.");
+      if (!clientePrevalece || operacionIdempotenteId == null || conflictosSincronizacion == null) {
+        throw new ApiException(
+            HttpStatus.CONFLICT,
+            "concurrencia_conflicto",
+            "Conflicto de concurrencia",
+            "La inspección fue modificada concurrentemente por otra sesión o dispositivo.");
+      }
+      var copiaServidor = objectMapper.valueToTree(aBorradorResponse(inspeccion));
+      var conflicto =
+          new ConflictoSincronizacion(
+              UuidV7Generator.generate(),
+              inspeccion.getId(),
+              operacionIdempotenteId,
+              inspeccion.getVersion(),
+              request.version(),
+              copiaServidor,
+              calcularHash(objectMapper.valueToTree(request).toString()),
+              clock.instant());
+      conflictosSincronizacion.save(conflicto);
+      if (auditoriaWriter != null) {
+        auditoriaWriter.registrarEnTransaccion(
+            usuarioId,
+            AccionAuditoria.MODIFICAR,
+            "conflicto_sincronizacion",
+            conflicto.getId(),
+            copiaServidor,
+            objectMapper.valueToTree(request),
+            "HU-059");
+      }
     }
 
     // 9. Fechas futuras o anteriores a la construcción
@@ -592,6 +665,38 @@ public class InspeccionService {
     inspeccionRepository.saveAndFlush(inspeccion);
 
     return aBorradorResponse(inspeccion);
+  }
+
+  @Transactional(readOnly = true)
+  public List<ConflictoSincronizacionResponse> listarConflictosSincronizacion(
+      UUID inspeccionId, UUID usuarioId) {
+    var inspeccion =
+        inspeccionRepository
+            .findActiveById(inspeccionId)
+            .orElseThrow(
+                () ->
+                    new ApiException(
+                        HttpStatus.NOT_FOUND,
+                        "inspeccion_no_encontrada",
+                        "Inspección no encontrada",
+                        "No existe la inspección solicitada."));
+    if (!inspeccion.getAutorId().equals(usuarioId))
+      throw new ApiException(
+          HttpStatus.NOT_FOUND,
+          "inspeccion_no_encontrada",
+          "Inspección no encontrada",
+          "No existe la inspección solicitada.");
+    if (conflictosSincronizacion == null) return List.of();
+    return conflictosSincronizacion.findByInspeccionIdOrderByDetectadoEnDesc(inspeccionId).stream()
+        .map(
+            c ->
+                new ConflictoSincronizacionResponse(
+                    c.getId(),
+                    c.getVersionServidor(),
+                    c.getVersionCliente(),
+                    c.getCopiaServidor(),
+                    c.getDetectadoEn()))
+        .toList();
   }
 
   @Transactional(readOnly = true)
@@ -832,17 +937,18 @@ public class InspeccionService {
                           "El estudiante no tiene una asignación vigente para este puente."));
     }
 
-    // 4. Versión activa de formulario (fijada para la inspección)
+    // Una captura preparada conserva su versión aunque cambie la activa.
     VersionFormulario versionActiva =
-        versionFormularioRepository
-            .findByActivaTrue()
+        (request.versionFormularioId() == null
+                ? versionFormularioRepository.findByActivaTrue()
+                : versionFormularioRepository.findById(request.versionFormularioId()))
             .orElseThrow(
                 () ->
                     new ApiException(
                         HttpStatus.CONFLICT,
                         "sin_formulario_activo",
                         "Formulario no disponible",
-                        "No existe una versión de formulario activa para iniciar inspecciones."));
+                        "No existe la versión de formulario solicitada para iniciar inspecciones."));
     if (versionActiva.getEstado() != EstadoVersionFormulario.PUBLICADA) {
       throw new ApiException(
           HttpStatus.UNPROCESSABLE_ENTITY,
@@ -1082,7 +1188,8 @@ public class InspeccionService {
           HttpStatus.FORBIDDEN,
           "rol_no_autorizado",
           "Acceso denegado",
-          "Solo Estudiantes asignados, Catedráticos y Profesionales externos verificados pueden iniciar inspecciones.");
+          "Solo Estudiantes asignados, Catedráticos y Profesionales externos verificados pueden"
+              + " iniciar inspecciones.");
     }
 
     return user;
@@ -1348,13 +1455,205 @@ public class InspeccionService {
                         "Inspección no encontrada",
                         "No existe la inspección publicada solicitada."));
     // Leer el resultado de ESTA publicación, nunca el vigente del puente ni un cálculo nuevo.
-    var resultado = resultadoIcRepository.findPublicacionByInspeccionId(id).orElse(null);
+    var resultado =
+        resultadoIcRepository != null
+            ? resultadoIcRepository.findPublicacionByInspeccionId(id).orElse(null)
+            : null;
     UUID correccionId = inspeccionRepository.findCorreccionPublicadaId(id).orElse(null);
     DatosPermanentesResponse permanentes =
         inspeccion.getDatoTecnico() == null
             ? null
             : aDatosPermanentesResponse(inspeccion.getDatoTecnico());
-    return inspeccionMapper.toPublicadaDetalle(inspeccion, resultado, permanentes, correccionId);
+    RelacionVersionActivaResponse relacionVersionActiva =
+        determinarRelacionVersionActiva(inspeccion.getVersionFormulario());
+    return inspeccionMapper.toPublicadaDetalle(
+        inspeccion, resultado, permanentes, correccionId, relacionVersionActiva);
+  }
+
+  public RelacionVersionActivaResponse determinarRelacionVersionActiva(
+      VersionFormulario versionInspeccion) {
+    if (versionInspeccion == null) {
+      return null;
+    }
+    if (versionFormularioRepository == null) {
+      return new RelacionVersionActivaResponse(
+          versionInspeccion.isActiva(),
+          versionInspeccion.getCodigo(),
+          null,
+          null,
+          false,
+          0,
+          0,
+          0,
+          Collections.emptyList());
+    }
+    Optional<VersionFormulario> activaOpt = versionFormularioRepository.findByActivaTrue();
+    if (activaOpt.isEmpty()) {
+      return new RelacionVersionActivaResponse(
+          versionInspeccion.isActiva(),
+          versionInspeccion.getCodigo(),
+          null,
+          null,
+          false,
+          0,
+          0,
+          0,
+          Collections.emptyList());
+    }
+
+    VersionFormulario activa = activaOpt.get();
+    boolean esActiva = activa.getId().equals(versionInspeccion.getId());
+    if (esActiva) {
+      return new RelacionVersionActivaResponse(
+          true,
+          versionInspeccion.getCodigo(),
+          activa.getCodigo(),
+          activa.getId(),
+          false,
+          0,
+          0,
+          0,
+          Collections.emptyList());
+    }
+
+    List<MapeoCampoFormulario> mapeos =
+        mapeoCampoFormularioRepository != null
+            ? mapeoCampoFormularioRepository.findAllByVersionOrigenIdAndVersionDestinoId(
+                versionInspeccion.getId(), activa.getId())
+            : Collections.emptyList();
+
+    List<MapeoCampoResponse> mapeosDto =
+        mapeos.stream()
+            .map(
+                m ->
+                    new MapeoCampoResponse(
+                        m.getId(),
+                        m.getVersionOrigen().getId(),
+                        m.getVersionDestino().getId(),
+                        m.getElementoRefOrigen(),
+                        m.getElementoRefDestino(),
+                        m.getTipo(),
+                        m.getObservacion()))
+            .toList();
+
+    int equivalentes =
+        (int) mapeosDto.stream().filter(m -> m.tipo() == TipoMapeoCampo.EQUIVALENTE).count();
+    int nuevos = (int) mapeosDto.stream().filter(m -> m.tipo() == TipoMapeoCampo.NUEVO).count();
+    int eliminados =
+        (int) mapeosDto.stream().filter(m -> m.tipo() == TipoMapeoCampo.ELIMINADO).count();
+
+    return new RelacionVersionActivaResponse(
+        false,
+        versionInspeccion.getCodigo(),
+        activa.getCodigo(),
+        activa.getId(),
+        !mapeosDto.isEmpty(),
+        equivalentes,
+        nuevos,
+        eliminados,
+        mapeosDto);
+  }
+
+  @Transactional(readOnly = true)
+  public ExportacionInspeccionResponse exportarInspeccion(UUID id) {
+    Inspeccion inspeccion =
+        inspeccionRepository
+            .findPublicadaConDetallesById(id)
+            .orElseThrow(
+                () ->
+                    new ApiException(
+                        HttpStatus.NOT_FOUND,
+                        "inspeccion_no_encontrada",
+                        "Inspección no encontrada",
+                        "No existe la inspección publicada solicitada."));
+
+    var resultado =
+        resultadoIcRepository != null
+            ? resultadoIcRepository.findPublicacionByInspeccionId(id).orElse(null)
+            : null;
+    ResultadoIcPublicadoResponse icDto =
+        resultado == null || inspeccionMapper == null
+            ? null
+            : inspeccionMapper.toResultadoPublicado(resultado);
+
+    DatosPermanentesResponse permanentes =
+        inspeccion.getDatoTecnico() == null
+            ? null
+            : aDatosPermanentesResponse(inspeccion.getDatoTecnico());
+
+    RelacionVersionActivaResponse relacion =
+        determinarRelacionVersionActiva(inspeccion.getVersionFormulario());
+
+    Puente puente = inspeccion.getPuente();
+    ExportacionInspeccionResponse.PuenteResumenExportacion puenteDto =
+        new ExportacionInspeccionResponse.PuenteResumenExportacion(
+            puente.getId(),
+            puente.getCodigo(),
+            puente.getNombre(),
+            puente.getMunicipio() != null && puente.getMunicipio().getDepartamento() != null
+                ? puente.getMunicipio().getDepartamento().getNombre()
+                : null,
+            puente.getMunicipio() != null ? puente.getMunicipio().getNombre() : null);
+
+    VersionFormulario vf = inspeccion.getVersionFormulario();
+    ExportacionInspeccionResponse.VersionFormularioExportacion versionDto =
+        new ExportacionInspeccionResponse.VersionFormularioExportacion(
+            vf.getId(), vf.getCodigo(), vf.getEsquema());
+
+    List<ExportacionInspeccionResponse.FotografiaExportacionResponse> fotosDto =
+        archivoInspeccionRepository != null
+            ? archivoInspeccionRepository
+                .findByInspeccionIdAndTipoUsoOrderByCreadoEnAsc(
+                    inspeccion.getId(), TipoUsoArchivo.FOTO_INSPECCION)
+                .stream()
+                .map(
+                    ai ->
+                        new ExportacionInspeccionResponse.FotografiaExportacionResponse(
+                            ai.getArchivo().getId(),
+                            ai.getArchivo().getCategoriaFoto() != null
+                                ? ai.getArchivo().getCategoriaFoto().name()
+                                : null,
+                            ai.getElementoRef(),
+                            ai.getArchivo().getCapturadoEn()))
+                .toList()
+            : Collections.emptyList();
+
+    List<ExportacionInspeccionResponse.PropuestaMantenimientoExportacionResponse> propuestasDto =
+        ordenMantenimientoRepository != null
+            ? ordenMantenimientoRepository
+                .findByInspeccionOrigenIdOrderByCreadoEnAscIdAsc(inspeccion.getId())
+                .stream()
+                .map(
+                    o ->
+                        new ExportacionInspeccionResponse.PropuestaMantenimientoExportacionResponse(
+                            o.getId(),
+                            o.getTipo().name(),
+                            o.getEstado().name(),
+                            o.getDescripcion(),
+                            o.getPrioridadSugerida() != null
+                                ? o.getPrioridadSugerida().name()
+                                : null))
+                .toList()
+            : Collections.emptyList();
+
+    UUID correccionId = inspeccionRepository.findCorreccionPublicadaId(id).orElse(null);
+    String vigencia = correccionId == null ? "VIGENTE" : "SUPERADA";
+
+    return new ExportacionInspeccionResponse(
+        inspeccion.getId(),
+        inspeccion.getFechaInspeccion(),
+        puenteDto,
+        versionDto,
+        relacion,
+        inspeccion.getEstado(),
+        vigencia,
+        inspeccion.getIdentificacionCapturada(),
+        inspeccion.getDatos(),
+        permanentes,
+        icDto,
+        fotosDto,
+        propuestasDto,
+        clock.instant());
   }
 
   @Transactional(readOnly = true)

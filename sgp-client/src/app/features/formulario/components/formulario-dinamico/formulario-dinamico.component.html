@@ -11,132 +11,136 @@
   }
 
   <div class="formulario-dinamico">
-    <nav class="secciones" [attr.aria-label]="'formulario.dinamico.sections' | transloco">
-      <p class="avance-total" aria-live="polite">
-        {{
-          'formulario.dinamico.progress'
-            | transloco
-              : { completos: avanceTotal().completos, obligatorios: avanceTotal().obligatorios }
-        }}
-      </p>
-      <ol>
-        @for (seccion of entradas(); track seccion.ruta; let i = $index) {
-          <li>
-            <button
-              type="button"
-              class="seccion"
-              [class.activa]="i === indiceActivo()"
-              [class.errores]="
-                seccion.tipo === 'esquema' &&
-                (seccion.estado === 'errores' || seccion.estado === 'faltantes')
-              "
-              [class.completa]="seccion.tipo === 'esquema' && seccion.estado === 'completa'"
-              [attr.aria-current]="i === indiceActivo() ? 'step' : null"
-              (click)="irA(i)"
-            >
-              <span class="seccion-icono" aria-hidden="true">
-                @if (seccion.tipo === 'apoyo') {
-                  <i class="pi pi-paperclip"></i>
-                } @else {
-                  @switch (seccion.estado) {
-                    @case ('completa') {
-                      <i class="pi pi-check-circle"></i>
-                    }
-                    @case ('errores') {
-                      <i class="pi pi-exclamation-circle"></i>
-                    }
-                    @case ('faltantes') {
-                      <i class="pi pi-exclamation-circle"></i>
-                    }
-                    @default {
-                      <i class="pi pi-circle"></i>
-                    }
-                  }
-                }
-              </span>
-              <span class="seccion-texto">
-                <span class="seccion-titulo">{{ seccion.titulo }}</span>
-                <span class="seccion-estado">
+    @if (!modoImpresion()) {
+      <nav class="secciones" [attr.aria-label]="'formulario.dinamico.sections' | transloco">
+        <p class="avance-total" aria-live="polite">
+          {{
+            'formulario.dinamico.progress'
+              | transloco
+                : { completos: avanceTotal().completos, obligatorios: avanceTotal().obligatorios }
+          }}
+        </p>
+        <ol>
+          @for (seccion of entradas(); track seccion.ruta; let i = $index) {
+            <li>
+              <button
+                type="button"
+                class="seccion"
+                [class.activa]="i === indiceActivo()"
+                [class.errores]="
+                  seccion.tipo === 'esquema' &&
+                  (seccion.estado === 'errores' || seccion.estado === 'faltantes')
+                "
+                [class.completa]="seccion.tipo === 'esquema' && seccion.estado === 'completa'"
+                [attr.aria-current]="i === indiceActivo() ? 'step' : null"
+                (click)="irA(i)"
+              >
+                <span class="seccion-icono" aria-hidden="true">
                   @if (seccion.tipo === 'apoyo') {
-                    {{ 'formulario.dinamico.supportSection' | transloco }}
+                    <i class="pi pi-paperclip"></i>
                   } @else {
                     @switch (seccion.estado) {
                       @case ('completa') {
-                        {{ 'formulario.dinamico.sectionComplete' | transloco }}
+                        <i class="pi pi-check-circle"></i>
                       }
                       @case ('errores') {
-                        {{ 'formulario.dinamico.sectionErrors' | transloco }}
+                        <i class="pi pi-exclamation-circle"></i>
                       }
                       @case ('faltantes') {
-                        {{ 'formulario.dinamico.sectionMissing' | transloco }}
+                        <i class="pi pi-exclamation-circle"></i>
                       }
                       @default {
-                        {{ 'formulario.dinamico.sectionPending' | transloco }}
+                        <i class="pi pi-circle"></i>
                       }
-                    }
-                    @if (seccion.avance.obligatorios > 0) {
-                      ·
-                      {{
-                        'formulario.dinamico.progress'
-                          | transloco
-                            : {
-                                completos: seccion.avance.completos,
-                                obligatorios: seccion.avance.obligatorios,
-                              }
-                      }}
                     }
                   }
                 </span>
-                @if (seccion.tipo === 'esquema' && seccion.elementos.total > 0) {
-                  <span class="seccion-elementos">
-                    {{
-                      'formulario.dinamico.elemento.revisados'
-                        | transloco
-                          : {
-                              revisados: seccion.elementos.revisados,
-                              total: seccion.elementos.total,
-                            }
-                    }}
+                <span class="seccion-texto">
+                  <span class="seccion-titulo">{{ seccion.titulo }}</span>
+                  <span class="seccion-estado">
+                    @if (seccion.tipo === 'apoyo') {
+                      {{ 'formulario.dinamico.supportSection' | transloco }}
+                    } @else {
+                      @switch (seccion.estado) {
+                        @case ('completa') {
+                          {{ 'formulario.dinamico.sectionComplete' | transloco }}
+                        }
+                        @case ('errores') {
+                          {{ 'formulario.dinamico.sectionErrors' | transloco }}
+                        }
+                        @case ('faltantes') {
+                          {{ 'formulario.dinamico.sectionMissing' | transloco }}
+                        }
+                        @default {
+                          {{ 'formulario.dinamico.sectionPending' | transloco }}
+                        }
+                      }
+                      @if (seccion.avance.obligatorios > 0) {
+                        ·
+                        {{
+                          'formulario.dinamico.progress'
+                            | transloco
+                              : {
+                                  completos: seccion.avance.completos,
+                                  obligatorios: seccion.avance.obligatorios,
+                                }
+                        }}
+                      }
+                    }
                   </span>
-                }
-                @if (seccion.tipo === 'esquema' && seccion.avance.obligatorios > 0) {
-                  <progress
-                    class="barra"
-                    [max]="seccion.avance.obligatorios"
-                    [value]="seccion.avance.completos"
-                    [attr.aria-label]="'formulario.dinamico.sectionProgressLabel' | transloco"
-                  ></progress>
-                }
-              </span>
-            </button>
-          </li>
-        }
-      </ol>
-    </nav>
-
-    <div class="contenido">
-      @if (seccionActiva(); as activa) {
-        <header class="cabecera">
-          <p class="posicion">
-            {{
-              'formulario.dinamico.sectionOf'
-                | transloco: { actual: indiceActivo() + 1, total: entradas().length }
-            }}
-          </p>
-          <div class="titulo-seccion">
-            <h2 #encabezado tabindex="-1">{{ activa.titulo }}</h2>
-            @if (activa.tipo === 'esquema') {
-              <app-anclaje-comentarios
-                [nodo]="activa.nodo"
-                [control]="c.form.controls[activa.nodo.clave]"
-                [enTitulo]="true"
-              />
-            }
-          </div>
-          @if (activa.descripcion) {
-            <p class="descripcion">{{ activa.descripcion }}</p>
+                  @if (seccion.tipo === 'esquema' && seccion.elementos.total > 0) {
+                    <span class="seccion-elementos">
+                      {{
+                        'formulario.dinamico.elemento.revisados'
+                          | transloco
+                            : {
+                                revisados: seccion.elementos.revisados,
+                                total: seccion.elementos.total,
+                              }
+                      }}
+                    </span>
+                  }
+                  @if (seccion.tipo === 'esquema' && seccion.avance.obligatorios > 0) {
+                    <progress
+                      class="barra"
+                      [max]="seccion.avance.obligatorios"
+                      [value]="seccion.avance.completos"
+                      [attr.aria-label]="'formulario.dinamico.sectionProgressLabel' | transloco"
+                    ></progress>
+                  }
+                </span>
+              </button>
+            </li>
           }
-        </header>
+        </ol>
+      </nav>
+    }
+
+    <div class="contenido" [class.modo-impresion]="modoImpresion()">
+      @if (seccionActiva(); as activa) {
+        @if (!modoImpresion()) {
+          <header class="cabecera">
+            <p class="posicion">
+              {{
+                'formulario.dinamico.sectionOf'
+                  | transloco: { actual: indiceActivo() + 1, total: entradas().length }
+              }}
+            </p>
+            <div class="titulo-seccion">
+              <h2 #encabezado tabindex="-1">{{ activa.titulo }}</h2>
+              @if (activa.tipo === 'esquema') {
+                <app-anclaje-comentarios
+                  [nodo]="activa.nodo"
+                  [control]="c.form.controls[activa.nodo.clave]"
+                  [enTitulo]="true"
+                />
+              }
+            </div>
+            @if (activa.descripcion) {
+              <p class="descripcion">{{ activa.descripcion }}</p>
+            }
+          </header>
+        }
 
         @if (!soloLectura() && activa.tipo === 'esquema') {
           <p class="leyenda">
@@ -146,6 +150,14 @@
         }
 
         @for (entrada of seccionesAMostrar(); track entrada.ruta) {
+          @if (modoImpresion()) {
+            <header class="cabecera seccion-impresion-cabecera">
+              <h2>{{ entrada.titulo }}</h2>
+              @if (entrada.descripcion) {
+                <p class="descripcion">{{ entrada.descripcion }}</p>
+              }
+            </header>
+          }
           @if (entrada.tipo === 'esquema') {
             <app-nodo-formulario
               [nodo]="entrada.nodo"
@@ -161,25 +173,27 @@
           }
         }
 
-        <footer class="navegacion">
-          <button
-            pButton
-            type="button"
-            severity="secondary"
-            [outlined]="true"
-            [disabled]="indiceActivo() === 0"
-            (click)="irA(indiceActivo() - 1)"
-          >
-            <i class="pi pi-arrow-left" aria-hidden="true"></i>
-            {{ 'formulario.dinamico.previous' | transloco }}
-          </button>
-          @if (indiceActivo() < entradas().length - 1) {
-            <button pButton type="button" (click)="irA(indiceActivo() + 1)">
-              {{ 'formulario.dinamico.next' | transloco }}
-              <i class="pi pi-arrow-right" aria-hidden="true"></i>
+        @if (!modoImpresion()) {
+          <footer class="navegacion">
+            <button
+              pButton
+              type="button"
+              severity="secondary"
+              [outlined]="true"
+              [disabled]="indiceActivo() === 0"
+              (click)="irA(indiceActivo() - 1)"
+            >
+              <i class="pi pi-arrow-left" aria-hidden="true"></i>
+              {{ 'formulario.dinamico.previous' | transloco }}
             </button>
-          }
-        </footer>
+            @if (indiceActivo() < entradas().length - 1) {
+              <button pButton type="button" (click)="irA(indiceActivo() + 1)">
+                {{ 'formulario.dinamico.next' | transloco }}
+                <i class="pi pi-arrow-right" aria-hidden="true"></i>
+              </button>
+            }
+          </footer>
+        }
       }
     </div>
   </div>

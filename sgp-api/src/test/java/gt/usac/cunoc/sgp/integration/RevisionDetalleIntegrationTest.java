@@ -1,6 +1,7 @@
 package gt.usac.cunoc.sgp.integration;
 
 import static org.assertj.core.api.Assertions.*;
+import static org.mockito.Mockito.*;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -11,6 +12,7 @@ import gt.usac.cunoc.sgp.formulario.validation.JsonSchemaValidatorService;
 import gt.usac.cunoc.sgp.inspeccion.service.*;
 import gt.usac.cunoc.sgp.revision.repository.RevisionRepository;
 import gt.usac.cunoc.sgp.revision.service.RevisionDetalleService;
+import gt.usac.cunoc.sgp.revision.service.RevisionIndicePreliminarService;
 import gt.usac.cunoc.sgp.usuario.model.RoleName;
 import java.math.BigDecimal;
 import java.time.*;
@@ -22,6 +24,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.boot.test.mock.mockito.SpyBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpStatus;
@@ -32,6 +35,8 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.*;
 import org.testcontainers.utility.DockerImageName;
@@ -40,6 +45,7 @@ import org.testcontainers.utility.DockerImageName;
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @Import({
   RevisionDetalleService.class,
+  RevisionIndicePreliminarService.class,
   PreparadorEntradaIcService.class,
   CalculoIndiceCondicionService.class,
   ResolverElementosIc.class,
@@ -52,6 +58,7 @@ import org.testcontainers.utility.DockerImageName;
   RevisionDetalleIntegrationTest.Config.class
 })
 @Testcontainers
+@Transactional(propagation = Propagation.NOT_SUPPORTED)
 class RevisionDetalleIntegrationTest {
   @Container
   static final PostgreSQLContainer<?> postgres =
@@ -69,6 +76,7 @@ class RevisionDetalleIntegrationTest {
   }
 
   @Autowired RevisionDetalleService servicio;
+  @SpyBean CalculoIndiceCondicionService calculador;
   @Autowired RevisionRepository revisiones;
   @Autowired JdbcTemplate jdbc;
   @Autowired ObjectMapper json;
@@ -80,6 +88,7 @@ class RevisionDetalleIntegrationTest {
 
   @BeforeEach
   void preparar() throws Exception {
+    jdbc.execute("TRUNCATE version_formulario CASCADE");
     revisor = usuario("CATEDRATICO");
     autor = usuario("ESTUDIANTE");
     puente = UUID.randomUUID();
@@ -95,11 +104,11 @@ class RevisionDetalleIntegrationTest {
     }
     String catalogo =
         """
-        {"formulario":"sieca-v1","elementos":[{"elemento_ref":"/subestructura/estribo_entrada/cortina_superior","repetible":false,"portante":false,"indicadores":["grietas_una_direccion"]}],
-         "reglas_evaluacion_ic":{"version_algoritmo":"hu037-prueba","escala_severidad":{"NO_PRESENTA":0,"LEVE":1,"MODERADO":2,"SEVERO":4},
-         "agregacion":{"indicadores_de_un_elemento":"MAXIMO","instancias_repetibles":"MAXIMO","elementos_ausentes_no_portantes":4,"elementos_ausentes_portantes":4},
-         "rangos_estado":{"BUENO":75,"REGULAR":50,"MALO":0},"conversion_indicadores":{"booleanos":{},"enumerados":{},"numericos":{}},"reglas_anulacion":[]}}
-        """;
+            {"formulario":"sieca-v1","elementos":[{"elemento_ref":"/subestructura/estribo_entrada/cortina_superior","repetible":false,"portante":false,"indicadores":["grietas_una_direccion"]}],
+             "reglas_evaluacion_ic":{"version_algoritmo":"hu037-prueba","escala_severidad":{"NO_PRESENTA":0,"LEVE":1,"MODERADO":2,"SEVERO":4},
+             "agregacion":{"indicadores_de_un_elemento":"MAXIMO","instancias_repetibles":"MAXIMO","elementos_ausentes_no_portantes":4,"elementos_ausentes_portantes":4},
+             "rangos_estado":{"BUENO":75,"REGULAR":50,"MALO":0},"conversion_indicadores":{"booleanos":{},"enumerados":{},"numericos":{}},"reglas_anulacion":[]}}
+            """;
     jdbc.update(
         "INSERT INTO version_formulario(id,codigo,estado,activa,esquema,reglas_evaluacion_ic,hash_contenido,version_algoritmo_ic,creado_por_id,publicado_por_id,publicado_en) VALUES (?,?,'PUBLICADA',false,?::jsonb,?::jsonb,?,'hu037-prueba',?,?,CURRENT_TIMESTAMP)",
         version,
@@ -274,6 +283,77 @@ class RevisionDetalleIntegrationTest {
     assertThatThrownBy(() -> servicio.obtener(ciclo, revisor))
         .isInstanceOfSatisfying(
             ApiException.class, e -> assertThat(e.getStatus()).isEqualTo(HttpStatus.CONFLICT));
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"pesos", "catalogo"})
+  void configuracionIncompletaNoImpideAbrirElDetalleNiMarcaRollback(String falta) {
+    var antes = servicio.obtener(ciclo, revisor);
+    if ("pesos".equals(falta)) {
+      jdbc.update("DELETE FROM configuracion_ic_elemento WHERE version_formulario_id=?", version);
+    } else {
+      jdbc.update(
+          "UPDATE version_formulario SET reglas_evaluacion_ic='{}'::jsonb WHERE id=?", version);
+    }
+    var respuesta = servicio.obtener(ciclo, revisor);
+    assertThat(respuesta.icPreliminar()).isNull();
+    assertThat(respuesta.datos()).isEqualTo(snapshot.path("datos"));
+    assertThat(respuesta.esquemaFormulario()).isEqualTo(esquema);
+    assertThat(respuesta)
+        .usingRecursiveComparison()
+        .ignoringFields("icPreliminar")
+        .isEqualTo(antes);
+    assertThat(jdbc.queryForObject("SELECT estado FROM revision WHERE id=?", String.class, ciclo))
+        .isEqualTo("EN_CURSO");
+  }
+
+  @Test
+  void datosInsuficientesConservanElRestoDelDetalle() {
+    var antes = servicio.obtener(ciclo, revisor);
+    ((ObjectNode) snapshot.path("datos")).remove("subestructura");
+    jdbc.update(
+        "UPDATE revision SET contenido_enviado=?::jsonb WHERE id=?", snapshot.toString(), ciclo);
+    var respuesta = servicio.obtener(ciclo, revisor);
+    assertThat(respuesta.icPreliminar()).isNull();
+    assertThat(respuesta.datos()).isEqualTo(snapshot.path("datos"));
+    assertThat(respuesta)
+        .usingRecursiveComparison()
+        .ignoringFields("icPreliminar", "datos")
+        .isEqualTo(antes);
+    assertThat(json.valueToTree(respuesta).toString())
+        .doesNotContain("configuracion_ic_incompleta", "Falta evaluar", "UNPROCESSABLE_ENTITY");
+  }
+
+  @Test
+  void falloInesperadoNoExponeMensajeNiDatosEnElRegistro() {
+    var appender =
+        new ch.qos.logback.core.read.ListAppender<ch.qos.logback.classic.spi.ILoggingEvent>();
+    var logger =
+        (ch.qos.logback.classic.Logger)
+            org.slf4j.LoggerFactory.getLogger(RevisionDetalleService.class);
+    appender.start();
+    logger.addAppender(appender);
+    try {
+      doThrow(new IllegalStateException("dato-confidencial-de-inspeccion"))
+          .when(calculador)
+          .calcular(any());
+      var respuesta = servicio.obtener(ciclo, revisor);
+      assertThat(respuesta.icPreliminar()).isNull();
+      assertThat(respuesta.datos()).isEqualTo(snapshot.path("datos"));
+      assertThat(appender.list)
+          .anySatisfy(
+              evento -> {
+                assertThat(evento.getFormattedMessage())
+                    .contains("IllegalStateException", "fallo_inesperado_calculo_ic");
+                assertThat(evento.getFormattedMessage())
+                    .doesNotContain("dato-confidencial", snapshot.toString());
+                assertThat(evento.getThrowableProxy()).isNull();
+              });
+      assertThat(json.valueToTree(respuesta).toString()).doesNotContain("dato-confidencial");
+    } finally {
+      logger.detachAppender(appender);
+      appender.stop();
+    }
   }
 
   @TestConfiguration

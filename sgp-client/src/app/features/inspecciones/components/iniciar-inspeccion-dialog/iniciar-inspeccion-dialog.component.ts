@@ -385,7 +385,8 @@ export class IniciarInspeccionDialogComponent implements OnChanges {
       const rolAutor = user?.role || 'PROFESIONAL_EXTERNO';
       const nombreAutor = (request.nombreAutor || user?.email || 'Inspector').trim();
       const esquemaActivo = await this.inspeccionesLocales.obtenerEsquemaActivoLocal();
-      const versionFormularioId = esquemaActivo?.id || 'version-preparada-local';
+      const versionFormularioId = esquemaActivo?.origenId ?? esquemaActivo?.id;
+      if (!versionFormularioId) throw new Error('offline.hu061.prepareFirst');
 
       // Validación GPS > 500m
       let advertenciaGps = false;

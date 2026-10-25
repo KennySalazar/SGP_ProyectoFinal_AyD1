@@ -19,9 +19,7 @@
   }
   @if (inventarioCargado()) {
     <p role="status">
-      {{
-        'inspecciones.fotos.contador' | transloco: { cantidad: confirmadas().length, maximo: 60 }
-      }}
+      {{ 'inspecciones.fotos.contador' | transloco: { cantidad: inventario().length, maximo: 60 } }}
     </p>
     <ul>
       @for (conteo of conteos(); track conteo.categoria) {
@@ -151,7 +149,7 @@
         @for (foto of confirmadasPorCategoria(categoria); track foto.id) {
           <figure>
             @if (foto.miniatura) {
-              <img [src]="foto.miniatura" [alt]="etiqueta(foto.categoria)" />
+              <img [src]="foto.miniatura" [alt]="etiqueta(foto.categoria)" loading="lazy" />
             }
             <figcaption>
               {{ etiqueta(foto.categoria) }} · {{ 'inspecciones.fotos.confirmada' | transloco }}

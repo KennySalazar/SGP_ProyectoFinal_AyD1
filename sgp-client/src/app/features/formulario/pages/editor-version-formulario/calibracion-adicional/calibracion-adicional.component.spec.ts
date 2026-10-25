@@ -1,14 +1,24 @@
+import { FormularioApiService } from '../../../services/formulario-api.service';
 import { TestBed } from '@angular/core/testing';
-import { TranslocoService } from '@jsverse/transloco';
+import { Pipe, PipeTransform } from '@angular/core';
+import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { of, throwError } from 'rxjs';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { CalibracionAdicionalComponent } from './calibracion-adicional.component';
 import { CalibracionAdicionalApiService } from '../../../services/calibracion-adicional-api.service';
 import { VersionFormulario } from '../../../models/formulario.models';
 
+@Pipe({ name: 'transloco', standalone: true })
+class TraduccionPruebaPipe implements PipeTransform {
+  transform(clave: string): string {
+    return clave;
+  }
+}
+
 describe('CalibracionAdicionalComponent', () => {
   const version = {
     id: 'v4',
+    version: 0,
     estado: 'BORRADOR',
     reglasEvaluacionIc: {
       reglas_evaluacion_ic: {
@@ -19,13 +29,21 @@ describe('CalibracionAdicionalComponent', () => {
             pendiente: 'Confirmar alcance',
             estado_resultante: 'MALO',
             elementos: ['/estribo'],
-            condicion: { indicador: 'nivel', algun_valor_en: ['CON_EXPOSICION'] },
+            condicion: {
+              indicador: 'nivel',
+              algun_valor_en: ['CON_EXPOSICION'],
+            },
           },
         ],
       },
     },
   } as unknown as VersionFormulario;
-  const sinActa = { versionFormularioId: 'v4', estado: 'SIN_ACTA', mensaje: '', acta: null };
+  const sinActa = {
+    versionFormularioId: 'v4',
+    estado: 'SIN_ACTA',
+    mensaje: '',
+    acta: null,
+  };
   const api = {
     consultarActa: vi.fn(),
     guardarReglas: vi.fn(),
@@ -42,12 +60,22 @@ describe('CalibracionAdicionalComponent', () => {
     TestBed.configureTestingModule({
       imports: [CalibracionAdicionalComponent],
       providers: [
+        {
+          provide: FormularioApiService,
+          useValue: {
+            obtenerPorId: vi.fn().mockReturnValue(of({ ...version, version: 1 })),
+          },
+        },
         { provide: CalibracionAdicionalApiService, useValue: api },
-        { provide: TranslocoService, useValue: { translate: (clave: string) => clave } },
+        {
+          provide: TranslocoService,
+          useValue: { translate: (clave: string) => clave },
+        },
       ],
     });
     TestBed.overrideComponent(CalibracionAdicionalComponent, {
-      set: { template: '', imports: [] },
+      remove: { imports: [TranslocoPipe] },
+      add: { imports: [TraduccionPruebaPipe] },
     });
     await TestBed.compileComponents();
     fixture = TestBed.createComponent(CalibracionAdicionalComponent);
@@ -86,7 +114,10 @@ describe('CalibracionAdicionalComponent', () => {
     expect(componente.cambio()).toBe(true);
   });
   it('no guarda reglas de una version publicada', () => {
-    fixture.componentRef.setInput('version', { ...version, estado: 'PUBLICADA' });
+    fixture.componentRef.setInput('version', {
+      ...version,
+      estado: 'PUBLICADA',
+    });
     fixture.detectChanges();
     componente.confirmar(0, { target: { checked: true } } as unknown as Event);
     componente.guardar();
@@ -121,5 +152,63 @@ describe('CalibracionAdicionalComponent', () => {
     expect(componente.puedeGuardar()).toBe(true);
     componente.guardar();
     expect(api.guardarReglas).toHaveBeenCalledTimes(1);
+  });
+
+  it('comunica la version nueva tras adjuntar y usa If-Match de la version mostrada', () => {
+    const emit = vi.spyOn(componente.guardada, 'emit');
+    componente.archivo.set(new File(['%PDF'], 'acta.pdf', { type: 'application/pdf' }));
+    componente.adjuntar();
+    expect(api.adjuntarActa).toHaveBeenCalledWith('v4', expect.any(File), 0);
+    expect(emit).toHaveBeenCalledWith(expect.objectContaining({ version: 1 }));
+  });
+  it('no adjunta un acta a una version publicada ni invocando la accion directamente', () => {
+    fixture.componentRef.setInput('version', {
+      ...version,
+      estado: 'PUBLICADA',
+    });
+    fixture.detectChanges();
+    componente.archivo.set(new File(['%PDF'], 'acta.pdf'));
+    componente.adjuntar();
+    expect(api.adjuntarActa).not.toHaveBeenCalled();
+  });
+  function mostrarResponsable(nombre?: string | null, email?: string | null) {
+    componente.acta.set({
+      ...sinActa,
+      estado: 'CON_ACTA',
+      acta: {
+        archivoId: 'archivo-1',
+        nombreOriginal: 'acta.pdf',
+        mimeReal: 'application/pdf',
+        tamanoBytes: 10,
+        checksumSha256: 'checksum',
+        subidoPorId: 'autor-del-acta',
+        subidoPorNombre: nombre,
+        subidoPorEmail: email,
+        subidoEn: '2026-10-22T17:00:00Z',
+      },
+    });
+    fixture.detectChanges();
+    return fixture.nativeElement as HTMLElement;
+  }
+
+  it('muestra nombre y correo del autor y conserva su UUID plegado', () => {
+    const vista = mostrarResponsable('Kenny Salazar', 'kenny@ejemplo.com');
+    expect(vista.textContent).toContain('Kenny Salazar');
+    expect(vista.textContent).toContain('kenny@ejemplo.com');
+    const detalle = vista.querySelector('code')?.closest('details');
+    expect(detalle?.open).toBe(false);
+    expect(detalle?.textContent).toContain('autor-del-acta');
+  });
+
+  it('muestra el correo cuando el responsable no tiene nombre', () => {
+    const vista = mostrarResponsable(null, 'kenny@ejemplo.com');
+    expect(vista.textContent).toContain('kenny@ejemplo.com');
+    expect(vista.textContent).not.toContain('formulario.adicional.responsableNoDisponible');
+  });
+
+  it('conserva el identificador si faltan los datos del responsable', () => {
+    const vista = mostrarResponsable();
+    expect(vista.textContent).toContain('formulario.adicional.responsableNoDisponible');
+    expect(vista.querySelector('code')?.textContent).toBe('autor-del-acta');
   });
 });

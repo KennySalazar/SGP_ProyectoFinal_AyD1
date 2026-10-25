@@ -14,6 +14,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.util.Objects;
 import java.util.UUID;
+import org.hibernate.annotations.Formula;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 import org.locationtech.jts.geom.Point;
@@ -73,6 +74,13 @@ public class Puente {
 
   @Column(name = "resultado_ic_vigente_id")
   private UUID resultadoIcVigenteId;
+
+  @Formula(
+      """
+          (select r.version_configuracion_id from resultado_ic r
+           where r.id = resultado_ic_vigente_id and r.inspeccion_id = inspeccion_vigente_id)
+          """)
+  private UUID versionFormularioIdIcVigente;
 
   @Column(name = "inspeccion_vigente_publicada_en")
   private Instant inspeccionVigentePublicadaEn;
@@ -219,6 +227,10 @@ public class Puente {
 
   public UUID getResultadoIcVigenteId() {
     return resultadoIcVigenteId;
+  }
+
+  public UUID getVersionFormularioIdIcVigente() {
+    return versionFormularioIdIcVigente;
   }
 
   public Instant getInspeccionVigentePublicadaEn() {

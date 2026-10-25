@@ -1,3 +1,7 @@
+import { RecalculoIcComponent } from '../../components/recalculo-ic/recalculo-ic.component';
+import { AprobacionCalibracionComponent } from '../../../formulario/components/aprobacion-calibracion/aprobacion-calibracion.component';
+import { AprobacionCalibracionApiService } from '../../../formulario/services/aprobacion-calibracion-api.service';
+import { of as estadoRespaldo } from 'rxjs';
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component, input, output, signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
@@ -12,6 +16,7 @@ import { FotografiasLocalesService } from '../../../../offline/services/fotograf
 import { FormularioDinamicoComponent } from '../../../formulario/components/formulario-dinamico/formulario-dinamico.component';
 import { traduccionesDePrueba } from '../../../formulario/motor/testing/traducciones';
 import { FormularioApiService } from '../../../formulario/services/formulario-api.service';
+import { DocumentosInspeccionComponent } from '../../components/documentos-inspeccion/documentos-inspeccion.component';
 import { ReporteFotograficoComponent } from '../../components/reporte-fotografico/reporte-fotografico.component';
 import { InspeccionPublicadaDetalleResponse } from '../../models/inspeccion.models';
 import { InspeccionApiService } from '../../services/inspeccion-api.service';
@@ -74,6 +79,7 @@ const historica: InspeccionPublicadaDetalleResponse = {
 class ForoInspeccionStubComponent {
   readonly inspeccionId = input.required<string>();
   readonly ancla = input<AnclaForo | null>(null);
+  readonly comentarioDestacado = input<string | null>(null);
   readonly etiquetaDeAncla = input<(a: AnclaForo) => string>();
   readonly anclaQuitada = output<void>();
   readonly anclasCambian = output<AnclaConTotal[]>();
@@ -82,6 +88,18 @@ class ForoInspeccionStubComponent {
   enfocarFormulario(): void {
     this.enfocados++;
   }
+}
+
+/** Los documentos PDF tienen su propia prueba; aquí no deben pedir nada al servidor. */
+@Component({ selector: 'app-documentos-inspeccion', standalone: true, template: '' })
+class DocumentosInspeccionStubComponent {
+  readonly inspeccion = input<unknown>();
+  readonly soloLectura = input(false);
+}
+
+@Component({ selector: 'app-recalculo-ic', standalone: true, template: '' })
+class RecalculoIcStubComponent {
+  readonly inspeccionId = input.required<string>();
 }
 
 describe('Detalle publicado de HU-030', () => {
@@ -99,6 +117,8 @@ describe('Detalle publicado de HU-030', () => {
     publicar: vi.fn(),
     adjuntarFotografia: vi.fn(),
     retirarFotografia: vi.fn(),
+    exportar: vi.fn(),
+    obtenerOrdenesMantenimiento: vi.fn(),
   };
   const formularios = { obtenerActiva: vi.fn(), obtenerEsquemaPublicado: vi.fn() };
   const locales = { guardarContexto: vi.fn(), pendientes: vi.fn(), guardar: vi.fn() };
@@ -112,6 +132,8 @@ describe('Detalle publicado de HU-030', () => {
     Object.values(formularios).forEach((fn) => fn.mockReset());
     Object.values(locales).forEach((fn) => fn.mockReset());
     api.obtenerPublicada.mockImplementation(() => of(respuesta));
+    api.exportar.mockReturnValue(of({ id: 'original' }));
+    api.obtenerOrdenesMantenimiento.mockReturnValue(of([]));
     api.listarFotografias.mockReturnValue(
       of([
         {
@@ -130,11 +152,29 @@ describe('Detalle publicado de HU-030', () => {
       },
     );
     vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined);
+    TestBed.overrideComponent(AprobacionCalibracionComponent, {
+      set: { template: '', imports: [] },
+    });
     await TestBed.configureTestingModule({
       imports: [DetallePublicadoPage, traduccionesDePrueba()],
       providers: [
+        {
+          provide: AprobacionCalibracionApiService,
+          useValue: {
+            actualizada: estadoRespaldo(),
+            estado: () =>
+              estadoRespaldo({
+                estado: 'SIN_APROBAR',
+                rotuloCalibracion: 'Calibracion provisional · sin aprobar',
+              }),
+            consultar: () => estadoRespaldo(null),
+          },
+        },
         provideRouter([]),
-        { provide: ActivatedRoute, useValue: { paramMap: parametros } },
+        {
+          provide: ActivatedRoute,
+          useValue: { paramMap: parametros, snapshot: { queryParamMap: convertToParamMap({}) } },
+        },
         { provide: AuthStore, useValue: { user: usuario, authenticated: autenticado } },
         { provide: InspeccionApiService, useValue: api },
         { provide: FormularioApiService, useValue: formularios },
@@ -143,10 +183,26 @@ describe('Detalle publicado de HU-030', () => {
       ],
     })
       .overrideComponent(DetallePublicadoPage, {
-        remove: { imports: [ForoInspeccionComponent] },
-        add: { imports: [ForoInspeccionStubComponent] },
+        remove: {
+          imports: [ForoInspeccionComponent, DocumentosInspeccionComponent, RecalculoIcComponent],
+        },
+        add: {
+          imports: [
+            ForoInspeccionStubComponent,
+            DocumentosInspeccionStubComponent,
+            RecalculoIcStubComponent,
+          ],
+        },
       })
       .compileComponents();
+  });
+
+  it('entrega la inspeccion publicada al comparador sin cambiar el IC original', async () => {
+    await abrir();
+    const comparador = fixture.debugElement.query(By.directive(RecalculoIcStubComponent))
+      .componentInstance as RecalculoIcStubComponent;
+    expect(comparador.inspeccionId()).toBe('original');
+    expect(fixture.componentInstance.detalle()?.ic).toEqual(historica.ic);
   });
 
   async function abrir() {
@@ -294,7 +350,12 @@ describe('Detalle publicado de HU-030', () => {
 
   it('carga la corrección al cambiar el id en la misma ruta', async () => {
     await abrir();
-    respuesta = { ...respuesta, id: 'correccion', superadaPorId: null, vigencia: 'VIGENTE' };
+    respuesta = {
+      ...respuesta,
+      id: 'correccion',
+      superadaPorId: null,
+      vigencia: 'VIGENTE',
+    };
     parametros.next(convertToParamMap({ id: 'correccion' }));
     fixture.detectChanges();
     await fixture.whenStable();
@@ -302,6 +363,77 @@ describe('Detalle publicado de HU-030', () => {
     expect(api.obtenerPublicada).toHaveBeenLastCalledWith('correccion');
     expect(fixture.componentInstance.detalle()?.id).toBe('correccion');
   });
+
+  it('muestra banner de versión histórica y tabla de correspondencia cuando no es la activa', async () => {
+    respuesta.relacionVersionActiva = {
+      esVersionActiva: false,
+      codigoVersionInspeccion: 'SIECA-v1',
+      codigoVersionActiva: 'SIECA-v2',
+      versionActivaId: 'v2',
+      mapeosDeclarados: true,
+      totalEquivalentes: 1,
+      totalNuevos: 1,
+      totalEliminados: 0,
+      mapeos: [
+        {
+          id: 'map-1',
+          elementoRefOrigen: 'subestructura.estribo',
+          elementoRefDestino: 'subestructura.estribo_entrada',
+          tipo: 'EQUIVALENTE',
+          observacion: 'Renombrado menor',
+        },
+      ],
+    };
+    const html = await abrir();
+    const banner = html.querySelector('.version-historica-banner');
+    expect(banner).not.toBeNull();
+    expect(banner?.textContent).toContain('SIECA-v1');
+    expect(banner?.textContent).toContain('SIECA-v2');
+
+    const toggle = html.querySelector<HTMLButtonElement>('.version-banner-accion button');
+    expect(toggle).not.toBeNull();
+    toggle?.click();
+    fixture.detectChanges();
+
+    const tablaMapeo = html.querySelector('.tabla-mapeo-contenedor');
+    expect(tablaMapeo).not.toBeNull();
+    expect(tablaMapeo?.textContent).toContain('subestructura.estribo');
+    expect(tablaMapeo?.textContent).toContain('subestructura.estribo_entrada');
+  });
+
+  it('permite exportar la inspección en JSON invocando el servicio', async () => {
+    const html = await abrir();
+    const botones = Array.from(
+      html.querySelectorAll<HTMLButtonElement>('.acciones-publicada button'),
+    );
+    expect(botones.length).toBeGreaterThanOrEqual(2);
+
+    fixture.componentInstance.exportar();
+    await fixture.whenStable();
+
+    expect(api.exportar).toHaveBeenCalledWith('original');
+  });
+
+  it('muestra propuestas de mantenimiento asociadas si existen', async () => {
+    api.obtenerOrdenesMantenimiento.mockReturnValue(
+      of([
+        {
+          id: 'prop-1',
+          tipo: 'REPARACION',
+          estado: 'PENDIENTE',
+          descripcion: 'Desplazamiento visible',
+          prioridadSugerida: 'ALTA',
+          prioridadConfirmada: 'ALTA',
+          creadoEn: '2026-10-20T10:00:00Z',
+        },
+      ]),
+    );
+
+    const html = await abrir();
+    expect(html.textContent).toContain('REPARACION');
+    expect(html.textContent).toContain('Desplazamiento visible');
+  });
+
   describe('comentarios anclados (HU-064)', () => {
     const SECCION = '/identificacion';
 
@@ -383,10 +515,80 @@ describe('Detalle publicado de HU-030', () => {
       );
     });
 
-    it('no marca los campos sueltos: el botón va en los elementos', async () => {
-      const html = await abrir();
+    describe('comentarios por campo', () => {
+      const CAMPO = '/identificacion/ruta';
+      const interruptor = (html: HTMLElement) =>
+        html.querySelector<HTMLButtonElement>('.herramientas-comentarios button');
 
-      expect(html.querySelector('[data-elemento-ref="/identificacion/ruta"]')).toBeNull();
+      it('un campo suelto también se puede comentar y entrega su ancla', async () => {
+        const html = await abrir();
+
+        const boton = botonDe(html, CAMPO)!;
+        expect(boton).not.toBeNull();
+        // El nombre dice a qué sección pertenece el campo, no solo cómo se llama.
+        expect(boton.getAttribute('aria-label')).toBe('Comentar Identificación versión 1 › Ruta');
+        boton.click();
+        fixture.detectChanges();
+
+        expect(foro().ancla()).toEqual({ elementoRef: CAMPO, instanciaElementoId: null });
+      });
+
+      it('el mismo nombre de campo en dos secciones se distingue por su ruta', async () => {
+        await abrir();
+        const etiqueta = fixture.componentInstance.etiquetaDeAncla();
+
+        expect(etiqueta({ elementoRef: '/identificacion/ruta' })).toBe(
+          'Identificación versión 1 › Ruta',
+        );
+        expect(etiqueta({ elementoRef: '/datos_generales/longitud_m' })).toBe(
+          'Datos generales v1 › Longitud',
+        );
+        expect(etiqueta({ elementoRef: '/identificacion/ruta' })).not.toBe(
+          etiqueta({ elementoRef: '/datos_generales/longitud_m' }),
+        );
+      });
+
+      it('el icono de un campo empieza escondido y se queda fijo si tiene comentarios', async () => {
+        const html = await abrir();
+        const anclaje = () => html.querySelector(`[data-elemento-ref="${CAMPO}"]`) as HTMLElement;
+        expect(anclaje().classList.contains('fijo')).toBe(false);
+
+        foro().anclasCambian.emit([{ elementoRef: CAMPO, instanciaElementoId: null, total: 2 }]);
+        fixture.detectChanges();
+
+        expect(anclaje().classList.contains('fijo')).toBe(true);
+        expect(botonDe(html, CAMPO)?.querySelector('.cantidad')?.textContent?.trim()).toBe('2');
+      });
+
+      it('el interruptor deja a la vista el icono de todos los campos y se puede apagar', async () => {
+        const html = await abrir();
+        const iconos = () =>
+          Array.from(
+            html.querySelectorAll<HTMLElement>('app-formulario-dinamico .anclaje.en-campo'),
+          );
+        expect(interruptor(html)?.getAttribute('aria-pressed')).toBe('false');
+        expect(iconos().length).toBeGreaterThan(0);
+        expect(iconos().some((icono) => icono.classList.contains('fijo'))).toBe(false);
+
+        interruptor(html)!.click();
+        fixture.detectChanges();
+
+        expect(interruptor(html)?.getAttribute('aria-pressed')).toBe('true');
+        expect(iconos().every((icono) => icono.classList.contains('fijo'))).toBe(true);
+
+        interruptor(html)!.click();
+        fixture.detectChanges();
+
+        expect(interruptor(html)?.getAttribute('aria-pressed')).toBe('false');
+        expect(iconos().some((icono) => icono.classList.contains('fijo'))).toBe(false);
+      });
+
+      it('sin sesión no se ofrece el interruptor, porque no hay nada que comentar', async () => {
+        autenticado.set(false);
+        const html = await abrir();
+
+        expect(interruptor(html)).toBeNull();
+      });
     });
 
     describe('ir al elemento desde un comentario', () => {
@@ -397,7 +599,10 @@ describe('Detalle publicado de HU-030', () => {
         const html = await abrir();
         expect(encabezado(html)).toBe('Identificación versión 1');
 
-        foro().irAElemento.emit({ elementoRef: '/datos_generales', instanciaElementoId: null });
+        foro().irAElemento.emit({
+          elementoRef: '/datos_generales',
+          instanciaElementoId: null,
+        });
         fixture.detectChanges();
         await fixture.whenStable();
         fixture.detectChanges();
@@ -406,11 +611,26 @@ describe('Detalle publicado de HU-030', () => {
         expect(document.activeElement).toBe(botonDe(html, '/datos_generales'));
       });
 
-      it('un comentario sobre un campo lleva al elemento que lo contiene', async () => {
+      it('un comentario sobre un campo lleva a ese campo, en su sección', async () => {
         const html = await abrir();
 
         foro().irAElemento.emit({
           elementoRef: '/datos_generales/longitud_m',
+          instanciaElementoId: null,
+        });
+        fixture.detectChanges();
+        await fixture.whenStable();
+        fixture.detectChanges();
+
+        expect(encabezado(html)).toBe('Datos generales v1');
+        expect(document.activeElement).toBe(botonDe(html, '/datos_generales/longitud_m'));
+      });
+
+      it('si el campo ya no está en el formulario lleva al elemento que lo contiene', async () => {
+        const html = await abrir();
+
+        foro().irAElemento.emit({
+          elementoRef: '/datos_generales/campo_que_ya_no_existe',
           instanciaElementoId: null,
         });
         fixture.detectChanges();
@@ -446,7 +666,10 @@ describe('Detalle publicado de HU-030', () => {
       it('no falla si el elemento ya no está en el formulario', async () => {
         const html = await abrir();
 
-        foro().irAElemento.emit({ elementoRef: '/no_existe/elemento', instanciaElementoId: null });
+        foro().irAElemento.emit({
+          elementoRef: '/no_existe/elemento',
+          instanciaElementoId: null,
+        });
         fixture.detectChanges();
         await fixture.whenStable();
 

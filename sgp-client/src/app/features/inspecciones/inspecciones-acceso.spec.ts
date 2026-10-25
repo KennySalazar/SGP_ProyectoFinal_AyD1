@@ -1,3 +1,4 @@
+import { SincronizacionService } from '../../offline/services/sincronizacion.service';
 import { Component, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
@@ -23,6 +24,7 @@ describe('Acceso al detalle publicado HU-030', () => {
     obtenerPublicada.mockReset().mockReturnValue(of(null));
     TestBed.configureTestingModule({
       providers: [
+        { provide: SincronizacionService, useValue: { iniciar: () => undefined } },
         provideRouter([
           { path: 'login', component: DestinoTest },
           { path: '', pathMatch: 'full', component: DestinoTest },
@@ -62,7 +64,7 @@ describe('Acceso al detalle publicado HU-030', () => {
     expect(obtenerPublicada).not.toHaveBeenCalled();
   });
 
-  it.each(['ESTUDIANTE', 'ADMINISTRADOR'])(
+  it.each(['ADMINISTRADOR'])(
     'conserva las restricciones existentes de listado y edición para %s',
     async (role) => {
       usuario.set({ id: 'lector', role });

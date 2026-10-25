@@ -106,6 +106,41 @@ describe('ForoApiService', () => {
     request.flush({ content: [] });
   });
 
+  it('filtra los comentarios por sección', () => {
+    service.listarComentarios('hilo-1', 0, 100, null, { seccion: 'subestructura' }).subscribe();
+
+    const request = http.expectOne((r) => r.url === '/api/v1/hilos/hilo-1/comentarios');
+    expect(request.request.params.get('seccion')).toBe('subestructura');
+    expect(request.request.params.has('soloGenerales')).toBe(false);
+    request.flush({ content: [] });
+  });
+
+  it('pide solo los comentarios generales', () => {
+    service.listarComentarios('hilo-1', 0, 100, null, { soloGenerales: true }).subscribe();
+
+    const request = http.expectOne((r) => r.url === '/api/v1/hilos/hilo-1/comentarios');
+    expect(request.request.params.get('soloGenerales')).toBe('true');
+    expect(request.request.params.has('seccion')).toBe(false);
+    request.flush({ content: [] });
+  });
+
+  it('con un elemento elegido no manda el filtro de sección: el servidor admite uno solo', () => {
+    service
+      .listarComentarios(
+        'hilo-1',
+        0,
+        100,
+        { elementoRef: '/subestructura/pilas', instanciaElementoId: null },
+        { seccion: 'subestructura' },
+      )
+      .subscribe();
+
+    const request = http.expectOne((r) => r.url === '/api/v1/hilos/hilo-1/comentarios');
+    expect(request.request.params.get('elementoRef')).toBe('/subestructura/pilas');
+    expect(request.request.params.has('seccion')).toBe(false);
+    request.flush({ content: [] });
+  });
+
   it('comenta un elemento enviando su ancla', () => {
     const cuerpo = {
       contenido: 'Se ve expuesta',
@@ -134,5 +169,53 @@ describe('ForoApiService', () => {
     const request = http.expectOne('/api/v1/inspecciones/insp-1/hilo');
     expect(request.request.method).toBe('POST');
     request.flush({ hilo: {}, anclas: [] });
+  });
+
+  it('edita un comentario propio con su nuevo texto', () => {
+    service.editarComentario('comentario-1', 'Corregido').subscribe();
+
+    const request = http.expectOne('/api/v1/comentarios/comentario-1');
+    expect(request.request.method).toBe('PUT');
+    expect(request.request.body).toEqual({ contenido: 'Corregido' });
+    request.flush({});
+  });
+
+  it('elimina un comentario propio', () => {
+    service.eliminarComentario('comentario-1').subscribe();
+
+    const request = http.expectOne('/api/v1/comentarios/comentario-1');
+    expect(request.request.method).toBe('DELETE');
+    request.flush({});
+  });
+
+  it('oculta un comentario y cierra un hilo con su motivo', () => {
+    service.ocultarComentario('comentario-1', 'Spam').subscribe();
+    service.cerrarHilo('hilo-1', 'Resuelto').subscribe();
+
+    const ocultar = http.expectOne('/api/v1/comentarios/comentario-1/ocultar');
+    expect(ocultar.request.method).toBe('POST');
+    expect(ocultar.request.body).toEqual({ motivo: 'Spam' });
+    ocultar.flush({});
+    const cerrar = http.expectOne('/api/v1/hilos/hilo-1/cerrar');
+    expect(cerrar.request.method).toBe('POST');
+    expect(cerrar.request.body).toEqual({ motivo: 'Resuelto' });
+    cerrar.flush({});
+  });
+
+  it('lista las inspecciones publicadas sin revisión paginadas', () => {
+    service.listarInspeccionesSinRevision(1, 50).subscribe();
+
+    const request = http.expectOne((r) => r.url === '/api/v1/moderacion/inspecciones-sin-revision');
+    expect(request.request.method).toBe('GET');
+    expect(request.request.params.get('pagina')).toBe('1');
+    expect(request.request.params.get('tamanio')).toBe('50');
+    request.flush({ content: [] });
+  });
+  it('consulta un comentario para llegar a su hilo desde un aviso', () => {
+    service.obtenerComentario('comentario-1').subscribe();
+
+    const request = http.expectOne('/api/v1/comentarios/comentario-1');
+    expect(request.request.method).toBe('GET');
+    request.flush({});
   });
 });

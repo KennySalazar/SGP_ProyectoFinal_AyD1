@@ -36,6 +36,7 @@ public class AdminProvisioningService {
   public void provisionAdmin(String rawEmail, String initialPassword) {
     if (!PasswordPolicy.isValid(initialPassword))
       throw new IllegalStateException("INITIAL_ADMIN_PASSWORD no cumple la politica de contraseña");
+    users.bloquearProvisionInicial();
     String email = EmailNormalizer.normalize(rawEmail);
     Role adminRole =
         roles

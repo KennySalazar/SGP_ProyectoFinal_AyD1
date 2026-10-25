@@ -12,8 +12,21 @@
     <h1 class="page-title">{{ d.puenteNombre }}</h1>
     <p class="page-description">{{ 'inspecciones.consulta.soloLectura' | transloco }}</p>
   </div>
-  <p-tag [value]="'inspecciones.consulta.publicada' | transloco" severity="success" />
+  <div class="cabecera-estados-acciones">
+    <div class="acciones-publicada no-print">
+      <button pButton type="button" severity="secondary" [outlined]="true" (click)="imprimir()">
+        <i class="pi pi-print" aria-hidden="true"></i>
+        <span>{{ 'inspecciones.consulta.imprimir' | transloco }}</span>
+      </button>
+      <button pButton type="button" [disabled]="exportando()" (click)="exportar()">
+        <i class="pi pi-download" aria-hidden="true"></i>
+        <span>{{ 'inspecciones.consulta.exportar' | transloco }}</span>
+      </button>
+    </div>
+    <p-tag [value]="'inspecciones.consulta.publicada' | transloco" severity="success" />
+  </div>
 </header>
+
 @if (d.superadaPorId) {
 <section class="surface-card superada" role="status">
   <p-tag [value]="'inspecciones.consulta.superada' | transloco" severity="warn" />
@@ -21,7 +34,92 @@
     {{ 'inspecciones.consulta.verCorreccion' | transloco }}
   </a>
 </section>
-}
+} @if (d.relacionVersionActiva; as relacion) { @if (!relacion.esVersionActiva) {
+<section class="surface-card version-historica-banner">
+  <div class="version-banner-header">
+    <div class="version-banner-icono">
+      <i class="pi pi-history" aria-hidden="true"></i>
+    </div>
+    <div class="version-banner-info">
+      <h2>{{ 'inspecciones.consulta.versionHistorica' | transloco }}</h2>
+      <p>
+        {{ 'inspecciones.consulta.versionHistoricaAviso' | transloco : { versionInspeccion:
+        d.versionFormularioCodigo, versionActiva: relacion.codigoVersionActiva, } }}
+      </p>
+      @if (relacion.mapeosDeclarados) {
+      <div class="mapeo-resumen-chips">
+        <span class="chip-equivalente">
+          <i class="pi pi-check"></i>
+          {{ relacion.totalEquivalentes }} {{ 'inspecciones.consulta.camposEquivalentes' | transloco
+          }}
+        </span>
+        <span class="chip-nuevo">
+          <i class="pi pi-plus"></i>
+          {{ relacion.totalNuevos }} {{ 'inspecciones.consulta.camposNuevos' | transloco }}
+        </span>
+        <span class="chip-eliminado">
+          <i class="pi pi-minus"></i>
+          {{ relacion.totalEliminados }} {{ 'inspecciones.consulta.camposEliminados' | transloco }}
+        </span>
+      </div>
+      } @else {
+      <p class="nota-sin-mapeo">
+        <i class="pi pi-info-circle"></i>
+        {{ 'inspecciones.consulta.sinMapeoDeclarado' | transloco }}
+      </p>
+      }
+    </div>
+    @if (relacion.mapeosDeclarados) {
+    <div class="version-banner-accion no-print">
+      <button pButton type="button" severity="secondary" [outlined]="true" (click)="toggleMapeo()">
+        <i
+          [class]="mostrarMapeo() ? 'pi pi-chevron-up' : 'pi pi-chevron-down'"
+          aria-hidden="true"
+        ></i>
+        <span
+          >{{ (mostrarMapeo() ? 'inspecciones.consulta.ocultarMapeo' :
+          'inspecciones.consulta.verMapeo' ) | transloco }}</span
+        >
+      </button>
+    </div>
+    }
+  </div>
+
+  @if (mostrarMapeo() && relacion.mapeos.length > 0) {
+  <div class="tabla-mapeo-contenedor">
+    <p-table
+      [value]="relacion.mapeos"
+      styleClass="p-datatable-sm p-datatable-striped"
+      [responsiveLayout]="'scroll'"
+    >
+      <ng-template #header>
+        <tr>
+          <th>{{ 'inspecciones.consulta.campoOrigen' | transloco }}</th>
+          <th>{{ 'inspecciones.consulta.campoDestino' | transloco }}</th>
+          <th>{{ 'inspecciones.consulta.tipoMapeo' | transloco }}</th>
+          <th>{{ 'inspecciones.consulta.observacionMapeo' | transloco }}</th>
+        </tr>
+      </ng-template>
+      <ng-template #body let-m>
+        <tr>
+          <td>
+            <code>{{ m.elementoRefOrigen || '—' }}</code>
+          </td>
+          <td>
+            <code>{{ m.elementoRefDestino || '—' }}</code>
+          </td>
+          <td>
+            <span class="tipo-badge" [attr.data-tipo]="m.tipo">{{ m.tipo }}</span>
+          </td>
+          <td>{{ m.observacion || '—' }}</td>
+        </tr>
+      </ng-template>
+    </p-table>
+  </div>
+  }
+</section>
+} }
+
 <section class="surface-card metadatos">
   <h2>{{ 'inspecciones.consulta.metadatos' | transloco }}</h2>
   <dl>
@@ -36,21 +134,21 @@
     <div>
       <dt>{{ 'inspecciones.consulta.creada' | transloco }}</dt>
       <dd>
-        {{ (d.creadoEn | date:'dd/MM/yyyy HH:mm:ss') || ('inspecciones.consulta.sinDato' |
+        {{ (d.creadoEn | date: 'dd/MM/yyyy HH:mm:ss') || ('inspecciones.consulta.sinDato' |
         transloco) }}
       </dd>
     </div>
     <div>
       <dt>{{ 'inspecciones.consulta.enviada' | transloco }}</dt>
       <dd>
-        {{ (d.enviadoEn | date:'dd/MM/yyyy HH:mm:ss') || ('inspecciones.consulta.sinDato' |
+        {{ (d.enviadoEn | date: 'dd/MM/yyyy HH:mm:ss') || ('inspecciones.consulta.sinDato' |
         transloco) }}
       </dd>
     </div>
     <div>
       <dt>{{ 'inspecciones.consulta.publicacion' | transloco }}</dt>
       <dd>
-        {{ (d.publicadoEn | date:'dd/MM/yyyy HH:mm:ss') || ('inspecciones.consulta.sinDato' |
+        {{ (d.publicadoEn | date: 'dd/MM/yyyy HH:mm:ss') || ('inspecciones.consulta.sinDato' |
         transloco) }}
       </dd>
     </div>
@@ -60,7 +158,7 @@
     </div>
     <div>
       <dt>{{ 'inspecciones.consulta.fechaInspeccion' | transloco }}</dt>
-      <dd>{{ d.fechaInspeccion | date:'dd/MM/yyyy' }}</dd>
+      <dd>{{ d.fechaInspeccion | date: 'dd/MM/yyyy' }}</dd>
     </div>
   </dl>
   <h3>{{ 'inspecciones.consulta.acompanantes' | transloco }}</h3>
@@ -72,14 +170,23 @@
     }
   </ul>
 </section>
+
 <section class="surface-card condicion">
   <h2>{{ 'inspecciones.consulta.icDefinitivo' | transloco }}</h2>
+  <app-aprobacion-calibracion [versionId]="d.versionFormularioId" />
   @if (d.ic; as ic) {
-  <p class="indice">{{ ic.indiceCalculado | number:'1.2-5' }}</p>
-  <p-tag
-    [value]="'inspecciones.consulta.estados.' + ic.estadoConfirmado | transloco"
-    [severity]="severidad(ic.estadoConfirmado)"
-  />
+  <div class="ic-resumen-fila">
+    <p class="indice">{{ ic.indiceCalculado | number: '1.2-5' }}</p>
+    <div class="ic-etiquetas">
+      <p-tag
+        [value]="'inspecciones.consulta.estados.' + ic.estadoConfirmado | transloco"
+        [severity]="severidad(ic.estadoConfirmado)"
+      />
+      <span class="ic-estado-textual" [attr.data-estado]="ic.estadoConfirmado">
+        {{ 'inspecciones.consulta.estadoTextual.' + ic.estadoConfirmado | transloco }}
+      </span>
+    </div>
+  </div>
   <dl>
     <div>
       <dt>{{ 'inspecciones.consulta.calculado' | transloco }}</dt>
@@ -100,23 +207,81 @@
   <p>{{ 'inspecciones.consulta.sinIc' | transloco }}</p>
   }
 </section>
-@if (esquema(); as historico) {
+
+<app-recalculo-ic [inspeccionId]="d.id" />
+
+@if (ordenesMantenimiento().length > 0) {
+<section class="surface-card propuestas-mantenimiento">
+  <h2>{{ 'inspecciones.consulta.propuestasMantenimiento' | transloco }}</h2>
+  <div class="tabla-propuestas-contenedor">
+    <p-table
+      [value]="ordenesMantenimiento()"
+      styleClass="p-datatable-sm p-datatable-striped"
+      [responsiveLayout]="'scroll'"
+    >
+      <ng-template #header>
+        <tr>
+          <th>{{ 'inspecciones.consulta.tipoPropuesta' | transloco }}</th>
+          <th>{{ 'inspecciones.consulta.prioridadSugerida' | transloco }}</th>
+          <th>{{ 'inspecciones.consulta.descripcionPropuesta' | transloco }}</th>
+          <th>{{ 'inspecciones.consulta.estadoPropuesta' | transloco }}</th>
+        </tr>
+      </ng-template>
+      <ng-template #body let-orden>
+        <tr>
+          <td>
+            <span class="badge-tipo-orden">{{ orden.tipo }}</span>
+          </td>
+          <td>
+            <span class="badge-prioridad" [attr.data-prioridad]="orden.prioridadSugerida">
+              {{ orden.prioridadSugerida }}
+            </span>
+          </td>
+          <td>{{ orden.descripcion }}</td>
+          <td>
+            <span class="badge-estado-orden">{{ orden.estado }}</span>
+          </td>
+        </tr>
+      </ng-template>
+    </p-table>
+  </div>
+</section>
+} @if (esquema(); as historico) { @if (puedeComentar()) {
+<div class="herramientas-comentarios">
+  <button
+    pButton
+    type="button"
+    severity="secondary"
+    [outlined]="!camposVisibles()"
+    [attr.aria-pressed]="camposVisibles()"
+    [attr.title]="'foro.ancla.camposAyuda' | transloco"
+    (click)="alternarCampos()"
+  >
+    <i class="pi pi-comment" aria-hidden="true"></i>
+    <span>{{ 'foro.ancla.camposAlternar' | transloco }}</span>
+  </button>
+</div>
+}
 <app-formulario-dinamico
   [esquema]="historico"
   [valoresIniciales]="valores()"
   [soloLectura]="true"
+  [modoImpresion]="imprimiendo()"
 />
 } @else {
 <p class="surface-card mensaje-error" role="alert">
   {{ 'inspecciones.consulta.sinEsquema' | transloco }}
 </p>
 }
+
 <app-reporte-fotografico [inspeccion]="d" [soloLectura]="true" />
+<app-documentos-inspeccion [inspeccion]="d" [soloLectura]="true" />
 <section class="surface-card foro">
   <app-foro-inspeccion
     #foro
     [inspeccionId]="d.id"
     [ancla]="seleccion()"
+    [comentarioDestacado]="comentarioDelAviso"
     [etiquetaDeAncla]="etiquetaDeAncla()"
     (anclaQuitada)="seleccion.set(null)"
     (irAElemento)="irAElemento($event)"

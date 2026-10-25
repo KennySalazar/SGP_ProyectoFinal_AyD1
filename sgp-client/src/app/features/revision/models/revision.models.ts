@@ -75,7 +75,7 @@ export interface RevisionDetalleResponse {
   esquemaFormulario: Record<string, unknown>;
   datos: Record<string, unknown>;
   identificacionCapturada: Record<string, unknown> | null;
-  icPreliminar: IndiceCondicionPreliminarResponse;
+  icPreliminar: IndiceCondicionPreliminarResponse | null;
   fotografiasEndpoint: string;
   fotografiasCongeladas: boolean;
   observacionesEndpoint: string;

@@ -66,7 +66,8 @@
     "pendingReviewsCount": "{{count}} inspecciones por revisar",
     "avisos": "Avisos",
     "maintenanceRules": "Catálogo de mantenimiento",
-    "maintenanceOrders": "Mantenimiento"
+    "maintenanceOrders": "Mantenimiento",
+    "forumModeration": "Moderación del foro"
   },
   "mantenimiento": {
     "kicker": "Mantenimiento",
@@ -373,10 +374,22 @@
       "sobre": "Sobre: {{elemento}}",
       "comentarSobre": "Tu comentario quedará anclado a «{{elemento}}».",
       "sinComentariosElemento": "Este elemento aún no tiene comentarios.",
+      "mostrarMas": "Mostrar más comentarios",
+      "verMas": "Ver más",
+      "verMenos": "Ver menos",
+      "verMiComentario": "Ver mi comentario",
+      "filtrarPor": "Ver comentarios de",
+      "filtroTodos": "Todos ({{total}})",
+      "filtroGenerales": "Generales ({{total}})",
+      "mostrando": "Mostrando {{mostrados}} de {{total}} comentarios",
+      "mostrandoSinTotal": "Mostrando {{mostrados}} comentarios",
       "verEnFormulario": "Ver en el formulario",
-      "irAlElemento": "Ir a {{elemento}} en el formulario"
+      "irAlElemento": "Ir a {{elemento}} en el formulario",
+      "ayudaMenciones": "Para avisar a alguien, menciónalo con @ y su nombre de usuario."
     },
     "ancla": {
+      "camposAlternar": "Comentarios por campo",
+      "camposAyuda": "Muestra el icono de comentarios junto a cada campo. Sin esto aparece al pasar el puntero sobre el campo o si ya tiene comentarios.",
       "comentarElemento": "Comentar {{elemento}}",
       "una": "1 comentario",
       "cantidad": "{{cantidad}} comentarios",
@@ -387,6 +400,61 @@
       "descripcion": "Discusión abierta sobre esta inspección publicada. Elige un elemento del formulario para comentar un dato concreto.",
       "error": "No se pudo abrir el foro de la inspección.",
       "sinHilo": "Esta inspección aún no tiene discusión."
+    },
+    "comentario": {
+      "editar": "Editar",
+      "eliminar": "Eliminar",
+      "ocultar": "Ocultar",
+      "editado": "editado",
+      "eliminado": "Comentario eliminado",
+      "oculto": "Oculto por moderación",
+      "motivo": "Motivo: {{motivo}}",
+      "editarTexto": "Edita tu comentario",
+      "guardar": "Guardar cambios",
+      "guardando": "Guardando..."
+    },
+    "moderacion": {
+      "cerrarHilo": "Cerrar hilo",
+      "motivo": "Motivo",
+      "error": "No fue posible completar la acción.",
+      "eliminar": {
+        "titulo": "Eliminar comentario",
+        "texto": "El comentario quedará marcado como eliminado y sus respuestas se conservarán. Esta acción no se puede deshacer.",
+        "confirmar": "Eliminar comentario",
+        "procesando": "Eliminando..."
+      },
+      "ocultar": {
+        "titulo": "Ocultar comentario",
+        "texto": "Los demás usuarios verán «Oculto por moderación» en su lugar; los moderadores conservarán el texto y el motivo. Quedará registrado en la bitácora.",
+        "confirmar": "Ocultar comentario",
+        "procesando": "Ocultando..."
+      },
+      "cerrar": {
+        "titulo": "Cerrar hilo",
+        "texto": "El hilo seguirá visible para lectura, pero ya no admitirá comentarios. El motivo será visible para todos y quedará registrado en la bitácora.",
+        "confirmar": "Cerrar hilo",
+        "procesando": "Cerrando..."
+      },
+      "pagina": {
+        "kicker": "Moderación del foro",
+        "titulo": "Inspecciones publicadas sin revisión",
+        "descripcion": "Inspecciones que un Catedrático o un Profesional externo publicó sin revisión previa, de la más reciente a la más antigua. Abre su foro para moderarlo a posteriori.",
+        "puente": "Puente",
+        "fecha": "Fecha de inspección",
+        "publicada": "Publicada",
+        "autor": "Autor",
+        "foro": "Foro",
+        "sinHilo": "Sin discusión",
+        "abrirForo": "Abrir foro de la inspección de {{puente}}",
+        "verForo": "Ver foro",
+        "vacia": "No hay inspecciones publicadas sin revisión.",
+        "error": "No se pudo cargar la lista."
+      }
+    },
+    "irA": {
+      "abriendo": "Abriendo el foro...",
+      "error": "No se encontró el comentario o el hilo de este aviso. Puede que ya no esté disponible.",
+      "volver": "Volver a los avisos"
     }
   },
   "perfil": {
@@ -408,6 +476,7 @@
     "notaPublico": "Tu nombre de usuario es lo que verán los demás en el foro y lo que se escribe tras la arroba para mencionarte. Tu nombre completo no se muestra públicamente."
   },
   "avisos": {
+    "readError": "No se pudo marcar el aviso como leído. Intenta abrirlo de nuevo.",
     "title": "Avisos",
     "kicker": "Notificaciones",
     "description": "Avisos y novedades dentro de la aplicación que requieren tu atención.",
@@ -589,7 +658,37 @@
     "persistentStorage": "Almacenamiento persistente",
     "localStorage": "ALMACENAMIENTO LOCAL",
     "controls": "Controles de diagnostico",
-    "basePrepared": "Base preparada"
+    "basePrepared": "Base preparada",
+    "hu061": {
+      "noLocal": "No hay una copia de esta inspección preparada para tu cuenta en este dispositivo.",
+      "noSchema": "No está disponible el formulario original de esta inspección. Prepáralo con conexión antes de continuar.",
+      "incomplete": "Completa los campos señalados antes de confirmar la inspección.",
+      "missingPhotos": "Adjunta al menos una fotografía de acceso, superestructura, subestructura y cauce.",
+      "storageError": "No fue posible guardar la operación en el dispositivo. Conserva esta pantalla y vuelve a intentar.",
+      "invalidDate": "La fecha de inspección debe estar entre el año de construcción y la fecha actual.",
+      "queueHint": "La acción quedará pendiente y se ejecutará al sincronizar los datos y las fotografías con una sesión válida.",
+      "pending": "Envío o publicación pendiente de confirmación. El contenido queda protegido hasta recibir la respuesta del servidor.",
+      "rejected": "El servidor no aceptó la acción. Revisa el motivo, corrige la inspección y confirma nuevamente.",
+      "updateReady": "Hay una nueva versión. Guarda tus cambios y cierra la cámara antes de actualizar. Los datos pendientes se conservarán.",
+      "reload": "Actualizar aplicación",
+      "later": "Más tarde",
+      "ENVIAR_INSPECCION": "Enviar inspección",
+      "PUBLICAR_INSPECCION": "Publicar inspección",
+      "CREAR_INSPECCION": "Crear inspección",
+      "GUARDAR_BORRADOR": "Guardar borrador",
+      "FOTO": "Subir fotografía",
+      "resume": "Continuar inspección",
+      "lastAttempt": "Último intento",
+      "processing": "Sincronizando",
+      "locked": "La inspección tiene una acción pendiente o pertenece a otra cuenta.",
+      "forbidden": "La cuenta no puede realizar esta acción.",
+      "notEditable": "Inspección no editable.",
+      "invalidPhotos": "Falta evidencia fotográfica obligatoria o se excede el límite de 60 fotografías.",
+      "resolveErrors": "Resuelva los errores de sincronización antes de confirmar.",
+      "prepareFirst": "Prepare el formulario antes de iniciar sin conexión.",
+      "versionMismatch": "La versión confirmada difiere del formulario capturado. Conserva la copia local y revisa la preparación.",
+      "unknownOperation": "Esta operación no se reconoce. Conserva los datos y solicita revisión."
+    }
   },
   "studentActivation": {
     "kicker": "GESTION ACADÉMICA",
@@ -720,6 +819,7 @@
       "soloLectura": "El contenido enviado es de solo lectura. La escritura de observaciones depende del estado del ciclo.",
       "fotosNoCongeladas": "Las fotografías se consultan mediante acceso protegido. No existe una instantánea fotográfica histórica de este ciclo.",
       "sinGeneral": "Sin observación general.",
+      "icNoDisponible": "IC no disponible",
       "sinAnclaje": "Observación anterior sin anclaje",
       "observarElemento": "Observar {{elemento}}",
       "observarCategoria": "Observar categoría",
@@ -1036,6 +1136,13 @@
       "note": "Al guardar correctamente volveras al catalogo de puentes.",
       "cancel": "Seguir editando",
       "confirm": "Si, guardar cambios"
+    },
+    "respaldo": {
+      "unavailable": "Respaldo de calibracion no disponible.",
+      "refresh": "El IC vigente cambio. Recargue el puente para consultar su respaldo.",
+      "loading": "Consultando respaldo de calibracion...",
+      "error": "No se pudo consultar el respaldo de calibracion.",
+      "retry": "Reintentar"
     }
   },
   "auditoria": {
@@ -1289,6 +1396,30 @@
     "rolCambiado": "Se cambió el rol de {{email}}."
   },
   "formulario": {
+    "hu054": {
+      "titulo": "Respaldo academico de la calibracion",
+      "soloPublicada": "La aprobacion se realiza sobre una version publicada. Los borradores no heredan aprobaciones.",
+      "offline": "Sin conexion: no es posible verificar ni aprobar el respaldo academico.",
+      "cargando": "Consultando respaldo academico...",
+      "responsable": "Aprobada por",
+      "fecha": "Fecha de aprobacion",
+      "observaciones": "Observaciones",
+      "sinObservaciones": "Sin observaciones",
+      "pdfOpcional": "El acta PDF es un adjunto opcional; no es requisito para aprobar.",
+      "exito": "Calibracion aprobada correctamente.",
+      "aprobar": "Aprobar calibracion",
+      "actualizar": "Actualizar respaldo",
+      "confirmar": "Confirmar aprobacion",
+      "confirmacion": "Se registrara tu respaldo academico para esta version publicada. No se modificaran sus valores y la aprobacion no podra sobrescribirse.",
+      "observacionesOpcionales": "Observaciones (opcional)",
+      "limite": "Las observaciones no deben superar 2000 caracteres.",
+      "consultaError": "No fue posible consultar el respaldo academico. Puedes volver a intentarlo.",
+      "duplicada": "Otro Catedratico ya aprobo esta calibracion. Se conserva la aprobacion original y se consulta el respaldo actualizado.",
+      "sinPermiso": "Solo un Catedratico autorizado puede aprobar la calibracion. Actualiza tu sesion.",
+      "sesionVencida": "Tu sesion vencio. Inicia sesion nuevamente para continuar.",
+      "resultadoIncierto": "No fue posible confirmar el resultado del envio. Actualiza el respaldo antes de volver a intentar la aprobacion.",
+      "guardarError": "No fue posible aprobar la calibracion. Se conservaron tus observaciones."
+    },
     "title": "Versiones del formulario SIECA",
     "description": "Gestiona, edita y publica versiones declarativas del esquema de inspección y calibración de pesos del Índice de Condición.",
     "open": "Formulario SIECA",
@@ -1339,7 +1470,7 @@
     "saveWeights": "Guardar pesos",
     "savingWeights": "Guardando...",
     "weightsSaved": "Pesos calibrados correctamente.",
-    "mappingComplete": "Mapeo completo. Todos los campos de la versión anterior tienen correspondencia declarada.",
+    "mappingComplete": "Mapeo completo. Todos los campos de ambas versiones tienen su correspondencia declarada.",
     "mappingIncomplete": "Mapeo incompleto. Debe declarar la correspondencia de los siguientes campos de la versión anterior:",
     "unmappedFields": "Campos pendientes de declarar",
     "addMapping": "Declarar mapeo",
@@ -1590,7 +1721,8 @@
       "configurada": "Configurada",
       "editarCondiciones": "Editar condiciones de la regla",
       "editarAyuda": "Ajuste los valores segun la calibracion aprobada. Las referencias deben corresponder al catalogo de esta version.",
-      "verRegistro": "Ver identificador del responsable"
+      "verRegistro": "Ver identificador del responsable",
+      "responsableNoDisponible": "Datos del responsable no disponibles"
     },
     "calibracion": {
       "completa": "Pesos y escala configurados",
@@ -1674,7 +1806,30 @@
       },
       "pendientes": "Complete y guarde las reglas de calculo del IC antes de publicar esta version."
     },
-    "crearSinBaseNota": "Esta opción carga el esquema canónico SIECA. Si elige una versión base, se copian su esquema, vínculos y reglas; no la use para corregir una versión con esquema inconsistente. Configure y calibre las reglas antes de publicar."
+    "crearSinBaseNota": "Esta opción carga el esquema canónico SIECA. Si elige una versión base, se copian su esquema, vínculos y reglas; no la use para corregir una versión con esquema inconsistente. Configure y calibre las reglas antes de publicar.",
+    "hu050": {
+      "provisional": "Calibracion provisional · sin aprobar",
+      "nota": "Los valores son provisionales. Las notas pendientes de RN-IC-05a y RN-IC-05c se conservan y no impiden publicar esta plantilla.",
+      "dosPasos": "1. Carga la plantilla SIECA con su IC completo. 2. Revisa y publica la version desde el editor.",
+      "activa": "Version publicada y activa del formulario SIECA.",
+      "historica": "Version publicada historica del formulario SIECA.",
+      "sinRegistro": "Calibracion sin aprobacion registrada",
+      "tipos": {
+        "EQUIVALENTE": "Equivalente",
+        "RENOMBRADO": "Renombrado",
+        "NUEVO": "Nuevo",
+        "ELIMINADO": "Eliminado"
+      }
+    },
+    "hu053": {
+      "conflicto": "Otra persona modifico esta version. Tus cambios siguen en pantalla. Recarga la version antes de volver a guardar.",
+      "inmutable": "Esta version ya fue publicada. Crea una version nueva para cambiar la calibracion.",
+      "sinConexion": "No se pudo guardar. Comprueba la conexion y vuelve a intentarlo. Tus cambios siguen en pantalla.",
+      "recargar": "Recargar version",
+      "confirmarRecarga": "Se descartaran los cambios sin guardar de esta pantalla. ¿Deseas recargar la version?",
+      "fechaCalibracion": "Ultima calibracion",
+      "responsable": "Ver responsable de la calibracion"
+    }
   },
   "inspecciones": {
     "historial": {
@@ -1714,6 +1869,37 @@
         "BUENO": "Bueno",
         "REGULAR": "Regular",
         "MALO": "Malo"
+      },
+      "imprimir": "Imprimir inspección",
+      "exportar": "Exportar datos (JSON)",
+      "exportando": "Exportando…",
+      "acciones": "Acciones del registro",
+      "versionHistorica": "Versión histórica",
+      "versionActiva": "Versión activa vigente",
+      "versionHistoricaAviso": "Inspección realizada con la versión {{ versionInspeccion }}. La versión activa actual es {{ versionActiva }}.",
+      "versionActivaAviso": "Esta inspección fue realizada con la versión activa vigente del sistema.",
+      "mapeoCampos": "Relación de campos con la versión activa",
+      "verMapeo": "Ver relación de campos",
+      "ocultarMapeo": "Ocultar relación de campos",
+      "sinMapeoDeclarado": "No hay matriz de mapeo registrada hacia la versión activa actual.",
+      "camposEquivalentes": "Equivalentes",
+      "camposNuevos": "Nuevos",
+      "camposEliminados": "Eliminados",
+      "campoOrigen": "Campo en versión original",
+      "campoDestino": "Campo en versión activa",
+      "tipoMapeo": "Tipo de cambio",
+      "observacionMapeo": "Observación",
+      "propuestasMantenimiento": "Propuestas de mantenimiento derivadas",
+      "sinPropuestasMantenimiento": "No se registraron propuestas de mantenimiento para esta inspección.",
+      "tipoPropuesta": "Tipo",
+      "prioridadSugerida": "Prioridad sugerida",
+      "descripcionPropuesta": "Intervención sugerida",
+      "estadoPropuesta": "Estado",
+      "estadoTextual": {
+        "BUENO": "Condición Buena (75 - 100)",
+        "REGULAR": "Condición Regular (50 - 74)",
+        "MALO": "Condición Mala (0 - 49)",
+        "CRITICO": "Condición Crítica"
       }
     },
     "iniciar": {
@@ -1765,7 +1951,7 @@
       "advertenciaGps500m": "El dispositivo se encuentra a más de 500 metros de la ubicación guardada del puente. La inspección se creará con advertencia."
     },
     "fotos": {
-      "offlineSprint4Aviso": "La captura y subida de fotografías se habilita con conexión hasta Sprint 4.",
+      "offlineSprint4Aviso": "Las fotografías se guardan en este dispositivo y se subirán al recuperar conexión. Conserva los datos pendientes.",
       "titulo": "Fotografías de la inspección",
       "descripcion": "Capture una fotografía con ubicación o seleccione una imagen con GPS y fecha EXIF con zona horaria o fecha UTC de GPS. Las cargas fallidas se conservan para reintentar.",
       "galeria": "Seleccionar desde galería",
@@ -1920,7 +2106,7 @@
     },
     "confirmacionIc": {
       "titulo": "Confirmacion del estado del IC",
-      "icPreliminarOffline": "El IC preliminar se calcula en el servidor y estará disponible al sincronizar",
+      "icPreliminarOffline": "IC disponible al sincronizar. El cálculo se realiza en el servidor.",
       "nota": "Consulte el calculo actualizado antes de confirmar el estado. Si selecciona un estado distinto del calculado, debe justificar su criterio profesional. El ajuste no modifica el valor numerico del IC.",
       "guardarPrimero": "Guarde los cambios de la inspeccion antes de consultar o confirmar el calculo.",
       "consultar": "Consultar calculo actualizado",
@@ -1954,6 +2140,51 @@
       "indicadorPendiente": "Completa la evaluacion pendiente en: {{recorrido}}. Guarda el borrador y vuelve a consultar el IC.",
       "datosPendientes": "Completa los datos de evaluacion y guarda el borrador antes de consultar el IC.",
       "seccionPendiente": "Completa la seccion {{seccion}} y guarda el borrador antes de consultar el IC."
+    },
+    "documentos": {
+      "titulo": "Documentos PDF",
+      "descripcion": "Respalda tus observaciones con informes o planos en PDF. Se adjuntan con conexión.",
+      "contador": "{{total}} de {{maximo}}",
+      "adjuntar": "Adjuntar documento PDF",
+      "subiendo": "Subiendo…",
+      "nota": "Solo PDF, hasta 20 MB por documento y 10 por inspección.",
+      "sinConexion": "Los documentos PDF se adjuntan con conexión. Vuelve a intentarlo cuando estés en línea.",
+      "cargando": "Cargando documentos…",
+      "reintentar": "Reintentar",
+      "vacio": "Esta inspección todavía no tiene documentos.",
+      "descargar": "Descargar",
+      "descargando": "Descargando…",
+      "retirar": "Retirar",
+      "retirando": "Retirando…",
+      "retirarTitulo": "Retirar documento",
+      "retirarTexto": "El documento «{{nombre}}» dejará de formar parte de la inspección.",
+      "errores": {
+        "limite": "La inspección ya tiene los 10 documentos permitidos. Retira uno para adjuntar otro.",
+        "tamano": "El documento supera los 20 MB permitidos.",
+        "general": "No fue posible completar la operación con el documento. Intenta nuevamente.",
+        "carga": "No fue posible cargar los documentos de la inspección."
+      }
+    },
+    "recalculo": {
+      "titulo": "Comparacion del IC",
+      "ayuda": "Recalcule con la configuracion vigente. El IC original y el estado vigente del puente se conservan. Las fechas se muestran en hora de Guatemala.",
+      "accion": "Recalcular con configuracion vigente",
+      "procesando": "Recalculando...",
+      "cargando": "Cargando resultados del IC...",
+      "reintentar": "Reintentar consulta",
+      "creado": "Resultado disponible para comparar. Se conserva la fecha y el solicitante registrados.",
+      "existente": "Este recalculo ya estaba registrado. Se conserva su fecha y solicitante originales.",
+      "comparacion": "IC original y recalculos registrados",
+      "resultado": "Resultado",
+      "version": "Version de configuracion",
+      "calculado": "Estado calculado",
+      "confirmado": "Estado confirmado al publicar",
+      "fecha": "Fecha de calculo",
+      "solicitante": "Solicitado por",
+      "original": "IC original",
+      "recalculado": "Recalculo del IC",
+      "noAplica": "No aplica",
+      "vacio": "Todavia no hay recalculos registrados."
     }
   }
 }

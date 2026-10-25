@@ -72,6 +72,7 @@ public class SecurityConfiguration {
                       HttpMethod.GET,
                       "/api/v1/puentes",
                       "/api/v1/puentes/*",
+                      "/api/v1/puentes/*/estado-calibracion",
                       "/api/v1/catalogos/departamentos")
                   .permitAll()
                   // El visitante puede leer el foro pero no participar (RN-FOR-09).
@@ -124,7 +125,8 @@ public class SecurityConfiguration {
             .toList();
     configuration.setAllowedOrigins(origins);
     configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
-    configuration.setAllowedHeaders(List.of("Authorization", "Content-Type", "Idempotency-Key"));
+    configuration.setAllowedHeaders(
+        List.of("Authorization", "Content-Type", "Idempotency-Key", "If-Match"));
     configuration.setExposedHeaders(List.of("Idempotent-Replay", "Retry-After", "Location"));
     configuration.setAllowCredentials(true);
     UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();

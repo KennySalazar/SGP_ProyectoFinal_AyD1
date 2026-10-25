@@ -1,3 +1,4 @@
+import { RespaldoIcComponent } from '../../components/respaldo-ic/respaldo-ic.component';
 import { HttpErrorResponse } from '@angular/common/http';
 import {
   ChangeDetectionStrategy,
@@ -35,7 +36,15 @@ const CODIGOS_UBICACION_RECHAZADA = [
 @Component({
   selector: 'app-editar-puente-page',
   standalone: true,
-  imports: [TranslocoPipe, ButtonModule, TagModule, DialogModule, RouterLink, PuenteFormComponent],
+  imports: [
+    RespaldoIcComponent,
+    TranslocoPipe,
+    ButtonModule,
+    TagModule,
+    DialogModule,
+    RouterLink,
+    PuenteFormComponent,
+  ],
   templateUrl: './editar-puente.page.html',
   styleUrl: './editar-puente.page.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,

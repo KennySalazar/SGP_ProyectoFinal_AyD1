@@ -1,5 +1,7 @@
 <section class="surface-card confirmacion-ic" aria-labelledby="confirmacion-ic-titulo">
-  <h2 id="confirmacion-ic-titulo">{{ 'inspecciones.confirmacionIc.titulo' | transloco }}</h2>
+  <h2 id="confirmacion-ic-titulo">
+    {{ 'inspecciones.confirmacionIc.titulo' | transloco }}
+  </h2>
   @if (esOffline()) {
     <p class="alerta-offline" role="status">
       <i class="pi pi-info-circle" aria-hidden="true"></i>
@@ -34,7 +36,8 @@
       }}
     </p>
   }
-  @if (calculo(); as c) {
+  @if (calculoVisible(); as c) {
+    <app-aprobacion-calibracion [versionId]="c.versionFormularioId" />
     <dl>
       <dt>{{ 'inspecciones.confirmacionIc.indice' | transloco }}</dt>
       <dd>{{ c.indiceCalculado }}</dd>
@@ -110,7 +113,9 @@
       <p role="status">{{ 'inspecciones.confirmacionIc.sinConfirmar' | transloco }}</p>
     }
     @if (exito()) {
-      <p class="exito" role="status">{{ 'inspecciones.confirmacionIc.exito' | transloco }}</p>
+      <p class="exito" role="status">
+        {{ 'inspecciones.confirmacionIc.exito' | transloco }}
+      </p>
     }
     <details>
       <summary>{{ 'inspecciones.confirmacionIc.desglose' | transloco }}</summary>

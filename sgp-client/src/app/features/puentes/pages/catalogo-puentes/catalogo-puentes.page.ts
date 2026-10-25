@@ -1,3 +1,4 @@
+import { RespaldoIcComponent } from '../../components/respaldo-ic/respaldo-ic.component';
 import { ChangeDetectionStrategy, Component, DestroyRef, inject, signal } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
@@ -28,6 +29,7 @@ import { AppShellComponent } from '../../../../layouts/app-shell/app-shell.compo
   selector: 'app-catalogo-puentes-page',
   standalone: true,
   imports: [
+    RespaldoIcComponent,
     NgTemplateOutlet,
     AppShellComponent,
     TranslocoPipe,

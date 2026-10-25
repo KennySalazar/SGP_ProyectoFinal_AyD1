@@ -52,20 +52,24 @@ export class FormularioApiService {
   actualizarBorrador(
     id: string,
     request: ActualizarBorradorRequest,
+    version: number,
   ): Observable<VersionFormulario> {
     return this.http.put<VersionFormulario>(
       `/api/v1/formularios/${encodeURIComponent(id)}`,
       request,
+      { headers: { 'If-Match': String(version) } },
     );
   }
 
   calibrarPesos(
     id: string,
     pesos: ConfiguracionIcElementoRequest[],
+    version: number,
   ): Observable<ConfiguracionIcElemento[]> {
     return this.http.put<ConfiguracionIcElemento[]>(
       `/api/v1/formularios/${encodeURIComponent(id)}/pesos`,
       pesos,
+      { headers: { 'If-Match': String(version) } },
     );
   }
 
@@ -99,10 +103,12 @@ export class FormularioApiService {
         SEVERO: number;
       };
     },
+    version: number,
   ): Observable<VersionFormulario> {
     return this.http.put<VersionFormulario>(
       `/api/v1/formularios/${encodeURIComponent(id)}/escala`,
       request,
+      { headers: { 'If-Match': String(version) } },
     );
   }
 }

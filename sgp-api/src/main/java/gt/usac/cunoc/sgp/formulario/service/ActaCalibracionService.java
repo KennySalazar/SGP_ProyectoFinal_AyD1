@@ -18,6 +18,7 @@ import gt.usac.cunoc.sgp.formulario.entity.VersionFormulario;
 import gt.usac.cunoc.sgp.formulario.repository.ConfiguracionIcElementoRepository;
 import gt.usac.cunoc.sgp.formulario.repository.VersionFormularioRepository;
 import gt.usac.cunoc.sgp.formulario.validation.ValidadorActaPdf;
+import gt.usac.cunoc.sgp.usuario.repository.UserAccountRepository;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.security.MessageDigest;
@@ -37,7 +38,7 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 import org.springframework.web.multipart.MultipartFile;
 
 @Service
-@PreAuthorize("hasRole('ADMINISTRADOR')")
+@PreAuthorize("hasAnyRole('ADMINISTRADOR', 'CATEDRATICO')")
 public class ActaCalibracionService {
   private static final Logger LOG = LoggerFactory.getLogger(ActaCalibracionService.class);
   private final VersionFormularioRepository versiones;
@@ -49,6 +50,7 @@ public class ActaCalibracionService {
   private final AuditoriaWriter auditoria;
   private final ObjectMapper json;
   private final Clock clock;
+  private final UserAccountRepository usuarios;
 
   public ActaCalibracionService(
       VersionFormularioRepository versiones,
@@ -59,7 +61,8 @@ public class ActaCalibracionService {
       ValidadorActaPdf validador,
       AuditoriaWriter auditoria,
       ObjectMapper json,
-      Clock clock) {
+      Clock clock,
+      UserAccountRepository usuarios) {
     this.versiones = versiones;
     this.pesos = pesos;
     this.archivos = archivos;
@@ -69,6 +72,7 @@ public class ActaCalibracionService {
     this.auditoria = auditoria;
     this.json = json;
     this.clock = clock;
+    this.usuarios = usuarios;
   }
 
   @Transactional(readOnly = true)
@@ -82,6 +86,14 @@ public class ActaCalibracionService {
       UUID versionId, MultipartFile fichero, UUID usuarioId) {
     VersionFormulario version =
         versiones.findByIdForUpdate(versionId).orElseThrow(this::versionNoEncontrada);
+    if (version.getEstado()
+        != gt.usac.cunoc.sgp.formulario.model.EstadoVersionFormulario.BORRADOR) {
+      throw new ApiException(
+          HttpStatus.CONFLICT,
+          "version_inmutable",
+          "Version inmutable",
+          "El acta de una version publicada no puede modificarse. Cree una version nueva.");
+    }
     validarPesos(version);
     byte[] contenido = validador.validar(fichero);
     Archivo anterior = vigente(versionId);
@@ -134,6 +146,8 @@ public class ActaCalibracionService {
       anterior.retirar(ahora);
       archivos.saveAndFlush(anterior);
     }
+    version.setCalibradoPorId(usuarioId);
+    version.setCalibradoEn(ahora);
     version.setActualizadoEn(ahora);
     versiones.saveAndFlush(version);
     var despues = estado(versionId, nuevo);
@@ -213,6 +227,10 @@ public class ActaCalibracionService {
   }
 
   private EstadoActaCalibracionResponse estado(UUID versionId, Archivo archivo) {
+    var responsable =
+        archivo == null || archivo.getSubidoPorId() == null
+            ? null
+            : usuarios.findById(archivo.getSubidoPorId()).orElse(null);
     ActaCalibracionResponse acta =
         archivo == null
             ? null
@@ -223,6 +241,8 @@ public class ActaCalibracionService {
                 archivo.getTamanoBytes(),
                 archivo.getChecksumSha256(),
                 archivo.getSubidoPorId(),
+                responsable == null ? null : responsable.getNombreCompleto(),
+                responsable == null ? null : responsable.getEmail(),
                 archivo.getConfirmadoEn());
     return new EstadoActaCalibracionResponse(
         versionId,
@@ -267,5 +287,33 @@ public class ActaCalibracionService {
 
   private ApiException error(HttpStatus estado, String codigo, String detalle) {
     return new ApiException(estado, codigo, "Acta de calibracion", detalle);
+  }
+
+  @Transactional
+  public EstadoActaCalibracionResponse adjuntar(
+      UUID versionId, MultipartFile fichero, UUID usuarioId, long versionEsperada) {
+    var version = versiones.findByIdForUpdate(versionId).orElseThrow(this::versionNoEncontrada);
+    if (version.getEstado()
+        != gt.usac.cunoc.sgp.formulario.model.EstadoVersionFormulario.BORRADOR) {
+      throw new ApiException(
+          HttpStatus.CONFLICT,
+          "version_inmutable",
+          "Version inmutable",
+          "El acta de una version publicada no puede modificarse. Cree una version nueva.");
+    }
+    if (version.getVersion() != versionEsperada) {
+      throw new ApiException(
+          HttpStatus.CONFLICT,
+          "concurrencia_conflicto",
+          "Conflicto de version",
+          "La version fue modificada. Recargue antes de adjuntar el acta.");
+    }
+    var respuesta = adjuntar(versionId, fichero, usuarioId);
+    if (version.getVersion() == versionEsperada) {
+      if (versiones.incrementarVersionCalibracion(version.getId(), versionEsperada) != 1) {
+        throw new IllegalStateException("No se pudo incrementar la version de calibracion");
+      }
+    }
+    return respuesta;
   }
 }

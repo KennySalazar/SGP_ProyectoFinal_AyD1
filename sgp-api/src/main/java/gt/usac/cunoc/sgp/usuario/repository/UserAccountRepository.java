@@ -3,6 +3,7 @@ package gt.usac.cunoc.sgp.usuario.repository;
 import gt.usac.cunoc.sgp.usuario.entity.UserAccount;
 import gt.usac.cunoc.sgp.usuario.model.RoleName;
 import jakarta.persistence.LockModeType;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -15,6 +16,9 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 public interface UserAccountRepository extends JpaRepository<UserAccount, UUID> {
+
+  @Query(value = "SELECT CAST(pg_advisory_xact_lock(510001) AS text)", nativeQuery = true)
+  String bloquearProvisionInicial();
 
   @EntityGraph(attributePaths = "role")
   Optional<UserAccount> findByEmail(String email);
@@ -42,14 +46,25 @@ public interface UserAccountRepository extends JpaRepository<UserAccount, UUID> 
   @EntityGraph(attributePaths = "role")
   @Query(
       """
-      SELECT u FROM UserAccount u
-      WHERE (:rol IS NULL OR u.role.name = :rol)
-        AND (:estado IS NULL
-          OR (:estado = 'INACTIVO' AND u.active = false)
-          OR (:estado = 'ACTIVO' AND u.active = true AND u.activated = true AND u.verified = true)
-          OR (:estado = 'PENDIENTE' AND u.active = true
-              AND (u.activated = false OR u.verified = false)))
-      """)
+          SELECT u FROM UserAccount u
+          WHERE (:rol IS NULL OR u.role.name = :rol)
+            AND (:estado IS NULL
+              OR (:estado = 'INACTIVO' AND u.active = false)
+              OR (:estado = 'ACTIVO' AND u.active = true AND u.activated = true AND u.verified = true)
+              OR (:estado = 'PENDIENTE' AND u.active = true
+                  AND (u.activated = false OR u.verified = false)))
+          """)
   Page<UserAccount> findByRolYEstado(
       @Param("rol") RoleName rol, @Param("estado") String estado, Pageable pageable);
+
+  /** Usuarios activos y con la cuenta activada de un rol: destinatarios de avisos (HU-069). */
+  @Query(
+      "select u.id from UserAccount u where u.role.name = :rol"
+          + " and u.active = true and u.activated = true order by u.email")
+  List<UUID> findIdsActivosPorRol(@Param("rol") RoleName rol);
+
+  /** De los indicados, los que siguen activos y con la cuenta activada. */
+  @Query(
+      "select u.id from UserAccount u where u.id in :ids and u.active = true and u.activated = true")
+  List<UUID> filtrarActivos(@Param("ids") Collection<UUID> ids);
 }

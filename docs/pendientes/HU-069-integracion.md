@@ -33,14 +33,11 @@ orden aún requiere la decisión definida en HU-069.
 
 ## Persistencia y compatibilidad pendientes de coordinación
 
-- La migración de HU-068 en esta rama es `V23__planes_mantenimiento_rutinario.sql`. Hace nulos
+- La migración de HU-068 en esta rama es `V25__planes_mantenimiento_rutinario.sql`. Hace nulos
   los metadatos opcionales preservando sus FK, crea actividades ordenadas y reemplaza la
   unicidad parcial de ciclos después de comprobar duplicados históricos.
-- En esta rama se observan migraciones hasta V21 y la nueva V23; no se verificó el contenido de
-  una futura V22 de otro trabajo. No se presume compatibilidad: antes de integrar o desplegar,
-  comparar esa V22 con los cambios de HU-068 a `plan_mantenimiento_rutinario` y
-  `orden_mantenimiento`, y acordar el orden de aplicación. No renumerar V23 sin coordinar la
-  historia compartida de migraciones.
+- La rama integrada contiene las migraciones de `develop` hasta V24; HU-068 usa V25 para evitar
+  la colisión de V23 con la migración de calibración. V25 conserva el SQL original de HU-068.
 
 ## Decisiones de HU-068 que afectan a HU-069
 

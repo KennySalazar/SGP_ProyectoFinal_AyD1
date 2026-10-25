@@ -30,6 +30,8 @@ export interface ReglaMantenimiento {
   provisional: boolean;
   estadoValidacion: string;
   creadoPorId: string;
+  validadoPorNombre: string | null;
+  rotuloValidacion: string;
   validadoPorId: string | null;
   validadoEn: string | null;
   creadoEn: string;

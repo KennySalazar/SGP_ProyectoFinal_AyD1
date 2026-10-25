@@ -8,6 +8,9 @@ describe('Persistencia de reintentos fotográficos', () => {
   beforeEach(() => {
     memoria.clear();
     contextos.clear();
+    vi.spyOn(sgpDb.inspecciones, 'get').mockImplementation(
+      (id: unknown) => Promise.resolve(contextos.get(String(id))) as never,
+    );
     vi.spyOn(sgpDb.inspecciones, 'put').mockImplementation((contexto: LocalInspection) => {
       contextos.set(contexto.id, contexto);
       return Promise.resolve(contexto.id) as never;
@@ -36,6 +39,9 @@ describe('Persistencia de reintentos fotográficos', () => {
       equals: (id: string) => ({
         toArray: async () => [...memoria.values()].filter((f) => f.inspeccionId === id),
       }),
+    } as never);
+    vi.spyOn(sgpDb.cola_sync, 'orderBy').mockReturnValue({
+      last: async () => undefined,
     } as never);
     vi.spyOn(sgpDb.cola_sync, 'put').mockResolvedValue('cola');
     vi.spyOn(sgpDb.cola_sync, 'delete').mockResolvedValue();

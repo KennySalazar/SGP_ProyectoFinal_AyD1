@@ -8,7 +8,7 @@ import { TranslocoPipe } from '@jsverse/transloco';
 import { afterEach, describe, expect, it } from 'vitest';
 import { ApiErrorService } from '../../../../core/services/api-error.service';
 import { AuthStore } from '../../../../core/services/auth.store';
-import { AnclaForo } from '../../models/foro.models';
+import { AnclaForo, OpcionesFiltroForo } from '../../models/foro.models';
 import { HiloForoComponent } from '../hilo-foro/hilo-foro.component';
 import { ForoInspeccionComponent } from './foro-inspeccion.component';
 
@@ -26,6 +26,9 @@ class HiloForoStubComponent {
   readonly ancla = input<AnclaForo | null>(null);
   readonly etiquetaDeAncla = input<(a: AnclaForo) => string>();
   readonly mostrarVolver = input(true);
+  readonly compositorArriba = input(false);
+  readonly filtros = input<OpcionesFiltroForo | null>(null);
+  readonly comentarioDestacado = input<string | null>(null);
   readonly anclaQuitada = output<void>();
   readonly comentarioPublicado = output<void>();
   readonly irAElemento = output<AnclaForo>();
@@ -57,7 +60,13 @@ describe('ForoInspeccionComponent', () => {
         provideHttpClientTesting(),
         provideRouter([]),
         provideNoopAnimations(),
-        { provide: AuthStore, useValue: { authenticated: signal(autenticado) } },
+        {
+          provide: AuthStore,
+          useValue: {
+            authenticated: signal(autenticado),
+            user: signal(autenticado ? { id: 'lector-1', role: 'ESTUDIANTE' } : null),
+          },
+        },
         { provide: ApiErrorService, useValue: { clear: () => errorGlobal.limpiado++ } },
       ],
     })
@@ -230,5 +239,93 @@ describe('ForoInspeccionComponent', () => {
       .flush({ hilo: { id: 'hilo-10' }, anclas: [] });
 
     expect(componente.hiloId()).toBe('hilo-10');
+  });
+  describe('filtros por sección', () => {
+    const titulos: Record<string, string> = {
+      '/identificacion': '1. Identificación del puente',
+      '/subestructura': '4. Sub-estructura',
+      '/otros': '10. Otros',
+    };
+    const etiqueta = (a: AnclaForo) => titulos[a.elementoRef] ?? a.elementoRef;
+    const RESPUESTA_FILTROS = {
+      hilo: { id: 'hilo-9', inspeccionId: 'insp-1', totalComentarios: 9 },
+      anclas: [
+        { elementoRef: '/subestructura/estribo/viga', instanciaElementoId: null, total: 2 },
+        { elementoRef: '/subestructura/pilas', instanciaElementoId: 'pila-2', total: 3 },
+        {
+          elementoRef: '/otros/senalizacion/horizontal/existe',
+          instanciaElementoId: null,
+          total: 1,
+        },
+        { elementoRef: '/identificacion/nombre_puente', instanciaElementoId: null, total: 1 },
+      ],
+    };
+    const hilo = () => fixture.debugElement.children.find((c) => c.name === 'app-hilo-foro');
+
+    it('el hilo se escribe arriba y recibe las opciones del selector', async () => {
+      await crear(true);
+      fixture.componentRef.setInput('etiquetaDeAncla', etiqueta);
+      http.expectOne(RUTA).flush(RESPUESTA_FILTROS);
+      fixture.detectChanges();
+
+      const stub = hilo()?.componentInstance as HiloForoStubComponent;
+      expect(stub.compositorArriba()).toBe(true);
+      expect(stub.filtros()).not.toBeNull();
+    });
+
+    it('agrupa los comentarios por la primera clave de su ruta, con su título y en orden numérico', async () => {
+      await crear(true);
+      fixture.componentRef.setInput('etiquetaDeAncla', etiqueta);
+      http.expectOne(RUTA).flush(RESPUESTA_FILTROS);
+      fixture.detectChanges();
+
+      const filtros = (hilo()?.componentInstance as HiloForoStubComponent).filtros()!;
+      expect(filtros.secciones).toEqual([
+        { clave: 'identificacion', titulo: '1. Identificación del puente', total: 1 },
+        { clave: 'subestructura', titulo: '4. Sub-estructura', total: 5 },
+        // «10» va después de «4» porque se ordena por número, no por texto.
+        { clave: 'otros', titulo: '10. Otros', total: 1 },
+      ]);
+    });
+
+    it('los generales son lo que no está anclado a ninguna sección', async () => {
+      await crear(true);
+      http.expectOne(RUTA).flush(RESPUESTA_FILTROS);
+      fixture.detectChanges();
+
+      const filtros = (hilo()?.componentInstance as HiloForoStubComponent).filtros()!;
+      expect(filtros.todos).toBe(9);
+      expect(filtros.generales).toBe(9 - 7);
+    });
+
+    it('un hilo sin comentarios anclados solo tiene generales', async () => {
+      await crear(true);
+      http.expectOne(RUTA).flush({ hilo: { id: 'hilo-9', totalComentarios: 3 }, anclas: [] });
+      fixture.detectChanges();
+
+      const filtros = (hilo()?.componentInstance as HiloForoStubComponent).filtros()!;
+      expect(filtros).toEqual({ todos: 3, generales: 3, secciones: [] });
+    });
+
+    it('al comentar se actualizan los totales de las secciones', async () => {
+      await crear(true);
+      fixture.componentRef.setInput('etiquetaDeAncla', etiqueta);
+      http.expectOne(RUTA).flush(RESPUESTA_FILTROS);
+      fixture.detectChanges();
+
+      (hilo()?.componentInstance as HiloForoStubComponent).comentarioPublicado.emit();
+      http.expectOne(RUTA).flush({
+        hilo: { id: 'hilo-9', totalComentarios: 10 },
+        anclas: [
+          ...RESPUESTA_FILTROS.anclas,
+          { elementoRef: '/identificacion/ruta', instanciaElementoId: null, total: 1 },
+        ],
+      });
+      fixture.detectChanges();
+
+      const filtros = (hilo()?.componentInstance as HiloForoStubComponent).filtros()!;
+      expect(filtros.todos).toBe(10);
+      expect(filtros.secciones.find((x) => x.clave === 'identificacion')?.total).toBe(2);
+    });
   });
 });
