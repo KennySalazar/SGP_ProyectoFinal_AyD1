@@ -1,70 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { uuidV7 } from '../../src/app/offline/services/uuid-v7.ts';
 import { readFile } from 'node:fs/promises';
-import { execFileSync } from 'node:child_process';
-
-const origen = process.env.HU061_API_ORIGIN;
-const pg = 'hu061-aceptacion-postgis';
-const versionId = '0199a000-0000-7000-8000-000000000004';
-const clavePrueba = 'Hu061-Prueba-2026!'; // Solo para el bootstrap de la base desechable.
-const datos = { vigas: { existencia: 'PRESENTE', dano: 'MODERADO', cortado: 'NO' } };
-
-function consulta(sql) {
-  return execFileSync(
-    'docker',
-    [
-      'exec',
-      pg,
-      'psql',
-      '-U',
-      'hu061_test',
-      '-d',
-      'hu061_aceptacion',
-      '-At',
-      '-v',
-      'ON_ERROR_STOP=1',
-      '-c',
-      sql,
-    ],
-    { encoding: 'utf8' },
-  ).trim();
-}
-
-async function locales(page, id) {
-  return page.evaluate(async (id) => {
-    const db = await new Promise((resolve, reject) => {
-      const req = indexedDB.open('sgp_offline');
-      req.onsuccess = () => resolve(req.result);
-      req.onerror = () => reject(req.error);
-    });
-    const tx = db.transaction(['inspecciones', 'cola_sync']);
-    const obtener = (req) =>
-      new Promise((resolve, reject) => {
-        req.onsuccess = () => resolve(req.result);
-        req.onerror = () => reject(req.error);
-      });
-    const [inspeccion, cola] = await Promise.all([
-      obtener(tx.objectStore('inspecciones').get(id)),
-      obtener(tx.objectStore('cola_sync').getAll()),
-    ]);
-    db.close();
-    return { inspeccion, cola: cola.filter((op) => op.entityId === id) };
-  }, id);
-}
-
-async function login(page, email) {
-  await page.goto('/login');
-  await page.locator('input[type=email]').fill(email);
-  await page.locator('input[type=password]').fill(clavePrueba);
-  const respuesta = page.waitForResponse(
-    (r) => r.url().endsWith('/api/v1/auth/login') && r.request().method() === 'POST',
-  );
-  await page.locator('form button[type=submit]').click();
-  const res = await respuesta;
-  expect(res.status()).toBe(200);
-  await expect(page.locator('app-shell')).toBeVisible();
-  return (await res.json()).accessToken;
-}
+import { origen, versionId, datos, consulta, locales, login } from './real-helpers.mjs';
 
 for (const rol of ['CATEDRATICO', 'ESTUDIANTE']) {
   test(`CA4/CA7 backend real: ${rol}`, async ({ browser }, testInfo) => {
