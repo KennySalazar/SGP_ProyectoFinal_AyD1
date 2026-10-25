@@ -1,9 +1,11 @@
 import { OperacionIdempotenteService } from './operacion-idempotente.service';
 import { FotografiaResponse, MetadatosFotografia } from '../models/fotografia.models';
-import { HttpClient } from '@angular/common/http';
+import { ERROR_GESTIONADO_LOCALMENTE } from '../../../core/interceptors/problem.interceptor';
+import { HttpClient, HttpContext } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
 import { map, Observable, of, switchMap } from 'rxjs';
 import {
+  ConflictoSincronizacionResponse,
   ConfirmacionEstadoIcResponse,
   ConfirmarEstadoIcRequest,
   DatosPermanentesResponse,
@@ -27,12 +29,15 @@ export class InspeccionApiService {
   iniciarInspeccion(
     request: IniciarInspeccionRequest,
     idempotencyKey?: string,
+    erroresLocales = false,
   ): Observable<IniciarInspeccionResponse> {
     return this.operaciones.ejecutar<IniciarInspeccionResponse>(
       'POST',
       '/api/v1/inspecciones',
       request,
       idempotencyKey,
+      {},
+      erroresLocales,
     );
   }
   obtenerDatosPermanentes(puenteId: string): Observable<DatosPermanentesResponse | null> {
@@ -121,25 +126,40 @@ export class InspeccionApiService {
       request,
       idempotencyKey,
       clientePrevalece ? { 'X-Sync-Conflict-Policy': 'client-wins' } : {},
+      clientePrevalece,
+    );
+  }
+  listarConflictosSincronizacion(id: string): Observable<ConflictoSincronizacionResponse[]> {
+    return this.http.get<ConflictoSincronizacionResponse[]>(
+      `/api/v1/inspecciones/${encodeURIComponent(id)}/conflictos-sincronizacion`,
+      { context: new HttpContext().set(ERROR_GESTIONADO_LOCALMENTE, true) },
     );
   }
   listarMisInspecciones(
     pagina = 0,
     tamanio = 20,
     estado?: EstadoInspeccion,
+    erroresLocales = false,
   ): Observable<PaginaResponse<InspeccionResumenResponse>> {
     const params: Record<string, string | number> = { pagina, tamanio };
     if (estado) params['estado'] = estado;
     return this.http.get<PaginaResponse<InspeccionResumenResponse>>('/api/v1/inspecciones', {
       params,
+      context: new HttpContext().set(ERROR_GESTIONADO_LOCALMENTE, erroresLocales),
     });
   }
-  enviar(id: string, idempotencyKey?: string): Observable<InspeccionResumenResponse> {
+  enviar(
+    id: string,
+    idempotencyKey?: string,
+    erroresLocales = false,
+  ): Observable<InspeccionResumenResponse> {
     return this.operaciones.ejecutar<InspeccionResumenResponse>(
       'POST',
       `/api/v1/inspecciones/${encodeURIComponent(id)}/enviar`,
       null,
       idempotencyKey,
+      {},
+      erroresLocales,
     );
   }
   reenviar(id: string, idempotencyKey?: string): Observable<InspeccionResumenResponse> {
@@ -150,12 +170,18 @@ export class InspeccionApiService {
       idempotencyKey,
     );
   }
-  publicar(id: string, idempotencyKey?: string): Observable<InspeccionResumenResponse> {
+  publicar(
+    id: string,
+    idempotencyKey?: string,
+    erroresLocales = false,
+  ): Observable<InspeccionResumenResponse> {
     return this.operaciones.ejecutar<InspeccionResumenResponse>(
       'POST',
       `/api/v1/inspecciones/${encodeURIComponent(id)}/publicar`,
       null,
       idempotencyKey,
+      {},
+      erroresLocales,
     );
   }
   crearCorreccion(id: string, motivo: string): Observable<InspeccionResumenResponse> {
@@ -189,11 +215,14 @@ export class InspeccionApiService {
   ): Observable<FotografiaResponse> {
     const datos = new FormData();
     datos.append('metadatos', new Blob([JSON.stringify(metadatos)], { type: 'application/json' }));
-    datos.append('archivo', blob, `${metadatos.id}.jpg`);
+    datos.append('archivo', blob, `${metadatos.id}.${blob.type === 'image/webp' ? 'webp' : 'jpg'}`);
     return this.http.post<FotografiaResponse>(
       `/api/v1/inspecciones/${inspeccionId}/fotografias`,
       datos,
-      { headers: { 'Idempotency-Key': clave } },
+      {
+        headers: { 'Idempotency-Key': clave },
+        context: new HttpContext().set(ERROR_GESTIONADO_LOCALMENTE, true),
+      },
     );
   }
   listarFotografias(inspeccionId: string): Observable<FotografiaResponse[]> {

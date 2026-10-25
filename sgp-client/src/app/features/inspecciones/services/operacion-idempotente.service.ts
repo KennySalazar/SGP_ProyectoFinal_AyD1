@@ -1,6 +1,7 @@
-import { HttpClient, HttpErrorResponse } from '@angular/common/http';
+import { HttpClient, HttpErrorResponse, HttpContext } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
 import { defer, Observable, shareReplay, tap, throwError } from 'rxjs';
+import { ERROR_GESTIONADO_LOCALMENTE } from '../../../core/interceptors/problem.interceptor';
 import { AuthStore } from '../../../core/services/auth.store';
 import { uuidV7 } from '../../../offline/services/uuid-v7';
 
@@ -25,6 +26,7 @@ export class OperacionIdempotenteService {
     cuerpo: unknown,
     clave?: string,
     encabezados: Record<string, string> = {},
+    erroresLocales = false,
   ): Observable<T> {
     const actor = this.auth.user()?.id ?? null;
     const serializado = JSON.stringify(cuerpo ?? null);
@@ -35,6 +37,7 @@ export class OperacionIdempotenteService {
       serializado,
       clave ?? null,
       encabezados,
+      erroresLocales,
     ]);
     const anterior = this.pendientes.get(identidad);
     if (anterior) return anterior as Observable<T>;
@@ -47,6 +50,7 @@ export class OperacionIdempotenteService {
       return this.http.request<T>(metodo, ruta, {
         body: copia,
         headers: { 'Idempotency-Key': idempotencia, ...encabezados },
+        context: new HttpContext().set(ERROR_GESTIONADO_LOCALMENTE, erroresLocales),
       });
     }).pipe(
       tap({

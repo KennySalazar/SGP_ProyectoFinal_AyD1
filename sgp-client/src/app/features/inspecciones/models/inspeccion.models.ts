@@ -352,3 +352,11 @@ export interface DocumentoInspeccionResponse {
   subidoPorId: string;
   subidoEn: string;
 }
+
+export interface ConflictoSincronizacionResponse {
+  id: string;
+  versionServidor: number;
+  versionCliente: number | null;
+  copiaServidor: unknown;
+  detectadoEn: string;
+}

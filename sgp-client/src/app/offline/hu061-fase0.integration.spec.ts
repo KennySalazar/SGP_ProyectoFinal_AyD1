@@ -318,6 +318,7 @@ describe('HU-061 fase 0: integración local y contratos HTTP', () => {
   });
 
   it('control E13: B no lista ni confirma fotografías pendientes de A', async () => {
+    await iniciar();
     await fotos.guardar({
       id: 'foto-fase0',
       propietarioId: AUTOR,

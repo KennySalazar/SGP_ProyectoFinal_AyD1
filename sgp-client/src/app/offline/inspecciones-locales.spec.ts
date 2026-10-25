@@ -641,6 +641,18 @@ describe('HU-042: Inspecciones Locales y Recuperación tras Recarga', () => {
   });
 
   it('elimina un borrador local sin sincronizar de la base de datos Dexie', async () => {
+    vi.spyOn(sgpDb.fotos, 'where').mockReturnValue({
+      equals: () => ({ toArray: async () => [] }),
+    } as never);
+    vi.spyOn(sgpDb.fotos, 'bulkDelete').mockResolvedValue();
+    vi.spyOn(sgpDb.cola_sync, 'toArray').mockImplementation(
+      () => Promise.resolve([...colaMemoria.values()]) as never,
+    );
+    vi.spyOn(sgpDb.cola_sync, 'bulkDelete').mockImplementation((ids) => {
+      for (const id of ids) colaMemoria.delete(String(id));
+      return Promise.resolve() as never;
+    });
+
     const id = '018f6730-local-to-delete';
     await service.guardarInspeccionLocal({
       id,

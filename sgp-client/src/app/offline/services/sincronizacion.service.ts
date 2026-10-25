@@ -1,5 +1,6 @@
 import { Injectable, OnDestroy, inject, signal } from '@angular/core';
-import { firstValueFrom, from, Subscription } from 'rxjs';
+import { firstValueFrom, from, Subscription, defer, EMPTY, startWith, switchMap } from 'rxjs';
+import { resumirSincronizacion, ResumenSincronizacion } from './diagnostico-sync';
 import { HttpErrorResponse } from '@angular/common/http';
 import { AuthStore } from '../../core/services/auth.store';
 import { TokenRefreshService } from '../../core/services/token-refresh.service';
@@ -13,7 +14,7 @@ import {
 import { ConnectivityService } from './connectivity.service';
 import { SyncQueueItem, sgpDb } from '../db/sgp-db';
 import { BorradorLocalPayload, InspeccionesLocalesService } from './inspecciones-locales.service';
-import { FotografiasLocalesService } from './fotografias-locales.service';
+import { FotografiasLocalesService, FotografiaPendiente } from './fotografias-locales.service';
 import { liveQuery } from 'dexie';
 import { esResultadoIncierto } from '../../features/inspecciones/services/operacion-idempotente.service';
 
@@ -35,7 +36,54 @@ export class SincronizacionService implements OnDestroy {
   private nuevaCorrida = false;
   private colaActual: SyncQueueItem[] = [];
   readonly sincronizando = signal(false);
-  readonly cola$ = from(liveQuery<SyncQueueItem[]>(() => sgpDb.cola_sync.toArray()));
+  readonly cola$ = defer(() =>
+    (this.auth.cambiosSesion$ ?? EMPTY).pipe(
+      startWith(null),
+      switchMap(() => {
+        const owner = this.auth.user()?.id;
+        return from(
+          liveQuery(async () =>
+            owner && this.auth.user()?.id === owner
+              ? (await sgpDb.cola_sync.toArray()).filter((item) => item.propietarioId === owner)
+              : [],
+          ),
+        ).pipe(startWith([] as SyncQueueItem[]));
+      }),
+    ),
+  );
+  readonly resumen$ = defer(() =>
+    (this.auth.cambiosSesion$ ?? EMPTY).pipe(
+      startWith(null),
+      switchMap(() => {
+        const owner = this.auth.user()?.id;
+        return from(
+          liveQuery(async () =>
+            resumirSincronizacion(
+              this.auth.user()?.id === owner ? owner : undefined,
+              await sgpDb.inspecciones.toArray(),
+              await sgpDb.fotos.toArray(),
+              await sgpDb.cola_sync.toArray(),
+            ),
+          ),
+        ).pipe(startWith({ ...resumirSincronizacion(owner, [], [], []), listo: false }));
+      }),
+    ),
+  );
+
+  async consultarResumen(): Promise<ResumenSincronizacion> {
+    const owner = this.auth.user()?.id;
+    const [inspecciones, fotos, cola] = await Promise.all([
+      sgpDb.inspecciones.toArray(),
+      sgpDb.fotos.toArray(),
+      sgpDb.cola_sync.toArray(),
+    ]);
+    return resumirSincronizacion(
+      this.auth.user()?.id === owner ? owner : undefined,
+      inspecciones,
+      fotos,
+      cola,
+    );
+  }
 
   iniciar(): void {
     if (this.iniciado) return;
@@ -182,9 +230,23 @@ export class SincronizacionService implements OnDestroy {
   }
 
   async reintentar(id: string): Promise<void> {
-    const item = await sgpDb.cola_sync.get(id);
-    if (!item || item.propietarioId !== this.auth.user()?.id) return;
-    await sgpDb.cola_sync.update(id, { estado: 'PENDIENTE', intentos: 0, ultimoError: undefined });
+    const owner = this.auth.user()?.id;
+    if (!owner) return;
+    if (id.startsWith('local-foto:')) {
+      await this.fotografiasLocales.recuperarCola(id.slice('local-foto:'.length), owner);
+      await this.sincronizarAhora();
+      return;
+    }
+    await sgpDb.transaction('rw', sgpDb.cola_sync, async () => {
+      const item = await sgpDb.cola_sync.get(id);
+      if (!item || item.propietarioId !== this.auth.user()?.id || item.estado === 'ENVIANDO')
+        return;
+      await sgpDb.cola_sync.update(id, {
+        estado: 'PENDIENTE',
+        intentos: 0,
+        ultimoError: undefined,
+      });
+    });
     await this.sincronizarAhora();
   }
 
@@ -202,6 +264,7 @@ export class SincronizacionService implements OnDestroy {
             this.api.iniciarInspeccion(
               item.payload as IniciarInspeccionRequest,
               item.idempotencyKey,
+              true,
             ),
           );
           const local = await sgpDb.inspecciones.get(item.entityId);
@@ -248,8 +311,8 @@ export class SincronizacionService implements OnDestroy {
         } else if (this.esFinal(item)) {
           const respuesta = await firstValueFrom(
             item.operacion === 'PUBLICAR_INSPECCION'
-              ? this.api.publicar(item.entityId, item.idempotencyKey)
-              : this.api.enviar(item.entityId, item.idempotencyKey),
+              ? this.api.publicar(item.entityId, item.idempotencyKey, true)
+              : this.api.enviar(item.entityId, item.idempotencyKey, true),
           );
           await this.confirmarFinal(item, propietarioId, respuesta);
         } else throw new Error('offline.hu061.unknownOperation');
@@ -397,24 +460,50 @@ export class SincronizacionService implements OnDestroy {
   }
 
   private async procesarFoto(item: SyncQueueItem, propietarioId: string): Promise<void> {
-    const foto = await sgpDb.fotos.get(item.entityId);
-    if (
-      !foto ||
-      foto.propietarioId !== propietarioId ||
-      foto.sincronizado ||
-      !foto.metadatos ||
-      !foto.idempotencyKey
-    ) {
-      await sgpDb.cola_sync.delete(item.id);
-      return;
-    }
     for (let intento = item.intentos; intento < 5; intento++) {
       if (this.auth.user()?.id !== propietarioId || !this.connectivity.online()) return;
-      await sgpDb.cola_sync.update(item.id, {
-        estado: 'ENVIANDO',
-        intentos: intento + 1,
-        iniciadoEn: new Date().toISOString(),
-      });
+      // La misma transacción que el borrado reclama la foto: funciona también entre pestañas.
+      const foto = await sgpDb.transaction(
+        'rw',
+        sgpDb.fotos,
+        sgpDb.cola_sync,
+        sgpDb.inspecciones,
+        async () => {
+          const actual = await sgpDb.cola_sync.get(item.id);
+          if (
+            !actual ||
+            actual.propietarioId !== propietarioId ||
+            (actual.estado ?? 'PENDIENTE') !== 'PENDIENTE' ||
+            actual.intentos > intento
+          )
+            return null;
+          const foto = await sgpDb.fotos.get(item.entityId);
+          const local = foto ? await sgpDb.inspecciones.get(foto.inspeccionId) : undefined;
+          if (
+            !local ||
+            local.propietarioId !== propietarioId ||
+            !foto ||
+            foto.propietarioId !== propietarioId ||
+            foto.sincronizado ||
+            !foto.metadatos ||
+            !foto.idempotencyKey
+          ) {
+            await sgpDb.cola_sync.update(item.id, {
+              estado: 'INTERVENCION',
+              codigoError: 'foto_local_incompleta',
+              ultimoError: 'offline.diagnostico.errores.datos',
+            });
+            return null;
+          }
+          await sgpDb.cola_sync.update(item.id, {
+            estado: 'ENVIANDO',
+            intentos: intento + 1,
+            iniciadoEn: new Date().toISOString(),
+          });
+          return foto as FotografiaPendiente;
+        },
+      );
+      if (!foto) return;
       try {
         const respuesta = await firstValueFrom(
           this.api.adjuntarFotografia(

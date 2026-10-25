@@ -125,3 +125,29 @@
     flex-direction: column;
   }
 }
+
+.diagnostic-card {
+  margin-bottom: 1rem;
+}
+.queue-row {
+  border-bottom: 1px solid var(--sgp-border);
+  padding: 1rem 0;
+  overflow-wrap: anywhere;
+}
+pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 28rem;
+  overflow: auto;
+}
+summary {
+  cursor: pointer;
+  padding: 0.75rem;
+}
+button:focus-visible,
+a:focus-visible,
+summary:focus-visible,
+pre:focus-visible {
+  outline: 3px solid var(--sgp-blue-600);
+  outline-offset: 3px;
+}

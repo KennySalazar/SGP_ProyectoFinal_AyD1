@@ -428,9 +428,35 @@ export class InspeccionesLocalesService {
    * Elimina una inspección local de Dexie si no ha sido sincronizada.
    */
   async eliminarInspeccionLocal(id: string): Promise<void> {
-    await sgpDb.transaction('rw', sgpDb.inspecciones, sgpDb.cola_sync, async () => {
+    const propietarioId = this.auth.user()?.id;
+    await sgpDb.transaction('rw', sgpDb.inspecciones, sgpDb.cola_sync, sgpDb.fotos, async () => {
+      const local = await sgpDb.inspecciones.get(id);
+      if (
+        !propietarioId ||
+        local?.propietarioId !== propietarioId ||
+        local.estado !== 'BORRADOR' ||
+        ['PENDIENTE', 'CONFIRMADA'].includes(local.intencionFinal?.estado ?? '')
+      )
+        throw new Error('offline.hu061.notEditable');
+      const fotos = await sgpDb.fotos.where('inspeccionId').equals(id).toArray();
+      const ids = new Set([id, ...fotos.map((foto) => foto.id)]);
+      const operaciones = (await sgpDb.cola_sync.toArray()).filter((item) =>
+        ids.has(item.entityId),
+      );
+      if (
+        fotos.some((foto) => foto.propietarioId !== propietarioId) ||
+        operaciones.some(
+          (item) =>
+            item.propietarioId !== propietarioId ||
+            item.estado === 'ENVIANDO' ||
+            item.intentos > 0 ||
+            item.iniciadoEn,
+        )
+      )
+        throw new Error('envioIncierto');
+      await sgpDb.cola_sync.bulkDelete(operaciones.map((item) => item.id));
+      await sgpDb.fotos.bulkDelete(fotos.map((foto) => foto.id));
       await sgpDb.inspecciones.delete(id);
-      await sgpDb.cola_sync.where('entityId').equals(id).delete();
     });
   }
 
@@ -454,10 +480,24 @@ export class InspeccionesLocalesService {
           !inspeccion.actualizacionLocalPendiente &&
           inspeccion.intencionFinal?.estado !== 'PENDIENTE' &&
           inspeccion.intencionFinal?.estado !== 'RECHAZADA' &&
-          !cola.some((item) => item.entityId === inspeccion.id) &&
-          !fotos.some((foto) => foto.inspeccionId === inspeccion.id && !foto.sincronizado),
+          !cola.some(
+            (item) =>
+              item.entityId === inspeccion.id ||
+              fotos.some(
+                (foto) => foto.inspeccionId === inspeccion.id && foto.id === item.entityId,
+              ),
+          ) &&
+          !fotos.some(
+            (foto) =>
+              foto.inspeccionId === inspeccion.id &&
+              (!foto.sincronizado || foto.propietarioId !== propietarioId),
+          ),
       );
-      await sgpDb.inspecciones.bulkDelete(eliminables.map((inspeccion) => inspeccion.id));
+      const ids = new Set(eliminables.map((inspeccion) => inspeccion.id));
+      await sgpDb.fotos.bulkDelete(
+        fotos.filter((foto) => ids.has(foto.inspeccionId)).map((foto) => foto.id),
+      );
+      await sgpDb.inspecciones.bulkDelete([...ids]);
       return eliminables.length;
     });
   }

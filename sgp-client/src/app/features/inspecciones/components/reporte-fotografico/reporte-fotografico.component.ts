@@ -1,3 +1,4 @@
+import { StorageService } from '../../../../offline/services/storage.service';
 import { SincronizacionService } from '../../../../offline/services/sincronizacion.service';
 import {
   ChangeDetectionStrategy,
@@ -85,6 +86,8 @@ export class ReporteFotograficoComponent implements OnDestroy {
   readonly contextoElemento = input<{ elementoRef: string; instanciaElementoId?: string } | null>(
     null,
   );
+  readonly storage = inject(StorageService);
+  readonly fotoLocalARetirar = signal<FotografiaPendiente | null>(null);
   private readonly sync = inject(SincronizacionService);
   private readonly api = inject(InspeccionApiService);
   private readonly auth = inject(AuthStore);
@@ -308,7 +311,15 @@ export class ReporteFotograficoComponent implements OnDestroy {
     } catch (e) {
       if (revision === this.revision)
         this.error.set(
-          e instanceof Error && ['tamano', 'formato', 'dimensiones', 'camara'].includes(e.message)
+          e instanceof Error &&
+            [
+              'tamano',
+              'formato',
+              'dimensiones',
+              'camara',
+              'compresion',
+              'procesamientoNoDisponible',
+            ].includes(e.message)
             ? e.message
             : 'metadatos',
         );
@@ -361,8 +372,14 @@ export class ReporteFotograficoComponent implements OnDestroy {
       this.previsualizacion.set(null);
       this.categoria.reset();
       void this.sync.sincronizarAhora();
-    } catch {
-      if (revision === this.revision) this.error.set('persistencia');
+    } catch (error) {
+      if (revision === this.revision)
+        this.error.set(
+          error instanceof Error &&
+            ['limite', 'espacioInsuficiente', 'estado', 'compresion'].includes(error.message)
+            ? error.message
+            : 'persistencia',
+        );
     } finally {
       if (revision === this.revision) this.ocupado.set(false);
     }
@@ -375,6 +392,36 @@ export class ReporteFotograficoComponent implements OnDestroy {
     )
       return;
     await this.sync.reintentar(foto.id);
+  }
+  async eliminarLocal() {
+    const foto = this.fotoLocalARetirar();
+    const propietario = this.auth.user()?.id;
+    if (
+      !foto ||
+      !propietario ||
+      !this.editable() ||
+      this.ocupado() ||
+      foto.inspeccionId !== this.contexto().id
+    )
+      return;
+    const revision = this.revision;
+    this.ocupado.set(true);
+    this.error.set(null);
+    try {
+      await this.locales.eliminar(foto.id, propietario);
+      if (revision !== this.revision) return;
+      this.pendientes.update((fotos) => fotos.filter((item) => item.id !== foto.id));
+      this.fotoLocalARetirar.set(null);
+    } catch (error) {
+      if (revision === this.revision)
+        this.error.set(
+          error instanceof Error && error.message === 'envioIncierto'
+            ? 'envioIncierto'
+            : 'retirada',
+        );
+    } finally {
+      if (revision === this.revision) this.ocupado.set(false);
+    }
   }
   solicitarRetirada(foto: FotografiaResponse) {
     if (
@@ -450,6 +497,7 @@ export class ReporteFotograficoComponent implements OnDestroy {
     if (url) URL.revokeObjectURL(url);
   }
   private limpiar() {
+    this.fotoLocalARetirar.set(null);
     this.revision++;
     this.cerrarCamara();
     this.revocar(this.previsualizacion());

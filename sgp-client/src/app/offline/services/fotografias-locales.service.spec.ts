@@ -8,6 +8,15 @@ describe('Persistencia de reintentos fotográficos', () => {
   beforeEach(() => {
     memoria.clear();
     contextos.clear();
+    contextos.set('i', {
+      id: 'i',
+      propietarioId: 'autor',
+      puenteId: 'puente',
+      estado: 'BORRADOR',
+      sincronizado: false,
+      actualizadoEn: '',
+      payload: {},
+    });
     vi.spyOn(sgpDb.inspecciones, 'get').mockImplementation(
       (id: unknown) => Promise.resolve(contextos.get(String(id))) as never,
     );
@@ -82,6 +91,7 @@ describe('Persistencia de reintentos fotográficos', () => {
 
   it('solo ofrece continuar un contexto propio mientras existan fotos pendientes', async () => {
     const servicio = TestBed.inject(FotografiasLocalesService);
+    contextos.delete('i');
     const payload = { id: 'i', autorId: 'autor' };
     await servicio.guardarContexto('autor', 'i', 'puente', 'BORRADOR', payload);
     await servicio.guardar(foto());

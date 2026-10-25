@@ -687,7 +687,50 @@
       "resolveErrors": "Resuelva los errores de sincronización antes de confirmar.",
       "prepareFirst": "Prepare el formulario antes de iniciar sin conexión.",
       "versionMismatch": "La versión confirmada difiere del formulario capturado. Conserva la copia local y revisa la preparación.",
-      "unknownOperation": "Esta operación no se reconoce. Conserva los datos y solicita revisión."
+      "unknownOperation": "Esta operación no se reconoce. Conserva los datos y solicita revisión.",
+      "DESCONOCIDA": "Operación pendiente de revisión"
+    },
+    "almacenamiento": {
+      "noPersistente": "El navegador no concedió almacenamiento persistente. Los datos siguen guardados, pero podrían ser desalojados por el navegador. Sincronice cuando tenga conexión.",
+      "pocoEspacio": "Queda poco espacio en este dispositivo. Sincronice y libere únicamente datos confirmados.",
+      "origen": "El espacio del navegador corresponde a este sitio completo y puede incluir datos de otras sesiones. No representa el tamaño de sus fotografías.",
+      "disponible": "Espacio disponible estimado",
+      "solicitar": "Solicitar almacenamiento persistente",
+      "actualizar": "Actualizar medición",
+      "errorMedicion": "No se pudo consultar el espacio. Los datos guardados se conservan."
+    },
+    "diagnostico": {
+      "bytesFotos": "Espacio de sus fotografías pendientes",
+      "identificador": "Identificador del elemento",
+      "intentos": "Intentos de sincronización",
+      "sinIntentos": "Todavía no se ha intentado",
+      "agotado": "Se agotaron cinco intentos. Se conservan los datos; revise la conexión antes de reintentar.",
+      "esperaReintento": "El último intento no se confirmó. Se conservan los datos para reintentar.",
+      "sinCola": "Hay datos locales sin operación de sincronización. Abra el borrador para revisarlos; no se eliminarán automáticamente.",
+      "rechazada": "La acción final fue rechazada. Abra el borrador, corrija los datos y confirme nuevamente.",
+      "errorAccion": "No se pudo completar la acción. Sus datos pendientes se conservan.",
+      "limpiezaSegura": "Liberar espacio conserva inspecciones editadas, fotografías pendientes y operaciones sin confirmar.",
+      "desconocido": "No disponible",
+      "conflictos": "Historial de conflictos de sincronización",
+      "conflictosNota": "Incluye conflictos resueltos automáticamente, aunque ya no estén en la cola. La copia técnica es de solo lectura; se omiten identificación, ubicación y texto libre.",
+      "consultar": "Actualizar conflictos",
+      "conflictosConexion": "Se requiere conexión para consultar el historial del servidor.",
+      "cargando": "Consultando conflictos…",
+      "errorConflictos": "No se pudo consultar todo el historial. Revise la sesión y la conexión y vuelva a intentarlo.",
+      "versiones": "Versión del cliente → versión del servidor al detectar el conflicto",
+      "clientePrevalece": "Resuelto automáticamente: prevalecieron los cambios del cliente.",
+      "copiaServidor": "Consultar copia técnica anterior del servidor (solo lectura)",
+      "sinConflictos": "No se encontraron conflictos en sus inspecciones.",
+      "errores": {
+        "general": "La operación fue rechazada o requiere revisión. Abra el borrador y compruebe sus datos antes de reintentar.",
+        "conflicto": "Se detectó un conflicto de versiones. Revise el borrador y el historial.",
+        "version": "La versión del formulario no coincide. Conserve los datos y consulte al responsable.",
+        "metadatos": "Revise la categoría, ubicación y fecha de la fotografía.",
+        "estado": "La inspección ya no admite esta operación. Los datos locales se conservan.",
+        "datos": "La fotografía u operación local está incompleta. Conserve los datos y consulte al responsable.",
+        "proceso": "El servidor sigue procesando la operación. Espere antes de reintentar."
+      },
+      "comprobando": "Comprobando datos locales…"
     }
   },
   "studentActivation": {
@@ -1987,18 +2030,25 @@
         "panel": "No se pudo abrir el panel de fotografías. Revise la conexión y vuelva a intentarlo.",
         "anclaje": "El elemento o su instancia ya no están disponibles en esta inspección. Conserve el pendiente y consulte al responsable.",
         "limite": "La inspección admite como máximo 60 fotografías confirmadas. Retire alguna de un borrador propio antes de adjuntar otra. Los pendientes se conservan para reintentar.",
-        "retirada": "No se pudo retirar la fotografía. La galería conserva su estado; compruebe la conexión y vuelva a intentarlo."
+        "retirada": "No se pudo retirar la fotografía. La galería conserva su estado; compruebe la conexión y vuelva a intentarlo.",
+        "compresion": "No se pudo obtener una fotografía válida de hasta 400 KB. Intente otra captura con menos detalle. No se guardó la imagen.",
+        "procesamientoNoDisponible": "Este navegador no permite procesar fotografías en segundo plano. Use un navegador compatible actualizado.",
+        "espacioInsuficiente": "No queda suficiente espacio para guardar la fotografía. Los datos anteriores se conservan. Sincronice o libere datos confirmados.",
+        "envioIncierto": "La fotografía ya inició un envío. Confirme su sincronización antes de retirarla para evitar perder datos."
       },
       "continuar": "Continuar fotografías pendientes",
       "continuarNota": "Hay fotografías pendientes de una inspección de este puente guardadas para su usuario en este dispositivo.",
       "soloLectura": "Solo puede consultar las fotografías de esta inspección.",
-      "contador": "Fotografías confirmadas: {{cantidad}} de {{maximo}}.",
-      "faltantes": "Falta al menos una fotografía confirmada en cada una de estas categorías:",
+      "contador": "Fotografías registradas: {{cantidad}} de {{maximo}}.",
+      "faltantes": "Falta al menos una fotografía en cada una de estas categorías:",
       "retirar": "Retirar fotografía",
       "retirada": "Fotografía retirada. La galería y los contadores se actualizaron.",
       "pendientesLocales": "Pendientes en este dispositivo",
       "confirmadasServidor": "Confirmadas por el servidor",
-      "confirmarRetirada": "¿Retirar esta fotografía de la inspección? Dejará de estar disponible y de contar como evidencia. Esta acción no se puede deshacer desde la galería."
+      "confirmarRetirada": "¿Retirar esta fotografía de la inspección? Dejará de estar disponible y de contar como evidencia. Esta acción no se puede deshacer desde la galería.",
+      "eliminarLocal": "Eliminar fotografía local",
+      "confirmarEliminarLocal": "¿Eliminar esta fotografía del dispositivo y cancelar su carga pendiente? Esta acción no se puede deshacer. Los envíos ya iniciados deben confirmarse antes de eliminar.",
+      "compresionNota": "Las imágenes se procesan en segundo plano, con un lado mayor de hasta 1600 píxeles y un objetivo de 200–400 KB. Una imagen sencilla puede ocupar menos espacio sin perder calidad."
     },
     "borrador": {
       "kicker": "INSPECCIÓN TÉCNICA · BORRADOR",

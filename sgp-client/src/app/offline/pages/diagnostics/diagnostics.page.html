@@ -3,81 +3,163 @@
   <h1 class="page-title">{{ 'offline.title' | transloco }}</h1>
   <p class="page-description">{{ 'offline.description' | transloco }}</p>
 </header>
-
-<section class="metrics">
+@if (resumen(); as datos) { @if (datos.listo && datos.propietarioId === auth.user()?.id) {
+<section class="metrics" aria-live="polite">
   <article>
-    <div class="metric-icon"><i class="pi pi-inbox"></i></div>
     <div>
-      <strong>{{ pending$ | async }}</strong><span>{{ 'offline.pendingItems' | transloco }}</span>
+      <strong>{{ datos.inspecciones }}</strong
+      ><span>{{ 'offline.pendingInspections' | transloco }}</span>
     </div>
   </article>
   <article>
-    <div class="metric-icon"><i class="pi pi-database"></i></div>
     <div>
-      <strong>{{ ((estimate().usage ?? 0) / 1048576) | number:'1.1-1' }} MB</strong
-      ><span>{{ 'offline.usedSpace' | transloco }}</span>
+      <strong>{{ datos.fotografias }}</strong><span>{{ 'offline.pendingFiles' | transloco }}</span>
     </div>
   </article>
   <article>
-    <div class="metric-icon"><i class="pi pi-save"></i></div>
     <div>
-      <strong
-        >{{ (storage.persistent() === true ? 'common.yes' : storage.persistent() === false ?
-        'common.no' : 'common.notRequested') | transloco }}</strong
-      ><span>{{ 'offline.persistentStorage' | transloco }}</span>
+      <strong>{{ datos.bytesFotos / 1048576 | number:'1.1-1' }} MB</strong
+      ><span>{{ 'offline.diagnostico.bytesFotos' | transloco }}</span>
     </div>
   </article>
 </section>
-
-<section class="diagnostic-card">
+<section class="diagnostic-card" aria-labelledby="cola-titulo" aria-live="polite">
   <div class="card-head">
-    <div>
-      <span>{{ 'offline.localStorage' | transloco }}</span>
-      <h2>{{ 'offline.controls' | transloco }}</h2>
-    </div>
-    <div class="status-pill">
-      <i class="pi pi-circle-fill"></i> {{ 'offline.basePrepared' | transloco }}
-    </div>
+    <h2 id="cola-titulo">{{ 'offline.queueTitle' | transloco }}</h2>
+    <span
+      >{{ (connectivity.online() ? 'connectivity.online' : 'connectivity.offline') | transloco
+      }}</span
+    >
   </div>
-</section>
-
-@if (cola$ | async; as cola) {
-<section class="diagnostic-card" aria-live="polite">
-  <div class="card-head"><h2>{{ 'offline.queueTitle' | transloco }}</h2></div>
-  @for (item of cola; track item.id) { @if (propietario(item)) {
-  <div class="queue-row">
-    <span>{{ 'offline.hu061.' + (item.operacion ?? 'FOTO') | transloco }}</span>
-    <span
-      >{{ (item.estado === 'INTERVENCION' ? 'offline.intervention' : item.estado === 'ENVIANDO' ?
-      'offline.hu061.processing' : 'offline.waiting') | transloco }}</span
-    >
-    @if (item.iniciadoEn) {
-    <span
-      >{{ 'offline.hu061.lastAttempt' | transloco }}: {{ item.iniciadoEn | date:'dd/MM/yyyy
-      HH:mm':'-0600' }}</span
-    >
-    } @if (item.tipo === 'INSPECCION') {
-    <a [routerLink]="['/inspecciones', item.entityId, 'borrador']"
-      >{{ 'offline.hu061.resume' | transloco }}</a
-    >
-    } @if (item.estado === 'INTERVENCION') {
-    <span role="alert"
-      >{{ item.ultimoError?.startsWith('offline.') ? (item.ultimoError! | transloco) :
-      item.ultimoError }}</span
-    >
-    <button type="button" (click)="sync.reintentar(item.id)">
-      {{ 'offline.retry' | transloco }}
-    </button>
+  @for (item of datos.elementos; track item.id) {
+  <article class="queue-row">
+    <h3>{{ 'offline.hu061.' + item.operacion | transloco }}</h3>
+    <p>{{ 'offline.diagnostico.identificador' | transloco }}: {{ item.entityId }}</p>
+    <p>
+      {{ (item.estado === 'INTERVENCION' ? 'offline.intervention' : item.estado === 'ENVIANDO' ?
+      'offline.hu061.processing' : 'offline.waiting') | transloco }}
+    </p>
+    <p>{{ 'offline.diagnostico.intentos' | transloco }}: {{ item.intentos }} / 5</p>
+    <p>
+      {{ 'offline.hu061.lastAttempt' | transloco }}: {{ item.iniciadoEn ? (item.iniciadoEn |
+      date:'dd/MM/yyyy HH:mm':'-0600') : ('offline.diagnostico.sinIntentos' | transloco) }}
+    </p>
+    @if (item.motivo) {
+    <p role="status">{{ item.motivo | transloco }}</p>
     }
+    <div class="actions">
+      @if (item.inspeccionId) {
+      <a [routerLink]="['/inspecciones', item.inspeccionId, 'borrador']"
+        >{{ 'offline.hu061.resume' | transloco }}</a
+      >
+      } @if (item.reintentable) {
+      <button
+        pButton
+        type="button"
+        (click)="reintentar(item.id)"
+        [disabled]="sync.sincronizando() || !connectivity.online()"
+      >
+        {{ 'offline.retry' | transloco }}
+      </button>
+      }
+    </div>
+  </article>
+  } @empty {
+  <p>{{ 'offline.synced' | transloco }}</p>
+  } @if (errorAccion()) {
+  <p role="alert">{{ 'offline.diagnostico.errorAccion' | transloco }}</p>
+  }
+  <div class="actions">
+    <button
+      pButton
+      type="button"
+      (click)="sincronizar()"
+      [disabled]="sync.sincronizando() || !connectivity.online()"
+    >
+      {{ 'offline.syncNow' | transloco }}
+    </button>
+    <button pButton type="button" (click)="liberarEspacio()" [disabled]="sync.sincronizando()">
+      {{ 'offline.releaseSpace' | transloco }}
+    </button>
   </div>
-  } }
-  <button
-    type="button"
-    (click)="sync.sincronizarAhora()"
-    [disabled]="sync.sincronizando() || !cola.length"
-  >
-    {{ 'offline.syncNow' | transloco }}
-  </button>
-  <button type="button" (click)="liberarEspacio()">{{ 'offline.releaseSpace' | transloco }}</button>
+  <p>{{ 'offline.diagnostico.limpiezaSegura' | transloco }}</p>
 </section>
-}
+} }
+<section class="diagnostic-card" aria-labelledby="espacio-titulo">
+  <h2 id="espacio-titulo">{{ 'offline.localStorage' | transloco }}</h2>
+  <p>{{ 'offline.almacenamiento.origen' | transloco }}</p>
+  <dl>
+    <dt>{{ 'offline.usedSpace' | transloco }}</dt>
+    <dd>
+      {{ storage.estimate().usage !== undefined ? ((storage.estimate().usage! / 1048576 |
+      number:'1.1-1') + ' MB') : ('offline.diagnostico.desconocido' | transloco) }}
+    </dd>
+    <dt>{{ 'offline.almacenamiento.disponible' | transloco }}</dt>
+    <dd>
+      {{ storage.disponible() !== null ? ((storage.disponible()! / 1048576 | number:'1.1-1') + '
+      MB') : ('offline.diagnostico.desconocido' | transloco) }}
+    </dd>
+    <dt>{{ 'offline.persistentStorage' | transloco }}</dt>
+    <dd>
+      {{ (storage.persistent() === true ? 'common.yes' : storage.persistent() === false ?
+      'common.no' : 'common.notRequested') | transloco }}
+    </dd>
+  </dl>
+  @if (storage.persistent() === false) {
+  <p role="status">{{ 'offline.almacenamiento.noPersistente' | transloco }}</p>
+  } @if (storage.pocoEspacio()) {
+  <p role="status">{{ 'offline.almacenamiento.pocoEspacio' | transloco }}</p>
+  } @if (errorAlmacenamiento()) {
+  <p role="alert">{{ 'offline.almacenamiento.errorMedicion' | transloco }}</p>
+  }
+  <div class="actions">
+    <button pButton type="button" (click)="persist()">
+      {{ 'offline.almacenamiento.solicitar' | transloco }}</button
+    ><button pButton type="button" (click)="refresh()">
+      {{ 'offline.almacenamiento.actualizar' | transloco }}
+    </button>
+  </div>
+</section>
+<section
+  class="diagnostic-card"
+  aria-labelledby="conflictos-titulo"
+  [attr.aria-busy]="cargandoConflictos()"
+>
+  <h2 id="conflictos-titulo">{{ 'offline.diagnostico.conflictos' | transloco }}</h2>
+  <p>{{ 'offline.diagnostico.conflictosNota' | transloco }}</p>
+  <div class="actions">
+    <button
+      pButton
+      type="button"
+      (click)="cargarConflictos()"
+      [disabled]="cargandoConflictos() || !connectivity.online()"
+    >
+      {{ 'offline.diagnostico.consultar' | transloco }}
+    </button>
+  </div>
+  @if (!connectivity.online()) {
+  <p role="status">{{ 'offline.diagnostico.conflictosConexion' | transloco }}</p>
+  } @if (cargandoConflictos()) {
+  <p role="status">{{ 'offline.diagnostico.cargando' | transloco }}</p>
+  } @if (errorConflictos()) {
+  <p role="alert">{{ 'offline.diagnostico.errorConflictos' | transloco }}</p>
+  } @for (conflicto of conflictos(); track conflicto.id) { @if (conflicto.propietarioId ===
+  auth.user()?.id) {
+  <article class="queue-row">
+    <h3>{{ 'offline.diagnostico.identificador' | transloco }}: {{ conflicto.inspeccionId }}</h3>
+    <p>{{ conflicto.detectadoEn | date:'dd/MM/yyyy HH:mm':'-0600' }}</p>
+    <p>
+      {{ 'offline.diagnostico.versiones' | transloco }}: {{ conflicto.versionCliente }} → {{
+      conflicto.versionServidor }}
+    </p>
+    <p>{{ 'offline.diagnostico.clientePrevalece' | transloco }}</p>
+    <details>
+      <summary>{{ 'offline.diagnostico.copiaServidor' | transloco }}</summary>
+      <pre tabindex="0" [attr.aria-label]="'offline.diagnostico.copiaServidor' | transloco">
+{{ conflicto.copiaServidor | json }}</pre>
+    </details>
+  </article>
+  } } @empty { @if (!cargandoConflictos() && !errorConflictos() && connectivity.online()) {
+  <p>{{ 'offline.diagnostico.sinConflictos' | transloco }}</p>
+  } }
+</section>
