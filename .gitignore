@@ -15,6 +15,8 @@
 *.log
 enunciado_ayd1.md
 manual_centro_americano.md
+/docs/Proyecto 2.md
+/docs/Jira_HUs.md
 
 # Artefactos de pruebas PWA en navegador
 sgp-client/test-results/

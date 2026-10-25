@@ -184,6 +184,34 @@ public class OrdenMantenimiento {
     return orden;
   }
 
+  /** PROPUESTA rutinaria identificada por un ciclo inmutable del plan (HU-068). */
+  public static OrdenMantenimiento propuestaCicloRutinario(
+      UUID id,
+      UUID puenteId,
+      UUID planId,
+      int ciclo,
+      String descripcion,
+      PrioridadOrden prioridad,
+      JsonNode fundamento,
+      Instant ahora) {
+    OrdenMantenimiento orden =
+        new OrdenMantenimiento(
+            id,
+            puenteId,
+            null,
+            null,
+            null,
+            TipoOrden.RUTINARIO,
+            descripcion,
+            prioridad,
+            null,
+            ahora);
+    orden.planMantenimientoRutinarioId = planId;
+    orden.cicloPlan = ciclo;
+    orden.fundamentoGeneracion = fundamento;
+    return orden;
+  }
+
   /**
    * Cambia el estado. Solo lo invoca {@code TransicionOrdenService}, después de validar la
    * transición con la máquina de estados (DT-BE-07).
@@ -203,6 +231,14 @@ public class OrdenMantenimiento {
   /** Motivo exigido para DESCARTADA y CANCELADA (RN-MTO-09). */
   public void registrarMotivoCierre(String motivo) {
     this.motivoCierreSinEjecucion = motivo;
+  }
+
+  /** HU-047: changes only the confirmed priority; the generated suggestion stays immutable. */
+  public void cambiarPrioridadConfirmada(
+      PrioridadOrden prioridad, String justificacion, Instant ahora) {
+    this.prioridadConfirmada = prioridad;
+    this.justificacionPrioridad = justificacion;
+    this.actualizadoEn = ahora;
   }
 
   public UUID getId() {

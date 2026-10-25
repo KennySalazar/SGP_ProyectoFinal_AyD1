@@ -23,6 +23,7 @@ import { TextareaModule } from 'primeng/textarea';
 import { finalize, forkJoin, Observable, of } from 'rxjs';
 import { catchError } from 'rxjs/operators';
 import { ApiErrorService } from '../../../../core/services/api-error.service';
+import { AuthStore } from '../../../../core/services/auth.store';
 import { PuenteResponse } from '../../../puentes/models/puente.models';
 import { PuenteApiService } from '../../../puentes/services/puente-api.service';
 import {
@@ -32,6 +33,7 @@ import {
   OrdenMantenimiento,
   ResponsableDisponible,
 } from '../../models/orden-mantenimiento.models';
+import { PrioridadMantenimiento } from '../../models/regla-mantenimiento.models';
 import { OrdenMantenimientoApiService } from '../../services/orden-mantenimiento-api.service';
 import { comprimirImagen } from '../../utils/comprimir-imagen';
 import { aFechaIso, severidadEstadoOrden, ZONA_GUATEMALA } from '../../utils/estado-orden';
@@ -72,6 +74,7 @@ export class DetalleOrdenPage {
   private readonly api = inject(OrdenMantenimientoApiService);
   private readonly puentesApi = inject(PuenteApiService);
   private readonly apiErrors = inject(ApiErrorService);
+  private readonly auth = inject(AuthStore);
   private readonly destroyRef = inject(DestroyRef);
   private readonly ordenId = inject(ActivatedRoute).snapshot.paramMap.get('id') ?? '';
 
@@ -90,6 +93,21 @@ export class DetalleOrdenPage {
   readonly motivo = signal('');
   readonly procesando = signal(false);
   readonly errorAccion = signal<ErrorAccion | null>(null);
+  readonly editandoPrioridad = signal(false);
+  readonly prioridadNueva = signal<PrioridadMantenimiento>('MEDIA');
+  readonly justificacionNueva = signal('');
+  readonly guardandoPrioridad = signal(false);
+  readonly errorPrioridad = signal<string | null>(null);
+  readonly puedeCambiarPrioridad = computed(() => {
+    const orden = this.orden();
+    const rol = this.auth.user()?.role;
+    return (
+      (rol === 'CATEDRATICO' || rol === 'ADMINISTRADOR') &&
+      !!orden &&
+      !['EJECUTADA', 'CANCELADA', 'DESCARTADA'].includes(orden.estado)
+    );
+  });
+  readonly opcionesPrioridad: PrioridadMantenimiento[] = ['BAJA', 'MEDIA', 'ALTA', 'CRITICA'];
 
   readonly modoResponsable = signal<ModoResponsable>('usuario');
   readonly responsableUsuarioId = signal<string | null>(null);
@@ -181,6 +199,43 @@ export class DetalleOrdenPage {
     this.motivo.set('');
     this.fechaProgramada.set(this.hoy);
     this.accion.set(accion);
+  }
+
+  abrirEdicionPrioridad(): void {
+    const orden = this.orden();
+    if (!orden || !this.puedeCambiarPrioridad()) return;
+    this.prioridadNueva.set(orden.prioridadConfirmada);
+    this.justificacionNueva.set('');
+    this.errorPrioridad.set(null);
+    this.editandoPrioridad.set(true);
+  }
+
+  guardarPrioridad(): void {
+    const justificacion = this.justificacionNueva().trim();
+    if (
+      !this.orden() ||
+      !this.puedeCambiarPrioridad() ||
+      !justificacion ||
+      this.guardandoPrioridad()
+    )
+      return;
+    this.guardandoPrioridad.set(true);
+    this.errorPrioridad.set(null);
+    this.api
+      .cambiarPrioridad(this.ordenId, this.prioridadNueva(), justificacion)
+      .pipe(
+        takeUntilDestroyed(this.destroyRef),
+        finalize(() => this.guardandoPrioridad.set(false)),
+      )
+      .subscribe({
+        next: () => {
+          this.editandoPrioridad.set(false);
+          this.cargar();
+        },
+        error: (err: HttpErrorResponse) => {
+          this.errorPrioridad.set(errorDe(err, 'No fue posible cambiar la prioridad.').mensaje);
+        },
+      });
   }
 
   cerrarDialogo(): void {

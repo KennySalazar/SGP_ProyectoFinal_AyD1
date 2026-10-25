@@ -6,6 +6,37 @@
   </div>
 </header>
 
+<section class="surface-card lista-ordenes planes-rutinarios">
+  <h2>{{ 'mantenimiento.plan.listado' | transloco }}</h2>
+  @if (cargandoPlanes()) {
+  <p role="status">{{ 'mantenimiento.plan.cargando' | transloco }}</p>
+  } @else if (errorPlanes()) {
+  <div class="estado-lista" role="alert">
+    <p>{{ 'mantenimiento.plan.errorListado' | transloco }}</p>
+    <button pButton type="button" severity="secondary" [outlined]="true" (click)="cargarPlanes()">
+      <span>{{ 'mantenimiento.plan.reintentar' | transloco }}</span>
+    </button>
+  </div>
+  } @else if (planes().length) { @for (plan of planes(); track plan.id) {
+  <article class="orden-fila">
+    <div class="orden-principal">
+      <h3>{{ plan.codigoPuente }} · {{ plan.nombrePuente }}</h3>
+      <p>
+        {{ plan.periodicidadMeses }} {{ 'mantenimiento.plan.meses' | transloco }} · {{
+        'mantenimiento.plan.proximoCiclo' | transloco }}: @if (plan.fechaProximoCiclo) { {{
+        plan.fechaProximoCiclo | date:'dd/MM/yyyy' }} } @else { {{
+        'mantenimiento.plan.puenteInactivo' | transloco }} }
+      </p>
+    </div>
+    <a pButton severity="secondary" [outlined]="true" [routerLink]="['/puentes', plan.puenteId]">
+      <span>{{ 'mantenimiento.plan.ver' | transloco }}</span>
+    </a>
+  </article>
+  } } @else {
+  <p>{{ 'mantenimiento.plan.sinPlanes' | transloco }}</p>
+  }
+</section>
+
 <section
   class="surface-card filtros"
   [attr.aria-label]="'mantenimiento.ordenes.filtros.titulo' | transloco"

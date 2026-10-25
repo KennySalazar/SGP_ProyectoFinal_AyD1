@@ -13,6 +13,7 @@ import gt.usac.cunoc.sgp.inspeccion.model.ResultadoCalculoIc;
 import gt.usac.cunoc.sgp.inspeccion.service.CalculoIndiceCondicionService;
 import gt.usac.cunoc.sgp.inspeccion.service.PreparadorEntradaIcService;
 import gt.usac.cunoc.sgp.inspeccion.service.PublicacionIndiceCondicionService;
+import gt.usac.cunoc.sgp.mantenimiento.service.PlanMantenimientoService;
 import gt.usac.cunoc.sgp.puente.dto.ActualizarPuenteRequest;
 import gt.usac.cunoc.sgp.puente.mapper.PuenteMapper;
 import gt.usac.cunoc.sgp.puente.mapper.PuenteMapperImpl;
@@ -102,6 +103,8 @@ class PublicacionIndiceCondicionIntegrationTest {
   @Autowired private PuenteService puenteService;
   @Autowired private gt.usac.cunoc.sgp.puente.service.EstadoCalibracionPuenteService respaldo;
   @MockBean private CalculoIndiceCondicionService calculador;
+
+  @MockBean private PlanMantenimientoService planesMantenimiento;
 
   private UUID usuarioId;
   private UUID puenteId;

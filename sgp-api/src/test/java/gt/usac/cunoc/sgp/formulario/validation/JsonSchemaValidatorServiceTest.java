@@ -10,6 +10,7 @@ import gt.usac.cunoc.sgp.common.exception.ApiException;
 import java.io.InputStream;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.http.HttpStatus;
 
 class JsonSchemaValidatorServiceTest {
@@ -129,6 +130,68 @@ class JsonSchemaValidatorServiceTest {
               assertThat(apiEx.getCode()).isEqualTo("esquema_invalido");
               assertThat(apiEx.getMessage()).contains("$.type");
             });
+  }
+
+  @Test
+  void rechazaTipoEscalarCuandoElNodoDefinePropiedades() throws Exception {
+    JsonNode esquema =
+        objectMapper.readTree(
+            """
+            {
+              "$schema": "https://json-schema.org/draft/2020-12/schema",
+              "type": "object",
+              "properties": {
+                "coordenadas": {
+                  "type": "string",
+                  "properties": { "norte": { "type": "number" } }
+                }
+              }
+            }
+            """);
+
+    assertThatThrownBy(() -> service.validarEsquema(esquema))
+        .isInstanceOfSatisfying(
+            ApiException.class,
+            ex -> {
+              assertThat(ex.getStatus()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+              assertThat(ex.getCode()).isEqualTo("esquema_invalido");
+              assertThat(ex.getMessage()).contains("$/properties/coordenadas", "object");
+            });
+  }
+
+  @Test
+  void rechazaTipoEscalarCuandoElNodoDefineItems() throws Exception {
+    JsonNode esquema =
+        objectMapper.readTree(
+            """
+            {
+              "$schema": "https://json-schema.org/draft/2020-12/schema",
+              "type": "object",
+              "properties": {
+                "pilas": {
+                  "type": "string",
+                  "items": { "type": "object", "properties": {} }
+                }
+              }
+            }
+            """);
+
+    assertThatThrownBy(() -> service.validarEsquema(esquema))
+        .isInstanceOfSatisfying(
+            ApiException.class,
+            ex -> {
+              assertThat(ex.getStatus()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+              assertThat(ex.getCode()).isEqualTo("esquema_invalido");
+              assertThat(ex.getMessage()).contains("$/properties/pilas", "array");
+            });
+  }
+
+  @Test
+  void aceptaEsquemaCanonicoSieca() throws Exception {
+    try (InputStream entrada =
+        new ClassPathResource("formulario/sieca-v1/esquema.schema.json").getInputStream()) {
+      service.validarEsquema(objectMapper.readTree(entrada));
+    }
   }
 
   @Test

@@ -8,6 +8,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import gt.usac.cunoc.sgp.common.exception.ApiException;
+import gt.usac.cunoc.sgp.mantenimiento.service.PlanMantenimientoService;
 import gt.usac.cunoc.sgp.puente.dto.PuenteCatalogoResponse;
 import gt.usac.cunoc.sgp.puente.entity.Puente;
 import gt.usac.cunoc.sgp.puente.mapper.PuenteMapper;
@@ -38,7 +39,8 @@ class PuenteCatalogoServiceTest {
           repository,
           mapper,
           mock(Validator.class),
-          Clock.systemUTC());
+          Clock.systemUTC(),
+          mock(PlanMantenimientoService.class));
 
   @ParameterizedTest
   @CsvSource({"-1,20", "0,0", "0,-1", "0,101"})

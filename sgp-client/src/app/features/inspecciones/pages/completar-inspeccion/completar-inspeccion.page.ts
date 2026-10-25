@@ -42,6 +42,7 @@ import {
   BorradorLocalPayload,
 } from '../../../../offline/services/inspecciones-locales.service';
 import { ConnectivityService } from '../../../../offline/services/connectivity.service';
+import { mensajeCampo } from '../../utils/nombre-campo';
 
 import { ReporteFotograficoComponent } from '../../components/reporte-fotografico/reporte-fotografico.component';
 import { DocumentosInspeccionComponent } from '../../components/documentos-inspeccion/documentos-inspeccion.component';
@@ -102,10 +103,18 @@ export class CompletarInspeccionPage implements OnInit {
   private ultimaHuellaDatos: string | null = null;
   private guardadoForzadoDuranteSolicitud = false;
   private guardadoPendiente: { request: GuardarBorradorRequest; revision: number } | null = null;
+  private publicarTrasGuardar = false;
 
   protected readonly reporteFotos = viewChild(ReporteFotograficoComponent);
   readonly fotografiasOcupadas = computed(() => this.reporteFotos()?.ocupado() ?? false);
   protected readonly formulario = viewChild(FormularioDinamicoComponent);
+  readonly valoresInicialesIncompatibles = computed(
+    () => this.formulario()?.valoresInicialesIncompatibles() ?? [],
+  );
+  readonly revisionInicialConfirmada = signal(false);
+  readonly requiereRevisionInicial = computed(
+    () => this.valoresInicialesIncompatibles().length > 0 && !this.revisionInicialConfirmada(),
+  );
   readonly revisionIc = signal(0);
   readonly operandoIc = signal(false);
   readonly esAutor = computed(() => this.auth.user()?.id === this.borrador()?.autorId);
@@ -363,6 +372,7 @@ export class CompletarInspeccionPage implements OnInit {
 
   private aplicarBorrador(borrador: InspeccionBorradorResponse): void {
     this.ultimaHuellaDatos = null;
+    this.revisionInicialConfirmada.set(false);
     this.borrador.set(this.conProgreso(borrador));
     this.datosIniciales.set(borrador);
     this.fechaInspeccion.set(borrador.fechaInspeccion || this.hoy);
@@ -555,7 +565,7 @@ export class CompletarInspeccionPage implements OnInit {
   }
   guardarBorrador(forzar = true): void {
     const b = this.borrador();
-    if (this.ejecutandoAccion() || this.resultadoAccion()) return;
+    if ((this.ejecutandoAccion() && !this.publicarTrasGuardar) || this.resultadoAccion()) return;
     if (!b || this.soloLectura() || (!forzar && this.revisionDatos <= this.revisionGuardada))
       return;
     if (this.guardando()) {
@@ -582,7 +592,22 @@ export class CompletarInspeccionPage implements OnInit {
       }
     }
     const formulario = this.formulario();
-    const valores = formulario?.construido() ? formulario.valor() : this.datosEnMemoria();
+    if (!formulario?.disponible()) {
+      const error = new HttpErrorResponse({
+        status: 0,
+        error: {
+          detail:
+            'El formulario de inspección todavía no está listo. Espere a que cargue para guardar.',
+        },
+      });
+      if (this.publicarTrasGuardar) this.abortarPublicacionPorGuardado(error);
+      else {
+        this.errorGuardado.set(error.error.detail);
+        this.estadoAutoguardado.set('pendiente');
+      }
+      return;
+    }
+    const valores = formulario.valor();
     const valorActual = {
       ...valores,
       identificacion: {
@@ -616,6 +641,15 @@ export class CompletarInspeccionPage implements OnInit {
     this.estadoAutoguardado.set('guardando');
     // Si no hay red o es un borrador que solo existe localmente (no sincronizado en servidor)
     if (!this.connectivity.online() || this.esSoloLocal()) {
+      if (this.publicarTrasGuardar) {
+        this.abortarPublicacionPorGuardado(
+          new HttpErrorResponse({
+            status: 0,
+            error: { detail: 'Se requiere conexión para guardar el borrador antes de publicar.' },
+          }),
+        );
+        return;
+      }
       void this.inspeccionesLocales
         .guardarBorradorLocal(
           {
@@ -689,6 +723,14 @@ export class CompletarInspeccionPage implements OnInit {
           this.guardando.set(false);
           this.estadoAutoguardado.set('guardado');
           this.mensajeExito.set(this.mensajeGuardadoEnDispositivo(new Date()));
+          if (this.publicarTrasGuardar) {
+            this.abortarPublicacionPorGuardado(
+              new HttpErrorResponse({
+                status: 403,
+                error: { detail: 'La sesión actual no corresponde al propietario del borrador.' },
+              }),
+            );
+          }
           return;
         }
         this.inspeccionApi.guardarBorrador(b.id, request, operacion.idempotencyKey).subscribe({
@@ -717,8 +759,18 @@ export class CompletarInspeccionPage implements OnInit {
             const guardarCambiosPendientes =
               this.guardadoForzadoDuranteSolicitud && hayCambiosNuevos;
             this.guardadoForzadoDuranteSolicitud = false;
-            if (guardarCambiosPendientes) {
+            const publicar = this.publicarTrasGuardar;
+            if (publicar && hayCambiosNuevos) {
               this.guardarBorrador(false);
+            } else if (guardarCambiosPendientes) {
+              this.publicarTrasGuardar = false;
+              this.guardarBorrador(false);
+            } else if (publicar) {
+              this.publicarTrasGuardar = false;
+              this.datosIniciales.set(actualizada);
+              this.ejecutarAccionFinal();
+            } else {
+              this.publicarTrasGuardar = false;
             }
           },
           error: (err: HttpErrorResponse) => {
@@ -750,13 +802,31 @@ export class CompletarInspeccionPage implements OnInit {
               this.estadoAutoguardado.set(null);
             }
             this.procesarErrorGuardado(err);
+            if (this.publicarTrasGuardar) this.abortarPublicacionPorGuardado(err);
           },
         });
+      })
+      .catch((err: unknown) => {
+        if (this.publicarTrasGuardar) {
+          this.abortarPublicacionPorGuardado(
+            err instanceof HttpErrorResponse
+              ? err
+              : new HttpErrorResponse({
+                  status: 0,
+                  error: { detail: 'No fue posible preparar el guardado.' },
+                }),
+          );
+        }
       });
+  }
+  confirmarRevisionInicial(): void {
+    if (this.valoresInicialesIncompatibles().length > 0) this.revisionInicialConfirmada.set(true);
   }
   abrirConfirmacion(): void {
     if (
       !this.accionFinal() ||
+      this.requiereRevisionInicial() ||
+      this.errorGuardado() ||
       this.guardando() ||
       this.operandoIc() ||
       this.colegiadoPendiente() ||
@@ -797,6 +867,7 @@ export class CompletarInspeccionPage implements OnInit {
     if (
       !b ||
       !accion ||
+      this.requiereRevisionInicial() ||
       !this.confirmandoAccion() ||
       this.ejecutandoAccion() ||
       this.guardando() ||
@@ -811,11 +882,19 @@ export class CompletarInspeccionPage implements OnInit {
     }
     this.ejecutandoAccion.set(true);
     this.errorAccion.set(null);
+    if (accion === 'publicar' && this.connectivity.online() && !this.esSoloLocal()) {
+      this.publicarTrasGuardar = true;
+      this.guardarBorrador(true);
+      return;
+    }
     try {
       await this.escrituraLocal;
       if (this.auth.user()?.id !== b.autorId || this.errorAlmacenamiento())
         throw new Error(this.i18n.translate('offline.hu061.storageError'));
-      const datos = this.formulario()!.valor();
+      const formulario = this.formulario();
+      if (!formulario?.disponible() || !formulario.construido())
+        throw new Error(this.i18n.translate('offline.hu061.incomplete'));
+      const datos = formulario.valor();
       const fecha = this.fechaInspeccion() || b.fechaInspeccion;
       if (
         fecha > this.hoy ||
@@ -852,6 +931,62 @@ export class CompletarInspeccionPage implements OnInit {
     } finally {
       this.ejecutandoAccion.set(false);
     }
+  }
+  private ejecutarAccionFinal(): void {
+    const b = this.borrador();
+    if (!b) return;
+    const peticion = this.inspeccionApi.publicar(b.id);
+    peticion.pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+      next: (resultado) => {
+        this.ejecutandoAccion.set(false);
+        this.confirmandoAccion.set(false);
+        this.resultadoAccion.set(resultado);
+        this.borrador.update((actual) =>
+          actual ? { ...actual, estado: resultado.estado } : actual,
+        );
+        if (resultado.estado === 'PUBLICADA')
+          void this.router.navigate(['/puentes', resultado.puenteId], { replaceUrl: true });
+      },
+      error: (err: HttpErrorResponse) => {
+        this.ejecutandoAccion.set(false);
+        this.errorAccion.set(this.errorDeAccion(err));
+        if (
+          err.status === 409 &&
+          ['confirmacion_ic_desactualizada', 'calculo_ic_desactualizado'].includes(err.error?.code)
+        ) {
+          this.confirmandoAccion.set(false);
+          this.revisionIc.update((revision) => revision + 1);
+        }
+        this.apiErrors.clear();
+      },
+    });
+  }
+  private abortarPublicacionPorGuardado(err: HttpErrorResponse): void {
+    this.publicarTrasGuardar = false;
+    this.guardando.set(false);
+    this.estadoAutoguardado.set(this.revisionDatos > this.revisionGuardada ? 'pendiente' : null);
+    this.ejecutandoAccion.set(false);
+    this.confirmandoAccion.set(false);
+    this.errorAccion.set(this.errorDeAccion(err));
+  }
+  private errorDeAccion(err: HttpErrorResponse): ErrorAccion {
+    const problema = err.error as {
+      detail?: string;
+      errores?: { campo?: string; mensaje?: string }[];
+    } | null;
+    const errores = problema?.errores ?? [];
+    return {
+      mensaje: problema?.detail ?? 'No fue posible completar la acción sobre la inspección.',
+      campos: errores
+        .filter((e) => e.campo && !e.campo.startsWith('fotografias.'))
+        .map((e) => ({
+          campo: e.campo ?? '',
+          mensaje: mensajeCampo(e.campo ?? '', e.mensaje ?? '', this.esquema()),
+        })),
+      fotografias: errores
+        .filter((e) => e.campo?.startsWith('fotografias.'))
+        .map((e) => (e.campo ?? '').replace('fotografias.', '')),
+    };
   }
   severidadIc(estado: string | null | undefined): 'success' | 'warn' | 'danger' | 'secondary' {
     switch (estado?.toUpperCase()) {

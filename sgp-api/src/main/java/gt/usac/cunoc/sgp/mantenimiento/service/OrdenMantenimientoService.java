@@ -7,6 +7,7 @@ import gt.usac.cunoc.sgp.common.audit.service.AuditoriaWriter;
 import gt.usac.cunoc.sgp.common.exception.ApiException;
 import gt.usac.cunoc.sgp.common.util.UuidV7Generator;
 import gt.usac.cunoc.sgp.inspeccion.repository.InspeccionRepository;
+import gt.usac.cunoc.sgp.mantenimiento.dto.CambiarPrioridadOrdenRequest;
 import gt.usac.cunoc.sgp.mantenimiento.dto.CrearOrdenMantenimientoRequest;
 import gt.usac.cunoc.sgp.mantenimiento.dto.FiltroOrdenesRequest;
 import gt.usac.cunoc.sgp.mantenimiento.dto.HistorialEstadoOrdenResponse;
@@ -198,6 +199,63 @@ public class OrdenMantenimientoService {
   @Transactional(readOnly = true)
   public OrdenMantenimientoResponse obtener(UUID ordenId) {
     return mapper.toResponse(buscar(ordenId));
+  }
+
+  /** HU-047: updates the confirmed priority with justification and an auditable before/after. */
+  @Transactional
+  public OrdenMantenimientoResponse cambiarPrioridad(
+      UUID ordenId, CambiarPrioridadOrdenRequest request, UUID usuarioId) {
+    List<Map<String, String>> errores = new ArrayList<>();
+    PrioridadOrden prioridad =
+        convertir(
+            PrioridadOrden.class,
+            request == null ? null : request.prioridad(),
+            "prioridad",
+            errores);
+    String justificacion = request == null ? null : texto(request.justificacion());
+    if (justificacion == null) {
+      errores.add(error("justificacion", "La justificación es obligatoria."));
+    }
+    if (!errores.isEmpty()) {
+      throw new ApiException(
+          HttpStatus.UNPROCESSABLE_ENTITY,
+          "prioridad_invalida",
+          "Prioridad inválida",
+          "Indique una prioridad válida y su justificación.",
+          errores);
+    }
+
+    OrdenMantenimiento orden = buscar(ordenId);
+    if (EnumSet.of(EstadoOrden.EJECUTADA, EstadoOrden.CANCELADA, EstadoOrden.DESCARTADA)
+        .contains(orden.getEstado())) {
+      throw new ApiException(
+          HttpStatus.CONFLICT,
+          "orden_terminal",
+          "Orden cerrada",
+          "No se puede cambiar la prioridad de una orden en estado terminal.");
+    }
+    PrioridadOrden anterior = orden.getPrioridadConfirmada();
+    ObjectNode valoresAnteriores =
+        json.createObjectNode()
+            .put("prioridadSugerida", orden.getPrioridadSugerida().name())
+            .put("prioridadConfirmada", anterior.name())
+            .put("justificacionPrioridad", orden.getJustificacionPrioridad());
+    orden.cambiarPrioridadConfirmada(prioridad, justificacion, clock.instant());
+    OrdenMantenimiento guardada = ordenes.saveAndFlush(orden);
+    ObjectNode valoresPosteriores =
+        json.createObjectNode()
+            .put("prioridadSugerida", guardada.getPrioridadSugerida().name())
+            .put("prioridadConfirmada", guardada.getPrioridadConfirmada().name())
+            .put("justificacionPrioridad", guardada.getJustificacionPrioridad());
+    auditoria.registrarEnTransaccion(
+        usuarioId,
+        AccionAuditoria.MODIFICAR,
+        TransicionOrdenService.ENTIDAD,
+        guardada.getId(),
+        valoresAnteriores,
+        valoresPosteriores,
+        null);
+    return mapper.toResponse(guardada);
   }
 
   /**

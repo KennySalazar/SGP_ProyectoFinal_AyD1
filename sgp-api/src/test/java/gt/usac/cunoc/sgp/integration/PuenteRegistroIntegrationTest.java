@@ -9,6 +9,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import gt.usac.cunoc.sgp.common.exception.ApiException;
+import gt.usac.cunoc.sgp.mantenimiento.service.PlanMantenimientoService;
 import gt.usac.cunoc.sgp.puente.dto.CrearPuenteRequest;
 import gt.usac.cunoc.sgp.puente.exception.CercaniaPuenteException;
 import gt.usac.cunoc.sgp.puente.mapper.PuenteMapperImpl;
@@ -34,6 +35,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -105,6 +107,8 @@ class PuenteRegistroIntegrationTest {
   @Autowired private JdbcTemplate jdbc;
 
   @Autowired private CatalogoTerritorialService catalogoTerritorialService;
+
+  @MockBean private PlanMantenimientoService planesMantenimiento;
 
   private UUID departamentoId;
   private UUID municipioId;
