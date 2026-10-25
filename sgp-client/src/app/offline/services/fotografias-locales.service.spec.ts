@@ -8,6 +8,9 @@ describe('Persistencia de reintentos fotográficos', () => {
   beforeEach(() => {
     memoria.clear();
     contextos.clear();
+    vi.spyOn(sgpDb.inspecciones, 'get').mockImplementation(
+      (id: unknown) => Promise.resolve(contextos.get(String(id))) as never,
+    );
     vi.spyOn(sgpDb.inspecciones, 'put').mockImplementation((contexto: LocalInspection) => {
       contextos.set(contexto.id, contexto);
       return Promise.resolve(contexto.id) as never;

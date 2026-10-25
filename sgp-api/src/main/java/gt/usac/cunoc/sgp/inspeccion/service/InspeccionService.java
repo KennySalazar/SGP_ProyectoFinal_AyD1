@@ -937,17 +937,18 @@ public class InspeccionService {
                           "El estudiante no tiene una asignación vigente para este puente."));
     }
 
-    // 4. Versión activa de formulario (fijada para la inspección)
+    // Una captura preparada conserva su versión aunque cambie la activa.
     VersionFormulario versionActiva =
-        versionFormularioRepository
-            .findByActivaTrue()
+        (request.versionFormularioId() == null
+                ? versionFormularioRepository.findByActivaTrue()
+                : versionFormularioRepository.findById(request.versionFormularioId()))
             .orElseThrow(
                 () ->
                     new ApiException(
                         HttpStatus.CONFLICT,
                         "sin_formulario_activo",
                         "Formulario no disponible",
-                        "No existe una versión de formulario activa para iniciar inspecciones."));
+                        "No existe la versión de formulario solicitada para iniciar inspecciones."));
     if (versionActiva.getEstado() != EstadoVersionFormulario.PUBLICADA) {
       throw new ApiException(
           HttpStatus.UNPROCESSABLE_ENTITY,

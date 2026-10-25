@@ -1,4 +1,7 @@
-import { Injectable } from '@angular/core';
+import { from } from 'rxjs';
+import { liveQuery } from 'dexie';
+import { AuthStore } from '../../core/services/auth.store';
+import { Injectable, inject } from '@angular/core';
 import { sgpDb, LocalInspection, LocalBridge, LocalFormSchema, SyncQueueItem } from '../db/sgp-db';
 import {
   IniciarInspeccionRequest,
@@ -20,6 +23,11 @@ export interface BorradorLocalPayload {
 
 @Injectable({ providedIn: 'root' })
 export class InspeccionesLocalesService {
+  private readonly auth = inject(AuthStore);
+  observarInspeccion(id: string) {
+    return from(liveQuery(() => sgpDb.inspecciones.get(id)));
+  }
+
   /**
    * Guarda o actualiza una inspección local en Dexie.
    * Lanza un error si se excede la cuota de almacenamiento.
@@ -38,12 +46,100 @@ export class InspeccionesLocalesService {
     }
   }
 
+  private exigirEditable(local: LocalInspection | undefined, propietarioId?: string): void {
+    if (
+      local &&
+      (local.propietarioId !== propietarioId ||
+        local.intencionFinal?.estado === 'PENDIENTE' ||
+        local.intencionFinal?.estado === 'CONFIRMADA')
+    ) {
+      throw new Error('offline.hu061.locked');
+    }
+  }
+
+  async encolarAccionFinal(
+    id: string,
+    accion: 'enviar' | 'publicar',
+    request: GuardarBorradorRequest,
+  ): Promise<void> {
+    const usuario = this.auth.user();
+    if (
+      !usuario?.active ||
+      !usuario.activated ||
+      !usuario.verified ||
+      (accion === 'enviar'
+        ? usuario.role !== 'ESTUDIANTE'
+        : !['CATEDRATICO', 'PROFESIONAL_EXTERNO'].includes(usuario.role)) ||
+      (usuario.role === 'PROFESIONAL_EXTERNO' && !usuario.colegiadoVerificado)
+    )
+      throw new Error('offline.hu061.forbidden');
+    await sgpDb.transaction('rw', sgpDb.inspecciones, sgpDb.cola_sync, sgpDb.fotos, async () => {
+      const local = await sgpDb.inspecciones.get(id);
+      if (!local || local.propietarioId !== usuario.id || local.estado !== 'BORRADOR')
+        throw new Error('offline.hu061.notEditable');
+      if (local.intencionFinal?.estado === 'PENDIENTE') return;
+      const fotos = await sgpDb.fotos.where('inspeccionId').equals(id).toArray();
+      const inventario = new Map<string, string>(
+        (local.fotosConfirmadas ?? []).map((foto) => [foto.id, foto.categoria]),
+      );
+      for (const foto of fotos)
+        if (foto.propietarioId === usuario.id && foto.metadatos && foto.blob.size > 0)
+          inventario.set(foto.id, foto.metadatos.categoria);
+      if (
+        inventario.size > 60 ||
+        ['ACCESO', 'SUPERESTRUCTURA', 'SUBESTRUCTURA', 'CAUCE'].some(
+          (categoria) => ![...inventario.values()].includes(categoria),
+        )
+      )
+        throw new Error('offline.hu061.invalidPhotos');
+      const pendientes = await sgpDb.cola_sync.where('entityId').equals(id).toArray();
+      if (pendientes.some((item) => item.estado === 'INTERVENCION'))
+        throw new Error('offline.hu061.resolveErrors');
+      await this.guardarBorradorLocal(
+        {
+          ...local,
+          actualizacionLocalPendiente: false,
+          sincronizado: false,
+          payload: {
+            ...(local.payload as BorradorLocalPayload),
+            borrador: {
+              ...(local.payload as BorradorLocalPayload).borrador,
+              datos: request.datos,
+              fechaInspeccion:
+                request.fechaInspeccion ??
+                (local.payload as BorradorLocalPayload).borrador.fechaInspeccion,
+            },
+          },
+        },
+        request,
+      );
+      await sgpDb.cola_sync.put({
+        id: uuidV7(),
+        tipo: 'INSPECCION',
+        entityId: id,
+        propietarioId: usuario.id,
+        operacion: accion === 'enviar' ? 'ENVIAR_INSPECCION' : 'PUBLICAR_INSPECCION',
+        payload: null,
+        idempotencyKey: uuidV7(),
+        intentos: 0,
+        creadoEn: await this.siguienteCreadoEn(),
+        estado: 'PENDIENTE',
+      });
+      await sgpDb.inspecciones.update(id, {
+        sincronizado: false,
+        intencionFinal: { accion, estado: 'PENDIENTE' },
+      });
+    });
+  }
+
   async guardarBorradorEnCache(inspeccion: LocalInspection): Promise<void> {
     await sgpDb.transaction('rw', sgpDb.inspecciones, sgpDb.cola_sync, async () => {
+      this.exigirEditable(await sgpDb.inspecciones.get(inspeccion.id), inspeccion.propietarioId);
       const pendientes = await sgpDb.cola_sync.where('entityId').equals(inspeccion.id).toArray();
       await sgpDb.inspecciones.put({
+        ...(await sgpDb.inspecciones.get(inspeccion.id)),
         ...inspeccion,
-        sincronizado: pendientes.length === 0,
+        sincronizado: pendientes.length === 0 && !inspeccion.actualizacionLocalPendiente,
       });
     });
   }
@@ -88,12 +184,18 @@ export class InspeccionesLocalesService {
       if (pendientes.length > 0) return false;
 
       const existente = await sgpDb.inspecciones.get(borrador.id);
-      if (existente?.actualizacionLocalPendiente) return false;
+      if (
+        existente?.actualizacionLocalPendiente ||
+        existente?.intencionFinal?.estado === 'PENDIENTE'
+      )
+        return false;
+      if (existente && existente.propietarioId !== propietarioId) return false;
       const payloadExistente =
         existente?.payload && typeof existente.payload === 'object'
           ? (existente.payload as Partial<BorradorLocalPayload>)
           : {};
       await sgpDb.inspecciones.put({
+        ...existente,
         id: borrador.id,
         puenteId: borrador.puenteId,
         propietarioId,
@@ -124,12 +226,14 @@ export class InspeccionesLocalesService {
   ): Promise<{ id: string; idempotencyKey: string }> {
     return sgpDb.transaction('rw', sgpDb.inspecciones, sgpDb.cola_sync, async () => {
       const existenteLocal = await sgpDb.inspecciones.get(inspeccion.id);
+      this.exigirEditable(existenteLocal, inspeccion.propietarioId);
       const versionConfirmada =
         existenteLocal && existenteLocal.propietarioId === inspeccion.propietarioId
           ? (existenteLocal.payload as BorradorLocalPayload | undefined)?.borrador?.version
           : undefined;
       const borradorEntrante = (inspeccion.payload as BorradorLocalPayload).borrador;
       await sgpDb.inspecciones.put({
+        ...existenteLocal,
         ...inspeccion,
         payload:
           versionConfirmada !== undefined && borradorEntrante.version < versionConfirmada
@@ -158,6 +262,8 @@ export class InspeccionesLocalesService {
         intentos: 0,
         creadoEn: await this.siguienteCreadoEn(),
         estado,
+        peticionFijada: estado === 'ENVIANDO',
+        iniciadoEn: estado === 'ENVIANDO' ? new Date().toISOString() : undefined,
       };
       await sgpDb.cola_sync.put(nueva);
       return { id: nueva.id, idempotencyKey: nueva.idempotencyKey };
@@ -186,13 +292,17 @@ export class InspeccionesLocalesService {
             item.creadoEn > operacionConfirmada.creadoEn,
         )
         .sort((a, b) => b.creadoEn.localeCompare(a.creadoEn));
-      const datosPosteriores = (
-        edicionesPosteriores[0]?.payload as GuardarBorradorRequest | undefined
-      )?.datos;
+      const datosPosteriores =
+        local.actualizacionLocalPendiente &&
+        operacionConfirmada?.payload &&
+        JSON.stringify(payload.borrador.datos) !==
+          JSON.stringify((operacionConfirmada.payload as GuardarBorradorRequest).datos)
+          ? payload.borrador.datos
+          : (edicionesPosteriores[0]?.payload as GuardarBorradorRequest | undefined)?.datos;
       await sgpDb.inspecciones.put({
         ...local,
         sincronizado: pendientes.length === 0,
-        actualizacionLocalPendiente: false,
+        actualizacionLocalPendiente: !!datosPosteriores && edicionesPosteriores.length === 0,
         payload: {
           ...payload,
           borrador: {
@@ -263,6 +373,7 @@ export class InspeccionesLocalesService {
         intentos: 0,
         creadoEn: await this.siguienteCreadoEn(),
         estado: 'ENVIANDO',
+        iniciadoEn: new Date().toISOString(),
       });
       return { id, idempotencyKey };
     });
@@ -283,7 +394,8 @@ export class InspeccionesLocalesService {
    */
   async obtenerInspeccionLocal(id: string): Promise<LocalInspection | undefined> {
     const local = await sgpDb.inspecciones.get(id);
-    if (!local) return undefined;
+    if (!local || !this.auth.user()?.id || local.propietarioId !== this.auth.user()?.id)
+      return undefined;
 
     if (typeof local.payload !== 'object' || local.payload === null) return local;
     const raw = local.payload as Record<string, unknown>;
@@ -339,6 +451,9 @@ export class InspeccionesLocalesService {
         (inspeccion) =>
           inspeccion.propietarioId === propietarioId &&
           inspeccion.sincronizado &&
+          !inspeccion.actualizacionLocalPendiente &&
+          inspeccion.intencionFinal?.estado !== 'PENDIENTE' &&
+          inspeccion.intencionFinal?.estado !== 'RECHAZADA' &&
           !cola.some((item) => item.entityId === inspeccion.id) &&
           !fotos.some((foto) => foto.inspeccionId === inspeccion.id && !foto.sincronizado),
       );
@@ -351,9 +466,11 @@ export class InspeccionesLocalesService {
    * Obtiene la versión activa de formulario guardada localmente en Dexie.
    */
   async obtenerEsquemaActivoLocal(): Promise<LocalFormSchema | undefined> {
-    const activos = (await sgpDb.esquemas_formulario.toArray()).filter((item) => item.activo);
+    const todos = (await sgpDb.esquemas_formulario.toArray()).filter(
+      (item) => !!this.auth.user()?.id && item.propietarioId === this.auth.user()?.id,
+    );
+    const activos = todos.filter((item) => item.activo);
     if (activos.length > 0) return activos[0];
-    const todos = await sgpDb.esquemas_formulario.toArray();
     return todos.length > 0 ? todos[todos.length - 1] : undefined;
   }
 
@@ -361,37 +478,59 @@ export class InspeccionesLocalesService {
    * Obtiene un esquema de formulario por su version/id desde Dexie.
    */
   async obtenerEsquemaLocal(idOVersion: string): Promise<LocalFormSchema | undefined> {
-    const porId = await sgpDb.esquemas_formulario.get(idOVersion);
-    if (porId) return porId;
-    const porVersion = await sgpDb.esquemas_formulario.where('version').equals(idOVersion).first();
-    return porVersion;
+    const propios = (await sgpDb.esquemas_formulario.toArray()).filter(
+      (item) => !!this.auth.user()?.id && item.propietarioId === this.auth.user()?.id,
+    );
+    return propios.find(
+      (item) =>
+        item.id === idOVersion || item.origenId === idOVersion || item.version === idOVersion,
+    );
   }
 
   /**
    * Guarda un esquema en Dexie.
    */
   async guardarEsquemaLocal(esquema: LocalFormSchema): Promise<void> {
+    const propietarioId = esquema.propietarioId ?? this.auth.user()?.id;
+    if (!propietarioId) return;
+    const origenId = esquema.origenId ?? esquema.id;
+    const id = `cache:${propietarioId}:${origenId}`;
     await sgpDb.transaction('rw', sgpDb.esquemas_formulario, async () => {
-      const existente = await sgpDb.esquemas_formulario.get(esquema.id);
+      const existente = await sgpDb.esquemas_formulario.get(id);
       if (esquema.activo) {
-        await sgpDb.esquemas_formulario.toCollection().modify({ activo: false });
+        await sgpDb.esquemas_formulario.toCollection().modify((item) => {
+          if (item.propietarioId === propietarioId) item.activo = false;
+        });
       }
       await sgpDb.esquemas_formulario.put({
         ...esquema,
+        id,
+        origenId,
+        propietarioId,
         activo: esquema.activo || existente?.activo === true,
       });
     });
   }
 
   async guardarPuenteLocal(bridge: LocalBridge): Promise<void> {
-    await sgpDb.puentes.put(bridge);
+    const propietarioId = bridge.propietarioId ?? this.auth.user()?.id;
+    if (!propietarioId) return;
+    const origenId = bridge.origenId ?? bridge.id;
+    await sgpDb.puentes.put({
+      ...bridge,
+      id: `cache:${propietarioId}:${origenId}`,
+      origenId,
+      propietarioId,
+    });
   }
 
   /**
    * Obtiene los puentes preparados en Dexie.
    */
   async obtenerPuentesPreparados(): Promise<LocalBridge[]> {
-    return sgpDb.puentes.toArray();
+    return (await sgpDb.puentes.toArray()).filter(
+      (item) => !!this.auth.user()?.id && item.propietarioId === this.auth.user()?.id,
+    );
   }
 
   /**
@@ -400,7 +539,12 @@ export class InspeccionesLocalesService {
   async obtenerDatosPermanentesLocal(puenteId: string): Promise<DatosPermanentesResponse | null> {
     // Buscar en inspecciones si hay una publicada guardada para el puente
     const inspecciones = await sgpDb.inspecciones.where('puenteId').equals(puenteId).toArray();
-    const publicada = inspecciones.find((i) => i.estado === 'PUBLICADA');
+    const publicada = inspecciones.find(
+      (i) =>
+        i.estado === 'PUBLICADA' &&
+        !!this.auth.user()?.id &&
+        i.propietarioId === this.auth.user()?.id,
+    );
     if (publicada && publicada.payload) {
       const payload = publicada.payload as { datosPermanentes?: DatosPermanentesResponse };
       if (payload.datosPermanentes) {
@@ -409,8 +553,10 @@ export class InspeccionesLocalesService {
     }
 
     // Si el puente guardó datos en su payload
-    const puenteLocal = await sgpDb.puentes.get(puenteId);
-    if (puenteLocal && puenteLocal.payload) {
+    const puenteLocal = (await this.obtenerPuentesPreparados()).find(
+      (item) => (item.origenId ?? item.id) === puenteId,
+    );
+    if (puenteLocal && puenteLocal.propietarioId === this.auth.user()?.id && puenteLocal.payload) {
       const p = puenteLocal.payload as { datosPermanentes?: DatosPermanentesResponse };
       if (p.datosPermanentes) {
         return p.datosPermanentes;
@@ -437,8 +583,11 @@ export class InspeccionesLocalesService {
     sinGps?: boolean,
   ): Promise<IniciarInspeccionResponse> {
     const hoyIso = new Date().toISOString();
-    const versionId = versionFormularioId || 'version-preparada-local';
-    const inspeccionId = solicitud.id || 'inspeccion-local';
+    const versionId = solicitud.versionFormularioId || versionFormularioId;
+    if (!versionId) throw new Error('offline.hu061.prepareFirst');
+    solicitud = { ...solicitud, versionFormularioId: versionId };
+    solicitud = { ...solicitud, id: solicitud.id ?? uuidV7() };
+    const inspeccionId = solicitud.id!;
 
     const borradorResponse: InspeccionBorradorResponse = {
       id: inspeccionId,

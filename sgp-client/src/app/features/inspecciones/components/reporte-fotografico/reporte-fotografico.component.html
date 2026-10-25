@@ -19,9 +19,7 @@
   }
   @if (inventarioCargado()) {
     <p role="status">
-      {{
-        'inspecciones.fotos.contador' | transloco: { cantidad: confirmadas().length, maximo: 60 }
-      }}
+      {{ 'inspecciones.fotos.contador' | transloco: { cantidad: inventario().length, maximo: 60 } }}
     </p>
     <ul>
       @for (conteo of conteos(); track conteo.categoria) {

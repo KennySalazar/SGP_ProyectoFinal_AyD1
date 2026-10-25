@@ -1,5 +1,6 @@
 package gt.usac.cunoc.sgp.inspeccion.dto;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import jakarta.validation.constraints.NotNull;
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -16,4 +17,30 @@ public record IniciarInspeccionRequest(
     Double longitud,
     BigDecimal precisionGpsM,
     boolean confirmarDatosPermanentes,
-    List<AcompananteRequest> acompanantes) {}
+    List<AcompananteRequest> acompanantes,
+    @JsonInclude(JsonInclude.Include.NON_NULL) UUID versionFormularioId) {
+  public IniciarInspeccionRequest(
+      UUID id,
+      UUID puenteId,
+      LocalDate fechaInspeccion,
+      String dispositivoId,
+      String nombreAutor,
+      Double latitud,
+      Double longitud,
+      BigDecimal precisionGpsM,
+      boolean confirmarDatosPermanentes,
+      List<AcompananteRequest> acompanantes) {
+    this(
+        id,
+        puenteId,
+        fechaInspeccion,
+        dispositivoId,
+        nombreAutor,
+        latitud,
+        longitud,
+        precisionGpsM,
+        confirmarDatosPermanentes,
+        acompanantes,
+        null);
+  }
+}

@@ -46,16 +46,25 @@
   <div class="card-head"><h2>{{ 'offline.queueTitle' | transloco }}</h2></div>
   @for (item of cola; track item.id) { @if (propietario(item)) {
   <div class="queue-row">
+    <span>{{ 'offline.hu061.' + (item.operacion ?? 'FOTO') | transloco }}</span>
     <span
-      >{{ item.tipo === 'INSPECCION' ? ('offline.inspection' | transloco) : ('offline.file' |
-      transloco) }}</span
+      >{{ (item.estado === 'INTERVENCION' ? 'offline.intervention' : item.estado === 'ENVIANDO' ?
+      'offline.hu061.processing' : 'offline.waiting') | transloco }}</span
     >
+    @if (item.iniciadoEn) {
     <span
-      >{{ item.estado === 'INTERVENCION' ? ('offline.intervention' | transloco) : ('offline.waiting'
-      | transloco) }}</span
+      >{{ 'offline.hu061.lastAttempt' | transloco }}: {{ item.iniciadoEn | date:'dd/MM/yyyy
+      HH:mm':'-0600' }}</span
     >
-    @if (item.estado === 'INTERVENCION') {
-    <span role="alert">{{ item.ultimoError }}</span>
+    } @if (item.tipo === 'INSPECCION') {
+    <a [routerLink]="['/inspecciones', item.entityId, 'borrador']"
+      >{{ 'offline.hu061.resume' | transloco }}</a
+    >
+    } @if (item.estado === 'INTERVENCION') {
+    <span role="alert"
+      >{{ item.ultimoError?.startsWith('offline.') ? (item.ultimoError! | transloco) :
+      item.ultimoError }}</span
+    >
     <button type="button" (click)="sync.reintentar(item.id)">
       {{ 'offline.retry' | transloco }}
     </button>
@@ -65,7 +74,7 @@
   <button
     type="button"
     (click)="sync.sincronizarAhora()"
-    [disabled]="!sync.sincronizando() && !cola.length"
+    [disabled]="sync.sincronizando() || !cola.length"
   >
     {{ 'offline.syncNow' | transloco }}
   </button>

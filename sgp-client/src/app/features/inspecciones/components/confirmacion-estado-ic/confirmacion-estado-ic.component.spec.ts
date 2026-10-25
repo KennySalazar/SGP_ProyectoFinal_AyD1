@@ -9,6 +9,7 @@ import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { ConfirmacionEstadoIcComponent } from './confirmacion-estado-ic.component';
 import { ConfirmacionEstadoIcResponse } from '../../models/inspeccion.models';
+import { ConnectivityService } from '../../../../offline/services/connectivity.service';
 
 @Pipe({ name: 'transloco' })
 class TraduccionTestPipe implements PipeTransform {
@@ -99,6 +100,20 @@ describe('Confirmacion del estado calculado HU032', () => {
     expect(fixture.nativeElement.textContent).toContain('80');
     expect(fixture.nativeElement.textContent).toContain('SIECA-v1 / IC-v1');
     expect(component.form.controls.estado.value).toBe('REGULAR');
+  });
+
+  it('HU-061 aceptación: sin red oculta el IC anterior y muestra disponible al sincronizar', () => {
+    consultar();
+    TestBed.inject(ConnectivityService).online.set(false);
+    fixture.detectChanges();
+    expect(component.calculoVisible()).toBeNull();
+    expect(fixture.nativeElement.querySelector('dl')).toBeNull();
+    expect(fixture.nativeElement.textContent).toContain(
+      'inspecciones.confirmacionIc.icPreliminarOffline',
+    );
+    component.consultar();
+    component.guardar();
+    http.expectNone(url);
   });
 
   it('confirma el estado automatico sin exigir justificacion ni enviar identidad', () => {
