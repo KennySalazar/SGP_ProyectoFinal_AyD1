@@ -51,21 +51,30 @@ describe('Procesamiento de fotografías', () => {
       'createImageBitmap',
       vi.fn().mockResolvedValue({ width: 3000, height: 1500, close }),
     );
-    const canvas = document.createElement('canvas');
-    const drawImage = vi.fn();
-    vi.spyOn(document, 'createElement').mockReturnValue(canvas);
-    vi.spyOn(canvas, 'getContext').mockReturnValue({
-      drawImage,
-    } as unknown as CanvasRenderingContext2D);
-    vi.spyOn(canvas, 'toBlob').mockImplementation((callback) =>
-      callback(new Blob(['jpg'], { type: 'image/jpeg' })),
+    const postMessage = vi.fn(function (this: { onmessage: (event: unknown) => void }) {
+      queueMicrotask(() =>
+        this.onmessage({ data: { blob: new Blob(['jpg'], { type: 'image/jpeg' }) } }),
+      );
+    });
+    const terminate = vi.fn();
+    vi.stubGlobal(
+      'Worker',
+      class {
+        onmessage!: (event: unknown) => void;
+        postMessage = postMessage;
+        terminate = terminate;
+      },
     );
+    const crearCanvas = vi.spyOn(document, 'createElement');
     const resultado = await servicio.galeria({
       size: 2,
       arrayBuffer: async () => new Uint8Array([255, 216]).buffer,
     } as File);
-    expect(canvas.width).toBe(1600);
-    expect(canvas.height).toBe(800);
+    expect(postMessage).toHaveBeenCalledWith(expect.objectContaining({ width: 3000 }), [
+      expect.objectContaining({ width: 3000 }),
+    ]);
+    expect(crearCanvas).not.toHaveBeenCalled();
+    expect(terminate).toHaveBeenCalled();
     expect(resultado.capturadoEn).toBe('2026-10-14T16:20:30.000Z');
     expect(resultado.orientacion).toBe(6);
     expect(resultado.latitud).toBe(14);

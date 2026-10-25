@@ -119,36 +119,69 @@ export class ProcesadorFotografiasService {
         timeout: 10000,
       }),
     );
-    if (Math.abs(Date.now() - posicion.timestamp) > 30000) throw new Error('metadatos');
+    if (
+      !Number.isFinite(posicion.coords.latitude) ||
+      !Number.isFinite(posicion.coords.longitude) ||
+      Math.abs(posicion.coords.latitude) > 90 ||
+      Math.abs(posicion.coords.longitude) > 180 ||
+      Math.abs(Date.now() - posicion.timestamp) > 30000
+    )
+      throw new Error('metadatos');
     const capturadoEn = new Date().toISOString();
     return {
-      blob: await this.comprimir(video),
+      blob: await this.comprimir(await createImageBitmap(video)),
       latitud: posicion.coords.latitude,
       longitud: posicion.coords.longitude,
       capturadoEn,
       orientacion: 1,
     };
   }
-  private async comprimir(fuente: ImageBitmap | HTMLVideoElement): Promise<Blob> {
-    const ancho = 'videoWidth' in fuente ? fuente.videoWidth : fuente.width;
-    const alto = 'videoHeight' in fuente ? fuente.videoHeight : fuente.height;
-    if (!ancho || !alto || ancho * alto > 40000000) throw new Error('dimensiones');
-    const proporcion = Math.min(1, 1600 / Math.max(ancho, alto));
-    const canvas = document.createElement('canvas');
-    canvas.width = Math.max(1, Math.round(ancho * proporcion));
-    canvas.height = Math.max(1, Math.round(alto * proporcion));
-    const ctx = canvas.getContext('2d');
-    if (!ctx) throw new Error('formato');
-    ctx.drawImage(fuente, 0, 0, canvas.width, canvas.height);
-    let blob: Blob | null = null;
-    for (let calidad = 0.88; calidad >= 0.4; calidad -= 0.08) {
-      blob = await new Promise<Blob | null>((resolve) =>
-        canvas.toBlob(resolve, 'image/jpeg', calidad),
-      );
-      if (!blob || !['image/jpeg', 'image/webp'].includes(blob.type)) throw new Error('formato');
-      if (blob.size <= 400 * 1024) break;
+  private async comprimir(bitmap: ImageBitmap): Promise<Blob> {
+    if (typeof Worker === 'undefined') {
+      bitmap.close();
+      throw new Error('procesamientoNoDisponible');
     }
-    if (!blob) throw new Error('formato');
-    return blob;
+    try {
+      return await new Promise<Blob>((resolve, reject) => {
+        const worker = new Worker(new URL('./fotografias.worker', import.meta.url), {
+          type: 'module',
+        });
+        const terminar = () => {
+          clearTimeout(timeout);
+          worker.terminate();
+        };
+        const timeout = setTimeout(() => {
+          terminar();
+          reject(new Error('compresion'));
+        }, 30000);
+        worker.onmessage = ({ data }: MessageEvent<{ blob?: Blob; error?: string }>) => {
+          terminar();
+          if (
+            data?.blob &&
+            data.blob.size > 0 &&
+            data.blob.size <= 400 * 1024 &&
+            ['image/jpeg', 'image/webp'].includes(data.blob.type)
+          )
+            resolve(data.blob);
+          else reject(new Error(data?.error ?? 'compresion'));
+        };
+        worker.onerror = () => {
+          terminar();
+          reject(new Error('procesamientoNoDisponible'));
+        };
+        worker.onmessageerror = () => {
+          terminar();
+          reject(new Error('procesamientoNoDisponible'));
+        };
+        try {
+          worker.postMessage(bitmap, [bitmap]);
+        } catch {
+          terminar();
+          reject(new Error('procesamientoNoDisponible'));
+        }
+      });
+    } finally {
+      bitmap.close();
+    }
   }
 }
