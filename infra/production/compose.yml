@@ -37,12 +37,9 @@ services:
       INVITACION_URL_ACTIVACION: ${INVITACION_URL_ACTIVACION:?INVITACION_URL_ACTIVACION is required}
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:?CORS_ALLOWED_ORIGINS is required}
       OPENAPI_PUBLIC: "false"
-      LOG_PATH: /var/log/sgp
       JAVA_TOOL_OPTIONS: ${JAVA_TOOL_OPTIONS:--XX:MaxRAMPercentage=65 -XX:InitialRAMPercentage=20 -Djava.security.egd=file:/dev/urandom}
     networks:
       - proxy
-    volumes:
-      - sgp-prod-logs:/var/log/sgp
     read_only: true
     tmpfs:
       - /tmp:size=64m,mode=1777
@@ -83,7 +80,3 @@ services:
 networks:
   proxy:
     name: sgp_prod_proxy
-
-volumes:
-  sgp-prod-logs:
-    name: sgp_prod_logs
