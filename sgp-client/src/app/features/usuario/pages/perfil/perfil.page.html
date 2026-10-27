@@ -8,7 +8,13 @@
   <dl class="cuenta" [attr.aria-label]="'perfil.datosCuenta' | transloco">
     <div>
       <dt>{{ 'common.email' | transloco }}</dt>
-      <dd>{{ auth.user()?.email }}</dd>
+      <dd class="email-bloqueado">
+        <span class="email-texto">{{ auth.user()?.email }}</span>
+        <span class="badge-no-editable">
+          <i class="pi pi-lock" aria-hidden="true"></i> {{ 'perfil.noEditable' | transloco }}
+        </span>
+      </dd>
+      <small class="readonly-hint">{{ 'perfil.correoNoEditable' | transloco }}</small>
     </div>
     <div>
       <dt>{{ 'perfil.rol' | transloco }}</dt>
@@ -52,7 +58,9 @@
     <p class="nota">
       <i class="pi pi-id-card" aria-hidden="true"></i> {{ 'perfil.notaPublico' | transloco }}
     </p>
-    @if (errorGeneral(); as mensaje) {
+    @if (errorEmail(); as mensaje) {
+    <p class="validation" role="alert">{{ mensaje }}</p>
+    } @if (errorGeneral(); as mensaje) {
     <p class="validation" role="alert">{{ mensaje }}</p>
     }
     <button pButton class="accion" type="submit" [disabled]="form.invalid || guardando()">

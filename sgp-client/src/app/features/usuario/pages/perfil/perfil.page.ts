@@ -13,6 +13,7 @@ import { LIMITE_NOMBRE_COMPLETO, PATRON_NOMBRE_USUARIO } from '../../utils/regla
 /**
  * Nombre completo y nombre de usuario de la cuenta. El nombre de usuario es lo que ven los demás en
  * el foro y lo que se escribe tras la arroba para mencionar a alguien.
+ * El correo electrónico está vinculado a la cuenta y no se puede editar.
  */
 @Component({
   selector: 'app-perfil-page',
@@ -21,6 +22,9 @@ import { LIMITE_NOMBRE_COMPLETO, PATRON_NOMBRE_USUARIO } from '../../utils/regla
   templateUrl: './perfil.page.html',
   styleUrl: './perfil.page.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
+  host: {
+    class: 'block',
+  },
 })
 export class PerfilPage {
   private readonly fb = inject(FormBuilder);
@@ -33,6 +37,7 @@ export class PerfilPage {
   readonly guardado = signal(false);
   readonly errorNombre = signal<string | null>(null);
   readonly errorUsuario = signal<string | null>(null);
+  readonly errorEmail = signal<string | null>(null);
   readonly errorGeneral = signal<string | null>(null);
 
   readonly form = this.fb.nonNullable.group({
@@ -53,6 +58,7 @@ export class PerfilPage {
     this.guardado.set(false);
     this.errorNombre.set(null);
     this.errorUsuario.set(null);
+    this.errorEmail.set(null);
     this.errorGeneral.set(null);
     const datos = this.form.getRawValue();
     this.usuarioApi
@@ -88,8 +94,12 @@ export class PerfilPage {
     const usuario =
       porCampo('nombreUsuario') ??
       (problema?.code === 'nombre_usuario_en_uso' ? (problema.detail ?? null) : null);
+    const email =
+      porCampo('email') ??
+      (problema?.code === 'correo_no_editable' ? (problema.detail ?? null) : null);
     this.errorNombre.set(nombre);
     this.errorUsuario.set(usuario);
-    if (!nombre && !usuario) this.errorGeneral.set(problema?.detail ?? null);
+    this.errorEmail.set(email);
+    if (!nombre && !usuario && !email) this.errorGeneral.set(problema?.detail ?? null);
   }
 }
