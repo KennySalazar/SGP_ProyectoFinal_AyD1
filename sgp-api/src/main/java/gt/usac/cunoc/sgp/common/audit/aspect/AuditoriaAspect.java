@@ -69,6 +69,12 @@ public class AuditoriaAspect {
 
       if (email != null) {
         posteriores = snapshots.cargarPorEmail(auditable.tipo(), email);
+        if (posteriores == null && anteriores != null) {
+          UUID idAnterior = idDesde(anteriores);
+          if (idAnterior != null) {
+            posteriores = snapshots.cargar(auditable.tipo(), idAnterior);
+          }
+        }
       } else if (auditable.recargarPosteriores()) {
         if (entidadId == null) {
           throw new IllegalStateException(

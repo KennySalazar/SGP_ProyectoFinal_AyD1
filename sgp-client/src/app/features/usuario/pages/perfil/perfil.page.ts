@@ -11,9 +11,8 @@ import { UsuarioApiService } from '../../services/usuario-api.service';
 import { LIMITE_NOMBRE_COMPLETO, PATRON_NOMBRE_USUARIO } from '../../utils/reglas-perfil';
 
 /**
- * Nombre completo y nombre de usuario de la cuenta. El nombre de usuario es lo que ven los demás en
- * el foro y lo que se escribe tras la arroba para mencionar a alguien.
- * El correo electrónico está vinculado a la cuenta y no se puede editar.
+ * Nombre completo, nombre de usuario y correo electrónico de la cuenta. El nombre de usuario es lo que
+ * ven los demás en el foro y lo que se escribe tras la arroba para mencionar a alguien.
  */
 @Component({
   selector: 'app-perfil-page',
@@ -49,6 +48,10 @@ export class PerfilPage {
       this.auth.user()?.nombreUsuario ?? '',
       [Validators.required, Validators.pattern(PATRON_NOMBRE_USUARIO)],
     ],
+    email: [
+      this.auth.user()?.email ?? '',
+      [Validators.required, Validators.email, Validators.maxLength(320)],
+    ],
   });
 
   guardar(): void {
@@ -65,6 +68,7 @@ export class PerfilPage {
       .actualizarPerfil({
         nombreCompleto: datos.nombreCompleto.trim(),
         nombreUsuario: datos.nombreUsuario.trim(),
+        email: datos.email.trim(),
       })
       .pipe(finalize(() => this.guardando.set(false)))
       .subscribe({
@@ -73,6 +77,7 @@ export class PerfilPage {
           this.form.reset({
             nombreCompleto: sesion.nombreCompleto ?? '',
             nombreUsuario: sesion.nombreUsuario ?? '',
+            email: sesion.email ?? '',
           });
           this.guardado.set(true);
         },
@@ -96,7 +101,7 @@ export class PerfilPage {
       (problema?.code === 'nombre_usuario_en_uso' ? (problema.detail ?? null) : null);
     const email =
       porCampo('email') ??
-      (problema?.code === 'correo_no_editable' ? (problema.detail ?? null) : null);
+      (problema?.code === 'email_already_registered' ? (problema.detail ?? null) : null);
     this.errorNombre.set(nombre);
     this.errorUsuario.set(usuario);
     this.errorEmail.set(email);

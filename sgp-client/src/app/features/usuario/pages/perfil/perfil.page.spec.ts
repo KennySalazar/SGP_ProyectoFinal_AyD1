@@ -62,14 +62,15 @@ describe('Perfil de la cuenta', () => {
     fixture.destroy();
   });
 
-  it('muestra el correo no editable y el rol y parte vacío en una cuenta sin perfil', () => {
+  it('muestra el rol y precarga el correo actual en el formulario para una cuenta sin perfil', () => {
     crear(SESION);
 
-    expect(texto()).toContain('ana@ejemplo.com');
-    expect(texto()).toContain('perfil.noEditable');
-    expect(texto()).toContain('perfil.correoNoEditable');
     expect(texto()).toContain('invitaciones.roles.ESTUDIANTE');
-    expect(page.form.getRawValue()).toEqual({ nombreCompleto: '', nombreUsuario: '' });
+    expect(page.form.getRawValue()).toEqual({
+      nombreCompleto: '',
+      nombreUsuario: '',
+      email: 'ana@ejemplo.com',
+    });
     expect(page.form.invalid).toBe(true);
   });
 
@@ -79,12 +80,17 @@ describe('Perfil de la cuenta', () => {
     expect(page.form.getRawValue()).toEqual({
       nombreCompleto: 'Ana Reyes',
       nombreUsuario: 'ana.reyes',
+      email: 'ana@ejemplo.com',
     });
   });
 
-  it('guarda el perfil, actualiza la sesión y lo confirma', () => {
+  it('guarda el perfil, actualiza el correo y la sesión, y lo confirma', () => {
     crear(SESION);
-    page.form.setValue({ nombreCompleto: '  Ana Reyes  ', nombreUsuario: 'ana.reyes' });
+    page.form.setValue({
+      nombreCompleto: '  Ana Reyes  ',
+      nombreUsuario: 'ana.reyes',
+      email: 'nuevo.correo@ejemplo.com',
+    });
 
     page.guardar();
 
@@ -93,8 +99,14 @@ describe('Perfil de la cuenta', () => {
     expect(request.request.body).toEqual({
       nombreCompleto: 'Ana Reyes',
       nombreUsuario: 'ana.reyes',
+      email: 'nuevo.correo@ejemplo.com',
     });
-    const actualizada = { ...SESION, nombreCompleto: 'Ana Reyes', nombreUsuario: 'ana.reyes' };
+    const actualizada = {
+      ...SESION,
+      nombreCompleto: 'Ana Reyes',
+      nombreUsuario: 'ana.reyes',
+      email: 'nuevo.correo@ejemplo.com',
+    };
     request.flush(actualizada);
     fixture.detectChanges();
 
@@ -104,26 +116,39 @@ describe('Perfil de la cuenta', () => {
   });
 
   it.each([
-    ['', 'ana'],
-    ['Ana', ''],
-    ['Ana', 'ab'],
-    ['Ana', 'ana reyes'],
-    ['Ana', 'ana.'],
-  ])('no envía un perfil incompleto o mal formado (%s / %s)', (nombre, usuarioNuevo) => {
-    crear(SESION);
-    page.form.setValue({ nombreCompleto: nombre, nombreUsuario: usuarioNuevo });
+    ['', 'ana', 'ana@ejemplo.com'],
+    ['Ana', '', 'ana@ejemplo.com'],
+    ['Ana', 'ab', 'ana@ejemplo.com'],
+    ['Ana', 'ana reyes', 'ana@ejemplo.com'],
+    ['Ana', 'ana.', 'ana@ejemplo.com'],
+    ['Ana', 'ana.reyes', ''],
+    ['Ana', 'ana.reyes', 'correo-invalido'],
+  ])(
+    'no envía un perfil incompleto o mal formado (%s / %s / %s)',
+    (nombre, usuarioNuevo, emailNuevo) => {
+      crear(SESION);
+      page.form.setValue({
+        nombreCompleto: nombre,
+        nombreUsuario: usuarioNuevo,
+        email: emailNuevo,
+      });
 
-    page.guardar();
+      page.guardar();
 
-    http.expectNone('/api/v1/auth/me/perfil');
-    expect(setUser).not.toHaveBeenCalled();
-  });
+      http.expectNone('/api/v1/auth/me/perfil');
+      expect(setUser).not.toHaveBeenCalled();
+    },
+  );
 
   it('un nombre de usuario en uso se explica junto al campo y sin aviso global', () => {
     crear(SESION);
     const errores = TestBed.inject(ApiErrorService);
     errores.lastMessage.set('mensaje global');
-    page.form.setValue({ nombreCompleto: 'Ana Reyes', nombreUsuario: 'ocupado' });
+    page.form.setValue({
+      nombreCompleto: 'Ana Reyes',
+      nombreUsuario: 'ocupado',
+      email: 'ana@ejemplo.com',
+    });
 
     page.guardar();
     http.expectOne('/api/v1/auth/me/perfil').flush(
@@ -143,30 +168,41 @@ describe('Perfil de la cuenta', () => {
     expect(setUser).not.toHaveBeenCalled();
   });
 
-  it('un intento de editar correo o rechazo de correo se explica con mensaje de error', () => {
+  it('un correo en uso se explica junto al campo y sin aviso global', () => {
     crear(SESION);
-    page.form.setValue({ nombreCompleto: 'Ana Reyes', nombreUsuario: 'ana.reyes' });
+    const errores = TestBed.inject(ApiErrorService);
+    errores.lastMessage.set('mensaje global');
+    page.form.setValue({
+      nombreCompleto: 'Ana Reyes',
+      nombreUsuario: 'ana.reyes',
+      email: 'ocupado@ejemplo.com',
+    });
 
     page.guardar();
     http.expectOne('/api/v1/auth/me/perfil').flush(
       {
-        status: 422,
-        code: 'correo_no_editable',
-        detail: 'El correo electrónico no se puede editar desde el perfil.',
-        errores: [{ campo: 'email', mensaje: 'El correo electrónico no se puede editar.' }],
+        status: 409,
+        code: 'email_already_registered',
+        detail: 'El correo electrónico ya está registrado por otro usuario.',
       },
-      { status: 422, statusText: 'Unprocessable Entity' },
+      { status: 409, statusText: 'Conflict' },
     );
     fixture.detectChanges();
 
-    expect(page.errorEmail()).toBe('El correo electrónico no se puede editar.');
-    expect(texto()).toContain('El correo electrónico no se puede editar.');
+    expect(page.errorEmail()).toBe('El correo electrónico ya está registrado por otro usuario.');
+    expect(texto()).toContain('El correo electrónico ya está registrado por otro usuario.');
+    expect(errores.lastMessage()).toBeNull();
     expect(page.guardado()).toBe(false);
+    expect(setUser).not.toHaveBeenCalled();
   });
 
   it('muestra junto a cada campo lo que rechaza el servidor', () => {
     crear(SESION);
-    page.form.setValue({ nombreCompleto: 'Ana Reyes', nombreUsuario: 'admin' });
+    page.form.setValue({
+      nombreCompleto: 'Ana Reyes',
+      nombreUsuario: 'admin',
+      email: 'correo@ejemplo.com',
+    });
 
     page.guardar();
     http.expectOne('/api/v1/auth/me/perfil').flush(

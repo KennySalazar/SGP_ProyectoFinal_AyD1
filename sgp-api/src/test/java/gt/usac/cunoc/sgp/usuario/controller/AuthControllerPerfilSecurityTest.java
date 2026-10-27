@@ -134,30 +134,55 @@ class AuthControllerPerfilSecurityTest {
   }
 
   @Test
-  void intentoDeEditarCorreoSeRechazaConUnprocessableEntity() throws Exception {
-    when(authService.actualizarPerfil(any(), any()))
-        .thenThrow(
-            new ApiException(
-                HttpStatus.UNPROCESSABLE_ENTITY,
-                "correo_no_editable",
-                "No se puede editar el correo",
-                "El correo electrónico no se puede editar desde el perfil.",
-                java.util.List.of(
-                    java.util.Map.of(
-                        "campo",
-                        "email",
-                        "mensaje",
-                        "El correo electrónico no se puede editar."))));
+  void actualizacionConNuevoCorreoRetornaRespuestaExitosa() throws Exception {
+    when(authService.actualizarPerfil(eq(CORREO), any(ActualizarPerfilRequest.class)))
+        .thenReturn(
+            new UserResponse(
+                UUID.randomUUID(),
+                "nuevo@ejemplo.com",
+                "Ana Reyes",
+                "ana.reyes",
+                RoleName.ESTUDIANTE.name(),
+                true,
+                true,
+                true,
+                false,
+                null));
 
     mockMvc
         .perform(
             put(RUTA)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(
-                    "{\"nombreCompleto\":\"Ana Reyes\",\"nombreUsuario\":\"ana.reyes\",\"email\":\"otro@ejemplo.com\"}")
+                    "{\"nombreCompleto\":\"Ana Reyes\",\"nombreUsuario\":\"ana.reyes\",\"email\":\"nuevo@ejemplo.com\"}")
                 .principal(autenticar(RoleName.ESTUDIANTE)))
-        .andExpect(status().isUnprocessableEntity())
-        .andExpect(jsonPath("$.code").value("correo_no_editable"));
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.email").value("nuevo@ejemplo.com"));
+
+    verify(authService)
+        .actualizarPerfil(
+            CORREO, new ActualizarPerfilRequest("Ana Reyes", "ana.reyes", "nuevo@ejemplo.com"));
+  }
+
+  @Test
+  void actualizacionConCorreoYaRegistradoRetornaConflicto() throws Exception {
+    when(authService.actualizarPerfil(any(), any()))
+        .thenThrow(
+            new ApiException(
+                HttpStatus.CONFLICT,
+                "email_already_registered",
+                "Correo ya registrado",
+                "El correo electrónico ya está registrado"));
+
+    mockMvc
+        .perform(
+            put(RUTA)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    "{\"nombreCompleto\":\"Ana Reyes\",\"nombreUsuario\":\"ana.reyes\",\"email\":\"ocupado@ejemplo.com\"}")
+                .principal(autenticar(RoleName.ESTUDIANTE)))
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.code").value("email_already_registered"));
   }
 
   private UserResponse respuesta(RoleName rol) {
