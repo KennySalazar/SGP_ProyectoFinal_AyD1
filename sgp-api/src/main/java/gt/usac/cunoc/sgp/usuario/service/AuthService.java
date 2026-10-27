@@ -308,7 +308,7 @@ public class AuthService {
             : "La autenticacion de dos factores fue desactivada");
   }
 
-  /** Cambia el nombre completo y el nombre de usuario de la cuenta que inició sesión. */
+  /** Cambia el perfil y correo electrónico de la cuenta que inició sesión. */
   @Transactional
   @Auditable(
       accion = AccionAuditoria.MODIFICAR,
@@ -317,22 +317,36 @@ public class AuthService {
       emailArgIndex = 0)
   public UserResponse actualizarPerfil(String rawEmail, ActualizarPerfilRequest request) {
     UserAccount user = requireUser(rawEmail);
-    if (request.email() != null
-        && !request.email().isBlank()
-        && !EmailNormalizer.normalize(request.email())
-            .equalsIgnoreCase(EmailNormalizer.normalize(user.getEmail()))) {
-      throw new ApiException(
-          HttpStatus.UNPROCESSABLE_ENTITY,
-          "correo_no_editable",
-          "No se puede editar el correo",
-          "El correo electrónico no se puede editar desde el perfil.",
-          java.util.List.of(
-              java.util.Map.of(
-                  "campo", "email", "mensaje", "El correo electrónico no se puede editar.")));
+    if (request.email() != null) {
+      String nuevoEmail = EmailNormalizer.normalize(request.email());
+      if (nuevoEmail.isBlank()) {
+        throw new ApiException(
+            HttpStatus.UNPROCESSABLE_ENTITY,
+            "perfil_invalido",
+            "Perfil inválido",
+            "El correo electrónico no puede estar vacío.",
+            java.util.List.of(
+                java.util.Map.of(
+                    "campo", "email", "mensaje", "El correo electrónico es obligatorio.")));
+      }
+      if (!nuevoEmail.equalsIgnoreCase(user.getEmail())) {
+        users
+            .findByEmail(nuevoEmail)
+            .filter(otra -> !otra.getId().equals(user.getId()))
+            .ifPresent(
+                otra -> {
+                  throw new ApiException(
+                      HttpStatus.CONFLICT,
+                      "email_already_registered",
+                      "Correo ya registrado",
+                      "El correo electrónico ya está registrado");
+                });
+        user.setEmail(nuevoEmail);
+      }
     }
     perfiles.aplicar(user, request.nombreCompleto(), request.nombreUsuario());
     perfiles.guardar(user);
-    return currentUser(rawEmail);
+    return currentUser(user.getEmail());
   }
 
   @Transactional(readOnly = true)
