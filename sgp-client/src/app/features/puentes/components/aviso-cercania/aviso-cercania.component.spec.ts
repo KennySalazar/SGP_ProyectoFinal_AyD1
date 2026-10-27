@@ -105,6 +105,18 @@ describe('AvisoCercaniaComponent: advertencia de posible duplicado', () => {
     expect(mostrar([activo], 'registro', 5)).toContain('puentes.proximityLimit');
     expect(mostrar([activo], 'registro', 1)).not.toContain('puentes.proximityLimit');
   });
+
+  it('cuando hay un puente superpuesto (< 1m) muestra la nota de superpuesto y rotula como superpuesto', () => {
+    const superpuesto: PuenteCercanoResponse = {
+      ...activo,
+      id: 's',
+      distanciaMetros: 0.2,
+    };
+    const texto = mostrar([superpuesto]);
+    expect(texto).toContain('puentes.proximityOverlappingNote');
+    expect(texto).toContain('puentes.overlapping');
+    expect(fixture.componentInstance.haySuperpuesto()).toBe(true);
+  });
 });
 
 describe('puntosDeCercanos', () => {

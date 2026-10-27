@@ -11,6 +11,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import gt.usac.cunoc.sgp.common.exception.ApiException;
 import gt.usac.cunoc.sgp.mantenimiento.service.PlanMantenimientoService;
 import gt.usac.cunoc.sgp.puente.dto.CrearPuenteRequest;
+import gt.usac.cunoc.sgp.puente.dto.DarBajaPuenteRequest;
 import gt.usac.cunoc.sgp.puente.exception.CercaniaPuenteException;
 import gt.usac.cunoc.sgp.puente.mapper.PuenteMapperImpl;
 import gt.usac.cunoc.sgp.puente.repository.PuenteRepository;
@@ -835,6 +836,60 @@ class PuenteRegistroIntegrationTest {
             """,
         Integer.class,
         municipioId);
+  }
+
+  @Test
+  void rechazaRegistrarPuenteSuperpuestoSobrePuenteActivoInclusoConConfirmacion() {
+    var primero =
+        puenteService.registrar(
+            solicitud(departamentoId, "14.481", "-90.615", false), ADMINISTRADOR_ID);
+
+    ApiException exSinConfirmar =
+        assertThrows(
+            ApiException.class,
+            () ->
+                puenteService.registrar(
+                    solicitud(departamentoId, "14.481", "-90.615", false), ADMINISTRADOR_ID));
+
+    assertEquals(HttpStatus.CONFLICT, exSinConfirmar.getStatus());
+    assertEquals("puente_superpuesto", exSinConfirmar.getCode());
+    assertTrue(exSinConfirmar.getMessage().contains(primero.codigo()));
+
+    ApiException exConConfirmar =
+        assertThrows(
+            ApiException.class,
+            () ->
+                puenteService.registrar(
+                    solicitud(departamentoId, "14.481", "-90.615", true), ADMINISTRADOR_ID));
+
+    assertEquals(HttpStatus.CONFLICT, exConConfirmar.getStatus());
+    assertEquals("puente_superpuesto", exConConfirmar.getCode());
+    assertEquals(1L, puenteRepository.count());
+    assertEquals(1, correlativoActual());
+  }
+
+  @Test
+  void rechazaRegistrarPuenteSuperpuestoSobrePuenteInactivoInclusoConConfirmacion() {
+    var primero =
+        puenteService.registrar(
+            solicitud(departamentoId, "14.481", "-90.615", false), ADMINISTRADOR_ID);
+
+    puenteService.darDeBaja(
+        primero.id(), new DarBajaPuenteRequest("Puente colapsado"), ADMINISTRADOR_ID);
+
+    ApiException ex =
+        assertThrows(
+            ApiException.class,
+            () ->
+                puenteService.registrar(
+                    solicitud(departamentoId, "14.481", "-90.615", true), ADMINISTRADOR_ID));
+
+    assertEquals(HttpStatus.CONFLICT, ex.getStatus());
+    assertEquals("puente_superpuesto", ex.getCode());
+    assertTrue(ex.getMessage().contains("inactivo"));
+    assertTrue(ex.getMessage().contains(primero.codigo()));
+    assertEquals(1L, puenteRepository.count());
+    assertEquals(1, correlativoActual());
   }
 
   @TestConfiguration

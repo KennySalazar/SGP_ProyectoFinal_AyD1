@@ -242,6 +242,54 @@ class SolicitudAltaPuenteIntegrationTest {
   }
 
   @Test
+  @WithMockUser(roles = "ADMINISTRADOR")
+  void solicitarSuperpuestoSobrePuenteActivoFallaConConflictoInclusoConConfirmacion() {
+    var existente = crearSolicitud("Existente", "14.481", "-90.615");
+    solicitudService.aprobar(
+        existente.id(), new AprobarSolicitudAltaPuenteRequest(false), ADMINISTRADOR_ID);
+
+    var superpuesta =
+        solicitud("Superpuesta", departamentoId, municipioId, "14.481", "-90.615", null, true);
+
+    var excepcion =
+        assertThrows(
+            ApiException.class,
+            () -> comoCatedratico(() -> solicitudService.crear(superpuesta, CATEDRATICO_ID)));
+
+    assertThat(excepcion.getStatus()).isEqualTo(HttpStatus.CONFLICT);
+    assertThat(excepcion.getCode()).isEqualTo("puente_superpuesto");
+  }
+
+  @Test
+  @WithMockUser(roles = "ADMINISTRADOR")
+  void solicitarSuperpuestoSobrePuenteInactivoFallaConConflictoInclusoConConfirmacion() {
+    var existente = crearSolicitud("Existente", "14.481", "-90.615");
+    var aprobada =
+        solicitudService.aprobar(
+            existente.id(), new AprobarSolicitudAltaPuenteRequest(false), ADMINISTRADOR_ID);
+    jdbc.update(
+        """
+        UPDATE puente
+        SET activo = false, inactivado_en = now(), inactivado_por_id = ?, motivo_inactivacion = 'prueba'
+        WHERE id = ?
+        """,
+        ADMINISTRADOR_ID,
+        aprobada.puenteCreadoId());
+
+    var superpuesta =
+        solicitud("Superpuesta", departamentoId, municipioId, "14.481", "-90.615", null, true);
+
+    var excepcion =
+        assertThrows(
+            ApiException.class,
+            () -> comoCatedratico(() -> solicitudService.crear(superpuesta, CATEDRATICO_ID)));
+
+    assertThat(excepcion.getStatus()).isEqualTo(HttpStatus.CONFLICT);
+    assertThat(excepcion.getCode()).isEqualTo("puente_superpuesto");
+    assertThat(excepcion.getMessage()).contains("inactivo");
+  }
+
+  @Test
   void sinPuentesCercanosNoPideConfirmacion() {
     var response =
         solicitudService.crear(
