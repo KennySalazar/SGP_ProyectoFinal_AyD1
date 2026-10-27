@@ -2,6 +2,8 @@ package gt.usac.cunoc.sgp.inspeccion.controller;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -32,12 +34,17 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.Import;
+import org.springframework.data.domain.Page;
 import org.springframework.http.MediaType;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -342,5 +349,89 @@ class InspeccionControllerTest {
             jwtData.email(), null, List.of(new SimpleGrantedAuthority("ROLE_" + rol.name())));
     auth.setDetails(jwtData);
     return auth;
+  }
+
+  @AfterEach
+  void limpiarSesion() {
+    SecurityContextHolder.clearContext();
+  }
+
+  @ParameterizedTest
+  @EnumSource(RoleName.class)
+  void losCuatroRolesConsultanPublicadasSinRestriccionDeInspector(RoleName rol) throws Exception {
+    UUID puente = UUID.randomUUID();
+    UUID id = UUID.randomUUID();
+    var auth =
+        new UsernamePasswordAuthenticationToken(
+            "lector", null, List.of(new SimpleGrantedAuthority("ROLE_" + rol.name())));
+    auth.setDetails(new JwtData("lector@ejemplo.com", UUID.randomUUID(), rol, 0));
+    SecurityContextHolder.getContext().setAuthentication(auth);
+    when(inspeccionService.listarPublicadasPorPuente(puente, 2, 5)).thenReturn(Page.empty());
+
+    mvc.perform(
+            get("/api/v1/inspecciones/puentes/{id}/publicadas", puente)
+                .param("pagina", "2")
+                .param("tamanio", "5"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.content").isEmpty());
+    mvc.perform(get("/api/v1/inspecciones/{id}/publicada", id)).andExpect(status().isOk());
+    verify(inspeccionService).listarPublicadasPorPuente(puente, 2, 5);
+    verify(inspeccionService).consultarPublicada(id);
+  }
+
+  @Test
+  void exportarInspeccionAutenticadoRetornaJsonConAttachmentHeader() throws Exception {
+    UUID id = UUID.randomUUID();
+    var auth = autenticacionMock(UUID.randomUUID(), RoleName.ESTUDIANTE);
+    SecurityContextHolder.getContext().setAuthentication(auth);
+
+    gt.usac.cunoc.sgp.inspeccion.dto.ExportacionInspeccionResponse exportacion =
+        new gt.usac.cunoc.sgp.inspeccion.dto.ExportacionInspeccionResponse(
+            id,
+            LocalDate.of(2026, 10, 15),
+            new gt.usac.cunoc.sgp.inspeccion.dto.ExportacionInspeccionResponse
+                .PuenteResumenExportacion(
+                UUID.randomUUID(), "P-001", "Puente Central", "Guatemala", "Guatemala"),
+            new gt.usac.cunoc.sgp.inspeccion.dto.ExportacionInspeccionResponse
+                .VersionFormularioExportacion(
+                UUID.randomUUID(), "SIECA-v1", objectMapper.createObjectNode()),
+            null,
+            "PUBLICADA",
+            "VIGENTE",
+            null,
+            objectMapper.createObjectNode(),
+            null,
+            null,
+            List.of(),
+            List.of(),
+            Instant.now());
+
+    when(inspeccionService.exportarInspeccion(eq(id))).thenReturn(exportacion);
+
+    mvc.perform(get("/api/v1/inspecciones/{id}/exportar", id))
+        .andExpect(status().isOk())
+        .andExpect(
+            org.springframework.test.web.servlet.result.MockMvcResultMatchers.header()
+                .string(
+                    org.springframework.http.HttpHeaders.CONTENT_DISPOSITION,
+                    "attachment; filename=\"inspeccion-" + id + ".json\""))
+        .andExpect(jsonPath("$.id").value(id.toString()))
+        .andExpect(jsonPath("$.estado").value("PUBLICADA"));
+
+    verify(inspeccionService).exportarInspeccion(id);
+  }
+
+  @ParameterizedTest
+  @ValueSource(
+      strings = {
+        "/api/v1/inspecciones/00000000-0000-0000-0000-000000000030",
+        "/api/v1/inspecciones/00000000-0000-0000-0000-000000000030/publicada",
+        "/api/v1/inspecciones/00000000-0000-0000-0000-000000000030/exportar",
+        "/api/v1/inspecciones/puentes/00000000-0000-0000-0000-000000000030/publicadas"
+      })
+  void consultaSinSesionResponde401SinInvocarServicio(String ruta) throws Exception {
+    SecurityContextHolder.clearContext();
+    mvc.perform(get(ruta)).andExpect(status().isUnauthorized());
+    verifyNoInteractions(inspeccionService);
   }
 }

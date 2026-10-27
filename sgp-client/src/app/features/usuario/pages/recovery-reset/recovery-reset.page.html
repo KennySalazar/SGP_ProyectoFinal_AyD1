@@ -26,13 +26,14 @@
         placeholder="000000"
     /></label>
     <label
-      >{{ 'common.newPassword' | transloco }}<input
-        pInputText
-        type="password"
-        formControlName="newPassword"
-        autocomplete="new-password"
-        [placeholder]="'common.minPasswordPlaceholder' | transloco"
-    /></label>
+      >{{ 'common.newPassword' | transloco }}<app-contrasena-visible
+        ><input
+          pInputText
+          type="password"
+          formControlName="newPassword"
+          autocomplete="new-password"
+          [placeholder]="'common.minPasswordPlaceholder' | transloco" /></app-contrasena-visible
+    ></label>
     <button pButton class="primary" type="submit" [disabled]="form.invalid">
       <i class="pi pi-key"></i><span>{{ 'auth.reset.action' | transloco }}</span>
     </button>

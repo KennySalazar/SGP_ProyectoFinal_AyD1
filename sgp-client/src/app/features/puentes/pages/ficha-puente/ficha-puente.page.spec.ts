@@ -1,17 +1,21 @@
+import { RespaldoIcComponent } from '../../components/respaldo-ic/respaldo-ic.component';
+import { SincronizacionService } from '../../../../offline/services/sincronizacion.service';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { Component, EventEmitter, Input, Output, Pipe, PipeTransform, signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
-import { ActivatedRoute, provideRouter } from '@angular/router';
+import { ActivatedRoute, Router, convertToParamMap, provideRouter } from '@angular/router';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { AuthStore } from '../../../../core/services/auth.store';
-import { UserSession } from '../../../../core/models/auth.models';
+import { RoleName, UserSession } from '../../../../core/models/auth.models';
 import { AppShellComponent } from '../../../../layouts/app-shell/app-shell.component';
 import { SelectorUbicacionComponent } from '../../../../shared/components/selector-ubicacion/selector-ubicacion.component';
 import { SelectorUbicacionStubComponent } from '../../../../shared/components/selector-ubicacion/selector-ubicacion.testing';
 import { IniciarInspeccionDialogComponent } from '../../../inspecciones/components/iniciar-inspeccion-dialog/iniciar-inspeccion-dialog.component';
+import { ForoPuenteComponent } from '../../../foro/components/foro-puente/foro-puente.component';
+import { MantenimientoPuenteComponent } from '../../../mantenimiento/components/mantenimiento-puente/mantenimiento-puente.component';
 import { PuenteResponse } from '../../models/puente.models';
 import { FichaPuentePage } from './ficha-puente.page';
 
@@ -22,12 +26,27 @@ class TraduccionTestPipe implements PipeTransform {
   }
 }
 
+@Component({ template: '' })
+class DetalleStubComponent {}
+
 @Component({ selector: 'app-iniciar-inspeccion-dialog', standalone: true, template: '' })
 class IniciarInspeccionDialogStubComponent {
   @Input() visible = false;
   @Input() puente: PuenteResponse | null = null;
   @Output() visibleChange = new EventEmitter<boolean>();
   @Output() inspeccionIniciada = new EventEmitter<unknown>();
+}
+
+@Component({ selector: 'app-mantenimiento-puente', standalone: true, template: '' })
+class MantenimientoPuenteStubComponent {
+  @Input() puente: PuenteResponse | null = null;
+}
+
+@Component({ selector: 'app-foro-puente', standalone: true, template: '' })
+class ForoPuenteStubComponent {
+  @Input() puente: PuenteResponse | null = null;
+  @Input() hiloInicial: string | null = null;
+  @Input() comentarioDestacado: string | null = null;
 }
 
 describe('FichaPuentePage', () => {
@@ -109,9 +128,10 @@ describe('FichaPuentePage', () => {
 
     TestBed.configureTestingModule({
       providers: [
+        { provide: SincronizacionService, useValue: { iniciar: () => undefined } },
         provideHttpClient(),
         provideHttpClientTesting(),
-        provideRouter([]),
+        provideRouter([{ path: 'inspecciones/:id/publicada', component: DetalleStubComponent }]),
         {
           provide: ActivatedRoute,
           useValue: {
@@ -119,6 +139,7 @@ describe('FichaPuentePage', () => {
               paramMap: {
                 get: () => paramMapId,
               },
+              queryParamMap: convertToParamMap({}),
             },
           },
         },
@@ -129,15 +150,27 @@ describe('FichaPuentePage', () => {
       ],
     });
 
+    TestBed.overrideComponent(RespaldoIcComponent, {
+      remove: { imports: [TranslocoPipe] },
+      add: { imports: [TraduccionTestPipe] },
+    });
     TestBed.overrideComponent(FichaPuentePage, {
       remove: {
-        imports: [TranslocoPipe, SelectorUbicacionComponent, IniciarInspeccionDialogComponent],
+        imports: [
+          TranslocoPipe,
+          SelectorUbicacionComponent,
+          IniciarInspeccionDialogComponent,
+          MantenimientoPuenteComponent,
+          ForoPuenteComponent,
+        ],
       },
       add: {
         imports: [
           TraduccionTestPipe,
           SelectorUbicacionStubComponent,
           IniciarInspeccionDialogStubComponent,
+          MantenimientoPuenteStubComponent,
+          ForoPuenteStubComponent,
         ],
       },
     });
@@ -155,6 +188,14 @@ describe('FichaPuentePage', () => {
     TestBed.resetTestingModule();
   });
 
+  function renderizarFicha(): void {
+    fixture.detectChanges();
+    for (const request of http.match((req) => req.url.endsWith('/publicadas'))) {
+      request.flush(paginaHistorial([]));
+    }
+    fixture.detectChanges();
+  }
+
   function iniciarComponente(): void {
     fixture = TestBed.createComponent(FichaPuentePage);
     page = fixture.componentInstance;
@@ -162,12 +203,12 @@ describe('FichaPuentePage', () => {
 
   it('muestra estado "Sin evaluar" en gris y nunca "Bueno" para puente recién registrado sin inspecciones (RN-INV-10)', () => {
     iniciarComponente();
-    fixture.detectChanges();
+    renderizarFicha();
 
     const peticion = http.expectOne('/api/v1/puentes/puente-sin-evaluar');
     expect(peticion.request.method).toBe('GET');
     peticion.flush(puenteSinEvaluar);
-    fixture.detectChanges();
+    renderizarFicha();
 
     expect(page.cargando()).toBe(false);
     expect(page.puente()?.estadoActual).toBe('Sin evaluar');
@@ -185,11 +226,11 @@ describe('FichaPuentePage', () => {
   it('muestra estado, IC y fecha de última inspección de solo lectura cuando cuenta con inspección (RN-INV-09)', () => {
     paramMapId = 'puente-evaluado';
     iniciarComponente();
-    fixture.detectChanges();
+    renderizarFicha();
 
     const peticion = http.expectOne('/api/v1/puentes/puente-evaluado');
     peticion.flush(puenteEvaluado);
-    fixture.detectChanges();
+    renderizarFicha();
 
     expect(page.cargando()).toBe(false);
 
@@ -209,11 +250,11 @@ describe('FichaPuentePage', () => {
     authStoreMock.user.set(null);
 
     iniciarComponente();
-    fixture.detectChanges();
+    renderizarFicha();
 
     const peticion = http.expectOne('/api/v1/puentes/puente-sin-evaluar');
     peticion.flush(puenteSinEvaluar);
-    fixture.detectChanges();
+    renderizarFicha();
 
     // Debe mostrar los datos publicos
     const titulo = fixture.debugElement.query(By.css('.page-title'));
@@ -232,7 +273,7 @@ describe('FichaPuentePage', () => {
     expect(botonLogin).not.toBeNull();
   });
 
-  it('muestra aviso de documentacion vacia y no solicita login cuando usuario está autenticado', () => {
+  it('muestra historial vacío y no solicita login cuando usuario está autenticado', () => {
     authStoreMock.authenticated.set(true);
     authStoreMock.user.set({
       id: 'usuario-1',
@@ -245,18 +286,18 @@ describe('FichaPuentePage', () => {
     });
 
     iniciarComponente();
-    fixture.detectChanges();
+    renderizarFicha();
 
     const peticion = http.expectOne('/api/v1/puentes/puente-sin-evaluar');
     peticion.flush(puenteSinEvaluar);
-    fixture.detectChanges();
+    renderizarFicha();
 
     const avisoRestringido = fixture.debugElement.query(By.css('.aviso-restringido'));
     expect(avisoRestringido).toBeNull();
 
     const avisoVacio = fixture.debugElement.query(By.css('.aviso-vacio'));
     expect(avisoVacio).not.toBeNull();
-    expect(avisoVacio.nativeElement.textContent).toContain('puentes.ficha.noDocumentation');
+    expect(avisoVacio.nativeElement.textContent).toContain('inspecciones.historial.vacio');
   });
 
   it('muestra boton de edicion cuando el usuario es Administrador', () => {
@@ -272,11 +313,11 @@ describe('FichaPuentePage', () => {
     });
 
     iniciarComponente();
-    fixture.detectChanges();
+    renderizarFicha();
 
     const peticion = http.expectOne('/api/v1/puentes/puente-sin-evaluar');
     peticion.flush(puenteSinEvaluar);
-    fixture.detectChanges();
+    renderizarFicha();
 
     const botonEditar = fixture.debugElement.query(
       By.css('a[href="/puentes/puente-sin-evaluar/editar"], a[ng-reflect-router-link*="editar"]'),
@@ -287,11 +328,11 @@ describe('FichaPuentePage', () => {
   it('muestra mensaje de error cuando el puente no existe o esta inactivo (404)', () => {
     paramMapId = 'puente-inexistente';
     iniciarComponente();
-    fixture.detectChanges();
+    renderizarFicha();
 
     const peticion = http.expectOne('/api/v1/puentes/puente-inexistente');
     peticion.flush({ code: 'puente_no_encontrado' }, { status: 404, statusText: 'Not Found' });
-    fixture.detectChanges();
+    renderizarFicha();
 
     expect(page.cargando()).toBe(false);
     expect(page.error()).toBe(true);
@@ -303,7 +344,7 @@ describe('FichaPuentePage', () => {
 
   it('muestra etiqueta de kilometraje y notAvailable (N/A) cuando campos opcionales no tienen datos', () => {
     iniciarComponente();
-    fixture.detectChanges();
+    renderizarFicha();
 
     const puenteSinOpcionales: PuenteResponse = {
       ...puenteSinEvaluar,
@@ -311,7 +352,7 @@ describe('FichaPuentePage', () => {
     };
     const peticion = http.expectOne('/api/v1/puentes/puente-sin-evaluar');
     peticion.flush(puenteSinOpcionales);
-    fixture.detectChanges();
+    renderizarFicha();
 
     const etiquetas = fixture.debugElement
       .queryAll(By.css('.dato-etiqueta'))
@@ -342,18 +383,18 @@ describe('FichaPuentePage', () => {
     });
 
     iniciarComponente();
-    fixture.detectChanges();
+    renderizarFicha();
 
     const peticion = http.expectOne('/api/v1/puentes/puente-sin-evaluar');
     peticion.flush(puenteSinEvaluar);
-    fixture.detectChanges();
+    renderizarFicha();
 
     const btn = fixture.debugElement.query(By.css('.btn-iniciar-inspeccion'));
     expect(btn).not.toBeNull();
     expect(page.puedeIniciarInspeccion()).toBe(true);
 
     btn.nativeElement.click();
-    fixture.detectChanges();
+    renderizarFicha();
     expect(page.mostrarModalIniciar()).toBe(true);
   });
 
@@ -371,11 +412,11 @@ describe('FichaPuentePage', () => {
     });
 
     iniciarComponente();
-    fixture.detectChanges();
+    renderizarFicha();
 
     const peticion = http.expectOne('/api/v1/puentes/puente-sin-evaluar');
     peticion.flush(puenteSinEvaluar);
-    fixture.detectChanges();
+    renderizarFicha();
 
     const btn = fixture.debugElement.query(By.css('.btn-iniciar-inspeccion'));
     expect(btn).not.toBeNull();
@@ -396,11 +437,11 @@ describe('FichaPuentePage', () => {
     });
 
     iniciarComponente();
-    fixture.detectChanges();
+    renderizarFicha();
 
     const peticion = http.expectOne('/api/v1/puentes/puente-sin-evaluar');
     peticion.flush(puenteSinEvaluar);
-    fixture.detectChanges();
+    renderizarFicha();
 
     const btn = fixture.debugElement.query(By.css('.btn-iniciar-inspeccion'));
     expect(btn).toBeNull();
@@ -420,11 +461,11 @@ describe('FichaPuentePage', () => {
     });
 
     iniciarComponente();
-    fixture.detectChanges();
+    renderizarFicha();
 
     const peticion = http.expectOne('/api/v1/puentes/puente-sin-evaluar');
     peticion.flush(puenteSinEvaluar);
-    fixture.detectChanges();
+    renderizarFicha();
 
     const btn = fixture.debugElement.query(By.css('.btn-iniciar-inspeccion'));
     expect(btn).toBeNull();
@@ -444,7 +485,7 @@ describe('FichaPuentePage', () => {
     });
 
     iniciarComponente();
-    fixture.detectChanges();
+    renderizarFicha();
 
     const puenteInactivo: PuenteResponse = {
       ...puenteSinEvaluar,
@@ -452,10 +493,204 @@ describe('FichaPuentePage', () => {
     };
     const peticion = http.expectOne('/api/v1/puentes/puente-sin-evaluar');
     peticion.flush(puenteInactivo);
-    fixture.detectChanges();
+    renderizarFicha();
 
     const btn = fixture.debugElement.query(By.css('.btn-iniciar-inspeccion'));
     expect(btn).toBeNull();
     expect(page.puedeIniciarInspeccion()).toBe(false);
+  });
+
+  function autenticar(role: RoleName = 'ESTUDIANTE'): void {
+    authStoreMock.user.set({
+      id: 'lector',
+      email: 'lector@ejemplo.com',
+      role,
+      active: true,
+      activated: true,
+      verified: true,
+      twoFactorEnabled: false,
+    });
+    authStoreMock.authenticated.set(true);
+  }
+
+  const rutaHistorial = '/api/v1/inspecciones/puentes/puente-sin-evaluar/publicadas';
+  const reciente = {
+    id: 'reciente',
+    puenteId: 'puente-sin-evaluar',
+    autorId: 'autor-1',
+    nombreAutor: 'Autora reciente',
+    fechaInspeccion: '2026-10-15',
+    publicadoEn: '2026-10-18T12:00:00Z',
+    estado: 'PUBLICADA',
+  };
+  const antigua = {
+    ...reciente,
+    id: 'antigua',
+    nombreAutor: 'Autor anterior',
+    publicadoEn: '2026-10-16T12:00:00Z',
+  };
+
+  function paginaHistorial(content: unknown[], number = 0, totalElements = content.length) {
+    return {
+      content,
+      number,
+      size: 20,
+      totalElements,
+      totalPages: Math.ceil(totalElements / 20),
+      first: number === 0,
+      last: (number + 1) * 20 >= totalElements,
+      empty: content.length === 0,
+    };
+  }
+
+  function abrirConHistorial(role: RoleName = 'ESTUDIANTE') {
+    autenticar(role);
+    iniciarComponente();
+    fixture.detectChanges();
+    http.expectOne('/api/v1/puentes/puente-sin-evaluar').flush(puenteSinEvaluar);
+    fixture.detectChanges();
+    return http.expectOne(rutaHistorial + '?pagina=0&tamanio=20');
+  }
+
+  it('consulta solo publicadas, conserva el orden recibido y muestra autor, fecha y etiqueta textual', () => {
+    const request = abrirConHistorial();
+    expect(request.request.method).toBe('GET');
+    expect(page.cargandoHistorial()).toBe(true);
+    expect(
+      fixture.nativeElement.querySelector('.historial-publicado [role=status]').textContent,
+    ).toContain('inspecciones.historial.cargando');
+    request.flush(paginaHistorial([reciente, antigua]));
+    fixture.detectChanges();
+    const filas: HTMLElement[] = Array.from(
+      fixture.nativeElement.querySelectorAll('.historial-fila'),
+    );
+    expect(filas).toHaveLength(2);
+    expect(filas[0].textContent).toContain('Autora reciente');
+    expect(filas[0].textContent).toContain('18/10/2026');
+    expect(filas[0].textContent).toContain('inspecciones.consulta.publicada');
+    expect(filas[1].textContent).toContain('Autor anterior');
+    expect(filas[0].querySelector('a')?.getAttribute('href')).toBe(
+      '/inspecciones/reciente/publicada',
+    );
+    expect(filas[0].textContent).not.toContain('inspecciones.consulta.superada');
+    http.expectNone('/api/v1/inspecciones');
+  });
+
+  it('pagina en el servidor con tamaño fijo 20 y permite regresar a la primera página', () => {
+    abrirConHistorial().flush(paginaHistorial([reciente], 0, 42));
+    fixture.detectChanges();
+    const paginador = fixture.debugElement.query(By.css('p-paginator')).componentInstance;
+    expect(paginador.rows).toBe(20);
+    expect(paginador.totalRecords).toBe(42);
+    paginador.onPageChange.emit({ page: 1, rows: 20, first: 20 });
+    const siguiente = http.expectOne(rutaHistorial + '?pagina=1&tamanio=20');
+    expect(page.cargandoHistorial()).toBe(true);
+    siguiente.flush(paginaHistorial([antigua], 1, 42));
+    fixture.detectChanges();
+    expect(page.historial()?.number).toBe(1);
+    expect(fixture.nativeElement.querySelector('.historial-fila').textContent).toContain(
+      'Autor anterior',
+    );
+    page.cambiarPaginaHistorial({ page: 0, rows: 20 });
+    http
+      .expectOne(rutaHistorial + '?pagina=0&tamanio=20')
+      .flush(paginaHistorial([reciente], 0, 42));
+    fixture.detectChanges();
+    expect(page.historial()?.number).toBe(0);
+  });
+
+  it('navega al detalle publicado desde el enlace del historial', async () => {
+    abrirConHistorial().flush(paginaHistorial([reciente]));
+    fixture.detectChanges();
+    fixture.nativeElement.querySelector('.historial-fila a').click();
+    await fixture.whenStable();
+    expect(TestBed.inject(Router).url).toBe('/inspecciones/reciente/publicada');
+  });
+
+  it('muestra estado vacío sin enlaces ni paginador', () => {
+    abrirConHistorial().flush(paginaHistorial([]));
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('.historial-publicado').textContent).toContain(
+      'inspecciones.historial.vacio',
+    );
+    expect(fixture.nativeElement.querySelector('.historial-fila')).toBeNull();
+    expect(fixture.nativeElement.querySelector('p-paginator')).toBeNull();
+  });
+
+  it.each([401, 403, 404, 500])(
+    'muestra error HTTP %s y permite reintentar sin alterar la ficha',
+    (status) => {
+      abrirConHistorial().flush({ detail: 'Error backend' }, { status, statusText: 'Error' });
+      fixture.detectChanges();
+      expect(page.errorHistorial()).toBe(true);
+      expect(
+        fixture.nativeElement.querySelector('.historial-publicado [role=alert]').textContent,
+      ).toContain('inspecciones.historial.error');
+      expect(fixture.nativeElement.querySelector('.page-title').textContent).toContain(
+        puenteSinEvaluar.nombre,
+      );
+      fixture.nativeElement.querySelector('.historial-publicado button').click();
+      http.expectOne(rutaHistorial + '?pagina=0&tamanio=20').flush(paginaHistorial([reciente]));
+      fixture.detectChanges();
+      expect(page.errorHistorial()).toBe(false);
+      expect(fixture.nativeElement.querySelector('.historial-fila')).not.toBeNull();
+    },
+  );
+
+  it.each<RoleName>(['ESTUDIANTE', 'CATEDRATICO', 'PROFESIONAL_EXTERNO', 'ADMINISTRADOR'])(
+    'permite consultar el historial al rol autenticado %s',
+    (role) => {
+      abrirConHistorial(role).flush(paginaHistorial([reciente]));
+      fixture.detectChanges();
+      expect(fixture.nativeElement.querySelector('.historial-fila')).not.toBeNull();
+    },
+  );
+
+  it('no solicita historial sin sesión y elimina datos al cerrar sesión', () => {
+    abrirConHistorial().flush(paginaHistorial([reciente]));
+    fixture.detectChanges();
+    authStoreMock.authenticated.set(false);
+    authStoreMock.user.set(null);
+    fixture.detectChanges();
+    expect(page.historial()).toBeNull();
+    expect(fixture.nativeElement.querySelector('.historial-publicado')).toBeNull();
+    http.expectNone((req) => req.url.endsWith('/publicadas'));
+  });
+
+  it('no muestra filas privadas aunque una respuesta inesperada las incluya', () => {
+    abrirConHistorial().flush(
+      paginaHistorial([
+        reciente,
+        { ...antigua, estado: 'BORRADOR', nombreAutor: 'Autor privado' },
+        { ...antigua, estado: 'ENVIADA', nombreAutor: 'Autor enviado' },
+      ]),
+    );
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelectorAll('.historial-fila')).toHaveLength(1);
+    expect(fixture.nativeElement.querySelector('.historial-publicado').textContent).not.toContain(
+      'Autor privado',
+    );
+    expect(fixture.nativeElement.querySelector('.historial-publicado').textContent).not.toContain(
+      'Autor enviado',
+    );
+  });
+
+  it('muestra SUPERADA únicamente cuando el resumen proporciona esa información', () => {
+    abrirConHistorial().flush(paginaHistorial([{ ...reciente, superadaPorId: 'correccion' }]));
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('.historial-fila').textContent).toContain(
+      'inspecciones.consulta.superada',
+    );
+    http.expectNone((req) => req.url.endsWith('/publicada'));
+  });
+
+  it('cancela la solicitud pendiente al salir de sesión sin conservar el historial', () => {
+    const request = abrirConHistorial();
+    authStoreMock.authenticated.set(false);
+    authStoreMock.user.set(null);
+    fixture.detectChanges();
+    expect(request.cancelled).toBe(true);
+    expect(page.historial()).toBeNull();
+    expect(page.cargandoHistorial()).toBe(false);
   });
 });

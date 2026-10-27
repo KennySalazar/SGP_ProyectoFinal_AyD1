@@ -1,0 +1,102 @@
+<section class="plan surface-card" aria-labelledby="plan-rutinario-titulo">
+  <header class="cabecera">
+    <div>
+      <p class="page-kicker">{{ 'mantenimiento.plan.kicker' | transloco }}</p>
+      <h2 id="plan-rutinario-titulo">{{ 'mantenimiento.plan.titulo' | transloco }}</h2>
+    </div>
+    @if (puedeGestionar() && plan() && !editando()) {
+      <button pButton type="button" severity="secondary" [outlined]="true" (click)="editar()">
+        <i class="pi pi-pencil" aria-hidden="true"></i>
+        <span>{{ 'mantenimiento.plan.editar' | transloco }}</span>
+      </button>
+    }
+  </header>
+
+  @if (cargando()) {
+    <p role="status">{{ 'mantenimiento.plan.cargando' | transloco }}</p>
+  } @else if (error()) {
+    <div class="mensaje error" role="alert">
+      <p>{{ 'mantenimiento.plan.error' | transloco }}</p>
+      <button pButton type="button" severity="secondary" [outlined]="true" (click)="cargar()">
+        <span>{{ 'mantenimiento.plan.reintentar' | transloco }}</span>
+      </button>
+    </div>
+  } @else if (plan(); as p) {
+    @if (guardado()) {
+      <p class="mensaje correcto" role="status">{{ 'mantenimiento.plan.guardado' | transloco }}</p>
+    }
+    @if (editando()) {
+      <form [formGroup]="formulario" (ngSubmit)="guardar()" class="formulario">
+        <label for="plan-periodicidad">
+          <span>{{ 'mantenimiento.plan.periodicidad' | transloco }}</span>
+          <p-inputnumber
+            formControlName="periodicidadMeses"
+            inputId="plan-periodicidad"
+            [min]="1"
+            [max]="12"
+            [showButtons]="true"
+            suffix=" {{ 'mantenimiento.plan.meses' | transloco }}"
+            [fluid]="true"
+          />
+          <small>{{ 'mantenimiento.plan.maximoAnual' | transloco }}</small>
+        </label>
+        <label>
+          <span>{{ 'mantenimiento.plan.actividades' | transloco }}</span>
+          <textarea
+            pTextarea
+            rows="5"
+            formControlName="actividadesTexto"
+            [placeholder]="'mantenimiento.plan.actividadesAyuda' | transloco"
+          ></textarea>
+          <small>{{ 'mantenimiento.plan.actividadesAyuda' | transloco }}</small>
+        </label>
+        <div class="acciones">
+          <button
+            pButton
+            type="button"
+            severity="secondary"
+            [outlined]="true"
+            [disabled]="guardando()"
+            (click)="cancelar()"
+          >
+            <span>{{ 'common.cancel' | transloco }}</span>
+          </button>
+          <button pButton type="submit" [disabled]="guardando() || formulario.invalid">
+            <i class="pi pi-check" aria-hidden="true"></i>
+            <span>{{
+              (guardando() ? 'mantenimiento.plan.guardando' : 'mantenimiento.plan.guardar')
+                | transloco
+            }}</span>
+          </button>
+        </div>
+      </form>
+    } @else {
+      <dl class="resumen">
+        <div>
+          <dt>{{ 'mantenimiento.plan.periodicidad' | transloco }}</dt>
+          <dd>{{ p.periodicidadMeses }} {{ 'mantenimiento.plan.meses' | transloco }}</dd>
+        </div>
+        <div>
+          <dt>{{ 'mantenimiento.plan.proximoCiclo' | transloco }}</dt>
+          <dd>
+            @if (p.fechaProximoCiclo) {
+              {{ p.fechaProximoCiclo | date: 'dd/MM/yyyy' }}
+            } @else {
+              {{ 'mantenimiento.plan.puenteInactivo' | transloco }}
+            }
+          </dd>
+        </div>
+      </dl>
+      <h3>{{ 'mantenimiento.plan.actividades' | transloco }}</h3>
+      @if (p.actividades.length) {
+        <ol>
+          @for (actividad of p.actividades; track actividad.id) {
+            <li>{{ actividad.descripcion }}</li>
+          }
+        </ol>
+      } @else {
+        <p>{{ 'mantenimiento.plan.sinActividades' | transloco }}</p>
+      }
+    }
+  }
+</section>

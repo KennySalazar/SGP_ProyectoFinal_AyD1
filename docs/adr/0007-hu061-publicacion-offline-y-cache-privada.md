@@ -1,0 +1,15 @@
+# ADR-0007: envío y publicación sin conexión (HU-061)
+
+Estado: aceptado para la implementación de HU-061.
+
+La cola Dexie existente se amplía con ENVIAR_INSPECCION y PUBLICAR_INSPECCION. Cada intención conserva una clave y el servidor sigue siendo la autoridad de autorización, validación, transiciones e IC. No se añaden estados a la máquina de negocio: pendiente y rechazo son información local. La edición se bloquea mientras una intención está pendiente; un rechazo definitivo conserva el contenido y permite corregir y confirmar con otra clave. Un resultado incierto conserva la clave y no habilita edición hasta reconciliarse.
+
+Por inspección se respeta crear → guardar → fotos confirmadas → acción final. La publicación usa el filtro JSON idempotente existente, cuyo adaptador oculta la cabecera al controlador. Las fotografías conservan su circuito multipart. La petición efectiva de guardado se fija antes del primer intento. Web Locks coordina el sincronizador entre pestañas cuando está disponible; sin esta API se conserva el bloqueo por instancia y la idempotencia del servidor, sin prometer exclusión entre pestañas. Las operaciones ENVIANDO se recuperan después de 60 segundos; la comprobación periódica y los eventos de conexión/login reanudan la cola con la aplicación abierta. No se promete sincronización con la aplicación cerrada ni idempotencia ilimitada después de la retención del servidor.
+
+El inicio admite versionFormularioId opcional: el cliente preparado transmite el UUID remoto y el servidor exige una versión publicada. Los clientes anteriores conservan la selección de la versión activa. La versión capturada no se sustituye silenciosamente al reconectar.
+
+“index.html sin caché” significa sin caché HTTP/intermediarios. Se conserva la copia versionada del app shell administrada por Angular Service Worker para arrancar sin red. Formulario activo y catálogos territoriales usan freshness con timeout 0u; las inspecciones y sus archivos quedan fuera del worker. Las asignaciones privadas usan stale-while-revalidate en la capa offline y una tabla Dexie por propietario, porque una caché compartida por URL no separa cuentas. El catálogo de puentes no se incorpora al worker, pues su respuesta puede depender de la sesión.
+
+El último perfil se conserva localmente para abrir de nuevo sin red, sin guardar tokens. Cerrar sesión elimina el perfil visible, conserva el trabajo y obliga a autenticarse para sincronizar. Ese perfil permite trabajo local; nunca autoriza peticiones remotas. Los registros sin propietario no se atribuyen automáticamente a ninguna cuenta.
+
+Se usa Playwright como única dependencia de navegador añadida: permite controlar conexión, reapertura de páginas y service workers sobre el build de producción. El sprint proponía Cypress como recomendación; la suite Cypress anterior no declaraba ejecutor ni probaba PWA. Las pruebas PWA emplean una API simulada explícita y un esquema mínimo; la API, PostGIS, autorización e IC se verifican por separado en las pruebas de integración backend. Esta combinación no se presenta como una certificación integral contra staging.

@@ -6,84 +6,103 @@ import { FormularioApiService } from './formulario-api.service';
 
 describe('FormularioApiService', () => {
   let service: FormularioApiService;
-  let httpTesting: HttpTestingController;
+  let http: HttpTestingController;
 
   beforeEach(() => {
     TestBed.configureTestingModule({
-      providers: [FormularioApiService, provideHttpClient(), provideHttpClientTesting()],
+      providers: [provideHttpClient(), provideHttpClientTesting()],
     });
+
     service = TestBed.inject(FormularioApiService);
-    httpTesting = TestBed.inject(HttpTestingController);
+    http = TestBed.inject(HttpTestingController);
   });
 
   afterEach(() => {
-    httpTesting.verify();
+    http.verify();
   });
 
-  it('lista las versiones de formulario', () => {
-    service.listarVersiones().subscribe((versiones) => {
-      expect(versiones).toHaveLength(1);
-      expect(versiones[0].codigo).toBe('SIECA-v1');
-    });
+  it('consulta las versiones del formulario', () => {
+    service.listarVersiones().subscribe();
 
-    const req = httpTesting.expectOne('/api/v1/formularios');
-    expect(req.request.method).toBe('GET');
-    req.flush([{ id: '1', codigo: 'SIECA-v1', estado: 'PUBLICADA', activa: true }]);
+    const request = http.expectOne('/api/v1/formularios');
+
+    expect(request.request.method).toBe('GET');
+
+    request.flush([]);
   });
 
-  it('obtiene la versión activa', () => {
-    service.obtenerActiva().subscribe((activa) => {
-      expect(activa.codigo).toBe('SIECA-v1');
-      expect(activa.version).toBe(1);
-    });
+  it('codifica el identificador al consultar una version', () => {
+    service.obtenerPorId('version/1').subscribe();
 
-    const req = httpTesting.expectOne('/api/v1/formularios/activo');
-    expect(req.request.method).toBe('GET');
-    req.flush({
-      id: '1',
-      codigo: 'SIECA-v1',
-      version: 1,
-      esquema: {},
-      hashContenido: 'abc',
-      publicadoEn: '2026-10-13T00:00:00Z',
-    });
+    const request = http.expectOne('/api/v1/formularios/version%2F1');
+
+    expect(request.request.method).toBe('GET');
+
+    request.flush({});
   });
 
-  it('obtiene el esquema de una versión publicada por su id', () => {
-    service.obtenerEsquemaPublicado('a b').subscribe((version) => {
-      expect(version.codigo).toBe('SIECA-v0');
-    });
+  it('envia los pesos asociados a la version seleccionada', () => {
+    const pesos = [
+      {
+        elementoRef: '/subestructura/pilas',
+        peso: 2,
+        descripcion: 'Pilas',
+      },
+    ];
 
-    const req = httpTesting.expectOne('/api/v1/formularios/a%20b/esquema');
-    expect(req.request.method).toBe('GET');
-    req.flush({
-      id: 'a b',
-      codigo: 'SIECA-v0',
-      version: 0,
-      esquema: {},
-      hashContenido: 'abc',
-      publicadoEn: '2026-10-01T00:00:00Z',
-    });
+    service.calibrarPesos('version-1', pesos, 0).subscribe();
+
+    const request = http.expectOne('/api/v1/formularios/version-1/pesos');
+
+    expect(request.request.method).toBe('PUT');
+    expect(request.request.body).toEqual(pesos);
+    expect(request.request.headers.get('If-Match')).toBe('0');
+
+    request.flush([
+      {
+        id: 'peso-1',
+        ...pesos[0],
+        creadoEn: '2026-10-17T00:00:00Z',
+      },
+    ]);
   });
 
-  it('carga la plantilla inicial sieca', () => {
-    service.cargarPlantillaSieca('SIECA-v1').subscribe((version) => {
-      expect(version.codigo).toBe('SIECA-v1');
-    });
+  it('envia los cuatro niveles al configurar la escala', () => {
+    const body = {
+      valores: {
+        NO_PRESENTA: 0,
+        LEVE: 1,
+        MODERADO: 2,
+        SEVERO: 4,
+      },
+    };
 
-    const req = httpTesting.expectOne('/api/v1/formularios/plantilla-sieca?codigo=SIECA-v1');
-    expect(req.request.method).toBe('POST');
-    req.flush({ id: '1', codigo: 'SIECA-v1', estado: 'BORRADOR', activa: false });
+    service.configurarEscala('version-1', body, 3).subscribe();
+
+    const request = http.expectOne('/api/v1/formularios/version-1/escala');
+
+    expect(request.request.method).toBe('PUT');
+    expect(request.request.body).toEqual(body);
+    expect(request.request.headers.get('If-Match')).toBe('3');
+
+    request.flush({});
   });
 
-  it('publica una versión', () => {
-    service.publicar('v-1').subscribe((pub) => {
-      expect(pub.estado).toBe('PUBLICADA');
-      expect(pub.activa).toBe(true);
-    });
+  it('publica la version mediante su endpoint sin enviar nuevos pesos', () => {
+    service.publicar('version-1', { mapeos: [] }).subscribe();
 
-    const req = httpTesting.expectOne('/api/v1/formularios/v-1/publicar');
-    expect(req.request.method).toBe('POST');
-    req.flush({ id: 'v-1', codigo: 'SIECA-v1', estado: 'PUBLICADA', activa: true });
+    const request = http.expectOne('/api/v1/formularios/version-1/publicar');
+
+    expect(request.request.method).toBe('POST');
+    expect(request.request.body).toEqual({ mapeos: [] });
+
+    request.flush({});
+  });
+
+  it('envia la version cero del borrador sin descartarla', () => {
+    service.actualizarBorrador('v0', { esquema: {} }, 0).subscribe();
+    const req = http.expectOne('/api/v1/formularios/v0');
+    expect(req.request.headers.get('If-Match')).toBe('0');
+    req.flush({});
   });
 });

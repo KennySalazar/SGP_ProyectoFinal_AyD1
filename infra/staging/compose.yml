@@ -3,14 +3,16 @@ name: sgp-staging
 x-logging: &default-logging
   driver: json-file
   options:
-    max-size: "10m"
-    max-file: "5"
+    max-size: "50m"
+    max-file: "90"
 
 services:
   backend:
     image: ${BACKEND_IMAGE:?BACKEND_IMAGE is required}
     environment:
       SPRING_PROFILES_ACTIVE: staging
+      AWS_REGION: ${AWS_REGION:-us-east-1}
+      ARCHIVOS_BUCKET: ${ARCHIVOS_BUCKET:-sgp-staging-archivos-ayd1-2026-gt01}
       DATABASE_URL: ${DATABASE_URL:?DATABASE_URL is required}
       DATABASE_USERNAME: ${DATABASE_USERNAME:?DATABASE_USERNAME is required}
       DATABASE_PASSWORD: ${DATABASE_PASSWORD:?DATABASE_PASSWORD is required}

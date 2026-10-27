@@ -1,0 +1,132 @@
+.page-heading {
+  margin-bottom: 1.5rem;
+}
+.page-kicker {
+  margin: 0 0 0.25rem;
+  color: var(--sgp-blue-600);
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.page-title {
+  margin: 0 0 0.4rem;
+  color: var(--sgp-navy-900);
+  font-size: clamp(1.8rem, 3vw, 2.45rem);
+}
+.page-description {
+  margin: 0;
+  color: var(--sgp-steel-700);
+}
+.filtros {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+  gap: 0.9rem;
+  align-items: end;
+  padding: 1.2rem 1.35rem;
+  margin-bottom: 1rem;
+}
+.filtros .campo {
+  display: grid;
+  gap: 0.35rem;
+  min-width: 0;
+  color: var(--sgp-navy-900);
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+.filtro-puente {
+  grid-column: span 2;
+}
+.filtros-acciones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+.lista-ordenes {
+  padding: 0.6rem 1.35rem 1.35rem;
+}
+.contador {
+  min-width: 1.6rem;
+  padding: 0.1rem 0.45rem;
+  margin-left: 0.4rem;
+  color: var(--sgp-navy-900);
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-align: center;
+  background: var(--sgp-surface-soft);
+  border: 1px solid var(--sgp-border);
+  border-radius: 999px;
+}
+.orden-fila,
+.fila-titulo {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+.orden-fila {
+  justify-content: space-between;
+  padding: 1rem 0;
+  border-bottom: 1px solid var(--sgp-border);
+}
+.fila-titulo {
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.orden-fila h3 {
+  margin: 0;
+  color: var(--sgp-navy-900);
+  font-size: 1.02rem;
+}
+.orden-principal {
+  flex: 1;
+  min-width: 0;
+}
+.orden-principal p,
+.orden-principal small {
+  margin: 0.35rem 0 0;
+  color: var(--sgp-steel-700);
+}
+.orden-principal small {
+  display: block;
+  font-family: ui-monospace, monospace;
+  font-size: 0.8rem;
+  word-break: break-all;
+}
+:host ::ng-deep .esqueleto .mt {
+  margin-top: 0.5rem;
+}
+.estado-lista {
+  display: grid;
+  justify-items: center;
+  gap: 0.6rem;
+  padding: 2rem 1rem;
+  color: var(--sgp-steel-700);
+  text-align: center;
+}
+.estado-lista i {
+  font-size: 1.6rem;
+  color: var(--sgp-steel-500);
+}
+.estado-lista p {
+  margin: 0;
+}
+@media (max-width: 700px) {
+  .filtro-puente {
+    grid-column: auto;
+  }
+  .filtros-acciones button {
+    flex: 1;
+    justify-content: center;
+  }
+  .orden-fila {
+    align-items: stretch;
+    flex-direction: column;
+    padding: 1rem;
+    margin-top: 0.75rem;
+    border: 1px solid var(--sgp-border);
+    border-radius: 14px;
+  }
+  .orden-fila a {
+    justify-content: center;
+  }
+}

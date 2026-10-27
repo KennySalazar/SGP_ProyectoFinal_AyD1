@@ -177,7 +177,11 @@ class InvitacionServiceTest {
   @ParameterizedTest
   @ValueSource(strings = {"corta1", "solamenteletras", "1234567890", "   "})
   void aceptarRechazaContrasenaFueraDePoliticaSinConsultarLaInvitacion(String password) {
-    assertThatThrownBy(() -> service.aceptar(new AceptarInvitacionRequest("token", password)))
+    assertThatThrownBy(
+            () ->
+                service.aceptar(
+                    new AceptarInvitacionRequest(
+                        "token", password, "Persona de Prueba", "persona.prueba")))
         .isInstanceOfSatisfying(
             ApiException.class, e -> assertThat(e.getCode()).isEqualTo("contrasena_invalida"));
 

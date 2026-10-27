@@ -76,11 +76,18 @@
     <div class="inspeccion-principal">
       <div class="fila-titulo">
         <h3>{{ inspeccion.codigoPuente }} · {{ inspeccion.nombrePuente }}</h3>
+        @if (inspeccion.estado === 'PENDIENTE_SYNC') {
+        <p-tag
+          icon="pi pi-cloud-upload"
+          [value]="etiquetaEstado(inspeccion.estado) | transloco"
+          [severity]="severidad(inspeccion.estado)"
+        />
+        } @else {
         <p-tag
           [value]="etiquetaEstado(inspeccion.estado) | transloco"
           [severity]="severidad(inspeccion.estado)"
         />
-        @if (inspeccion.tipo === 'CORRECCION') {
+        } @if (inspeccion.tipo === 'CORRECCION') {
         <p-tag [value]="'inspecciones.correccion.tagCorreccion' | transloco" severity="info" />
         } @if (inspeccion.superadaPorId) {
         <p-tag [value]="'inspecciones.correccion.tagSuperada' | transloco" severity="secondary" />
@@ -105,7 +112,18 @@
       }
     </div>
     <div class="acciones">
-      @if (inspeccion.estado === 'BORRADOR') {
+      @if (inspeccion.autorId === auth.user()?.id && inspeccion.estado !== 'PUBLICADA' &&
+      inspeccion.estado !== 'RECHAZADA') {
+      <button
+        pButton
+        type="button"
+        severity="secondary"
+        [outlined]="true"
+        (click)="inspeccionIc.set(inspeccion)"
+      >
+        {{ 'inspecciones.confirmacionIc.titulo' | transloco }}
+      </button>
+      } @if (inspeccion.estado === 'BORRADOR' || inspeccion.estado === 'PENDIENTE_SYNC') {
       <button
         pButton
         type="button"
@@ -249,3 +267,19 @@
   [puente]="puenteSeleccionado()"
   (inspeccionIniciada)="cargar()"
 />
+
+<p-dialog
+  [visible]="!!inspeccionIc()"
+  (visibleChange)="!$event && !operandoIc() && inspeccionIc.set(null)"
+  [modal]="true"
+  [closable]="!operandoIc()"
+  [closeOnEscape]="!operandoIc()"
+  [draggable]="false"
+  [style]="{ width: '94vw', maxWidth: '48rem' }"
+  [header]="'inspecciones.confirmacionIc.titulo' | transloco"
+>
+  @if (inspeccionIc(); as inspeccion) {
+  <p>{{ inspeccion.nombrePuente }} ({{ inspeccion.codigoPuente }})</p>
+  <app-confirmacion-estado-ic [inspeccionId]="inspeccion.id" (ocupado)="operandoIc.set($event)" />
+  }
+</p-dialog>

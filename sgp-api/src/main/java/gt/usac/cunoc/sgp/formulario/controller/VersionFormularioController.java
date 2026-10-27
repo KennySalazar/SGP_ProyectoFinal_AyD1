@@ -14,6 +14,7 @@ import gt.usac.cunoc.sgp.formulario.dto.PublicarVersionRequest;
 import gt.usac.cunoc.sgp.formulario.dto.VersionFormularioResponse;
 import gt.usac.cunoc.sgp.formulario.dto.VersionFormularioResumenResponse;
 import gt.usac.cunoc.sgp.formulario.service.VersionFormularioService;
+import gt.usac.cunoc.sgp.formulario.validation.VersionCalibracionHttp;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -29,6 +30,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -48,7 +50,7 @@ public class VersionFormularioController {
   }
 
   @GetMapping
-  @PreAuthorize("hasRole('ADMINISTRADOR')")
+  @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'CATEDRATICO')")
   @Operation(
       summary = "Listar todas las versiones de formulario",
       description = "Lista resumida de versiones creadas en el sistema ordenadas cronológicamente.")
@@ -78,7 +80,7 @@ public class VersionFormularioController {
   }
 
   @GetMapping("/{id}")
-  @PreAuthorize("hasRole('ADMINISTRADOR')")
+  @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'CATEDRATICO')")
   @Operation(
       summary = "Consultar el detalle de una versión de formulario",
       description = "Retorna el esquema completo, pesos configurados y mapeos declarados.")
@@ -87,7 +89,7 @@ public class VersionFormularioController {
   }
 
   @PostMapping
-  @PreAuthorize("hasRole('ADMINISTRADOR')")
+  @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'CATEDRATICO')")
   @Operation(
       summary = "Crear una nueva versión de formulario",
       description =
@@ -103,7 +105,7 @@ public class VersionFormularioController {
   @Operation(
       summary = "Cargar versión inicial desde plantilla SIECA",
       description =
-          "Carga la plantilla sieca-v1 con sus ocho secciones, reporte fotográfico, recomendaciones y pesos.")
+          "Carga SIECA en borrador con 45 pesos e IC completo provisional, notas de decisiones pendientes y mapeos iniciales respecto a la version activa. Publicar es una segunda accion del Administrador.")
   public ResponseEntity<VersionFormularioResponse> cargarPlantillaSieca(
       @RequestParam(required = false, defaultValue = "SIECA-v1") String codigo,
       Authentication authentication) {
@@ -113,7 +115,7 @@ public class VersionFormularioController {
   }
 
   @PutMapping("/{id}")
-  @PreAuthorize("hasRole('ADMINISTRADOR')")
+  @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'CATEDRATICO')")
   @Operation(
       summary = "Actualizar borrador de una versión de formulario",
       description =
@@ -121,6 +123,7 @@ public class VersionFormularioController {
   public ResponseEntity<VersionFormularioResponse> actualizarBorrador(
       @PathVariable UUID id,
       @Valid @RequestBody ActualizarBorradorRequest request,
+      @RequestHeader(value = "If-Match", required = false) String versionEsperada,
       Authentication authentication) {
     VersionFormularioResponse response =
         service.actualizarBorrador(
@@ -129,26 +132,29 @@ public class VersionFormularioController {
             request.vinculosAlmacenamiento(),
             request.reglasEvaluacionIc(),
             request.codigo(),
-            usuarioId(authentication));
+            usuarioId(authentication),
+            VersionCalibracionHttp.exigir(versionEsperada));
     return ResponseEntity.ok(response);
   }
 
   @PutMapping("/{id}/pesos")
-  @PreAuthorize("hasRole('ADMINISTRADOR')")
+  @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'CATEDRATICO')")
   @Operation(
       summary = "Calibrar pesos de los elementos evaluables",
       description = "Reemplaza los pesos configurados para los elementos de cálculo de IC.")
   public ResponseEntity<List<ConfiguracionIcElementoResponse>> calibrarPesos(
       @PathVariable UUID id,
-      @Valid @RequestBody List<ConfiguracionIcElementoRequest> request,
+      @RequestBody List<ConfiguracionIcElementoRequest> request,
+      @RequestHeader(value = "If-Match", required = false) String versionEsperada,
       Authentication authentication) {
     List<ConfiguracionIcElementoResponse> response =
-        service.calibrarPesos(id, request, usuarioId(authentication));
+        service.calibrarPesos(
+            id, request, usuarioId(authentication), VersionCalibracionHttp.exigir(versionEsperada));
     return ResponseEntity.ok(response);
   }
 
   @GetMapping("/{id}/mapeos/analisis")
-  @PreAuthorize("hasRole('ADMINISTRADOR')")
+  @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'CATEDRATICO')")
   @Operation(
       summary = "Analizar diferencias y mapeos con la versión anterior",
       description =
@@ -197,15 +203,37 @@ public class VersionFormularioController {
   }
 
   @PutMapping("/{id}/escala")
-  @PreAuthorize("hasRole('ADMINISTRADOR')")
+  @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'CATEDRATICO')")
   @Operation(
       summary = "Configurar escala de severidad del IC",
       description = "Configura los valores de severidad de una version en BORRADOR.")
   public ResponseEntity<VersionFormularioResponse> configurarEscala(
       @PathVariable UUID id,
       @Valid @RequestBody gt.usac.cunoc.sgp.formulario.dto.ConfigurarEscalaIcRequest request,
+      @RequestHeader(value = "If-Match", required = false) String versionEsperada,
       Authentication authentication) {
-    return ResponseEntity.ok(service.configurarEscala(id, request, usuarioId(authentication)));
+    return ResponseEntity.ok(
+        service.configurarEscala(
+            id,
+            request,
+            usuarioId(authentication),
+            VersionCalibracionHttp.exigir(versionEsperada)));
+  }
+
+  @PutMapping("/{id}/reglas-criticas")
+  @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'CATEDRATICO')")
+  public ResponseEntity<VersionFormularioResponse> configurarReglasCriticas(
+      @PathVariable UUID id,
+      @Valid @RequestBody
+          gt.usac.cunoc.sgp.formulario.dto.ConfigurarReglasCriticasIcRequest request,
+      @RequestHeader(value = "If-Match", required = false) String versionEsperada,
+      Authentication authentication) {
+    return ResponseEntity.ok(
+        service.configurarReglasCriticas(
+            id,
+            request,
+            usuarioId(authentication),
+            VersionCalibracionHttp.exigir(versionEsperada)));
   }
 
   @PostMapping("/{id}/validar-respuestas")

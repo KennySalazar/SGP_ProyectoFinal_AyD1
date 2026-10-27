@@ -1,7 +1,7 @@
 {
-  "$comment": "Borrador HU-017. Catálogo de elementos evaluables del formulario sieca-v1 para la configuración del Índice de Condición. Los pesos están en null a propósito: no hay valores aprobados académicamente. Al aprobarse el acta, cada elemento con peso se carga como una fila de configuracion_ic_elemento (version_formulario_id, elemento_ref, peso, descripcion); un elemento excluido del IC simplemente no tiene fila (la BD exige peso > 0). Generado a partir de las anotaciones x-sgp-evaluable del esquema.",
+  "$comment": "Calibracion provisional para pruebas desde la interfaz. No constituye una calibracion aprobada academicamente.",
   "formulario": "sieca-v1",
-  "estado": "BORRADOR_SIN_CALIBRAR",
+  "estado": "CALIBRACION_PROVISIONAL",
   "elementos": [
     {
       "id": "E01",
@@ -10,7 +10,7 @@
       "seccion": "subestructura",
       "repetible": false,
       "portante": false,
-      "fundamento_portante": null,
+      "fundamento_portante": "Elemento no portante segun el catalogo SIECA",
       "indicadores": [
         "grietas_una_direccion",
         "grietas_dos_direcciones",
@@ -18,8 +18,8 @@
         "exposicion_acero",
         "otros"
       ],
-      "peso": null,
-      "criterio_peso": null
+      "peso": 1,
+      "criterio_peso": "Peso provisional no portante"
     },
     {
       "id": "E02",
@@ -28,7 +28,7 @@
       "seccion": "subestructura",
       "repetible": false,
       "portante": false,
-      "fundamento_portante": null,
+      "fundamento_portante": "Elemento no portante segun el catalogo SIECA",
       "indicadores": [
         "grietas_una_direccion",
         "grietas_dos_direcciones",
@@ -36,8 +36,8 @@
         "exposicion_acero",
         "otros"
       ],
-      "peso": null,
-      "criterio_peso": null
+      "peso": 1,
+      "criterio_peso": "Peso provisional no portante"
     },
     {
       "id": "E03",
@@ -54,8 +54,8 @@
         "exposicion_acero",
         "otros"
       ],
-      "peso": null,
-      "criterio_peso": null
+      "peso": 2,
+      "criterio_peso": "Peso provisional portante"
     },
     {
       "id": "E04",
@@ -64,7 +64,7 @@
       "seccion": "subestructura",
       "repetible": false,
       "portante": false,
-      "fundamento_portante": null,
+      "fundamento_portante": "Elemento no portante segun el catalogo SIECA",
       "indicadores": [
         "neopreno_aplastado",
         "fuera_de_lugar",
@@ -73,8 +73,8 @@
         "perno_roto",
         "otros"
       ],
-      "peso": null,
-      "criterio_peso": null
+      "peso": 1,
+      "criterio_peso": "Peso provisional no portante"
     },
     {
       "id": "E05",
@@ -91,8 +91,8 @@
         "exposicion_acero",
         "otros"
       ],
-      "peso": null,
-      "criterio_peso": null
+      "peso": 2,
+      "criterio_peso": "Peso provisional portante"
     },
     {
       "id": "E06",
@@ -108,8 +108,8 @@
         "perdida_petreos_golpe",
         "otros"
       ],
-      "peso": null,
-      "criterio_peso": null
+      "peso": 2,
+      "criterio_peso": "Peso provisional portante"
     },
     {
       "id": "E07",
@@ -118,7 +118,7 @@
       "seccion": "subestructura",
       "repetible": false,
       "portante": false,
-      "fundamento_portante": null,
+      "fundamento_portante": "Elemento no portante segun el catalogo SIECA",
       "indicadores": [
         "grietas_una_direccion",
         "grietas_dos_direcciones",
@@ -126,8 +126,8 @@
         "exposicion_acero",
         "otros"
       ],
-      "peso": null,
-      "criterio_peso": null
+      "peso": 1,
+      "criterio_peso": "Peso provisional no portante"
     },
     {
       "id": "E08",
@@ -136,7 +136,7 @@
       "seccion": "subestructura",
       "repetible": false,
       "portante": false,
-      "fundamento_portante": null,
+      "fundamento_portante": "Elemento no portante segun el catalogo SIECA",
       "indicadores": [
         "grietas_una_direccion",
         "grietas_dos_direcciones",
@@ -144,8 +144,8 @@
         "exposicion_acero",
         "otros"
       ],
-      "peso": null,
-      "criterio_peso": null
+      "peso": 1,
+      "criterio_peso": "Peso provisional no portante"
     },
     {
       "id": "E09",
@@ -154,13 +154,13 @@
       "seccion": "subestructura",
       "repetible": false,
       "portante": false,
-      "fundamento_portante": null,
+      "fundamento_portante": "Elemento no portante segun el catalogo SIECA",
       "indicadores": [
         "aguas_arriba",
         "aguas_abajo"
       ],
-      "peso": null,
-      "criterio_peso": null
+      "peso": 1,
+      "criterio_peso": "Peso provisional no portante"
     },
     {
       "id": "E10",
@@ -169,7 +169,7 @@
       "seccion": "subestructura",
       "repetible": false,
       "portante": false,
-      "fundamento_portante": null,
+      "fundamento_portante": "Elemento no portante segun el catalogo SIECA",
       "indicadores": [
         "grietas_una_direccion",
         "grietas_dos_direcciones",
@@ -177,8 +177,8 @@
         "exposicion_acero",
         "otros"
       ],
-      "peso": null,
-      "criterio_peso": null
+      "peso": 1,
+      "criterio_peso": "Peso provisional no portante"
     },
     {
       "id": "E11",
@@ -187,7 +187,7 @@
       "seccion": "subestructura",
       "repetible": false,
       "portante": false,
-      "fundamento_portante": null,
+      "fundamento_portante": "Elemento no portante segun el catalogo SIECA",
       "indicadores": [
         "grietas_una_direccion",
         "grietas_dos_direcciones",
@@ -195,8 +195,8 @@
         "exposicion_acero",
         "otros"
       ],
-      "peso": null,
-      "criterio_peso": null
+      "peso": 1,
+      "criterio_peso": "Peso provisional no portante"
     },
     {
       "id": "E12",
@@ -213,8 +213,8 @@
         "exposicion_acero",
         "otros"
       ],
-      "peso": null,
-      "criterio_peso": null
+      "peso": 2,
+      "criterio_peso": "Peso provisional portante"
     },
     {
       "id": "E13",
@@ -223,7 +223,7 @@
       "seccion": "subestructura",
       "repetible": false,
       "portante": false,
-      "fundamento_portante": null,
+      "fundamento_portante": "Elemento no portante segun el catalogo SIECA",
       "indicadores": [
         "neopreno_aplastado",
         "fuera_de_lugar",
@@ -232,8 +232,8 @@
         "perno_roto",
         "otros"
       ],
-      "peso": null,
-      "criterio_peso": null
+      "peso": 1,
+      "criterio_peso": "Peso provisional no portante"
     },
     {
       "id": "E14",
@@ -250,8 +250,8 @@
         "exposicion_acero",
         "otros"
       ],
-      "peso": null,
-      "criterio_peso": null
+      "peso": 2,
+      "criterio_peso": "Peso provisional portante"
     },
     {
       "id": "E15",
@@ -267,8 +267,8 @@
         "perdida_petreos_golpe",
         "otros"
       ],
-      "peso": null,
-      "criterio_peso": null
+      "peso": 2,
+      "criterio_peso": "Peso provisional portante"
     },
     {
       "id": "E16",
@@ -277,7 +277,7 @@
       "seccion": "subestructura",
       "repetible": false,
       "portante": false,
-      "fundamento_portante": null,
+      "fundamento_portante": "Elemento no portante segun el catalogo SIECA",
       "indicadores": [
         "grietas_una_direccion",
         "grietas_dos_direcciones",
@@ -285,8 +285,8 @@
         "exposicion_acero",
         "otros"
       ],
-      "peso": null,
-      "criterio_peso": null
+      "peso": 1,
+      "criterio_peso": "Peso provisional no portante"
     },
     {
       "id": "E17",
@@ -295,7 +295,7 @@
       "seccion": "subestructura",
       "repetible": false,
       "portante": false,
-      "fundamento_portante": null,
+      "fundamento_portante": "Elemento no portante segun el catalogo SIECA",
       "indicadores": [
         "grietas_una_direccion",
         "grietas_dos_direcciones",
@@ -303,8 +303,8 @@
         "exposicion_acero",
         "otros"
       ],
-      "peso": null,
-      "criterio_peso": null
+      "peso": 1,
+      "criterio_peso": "Peso provisional no portante"
     },
     {
       "id": "E18",
@@ -313,13 +313,13 @@
       "seccion": "subestructura",
       "repetible": false,
       "portante": false,
-      "fundamento_portante": null,
+      "fundamento_portante": "Elemento no portante segun el catalogo SIECA",
       "indicadores": [
         "aguas_arriba",
         "aguas_abajo"
       ],
-      "peso": null,
-      "criterio_peso": null
+      "peso": 1,
+      "criterio_peso": "Peso provisional no portante"
     },
     {
       "id": "E19",
@@ -336,8 +336,8 @@
         "exposicion_acero",
         "otros"
       ],
-      "peso": null,
-      "criterio_peso": null
+      "peso": 2,
+      "criterio_peso": "Peso provisional portante"
     },
     {
       "id": "E20",
@@ -354,8 +354,8 @@
         "exposicion_acero",
         "otros"
       ],
-      "peso": null,
-      "criterio_peso": null
+      "peso": 2,
+      "criterio_peso": "Peso provisional portante"
     },
     {
       "id": "E21",
@@ -371,8 +371,8 @@
         "perdida_petreos_golpe",
         "otros"
       ],
-      "peso": null,
-      "criterio_peso": null
+      "peso": 2,
+      "criterio_peso": "Peso provisional portante"
     },
     {
       "id": "E22",
@@ -381,7 +381,7 @@
       "seccion": "subestructura",
       "repetible": true,
       "portante": false,
-      "fundamento_portante": null,
+      "fundamento_portante": "Elemento no portante segun el catalogo SIECA",
       "indicadores": [
         "neopreno_aplastado",
         "fuera_de_lugar",
@@ -390,8 +390,8 @@
         "perno_roto",
         "otros"
       ],
-      "peso": null,
-      "criterio_peso": null
+      "peso": 1,
+      "criterio_peso": "Peso provisional no portante"
     },
     {
       "id": "E23",
@@ -400,13 +400,13 @@
       "seccion": "subestructura",
       "repetible": true,
       "portante": false,
-      "fundamento_portante": null,
+      "fundamento_portante": "Elemento no portante segun el catalogo SIECA",
       "indicadores": [
         "aguas_arriba",
         "aguas_abajo"
       ],
-      "peso": null,
-      "criterio_peso": null
+      "peso": 1,
+      "criterio_peso": "Peso provisional no portante"
     },
     {
       "id": "E24",
@@ -415,7 +415,7 @@
       "seccion": "superestructura",
       "repetible": false,
       "portante": false,
-      "fundamento_portante": null,
+      "fundamento_portante": "Elemento no portante segun el catalogo SIECA",
       "indicadores": [
         "grietas_una_direccion",
         "grietas_dos_direcciones",
@@ -424,8 +424,8 @@
         "exposicion_acero",
         "otros"
       ],
-      "peso": null,
-      "criterio_peso": null
+      "peso": 1,
+      "criterio_peso": "Peso provisional no portante"
     },
     {
       "id": "E25",
@@ -442,8 +442,8 @@
         "exposicion_acero",
         "otros"
       ],
-      "peso": null,
-      "criterio_peso": null
+      "peso": 2,
+      "criterio_peso": "Peso provisional portante"
     },
     {
       "id": "E26",
@@ -461,8 +461,8 @@
         "pintura",
         "otros"
       ],
-      "peso": null,
-      "criterio_peso": null
+      "peso": 2,
+      "criterio_peso": "Peso provisional portante"
     },
     {
       "id": "E27",
@@ -471,7 +471,7 @@
       "seccion": "superestructura",
       "repetible": false,
       "portante": false,
-      "fundamento_portante": null,
+      "fundamento_portante": "Elemento no portante segun el catalogo SIECA",
       "indicadores": [
         "grietas_diagonal",
         "grietas_verticales",
@@ -479,8 +479,8 @@
         "exposicion_acero",
         "otros"
       ],
-      "peso": null,
-      "criterio_peso": null
+      "peso": 1,
+      "criterio_peso": "Peso provisional no portante"
     },
     {
       "id": "E28",
@@ -489,7 +489,7 @@
       "seccion": "superestructura",
       "repetible": false,
       "portante": false,
-      "fundamento_portante": null,
+      "fundamento_portante": "Elemento no portante segun el catalogo SIECA",
       "indicadores": [
         "oxido",
         "faltan_pernos",
@@ -498,8 +498,8 @@
         "pintura",
         "otros"
       ],
-      "peso": null,
-      "criterio_peso": null
+      "peso": 1,
+      "criterio_peso": "Peso provisional no portante"
     },
     {
       "id": "E29",
@@ -517,8 +517,8 @@
         "pintura",
         "otros"
       ],
-      "peso": null,
-      "criterio_peso": null
+      "peso": 2,
+      "criterio_peso": "Peso provisional portante"
     },
     {
       "id": "E30",
@@ -527,12 +527,12 @@
       "seccion": "superestructura",
       "repetible": false,
       "portante": false,
-      "fundamento_portante": null,
+      "fundamento_portante": "Elemento no portante segun el catalogo SIECA",
       "indicadores": [
         "estado"
       ],
-      "peso": null,
-      "criterio_peso": null
+      "peso": 1,
+      "criterio_peso": "Peso provisional no portante"
     },
     {
       "id": "E31",
@@ -541,7 +541,7 @@
       "seccion": "elementos_no_estructurales",
       "repetible": false,
       "portante": false,
-      "fundamento_portante": null,
+      "fundamento_portante": "Elemento no portante segun el catalogo SIECA",
       "indicadores": [
         "ausencia_seccion",
         "deformacion_elemento",
@@ -549,8 +549,8 @@
         "pintura",
         "otros"
       ],
-      "peso": null,
-      "criterio_peso": null
+      "peso": 1,
+      "criterio_peso": "Peso provisional no portante"
     },
     {
       "id": "E32",
@@ -559,7 +559,7 @@
       "seccion": "elementos_no_estructurales",
       "repetible": false,
       "portante": false,
-      "fundamento_portante": null,
+      "fundamento_portante": "Elemento no portante segun el catalogo SIECA",
       "indicadores": [
         "ausencia_seccion",
         "deformacion_elemento",
@@ -567,8 +567,8 @@
         "pintura",
         "otros"
       ],
-      "peso": null,
-      "criterio_peso": null
+      "peso": 1,
+      "criterio_peso": "Peso provisional no portante"
     },
     {
       "id": "E33",
@@ -577,7 +577,7 @@
       "seccion": "elementos_no_estructurales",
       "repetible": false,
       "portante": false,
-      "fundamento_portante": null,
+      "fundamento_portante": "Elemento no portante segun el catalogo SIECA",
       "indicadores": [
         "grietas_una_direccion",
         "grietas_dos_direcciones",
@@ -585,8 +585,8 @@
         "pintura",
         "otros"
       ],
-      "peso": null,
-      "criterio_peso": null
+      "peso": 1,
+      "criterio_peso": "Peso provisional no portante"
     },
     {
       "id": "E34",
@@ -595,14 +595,14 @@
       "seccion": "elementos_no_estructurales",
       "repetible": false,
       "portante": false,
-      "fundamento_portante": null,
+      "fundamento_portante": "Elemento no portante segun el catalogo SIECA",
       "indicadores": [
         "falta_elemento",
         "junta_limpia",
         "danos"
       ],
-      "peso": null,
-      "criterio_peso": null
+      "peso": 1,
+      "criterio_peso": "Peso provisional no portante"
     },
     {
       "id": "E35",
@@ -611,14 +611,14 @@
       "seccion": "elementos_no_estructurales",
       "repetible": false,
       "portante": false,
-      "fundamento_portante": null,
+      "fundamento_portante": "Elemento no portante segun el catalogo SIECA",
       "indicadores": [
         "falta_elemento",
         "junta_limpia",
         "danos"
       ],
-      "peso": null,
-      "criterio_peso": null
+      "peso": 1,
+      "criterio_peso": "Peso provisional no portante"
     },
     {
       "id": "E36",
@@ -627,14 +627,14 @@
       "seccion": "elementos_no_estructurales",
       "repetible": false,
       "portante": false,
-      "fundamento_portante": null,
+      "fundamento_portante": "Elemento no portante segun el catalogo SIECA",
       "indicadores": [
         "falta_elemento",
         "junta_limpia",
         "danos"
       ],
-      "peso": null,
-      "criterio_peso": null
+      "peso": 1,
+      "criterio_peso": "Peso provisional no portante"
     },
     {
       "id": "E37",
@@ -643,15 +643,15 @@
       "seccion": "elementos_no_estructurales",
       "repetible": false,
       "portante": false,
-      "fundamento_portante": null,
+      "fundamento_portante": "Elemento no portante segun el catalogo SIECA",
       "indicadores": [
         "buen_estado",
         "asentado",
         "fisurado",
         "bache"
       ],
-      "peso": null,
-      "criterio_peso": null
+      "peso": 1,
+      "criterio_peso": "Peso provisional no portante"
     },
     {
       "id": "E38",
@@ -660,15 +660,15 @@
       "seccion": "elementos_no_estructurales",
       "repetible": false,
       "portante": false,
-      "fundamento_portante": null,
+      "fundamento_portante": "Elemento no portante segun el catalogo SIECA",
       "indicadores": [
         "buen_estado",
         "asentado",
         "fisurado",
         "bache"
       ],
-      "peso": null,
-      "criterio_peso": null
+      "peso": 1,
+      "criterio_peso": "Peso provisional no portante"
     },
     {
       "id": "E39",
@@ -677,12 +677,12 @@
       "seccion": "caracteristicas_cauce",
       "repetible": false,
       "portante": false,
-      "fundamento_portante": null,
+      "fundamento_portante": "Elemento no portante segun el catalogo SIECA",
       "indicadores": [
         "condiciones"
       ],
-      "peso": null,
-      "criterio_peso": null
+      "peso": 1,
+      "criterio_peso": "Peso provisional no portante"
     },
     {
       "id": "E40",
@@ -691,12 +691,12 @@
       "seccion": "caracteristicas_cauce",
       "repetible": false,
       "portante": false,
-      "fundamento_portante": null,
+      "fundamento_portante": "Elemento no portante segun el catalogo SIECA",
       "indicadores": [
         "condiciones"
       ],
-      "peso": null,
-      "criterio_peso": null
+      "peso": 1,
+      "criterio_peso": "Peso provisional no portante"
     },
     {
       "id": "E41",
@@ -705,13 +705,13 @@
       "seccion": "otros",
       "repetible": false,
       "portante": false,
-      "fundamento_portante": null,
+      "fundamento_portante": "Elemento no portante segun el catalogo SIECA",
       "indicadores": [
         "existe",
         "estado"
       ],
-      "peso": null,
-      "criterio_peso": null
+      "peso": 1,
+      "criterio_peso": "Peso provisional no portante"
     },
     {
       "id": "E42",
@@ -720,13 +720,13 @@
       "seccion": "otros",
       "repetible": false,
       "portante": false,
-      "fundamento_portante": null,
+      "fundamento_portante": "Elemento no portante segun el catalogo SIECA",
       "indicadores": [
         "existe",
         "estado"
       ],
-      "peso": null,
-      "criterio_peso": null
+      "peso": 1,
+      "criterio_peso": "Peso provisional no portante"
     },
     {
       "id": "E43",
@@ -735,13 +735,13 @@
       "seccion": "otros",
       "repetible": false,
       "portante": false,
-      "fundamento_portante": null,
+      "fundamento_portante": "Elemento no portante segun el catalogo SIECA",
       "indicadores": [
         "existe",
         "estado"
       ],
-      "peso": null,
-      "criterio_peso": null
+      "peso": 1,
+      "criterio_peso": "Peso provisional no portante"
     },
     {
       "id": "E44",
@@ -750,13 +750,13 @@
       "seccion": "otros",
       "repetible": false,
       "portante": false,
-      "fundamento_portante": null,
+      "fundamento_portante": "Elemento no portante segun el catalogo SIECA",
       "indicadores": [
         "existe",
         "estado"
       ],
-      "peso": null,
-      "criterio_peso": null
+      "peso": 1,
+      "criterio_peso": "Peso provisional no portante"
     },
     {
       "id": "E45",
@@ -765,83 +765,87 @@
       "seccion": "otros",
       "repetible": false,
       "portante": false,
-      "fundamento_portante": null,
+      "fundamento_portante": "Elemento no portante segun el catalogo SIECA",
       "indicadores": [
         "existe",
         "estado"
       ],
-      "peso": null,
-      "criterio_peso": null
+      "peso": 1,
+      "criterio_peso": "Peso provisional no portante"
     }
   ],
   "reglas_evaluacion_ic": {
-    "$comment": "Estructura propuesta para version_formulario.reglas_evaluacion_ic. Los valores tomados de los criterios de aceptación de HU-018 (RN-IC-05) están fijados; todo valor null queda pendiente del acta de calibración.",
-    "version_algoritmo": "ic-sieca-v1-borrador",
+    "version_algoritmo": "ic-sieca-v1-provisional",
     "escala_severidad": {
-      "$comment": "Calificación numérica por nivel. NO_PRESENTA = 0 viene de HU-018 (todos los elementos con calificación 0 dan IC = 100); el resto queda pendiente.",
       "NO_PRESENTA": 0,
-      "LEVE": null,
-      "MODERADO": null,
-      "SEVERO": null
+      "LEVE": 1,
+      "MODERADO": 2,
+      "SEVERO": 4
+    },
+    "agregacion": {
+      "indicadores_de_un_elemento": "MAXIMO",
+      "instancias_repetibles": "MAXIMO",
+      "elementos_ausentes_no_portantes": 4,
+      "elementos_ausentes_portantes": 4,
+      "elementos_que_no_aplican": "EXCLUIR"
+    },
+    "rangos_estado": {
+      "BUENO": 75,
+      "REGULAR": 50,
+      "MALO": 0
     },
     "conversion_indicadores": {
       "booleanos": {
-        "junta.falta_elemento=true": null,
-        "junta.junta_limpia=false": null,
-        "senal.existe=false": null
+        "junta.falta_elemento=true": 4,
+        "junta.falta_elemento=false": 0,
+        "junta.junta_limpia=true": 0,
+        "junta.junta_limpia=false": 2,
+        "senal.existe=true": 0,
+        "senal.existe=false": 4,
+        "losa.buen_estado=true": 0,
+        "losa.buen_estado=false": 0,
+        "drenaje_aledano.existe=true": 0,
+        "drenaje_aledano.existe=false": 4
       },
       "enumerados": {
         "drenaje.estado": {
-          "LIMPIOS": null,
-          "OBSTRUIDOS": null
+          "LIMPIOS": 0,
+          "OBSTRUIDOS": 4
         },
         "socavacion.nivel": {
-          "NO_HAY": null,
-          "SIN_EXPOSICION": null,
-          "CON_EXPOSICION": null,
-          "ASENTAMIENTO_ESTRUCTURA": null
+          "NO_HAY": 0,
+          "SIN_EXPOSICION": 1,
+          "CON_EXPOSICION": 4,
+          "ASENTAMIENTO_ESTRUCTURA": 4
         },
         "condicionesCauce": {
-          "LIMPIO": null,
-          "ASOLVADO_SEDIMENTADO": null,
-          "EROSIONADO": null,
-          "OTRO": null
+          "LIMPIO": 0,
+          "ASOLVADO_SEDIMENTADO": 1,
+          "EROSIONADO": 2,
+          "OTRO": 4
         },
         "estado_bueno_malo": {
-          "BUENO": null,
-          "MALO": null
+          "BUENO": 0,
+          "MALO": 4
         }
       },
       "numericos": {
         "golpeado_longitud_m": {
           "umbrales_m": {
-            "LEVE": null,
-            "MODERADO": null,
-            "SEVERO": null
+            "LEVE": 1,
+            "MODERADO": 3,
+            "SEVERO": 5000
           }
         },
         "golpeados_cantidad": {
           "umbrales": {
-            "LEVE": null,
-            "MODERADO": null,
-            "SEVERO": null
+            "LEVE": 1,
+            "MODERADO": 3,
+            "SEVERO": 10000
           }
         }
       },
-      "otros_y_danos": "Se usa la severidad declarada por el inspector en otros/danos"
-    },
-    "agregacion": {
-      "$comment": "Los elementos con existencia NO_APLICA no tienen calificación. Un elemento AUSENTE que no es portante también necesita una regla (p. ej. calificación máxima).",
-      "indicadores_de_un_elemento": null,
-      "instancias_repetibles": null,
-      "elementos_que_no_aplican": null,
-      "elementos_ausentes_no_portantes": null
-    },
-    "rangos_estado": {
-      "$comment": "Restricciones de los ejemplos de HU-018: IC 80 y 75 son BUENO; 60 y 50 son REGULAR; 30 y 0 son MALO. Por tanto el límite BUENO/REGULAR está en (60, 75] y el límite REGULAR/MALO en (30, 50].",
-      "BUENO": null,
-      "REGULAR": null,
-      "MALO": null
+      "otros_y_danos": "Severidad declarada"
     },
     "reglas_anulacion": [
       {
@@ -880,8 +884,7 @@
             "ASENTAMIENTO_ESTRUCTURA"
           ]
         },
-        "estado_resultante": "MALO",
-        "pendiente": null
+        "estado_resultante": "MALO"
       },
       {
         "id": "RN-IC-05c",
@@ -956,9 +959,15 @@
           "campo": "existencia",
           "igual_a": "AUSENTE"
         },
-        "estado_resultante": "MALO",
-        "pendiente": null
+        "estado_resultante": "MALO"
       }
-    ]
+    ],
+    "calibracion_provisional": true
+  },
+  "calibracion": {
+    "provisional": true,
+    "estado": "SIN_APROBAR",
+    "rotulo": "Calibracion provisional · sin aprobar",
+    "fuente": "Calibracion de prueba del repositorio; pendiente de revision academica"
   }
 }

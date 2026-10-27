@@ -1,0 +1,54 @@
+<div class="cabecera">
+  <h2 class="seccion-titulo">
+    <i class="pi pi-comments" aria-hidden="true"></i>
+    {{ 'foro.inspeccion.titulo' | transloco }}
+  </h2>
+</div>
+<p class="descripcion">{{ 'foro.inspeccion.descripcion' | transloco }}</p>
+
+@switch (estado()) {
+  @case ('cargando') {
+    <div class="cargando" aria-hidden="true">
+      <p-skeleton width="55%" height="1.4rem" />
+      <p-skeleton width="90%" height="3rem" />
+    </div>
+    <span class="sr-only" role="status">{{ 'foro.cargando' | transloco }}</span>
+  }
+  @case ('error') {
+    <div class="estado" role="alert">
+      <i class="pi pi-exclamation-circle" aria-hidden="true"></i>
+      <p>{{ 'foro.inspeccion.error' | transloco }}</p>
+      <button pButton type="button" severity="secondary" [outlined]="true" (click)="cargar()">
+        <i class="pi pi-refresh" aria-hidden="true"></i
+        ><span>{{ 'foro.reintentar' | transloco }}</span>
+      </button>
+    </div>
+  }
+  @case ('sinHilo') {
+    <div class="estado" role="status">
+      <i class="pi pi-comments" aria-hidden="true"></i>
+      <p>{{ 'foro.inspeccion.sinHilo' | transloco }}</p>
+      <p>
+        {{ 'foro.sinSesion' | transloco }}
+        <a routerLink="/login">{{ 'foro.iniciarSesion' | transloco }}</a>
+      </p>
+    </div>
+  }
+  @case ('listo') {
+    @if (hiloId(); as id) {
+      <app-hilo-foro
+        #hilo
+        [hiloId]="id"
+        [ancla]="ancla()"
+        [etiquetaDeAncla]="etiquetaDeAncla()"
+        [mostrarVolver]="false"
+        [compositorArriba]="true"
+        [filtros]="filtros()"
+        [comentarioDestacado]="comentarioDestacado()"
+        (anclaQuitada)="anclaQuitada.emit()"
+        (irAElemento)="irAElemento.emit($event)"
+        (comentarioPublicado)="actualizarAnclas()"
+      />
+    }
+  }
+}

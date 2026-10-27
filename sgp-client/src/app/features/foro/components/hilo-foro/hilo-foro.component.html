@@ -1,0 +1,580 @@
+@if (mostrarVolver()) {
+  <button pButton type="button" severity="secondary" [outlined]="true" (click)="volver.emit()">
+    <i class="pi pi-arrow-left" aria-hidden="true"></i
+    ><span>{{ 'foro.hilo.volver' | transloco }}</span>
+  </button>
+}
+
+<ng-template #autor let-usuario="usuario" let-rol="rol">
+  @if (usuario) {
+    <strong>{{ '@' + usuario }}</strong>
+  } @else {
+    <strong>{{ 'foro.roles.' + rol | transloco }}</strong>
+  }
+</ng-template>
+
+@if (cargando() && !hilo()) {
+  <div class="hilo-cargando" aria-hidden="true">
+    <p-skeleton width="55%" height="1.4rem" />
+    <p-skeleton width="35%" height="0.9rem" />
+    <p-skeleton width="90%" height="3rem" />
+  </div>
+  <span class="sr-only" role="status">{{ 'foro.cargando' | transloco }}</span>
+} @else if (error()) {
+  <div class="estado" role="alert">
+    <i class="pi pi-exclamation-circle" aria-hidden="true"></i>
+    <p>{{ 'foro.hilo.error' | transloco }}</p>
+    <button pButton type="button" severity="secondary" [outlined]="true" (click)="cargar()">
+      <i class="pi pi-refresh" aria-hidden="true"></i
+      ><span>{{ 'foro.reintentar' | transloco }}</span>
+    </button>
+  </div>
+} @else if (hilo(); as h) {
+  <header class="hilo-cabecera">
+    <h3>{{ h.titulo }}</h3>
+    <div class="etiquetas">
+      <p-tag
+        [value]="'foro.categorias.' + h.categoria | transloco"
+        [severity]="severidad(h.categoria)"
+      />
+      @if (h.cerrado) {
+        <p-tag [value]="'foro.hilo.cerrado' | transloco" severity="secondary" icon="pi pi-lock" />
+      }
+    </div>
+    <p class="meta">
+      <ng-container
+        [ngTemplateOutlet]="autor"
+        [ngTemplateOutletContext]="{ usuario: h.autorUsuario, rol: h.autorRol }"
+      />
+      · {{ h.creadoEn | date: 'dd/MM/yyyy HH:mm' : zona }}
+    </p>
+    @if (esModerador() && !h.cerrado) {
+      <button
+        pButton
+        type="button"
+        class="boton-cerrar"
+        severity="danger"
+        [outlined]="true"
+        (click)="pedirCerrar()"
+      >
+        <i class="pi pi-lock" aria-hidden="true"></i
+        ><span>{{ 'foro.moderacion.cerrarHilo' | transloco }}</span>
+      </button>
+    }
+  </header>
+
+  @if (h.cerrado) {
+    <p class="aviso" role="status">
+      <i class="pi pi-lock" aria-hidden="true"></i>
+      {{ 'foro.hilo.avisoCerrado' | transloco }}
+      @if (h.motivoCierre) {
+        <span>{{ 'foro.comentario.motivo' | transloco: { motivo: h.motivoCierre } }}</span>
+      }
+    </p>
+  }
+
+  @if (ancla(); as a) {
+    <div class="filtro" role="status">
+      <p>
+        <i class="pi pi-filter" aria-hidden="true"></i>
+        {{ 'foro.hilo.filtrando' | transloco: { elemento: etiquetaDeAncla()(a) } }}
+      </p>
+      <div class="acciones">
+        <button
+          pButton
+          type="button"
+          severity="secondary"
+          [outlined]="true"
+          (click)="irAElemento.emit(a)"
+        >
+          <i class="pi pi-arrow-up" aria-hidden="true"></i
+          ><span>{{ 'foro.hilo.verEnFormulario' | transloco }}</span>
+        </button>
+        <button pButton type="button" severity="secondary" [outlined]="true" (click)="verTodos()">
+          <span>{{ 'foro.hilo.verTodos' | transloco }}</span>
+        </button>
+      </div>
+    </div>
+  }
+
+  <ng-template #compositor>
+    @if (puedeParticipar()) {
+      <form class="formulario" (ngSubmit)="publicar()">
+        @if (ancla(); as a) {
+          <p class="destino">
+            <i class="pi pi-bookmark" aria-hidden="true"></i>
+            {{ 'foro.hilo.comentarSobre' | transloco: { elemento: etiquetaDeAncla()(a) } }}
+          </p>
+        }
+        <label>
+          <span>{{ 'foro.hilo.escribir' | transloco }}</span>
+          <textarea
+            pTextarea
+            name="comentario"
+            rows="4"
+            [attr.maxlength]="limite"
+            [ngModel]="texto()"
+            (ngModelChange)="texto.set($event)"
+          ></textarea>
+          <small class="contador-texto">{{ texto().length }} / {{ limite }}</small>
+        </label>
+        <p class="ayuda-menciones">
+          <i class="pi pi-at" aria-hidden="true"></i>
+          {{ 'foro.hilo.ayudaMenciones' | transloco }}
+        </p>
+        @if (errorPublicar(); as error) {
+          <p class="error-formulario" role="alert">{{ error }}</p>
+        }
+        @if (publicado()) {
+          <p class="confirmacion" role="status">
+            <i class="pi pi-check-circle" aria-hidden="true"></i>
+            {{ 'foro.hilo.publicado' | transloco }}
+            @if (miComentarioOculto()) {
+              <button type="button" class="ver-mas" (click)="verMiComentario()">
+                {{ 'foro.hilo.verMiComentario' | transloco }}
+              </button>
+            }
+          </p>
+        }
+        <div class="acciones">
+          @if (ancla()) {
+            <button
+              pButton
+              type="button"
+              severity="secondary"
+              [outlined]="true"
+              [disabled]="publicando()"
+              (click)="cancelarComentarioAnclado()"
+            >
+              <span>{{ 'common.cancel' | transloco }}</span>
+            </button>
+          }
+          <button pButton type="submit" [disabled]="publicando() || !texto().trim()">
+            <i class="pi pi-send" aria-hidden="true"></i
+            ><span>{{
+              (publicando() ? 'foro.hilo.publicando' : 'foro.hilo.publicar') | transloco
+            }}</span>
+          </button>
+        </div>
+      </form>
+    } @else if (!autenticado()) {
+      <p class="aviso" role="note">
+        <i class="pi pi-info-circle" aria-hidden="true"></i>
+        {{ 'foro.sinSesion' | transloco }}
+        <a routerLink="/login">{{ 'foro.iniciarSesion' | transloco }}</a>
+      </p>
+    }
+  </ng-template>
+
+  <!--
+    El texto de un comentario o respuesta; si es muy largo se recorta con «Ver más». Uno eliminado
+    deja la marca; uno oculto, el aviso de moderación (y su texto y motivo para los moderadores).
+  -->
+  <ng-template #textoComentario let-c>
+    @if (c.eliminado) {
+      <p class="marca">
+        <i class="pi pi-trash" aria-hidden="true"></i>
+        {{ 'foro.comentario.eliminado' | transloco }}
+      </p>
+    } @else if (c.oculto && c.contenido === null) {
+      <p class="marca">
+        <i class="pi pi-eye-slash" aria-hidden="true"></i>
+        {{ 'foro.comentario.oculto' | transloco }}
+      </p>
+    } @else if (editandoId() === c.id) {
+      <form class="formulario edicion-formulario" (ngSubmit)="guardarEdicion()">
+        <label>
+          <span>{{ 'foro.comentario.editarTexto' | transloco }}</span>
+          <textarea
+            pTextarea
+            name="edicion"
+            rows="3"
+            [attr.maxlength]="limite"
+            [ngModel]="textoEdicion()"
+            (ngModelChange)="textoEdicion.set($event)"
+          ></textarea>
+          <small class="contador-texto">{{ textoEdicion().length }} / {{ limite }}</small>
+        </label>
+        @if (errorEdicion(); as error) {
+          <p class="error-formulario" role="alert">{{ error }}</p>
+        }
+        <div class="acciones">
+          <button
+            pButton
+            type="button"
+            severity="secondary"
+            [outlined]="true"
+            [disabled]="guardandoEdicion()"
+            (click)="cancelarEdicion()"
+          >
+            <span>{{ 'common.cancel' | transloco }}</span>
+          </button>
+          <button pButton type="submit" [disabled]="guardandoEdicion() || !textoEdicion().trim()">
+            <i class="pi pi-check" aria-hidden="true"></i
+            ><span>{{
+              (guardandoEdicion() ? 'foro.comentario.guardando' : 'foro.comentario.guardar')
+                | transloco
+            }}</span>
+          </button>
+        </div>
+      </form>
+    } @else {
+      @if (c.oculto) {
+        <p class="moderado" role="note">
+          <i class="pi pi-eye-slash" aria-hidden="true"></i>
+          <strong>{{ 'foro.comentario.oculto' | transloco }}</strong>
+          <span>{{ 'foro.comentario.motivo' | transloco: { motivo: c.motivoOcultamiento } }}</span>
+        </p>
+      }
+      <p class="contenido" [class.recortado]="estaRecortado(c)">{{ c.contenido }}</p>
+      @if (esLargo(c)) {
+        <button
+          type="button"
+          class="ver-mas"
+          [attr.aria-expanded]="!estaRecortado(c)"
+          (click)="alternarTexto(c.id)"
+        >
+          {{ (estaRecortado(c) ? 'foro.hilo.verMas' : 'foro.hilo.verMenos') | transloco }}
+        </button>
+      }
+    }
+  </ng-template>
+
+  <!-- Lo que puede hacer quien lee con un comentario: su autor editarlo o eliminarlo; un
+  moderador, ocultarlo. -->
+  <ng-template #accionesComentario let-c>
+    @if (puedeEditar(c) && editandoId() !== c.id) {
+      <button
+        pButton
+        type="button"
+        class="boton-accion"
+        severity="secondary"
+        [text]="true"
+        (click)="abrirEdicion(c)"
+      >
+        <i class="pi pi-pencil" aria-hidden="true"></i
+        ><span>{{ 'foro.comentario.editar' | transloco }}</span>
+      </button>
+    }
+    @if (puedeEliminar(c)) {
+      <button
+        pButton
+        type="button"
+        class="boton-accion"
+        severity="danger"
+        [text]="true"
+        (click)="pedirEliminar(c)"
+      >
+        <i class="pi pi-trash" aria-hidden="true"></i
+        ><span>{{ 'foro.comentario.eliminar' | transloco }}</span>
+      </button>
+    }
+    @if (puedeOcultar(c)) {
+      <button
+        pButton
+        type="button"
+        class="boton-accion"
+        severity="danger"
+        [text]="true"
+        (click)="pedirOcultar(c)"
+      >
+        <i class="pi pi-eye-slash" aria-hidden="true"></i
+        ><span>{{ 'foro.comentario.ocultar' | transloco }}</span>
+      </button>
+    }
+  </ng-template>
+
+  @if (compositorArriba()) {
+    <ng-container [ngTemplateOutlet]="compositor" />
+  }
+
+  @if (mostrarFiltro() || hayMasPorMostrar()) {
+    <div class="barra-lista">
+      @if (mostrarFiltro()) {
+        @if (filtros(); as f) {
+          <label class="filtro-seccion">
+            <span>{{ 'foro.hilo.filtrarPor' | transloco }}</span>
+            <select [ngModel]="filtro()" (ngModelChange)="filtro.set($event)" name="filtro-seccion">
+              <option value="todos">
+                {{ 'foro.hilo.filtroTodos' | transloco: { total: f.todos } }}
+              </option>
+              @if (f.generales > 0) {
+                <option value="generales">
+                  {{ 'foro.hilo.filtroGenerales' | transloco: { total: f.generales } }}
+                </option>
+              }
+              @for (seccion of f.secciones; track seccion.clave) {
+                <option [value]="'seccion:' + seccion.clave">
+                  {{ seccion.titulo }} ({{ seccion.total }})
+                </option>
+              }
+            </select>
+          </label>
+        }
+      }
+      <p class="contador-vista" role="status">
+        {{
+          (totalConocido() === null ? 'foro.hilo.mostrandoSinTotal' : 'foro.hilo.mostrando')
+            | transloco: { mostrados: comentariosMostrados(), total: totalConocido() }
+        }}
+      </p>
+    </div>
+  }
+
+  <section
+    class="comentarios"
+    [attr.aria-label]="'foro.hilo.comentarios' | transloco"
+    [attr.aria-busy]="cargandoMas()"
+  >
+    @for (comentario of principalesVisibles(); track comentario.id; let i = $index) {
+      <article
+        class="comentario"
+        tabindex="-1"
+        [class.destacado]="destacadoId() === comentario.id"
+        [attr.data-comentario-id]="comentario.id"
+        [attr.data-posicion]="i"
+      >
+        <div class="comentario-cabecera">
+          <p class="comentario-meta">
+            <ng-container
+              [ngTemplateOutlet]="autor"
+              [ngTemplateOutletContext]="{
+                usuario: comentario.autorUsuario,
+                rol: comentario.autorRol,
+              }"
+            />
+            · {{ comentario.creadoEn | date: 'dd/MM/yyyy HH:mm' : zona }}
+            @if (comentario.editadoEn && !comentario.eliminado) {
+              <span>· {{ 'foro.comentario.editado' | transloco }}</span>
+            }
+          </p>
+          <div class="acciones-comentario">
+            <ng-container
+              [ngTemplateOutlet]="accionesComentario"
+              [ngTemplateOutletContext]="{ $implicit: comentario }"
+            />
+            @if (puedeParticipar() && respondiendoA() !== comentario.id) {
+              <button
+                pButton
+                type="button"
+                class="boton-responder"
+                [attr.data-comentario]="comentario.id"
+                severity="secondary"
+                [text]="true"
+                [attr.aria-label]="
+                  'foro.hilo.responderA'
+                    | transloco
+                      : {
+                          autor: comentario.autorUsuario
+                            ? '@' + comentario.autorUsuario
+                            : ('foro.roles.' + comentario.autorRol | transloco),
+                        }
+                "
+                (click)="abrirRespuesta(comentario.id)"
+              >
+                <i class="pi pi-reply" aria-hidden="true"></i
+                ><span>{{ 'foro.hilo.responder' | transloco }}</span>
+              </button>
+            }
+          </div>
+        </div>
+        @if (comentario.elementoRef && !ancla()) {
+          <button
+            type="button"
+            class="sobre"
+            [attr.title]="'foro.hilo.verEnFormulario' | transloco"
+            [attr.aria-label]="
+              ('foro.hilo.sobre' | transloco: { elemento: etiquetaDe(comentario) }) +
+              '. ' +
+              ('foro.hilo.verEnFormulario' | transloco)
+            "
+            (click)="irAElemento.emit(anclaDe(comentario))"
+          >
+            <i class="pi pi-bookmark" aria-hidden="true"></i>
+            <span>{{ 'foro.hilo.sobre' | transloco: { elemento: etiquetaDe(comentario) } }}</span>
+          </button>
+        }
+        <ng-container
+          [ngTemplateOutlet]="textoComentario"
+          [ngTemplateOutletContext]="{ $implicit: comentario }"
+        />
+
+        @if (respuestasPorPadre().get(comentario.id); as respuestas) {
+          <div class="respuestas">
+            @for (respuesta of respuestas; track respuesta.id) {
+              <article
+                class="comentario respuesta"
+                tabindex="-1"
+                [class.destacado]="destacadoId() === respuesta.id"
+                [attr.data-comentario-id]="respuesta.id"
+              >
+                <div class="comentario-cabecera">
+                  <p class="comentario-meta">
+                    <i class="pi pi-reply" aria-hidden="true"></i>
+                    <ng-container
+                      [ngTemplateOutlet]="autor"
+                      [ngTemplateOutletContext]="{
+                        usuario: respuesta.autorUsuario,
+                        rol: respuesta.autorRol,
+                      }"
+                    />
+                    · {{ respuesta.creadoEn | date: 'dd/MM/yyyy HH:mm' : zona }}
+                    @if (respuesta.editadoEn && !respuesta.eliminado) {
+                      <span>· {{ 'foro.comentario.editado' | transloco }}</span>
+                    }
+                  </p>
+                  <div class="acciones-comentario">
+                    <ng-container
+                      [ngTemplateOutlet]="accionesComentario"
+                      [ngTemplateOutletContext]="{ $implicit: respuesta }"
+                    />
+                  </div>
+                </div>
+                <ng-container
+                  [ngTemplateOutlet]="textoComentario"
+                  [ngTemplateOutletContext]="{ $implicit: respuesta }"
+                />
+              </article>
+            }
+          </div>
+        }
+
+        @if (puedeParticipar() && respondiendoA() === comentario.id) {
+          <form class="formulario respuesta-formulario" (ngSubmit)="responder()">
+            <label>
+              <span>{{ 'foro.hilo.tuRespuesta' | transloco }}</span>
+              <textarea
+                pTextarea
+                name="respuesta"
+                rows="3"
+                [attr.maxlength]="limite"
+                [ngModel]="textoRespuesta()"
+                (ngModelChange)="textoRespuesta.set($event)"
+              ></textarea>
+              <small class="contador-texto">{{ textoRespuesta().length }} / {{ limite }}</small>
+            </label>
+            @if (errorRespuesta(); as error) {
+              <p class="error-formulario" role="alert">{{ error }}</p>
+            }
+            <div class="acciones">
+              <button
+                pButton
+                type="button"
+                severity="secondary"
+                [outlined]="true"
+                [disabled]="publicandoRespuesta()"
+                (click)="cancelarRespuesta()"
+              >
+                <span>{{ 'common.cancel' | transloco }}</span>
+              </button>
+              <button
+                pButton
+                type="submit"
+                [disabled]="publicandoRespuesta() || !textoRespuesta().trim()"
+              >
+                <i class="pi pi-send" aria-hidden="true"></i
+                ><span>{{
+                  (publicandoRespuesta() ? 'foro.hilo.respondiendo' : 'foro.hilo.responder')
+                    | transloco
+                }}</span>
+              </button>
+            </div>
+          </form>
+        }
+      </article>
+    } @empty {
+      <div class="estado" role="status">
+        <i class="pi pi-comments" aria-hidden="true"></i>
+        <p>
+          {{
+            (ancla() ? 'foro.hilo.sinComentariosElemento' : 'foro.hilo.sinComentarios') | transloco
+          }}
+        </p>
+      </div>
+    }
+
+    @if (hayMasPorMostrar()) {
+      <button
+        pButton
+        type="button"
+        class="cargar-mas"
+        severity="secondary"
+        [outlined]="true"
+        [disabled]="cargandoMas()"
+        (click)="mostrarMas()"
+      >
+        <i class="pi pi-chevron-down" aria-hidden="true"></i
+        ><span>{{
+          (cargandoMas() ? 'foro.hilo.cargandoMas' : 'foro.hilo.mostrarMas') | transloco
+        }}</span>
+      </button>
+    }
+  </section>
+
+  @if (!compositorArriba()) {
+    <ng-container [ngTemplateOutlet]="compositor" />
+  }
+}
+
+<p-dialog
+  [header]="'foro.moderacion.' + (accion()?.tipo ?? 'cerrar') + '.titulo' | transloco"
+  [visible]="accion() !== null"
+  (visibleChange)="!$event && cancelarAccion()"
+  [modal]="true"
+  [style]="{ width: 'min(520px, 95vw)' }"
+  [draggable]="false"
+  [resizable]="false"
+>
+  @if (accion(); as a) {
+    <div class="dialogo">
+      <p class="dialogo-texto">{{ 'foro.moderacion.' + a.tipo + '.texto' | transloco }}</p>
+      @if (a.comentario; as c) {
+        @if (c.contenido) {
+          <p class="cita">{{ c.contenido }}</p>
+        }
+      } @else if (hilo(); as h) {
+        <p class="cita">{{ h.titulo }}</p>
+      }
+      @if (pideMotivo()) {
+        <label class="campo-motivo">
+          <span>{{ 'foro.moderacion.motivo' | transloco }}</span>
+          <textarea
+            pTextarea
+            rows="3"
+            [attr.maxlength]="limiteMotivo"
+            [ngModel]="motivo()"
+            (ngModelChange)="motivo.set($event)"
+          ></textarea>
+          <small class="contador-texto">{{ motivo().length }} / {{ limiteMotivo }}</small>
+        </label>
+      }
+      @if (errorAccion(); as error) {
+        <p class="error-formulario" role="alert">{{ error }}</p>
+      }
+      <div class="acciones">
+        <button
+          pButton
+          type="button"
+          severity="secondary"
+          [outlined]="true"
+          [disabled]="procesandoAccion()"
+          (click)="cancelarAccion()"
+        >
+          <span>{{ 'common.cancel' | transloco }}</span>
+        </button>
+        <button
+          pButton
+          type="button"
+          severity="danger"
+          [disabled]="procesandoAccion() || (pideMotivo() && !motivo().trim())"
+          (click)="confirmarAccion()"
+        >
+          <span>{{
+            'foro.moderacion.' + a.tipo + (procesandoAccion() ? '.procesando' : '.confirmar')
+              | transloco
+          }}</span>
+        </button>
+      </div>
+    </div>
+  }
+</p-dialog>

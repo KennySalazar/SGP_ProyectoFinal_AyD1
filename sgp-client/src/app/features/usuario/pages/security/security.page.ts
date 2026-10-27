@@ -4,13 +4,21 @@ import { ButtonModule } from 'primeng/button';
 import { InputTextModule } from 'primeng/inputtext';
 import { TagModule } from 'primeng/tag';
 import { AuthStore } from '../../../../core/services/auth.store';
+import { ContrasenaVisibleComponent } from '../../../../shared/components/contrasena-visible/contrasena-visible.component';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { UsuarioApiService } from '../../services/usuario-api.service';
 
 @Component({
   selector: 'app-security-page',
   standalone: true,
-  imports: [ReactiveFormsModule, ButtonModule, InputTextModule, TagModule, TranslocoPipe],
+  imports: [
+    ReactiveFormsModule,
+    ContrasenaVisibleComponent,
+    ButtonModule,
+    InputTextModule,
+    TagModule,
+    TranslocoPipe,
+  ],
   templateUrl: './security.page.html',
   styleUrl: './security.page.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,

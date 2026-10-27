@@ -1,3 +1,4 @@
+import { provideRouter } from '@angular/router';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { Pipe, PipeTransform } from '@angular/core';
@@ -53,6 +54,7 @@ describe('Característica: invitación de Catedrático HU001', () => {
     );
     TestBed.configureTestingModule({
       providers: [
+        provideRouter([]),
         provideHttpClient(),
         provideHttpClientTesting(),
         { provide: TranslocoService, useValue: { translate: (key: string) => key } },

@@ -64,7 +64,10 @@ public class SecurityConfiguration {
                             referrer.policy(
                                 org.springframework.security.web.header.writers
                                     .ReferrerPolicyHeaderWriter.ReferrerPolicy
-                                    .STRICT_ORIGIN_WHEN_CROSS_ORIGIN)))
+                                    .STRICT_ORIGIN_WHEN_CROSS_ORIGIN))
+                    .contentTypeOptions(contentType -> {})
+                    .httpStrictTransportSecurity(
+                        hsts -> hsts.includeSubDomains(true).maxAgeInSeconds(31536000)))
         .authorizeHttpRequests(
             authorize -> {
               authorize
@@ -72,7 +75,16 @@ public class SecurityConfiguration {
                       HttpMethod.GET,
                       "/api/v1/puentes",
                       "/api/v1/puentes/*",
+                      "/api/v1/puentes/*/estado-calibracion",
                       "/api/v1/catalogos/departamentos")
+                  .permitAll()
+                  // El visitante puede leer el foro pero no participar (RN-FOR-09).
+                  .requestMatchers(
+                      HttpMethod.GET,
+                      "/api/v1/puentes/*/hilos",
+                      "/api/v1/inspecciones/*/hilo",
+                      "/api/v1/hilos/*",
+                      "/api/v1/hilos/*/comentarios")
                   .permitAll()
                   .requestMatchers(
                       HttpMethod.POST,
@@ -106,7 +118,7 @@ public class SecurityConfiguration {
   }
 
   @Bean
-  CorsConfigurationSource corsConfigurationSource(
+  public CorsConfigurationSource corsConfigurationSource(
       @Value("${app.cors.allowed-origins}") String allowedOrigins) {
     CorsConfiguration configuration = new CorsConfiguration();
     List<String> origins =
@@ -114,9 +126,15 @@ public class SecurityConfiguration {
             .map(String::trim)
             .filter(value -> !value.isBlank())
             .toList();
+    if (origins.isEmpty() || origins.stream().anyMatch(o -> o.equals("*") || o.contains("*"))) {
+      throw new IllegalArgumentException(
+          "CORS no permite el comodin '*' por directriz de seguridad DT-SEC-06");
+    }
     configuration.setAllowedOrigins(origins);
     configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
-    configuration.setAllowedHeaders(List.of("Authorization", "Content-Type", "Idempotency-Key"));
+    configuration.setAllowedHeaders(
+        List.of("Authorization", "Content-Type", "Idempotency-Key", "If-Match"));
+    configuration.setExposedHeaders(List.of("Idempotent-Replay", "Retry-After", "Location"));
     configuration.setAllowCredentials(true);
     UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
     source.registerCorsConfiguration("/**", configuration);

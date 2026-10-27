@@ -13,6 +13,7 @@ import gt.usac.cunoc.sgp.inspeccion.model.ResultadoCalculoIc;
 import gt.usac.cunoc.sgp.inspeccion.service.CalculoIndiceCondicionService;
 import gt.usac.cunoc.sgp.inspeccion.service.PreparadorEntradaIcService;
 import gt.usac.cunoc.sgp.inspeccion.service.PublicacionIndiceCondicionService;
+import gt.usac.cunoc.sgp.mantenimiento.service.PlanMantenimientoService;
 import gt.usac.cunoc.sgp.puente.dto.ActualizarPuenteRequest;
 import gt.usac.cunoc.sgp.puente.mapper.PuenteMapper;
 import gt.usac.cunoc.sgp.puente.mapper.PuenteMapperImpl;
@@ -64,6 +65,7 @@ import org.testcontainers.utility.DockerImageName;
   PreparadorEntradaIcService.class,
   AuditoriaWriter.class,
   PuenteService.class,
+  gt.usac.cunoc.sgp.puente.service.EstadoCalibracionPuenteService.class,
   PuenteMapperImpl.class,
   PublicacionIndiceCondicionIntegrationTest.Config.class
 })
@@ -99,7 +101,10 @@ class PublicacionIndiceCondicionIntegrationTest {
   @Autowired private PuenteRepository puentes;
   @Autowired private PuenteMapper mapper;
   @Autowired private PuenteService puenteService;
+  @Autowired private gt.usac.cunoc.sgp.puente.service.EstadoCalibracionPuenteService respaldo;
   @MockBean private CalculoIndiceCondicionService calculador;
+
+  @MockBean private PlanMantenimientoService planesMantenimiento;
 
   private UUID usuarioId;
   private UUID puenteId;
@@ -117,24 +122,24 @@ class PublicacionIndiceCondicionIntegrationTest {
 
     jdbc.update(
         """
-        INSERT INTO usuario (id, email, password_hash, rol_id,
-          verificado, activado, activo, nombre_completo)
-        SELECT ?, ?, 'hash-prueba', id, true, true, true, 'Publicador de prueba'
-        FROM rol WHERE nombre = 'ADMINISTRADOR'
-        """,
+                INSERT INTO usuario (id, email, password_hash, rol_id,
+                  verificado, activado, activo, nombre_completo)
+                SELECT ?, ?, 'hash-prueba', id, true, true, true, 'Publicador de prueba'
+                FROM rol WHERE nombre = 'ADMINISTRADOR'
+                """,
         usuarioId,
         usuarioId + "@ejemplo.com");
 
     jdbc.update(
         """
-        INSERT INTO version_formulario (id, codigo, estado, activa, esquema,
-          reglas_evaluacion_ic, hash_contenido, version_algoritmo_ic,
-          creado_por_id, publicado_por_id, publicado_en)
-        VALUES (?, ?, 'PUBLICADA', false, '{"type":"object"}'::jsonb,
-          '{"formulario":"sieca-v1","elementos":[{"elemento_ref":"/vigas"}],
-            "reglas_evaluacion_ic":{"version_algoritmo":"ic-hu020-prueba"}}'::jsonb,
-          ?, ?, ?, ?, ?)
-        """,
+                INSERT INTO version_formulario (id, codigo, estado, activa, esquema,
+                  reglas_evaluacion_ic, hash_contenido, version_algoritmo_ic,
+                  creado_por_id, publicado_por_id, publicado_en)
+                VALUES (?, ?, 'PUBLICADA', false, '{"type":"object"}'::jsonb,
+                  '{"formulario":"sieca-v1","elementos":[{"elemento_ref":"/vigas"}],
+                    "reglas_evaluacion_ic":{"version_algoritmo":"ic-hu020-prueba"}}'::jsonb,
+                  ?, ?, ?, ?, ?)
+                """,
         versionId,
         "HU020-" + versionId,
         "a".repeat(64),
@@ -145,21 +150,21 @@ class PublicacionIndiceCondicionIntegrationTest {
 
     jdbc.update(
         """
-        INSERT INTO configuracion_ic_elemento
-          (id, version_formulario_id, elemento_ref, peso, descripcion)
-        VALUES (?, ?, '/vigas', 1, 'Peso de prueba')
-        """,
+                INSERT INTO configuracion_ic_elemento
+                  (id, version_formulario_id, elemento_ref, peso, descripcion)
+                VALUES (?, ?, '/vigas', 1, 'Peso de prueba')
+                """,
         UUID.randomUUID(),
         versionId);
 
     jdbc.update(
         """
-        INSERT INTO puente (id, codigo, correlativo_municipal, municipio_id,
-          nombre, ruta, ubicacion, creado_por_id)
-        SELECT ?, ?, ?, id, 'Puente de prueba', 'CA-1',
-          ST_SetSRID(ST_MakePoint(-90.615, 14.481), 4326)::geography, ?
-        FROM municipio WHERE codigo_ine = '0114'
-        """,
+                INSERT INTO puente (id, codigo, correlativo_municipal, municipio_id,
+                  nombre, ruta, ubicacion, creado_por_id)
+                SELECT ?, ?, ?, id, 'Puente de prueba', 'CA-1',
+                  ST_SetSRID(ST_MakePoint(-90.615, 14.481), 4326)::geography, ?
+                FROM municipio WHERE codigo_ine = '0114'
+                """,
         puenteId,
         "T-" + puenteId,
         siguienteCorrelativo(),
@@ -168,6 +173,54 @@ class PublicacionIndiceCondicionIntegrationTest {
     assertThat(numero("SELECT count(*) FROM puente WHERE id = ?", puenteId)).isEqualTo(1);
     crearInspeccion(inspeccionId, LocalDate.of(2026, 10, 14));
     when(calculador.calcular(any())).thenReturn(resultado("80", EstadoCondicion.BUENO, false));
+  }
+
+  @Test
+  void respaldoDelIcVigenteConservaVersionHistoricaAunqueSePubliqueOtroFormulario() {
+    publicar(inspeccionId, AHORA);
+    UUID nuevaActiva = UUID.randomUUID();
+    jdbc.update("UPDATE version_formulario SET activa = false WHERE activa = true");
+    jdbc.update(
+        """
+                INSERT INTO version_formulario (id, codigo, estado, activa, esquema, reglas_evaluacion_ic,
+                  hash_contenido, version_algoritmo_ic, creado_por_id, publicado_por_id, publicado_en)
+                SELECT ?, ?, 'PUBLICADA', true, esquema, reglas_evaluacion_ic, hash_contenido,
+                  version_algoritmo_ic, creado_por_id, publicado_por_id, CURRENT_TIMESTAMP
+                FROM version_formulario WHERE id = ?
+                """,
+        nuevaActiva,
+        "HU054-activa-" + nuevaActiva,
+        versionId);
+    assertThat(respaldo.consultar(puenteId).versionFormularioId()).isEqualTo(versionId);
+    assertThat(respaldo.consultar(puenteId).estado()).isEqualTo("SIN_APROBAR");
+    jdbc.update(
+        """
+                INSERT INTO aprobacion_calibracion_ic (id, version_formulario_id, aprobado_por_id,
+                  aprobado_por_nombre, aprobado_en, observaciones)
+                VALUES (?, ?, ?, 'Nombre academico', CURRENT_TIMESTAMP, 'Nota privada')
+                """,
+        UUID.randomUUID(),
+        versionId,
+        usuarioId);
+    var resumen = respaldo.consultar(puenteId);
+    assertThat(resumen.estado()).isEqualTo("APROBADA");
+    assertThat(resumen.aprobadoPorNombre()).isEqualTo("Nombre academico");
+    assertThat(resumen.versionFormularioId()).isEqualTo(versionId).isNotEqualTo(nuevaActiva);
+    transaccion.executeWithoutResult(
+        estado -> {
+          var puente = puentes.findPuenteConRelacionesById(puenteId).orElseThrow();
+          assertThat(mapper.toAltaResponse(puente, null).versionFormularioIdIcVigente())
+              .isEqualTo(versionId)
+              .isNotEqualTo(nuevaActiva);
+          var pagina = puentes.findCatalogo(null, true, PageRequest.of(0, 100));
+          var fila =
+              pagina.getContent().stream()
+                  .filter(p -> p.getId().equals(puenteId))
+                  .findFirst()
+                  .orElseThrow();
+          assertThat(mapper.toCatalogoResponse(fila).versionFormularioIdIcVigente())
+              .isEqualTo(versionId);
+        });
   }
 
   @Test
@@ -216,10 +269,10 @@ class PublicacionIndiceCondicionIntegrationTest {
     var registro =
         jdbc.queryForMap(
             """
-        SELECT usuario_id, accion, creado_en, valores_anteriores::text AS anteriores,
-          valores_posteriores::text AS posteriores
-        FROM auditoria WHERE entidad = 'puente' AND entidad_id = ?
-        """,
+                    SELECT usuario_id, accion, creado_en, valores_anteriores::text AS anteriores,
+                      valores_posteriores::text AS posteriores
+                    FROM auditoria WHERE entidad = 'puente' AND entidad_id = ?
+                    """,
             puenteId);
     assertThat(registro.get("usuario_id")).isEqualTo(usuarioId);
     assertThat(registro.get("accion")).isEqualTo("MODIFICAR");
@@ -238,10 +291,10 @@ class PublicacionIndiceCondicionIntegrationTest {
     var fila =
         jdbc.queryForMap(
             """
-        SELECT indice_calculado, estado_por_rango, estado_calculado,
-          condiciones_anulacion::text AS condiciones
-        FROM resultado_ic WHERE id = ?
-        """,
+                    SELECT indice_calculado, estado_por_rango, estado_calculado,
+                      condiciones_anulacion::text AS condiciones
+                    FROM resultado_ic WHERE id = ?
+                    """,
             resultadoId);
     assertThat((BigDecimal) fila.get("indice_calculado")).isEqualByComparingTo("80");
     assertThat(fila.get("estado_por_rango")).isEqualTo("BUENO");
@@ -368,11 +421,15 @@ class PublicacionIndiceCondicionIntegrationTest {
           assertThat(detalle.estadoActual()).isEqualTo(estado);
           assertThat(catalogo.estadoActual()).isEqualTo(estado);
           if ("Sin evaluar".equals(estado)) {
+            assertThat(detalle.versionFormularioIdIcVigente()).isNull();
+            assertThat(catalogo.versionFormularioIdIcVigente()).isNull();
             assertThat(detalle.indiceCondicionActual()).isNull();
             assertThat(catalogo.indiceCondicionActual()).isNull();
             assertThat(catalogo.fechaUltimaInspeccion()).isNull();
             assertThat(detalle.fechaUltimaInspeccion()).isNull();
           } else {
+            assertThat(detalle.versionFormularioIdIcVigente()).isEqualTo(versionId);
+            assertThat(catalogo.versionFormularioIdIcVigente()).isEqualTo(versionId);
             assertThat(detalle.indiceCondicionActual())
                 .isEqualByComparingTo(Integer.toString(indice));
             assertThat(detalle.fechaUltimaInspeccion()).isEqualTo(LocalDate.of(2026, 10, 14));
@@ -388,10 +445,10 @@ class PublicacionIndiceCondicionIntegrationTest {
           Long totalEsperado =
               jdbc.queryForObject(
                   """
-                    SELECT count(*) FROM puente p
-                    JOIN municipio m ON m.id = p.municipio_id
-                    WHERE m.departamento_id = ? AND p.activo = true AND p.estado_actual = ?
-                    """,
+                                      SELECT count(*) FROM puente p
+                                      JOIN municipio m ON m.id = p.municipio_id
+                                      WHERE m.departamento_id = ? AND p.activo = true AND p.estado_actual = ?
+                                      """,
                   Long.class,
                   departamentoId,
                   estado);
@@ -418,10 +475,10 @@ class PublicacionIndiceCondicionIntegrationTest {
     publicar(inspeccionId, AHORA);
     jdbc.update(
         """
-                UPDATE puente SET activo = false, inactivado_en = ?, inactivado_por_id = ?,
-                  motivo_inactivacion = 'Baja de prueba'
-                WHERE id = ?
-                """,
+                        UPDATE puente SET activo = false, inactivado_en = ?, inactivado_por_id = ?,
+                          motivo_inactivacion = 'Baja de prueba'
+                        WHERE id = ?
+                        """,
         OffsetDateTime.ofInstant(AHORA, ZoneOffset.UTC),
         usuarioId,
         puenteId);
@@ -539,9 +596,9 @@ class PublicacionIndiceCondicionIntegrationTest {
   private void marcarPublicada(UUID id, Instant publicadaEn) {
     jdbc.update(
         """
-        UPDATE inspeccion SET estado = 'PUBLICADA', publicado_en = ?,
-          actualizado_en = ?, version = version + 1 WHERE id = ?
-        """,
+                UPDATE inspeccion SET estado = 'PUBLICADA', publicado_en = ?,
+                  actualizado_en = ?, version = version + 1 WHERE id = ?
+                """,
         OffsetDateTime.ofInstant(publicadaEn, ZoneOffset.UTC),
         OffsetDateTime.ofInstant(AHORA, ZoneOffset.UTC),
         id);
@@ -550,10 +607,10 @@ class PublicacionIndiceCondicionIntegrationTest {
   private void crearInspeccion(UUID id, LocalDate fecha) {
     jdbc.update(
         """
-        INSERT INTO inspeccion (id, puente_id, version_formulario_id, autor_id,
-          rol_autor_creacion, nombre_autor_capturado, fecha_inspeccion, dispositivo_id, datos)
-        VALUES (?, ?, ?, ?, 'ADMINISTRADOR', 'Autor de prueba', ?, 'equipo-prueba', '{}'::jsonb)
-        """,
+                INSERT INTO inspeccion (id, puente_id, version_formulario_id, autor_id,
+                  rol_autor_creacion, nombre_autor_capturado, fecha_inspeccion, dispositivo_id, datos)
+                VALUES (?, ?, ?, ?, 'ADMINISTRADOR', 'Autor de prueba', ?, 'equipo-prueba', '{}'::jsonb)
+                """,
         id,
         puenteId,
         versionId,
@@ -564,10 +621,10 @@ class PublicacionIndiceCondicionIntegrationTest {
   private int siguienteCorrelativo() {
     return jdbc.queryForObject(
         """
-        SELECT COALESCE(MAX(p.correlativo_municipal), 0) + 1
-        FROM puente p JOIN municipio m ON m.id = p.municipio_id
-        WHERE m.codigo_ine = '0114'
-        """,
+                SELECT COALESCE(MAX(p.correlativo_municipal), 0) + 1
+                FROM puente p JOIN municipio m ON m.id = p.municipio_id
+                WHERE m.codigo_ine = '0114'
+                """,
         Integer.class);
   }
 

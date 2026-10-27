@@ -2,19 +2,72 @@
   <main class="workspace">
     <header class="workspace-bar">
       <div>
-        <p class="workspace-kicker">{{ 'app.technicalPlatform' | transloco }}</p>
+        <p class="workspace-kicker">
+          {{ 'app.technicalPlatform' | transloco }}
+        </p>
         <strong>{{ 'app.title' | transloco }}</strong>
       </div>
       <div class="workspace-meta">
+        <app-campana-avisos />
         <span class="environment">{{ 'app.development' | transloco }}</span>
-        <span class="connectivity" [class.offline]="!connectivity.online()">
-          <span class="dot"></span>
-          {{ (connectivity.online() ? 'connectivity.online' : 'connectivity.offline') | transloco }}
-        </span>
+        @if (sincronizacion.resumen$ | async; as resumen) {
+          <a
+            aria-live="polite"
+            class="connectivity"
+            [class.offline]="!connectivity.online()"
+            routerLink="/offline"
+          >
+            <span class="dot"></span>
+            @if (!resumen.listo || resumen.propietarioId !== auth.user()?.id) {
+              {{ 'offline.diagnostico.comprobando' | transloco }}
+            } @else if (resumen.inspecciones + resumen.fotografias === 0) {
+              {{ (connectivity.online() ? 'offline.synced' : 'connectivity.offline') | transloco }}
+            } @else {
+              {{
+                (connectivity.online() ? 'connectivity.online' : 'connectivity.offline') | transloco
+              }}
+              · {{ resumen.inspecciones }} {{ 'offline.pendingInspections' | transloco }} ·
+              {{ resumen.fotografias }}
+              {{ 'offline.pendingFiles' | transloco }}
+            }
+          </a>
+          @if (resumen.inspecciones + resumen.fotografias > 0 && connectivity.online()) {
+            <button type="button" class="sync-now" (click)="sincronizacion.sincronizarAhora()">
+              {{ 'offline.syncNow' | transloco }}
+            </button>
+          }
+        }
       </div>
     </header>
 
     <section class="route-content">
+      @if (actualizacion.disponible() && !actualizacion.pospuesta()) {
+        <div class="aviso-perfil" role="status">
+          <span>{{ 'offline.hu061.updateReady' | transloco }}</span>
+          <button
+            type="button"
+            (click)="actualizacion.recargar()"
+            [disabled]="actualizacion.preparando() || sincronizacion.sincronizando()"
+          >
+            {{ 'offline.hu061.reload' | transloco }}
+          </button>
+          <button type="button" (click)="actualizacion.pospuesta.set(true)">
+            {{ 'offline.hu061.later' | transloco }}
+          </button>
+          @if (actualizacion.error()) {
+            <span role="alert">{{ 'offline.hu061.storageError' | transloco }}</span>
+          }
+        </div>
+      }
+
+      @if (avisarPerfil()) {
+        <p class="aviso-perfil" role="status">
+          <i class="pi pi-id-card" aria-hidden="true"></i>
+          <span>{{ 'perfil.aviso' | transloco }}</span>
+          <a routerLink="/perfil">{{ 'perfil.completar' | transloco }}</a>
+        </p>
+      }
+      <app-aviso-salida />
       <ng-content />
       <router-outlet />
     </section>
@@ -44,6 +97,11 @@
           <i class="pi pi-list" aria-hidden="true"></i
           ><span>{{ 'nav.bridgeCatalog' | transloco }}</span>
         </a>
+        @if (puedePrepararSalida()) {
+          <a routerLink="/preparar-salida" routerLinkActive="active" ariaCurrentWhenActive="page">
+            <i class="pi pi-download" aria-hidden="true"></i><span>Preparar salida</span>
+          </a>
+        }
         <a routerLink="/offline" routerLinkActive="active">
           <i class="pi pi-cloud"></i><span>{{ 'nav.offline' | transloco }}</span>
         </a>
@@ -51,7 +109,11 @@
           <i class="pi pi-clipboard" aria-hidden="true"></i
           ><span>{{ 'nav.inspectionForm' | transloco }}</span>
         </a>
-        @if (auth.user()?.role === 'CATEDRATICO' || auth.user()?.role === 'PROFESIONAL_EXTERNO') {
+        @if (
+          auth.user()?.role === 'CATEDRATICO' ||
+          auth.user()?.role === 'PROFESIONAL_EXTERNO' ||
+          auth.user()?.role === 'ESTUDIANTE'
+        ) {
           <a
             routerLink="/inspecciones"
             [routerLinkActiveOptions]="{ exact: true }"
@@ -61,9 +123,34 @@
             ><span>{{ 'nav.myInspections' | transloco }}</span>
           </a>
         }
+        @if (auth.user()?.role === 'ESTUDIANTE') {
+          <a routerLink="/observaciones" routerLinkActive="active" ariaCurrentWhenActive="page">
+            <i class="pi pi-comments" aria-hidden="true"></i
+            ><span>{{ 'revision.autor.titulo' | transloco }}</span>
+          </a>
+        }
+        <a routerLink="/perfil" routerLinkActive="active">
+          <i class="pi pi-id-card" aria-hidden="true"></i
+          ><span>{{ 'nav.profile' | transloco }}</span>
+        </a>
         <a routerLink="/seguridad" routerLinkActive="active">
           <i class="pi pi-shield"></i><span>{{ 'nav.security' | transloco }}</span>
         </a>
+        @if (auth.user()?.role === 'ADMINISTRADOR' || auth.user()?.role === 'CATEDRATICO') {
+          <a routerLink="/admin/formularios" routerLinkActive="active">
+            <i class="pi pi-file-edit"></i><span>{{ 'nav.formularioSieca' | transloco }}</span>
+          </a>
+          <a routerLink="/mantenimiento/reglas" routerLinkActive="active">
+            <i class="pi pi-wrench"></i><span>{{ 'nav.maintenanceRules' | transloco }}</span>
+          </a>
+          <a routerLink="/mantenimiento/ordenes" routerLinkActive="active">
+            <i class="pi pi-briefcase"></i><span>{{ 'nav.maintenanceOrders' | transloco }}</span>
+          </a>
+          <a routerLink="/foro/moderacion" routerLinkActive="active">
+            <i class="pi pi-flag" aria-hidden="true"></i
+            ><span>{{ 'nav.forumModeration' | transloco }}</span>
+          </a>
+        }
         @if (auth.user()?.role === 'ADMINISTRADOR') {
           <a
             routerLink="/admin"
@@ -71,9 +158,6 @@
             routerLinkActive="active"
           >
             <i class="pi pi-users"></i><span>{{ 'nav.users' | transloco }}</span>
-          </a>
-          <a routerLink="/admin/formularios" routerLinkActive="active">
-            <i class="pi pi-file-edit"></i><span>{{ 'nav.formularioSieca' | transloco }}</span>
           </a>
           <a routerLink="/admin/cursos" routerLinkActive="active">
             <i class="pi pi-book"></i><span>{{ 'nav.courses' | transloco }}</span>
@@ -89,6 +173,20 @@
           </a>
         }
         @if (auth.user()?.role === 'CATEDRATICO') {
+          <a routerLink="/revisiones" routerLinkActive="active">
+            <i class="pi pi-inbox" aria-hidden="true"></i>
+            <span>{{ 'nav.reviewInbox' | transloco }}</span>
+            @if (revisiones.pendientes() > 0) {
+              <span
+                class="nav-count"
+                [attr.aria-label]="
+                  'nav.pendingReviewsCount' | transloco: { count: revisiones.pendientes() }
+                "
+              >
+                {{ revisiones.pendientes() }}
+              </span>
+            }
+          </a>
           <a routerLink="/puentes/solicitudes" routerLinkActive="active">
             <i class="pi pi-send" aria-hidden="true"></i>
             <span>{{ 'nav.myBridgeRequests' | transloco }}</span>
@@ -111,9 +209,11 @@
     <div class="sidebar-spacer"></div>
 
     <div class="user-panel">
-      <div class="user-avatar">{{ auth.user()?.email?.charAt(0)?.toUpperCase() || 'U' }}</div>
+      <div class="user-avatar">
+        {{ nombreVisible().charAt(0).toUpperCase() || 'U' }}
+      </div>
       <div class="user-data">
-        <strong>{{ auth.user()?.email }}</strong>
+        <strong>{{ nombreVisible() }}</strong>
         <span>{{ auth.user()?.role }}</span>
       </div>
     </div>

@@ -1,7 +1,9 @@
 package gt.usac.cunoc.sgp.inspeccion.repository;
 
+import gt.usac.cunoc.sgp.inspeccion.dto.InspeccionPublicadaResumenResponse;
 import gt.usac.cunoc.sgp.inspeccion.entity.Inspeccion;
 import jakarta.persistence.LockModeType;
+import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -20,6 +22,10 @@ public interface InspeccionRepository extends JpaRepository<Inspeccion, UUID> {
   Optional<Inspeccion> findConDetallesById(UUID id);
 
   Optional<Inspeccion> findByIdAndEliminadoEnIsNull(UUID id);
+
+  @Lock(LockModeType.PESSIMISTIC_WRITE)
+  @Query("select i from Inspeccion i where i.id = :id and i.eliminadoEn is null")
+  Optional<Inspeccion> findByIdAndEliminadoEnIsNullForUpdate(@Param("id") UUID id);
 
   @EntityGraph(attributePaths = {"puente", "puente.municipio.departamento", "versionFormulario"})
   @Query(
@@ -40,9 +46,35 @@ public interface InspeccionRepository extends JpaRepository<Inspeccion, UUID> {
   Page<Inspeccion> findMisInspecciones(
       @Param("autorId") UUID autorId, @Param("estado") String estado, Pageable pageable);
 
+  @Query(
+      value =
+          """
+          SELECT new gt.usac.cunoc.sgp.inspeccion.dto.InspeccionPublicadaResumenResponse(
+            i.id, i.puente.id, i.autorId, i.nombreAutorCapturado,
+            i.fechaInspeccion, i.publicadoEn, i.estado)
+          FROM Inspeccion i
+          WHERE i.puente.id = :puenteId AND i.estado = 'PUBLICADA' AND i.eliminadoEn IS NULL
+          """,
+      countQuery =
+          """
+          SELECT count(i) FROM Inspeccion i
+          WHERE i.puente.id = :puenteId AND i.estado = 'PUBLICADA' AND i.eliminadoEn IS NULL
+          """)
+  Page<InspeccionPublicadaResumenResponse> findPublicadasByPuenteId(
+      @Param("puenteId") UUID puenteId, Pageable pageable);
+
+  @EntityGraph(attributePaths = {"puente", "versionFormulario", "acompanantes", "datoTecnico"})
+  @Query(
+      "SELECT i FROM Inspeccion i WHERE i.id = :id AND i.estado = 'PUBLICADA'"
+          + " AND i.eliminadoEn IS NULL")
+  Optional<Inspeccion> findPublicadaConDetallesById(@Param("id") UUID id);
+
   List<Inspeccion> findByPuenteIdOrderByFechaInspeccionDesc(UUID puenteId);
 
   List<Inspeccion> findByAutorIdOrderByFechaInspeccionDesc(UUID autorId);
+
+  Optional<Inspeccion> findTopByAsignacionPuenteIdAndEliminadoEnIsNullOrderByCreadoEnDesc(
+      UUID asignacionPuenteId);
 
   @Query("SELECT i FROM Inspeccion i WHERE i.id = :id AND i.eliminadoEn IS NULL")
   Optional<Inspeccion> findActiveById(@Param("id") UUID id);
@@ -74,6 +106,27 @@ public interface InspeccionRepository extends JpaRepository<Inspeccion, UUID> {
       nativeQuery = true)
   List<String> findCategoriasFotoDisponibles(@Param("id") UUID id);
 
+  interface ConteoFotoCategoria {
+    String getCategoria();
+
+    long getCantidad();
+  }
+
+  /** Conteos para evaluar evidencia bajo el bloqueo de la inspección. */
+  @Query(
+      value =
+          """
+          SELECT a.categoria_foto AS categoria, count(*) AS cantidad
+          FROM archivo_inspeccion ai
+          JOIN archivo a ON a.id = ai.archivo_id
+          WHERE ai.inspeccion_id = :id
+            AND a.tipo_uso = 'FOTO_INSPECCION'
+            AND a.estado = 'DISPONIBLE'
+          GROUP BY a.categoria_foto
+          """,
+      nativeQuery = true)
+  List<ConteoFotoCategoria> findConteosFotoDisponibles(@Param("id") UUID id);
+
   /** Corrección publicada que supera a la inspección indicada, si existe (RN-INS-08). */
   @Query(
       "SELECT i.id FROM Inspeccion i WHERE i.supersedeAId = :id AND i.estado = 'PUBLICADA'"
@@ -84,4 +137,17 @@ public interface InspeccionRepository extends JpaRepository<Inspeccion, UUID> {
       "SELECT i.supersedeAId, i.id FROM Inspeccion i WHERE i.supersedeAId IN :ids"
           + " AND i.estado = 'PUBLICADA' AND i.eliminadoEn IS NULL")
   List<Object[]> findCorreccionesPublicadas(@Param("ids") Collection<UUID> ids);
+
+  /**
+   * Borradores vigentes sin actividad desde el límite (RN-ARC-06): id, autor, nombre del puente y
+   * última actividad.
+   */
+  @Query(
+      value =
+          "SELECT i.id, i.autor_id, p.nombre, i.ultima_actividad_en FROM inspeccion i"
+              + " JOIN puente p ON p.id = i.puente_id"
+              + " WHERE i.estado = 'BORRADOR' AND i.eliminado_en IS NULL"
+              + " AND i.ultima_actividad_en <= :limite ORDER BY i.ultima_actividad_en",
+      nativeQuery = true)
+  List<Object[]> findBorradoresInactivosDesde(@Param("limite") Instant limite);
 }

@@ -1,0 +1,258 @@
+<app-plan-rutinario [puente]="puente()" />
+
+<div class="cabecera">
+  <h2 class="seccion-titulo">
+    <i class="pi pi-wrench" aria-hidden="true"></i>
+    {{ 'mantenimiento.puente.titulo' | transloco }}
+  </h2>
+  @if (puedeGestionar() && puente().activo) {
+    <button pButton type="button" (click)="abrirNuevaOrden()">
+      <i class="pi pi-plus" aria-hidden="true"></i
+      ><span>{{ 'mantenimiento.puente.nuevaOrden' | transloco }}</span>
+    </button>
+  }
+</div>
+
+@if (ordenCreada()) {
+  <p class="confirmacion" role="status">
+    <i class="pi pi-check-circle" aria-hidden="true"></i>
+    {{ 'mantenimiento.puente.creada' | transloco }}
+  </p>
+}
+
+<p-tabs [value]="grupo()" (valueChange)="cambiarGrupo($event)">
+  <p-tablist>
+    <p-tab value="abiertas">
+      {{ 'mantenimiento.puente.abiertas' | transloco }}
+      @if (paginas().abiertas; as p) {
+        <span class="contador">{{ p.totalElements }}</span>
+      }
+    </p-tab>
+    <p-tab value="cerradas">
+      {{ 'mantenimiento.puente.cerradas' | transloco }}
+      @if (paginas().cerradas; as p) {
+        <span class="contador">{{ p.totalElements }}</span>
+      }
+    </p-tab>
+  </p-tablist>
+</p-tabs>
+
+<div class="lista" [attr.aria-busy]="cargando()">
+  @if (cargando() && !paginas()[grupo()]) {
+    @for (fila of [1, 2]; track fila) {
+      <div class="orden" aria-hidden="true">
+        <p-skeleton width="65%" height="1.1rem" />
+        <p-skeleton width="40%" height="0.85rem" />
+      </div>
+    }
+    <span class="sr-only" role="status">{{ 'mantenimiento.ordenes.cargando' | transloco }}</span>
+  } @else if (error()) {
+    <div class="estado-lista" role="alert">
+      <i class="pi pi-exclamation-circle" aria-hidden="true"></i>
+      <p>{{ 'mantenimiento.puente.error' | transloco }}</p>
+      <button pButton type="button" severity="secondary" [outlined]="true" (click)="reintentar()">
+        <i class="pi pi-refresh" aria-hidden="true"></i
+        ><span>{{ 'mantenimiento.ordenes.reintentar' | transloco }}</span>
+      </button>
+    </div>
+  } @else if (paginas()[grupo()]; as pagina) {
+    @for (orden of pagina.content; track orden.id) {
+      <article class="orden">
+        <div class="orden-titulo">
+          <h3>{{ orden.descripcion }}</h3>
+          <p-tag
+            [value]="'mantenimiento.ordenes.estados.' + orden.estado | transloco"
+            [severity]="severidad(orden.estado)"
+          />
+          <p-tag
+            [value]="'mantenimiento.ordenes.tipos.' + orden.tipo | transloco"
+            severity="secondary"
+          />
+          @if (orden.reglaProvisional) {
+            <p-tag [value]="'mantenimiento.ordenes.provisional' | transloco" severity="warn" />
+          }
+        </div>
+        <p>
+          {{ 'mantenimiento.ordenes.prioridad' | transloco }}:
+          {{ 'mantenimiento.ordenes.prioridades.' + orden.prioridadConfirmada | transloco }} ·
+          {{ 'mantenimiento.ordenes.creada' | transloco }}
+          {{ orden.creadoEn | date: 'dd/MM/yyyy' : zona }}
+          @if (orden.fechaProgramada) {
+            · {{ 'mantenimiento.ordenes.programadaPara' | transloco }}
+            {{ orden.fechaProgramada | date: 'dd/MM/yyyy' }}
+          }
+          @if (orden.motivoCierreSinEjecucion) {
+            · {{ orden.motivoCierreSinEjecucion }}
+          }
+        </p>
+        @if (puedeGestionar()) {
+          <a
+            pButton
+            severity="secondary"
+            [outlined]="true"
+            [routerLink]="['/mantenimiento/ordenes', orden.id]"
+          >
+            <i class="pi pi-eye" aria-hidden="true"></i
+            ><span>{{ 'mantenimiento.ordenes.verDetalle' | transloco }}</span>
+          </a>
+        }
+      </article>
+    } @empty {
+      <div class="estado-lista" role="status">
+        <i class="pi pi-inbox" aria-hidden="true"></i>
+        <p>
+          {{
+            (grupo() === 'abiertas'
+              ? 'mantenimiento.puente.sinAbiertas'
+              : 'mantenimiento.puente.sinCerradas'
+            ) | transloco
+          }}
+        </p>
+      </div>
+    }
+    @if (pagina.totalElements > tamanio) {
+      <p-paginator
+        [first]="pagina.number * tamanio"
+        [rows]="tamanio"
+        [totalRecords]="pagina.totalElements"
+        (onPageChange)="cambiarPagina(grupo(), $event)"
+      />
+    }
+  }
+</div>
+
+<p-dialog
+  [visible]="creando()"
+  (visibleChange)="!$event && cerrarNuevaOrden()"
+  [modal]="true"
+  [style]="{ width: 'min(36rem, 94vw)' }"
+  [draggable]="false"
+  [resizable]="false"
+  [header]="'mantenimiento.puente.nuevaOrden' | transloco"
+>
+  <p>{{ 'mantenimiento.puente.nuevaOrdenTexto' | transloco: { puente: puente().nombre } }}</p>
+  <div class="formulario">
+    <div class="campo">
+      <label for="nueva-1">{{ 'mantenimiento.ordenes.tipo' | transloco }}</label>
+      <p-select
+        inputId="nueva-1"
+        [options]="tipos"
+        [ngModel]="nuevoTipo()"
+        (ngModelChange)="nuevoTipo.set($event)"
+        [placeholder]="'mantenimiento.puente.seleccionar' | transloco"
+        appendTo="body"
+        styleClass="w-full"
+      >
+        <ng-template #selectedItem let-valor>{{
+          'mantenimiento.ordenes.tipos.' + valor | transloco
+        }}</ng-template>
+        <ng-template #item let-valor>{{
+          'mantenimiento.ordenes.tipos.' + valor | transloco
+        }}</ng-template>
+      </p-select>
+      @if (erroresCampo()['tipo']; as error) {
+        <small class="error-campo" role="alert">{{ error }}</small>
+      }
+    </div>
+    <div class="campo">
+      <label for="nueva-2">{{ 'mantenimiento.ordenes.prioridad' | transloco }}</label>
+      <p-select
+        inputId="nueva-2"
+        [options]="prioridades"
+        [ngModel]="nuevaPrioridad()"
+        (ngModelChange)="nuevaPrioridad.set($event)"
+        [placeholder]="'mantenimiento.puente.seleccionar' | transloco"
+        appendTo="body"
+        styleClass="w-full"
+      >
+        <ng-template #selectedItem let-valor>{{
+          'mantenimiento.ordenes.prioridades.' + valor | transloco
+        }}</ng-template>
+        <ng-template #item let-valor>{{
+          'mantenimiento.ordenes.prioridades.' + valor | transloco
+        }}</ng-template>
+      </p-select>
+      @if (erroresCampo()['prioridad']; as error) {
+        <small class="error-campo" role="alert">{{ error }}</small>
+      }
+    </div>
+    <label class="ancho">
+      <span>{{ 'mantenimiento.ordenes.descripcionOrden' | transloco }}</span>
+      <textarea
+        pTextarea
+        rows="3"
+        maxlength="2000"
+        [ngModel]="nuevaDescripcion()"
+        (ngModelChange)="nuevaDescripcion.set($event)"
+      ></textarea>
+      @if (erroresCampo()['descripcion']; as error) {
+        <small class="error-campo" role="alert">{{ error }}</small>
+      }
+    </label>
+    <label class="ancho">
+      <span>{{ 'mantenimiento.puente.elementoOpcional' | transloco }}</span>
+      <input
+        pInputText
+        maxlength="300"
+        [ngModel]="nuevoElemento()"
+        (ngModelChange)="nuevoElemento.set($event)"
+        [placeholder]="'mantenimiento.ordenes.evidencia.elementoPlaceholder' | transloco"
+      />
+      @if (erroresCampo()['elementoRef']; as error) {
+        <small class="error-campo" role="alert">{{ error }}</small>
+      }
+    </label>
+    <div class="campo ancho">
+      <label for="nueva-3">{{ 'mantenimiento.puente.inspeccionOpcional' | transloco }}</label>
+      <p-select
+        inputId="nueva-3"
+        [options]="inspecciones()"
+        optionValue="id"
+        [ngModel]="nuevaInspeccion()"
+        (ngModelChange)="nuevaInspeccion.set($event)"
+        [showClear]="true"
+        [placeholder]="'mantenimiento.puente.sinInspeccion' | transloco"
+        appendTo="body"
+        styleClass="w-full"
+      >
+        <ng-template #selectedItem let-inspeccion
+          >{{ inspeccion.fechaInspeccion | date: 'dd/MM/yyyy' }} ·
+          {{ inspeccion.nombreAutor }}</ng-template
+        >
+        <ng-template #item let-inspeccion
+          >{{ inspeccion.fechaInspeccion | date: 'dd/MM/yyyy' }} ·
+          {{ inspeccion.nombreAutor }}</ng-template
+        >
+      </p-select>
+      @if (erroresCampo()['inspeccionOrigenId']; as error) {
+        <small class="error-campo" role="alert">{{ error }}</small>
+      }
+    </div>
+  </div>
+  @if (errorCrear(); as error) {
+    <p class="error-dialogo" role="alert">{{ error }}</p>
+  }
+  <div class="dialog-acciones">
+    <button
+      pButton
+      type="button"
+      severity="secondary"
+      [outlined]="true"
+      [disabled]="guardando()"
+      (click)="cerrarNuevaOrden()"
+    >
+      <span>{{ 'common.cancel' | transloco }}</span>
+    </button>
+    <button
+      pButton
+      type="button"
+      [disabled]="guardando() || !formularioValido()"
+      (click)="crearOrden()"
+    >
+      <i class="pi pi-plus" aria-hidden="true"></i
+      ><span>{{
+        (guardando() ? 'mantenimiento.puente.creando' : 'mantenimiento.puente.crear') | transloco
+      }}</span>
+    </button>
+  </div>
+</p-dialog>

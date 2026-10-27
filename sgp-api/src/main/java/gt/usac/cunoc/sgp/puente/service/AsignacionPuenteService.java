@@ -3,6 +3,8 @@ package gt.usac.cunoc.sgp.puente.service;
 import gt.usac.cunoc.sgp.common.audit.AuditService;
 import gt.usac.cunoc.sgp.common.exception.ApiException;
 import gt.usac.cunoc.sgp.curso.repository.CursoEstudianteRepository;
+import gt.usac.cunoc.sgp.inspeccion.entity.Inspeccion;
+import gt.usac.cunoc.sgp.inspeccion.repository.InspeccionRepository;
 import gt.usac.cunoc.sgp.puente.dto.AsignacionPuenteResponse;
 import gt.usac.cunoc.sgp.puente.dto.AsignarPuenteRequest;
 import gt.usac.cunoc.sgp.puente.dto.EstudianteAsignableResponse;
@@ -18,9 +20,12 @@ import gt.usac.cunoc.sgp.usuario.model.RoleName;
 import gt.usac.cunoc.sgp.usuario.repository.UserAccountRepository;
 import java.time.Clock;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
@@ -30,10 +35,13 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(readOnly = true)
 public class AsignacionPuenteService {
 
+  private static final ZoneId ZONA_GUATEMALA = ZoneId.of("America/Guatemala");
+
   private final UserAccountRepository usuarios;
   private final CursoEstudianteRepository inscripciones;
   private final PuenteRepository puentes;
   private final AsignacionPuenteRepository asignaciones;
+  private final InspeccionRepository inspecciones;
   private final AuditService auditoria;
   private final Clock clock;
 
@@ -44,10 +52,23 @@ public class AsignacionPuenteService {
       AsignacionPuenteRepository asignaciones,
       AuditService auditoria,
       Clock clock) {
+    this(usuarios, inscripciones, puentes, asignaciones, null, auditoria, clock);
+  }
+
+  @Autowired
+  public AsignacionPuenteService(
+      UserAccountRepository usuarios,
+      CursoEstudianteRepository inscripciones,
+      PuenteRepository puentes,
+      AsignacionPuenteRepository asignaciones,
+      InspeccionRepository inspecciones,
+      AuditService auditoria,
+      Clock clock) {
     this.usuarios = usuarios;
     this.inscripciones = inscripciones;
     this.puentes = puentes;
     this.asignaciones = asignaciones;
+    this.inspecciones = inspecciones;
     this.auditoria = auditoria;
     this.clock = clock;
   }
@@ -174,7 +195,8 @@ public class AsignacionPuenteService {
   @PreAuthorize("hasRole('ESTUDIANTE')")
   public List<AsignacionPuenteResponse> listarMisPuentes(String emailEstudiante) {
     UserAccount estudiante = buscarEstudianteActivo(emailEstudiante);
-    return asignaciones.findActivasByEstudianteId(estudiante.getId()).stream()
+    LocalDate hoy = LocalDate.now(clock.withZone(ZONA_GUATEMALA));
+    return asignaciones.findVigentesByEstudianteId(estudiante.getId(), hoy).stream()
         .map(this::respuesta)
         .toList();
   }
@@ -245,6 +267,13 @@ public class AsignacionPuenteService {
 
   private AsignacionPuenteResponse respuesta(
       AsignacionPuenteRepository.AsignacionPuenteProjection asignacion) {
+    Inspeccion inspeccion =
+        inspecciones == null
+            ? null
+            : inspecciones
+                .findTopByAsignacionPuenteIdAndEliminadoEnIsNullOrderByCreadoEnDesc(
+                    asignacion.getId())
+                .orElse(null);
     return new AsignacionPuenteResponse(
         asignacion.getId(),
         asignacion.getCursoEstudianteId(),
@@ -254,6 +283,8 @@ public class AsignacionPuenteService {
         asignacion.getPuenteId(),
         asignacion.getPuenteCodigo(),
         asignacion.getPuenteNombre(),
-        asignacion.getAsignadoEn());
+        asignacion.getAsignadoEn(),
+        inspeccion != null ? inspeccion.getId() : null,
+        inspeccion != null ? inspeccion.getEstado() : null);
   }
 }

@@ -31,7 +31,6 @@ export class FormularioApiService {
     return this.http.get<FormularioActivo>('/api/v1/formularios/activo');
   }
 
-  /** Esquema de una versión ya publicada, para mostrar inspecciones hechas con versiones anteriores. */
   obtenerEsquemaPublicado(id: string): Observable<FormularioActivo> {
     return this.http.get<FormularioActivo>(`/api/v1/formularios/${encodeURIComponent(id)}/esquema`);
   }
@@ -53,20 +52,24 @@ export class FormularioApiService {
   actualizarBorrador(
     id: string,
     request: ActualizarBorradorRequest,
+    version: number,
   ): Observable<VersionFormulario> {
     return this.http.put<VersionFormulario>(
       `/api/v1/formularios/${encodeURIComponent(id)}`,
       request,
+      { headers: { 'If-Match': String(version) } },
     );
   }
 
   calibrarPesos(
     id: string,
     pesos: ConfiguracionIcElementoRequest[],
+    version: number,
   ): Observable<ConfiguracionIcElemento[]> {
     return this.http.put<ConfiguracionIcElemento[]>(
       `/api/v1/formularios/${encodeURIComponent(id)}/pesos`,
       pesos,
+      { headers: { 'If-Match': String(version) } },
     );
   }
 
@@ -87,6 +90,25 @@ export class FormularioApiService {
     return this.http.post<VersionFormulario>(
       `/api/v1/formularios/${encodeURIComponent(id)}/publicar`,
       request ?? {},
+    );
+  }
+
+  configurarEscala(
+    id: string,
+    request: {
+      valores: {
+        NO_PRESENTA: number;
+        LEVE: number;
+        MODERADO: number;
+        SEVERO: number;
+      };
+    },
+    version: number,
+  ): Observable<VersionFormulario> {
+    return this.http.put<VersionFormulario>(
+      `/api/v1/formularios/${encodeURIComponent(id)}/escala`,
+      request,
+      { headers: { 'If-Match': String(version) } },
     );
   }
 }

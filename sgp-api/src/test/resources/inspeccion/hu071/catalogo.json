@@ -1,0 +1,47 @@
+{
+  "formulario": "sieca-v1",
+  "elementos": [
+    {
+      "elemento_ref": "/vigas",
+      "repetible": false,
+      "portante": true,
+      "indicadores": [
+        "dano"
+      ]
+    },
+    {
+      "elemento_ref": "/losa",
+      "repetible": false,
+      "portante": true,
+      "indicadores": [
+        "dano"
+      ]
+    }
+  ],
+  "reglas_evaluacion_ic": {
+    "version_algoritmo": "ic-hu071-prueba-v1",
+    "escala_severidad": {
+      "NO_PRESENTA": 0,
+      "LEVE": 1,
+      "MODERADO": 2,
+      "SEVERO": 4
+    },
+    "agregacion": {
+      "indicadores_de_un_elemento": "MAXIMO",
+      "instancias_repetibles": "MAXIMO",
+      "elementos_ausentes_no_portantes": 4,
+      "elementos_ausentes_portantes": 4
+    },
+    "rangos_estado": {
+      "BUENO": 75,
+      "REGULAR": 50,
+      "MALO": 0
+    },
+    "conversion_indicadores": {
+      "booleanos": {},
+      "enumerados": {},
+      "numericos": {}
+    },
+    "reglas_anulacion": []
+  }
+}

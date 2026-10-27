@@ -23,6 +23,7 @@ import gt.usac.cunoc.sgp.common.audit.service.AuditoriaWriter;
 import gt.usac.cunoc.sgp.common.exception.ApiException;
 import gt.usac.cunoc.sgp.common.security.JwtData;
 import gt.usac.cunoc.sgp.common.security.JwtService;
+import gt.usac.cunoc.sgp.mantenimiento.service.PlanMantenimientoService;
 import gt.usac.cunoc.sgp.puente.dto.CrearPuenteRequest;
 import gt.usac.cunoc.sgp.puente.entity.Puente;
 import gt.usac.cunoc.sgp.puente.mapper.PuenteMapperImpl;
@@ -86,6 +87,7 @@ import org.testcontainers.utility.DockerImageName;
     })
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @Import({
+  gt.usac.cunoc.sgp.usuario.service.PerfilUsuarioService.class,
   PuenteService.class,
   PuenteMapperImpl.class,
   CatalogoTerritorialService.class,
@@ -103,6 +105,8 @@ import org.testcontainers.utility.DockerImageName;
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 @Testcontainers
 class AuditoriaRegistroIntegrationTest {
+
+  @MockBean private PlanMantenimientoService planesMantenimiento;
 
   private static final UUID ADMINISTRADOR_ID =
       UUID.fromString("019a0000-0000-7000-8000-000000000006");
@@ -392,7 +396,9 @@ class AuditoriaRegistroIntegrationTest {
     when(otpService.issue(any(UserAccount.class), eq(OtpPurpose.REGISTRO))).thenReturn(desafio);
 
     // Cuando se registra con correo y contraseña
-    authService.register(new RegisterRequest("nuevo.hu006@ejemplo.com", "Auditoria2026"));
+    authService.register(
+        new RegisterRequest(
+            "nuevo.hu006@ejemplo.com", "Auditoria2026", "Nuevo Usuario", "nuevo.hu006"));
 
     // Entonces el actor y la entidad son el usuario creado y no se guarda el hash
     var auditoria = auditoriaRepository.findAll().get(0);

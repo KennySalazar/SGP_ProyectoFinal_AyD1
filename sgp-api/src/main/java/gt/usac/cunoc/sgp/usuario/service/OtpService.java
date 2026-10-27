@@ -90,7 +90,10 @@ public class OtpService {
 
   @Transactional(noRollbackFor = ApiException.class)
   public UserAccount verifyLatest(UserAccount user, OtpPurpose purpose, String code) {
-    OtpChallenge challenge = challenges.findLatestActiveForUpdate(user, purpose).orElse(null);
+    OtpChallenge challenge =
+        challenges
+            .findTopByUserAndPurposeAndConsumedAtIsNullOrderByCreatedAtDesc(user, purpose)
+            .orElse(null);
     if (challenge == null) throw invalidOtp();
     verifyCode(challenge, code);
     challenge.consume(clock.instant());

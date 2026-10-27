@@ -194,7 +194,7 @@
             [pt]="{ tableContainer: { style: { overflow: 'visible' } } }"
             [value]="resultado.content"
             dataKey="id"
-            [tableStyle]="{ 'min-width': '44rem', width: '100%', 'table-layout': 'fixed', 'border-collapse': 'collapse' }"
+            [tableStyle]="{ 'min-width': '52rem', width: '100%', 'table-layout': 'fixed', 'border-collapse': 'collapse' }"
           >
             <ng-template #header>
               <tr>
@@ -229,6 +229,23 @@
                     [value]="puente.activo ? puente.estadoActual : ('puentes.catalogo.inactiveStatus' | transloco)"
                     [severity]="puente.activo ? severidad(puente.estadoActual) : 'danger'"
                   />
+                  <dl class="condicion-catalogo">
+                    <div>
+                      <dt>{{ 'puentes.ficha.conditionIndex' | transloco }}</dt>
+                      <dd data-testid="catalogo-ic">
+                        {{ puente.indiceCondicionActual ?? ('puentes.ficha.notAvailable' |
+                        transloco) }}
+                      </dd>
+                      <app-respaldo-ic [puente]="puente" />
+                    </div>
+                    <div>
+                      <dt>{{ 'puentes.ficha.lastInspection' | transloco }}</dt>
+                      <dd data-testid="catalogo-fecha">
+                        {{ puente.fechaUltimaInspeccion ?? ('puentes.ficha.noInspections' |
+                        transloco) }}
+                      </dd>
+                    </div>
+                  </dl>
                 </td>
                 @if (auth.user()?.role === 'ADMINISTRADOR') {
                 <td class="col-acciones">

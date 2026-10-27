@@ -13,6 +13,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -32,7 +33,7 @@ public class TransicionInspeccionController {
     this.transiciones = transiciones;
   }
 
-  @PostMapping("/{id}/enviar")
+  @PostMapping({"/{id}/enviar", "/{id}/reenviar"})
   @PreAuthorize("hasRole('ESTUDIANTE')")
   @Operation(
       summary = "Enviar una inspección a revisión",
@@ -40,8 +41,14 @@ public class TransicionInspeccionController {
           "Solo el Estudiante autor, desde BORRADOR. Exige los campos obligatorios de su versión "
               + "y fotografías de accesos, superestructura, subestructura y cauce (422 con el "
               + "detalle de lo que falta). Una transición no permitida responde 409.")
-  public InspeccionResumenResponse enviar(@PathVariable UUID id, Authentication authentication) {
-    return transiciones.enviar(id, usuarioId(authentication));
+  public InspeccionResumenResponse enviar(
+      @PathVariable UUID id,
+      @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
+      Authentication authentication) {
+    UUID usuarioId = usuarioId(authentication);
+    return idempotencyKey == null || idempotencyKey.isBlank()
+        ? transiciones.enviar(id, usuarioId)
+        : transiciones.enviar(id, usuarioId, idempotencyKey);
   }
 
   @PostMapping("/{id}/publicar")

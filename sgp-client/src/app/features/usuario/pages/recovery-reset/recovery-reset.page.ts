@@ -4,6 +4,7 @@ import { ActivatedRoute, RouterLink } from '@angular/router';
 import { ButtonModule } from 'primeng/button';
 import { InputTextModule } from 'primeng/inputtext';
 import { AuthCardComponent } from '../../../../shared/components/auth-card/auth-card.component';
+import { ContrasenaVisibleComponent } from '../../../../shared/components/contrasena-visible/contrasena-visible.component';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { UsuarioApiService } from '../../services/usuario-api.service';
 
@@ -12,6 +13,7 @@ import { UsuarioApiService } from '../../services/usuario-api.service';
   standalone: true,
   imports: [
     ReactiveFormsModule,
+    ContrasenaVisibleComponent,
     RouterLink,
     AuthCardComponent,
     ButtonModule,

@@ -35,8 +35,9 @@
       </a>
     </div>
   </div>
-  } @else if (borrador(); as b) {
-  <!-- Encabezado de la página -->
+  } @else if (borrador(); as b) { @if (b.rolAutor === 'ESTUDIANTE') {
+  <app-resultado-revision [inspeccionId]="b.id" />
+  }
   <header class="page-heading encabezado-inspeccion">
     <div>
       <p class="page-kicker">{{ 'inspecciones.borrador.kicker' | transloco }}</p>
@@ -71,6 +72,7 @@
           type="date"
           [max]="hoy"
           [ngModel]="fechaInspeccion()"
+          [disabled]="soloLectura()"
           (ngModelChange)="onFechaInspeccionChange($event)"
           class="input-fecha"
         />
@@ -87,29 +89,14 @@
         <span>{{ 'inspecciones.borrador.volverPuente' | transloco }}</span>
       </a>
 
-      <button
-        pButton
-        type="button"
-        (click)="guardarBorrador()"
-        [disabled]="guardando()"
-        [loading]="guardando()"
-        class="btn-guardar"
-      >
-        <i class="pi pi-save" aria-hidden="true"></i>
-        <span
-          >{{ (guardando() ? 'inspecciones.borrador.guardando' : 'inspecciones.borrador.guardar' ) |
-          transloco }}</span
-        >
-      </button>
-
       @if (accionFinal(); as accion) {
       <button
         pButton
         type="button"
         severity="success"
         class="btn-accion-final"
-        [disabled]="cambiosSinGuardar() || colegiadoPendiente()"
-        [attr.title]="cambiosSinGuardar() ? ('inspecciones.transicion.guardaPrimero' | transloco) : null"
+        [disabled]="guardando() || !!errorGuardado() || requiereRevisionInicial() || operandoIc() || colegiadoPendiente() || fotografiasOcupadas()"
+        [attr.title]="esOffline() ? ('offline.hu061.queueHint' | transloco) : null"
         (click)="abrirConfirmacion()"
       >
         <i [class]="accion === 'publicar' ? 'pi pi-verified' : 'pi pi-send'" aria-hidden="true"></i>
@@ -118,18 +105,69 @@
       }
     </div>
   </header>
-
-  @if (colegiadoPendiente()) {
+  @if (valoresInicialesIncompatibles().length > 0) {
+  <section
+    class="alerta-autoguardado surface-card"
+    [attr.role]="requiereRevisionInicial() ? 'alert' : 'status'"
+  >
+    <i class="pi pi-exclamation-triangle" aria-hidden="true"></i>
+    <div>
+      <p>{{ 'inspecciones.borrador.valoresInicialesIncompatibles' | transloco }}</p>
+      <ul>
+        @for (valor of valoresInicialesIncompatibles(); track valor.ruta) {
+        <li><code>{{ valor.ruta }}</code>: <q>{{ valor.valorOriginal }}</q></li>
+        }
+      </ul>
+      @if (requiereRevisionInicial()) {
+      <button
+        pButton
+        type="button"
+        severity="secondary"
+        [outlined]="true"
+        (click)="confirmarRevisionInicial()"
+      >
+        {{ 'inspecciones.borrador.confirmarRevisionInicial' | transloco }}
+      </button>
+      } @else {
+      <p>{{ 'inspecciones.borrador.revisionInicialConfirmada' | transloco }}</p>
+      }
+    </div>
+  </section>
+  } @if (intencionFinal(); as intencion) { @if (intencion.estado === 'PENDIENTE') {
+  <div class="alerta-autoguardado surface-card" role="status">
+    <i class="pi pi-clock" aria-hidden="true"></i>
+    <span>{{ 'offline.hu061.pending' | transloco }}</span>
+    <a routerLink="/offline">{{ 'offline.queueTitle' | transloco }}</a>
+  </div>
+  } @else if (intencion.estado === 'RECHAZADA') {
+  <div class="estado-error surface-card" role="alert">
+    <p>{{ 'offline.hu061.rejected' | transloco }}</p>
+    <p>{{ intencion.error }}</p>
+  </div>
+  } } @if (soloLectura()) {
+  <div class="alerta-autoguardado surface-card" role="status">
+    <i class="pi pi-eye" aria-hidden="true"></i>
+    <span>{{ 'inspecciones.borrador.soloLectura' | transloco }}</span>
+  </div>
+  } @if (errorAccion() && !confirmandoAccion()) {
+  <div class="estado-mensaje estado-error surface-card" role="alert">
+    {{ errorAccion()?.mensaje }}
+  </div>
+  } @if (esAutor() && b.estado !== 'PUBLICADA' && b.estado !== 'RECHAZADA') {
+  <app-confirmacion-estado-ic
+    [inspeccionId]="b.id"
+    [revision]="revisionIc()"
+    [bloqueado]="soloLectura() || cambiosSinGuardar() || !!errorGuardado() || confirmandoAccion() || ejecutandoAccion()"
+    (ocupado)="operandoIc.set($event)"
+  />
+  } @if (colegiadoPendiente()) {
   <div class="alerta-autoguardado surface-card" role="status">
     <i class="pi pi-id-card" aria-hidden="true"></i>
     <span>{{ 'inspecciones.transicion.colegiadoPendiente' | transloco }}</span>
   </div>
   } @else if (accionFinal() && cambiosSinGuardar()) {
   <p class="nota-accion">{{ 'inspecciones.transicion.guardaPrimero' | transloco }}</p>
-  }
-
-  <!-- Avisos de resultado de guardado -->
-  @if (estadoAutoguardado(); as estado) {
+  } @if (estadoAutoguardado(); as estado) {
   <div
     class="surface-card"
     [class.alerta-exito]="estado === 'guardado'"
@@ -141,9 +179,9 @@
       aria-hidden="true"
     ></i>
     <span>
-      {{ (estado === 'guardando' ? 'inspecciones.borrador.autoguardando' : estado === 'guardado' ?
-      'inspecciones.borrador.guardadoExitoso' : 'inspecciones.borrador.cambiosPendientes') |
-      transloco }}
+      @if (estado === 'guardado' && mensajeExito()) { {{ mensajeExito() }} } @else { {{ (estado ===
+      'guardando' ? 'inspecciones.borrador.autoguardando' :
+      'inspecciones.borrador.cambiosPendientes') | transloco }} }
     </span>
   </div>
   } @if (errorGuardado(); as errGuardado) {
@@ -151,9 +189,12 @@
     <i class="pi pi-exclamation-triangle" aria-hidden="true"></i>
     <span>{{ errGuardado }}</span>
   </div>
+  } @if (errorAlmacenamiento(); as errEspacio) {
+  <div class="alerta-error surface-card" role="alert">
+    <i class="pi pi-database" aria-hidden="true"></i>
+    <span>{{ errEspacio }}</span>
+  </div>
   }
-
-  <!-- Panel de Avance y Condición Preliminar -->
   <div class="resumen-panel surface-card">
     <div class="avance-general">
       <div class="avance-cabecera">
@@ -169,9 +210,8 @@
       </div>
       <p-progressBar [value]="b.progreso.porcentajeTotal" [showValue]="false" />
     </div>
-
-    <!-- Índice de Condición Preliminar (cuando backend lo proporcione) -->
-    @if (b.icPreliminar; as ic) {
+    <app-aprobacion-calibracion [versionId]="b.versionFormularioId" />
+    @if (icVisible(); as ic) {
     <div class="ic-preliminar-card">
       <div class="ic-cabecera">
         <span class="ic-titulo"
@@ -188,10 +228,7 @@
       </div>
       <p class="ic-nota">{{ 'inspecciones.borrador.indicePreliminarNota' | transloco }}</p>
     </div>
-    }
-
-    <!-- Avance por las 8 secciones -->
-    @if (b.progreso.secciones && b.progreso.secciones.length > 0) {
+    } @if (b.progreso.secciones && b.progreso.secciones.length > 0) {
     <div class="secciones-progreso">
       <h4>{{ 'inspecciones.borrador.seccionesTitulo' | transloco }}</h4>
       <div class="secciones-grid">
@@ -221,18 +258,27 @@
     </div>
     }
   </div>
-
-  <!-- Formulario Dinámico -->
   @if (esquema(); as esq) {
   <div class="formulario-contenedor">
     <app-formulario-dinamico
       [esquema]="esq"
       [valoresIniciales]="valoresIniciales()"
+      [valoresOriginalesParaRevision]="datosIniciales()?.datos ?? null"
+      [soloLectura]="soloLectura()"
       (valorChange)="onValorChange($event)"
       (seccionCambiando)="onSeccionCambiando()"
     />
   </div>
   }
+
+  <app-reporte-fotografico
+    [inspeccion]="b"
+    [soloLectura]="soloLectura() || confirmandoAccion() || ejecutandoAccion()"
+  />
+  <app-documentos-inspeccion
+    [inspeccion]="b"
+    [soloLectura]="soloLectura() || confirmandoAccion() || ejecutandoAccion()"
+  />
 
   <p-dialog
     [header]="'inspecciones.transicion.' + (accionFinal() ?? 'publicar') + 'Titulo' | transloco"
@@ -244,7 +290,8 @@
     [resizable]="false"
   >
     <p class="dialogo-texto">
-      {{ 'inspecciones.transicion.' + (accionFinal() ?? 'publicar') + 'Texto' | transloco }}
+      {{ 'inspecciones.transicion.' + (accionFinal() ?? 'publicar') + 'Texto' | transloco }} @if
+      (esOffline()) { {{ 'offline.hu061.queueHint' | transloco }} }
     </p>
     <dl class="dialogo-datos">
       <div>
@@ -293,7 +340,7 @@
         pButton
         type="button"
         severity="success"
-        [disabled]="ejecutandoAccion()"
+        [disabled]="ejecutandoAccion() || requiereRevisionInicial()"
         (click)="confirmarAccion()"
       >
         <i

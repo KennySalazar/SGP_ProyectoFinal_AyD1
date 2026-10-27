@@ -1,3 +1,5 @@
+import { RespaldoIcComponent } from '../../components/respaldo-ic/respaldo-ic.component';
+import { SincronizacionService } from '../../../../offline/services/sincronizacion.service';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { Pipe, PipeTransform, signal } from '@angular/core';
@@ -29,11 +31,16 @@ describe('Base compartida del catálogo HU014', () => {
     vi.spyOn(MapaPuentesComponent.prototype, 'ngAfterViewInit').mockResolvedValue();
     TestBed.configureTestingModule({
       providers: [
+        { provide: SincronizacionService, useValue: { iniciar: () => undefined } },
         provideHttpClient(),
         provideHttpClientTesting(),
         provideRouter([]),
         { provide: TranslocoService, useValue: { translate: (key: string) => key } },
       ],
+    });
+    TestBed.overrideComponent(RespaldoIcComponent, {
+      remove: { imports: [TranslocoPipe] },
+      add: { imports: [TraduccionTestPipe] },
     });
     TestBed.overrideComponent(MapaPuentesComponent, { set: { template: '', imports: [] } });
     TestBed.overrideComponent(CatalogoPuentesPage, {
@@ -338,6 +345,36 @@ describe('Base compartida del catálogo HU014', () => {
     http.expectOne((req) => req.url === '/api/v1/puentes').flush({ content: [] });
   });
 
+  it('muestra IC cero, fecha y estado del servidor sin recalcularlo', () => {
+    const content = [0, 80].map((indiceCondicionActual, index) => ({
+      id: `hu033-${index}`,
+      codigo: `GT-${index}`,
+      nombre: `Puente ${index}`,
+      departamento: { id: 'd', codigoIne: '01', nombre: 'Guatemala' },
+      municipio: { id: 'm', departamentoId: 'd', codigoIne: '0114', nombre: 'Amatitlan' },
+      activo: true,
+      estadoActual: 'Malo',
+      indiceCondicionActual,
+      fechaUltimaInspeccion: '2026-10-16',
+    }));
+    http.expectOne((req) => req.url === '/api/v1/puentes').flush({ content, totalElements: 2 });
+    fixture.detectChanges();
+    const valores: NodeListOf<HTMLElement> = fixture.nativeElement.querySelectorAll(
+      '[data-testid="catalogo-ic"]',
+    );
+    expect(Array.from(valores, (el) => el.textContent?.trim())).toEqual(['0', '80']);
+    const fechas: NodeListOf<HTMLElement> = fixture.nativeElement.querySelectorAll(
+      '[data-testid="catalogo-fecha"]',
+    );
+    expect(Array.from(fechas, (el) => el.textContent?.trim())).toEqual([
+      '2026-10-16',
+      '2026-10-16',
+    ]);
+    expect(
+      fixture.nativeElement.querySelectorAll('.estado-puente[data-estado="Malo"]'),
+    ).toHaveLength(2);
+  });
+
   it('muestra datos públicos y cada estado con texto y severidad visual', () => {
     const estados: EstadoPuente[] = ['Bueno', 'Regular', 'Malo', 'Sin evaluar'];
     const severidades = ['success', 'warn', 'danger', 'secondary'];
@@ -593,6 +630,7 @@ describe('Baja lógica y reactivación de puentes por administrador', () => {
     TestBed.resetTestingModule();
     TestBed.configureTestingModule({
       providers: [
+        { provide: SincronizacionService, useValue: { iniciar: () => undefined } },
         provideHttpClient(),
         provideHttpClientTesting(),
         provideRouter([]),
@@ -606,6 +644,10 @@ describe('Baja lógica y reactivación de puentes por administrador', () => {
           },
         },
       ],
+    });
+    TestBed.overrideComponent(RespaldoIcComponent, {
+      remove: { imports: [TranslocoPipe] },
+      add: { imports: [TraduccionTestPipe] },
     });
     TestBed.overrideComponent(CatalogoPuentesPage, {
       remove: { imports: [TranslocoPipe] },

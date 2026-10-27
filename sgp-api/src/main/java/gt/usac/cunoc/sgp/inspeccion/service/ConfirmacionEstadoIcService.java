@@ -57,8 +57,19 @@ public class ConfirmacionEstadoIcService {
   @Transactional
   @PreAuthorize("isAuthenticated()")
   public ConfirmacionEstadoIcResponse consultar(UUID inspeccionId) {
-    UUID usuarioId = usuarioActual();
-    Inspeccion inspeccion = cargarYAutorizar(inspeccionId, usuarioId);
+    return consultarInterno(inspeccionId, usuarioActual(), null);
+  }
+
+  @Transactional
+  @PreAuthorize("hasRole('CATEDRATICO')")
+  public ConfirmacionEstadoIcResponse consultarRevision(UUID revisionId) {
+    UUID actor = usuarioActual();
+    return consultarInterno(inspeccionDeRevision(revisionId, actor), actor, revisionId);
+  }
+
+  private ConfirmacionEstadoIcResponse consultarInterno(
+      UUID inspeccionId, UUID usuarioId, UUID revisionId) {
+    Inspeccion inspeccion = cargarYAutorizar(inspeccionId, usuarioId, revisionId);
     ResultadoCalculoIc calculo = calcular(inspeccion);
     JsonNode guardada = cargarConfirmacion(inspeccionId);
     boolean vigente =
@@ -79,8 +90,20 @@ public class ConfirmacionEstadoIcService {
   @PreAuthorize("isAuthenticated()")
   public ConfirmacionEstadoIcResponse confirmar(
       UUID inspeccionId, ConfirmarEstadoIcRequest request) {
-    UUID usuarioId = usuarioActual();
-    Inspeccion inspeccion = cargarYAutorizar(inspeccionId, usuarioId);
+    return confirmarInterno(inspeccionId, usuarioActual(), null, request);
+  }
+
+  @Transactional
+  @PreAuthorize("hasRole('CATEDRATICO')")
+  public ConfirmacionEstadoIcResponse confirmarRevision(
+      UUID revisionId, ConfirmarEstadoIcRequest request) {
+    UUID actor = usuarioActual();
+    return confirmarInterno(inspeccionDeRevision(revisionId, actor), actor, revisionId, request);
+  }
+
+  private ConfirmacionEstadoIcResponse confirmarInterno(
+      UUID inspeccionId, UUID usuarioId, UUID revisionId, ConfirmarEstadoIcRequest request) {
+    Inspeccion inspeccion = cargarYAutorizar(inspeccionId, usuarioId, revisionId);
     if (request == null) {
       throw error(
           HttpStatus.UNPROCESSABLE_ENTITY,
@@ -160,7 +183,21 @@ public class ConfirmacionEstadoIcService {
         preparador.preparar(inspeccion.versionFormularioId(), inspeccion.datos()));
   }
 
-  private Inspeccion cargarYAutorizar(UUID id, UUID usuarioId) {
+  private UUID inspeccionDeRevision(UUID revisionId, UUID actor) {
+    var ids =
+        jdbc.query(
+            "select r.inspeccion_id from revision r join inspeccion i on i.id=r.inspeccion_id "
+                + "where r.id=? and r.revisor_id=? and i.eliminado_en is null",
+            (rs, n) -> rs.getObject(1, UUID.class),
+            revisionId,
+            actor);
+    if (ids.isEmpty())
+      throw error(
+          HttpStatus.NOT_FOUND, "revision_no_encontrada", "La revisión no está disponible.");
+    return ids.get(0);
+  }
+
+  private Inspeccion cargarYAutorizar(UUID id, UUID usuarioId, UUID revisionId) {
     if (id == null) {
       throw error(
           HttpStatus.UNPROCESSABLE_ENTITY,
@@ -185,11 +222,25 @@ public class ConfirmacionEstadoIcService {
       throw error(HttpStatus.NOT_FOUND, "inspeccion_no_encontrada", "No existe la inspeccion.");
     }
     Inspeccion inspeccion = encontrados.get(0);
-    if (!usuarioId.equals(inspeccion.autorId())) {
+    if (revisionId == null && !usuarioId.equals(inspeccion.autorId())) {
       throw error(
           HttpStatus.FORBIDDEN,
           "evaluador_no_responsable",
           "Solo el autor responsable puede confirmar o ajustar el estado.");
+    }
+    if (revisionId != null
+        && (!"EN_REVISION".equals(inspeccion.estado())
+            || !Boolean.TRUE.equals(
+                jdbc.queryForObject(
+                    "select exists(select 1 from revision where id=? and inspeccion_id=? and revisor_id=? and estado='EN_CURSO')",
+                    Boolean.class,
+                    revisionId,
+                    id,
+                    usuarioId)))) {
+      throw error(
+          HttpStatus.CONFLICT,
+          "revision_no_editable",
+          "La confirmación requiere el ciclo EN_CURSO de esta inspección EN_REVISION.");
     }
     if (inspeccion.eliminada()) {
       throw error(

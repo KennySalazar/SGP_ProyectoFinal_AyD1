@@ -1,0 +1,175 @@
+<section class="surface-card panel">
+  <h2>{{ 'formulario.adicional.titulo' | transloco }}</h2>
+  <p>{{ 'formulario.adicional.ayuda' | transloco }}</p>
+  @if (error()) {
+    <p role="alert" class="error">{{ error() }}</p>
+  }
+  @if (mensaje()) {
+    <p role="status">{{ mensaje() }}</p>
+  }
+  @if (!vistas().length) {
+    <p role="alert">{{ 'formulario.adicional.sinReglas' | transloco }}</p>
+  }
+  <form [formGroup]="form" (ngSubmit)="guardar()">
+    @for (vista of vistas(); track $index; let i = $index) {
+      <details class="regla" [open]="!!vista.regla['pendiente']">
+        <summary>
+          <span class="codigo">{{ vista.regla['id'] }}</span>
+          <strong>{{ vista.regla['descripcion'] }}</strong>
+          <span class="estado">{{
+            (vista.regla['pendiente']
+              ? 'formulario.adicional.revisionPendiente'
+              : 'formulario.adicional.configurada'
+            ) | transloco
+          }}</span>
+        </summary>
+        <fieldset [disabled]="version().estado === 'PUBLICADA' || bloqueado() || operando()">
+          <legend class="sr-only">{{ vista.regla['id'] }}</legend>
+          <p>{{ 'formulario.adicional.estadoMalo' | transloco }}</p>
+          @if (vista.regla['pendiente']; as pendiente) {
+            <p class="pendiente">{{ pendiente }}</p>
+          }
+          <div class="condiciones">
+            @for (campo of vista.campos; track $index; let j = $index) {
+              @if (campo.ruta[0] !== 'descripcion') {
+                <div class="condicion">
+                  <h3>{{ etiqueta(campo) }}</h3>
+                  <ul>
+                    @for (valor of valoresLegibles(campo, i, j); track $index) {
+                      <li>{{ valor }}</li>
+                    }
+                  </ul>
+                </div>
+              }
+            }
+          </div>
+          @if (version().estado === 'BORRADOR') {
+            <details class="edicion">
+              <summary>
+                {{ 'formulario.adicional.editarCondiciones' | transloco }}
+              </summary>
+              <p>{{ 'formulario.adicional.editarAyuda' | transloco }}</p>
+              @for (campo of vista.campos; track $index; let j = $index) {
+                <label>
+                  <span>{{ etiqueta(campo) }}</span>
+                  <textarea [formControlName]="clave(i, j)" [rows]="campo.lista ? 3 : 2"></textarea>
+                  @if (campo.lista) {
+                    <small>{{ 'formulario.adicional.unaLinea' | transloco }}</small>
+                  }
+                </label>
+              }
+            </details>
+          }
+          @if (vista.regla['pendiente'] !== null && vista.regla['pendiente'] !== undefined) {
+            <label class="confirmacion"
+              ><input
+                type="checkbox"
+                [checked]="!!confirmadas()[i]"
+                (change)="confirmar(i, $event)"
+              />
+              <span>{{ 'formulario.adicional.confirmar' | transloco }}</span>
+            </label>
+          }
+        </fieldset>
+      </details>
+    }
+    @if (version().estado === 'BORRADOR') {
+      <div class="acciones">
+        <button pButton type="submit" [disabled]="!puedeGuardar()">
+          {{ 'formulario.adicional.guardar' | transloco }}
+        </button>
+        <button
+          pButton
+          type="button"
+          severity="secondary"
+          [outlined]="true"
+          [disabled]="!cambio() || operando() || bloqueado()"
+          (click)="descartar()"
+        >
+          {{ 'formulario.adicional.descartar' | transloco }}
+        </button>
+      </div>
+    }
+  </form>
+</section>
+<section class="surface-card panel">
+  <h2>{{ 'formulario.adicional.actaTitulo' | transloco }}</h2>
+  <p>{{ 'formulario.adicional.actaAyuda' | transloco }}</p>
+  @if (errorActa()) {
+    <p role="alert" class="error">{{ errorActa() }}</p>
+    <button
+      pButton
+      type="button"
+      severity="secondary"
+      [disabled]="cargandoActa() || operando()"
+      (click)="consultarActa()"
+    >
+      {{ 'formulario.adicional.reintentar' | transloco }}
+    </button>
+  }
+  @if (cargandoActa()) {
+    <p role="status">{{ 'formulario.adicional.cargando' | transloco }}</p>
+  }
+  @if (acta(); as estadoActa) {
+    @if (estadoActa.acta; as documento) {
+      <p role="status">
+        {{ 'formulario.adicional.conActa' | transloco }}:
+        {{ documento.nombreOriginal }}
+      </p>
+      <dl>
+        <dt>{{ 'formulario.adicional.fecha' | transloco }} (Guatemala)</dt>
+        <dd>{{ fechaLegible(documento.subidoEn) }}</dd>
+        <dt>{{ 'formulario.adicional.usuario' | transloco }}</dt>
+        <dd>
+          @if (documento.subidoPorNombre?.trim(); as nombre) {
+            <p>{{ nombre }}</p>
+          }
+          @if (documento.subidoPorEmail?.trim(); as correo) {
+            <p>{{ correo }}</p>
+          }
+          @if (!documento.subidoPorNombre?.trim() && !documento.subidoPorEmail?.trim()) {
+            <p>
+              {{ 'formulario.adicional.responsableNoDisponible' | transloco }}
+            </p>
+          }
+          <details>
+            <summary>
+              {{ 'formulario.adicional.verRegistro' | transloco }}
+            </summary>
+            <code>{{ documento.subidoPorId }}</code>
+          </details>
+        </dd>
+      </dl>
+      <button pButton type="button" [disabled]="operando() || bloqueado()" (click)="descargar()">
+        {{ 'formulario.adicional.descargar' | transloco }}
+      </button>
+    } @else {
+      <p role="status">{{ 'formulario.adicional.sinActa' | transloco }}</p>
+    }
+  }
+  @if (version().estado === 'BORRADOR') {
+    <label class="selector-pdf"
+      ><span>{{ 'formulario.adicional.elegirPdf' | transloco }}</span>
+      <input
+        type="file"
+        accept="application/pdf,.pdf"
+        [disabled]="operando() || bloqueado() || cambio()"
+        (change)="seleccionar($event)"
+      />
+    </label>
+    @if (archivo(); as seleccionado) {
+      <p>{{ seleccionado.name }}</p>
+    }
+    <button
+      pButton
+      type="button"
+      [disabled]="!archivo() || operando() || bloqueado() || cambio()"
+      (click)="adjuntar()"
+    >
+      {{
+        (operando() ? 'formulario.adicional.procesando' : 'formulario.adicional.adjuntar')
+          | transloco
+      }}
+    </button>
+  }
+</section>

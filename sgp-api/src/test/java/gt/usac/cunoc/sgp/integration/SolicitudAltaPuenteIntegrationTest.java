@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import gt.usac.cunoc.sgp.common.exception.ApiException;
+import gt.usac.cunoc.sgp.mantenimiento.service.PlanMantenimientoService;
 import gt.usac.cunoc.sgp.notificacion.service.NotificacionService;
 import gt.usac.cunoc.sgp.puente.dto.AprobarSolicitudAltaPuenteRequest;
 import gt.usac.cunoc.sgp.puente.dto.CrearSolicitudAltaPuenteRequest;
@@ -30,6 +31,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpStatus;
@@ -102,6 +104,8 @@ class SolicitudAltaPuenteIntegrationTest {
   @Autowired private PuenteRepository puenteRepository;
 
   @Autowired private JdbcTemplate jdbc;
+
+  @MockBean private PlanMantenimientoService planesMantenimiento;
 
   private UUID departamentoId;
   private UUID municipioId;

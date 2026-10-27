@@ -53,12 +53,37 @@ public class HistorialEstadoInspeccion {
       String evento,
       String motivo,
       Instant creadoEn) {
+    this(
+        id,
+        inspeccionId,
+        secuencia,
+        estadoAnterior,
+        estadoNuevo,
+        realizadoPorId,
+        null,
+        evento,
+        motivo,
+        creadoEn);
+  }
+
+  public HistorialEstadoInspeccion(
+      UUID id,
+      UUID inspeccionId,
+      int secuencia,
+      String estadoAnterior,
+      String estadoNuevo,
+      UUID realizadoPorId,
+      UUID revisionId,
+      String evento,
+      String motivo,
+      Instant creadoEn) {
     this.id = id;
     this.inspeccionId = inspeccionId;
     this.secuencia = secuencia;
     this.estadoAnterior = estadoAnterior;
     this.estadoNuevo = estadoNuevo;
     this.realizadoPorId = realizadoPorId;
+    this.revisionId = revisionId;
     this.evento = evento;
     this.motivo = motivo;
     this.creadoEn = creadoEn;

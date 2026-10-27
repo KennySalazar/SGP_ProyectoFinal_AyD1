@@ -21,8 +21,8 @@ export const adminRoutes: Routes = [
       import('./pages/catalogo-cursos/catalogo-cursos.page').then((m) => m.CatalogoCursosPage),
   },
   {
-    path: 'formularios',
-    loadChildren: () => import('../formulario/formulario.routes').then((m) => m.formularioRoutes),
+    path: 'reglas-mantenimiento',
+    redirectTo: '/mantenimiento/reglas',
   },
   {
     path: '',

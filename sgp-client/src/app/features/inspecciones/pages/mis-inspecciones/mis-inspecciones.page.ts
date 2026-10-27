@@ -23,12 +23,20 @@ import { EstadoInspeccion, InspeccionResumenResponse } from '../../models/inspec
 import { InspeccionApiService } from '../../services/inspeccion-api.service';
 import { ApiErrorService } from '../../../../core/services/api-error.service';
 import { AuthStore } from '../../../../core/services/auth.store';
+import {
+  InspeccionesLocalesService,
+  BorradorLocalPayload,
+} from '../../../../offline/services/inspecciones-locales.service';
+import { ConnectivityService } from '../../../../offline/services/connectivity.service';
+
+import { ConfirmacionEstadoIcComponent } from '../../components/confirmacion-estado-ic/confirmacion-estado-ic.component';
 
 @Component({
   selector: 'app-mis-inspecciones-page',
   standalone: true,
   imports: [
     FormsModule,
+    ConfirmacionEstadoIcComponent,
     TranslocoPipe,
     ButtonModule,
     DialogModule,
@@ -47,10 +55,14 @@ export class MisInspeccionesPage {
   readonly auth = inject(AuthStore);
   private readonly inspeccionesApi = inject(InspeccionApiService);
   private readonly puentesApi = inject(PuenteApiService);
+  private readonly inspeccionesLocales = inject(InspeccionesLocalesService);
+  private readonly connectivity = inject(ConnectivityService);
   private readonly router = inject(Router);
   private readonly destroyRef = inject(DestroyRef);
   private readonly apiErrors = inject(ApiErrorService);
 
+  readonly inspeccionIc = signal<InspeccionResumenResponse | null>(null);
+  readonly operandoIc = signal(false);
   readonly pagina = signal<PaginaResponse<InspeccionResumenResponse> | null>(null);
   readonly cargando = signal(false);
   readonly error = signal<string | null>(null);
@@ -73,6 +85,7 @@ export class MisInspeccionesPage {
   readonly estados: { label: string; value: EstadoInspeccion | null }[] = [
     { label: 'Todas', value: null },
     { label: 'Borrador', value: 'BORRADOR' },
+    { label: 'Pendiente de sincronizar', value: 'PENDIENTE_SYNC' as unknown as EstadoInspeccion },
     { label: 'Enviada', value: 'ENVIADA' },
     { label: 'En revisión', value: 'EN_REVISION' },
     { label: 'Cambios solicitados', value: 'CAMBIOS_SOLICITADOS' },
@@ -96,16 +109,104 @@ export class MisInspeccionesPage {
     if (this.cargando()) return;
     this.cargando.set(true);
     this.error.set(null);
-    this.inspeccionesApi
-      .listarMisInspecciones(pagina, this.tamanio(), this.estadoFiltro() ?? undefined)
-      .pipe(
-        takeUntilDestroyed(this.destroyRef),
-        finalize(() => this.cargando.set(false)),
-      )
-      .subscribe({
-        next: (respuesta) => this.pagina.set(respuesta),
-        error: () => this.error.set('load'),
+
+    const autorId = this.auth.user()?.id || '';
+    const filtro = this.estadoFiltro();
+
+    // Obtener las inspecciones locales pendientes de sincronizar
+    this.inspeccionesLocales.listarPorUsuario(autorId).then((inspeccionesLocales) => {
+      const localesResumen: InspeccionResumenResponse[] = inspeccionesLocales.map((loc) => {
+        const raw = (loc.payload || {}) as BorradorLocalPayload & Record<string, unknown>;
+        const payload = (raw.borrador ? raw : { borrador: raw }) as BorradorLocalPayload;
+        const b = payload.borrador;
+        return {
+          id: loc.id,
+          puenteId: loc.puenteId,
+          codigoPuente: b?.codigoPuente || 'LOCAL',
+          nombrePuente: b?.nombrePuente || 'Puente sin sincronizar',
+          departamentoNombre: '',
+          municipioNombre: null,
+          versionFormularioId: b?.versionFormularioId || payload.versionFormularioId || '',
+          codigoVersionFormulario: b?.codigoVersionFormulario || payload.versionFormularioId || '',
+          fechaInspeccion: b?.fechaInspeccion || loc.actualizadoEn?.slice(0, 10) || '',
+          estado: loc.sincronizado
+            ? ((b?.estado as EstadoInspeccion | undefined) ?? (loc.estado as EstadoInspeccion))
+            : 'PENDIENTE_SYNC',
+          tipo: 'INICIAL',
+          autorId: loc.propietarioId || autorId,
+          rolAutorCreacion: b?.rolAutor || 'PROFESIONAL_EXTERNO',
+          nombreAutorCapturado: b?.nombreAutor || 'Inspector',
+          superadaPorId: null,
+          motivoCorreccion: null,
+          porcentajeAvance: b?.progreso?.porcentajeTotal ?? 0,
+          creadoEn: b?.creadoEn || loc.actualizadoEn,
+        };
       });
+
+      if (!this.connectivity.online()) {
+        this.cargando.set(false);
+        const filtradas =
+          filtro === null || filtro === undefined
+            ? localesResumen
+            : localesResumen.filter((i) => i.estado === filtro);
+        this.pagina.set({
+          content: filtradas,
+          totalElements: filtradas.length,
+          totalPages: 1,
+          number: 0,
+          size: this.tamanio(),
+          first: true,
+          last: true,
+          empty: filtradas.length === 0,
+        });
+        return;
+      }
+
+      this.inspeccionesApi
+        .listarMisInspecciones(
+          pagina,
+          this.tamanio(),
+          (filtro as string) === 'PENDIENTE_SYNC' ? undefined : (filtro ?? undefined),
+        )
+        .pipe(
+          takeUntilDestroyed(this.destroyRef),
+          finalize(() => this.cargando.set(false)),
+        )
+        .subscribe({
+          next: (respuesta) => {
+            const porId = new Map(
+              respuesta.content.map((inspeccion) => [inspeccion.id, inspeccion]),
+            );
+            for (const local of localesResumen) porId.set(local.id, local);
+            let combinadas = [...porId.values()];
+            if (filtro) {
+              combinadas = combinadas.filter((i) => i.estado === filtro);
+            }
+            this.pagina.set({
+              ...respuesta,
+              content: combinadas,
+              totalElements: Math.max(respuesta.totalElements, combinadas.length),
+              empty: combinadas.length === 0,
+            });
+          },
+          error: () => {
+            if (localesResumen.length > 0) {
+              this.pagina.set({
+                content: localesResumen,
+                totalElements: localesResumen.length,
+                totalPages: 1,
+                number: 0,
+                size: this.tamanio(),
+                first: true,
+                last: true,
+                empty: false,
+              });
+            } else {
+              this.error.set('load');
+            }
+          },
+        });
+    });
   }
 
   cambiarEstado(estado: EstadoInspeccion | null): void {
@@ -123,6 +224,49 @@ export class MisInspeccionesPage {
     const busqueda = this.busquedaPuente().trim();
     if (!busqueda || this.buscandoPuentes()) return;
     this.buscandoPuentes.set(true);
+
+    if (!this.connectivity.online()) {
+      this.inspeccionesLocales.obtenerPuentesPreparados().then((puentesLocales) => {
+        this.buscandoPuentes.set(false);
+        const q = busqueda.toLowerCase();
+        const filtrados: PuenteCatalogoResponse[] = puentesLocales
+          .filter((p) => {
+            const codigo = (p.codigo || '').toLowerCase();
+            const payload = (p.payload || {}) as { nombre?: string };
+            const nombre = (payload.nombre || '').toLowerCase();
+            return codigo.includes(q) || nombre.includes(q);
+          })
+          .map((p) => {
+            const payload = (p.payload || {}) as {
+              nombre?: string;
+              departamento?: { id: string; codigoIne: string; nombre: string };
+              municipio?: { id: string; departamentoId: string; codigoIne: string; nombre: string };
+              latitud?: number;
+              longitud?: number;
+              activo?: boolean;
+            };
+            return {
+              id: p.origenId ?? p.id,
+              codigo: p.codigo || '',
+              nombre: payload.nombre || '',
+              departamento: payload.departamento || { id: '', codigoIne: '', nombre: '' },
+              municipio: payload.municipio || {
+                id: '',
+                departamentoId: '',
+                codigoIne: '',
+                nombre: '',
+              },
+              latitud: payload.latitud ?? null,
+              longitud: payload.longitud ?? null,
+              activo: payload.activo ?? true,
+              estadoActual: 'Sin evaluar',
+            };
+          });
+        this.resultadosPuente.set(filtrados);
+      });
+      return;
+    }
+
     this.puentesApi
       .listarCatalogo({ busqueda, pagina: 0, tamanio: 20 })
       .pipe(
@@ -138,6 +282,38 @@ export class MisInspeccionesPage {
   seleccionarPuente(puente: PuenteCatalogoResponse): void {
     if (this.cargandoPuente()) return;
     this.cargandoPuente.set(true);
+
+    if (!this.connectivity.online()) {
+      this.inspeccionesLocales.obtenerPuentesPreparados().then((puentes) => {
+        this.cargandoPuente.set(false);
+        const encontrado = puentes.find((p) => (p.origenId ?? p.id) === puente.id);
+        if (encontrado) {
+          const payload = (encontrado.payload || {}) as unknown as PuenteResponse;
+          this.puenteSeleccionado.set({
+            id: encontrado.origenId ?? encontrado.id,
+            codigo: encontrado.codigo || puente.codigo,
+            nombre: payload.nombre || puente.nombre,
+            departamento: payload.departamento || puente.departamento,
+            municipio: payload.municipio || puente.municipio,
+            ruta: payload.ruta || '',
+            kilometraje: payload.kilometraje ?? null,
+            latitud: payload.latitud ?? puente.latitud ?? 0,
+            longitud: payload.longitud ?? puente.longitud ?? 0,
+            utm: payload.utm || { zona: 15, hemisferio: 'Norte', epsg: 32615, este: 0, norte: 0 },
+            activo: payload.activo ?? true,
+            estadoActual: payload.estadoActual || 'Sin evaluar',
+            indiceCondicionActual: payload.indiceCondicionActual ?? null,
+            fechaUltimaInspeccion: payload.fechaUltimaInspeccion ?? null,
+            creadoEn: payload.creadoEn || new Date().toISOString(),
+          });
+          this.mostrarInicio.set(true);
+        } else {
+          this.error.set('bridge');
+        }
+      });
+      return;
+    }
+
     this.puentesApi
       .obtenerPorId(puente.id)
       .pipe(
@@ -147,6 +323,12 @@ export class MisInspeccionesPage {
       .subscribe({
         next: (respuesta) => {
           this.puenteSeleccionado.set(respuesta);
+          void this.inspeccionesLocales.guardarPuenteLocal({
+            id: respuesta.id,
+            codigo: respuesta.codigo,
+            actualizadoEn: respuesta.creadoEn,
+            payload: respuesta,
+          });
           this.mostrarInicio.set(true);
         },
         error: () => this.error.set('bridge'),
@@ -167,6 +349,23 @@ export class MisInspeccionesPage {
     if (!inspeccion || this.eliminando()) return;
     this.eliminando.set(true);
     this.errorEliminar.set(null);
+
+    // Si es un borrador que solo existe localmente (PENDIENTE_SYNC)
+    if ((inspeccion.estado as string) === 'PENDIENTE_SYNC' || !this.connectivity.online()) {
+      this.inspeccionesLocales
+        .eliminarInspeccionLocal(inspeccion.id)
+        .then(() => {
+          this.eliminando.set(false);
+          this.inspeccionEliminar.set(null);
+          this.cargar(this.pagina()?.number ?? 0);
+        })
+        .catch(() => {
+          this.eliminando.set(false);
+          this.errorEliminar.set('delete');
+        });
+      return;
+    }
+
     this.inspeccionesApi
       .eliminarBorrador(inspeccion.id)
       .pipe(
@@ -182,7 +381,6 @@ export class MisInspeccionesPage {
       });
   }
 
-  /** Solo una inspección publicada y vigente admite corrección (HU-027). */
   puedeCorregir(inspeccion: InspeccionResumenResponse): boolean {
     return inspeccion.estado === 'PUBLICADA' && !inspeccion.superadaPorId;
   }
@@ -216,7 +414,6 @@ export class MisInspeccionesPage {
           void this.router.navigate(['/inspecciones', correccion.id, 'borrador']);
         },
         error: (err: HttpErrorResponse) => {
-          // El error se muestra dentro del diálogo; se evita duplicarlo en el aviso global.
           this.apiErrors.clear();
           const problema = err.error as { detail?: string } | null;
           this.errorCorreccion.set(
@@ -232,7 +429,7 @@ export class MisInspeccionesPage {
 
   severidad(estado: EstadoInspeccion): 'success' | 'warn' | 'danger' | 'info' | 'secondary' {
     if (estado === 'PUBLICADA') return 'success';
-    if (estado === 'BORRADOR') return 'secondary';
+    if (estado === 'BORRADOR' || (estado as string) === 'PENDIENTE_SYNC') return 'secondary';
     if (estado === 'RECHAZADA') return 'danger';
     if (estado === 'CAMBIOS_SOLICITADOS') return 'warn';
     return 'info';

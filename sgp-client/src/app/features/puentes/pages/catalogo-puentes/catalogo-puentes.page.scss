@@ -145,7 +145,7 @@ h2 {
   width: 17%;
 }
 .col-estado {
-  width: 12%;
+  width: 24%;
 }
 .col-acciones {
   width: 20%;
@@ -391,4 +391,23 @@ h2 {
   display: flex;
   justify-content: flex-end;
   gap: 0.75rem;
+}
+
+.condicion-catalogo {
+  margin: 0.65rem 0 0;
+  display: grid;
+  gap: 0.5rem;
+  font-size: 0.8rem;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+
+  dt {
+    color: var(--sgp-steel-700);
+    font-weight: 600;
+  }
+
+  dd {
+    margin: 0.15rem 0 0;
+    color: var(--sgp-navy-900);
+  }
 }

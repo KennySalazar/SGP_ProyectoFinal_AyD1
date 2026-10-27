@@ -42,7 +42,7 @@
     </div>
     <div class="readonly-item">
       <dt>{{ 'puentes.conditionIndex' | transloco }}</dt>
-      <dd>{{ puente()?.indiceCondicionActual ?? '—' }}</dd>
+      <dd>{{ puente()?.indiceCondicionActual ?? '—' }}<app-respaldo-ic [puente]="puente()" /></dd>
     </div>
     <div class="readonly-item">
       <dt>{{ 'puentes.lastInspection' | transloco }}</dt>
@@ -94,4 +94,34 @@
   </section>
   }
 </app-puente-form>
+
+<p-dialog
+  [visible]="mostrarConfirmacionEdicion()"
+  (visibleChange)="!$event && cancelarEdicion()"
+  [modal]="true"
+  appendTo="body"
+  [header]="'puentes.editConfirmation.title' | transloco"
+  [style]="{ width: '92vw', maxWidth: '32rem' }"
+  [draggable]="false"
+  [resizable]="false"
+>
+  <p>{{ 'puentes.editConfirmation.message' | transloco: { nombre: puente()?.nombre } }}</p>
+  <p>{{ 'puentes.editConfirmation.note' | transloco }}</p>
+  <ng-template #footer>
+    <button
+      pButton
+      type="button"
+      severity="secondary"
+      [outlined]="true"
+      (click)="cancelarEdicion()"
+    >
+      {{ 'puentes.editConfirmation.cancel' | transloco }}
+    </button>
+    <button pButton type="button" (click)="confirmarEdicion()">
+      <i class="pi pi-check" aria-hidden="true"></i>
+      {{ 'puentes.editConfirmation.confirm' | transloco }}
+    </button>
+  </ng-template>
+</p-dialog>
+
 }

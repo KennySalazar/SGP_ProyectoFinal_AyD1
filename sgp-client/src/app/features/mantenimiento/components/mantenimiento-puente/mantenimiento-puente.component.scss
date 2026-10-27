@@ -1,0 +1,132 @@
+:host {
+  display: block;
+}
+.cabecera {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding-bottom: 0.75rem;
+  margin-bottom: 0.75rem;
+  border-bottom: 1px solid var(--sgp-border);
+}
+.seccion-titulo {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin: 0;
+  color: var(--sgp-navy-900);
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+.contador {
+  min-width: 1.6rem;
+  padding: 0.1rem 0.45rem;
+  margin-left: 0.4rem;
+  color: var(--sgp-navy-900);
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-align: center;
+  background: var(--sgp-surface-soft);
+  border: 1px solid var(--sgp-border);
+  border-radius: 999px;
+}
+.orden {
+  display: grid;
+  gap: 0.4rem;
+  padding: 1rem 0;
+  border-bottom: 1px solid var(--sgp-border);
+}
+.orden a {
+  justify-self: start;
+}
+.orden-titulo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+.orden h3 {
+  margin: 0;
+  color: var(--sgp-navy-900);
+  font-size: 1rem;
+}
+.orden p {
+  margin: 0;
+  color: var(--sgp-steel-700);
+  font-size: 0.9rem;
+}
+.estado-lista {
+  display: grid;
+  justify-items: center;
+  gap: 0.6rem;
+  padding: 1.5rem 1rem;
+  color: var(--sgp-steel-700);
+  text-align: center;
+}
+.estado-lista p {
+  margin: 0;
+}
+.confirmacion {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  padding: 0.7rem 0.9rem;
+  margin: 0 0 0.75rem;
+  color: #166534;
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-radius: 10px;
+}
+.formulario {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.9rem;
+  margin-top: 1rem;
+}
+.formulario label,
+.formulario .campo {
+  display: grid;
+  gap: 0.35rem;
+  color: var(--sgp-navy-900);
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+.formulario .ancho {
+  grid-column: 1 / -1;
+}
+.formulario textarea {
+  width: 100%;
+  resize: vertical;
+  font-weight: 400;
+}
+.error-campo {
+  color: #b91c1c;
+  font-weight: 600;
+}
+.error-dialogo {
+  padding: 0.8rem 1rem;
+  margin: 1rem 0 0;
+  color: #991b1b;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 10px;
+}
+.dialog-acciones {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  margin-top: 1.25rem;
+}
+@media (max-width: 700px) {
+  .formulario {
+    grid-template-columns: 1fr;
+  }
+  .orden a,
+  .cabecera button {
+    justify-self: stretch;
+    justify-content: center;
+    width: 100%;
+  }
+}

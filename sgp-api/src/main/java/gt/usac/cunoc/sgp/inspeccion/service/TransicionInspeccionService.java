@@ -13,20 +13,31 @@ import gt.usac.cunoc.sgp.inspeccion.entity.Inspeccion;
 import gt.usac.cunoc.sgp.inspeccion.mapper.InspeccionMapper;
 import gt.usac.cunoc.sgp.inspeccion.model.EstadoInspeccion;
 import gt.usac.cunoc.sgp.inspeccion.model.EventoInspeccion;
+import gt.usac.cunoc.sgp.inspeccion.model.InspeccionPublicadaEvent;
 import gt.usac.cunoc.sgp.inspeccion.repository.HistorialEstadoInspeccionRepository;
 import gt.usac.cunoc.sgp.inspeccion.repository.InspeccionRepository;
 import gt.usac.cunoc.sgp.puente.repository.PuenteRepository;
+import gt.usac.cunoc.sgp.revision.entity.Revision;
+import gt.usac.cunoc.sgp.revision.service.CicloRevisionService;
+import gt.usac.cunoc.sgp.sync.model.SolicitudOperacion;
+import gt.usac.cunoc.sgp.sync.service.OperacionIdempotenteService;
 import gt.usac.cunoc.sgp.usuario.entity.UsuarioProfesional;
 import gt.usac.cunoc.sgp.usuario.model.RoleName;
 import gt.usac.cunoc.sgp.usuario.repository.UsuarioProfesionalRepository;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.HashSet;
+import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
@@ -40,10 +51,6 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class TransicionInspeccionService {
 
-  /** Evidencia fotográfica mínima para enviar o publicar (RN-INS-06). */
-  static final List<String> CATEGORIAS_FOTO_OBLIGATORIAS =
-      List.of("ACCESO", "SUPERESTRUCTURA", "SUBESTRUCTURA", "CAUCE");
-
   /** Roles cuyas inspecciones se publican sin revisión previa (RN-REV-02). */
   private static final Set<String> ROLES_PUBLICACION_DIRECTA =
       Set.of(RoleName.CATEDRATICO.name(), RoleName.PROFESIONAL_EXTERNO.name());
@@ -53,11 +60,15 @@ public class TransicionInspeccionService {
   private final PuenteRepository puentes;
   private final UsuarioProfesionalRepository profesionales;
   private final JsonSchemaValidatorService validadorEsquema;
+  private final ReglasEvidenciaFotografica reglasEvidencia;
   private final PublicacionIndiceCondicionService publicacionIc;
   private final AuditoriaWriter auditoria;
   private final InspeccionMapper mapper;
   private final ObjectMapper json;
   private final Clock clock;
+  private CicloRevisionService ciclosRevision;
+  private OperacionIdempotenteService operaciones;
+  private ApplicationEventPublisher eventos;
 
   public TransicionInspeccionService(
       InspeccionRepository inspecciones,
@@ -65,6 +76,7 @@ public class TransicionInspeccionService {
       PuenteRepository puentes,
       UsuarioProfesionalRepository profesionales,
       JsonSchemaValidatorService validadorEsquema,
+      ReglasEvidenciaFotografica reglasEvidencia,
       PublicacionIndiceCondicionService publicacionIc,
       AuditoriaWriter auditoria,
       InspeccionMapper mapper,
@@ -75,6 +87,7 @@ public class TransicionInspeccionService {
     this.puentes = puentes;
     this.profesionales = profesionales;
     this.validadorEsquema = validadorEsquema;
+    this.reglasEvidencia = reglasEvidencia;
     this.publicacionIc = publicacionIc;
     this.auditoria = auditoria;
     this.mapper = mapper;
@@ -82,9 +95,55 @@ public class TransicionInspeccionService {
     this.clock = clock;
   }
 
+  @Autowired(required = false)
+  void setCiclosRevision(CicloRevisionService ciclosRevision) {
+    this.ciclosRevision = ciclosRevision;
+  }
+
+  @Autowired(required = false)
+  void setOperaciones(OperacionIdempotenteService operaciones) {
+    this.operaciones = operaciones;
+  }
+
+  /**
+   * Publicador de eventos internos (HU-046). Opcional, como las demás dependencias añadidas después
+   * del constructor: sin él la publicación funciona igual, sin avisar al mantenimiento.
+   */
+  @Autowired(required = false)
+  void setEventos(ApplicationEventPublisher eventos) {
+    this.eventos = eventos;
+  }
+
   /** El Estudiante envía su inspección completa a revisión (RN-INS-06, RN-REV-01). */
   @Transactional
   public InspeccionResumenResponse enviar(UUID inspeccionId, UUID usuarioId) {
+    return enviarInterno(inspeccionId, usuarioId);
+  }
+
+  @Transactional
+  public InspeccionResumenResponse enviar(
+      UUID inspeccionId, UUID usuarioId, String idempotencyKey) {
+    if (idempotencyKey == null || idempotencyKey.isBlank() || operaciones == null) {
+      return enviarInterno(inspeccionId, usuarioId);
+    }
+    SolicitudOperacion solicitud =
+        new SolicitudOperacion(
+            usuarioId,
+            idempotencyKey,
+            "POST",
+            "/api/v1/inspecciones/" + inspeccionId + "/enviar",
+            hash(inspeccionId.toString()),
+            "revision",
+            inspeccionId);
+    return operaciones.ejecutar(
+        solicitud,
+        InspeccionResumenResponse.class,
+        200,
+        () -> enviarInterno(inspeccionId, usuarioId),
+        InspeccionResumenResponse::id);
+  }
+
+  private InspeccionResumenResponse enviarInterno(UUID inspeccionId, UUID usuarioId) {
     Inspeccion inspeccion = bloquear(inspeccionId);
     exigirAutor(inspeccion, usuarioId);
     if (publicaSinRevision(inspeccion)) {
@@ -97,7 +156,13 @@ public class TransicionInspeccionService {
     MaquinaEstadosInspeccion.destino(inspeccion.estadoActual(), EventoInspeccion.ENVIAR);
     exigirCompleta(inspeccion);
 
-    aplicar(inspeccion, EventoInspeccion.ENVIAR, usuarioId, null);
+    Revision revision = ciclosRevision != null ? ciclosRevision.crearParaEnvio(inspeccion) : null;
+    aplicar(
+        inspeccion,
+        EventoInspeccion.ENVIAR,
+        usuarioId,
+        null,
+        revision != null ? revision.getId() : null);
     return mapper.toResumenResponse(inspecciones.saveAndFlush(inspeccion));
   }
 
@@ -131,9 +196,16 @@ public class TransicionInspeccionService {
   @Transactional
   @PreAuthorize("hasRole('CATEDRATICO')")
   public InspeccionResumenResponse iniciarRevision(UUID inspeccionId, UUID revisorId) {
+    return iniciarRevision(inspeccionId, revisorId, null);
+  }
+
+  @Transactional
+  @PreAuthorize("hasRole('CATEDRATICO')")
+  public InspeccionResumenResponse iniciarRevision(
+      UUID inspeccionId, UUID revisorId, UUID revisionId) {
     Inspeccion inspeccion = bloquear(inspeccionId);
     exigirRevisorDistintoDelAutor(inspeccion, revisorId);
-    aplicar(inspeccion, EventoInspeccion.INICIAR_REVISION, revisorId, null);
+    aplicar(inspeccion, EventoInspeccion.INICIAR_REVISION, revisorId, null, revisionId);
     return mapper.toResumenResponse(inspecciones.saveAndFlush(inspeccion));
   }
 
@@ -141,11 +213,18 @@ public class TransicionInspeccionService {
   @Transactional
   @PreAuthorize("hasRole('CATEDRATICO')")
   public InspeccionResumenResponse aprobar(UUID inspeccionId, UUID revisorId) {
+    return aprobar(inspeccionId, revisorId, null);
+  }
+
+  @Transactional
+  @PreAuthorize("hasRole('CATEDRATICO')")
+  public InspeccionResumenResponse aprobar(UUID inspeccionId, UUID revisorId, UUID revisionId) {
     Inspeccion inspeccion = bloquearParaPublicar(inspeccionId);
     exigirRevisorDistintoDelAutor(inspeccion, revisorId);
     MaquinaEstadosInspeccion.destino(inspeccion.estadoActual(), EventoInspeccion.APROBAR);
     exigirSinCorreccionPublicada(inspeccion);
-    aplicar(inspeccion, EventoInspeccion.APROBAR, revisorId, null);
+    exigirEvidenciaCompleta(inspeccion, List.of());
+    aplicar(inspeccion, EventoInspeccion.APROBAR, revisorId, null, revisionId);
     return publicarConIndice(inspeccion, revisorId);
   }
 
@@ -153,26 +232,48 @@ public class TransicionInspeccionService {
   @PreAuthorize("hasRole('CATEDRATICO')")
   public InspeccionResumenResponse solicitarCambios(
       UUID inspeccionId, UUID revisorId, String motivo) {
-    return resolverConMotivo(inspeccionId, revisorId, motivo, EventoInspeccion.SOLICITAR_CAMBIOS);
+    return solicitarCambios(inspeccionId, revisorId, motivo, null);
+  }
+
+  @Transactional
+  @PreAuthorize("hasRole('CATEDRATICO')")
+  public InspeccionResumenResponse solicitarCambios(
+      UUID inspeccionId, UUID revisorId, String motivo, UUID revisionId) {
+    return resolverConMotivo(
+        inspeccionId, revisorId, motivo, EventoInspeccion.SOLICITAR_CAMBIOS, revisionId);
   }
 
   @Transactional
   @PreAuthorize("hasRole('CATEDRATICO')")
   public InspeccionResumenResponse rechazar(UUID inspeccionId, UUID revisorId, String motivo) {
-    return resolverConMotivo(inspeccionId, revisorId, motivo, EventoInspeccion.RECHAZAR);
+    return rechazar(inspeccionId, revisorId, motivo, null);
+  }
+
+  @Transactional
+  @PreAuthorize("hasRole('CATEDRATICO')")
+  public InspeccionResumenResponse rechazar(
+      UUID inspeccionId, UUID revisorId, String motivo, UUID revisionId) {
+    return resolverConMotivo(
+        inspeccionId, revisorId, motivo, EventoInspeccion.RECHAZAR, revisionId);
   }
 
   /** Con cambios solicitados, la inspección vuelve al autor como borrador editable (RN-REV-06). */
   @Transactional
   public InspeccionResumenResponse devolverABorrador(UUID inspeccionId, UUID usuarioId) {
+    return devolverABorrador(inspeccionId, usuarioId, null);
+  }
+
+  @Transactional
+  public InspeccionResumenResponse devolverABorrador(
+      UUID inspeccionId, UUID usuarioId, UUID revisionId) {
     Inspeccion inspeccion = bloquear(inspeccionId);
     exigirAutor(inspeccion, usuarioId);
-    aplicar(inspeccion, EventoInspeccion.DEVOLVER_A_BORRADOR, usuarioId, null);
+    aplicar(inspeccion, EventoInspeccion.DEVOLVER_A_BORRADOR, usuarioId, null, revisionId);
     return mapper.toResumenResponse(inspecciones.saveAndFlush(inspeccion));
   }
 
   private InspeccionResumenResponse resolverConMotivo(
-      UUID inspeccionId, UUID revisorId, String motivo, EventoInspeccion evento) {
+      UUID inspeccionId, UUID revisorId, String motivo, EventoInspeccion evento, UUID revisionId) {
     if (motivo == null || motivo.isBlank()) {
       throw new ApiException(
           HttpStatus.UNPROCESSABLE_ENTITY,
@@ -182,7 +283,7 @@ public class TransicionInspeccionService {
     }
     Inspeccion inspeccion = bloquear(inspeccionId);
     exigirRevisorDistintoDelAutor(inspeccion, revisorId);
-    aplicar(inspeccion, evento, revisorId, motivo.strip());
+    aplicar(inspeccion, evento, revisorId, motivo.strip(), revisionId);
     return mapper.toResumenResponse(inspecciones.saveAndFlush(inspeccion));
   }
 
@@ -193,12 +294,24 @@ public class TransicionInspeccionService {
   private InspeccionResumenResponse publicarConIndice(Inspeccion inspeccion, UUID usuarioId) {
     Inspeccion guardada = inspecciones.saveAndFlush(inspeccion);
     publicacionIc.integrarPublicacion(guardada.getId(), usuarioId);
+    if (eventos != null) {
+      eventos.publishEvent(new InspeccionPublicadaEvent(guardada.getId(), usuarioId));
+    }
     return mapper.toResumenResponse(guardada);
   }
 
   /** Aplica la transición validada, con su historial y auditoría en la misma transacción. */
   private void aplicar(
       Inspeccion inspeccion, EventoInspeccion evento, UUID usuarioId, String motivo) {
+    aplicar(inspeccion, evento, usuarioId, motivo, null);
+  }
+
+  private void aplicar(
+      Inspeccion inspeccion,
+      EventoInspeccion evento,
+      UUID usuarioId,
+      String motivo,
+      UUID revisionId) {
     EstadoInspeccion anterior = inspeccion.estadoActual();
     EstadoInspeccion destino = MaquinaEstadosInspeccion.destino(anterior, evento);
     Instant ahora = clock.instant();
@@ -212,6 +325,7 @@ public class TransicionInspeccionService {
             anterior.name(),
             destino.name(),
             usuarioId,
+            revisionId,
             evento.name(),
             motivo,
             ahora));
@@ -243,20 +357,29 @@ public class TransicionInspeccionService {
             inspeccion.getVersionFormulario().getEsquema(), inspeccion.getDatos(), false)
         .forEach(
             error -> faltantes.add(Map.of("campo", error.campo(), "mensaje", error.mensaje())));
-    int campos = faltantes.size();
+    exigirEvidenciaCompleta(inspeccion, faltantes);
+  }
 
-    Set<String> presentes =
-        new HashSet<>(inspecciones.findCategoriasFotoDisponibles(inspeccion.getId()));
-    for (String categoria : CATEGORIAS_FOTO_OBLIGATORIAS) {
-      if (!presentes.contains(categoria)) {
-        faltantes.add(
-            Map.of(
-                "campo",
-                "fotografias." + categoria,
-                "mensaje",
-                "Falta al menos una fotografia de la categoria " + categoria));
-      }
-    }
+  private void exigirEvidenciaCompleta(
+      Inspeccion inspeccion, List<Map<String, String>> erroresCampos) {
+    List<Map<String, String>> faltantes = new ArrayList<>(erroresCampos);
+    int campos = erroresCampos.size();
+    var conteos =
+        inspecciones.findConteosFotoDisponibles(inspeccion.getId()).stream()
+            .collect(
+                Collectors.toMap(
+                    InspeccionRepository.ConteoFotoCategoria::getCategoria,
+                    InspeccionRepository.ConteoFotoCategoria::getCantidad));
+    reglasEvidencia
+        .faltantesObligatorios(conteos)
+        .forEach(
+            faltante ->
+                faltantes.add(
+                    Map.of(
+                        "campo", "fotografias." + faltante.categoria(),
+                        "mensaje",
+                            "Falta al menos una fotografia de la categoria "
+                                + faltante.categoria())));
 
     if (!faltantes.isEmpty()) {
       throw new ApiException(
@@ -363,5 +486,15 @@ public class TransicionInspeccionService {
         "inspeccion_no_encontrada",
         "Inspeccion no encontrada",
         "No existe la inspeccion " + inspeccionId);
+  }
+
+  private String hash(String valor) {
+    try {
+      return HexFormat.of()
+          .formatHex(
+              MessageDigest.getInstance("SHA-256").digest(valor.getBytes(StandardCharsets.UTF_8)));
+    } catch (NoSuchAlgorithmException ex) {
+      throw new IllegalStateException("SHA-256 no está disponible", ex);
+    }
   }
 }

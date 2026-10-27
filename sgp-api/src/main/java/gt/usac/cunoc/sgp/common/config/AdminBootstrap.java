@@ -17,6 +17,7 @@ public class AdminBootstrap {
     this.adminProvisioningService = adminProvisioningService;
   }
 
+  @org.springframework.core.annotation.Order(0)
   @EventListener(ApplicationReadyEvent.class)
   public void provisionAdmin() {
     adminProvisioningService.provisionAdmin(properties.getEmail(), properties.getInitialPassword());

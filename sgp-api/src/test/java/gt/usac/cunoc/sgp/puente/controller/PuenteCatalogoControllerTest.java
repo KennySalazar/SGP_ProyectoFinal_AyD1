@@ -4,6 +4,7 @@ import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -88,6 +89,8 @@ class PuenteCatalogoControllerTest {
 
     mvc.perform(get("/api/v1/puentes"))
         .andExpect(status().isOk())
+        .andExpect(header().string("Cache-Control", "private, no-store, max-age=0"))
+        .andExpect(header().string("Vary", "Authorization"))
         .andExpect(jsonPath("$.content[0].nombre").value("Puente público"))
         .andExpect(jsonPath("$.content[0].estadoActual").value("Sin evaluar"))
         .andExpect(jsonPath("$.content[0].fotografias").doesNotExist())
@@ -296,19 +299,28 @@ class PuenteCatalogoControllerTest {
     when(service.listarCatalogo(null, null, 0, 20))
         .thenReturn(new PageImpl<>(List.of(puente), PageRequest.of(0, 20), 1));
 
-    mvc.perform(get("/api/v1/puentes"))
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$.content[0].id").value(id.toString()))
-        .andExpect(jsonPath("$.content[0].estadoActual").value(estado))
-        .andExpect(jsonPath("$.content[0].indiceCondicionActual").value(Integer.parseInt(indice)))
-        .andExpect(jsonPath("$.content[0].fechaUltimaInspeccion").value("2026-10-15"))
-        .andExpect(jsonPath("$.content[0].latitud").value(14.481))
-        .andExpect(jsonPath("$.content[0].longitud").value(-90.615))
-        .andExpect(jsonPath("$.content[0].danos").doesNotExist())
-        .andExpect(jsonPath("$.content[0].fotografias").doesNotExist())
-        .andExpect(jsonPath("$.content[0].informes").doesNotExist())
-        .andExpect(jsonPath("$.content[0].desglose").doesNotExist())
-        .andExpect(jsonPath("$.content[0].condicionesAnulacion").doesNotExist());
+    var resultado =
+        mvc.perform(get("/api/v1/puentes"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.content[0].id").value(id.toString()))
+            .andExpect(jsonPath("$.content[0].estadoActual").value(estado))
+            .andExpect(
+                jsonPath("$.content[0].indiceCondicionActual").value(Integer.parseInt(indice)))
+            .andExpect(jsonPath("$.content[0].fechaUltimaInspeccion").value("2026-10-15"))
+            .andExpect(jsonPath("$.content[0].danos").doesNotExist())
+            .andExpect(jsonPath("$.content[0].fotografias").doesNotExist())
+            .andExpect(jsonPath("$.content[0].informes").doesNotExist())
+            .andExpect(jsonPath("$.content[0].desglose").doesNotExist())
+            .andExpect(jsonPath("$.content[0].condicionesAnulacion").doesNotExist());
+    if (estado.equals("Malo")) {
+      resultado
+          .andExpect(jsonPath("$.content[0].latitud").doesNotExist())
+          .andExpect(jsonPath("$.content[0].longitud").doesNotExist());
+    } else {
+      resultado
+          .andExpect(jsonPath("$.content[0].latitud").value(14.481))
+          .andExpect(jsonPath("$.content[0].longitud").value(-90.615));
+    }
   }
 
   @ParameterizedTest
@@ -334,16 +346,83 @@ class PuenteCatalogoControllerTest {
             OffsetDateTime.parse("2026-10-01T08:00:00-06:00"));
     when(service.obtenerPorId(id)).thenReturn(puente);
 
+    var resultado =
+        mvc.perform(get("/api/v1/puentes/{id}", id))
+            .andExpect(status().isOk())
+            .andExpect(header().string("Cache-Control", "private, no-store, max-age=0"))
+            .andExpect(header().string("Vary", "Authorization"))
+            .andExpect(jsonPath("$.estadoActual").value(estado))
+            .andExpect(jsonPath("$.indiceCondicionActual").value(Integer.parseInt(indice)))
+            .andExpect(jsonPath("$.fechaUltimaInspeccion").value("2026-10-15"))
+            .andExpect(jsonPath("$.danos").doesNotExist())
+            .andExpect(jsonPath("$.fotografias").doesNotExist())
+            .andExpect(jsonPath("$.informes").doesNotExist())
+            .andExpect(jsonPath("$.desglose").doesNotExist())
+            .andExpect(jsonPath("$.condicionesAnulacion").doesNotExist());
+    if (estado.equals("Malo")) {
+      resultado
+          .andExpect(jsonPath("$.latitud").doesNotExist())
+          .andExpect(jsonPath("$.longitud").doesNotExist())
+          .andExpect(jsonPath("$.utm").doesNotExist());
+    } else {
+      resultado
+          .andExpect(jsonPath("$.latitud").value(14.481))
+          .andExpect(jsonPath("$.longitud").value(-90.615));
+    }
+  }
+
+  @Test
+  @WithMockUser(roles = "ESTUDIANTE")
+  void usuarioAutenticadoConservaCoordenadasDePuenteMalo() throws Exception {
+    UUID id = UUID.randomUUID();
+    var puente =
+        new PuenteResponse(
+            id,
+            "GT-01-0114-0001",
+            "Puente malo",
+            null,
+            null,
+            "CA-9",
+            null,
+            14.481,
+            -90.615,
+            null,
+            true,
+            "Malo",
+            null,
+            null,
+            null);
+    when(service.obtenerPorId(id)).thenReturn(puente);
+
     mvc.perform(get("/api/v1/puentes/{id}", id))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.estadoActual").value(estado))
-        .andExpect(jsonPath("$.indiceCondicionActual").value(Integer.parseInt(indice)))
-        .andExpect(jsonPath("$.fechaUltimaInspeccion").value("2026-10-15"))
-        .andExpect(jsonPath("$.danos").doesNotExist())
-        .andExpect(jsonPath("$.fotografias").doesNotExist())
-        .andExpect(jsonPath("$.informes").doesNotExist())
-        .andExpect(jsonPath("$.desglose").doesNotExist())
-        .andExpect(jsonPath("$.condicionesAnulacion").doesNotExist());
+        .andExpect(jsonPath("$.latitud").value(14.481))
+        .andExpect(jsonPath("$.longitud").value(-90.615));
+  }
+
+  @Test
+  @WithMockUser(roles = "ESTUDIANTE")
+  void catalogoAutenticadoConservaCoordenadasDePuenteMalo() throws Exception {
+    var puente =
+        new PuenteCatalogoResponse(
+            UUID.randomUUID(),
+            "GT-01-0114-0001",
+            "Puente malo",
+            null,
+            null,
+            14.481,
+            -90.615,
+            true,
+            "Malo",
+            null,
+            null);
+    when(service.listarCatalogo(null, null, 0, 20))
+        .thenReturn(new PageImpl<>(List.of(puente), PageRequest.of(0, 20), 1));
+
+    mvc.perform(get("/api/v1/puentes"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.content[0].latitud").value(14.481))
+        .andExpect(jsonPath("$.content[0].longitud").value(-90.615));
   }
 
   @Test

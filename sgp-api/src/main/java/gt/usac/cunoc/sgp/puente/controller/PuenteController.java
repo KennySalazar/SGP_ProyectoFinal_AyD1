@@ -11,12 +11,14 @@ import gt.usac.cunoc.sgp.puente.service.PuenteService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -39,6 +41,7 @@ public class PuenteController {
   }
 
   @GetMapping
+  @PreAuthorize("permitAll()")
   @Operation(
       summary = "Consultar el catálogo público de puentes",
       description =
@@ -53,24 +56,34 @@ public class PuenteController {
       @RequestParam(required = false) String busqueda,
       @RequestParam(defaultValue = "0") int pagina,
       @RequestParam(defaultValue = "20") int tamanio,
-      Authentication authentication) {
+      Authentication authentication,
+      HttpServletResponse response) {
+    noCache(response);
     boolean esAdmin =
         authentication != null
             && authentication.getAuthorities().stream()
                 .anyMatch(a -> "ROLE_ADMINISTRADOR".equals(a.getAuthority()));
+    Page<PuenteCatalogoResponse> resultado;
     if (busqueda != null && !busqueda.isBlank()) {
       if (esAdmin && (activo != null || todos)) {
-        return puenteService.listarCatalogo(
-            departamentoId, estado, todos ? null : activo, busqueda, pagina, tamanio);
+        resultado =
+            puenteService.listarCatalogo(
+                departamentoId, estado, todos ? null : activo, busqueda, pagina, tamanio);
+      } else {
+        resultado =
+            puenteService.listarCatalogo(
+                departamentoId, estado, Boolean.TRUE, busqueda, pagina, tamanio);
       }
-      return puenteService.listarCatalogo(
-          departamentoId, estado, Boolean.TRUE, busqueda, pagina, tamanio);
+    } else if (esAdmin && (activo != null || todos)) {
+      resultado =
+          puenteService.listarCatalogo(
+              departamentoId, estado, todos ? null : activo, pagina, tamanio);
+    } else {
+      resultado = puenteService.listarCatalogo(departamentoId, estado, pagina, tamanio);
     }
-    if (esAdmin && (activo != null || todos)) {
-      return puenteService.listarCatalogo(
-          departamentoId, estado, todos ? null : activo, pagina, tamanio);
-    }
-    return puenteService.listarCatalogo(departamentoId, estado, pagina, tamanio);
+    return esAutenticado(authentication)
+        ? resultado
+        : resultado.map(PuenteController::ocultarCoordenadasSiMalo);
   }
 
   @PostMapping
@@ -99,11 +112,64 @@ public class PuenteController {
   }
 
   @GetMapping("/{id}")
+  @PreAuthorize("permitAll()")
   @Operation(
       summary = "Obtener un puente por su identificador",
       description = "Retorna los datos de la ficha de un puente activo.")
-  public ResponseEntity<PuenteResponse> obtenerPorId(@PathVariable UUID id) {
-    return ResponseEntity.ok(puenteService.obtenerPorId(id));
+  public ResponseEntity<PuenteResponse> obtenerPorId(
+      @PathVariable UUID id, Authentication authentication, HttpServletResponse response) {
+    noCache(response);
+    PuenteResponse puente = puenteService.obtenerPorId(id);
+    if (!esAutenticado(authentication)) puente = ocultarCoordenadasSiMalo(puente);
+    return ResponseEntity.ok(puente);
+  }
+
+  private static boolean esAutenticado(Authentication authentication) {
+    return authentication != null
+        && authentication.isAuthenticated()
+        && !(authentication instanceof AnonymousAuthenticationToken);
+  }
+
+  private static void noCache(HttpServletResponse response) {
+    response.setHeader("Cache-Control", "private, no-store, max-age=0");
+    response.setHeader("Vary", "Authorization");
+  }
+
+  private static PuenteCatalogoResponse ocultarCoordenadasSiMalo(PuenteCatalogoResponse puente) {
+    if (!"Malo".equals(puente.estadoActual())) return puente;
+    return new PuenteCatalogoResponse(
+        puente.id(),
+        puente.codigo(),
+        puente.nombre(),
+        puente.departamento(),
+        puente.municipio(),
+        null,
+        null,
+        puente.activo(),
+        puente.estadoActual(),
+        puente.indiceCondicionActual(),
+        puente.fechaUltimaInspeccion());
+  }
+
+  private static PuenteResponse ocultarCoordenadasSiMalo(PuenteResponse puente) {
+    if (!"Malo".equals(puente.estadoActual())) return puente;
+    return new PuenteResponse(
+        puente.id(),
+        puente.codigo(),
+        puente.nombre(),
+        puente.departamento(),
+        puente.municipio(),
+        puente.ruta(),
+        puente.kilometraje(),
+        null,
+        null,
+        null,
+        puente.activo(),
+        puente.estadoActual(),
+        puente.indiceCondicionActual(),
+        puente.fechaUltimaInspeccion(),
+        puente.creadoEn(),
+        puente.versionFormularioIdIcVigente());
   }
 
   @PutMapping("/{id}")

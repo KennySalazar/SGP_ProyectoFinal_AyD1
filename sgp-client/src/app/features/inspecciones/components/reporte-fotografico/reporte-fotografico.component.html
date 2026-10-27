@@ -1,0 +1,269 @@
+<section class="reporte surface-card" [attr.aria-label]="'inspecciones.fotos.titulo' | transloco">
+  <h3>{{ 'inspecciones.fotos.titulo' | transloco }}</h3>
+  <p>{{ 'inspecciones.fotos.descripcion' | transloco }}</p>
+  <p>{{ 'inspecciones.fotos.compresionNota' | transloco }}</p>
+  @if (esOffline()) {
+    <div class="alerta-offline" role="status">
+      <i class="pi pi-info-circle" aria-hidden="true"></i>
+      <p>{{ 'inspecciones.fotos.offlineSprint4Aviso' | transloco }}</p>
+    </div>
+  }
+  @if (editable() && storage.persistent() === false) {
+    <p role="status">{{ 'offline.almacenamiento.noPersistente' | transloco }}</p>
+  }
+  @if (editable() && storage.pocoEspacio()) {
+    <p role="status">{{ 'offline.almacenamiento.pocoEspacio' | transloco }}</p>
+  }
+  @if (!editable()) {
+    <p role="status">
+      {{
+        (contexto().estado !== 'BORRADOR' || bloqueada()
+          ? 'inspecciones.fotos.errores.estado'
+          : 'inspecciones.fotos.soloLectura'
+        ) | transloco
+      }}
+    </p>
+  }
+  @if (inventarioCargado()) {
+    <p role="status">
+      {{ 'inspecciones.fotos.contador' | transloco: { cantidad: inventario().length, maximo: 60 } }}
+    </p>
+    <ul>
+      @for (conteo of conteos(); track conteo.categoria) {
+        <li>{{ etiqueta(conteo.categoria) }}: {{ conteo.cantidad }}</li>
+      }
+    </ul>
+    @if (faltantes().length) {
+      <p>{{ 'inspecciones.fotos.faltantes' | transloco }}</p>
+      <ul class="categorias-faltantes">
+        @for (categoria of faltantes(); track categoria) {
+          <li>{{ etiqueta(categoria) }}</li>
+        }
+      </ul>
+    }
+  }
+  @if (limiteAlcanzado()) {
+    <p role="status">{{ 'inspecciones.fotos.errores.limite' | transloco }}</p>
+  }
+  @if (retirada()) {
+    <p role="status">{{ 'inspecciones.fotos.retirada' | transloco }}</p>
+  }
+  @if (error(); as error) {
+    <p class="mensaje-error" role="alert">
+      {{ 'inspecciones.fotos.errores.' + error | transloco }}
+    </p>
+  }
+  @if (aviso()) {
+    <p role="status">{{ 'inspecciones.fotos.confirmada' | transloco }}</p>
+  }
+  @if (editable()) {
+    <div class="acciones">
+      <label
+        >{{ 'inspecciones.fotos.galeria' | transloco
+        }}<input
+          type="file"
+          accept="image/jpeg,image/webp"
+          [disabled]="ocupado() || limiteAlcanzado()"
+          (change)="seleccionar($event)"
+      /></label>
+      <button
+        pButton
+        type="button"
+        [disabled]="ocupado() || camaraAbierta() || limiteAlcanzado()"
+        (click)="abrirCamara()"
+      >
+        {{ 'inspecciones.fotos.camara' | transloco }}
+      </button>
+    </div>
+    @if (camaraAbierta()) {
+      <video
+        #video
+        autoplay
+        muted
+        playsinline
+        [attr.aria-label]="'inspecciones.fotos.camara' | transloco"
+      ></video>
+      <div class="acciones">
+        <button pButton type="button" [disabled]="ocupado()" (click)="capturar()">
+          {{ 'inspecciones.fotos.capturar' | transloco }}</button
+        ><button pButton type="button" (click)="cerrarCamara()">
+          {{ 'common.close' | transloco }}
+        </button>
+      </div>
+    }
+    @if (previsualizacion(); as url) {
+      <img [src]="url" [alt]="'inspecciones.fotos.previa' | transloco" />
+      <label for="categoria-foto">{{ 'inspecciones.fotos.categoria' | transloco }}</label
+      ><p-select
+        inputId="categoria-foto"
+        [formControl]="categoria"
+        [options]="categorias"
+        appendTo="body"
+      >
+        <ng-template #item let-opcion>{{ etiqueta(opcion) }}</ng-template>
+        <ng-template #selectedItem let-opcion>{{ etiqueta(opcion) }}</ng-template>
+      </p-select>
+      @if (contextoElemento(); as contexto) {
+        <p>{{ 'inspecciones.fotos.anclaje' | transloco }}: {{ contexto.elementoRef }}</p>
+      }
+      <button
+        pButton
+        type="button"
+        [disabled]="categoria.invalid || ocupado() || limiteAlcanzado()"
+        (click)="adjuntar()"
+      >
+        {{ 'inspecciones.fotos.adjuntar' | transloco }}
+      </button>
+    }
+  }
+  @if (ocupado()) {
+    <p role="status">{{ 'inspecciones.fotos.procesando' | transloco }}</p>
+  }
+  @if (pendientes().length) {
+    <h4>{{ 'inspecciones.fotos.pendientesLocales' | transloco }}</h4>
+  }
+  @for (foto of pendientes(); track foto.id) {
+    <div class="pendiente">
+      <span
+        >{{ etiqueta(foto.metadatos.categoria) }} ·
+        {{ 'inspecciones.fotos.pendiente' | transloco }}</span
+      >
+      @if (editable()) {
+        <button pButton type="button" [disabled]="ocupado()" (click)="reintentar(foto)">
+          {{ 'inspecciones.fotos.reintentar' | transloco }}
+        </button>
+        <button
+          pButton
+          type="button"
+          severity="danger"
+          [outlined]="true"
+          [disabled]="ocupado()"
+          (click)="fotoLocalARetirar.set(foto)"
+        >
+          {{ 'inspecciones.fotos.eliminarLocal' | transloco }}
+        </button>
+      }
+    </div>
+  }
+  <h4>{{ 'inspecciones.fotos.confirmadasServidor' | transloco }}</h4>
+  <div class="fotografias">
+    @for (categoria of categorias; track categoria) {
+      <section class="categoria" tabindex="-1" [attr.data-categoria-fotografica]="categoria">
+        <h5>{{ etiqueta(categoria) }}</h5>
+        @if (observacionesCategoria()[categoria]; as cantidad) {
+          <app-marcador-observaciones
+            [cantidad]="cantidad"
+            [interactivo]="true"
+            (abrir)="abrirObservacionesCategoria.emit()"
+          />
+        }
+        @if (permitirObservarCategoria()) {
+          <button pButton type="button" (click)="observarCategoria.emit(categoria)">
+            <i class="pi pi-comment" aria-hidden="true"></i
+            >{{ 'revision.detalle.observarCategoria' | transloco }} · {{ etiqueta(categoria) }}
+          </button>
+        }
+        @for (foto of confirmadasPorCategoria(categoria); track foto.id) {
+          <figure>
+            @if (foto.miniatura) {
+              <img [src]="foto.miniatura" [alt]="etiqueta(foto.categoria)" loading="lazy" />
+            }
+            <figcaption>
+              {{ etiqueta(foto.categoria) }} · {{ 'inspecciones.fotos.confirmada' | transloco }}
+            </figcaption>
+            <button pButton type="button" (click)="abrirOriginal(foto)">
+              {{ 'inspecciones.fotos.original' | transloco }}
+            </button>
+            @if (editable()) {
+              <button
+                pButton
+                type="button"
+                severity="danger"
+                [outlined]="true"
+                [disabled]="ocupado()"
+                (click)="solicitarRetirada(foto)"
+              >
+                {{ 'inspecciones.fotos.retirar' | transloco }}
+              </button>
+            }
+          </figure>
+        }
+      </section>
+    }
+  </div>
+  <p-dialog
+    [header]="'inspecciones.fotos.retirar' | transloco"
+    [visible]="fotoARetirar() !== null"
+    (visibleChange)="!$event && cancelarRetirada()"
+    [modal]="true"
+    [closable]="!ocupado()"
+    [draggable]="false"
+    [resizable]="false"
+    [style]="{ width: 'min(520px, 95vw)' }"
+  >
+    @if (fotoARetirar(); as foto) {
+      <p>{{ 'inspecciones.fotos.confirmarRetirada' | transloco }}</p>
+      <p>{{ etiqueta(foto.categoria) }}</p>
+      @if (error(); as error) {
+        <p class="mensaje-error" role="alert">
+          {{ 'inspecciones.fotos.errores.' + error | transloco }}
+        </p>
+      }
+      <div class="acciones">
+        <button
+          pButton
+          type="button"
+          severity="secondary"
+          [outlined]="true"
+          [disabled]="ocupado()"
+          (click)="cancelarRetirada()"
+        >
+          {{ 'inspecciones.transicion.cancelar' | transloco }}
+        </button>
+        <button
+          pButton
+          type="button"
+          severity="danger"
+          [disabled]="ocupado() || !editable()"
+          (click)="retirar(foto)"
+        >
+          {{ 'inspecciones.fotos.retirar' | transloco }}
+        </button>
+      </div>
+    }
+  </p-dialog>
+  <p-dialog
+    [header]="'inspecciones.fotos.eliminarLocal' | transloco"
+    [visible]="fotoLocalARetirar() !== null"
+    (visibleChange)="!$event && !ocupado() && fotoLocalARetirar.set(null)"
+    [modal]="true"
+    [closable]="!ocupado()"
+    [draggable]="false"
+    [resizable]="false"
+  >
+    <p>{{ 'inspecciones.fotos.confirmarEliminarLocal' | transloco }}</p>
+    @if (error(); as mensaje) {
+      <p role="alert">{{ 'inspecciones.fotos.errores.' + mensaje | transloco }}</p>
+    }
+    <div class="acciones">
+      <button
+        pButton
+        type="button"
+        severity="secondary"
+        [disabled]="ocupado()"
+        (click)="fotoLocalARetirar.set(null)"
+      >
+        {{ 'common.close' | transloco }}
+      </button>
+      <button
+        pButton
+        type="button"
+        severity="danger"
+        [disabled]="ocupado()"
+        (click)="eliminarLocal()"
+      >
+        {{ 'inspecciones.fotos.eliminarLocal' | transloco }}
+      </button>
+    </div>
+  </p-dialog>
+</section>

@@ -1,3 +1,4 @@
+import { RouterLink } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
 import { ChangeDetectionStrategy, Component, DestroyRef, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
@@ -36,6 +37,7 @@ type Severidad = 'success' | 'warn' | 'danger' | 'secondary';
   selector: 'app-invitaciones-page',
   standalone: true,
   imports: [
+    RouterLink,
     TranslocoPipe,
     ReactiveFormsModule,
     ButtonModule,
@@ -213,7 +215,7 @@ export class InvitacionesPage {
           this.reenvioExitoso.set(nueva);
           this.cargar(this.resultado()?.number ?? 0);
         },
-        // El aviso global muestra el detalle del problema (por ejemplo, ya aceptada).
+
         error: () => this.cargar(this.resultado()?.number ?? 0),
       });
   }

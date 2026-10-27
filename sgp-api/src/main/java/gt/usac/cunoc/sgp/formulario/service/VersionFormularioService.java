@@ -6,6 +6,7 @@ import gt.usac.cunoc.sgp.common.audit.aspect.Auditable;
 import gt.usac.cunoc.sgp.common.audit.model.AccionAuditoria;
 import gt.usac.cunoc.sgp.common.exception.ApiException;
 import gt.usac.cunoc.sgp.formulario.dto.AnalisisMapeoResponse;
+import gt.usac.cunoc.sgp.formulario.dto.AprobacionCalibracionResponse;
 import gt.usac.cunoc.sgp.formulario.dto.ConfiguracionIcElementoRequest;
 import gt.usac.cunoc.sgp.formulario.dto.ConfiguracionIcElementoResponse;
 import gt.usac.cunoc.sgp.formulario.dto.CrearVersionRequest;
@@ -21,11 +22,14 @@ import gt.usac.cunoc.sgp.formulario.entity.VersionFormulario;
 import gt.usac.cunoc.sgp.formulario.mapper.VersionFormularioMapper;
 import gt.usac.cunoc.sgp.formulario.model.EstadoVersionFormulario;
 import gt.usac.cunoc.sgp.formulario.model.TipoMapeoCampo;
+import gt.usac.cunoc.sgp.formulario.repository.AprobacionCalibracionRepository;
 import gt.usac.cunoc.sgp.formulario.repository.ConfiguracionIcElementoRepository;
 import gt.usac.cunoc.sgp.formulario.repository.MapeoCampoFormularioRepository;
 import gt.usac.cunoc.sgp.formulario.repository.VersionFormularioRepository;
 import gt.usac.cunoc.sgp.formulario.validation.CampoSchemaExtractor;
 import gt.usac.cunoc.sgp.formulario.validation.JsonSchemaValidatorService;
+import gt.usac.cunoc.sgp.formulario.validation.ValidadorReglasCriticasIc;
+import gt.usac.cunoc.sgp.notificacion.service.AvisosAcademicosService;
 import java.io.InputStream;
 import java.security.MessageDigest;
 import java.time.Clock;
@@ -53,6 +57,8 @@ public class VersionFormularioService {
   private final CampoSchemaExtractor campoExtractor;
   private final ObjectMapper objectMapper;
   private final Clock clock;
+  private final AvisosAcademicosService avisosAcademicos;
+  private final AprobacionCalibracionRepository aprobaciones;
 
   public VersionFormularioService(
       VersionFormularioRepository versiones,
@@ -62,7 +68,9 @@ public class VersionFormularioService {
       JsonSchemaValidatorService schemaValidator,
       CampoSchemaExtractor campoExtractor,
       ObjectMapper objectMapper,
-      Clock clock) {
+      Clock clock,
+      AprobacionCalibracionRepository aprobaciones,
+      AvisosAcademicosService avisosAcademicos) {
     this.versiones = versiones;
     this.mapeos = mapeos;
     this.configuracionesIc = configuracionesIc;
@@ -71,10 +79,12 @@ public class VersionFormularioService {
     this.campoExtractor = campoExtractor;
     this.objectMapper = objectMapper;
     this.clock = clock;
+    this.aprobaciones = aprobaciones;
+    this.avisosAcademicos = avisosAcademicos;
   }
 
   @Transactional(readOnly = true)
-  @PreAuthorize("hasRole('ADMINISTRADOR')")
+  @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'CATEDRATICO')")
   public List<VersionFormularioResumenResponse> listarVersiones() {
     return versiones.findAllByOrderByCreadoEnDesc().stream()
         .map(mapper::toResumenResponse)
@@ -82,7 +92,7 @@ public class VersionFormularioService {
   }
 
   @Transactional(readOnly = true)
-  @PreAuthorize("hasRole('ADMINISTRADOR')")
+  @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'CATEDRATICO')")
   public VersionFormularioResponse obtenerPorId(UUID id) {
     VersionFormulario version =
         versiones
@@ -138,7 +148,7 @@ public class VersionFormularioService {
   }
 
   @Transactional
-  @PreAuthorize("hasRole('ADMINISTRADOR')")
+  @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'CATEDRATICO')")
   @Auditable(accion = AccionAuditoria.CREAR, entidad = "version_formulario")
   public VersionFormularioResponse crear(CrearVersionRequest request, UUID usuarioId) {
     if (Boolean.TRUE.equals(request.cargarPlantillaInicial())) {
@@ -278,6 +288,8 @@ public class VersionFormularioService {
     Instant ahora = clock.instant();
     UUID id = UUID.randomUUID();
 
+    VersionFormulario anterior = versiones.findByActivaTrue().orElse(null);
+
     VersionFormulario versionInicial =
         new VersionFormulario(
             id,
@@ -287,14 +299,13 @@ public class VersionFormularioService {
             esquema,
             vinculos,
             elementosIcNode,
-            null,
+            anterior,
             usuarioId,
             ahora,
             ahora);
 
     VersionFormulario guardada = versiones.save(versionInicial);
 
-    // Precargar configuración de pesos a partir del catálogo elementos-ic.json
     if (elementosIcNode.has("elementos") && elementosIcNode.get("elementos").isArray()) {
       for (JsonNode elem : elementosIcNode.get("elementos")) {
         JsonNode pesoConfigurado = elem.get("peso");
@@ -336,11 +347,48 @@ public class VersionFormularioService {
       }
     }
 
+    if (anterior != null) {
+      Set<String> origen =
+          new java.util.LinkedHashSet<>(campoExtractor.extraerCampos(anterior.getEsquema()));
+      Set<String> destino = new java.util.LinkedHashSet<>(campoExtractor.extraerCampos(esquema));
+      List<MapeoCampoFormulario> declaraciones = new ArrayList<>();
+      for (String campo : origen) {
+        boolean equivalente = destino.contains(campo);
+        declaraciones.add(
+            new MapeoCampoFormulario(
+                UUID.randomUUID(),
+                anterior,
+                guardada,
+                campo,
+                equivalente ? campo : null,
+                equivalente ? TipoMapeoCampo.EQUIVALENTE : TipoMapeoCampo.ELIMINADO,
+                "Declaracion inicial desde plantilla SIECA; revisar antes de publicar",
+                usuarioId,
+                ahora));
+      }
+      for (String campo : destino) {
+        if (!origen.contains(campo)) {
+          declaraciones.add(
+              new MapeoCampoFormulario(
+                  UUID.randomUUID(),
+                  anterior,
+                  guardada,
+                  null,
+                  campo,
+                  TipoMapeoCampo.NUEVO,
+                  "Campo nuevo de plantilla SIECA",
+                  usuarioId,
+                  ahora));
+        }
+      }
+      mapeos.saveAll(declaraciones);
+    }
+
     return construirRespuestaDetallada(guardada);
   }
 
   @Transactional
-  @PreAuthorize("hasRole('ADMINISTRADOR')")
+  @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'CATEDRATICO')")
   @Auditable(
       accion = AccionAuditoria.MODIFICAR,
       entidad = "version_formulario",
@@ -374,6 +422,9 @@ public class VersionFormularioService {
     }
 
     schemaValidator.validarEsquema(esquema);
+    if (reglasEvaluacionIc != null) {
+      gt.usac.cunoc.sgp.formulario.validation.ValidadorCalibracionIc.validar(reglasEvaluacionIc);
+    }
 
     if (nuevoCodigo != null && !nuevoCodigo.isBlank() && !nuevoCodigo.equals(version.getCodigo())) {
       if (versiones.existsByCodigo(nuevoCodigo)) {
@@ -391,7 +442,9 @@ public class VersionFormularioService {
       version.setVinculosAlmacenamiento(vinculosAlmacenamiento);
     }
     if (reglasEvaluacionIc != null) {
-      version.setReglasEvaluacionIc(reglasEvaluacionIc);
+      version.setReglasEvaluacionIc(reglasEvaluacionIc.deepCopy());
+      version.setCalibradoPorId(usuarioId);
+      version.setCalibradoEn(clock.instant());
     }
     version.setActualizadoEn(clock.instant());
 
@@ -400,7 +453,7 @@ public class VersionFormularioService {
   }
 
   @Transactional
-  @PreAuthorize("hasRole('ADMINISTRADOR')")
+  @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'CATEDRATICO')")
   @Auditable(
       accion = AccionAuditoria.MODIFICAR,
       entidad = "version_formulario",
@@ -455,7 +508,9 @@ public class VersionFormularioService {
             HttpStatus.UNPROCESSABLE_ENTITY,
             "peso_invalido",
             "Peso invalido",
-            "El peso para '" + req.elementoRef() + "' debe ser mayor a cero.");
+            "El peso para '" + req.elementoRef() + "' debe ser mayor a cero.",
+            java.util.List.of(
+                java.util.Map.of("campo", "peso", "mensaje", "Debe ser mayor a cero.")));
       }
 
       if (req.peso().scale() > 6 || req.peso().precision() - req.peso().scale() > 6) {
@@ -570,7 +625,7 @@ public class VersionFormularioService {
   }
 
   @Transactional(readOnly = true)
-  @PreAuthorize("hasRole('ADMINISTRADOR')")
+  @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'CATEDRATICO')")
   public AnalisisMapeoResponse analizarMapeo(UUID versionDestinoId) {
     VersionFormulario destino =
         versiones
@@ -604,7 +659,11 @@ public class VersionFormularioService {
         mapeos.findAllByVersionOrigenIdAndVersionDestinoId(origen.getId(), destino.getId());
 
     Set<String> mapeadosOrigen = new HashSet<>();
+    Set<String> mapeadosDestino = new HashSet<>();
     for (MapeoCampoFormulario m : mapeosGuardados) {
+      if (m.getElementoRefDestino() != null) {
+        mapeadosDestino.add(m.getElementoRefDestino());
+      }
       if (m.getElementoRefOrigen() != null) {
         mapeadosOrigen.add(m.getElementoRefOrigen());
       }
@@ -622,7 +681,7 @@ public class VersionFormularioService {
         camposDestino,
         mapeosGuardados.stream().map(mapper::toMapeoResponse).toList(),
         pendientes,
-        pendientes.isEmpty());
+        pendientes.isEmpty() && camposDestino.stream().allMatch(mapeadosDestino::contains));
   }
 
   @Transactional
@@ -630,6 +689,7 @@ public class VersionFormularioService {
   @Auditable(accion = AccionAuditoria.CAMBIAR_ESTADO, entidad = "version_formulario")
   public VersionFormularioResponse publicar(
       UUID id, PublicarVersionRequest request, UUID usuarioId) {
+
     VersionFormulario version =
         versiones
             .findById(id)
@@ -666,14 +726,19 @@ public class VersionFormularioService {
             "mapeo_incompleto",
             "Mapeo de campos incompleto",
             "Debe declarar para cada campo de la versión anterior si es equivalente, renombrado, nuevo o eliminado. Faltan por declarar: "
-                + analisis.camposOrigenSinMapeo());
+                + analisis.camposOrigenSinMapeo()
+                + "; campos destino sin declarar: "
+                + analisis.camposDestinoSinMapeo());
       }
     }
 
-    // 4. Validar pesos completos
-    validarPesosParaPublicacion(version);
     validarPesosParaPublicacion(version);
     validarEscalaParaPublicacion(version);
+    validarReglasParaPublicacion(version);
+    validarConversionesParaPublicacion(version);
+    ValidadorReglasCriticasIc.validarCatalogo(
+        version.getReglasEvaluacionIc().get("reglas_evaluacion_ic"),
+        version.getReglasEvaluacionIc());
 
     Instant ahora = clock.instant();
 
@@ -707,7 +772,14 @@ public class VersionFormularioService {
     version.setActualizadoEn(ahora);
 
     VersionFormulario publicada = versiones.saveAndFlush(version);
+    avisosAcademicos.calibracionPendiente(publicada.getId());
     return construirRespuestaDetallada(publicada);
+  }
+
+  @Transactional(propagation = org.springframework.transaction.annotation.Propagation.MANDATORY)
+  public VersionFormularioResponse sembrarPlantillaInicial(String codigo, UUID usuarioId) {
+    var creada = cargarPlantillaSiecaInicial(codigo, usuarioId);
+    return publicar(creada.id(), null, usuarioId);
   }
 
   private void validarPesosParaPublicacion(VersionFormulario version) {
@@ -862,11 +934,16 @@ public class VersionFormularioService {
                 .toList()
             : Collections.emptyList();
 
-    return mapper.toResponse(version, listaPesos, listaMapeos);
+    var aprobacion =
+        aprobaciones
+            .findByVersionFormularioId(version.getId())
+            .map(AprobacionCalibracionResponse::de)
+            .orElse(null);
+    return mapper.toResponse(version, listaPesos, listaMapeos, aprobacion);
   }
 
   @Transactional
-  @PreAuthorize("hasRole('ADMINISTRADOR')")
+  @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'CATEDRATICO')")
   @Auditable(
       accion = AccionAuditoria.MODIFICAR,
       entidad = "version_formulario",
@@ -961,7 +1038,11 @@ public class VersionFormularioService {
       escala.put(nivel, request.valores().get(nivel));
     }
 
-    reglas.set("escala_severidad", escala);
+    try {
+      reglas.set("escala_severidad", objectMapper.readTree(escala.toString()));
+    } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+      throw new IllegalStateException("No se pudo serializar la escala del IC", e);
+    }
     configuracion.set("reglas_evaluacion_ic", reglas);
 
     Instant ahora = clock.instant();
@@ -1017,6 +1098,62 @@ public class VersionFormularioService {
     }
   }
 
+  @Transactional
+  @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'CATEDRATICO')")
+  @Auditable(
+      accion = AccionAuditoria.MODIFICAR,
+      entidad = "version_formulario",
+      idArg = "id",
+      tipo = VersionFormulario.class,
+      recargarPosteriores = true)
+  public VersionFormularioResponse configurarReglasCriticas(
+      UUID id,
+      gt.usac.cunoc.sgp.formulario.dto.ConfigurarReglasCriticasIcRequest request,
+      UUID usuarioId) {
+    VersionFormulario version =
+        versiones
+            .findById(id)
+            .orElseThrow(
+                () ->
+                    new ApiException(
+                        HttpStatus.NOT_FOUND,
+                        "version_no_encontrada",
+                        "Version no encontrada",
+                        "No existe la version de formulario solicitada."));
+    if (version.getEstado() != EstadoVersionFormulario.BORRADOR) {
+      throw new ApiException(
+          HttpStatus.CONFLICT,
+          "version_inmutable",
+          "Version inmutable",
+          "Las reglas de una version publicada no pueden modificarse. Cree una nueva version.");
+    }
+    if (request == null || request.reglasAnulacion() == null) {
+      throw new ApiException(
+          HttpStatus.UNPROCESSABLE_ENTITY,
+          "reglas_anulacion_ic_invalidas",
+          "Reglas de anulacion del IC invalidas",
+          "Debe indicar las reglas criticas completas.");
+    }
+    JsonNode actual = version.getReglasEvaluacionIc();
+    if (actual == null || !actual.isObject() || !actual.path("reglas_evaluacion_ic").isObject()) {
+      throw new ApiException(
+          HttpStatus.UNPROCESSABLE_ENTITY,
+          "configuracion_ic_invalida",
+          "Configuracion IC invalida",
+          "La version no contiene reglas de evaluacion IC.");
+    }
+    com.fasterxml.jackson.databind.node.ObjectNode copia = actual.deepCopy();
+    com.fasterxml.jackson.databind.node.ObjectNode reglas =
+        (com.fasterxml.jackson.databind.node.ObjectNode) copia.get("reglas_evaluacion_ic");
+    reglas.set("reglas_anulacion", request.reglasAnulacion().deepCopy());
+    ValidadorReglasCriticasIc.validarCatalogo(reglas, copia);
+    version.setReglasEvaluacionIc(copia);
+    version.setCalibradoPorId(usuarioId);
+    version.setCalibradoEn(clock.instant());
+    version.setActualizadoEn(clock.instant());
+    return construirRespuestaDetallada(versiones.save(version));
+  }
+
   @Transactional(readOnly = true)
   public void validarRespuestas(UUID versionId, JsonNode datos, Boolean esBorrador) {
     VersionFormulario version =
@@ -1032,5 +1169,325 @@ public class VersionFormularioService {
 
     boolean modoBorrador = esBorrador == null || esBorrador;
     schemaValidator.validarRespuestas(version.getEsquema(), datos, modoBorrador);
+  }
+
+  private void validarReglasParaPublicacion(VersionFormulario version) {
+    JsonNode configuracion = version.getReglasEvaluacionIc();
+    JsonNode reglas =
+        configuracion == null
+            ? com.fasterxml.jackson.databind.node.MissingNode.getInstance()
+            : configuracion.path("reglas_evaluacion_ic");
+
+    List<String> pendientes = new ArrayList<>();
+    List<String> invalidas = new ArrayList<>();
+
+    for (String campo : List.of("indicadores_de_un_elemento", "instancias_repetibles")) {
+      JsonNode valor = reglas.path("agregacion").path(campo);
+      String referencia = "agregacion." + campo;
+
+      if (valor.isMissingNode()
+          || valor.isNull()
+          || (valor.isTextual() && valor.asText().isBlank())) {
+        pendientes.add(referencia);
+      } else if (!valor.isTextual() || !Set.of("MAXIMO", "PROMEDIO").contains(valor.asText())) {
+        invalidas.add(referencia + ": debe ser MAXIMO o PROMEDIO");
+      }
+    }
+
+    for (String campo :
+        List.of("elementos_ausentes_portantes", "elementos_ausentes_no_portantes")) {
+      validarCalificacionConfigurada(
+          reglas.path("agregacion").path(campo), "agregacion." + campo, pendientes, invalidas);
+    }
+
+    JsonNode rangos = reglas.path("rangos_estado");
+
+    for (String estado : List.of("BUENO", "REGULAR", "MALO")) {
+      JsonNode valor = rangos.path(estado);
+
+      if (valor.isMissingNode() || valor.isNull()) {
+        pendientes.add("rangos_estado." + estado);
+      } else if (!valor.isNumber()) {
+        invalidas.add("rangos_estado." + estado + ": debe ser numerico");
+      }
+    }
+
+    if (rangos.path("BUENO").isNumber()
+        && rangos.path("REGULAR").isNumber()
+        && rangos.path("MALO").isNumber()) {
+      java.math.BigDecimal bueno = rangos.path("BUENO").decimalValue();
+      java.math.BigDecimal regular = rangos.path("REGULAR").decimalValue();
+      java.math.BigDecimal malo = rangos.path("MALO").decimalValue();
+
+      if (malo.signum() != 0
+          || regular.compareTo(malo) <= 0
+          || bueno.compareTo(regular) <= 0
+          || bueno.compareTo(java.math.BigDecimal.valueOf(100)) > 0) {
+        invalidas.add("rangos_estado: debe cumplir MALO = 0 < REGULAR < BUENO <= 100");
+      }
+    }
+
+    if (!pendientes.isEmpty() || !invalidas.isEmpty()) {
+      List<String> detalles = new ArrayList<>();
+
+      if (!pendientes.isEmpty()) {
+        detalles.add("Falta configurar: " + String.join(", ", pendientes));
+      }
+
+      if (!invalidas.isEmpty()) {
+        detalles.add("Configuracion invalida: " + String.join("; ", invalidas));
+      }
+
+      throw new ApiException(
+          HttpStatus.UNPROCESSABLE_ENTITY,
+          "reglas_ic_invalidas",
+          "Reglas del IC incompletas o invalidas",
+          String.join(". ", detalles));
+    }
+  }
+
+  private void validarCalificacionConfigurada(
+      JsonNode valor, String referencia, List<String> pendientes, List<String> invalidas) {
+    if (valor.isMissingNode() || valor.isNull()) {
+      pendientes.add(referencia);
+      return;
+    }
+
+    if (!valor.isNumber()
+        || valor.decimalValue().signum() < 0
+        || valor.decimalValue().compareTo(java.math.BigDecimal.valueOf(4)) > 0) {
+      invalidas.add(referencia + ": requiere una calificacion numerica entre 0 y 4");
+    }
+  }
+
+  private void validarConversionesParaPublicacion(VersionFormulario version) {
+    JsonNode configuracion = version.getReglasEvaluacionIc();
+    JsonNode conversiones =
+        configuracion.path("reglas_evaluacion_ic").path("conversion_indicadores");
+
+    Set<String> booleanos = new java.util.TreeSet<>();
+    Set<String> numericos = new java.util.TreeSet<>();
+    Set<String> enumerados = new java.util.TreeSet<>();
+    List<String> errores = new ArrayList<>();
+
+    for (JsonNode elemento : configuracion.path("elementos")) {
+      String referencia = elemento.path("elemento_ref").asText();
+
+      for (JsonNode indicador : elemento.path("indicadores")) {
+        String nombre = indicador.asText();
+
+        if ("falta_elemento".equals(nombre) || "junta_limpia".equals(nombre)) {
+          booleanos.add("junta." + nombre);
+        } else if ("buen_estado".equals(nombre)) {
+          booleanos.add("losa.buen_estado");
+        } else if ("existe".equals(nombre)) {
+          if (referencia.startsWith("/otros/senalizacion/")) {
+            booleanos.add("senal.existe");
+          } else if ("/otros/drenajes_aledanos".equals(referencia)) {
+            booleanos.add("drenaje_aledano.existe");
+          }
+        } else if ("golpeado_longitud_m".equals(nombre) || "golpeados_cantidad".equals(nombre)) {
+          numericos.add(nombre);
+        } else if ("aguas_arriba".equals(nombre) || "aguas_abajo".equals(nombre)) {
+          enumerados.add("socavacion.nivel");
+        } else if ("condiciones".equals(nombre)) {
+          enumerados.add("condicionesCauce");
+        } else if ("estado".equals(nombre)) {
+          enumerados.add(
+              referencia.startsWith("/superestructura/drenaje")
+                  ? "drenaje.estado"
+                  : "estado_bueno_malo");
+        }
+      }
+    }
+
+    for (String clave : booleanos) {
+      for (String valor : List.of("true", "false")) {
+        String equivalencia = clave + "=" + valor;
+        validarEquivalenciaParaPublicacion(
+            conversiones.path("booleanos").path(equivalencia),
+            "conversion_indicadores.booleanos." + equivalencia,
+            errores);
+      }
+    }
+
+    for (String familia : enumerados) {
+      List<String> categorias =
+          switch (familia) {
+            case "socavacion.nivel" ->
+                List.of("NO_HAY", "SIN_EXPOSICION", "CON_EXPOSICION", "ASENTAMIENTO_ESTRUCTURA");
+            case "condicionesCauce" ->
+                List.of("LIMPIO", "ASOLVADO_SEDIMENTADO", "EROSIONADO", "OTRO");
+            case "drenaje.estado" -> List.of("LIMPIOS", "OBSTRUIDOS");
+            case "estado_bueno_malo" -> List.of("BUENO", "MALO");
+            default -> List.of();
+          };
+
+      for (String categoria : categorias) {
+        validarEquivalenciaParaPublicacion(
+            conversiones.path("enumerados").path(familia).path(categoria),
+            "conversion_indicadores.enumerados." + familia + "." + categoria,
+            errores);
+      }
+    }
+
+    for (String indicador : numericos) {
+      String campo = "golpeado_longitud_m".equals(indicador) ? "umbrales_m" : "umbrales";
+      String ruta = "conversion_indicadores.numericos." + indicador + "." + campo;
+      JsonNode umbrales = conversiones.path("numericos").path(indicador).path(campo);
+
+      List<java.math.BigDecimal> valores = new ArrayList<>();
+
+      for (String nivel : List.of("LEVE", "MODERADO", "SEVERO")) {
+        JsonNode valor = umbrales.path(nivel);
+
+        if (!valor.isNumber()) {
+          errores.add(ruta + "." + nivel + " requiere un valor numerico");
+        } else {
+          valores.add(valor.decimalValue());
+        }
+      }
+
+      if (valores.size() == 3
+          && (valores.get(0).signum() <= 0
+              || valores.get(1).compareTo(valores.get(0)) <= 0
+              || valores.get(2).compareTo(valores.get(1)) <= 0)) {
+        errores.add(ruta + " debe cumplir 0 < LEVE < MODERADO < SEVERO");
+      }
+    }
+
+    if (!errores.isEmpty()) {
+      throw new ApiException(
+          HttpStatus.UNPROCESSABLE_ENTITY,
+          "conversiones_ic_invalidas",
+          "Conversiones del IC incompletas o invalidas",
+          String.join("; ", errores));
+    }
+  }
+
+  private void validarEquivalenciaParaPublicacion(
+      JsonNode valor, String referencia, List<String> errores) {
+    if (!valor.isNumber()
+        || valor.decimalValue().signum() < 0
+        || valor.decimalValue().compareTo(java.math.BigDecimal.valueOf(4)) > 0) {
+      errores.add(referencia + " requiere una calificacion numerica entre 0 y 4");
+    }
+  }
+
+  @Transactional
+  @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'CATEDRATICO')")
+  @Auditable(
+      accion = AccionAuditoria.MODIFICAR,
+      entidad = "version_formulario",
+      idArg = "id",
+      tipo = VersionFormulario.class,
+      recargarPosteriores = true)
+  public VersionFormularioResponse actualizarBorrador(
+      UUID id,
+      JsonNode esquema,
+      JsonNode vinculosAlmacenamiento,
+      JsonNode reglasEvaluacionIc,
+      String nuevoCodigo,
+      UUID usuarioId,
+      long versionEsperada) {
+    exigirVersionCalibracion(id, versionEsperada);
+    actualizarBorrador(
+        id, esquema, vinculosAlmacenamiento, reglasEvaluacionIc, nuevoCodigo, usuarioId);
+    finalizarCalibracion(id, versionEsperada);
+    return construirRespuestaDetallada(versiones.findById(id).orElseThrow());
+  }
+
+  @Transactional
+  @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'CATEDRATICO')")
+  @Auditable(
+      accion = AccionAuditoria.MODIFICAR,
+      entidad = "version_formulario",
+      idArg = "id",
+      tipo = VersionFormulario.class,
+      recargarPosteriores = true)
+  public List<ConfiguracionIcElementoResponse> calibrarPesos(
+      UUID id,
+      List<ConfiguracionIcElementoRequest> nuevosPesos,
+      UUID usuarioId,
+      long versionEsperada) {
+    exigirVersionCalibracion(id, versionEsperada);
+    var respuesta = calibrarPesos(id, nuevosPesos, usuarioId);
+    finalizarCalibracion(id, versionEsperada);
+    return respuesta;
+  }
+
+  @Transactional
+  @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'CATEDRATICO')")
+  @Auditable(
+      accion = AccionAuditoria.MODIFICAR,
+      entidad = "version_formulario",
+      idArg = "id",
+      tipo = VersionFormulario.class,
+      recargarPosteriores = true)
+  public VersionFormularioResponse configurarEscala(
+      UUID id,
+      gt.usac.cunoc.sgp.formulario.dto.ConfigurarEscalaIcRequest request,
+      UUID usuarioId,
+      long versionEsperada) {
+    exigirVersionCalibracion(id, versionEsperada);
+    configurarEscala(id, request, usuarioId);
+    finalizarCalibracion(id, versionEsperada);
+    return construirRespuestaDetallada(versiones.findById(id).orElseThrow());
+  }
+
+  @Transactional
+  @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'CATEDRATICO')")
+  @Auditable(
+      accion = AccionAuditoria.MODIFICAR,
+      entidad = "version_formulario",
+      idArg = "id",
+      tipo = VersionFormulario.class,
+      recargarPosteriores = true)
+  public VersionFormularioResponse configurarReglasCriticas(
+      UUID id,
+      gt.usac.cunoc.sgp.formulario.dto.ConfigurarReglasCriticasIcRequest request,
+      UUID usuarioId,
+      long versionEsperada) {
+    exigirVersionCalibracion(id, versionEsperada);
+    configurarReglasCriticas(id, request, usuarioId);
+    finalizarCalibracion(id, versionEsperada);
+    return construirRespuestaDetallada(versiones.findById(id).orElseThrow());
+  }
+
+  private void finalizarCalibracion(UUID id, long versionEsperada) {
+    versiones.flush();
+    var version = versiones.findById(id).orElseThrow();
+    if (version.getVersion() == versionEsperada) {
+      if (versiones.incrementarVersionCalibracion(version.getId(), versionEsperada) != 1) {
+        throw new IllegalStateException("No se pudo incrementar la version de calibracion");
+      }
+    }
+  }
+
+  private void exigirVersionCalibracion(UUID id, long versionEsperada) {
+    var version =
+        versiones
+            .findByIdForUpdate(id)
+            .orElseThrow(
+                () ->
+                    new ApiException(
+                        HttpStatus.NOT_FOUND,
+                        "version_no_encontrada",
+                        "Version no encontrada",
+                        "No existe la version de formulario solicitada."));
+    if (version.getEstado() != EstadoVersionFormulario.BORRADOR) {
+      throw new ApiException(
+          HttpStatus.CONFLICT,
+          "version_inmutable",
+          "Version inmutable",
+          "La version publicada no puede modificarse. Cree una version nueva.");
+    }
+    if (version.getVersion() != versionEsperada) {
+      throw new ApiException(
+          HttpStatus.CONFLICT,
+          "concurrencia_conflicto",
+          "Conflicto de version",
+          "La version fue modificada por otro usuario. Recargue antes de guardar.");
+    }
   }
 }

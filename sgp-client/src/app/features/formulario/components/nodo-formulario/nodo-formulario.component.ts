@@ -1,3 +1,5 @@
+import { AnclajeComentariosComponent } from '../comentarios/anclaje-comentarios.component';
+import { AnclajeObservacionesComponent } from '../observaciones/anclaje-observaciones.component';
 import { ChangeDetectionStrategy, Component, computed, inject, input } from '@angular/core';
 import { AbstractControl, FormArray, FormGroup } from '@angular/forms';
 import { TranslocoPipe } from '@jsverse/transloco';
@@ -21,17 +23,26 @@ function esTextoLargo(nodo: NodoCampo): boolean {
 @Component({
   selector: 'app-nodo-formulario',
   standalone: true,
-  imports: [TranslocoPipe, ButtonModule, CampoFormularioComponent, RenderizadorNodoDirective],
+  imports: [
+    AnclajeObservacionesComponent,
+    AnclajeComentariosComponent,
+    TranslocoPipe,
+    ButtonModule,
+    CampoFormularioComponent,
+    RenderizadorNodoDirective,
+  ],
   templateUrl: './nodo-formulario.component.html',
   styleUrl: './nodo-formulario.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { '[class.ancho-completo]': 'anchoCompleto()' },
 })
 export class NodoFormularioComponent {
+  private readonly predeterminados =
+    inject(RENDERIZADORES_PREDETERMINADOS, { optional: true }) ?? [];
   /** Los que aporta quien usa el formulario tienen prioridad sobre los predeterminados. */
   private readonly renderizadores = [
     ...(inject(RENDERIZADORES_NODO, { optional: true }) ?? []),
-    ...(inject(RENDERIZADORES_PREDETERMINADOS, { optional: true }) ?? []),
+    ...this.predeterminados,
   ];
 
   readonly nodo = input.required<NodoFormulario>();
@@ -40,6 +51,8 @@ export class NodoFormularioComponent {
   /** Profundidad dentro de la sección; el nivel 0 no repite el título que ya muestra la sección. */
   readonly nivel = input(0);
   readonly mostrarLeyenda = input(true);
+  /** Quien lo contiene dibuja el botón de comentarios junto al nombre de este nodo. */
+  readonly comentariosEnCabecera = input(false);
   /** Dibuja los campos con el estilo de la grilla de daños (botones amplios, 44 px), como en un elemento. */
   readonly modoGrilla = input(false);
 
@@ -47,6 +60,27 @@ export class NodoFormularioComponent {
   protected readonly renderizador = computed(() =>
     this.renderizadores.find((candidato) => candidato.coincide(this.nodo())),
   );
+  /** Los renderizadores predeterminados (la tarjeta de un elemento) dibujan su propio nombre. */
+  private readonly renderizadorPredeterminado = computed(() => {
+    const renderizador = this.renderizador();
+    return renderizador !== undefined && this.predeterminados.includes(renderizador);
+  });
+  /**
+   * Dónde va el botón de comentarios: siempre pegado al nombre del nodo. La tarjeta de un elemento,
+   * la cabecera de una instancia y el título de una sección lo dibujan ellos mismos; un grupo lo
+   * lleva en su leyenda. Un grupo opcional plegado no tiene dónde (un botón dentro de su
+   * `summary` sería un control dentro de otro), así que lo lleva en una fila sobre él.
+   */
+  protected readonly ubicacionComentarios = computed<'cabecera' | 'leyenda' | 'fila'>(() => {
+    if (this.comentariosEnCabecera() || this.renderizadorPredeterminado()) return 'cabecera';
+    const nodo = this.nodo();
+    return nodo.clase === 'objeto' &&
+      !this.esOpcional() &&
+      this.nivel() > 0 &&
+      this.mostrarLeyenda()
+      ? 'leyenda'
+      : 'fila';
+  });
   protected readonly entradasRenderizador = computed(() => ({
     nodo: this.nodo(),
     control: this.control(),

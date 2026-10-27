@@ -59,6 +59,14 @@ public class UserAccount {
   @JoinColumn(name = "rol_id", nullable = false)
   private Role role;
 
+  /** Nulo en las cuentas anteriores a que el perfil fuera obligatorio. */
+  @Column(name = "nombre_completo", length = 200)
+  private String nombreCompleto;
+
+  /** Identidad visible en el foro y base de las menciones; única sin distinguir mayúsculas. */
+  @Column(name = "nombre_usuario", length = 60)
+  private String nombreUsuario;
+
   @Column(name = "desactivado_en")
   private Instant desactivadoEn;
 
@@ -137,6 +145,19 @@ public class UserAccount {
 
   public Role getRole() {
     return role;
+  }
+
+  public String getNombreCompleto() {
+    return nombreCompleto;
+  }
+
+  public String getNombreUsuario() {
+    return nombreUsuario;
+  }
+
+  public void actualizarPerfil(String nombreCompleto, String nombreUsuario) {
+    this.nombreCompleto = nombreCompleto;
+    this.nombreUsuario = nombreUsuario;
   }
 
   public Instant getLockedUntil() {

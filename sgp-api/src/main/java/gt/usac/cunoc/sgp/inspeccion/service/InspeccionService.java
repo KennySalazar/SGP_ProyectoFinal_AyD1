@@ -3,17 +3,25 @@ package gt.usac.cunoc.sgp.inspeccion.service;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import gt.usac.cunoc.sgp.archivo.model.TipoUsoArchivo;
+import gt.usac.cunoc.sgp.archivo.repository.ArchivoInspeccionRepository;
 import gt.usac.cunoc.sgp.common.audit.model.AccionAuditoria;
 import gt.usac.cunoc.sgp.common.audit.service.AuditoriaWriter;
 import gt.usac.cunoc.sgp.common.exception.ApiException;
 import gt.usac.cunoc.sgp.common.util.UuidV7Generator;
+import gt.usac.cunoc.sgp.formulario.dto.MapeoCampoResponse;
+import gt.usac.cunoc.sgp.formulario.entity.MapeoCampoFormulario;
 import gt.usac.cunoc.sgp.formulario.entity.VersionFormulario;
 import gt.usac.cunoc.sgp.formulario.model.EstadoVersionFormulario;
+import gt.usac.cunoc.sgp.formulario.model.TipoMapeoCampo;
+import gt.usac.cunoc.sgp.formulario.repository.MapeoCampoFormularioRepository;
 import gt.usac.cunoc.sgp.formulario.repository.VersionFormularioRepository;
 import gt.usac.cunoc.sgp.formulario.validation.JsonSchemaValidatorService;
 import gt.usac.cunoc.sgp.inspeccion.dto.AcompananteRequest;
 import gt.usac.cunoc.sgp.inspeccion.dto.AcompananteResponse;
+import gt.usac.cunoc.sgp.inspeccion.dto.ConflictoSincronizacionResponse;
 import gt.usac.cunoc.sgp.inspeccion.dto.DatosPermanentesResponse;
+import gt.usac.cunoc.sgp.inspeccion.dto.ExportacionInspeccionResponse;
 import gt.usac.cunoc.sgp.inspeccion.dto.GuardarBorradorRequest;
 import gt.usac.cunoc.sgp.inspeccion.dto.GuardarRespuestasRequest;
 import gt.usac.cunoc.sgp.inspeccion.dto.IndiceCondicionPreliminarResponse;
@@ -22,8 +30,12 @@ import gt.usac.cunoc.sgp.inspeccion.dto.IniciarInspeccionResponse;
 import gt.usac.cunoc.sgp.inspeccion.dto.IniciarInspeccionVersionadaRequest;
 import gt.usac.cunoc.sgp.inspeccion.dto.IniciarInspeccionVersionadaResponse;
 import gt.usac.cunoc.sgp.inspeccion.dto.InspeccionBorradorResponse;
+import gt.usac.cunoc.sgp.inspeccion.dto.InspeccionPublicadaDetalleResponse;
+import gt.usac.cunoc.sgp.inspeccion.dto.InspeccionPublicadaResumenResponse;
 import gt.usac.cunoc.sgp.inspeccion.dto.InspeccionResumenResponse;
 import gt.usac.cunoc.sgp.inspeccion.dto.ProgresoBorradorResponse;
+import gt.usac.cunoc.sgp.inspeccion.dto.RelacionVersionActivaResponse;
+import gt.usac.cunoc.sgp.inspeccion.dto.ResultadoIcPublicadoResponse;
 import gt.usac.cunoc.sgp.inspeccion.entity.Inspeccion;
 import gt.usac.cunoc.sgp.inspeccion.entity.InspeccionAcompanante;
 import gt.usac.cunoc.sgp.inspeccion.entity.InspeccionDatoTecnico;
@@ -32,10 +44,16 @@ import gt.usac.cunoc.sgp.inspeccion.model.EntradaCalculoIc;
 import gt.usac.cunoc.sgp.inspeccion.model.ResultadoCalculoIc;
 import gt.usac.cunoc.sgp.inspeccion.repository.InspeccionDatoTecnicoRepository;
 import gt.usac.cunoc.sgp.inspeccion.repository.InspeccionRepository;
+import gt.usac.cunoc.sgp.inspeccion.repository.ResultadoIcRepository;
+import gt.usac.cunoc.sgp.mantenimiento.repository.OrdenMantenimientoRepository;
 import gt.usac.cunoc.sgp.puente.entity.Puente;
+import gt.usac.cunoc.sgp.puente.repository.AsignacionPuenteRepository;
 import gt.usac.cunoc.sgp.puente.repository.PuenteRepository;
-import gt.usac.cunoc.sgp.sync.entity.OperacionIdempotente;
-import gt.usac.cunoc.sgp.sync.repository.OperacionIdempotenteRepository;
+import gt.usac.cunoc.sgp.sync.entity.ConflictoSincronizacion;
+import gt.usac.cunoc.sgp.sync.model.SolicitudOperacion;
+import gt.usac.cunoc.sgp.sync.repository.ConflictoSincronizacionRepository;
+import gt.usac.cunoc.sgp.sync.service.HuellaSolicitud;
+import gt.usac.cunoc.sgp.sync.service.OperacionIdempotenteService;
 import gt.usac.cunoc.sgp.usuario.entity.UserAccount;
 import gt.usac.cunoc.sgp.usuario.model.RoleName;
 import gt.usac.cunoc.sgp.usuario.repository.UserAccountRepository;
@@ -46,11 +64,11 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.Clock;
-import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HexFormat;
 import java.util.List;
@@ -87,7 +105,7 @@ public class InspeccionService {
   private final VersionFormularioRepository versionFormularioRepository;
   private final UserAccountRepository userAccountRepository;
   private final UsuarioProfesionalRepository profesionalRepository;
-  private final OperacionIdempotenteRepository operacionIdempotenteRepository;
+  private final OperacionIdempotenteService operaciones;
   private final AuditoriaWriter auditoriaWriter;
   private final ObjectMapper objectMapper;
   private final Clock clock;
@@ -96,6 +114,14 @@ public class InspeccionService {
   private final CalculoIndiceCondicionService calculoIndiceCondicionService;
   private final JsonSchemaValidatorService jsonSchemaValidatorService;
   private final InspeccionMapper inspeccionMapper;
+  private AsignacionPuenteRepository asignaciones;
+  private final ResultadoIcRepository resultadoIcRepository;
+  private MapeoCampoFormularioRepository mapeoCampoFormularioRepository;
+  private ArchivoInspeccionRepository archivoInspeccionRepository;
+  private OrdenMantenimientoRepository ordenMantenimientoRepository;
+
+  @Autowired(required = false)
+  private ConflictoSincronizacionRepository conflictosSincronizacion;
 
   public InspeccionService(
       InspeccionRepository inspeccionRepository,
@@ -103,7 +129,8 @@ public class InspeccionService {
       PuenteRepository puenteRepository,
       JsonSchemaValidatorService jsonSchemaValidatorService,
       InspeccionMapper inspeccionMapper,
-      ObjectMapper objectMapper) {
+      ObjectMapper objectMapper,
+      AsignacionPuenteRepository asignaciones) {
     this(
         inspeccionRepository,
         null,
@@ -119,7 +146,8 @@ public class InspeccionService {
         null,
         null,
         jsonSchemaValidatorService,
-        inspeccionMapper);
+        inspeccionMapper,
+        asignaciones);
   }
 
   public InspeccionService(
@@ -129,7 +157,7 @@ public class InspeccionService {
       VersionFormularioRepository versionFormularioRepository,
       UserAccountRepository userAccountRepository,
       UsuarioProfesionalRepository profesionalRepository,
-      OperacionIdempotenteRepository operacionIdempotenteRepository,
+      OperacionIdempotenteService operaciones,
       AuditoriaWriter auditoriaWriter,
       ObjectMapper objectMapper,
       Clock clock) {
@@ -140,10 +168,11 @@ public class InspeccionService {
         versionFormularioRepository,
         userAccountRepository,
         profesionalRepository,
-        operacionIdempotenteRepository,
+        operaciones,
         auditoriaWriter,
         objectMapper,
         clock,
+        null,
         null,
         null,
         null,
@@ -158,7 +187,7 @@ public class InspeccionService {
       VersionFormularioRepository versionFormularioRepository,
       UserAccountRepository userAccountRepository,
       UsuarioProfesionalRepository profesionalRepository,
-      OperacionIdempotenteRepository operacionIdempotenteRepository,
+      OperacionIdempotenteService operaciones,
       AuditoriaWriter auditoriaWriter,
       ObjectMapper objectMapper,
       Clock clock,
@@ -172,7 +201,7 @@ public class InspeccionService {
         versionFormularioRepository,
         userAccountRepository,
         profesionalRepository,
-        operacionIdempotenteRepository,
+        operaciones,
         auditoriaWriter,
         objectMapper,
         clock,
@@ -180,6 +209,44 @@ public class InspeccionService {
         preparadorEntradaIcService,
         calculoIndiceCondicionService,
         null,
+        null,
+        null);
+  }
+
+  public InspeccionService(
+      InspeccionRepository inspeccionRepository,
+      InspeccionDatoTecnicoRepository datoTecnicoRepository,
+      PuenteRepository puenteRepository,
+      VersionFormularioRepository versionFormularioRepository,
+      UserAccountRepository userAccountRepository,
+      UsuarioProfesionalRepository profesionalRepository,
+      OperacionIdempotenteService operaciones,
+      AuditoriaWriter auditoriaWriter,
+      ObjectMapper objectMapper,
+      Clock clock,
+      CalculadorProgresoBorrador calculadorProgreso,
+      PreparadorEntradaIcService preparadorEntradaIcService,
+      CalculoIndiceCondicionService calculoIndiceCondicionService,
+      JsonSchemaValidatorService jsonSchemaValidatorService,
+      InspeccionMapper inspeccionMapper,
+      AsignacionPuenteRepository asignaciones) {
+    this(
+        inspeccionRepository,
+        datoTecnicoRepository,
+        puenteRepository,
+        versionFormularioRepository,
+        userAccountRepository,
+        profesionalRepository,
+        operaciones,
+        auditoriaWriter,
+        objectMapper,
+        clock,
+        calculadorProgreso,
+        preparadorEntradaIcService,
+        calculoIndiceCondicionService,
+        jsonSchemaValidatorService,
+        inspeccionMapper,
+        asignaciones,
         null);
   }
 
@@ -191,7 +258,7 @@ public class InspeccionService {
       VersionFormularioRepository versionFormularioRepository,
       UserAccountRepository userAccountRepository,
       UsuarioProfesionalRepository profesionalRepository,
-      OperacionIdempotenteRepository operacionIdempotenteRepository,
+      OperacionIdempotenteService operaciones,
       AuditoriaWriter auditoriaWriter,
       ObjectMapper objectMapper,
       Clock clock,
@@ -199,14 +266,16 @@ public class InspeccionService {
       PreparadorEntradaIcService preparadorEntradaIcService,
       CalculoIndiceCondicionService calculoIndiceCondicionService,
       JsonSchemaValidatorService jsonSchemaValidatorService,
-      InspeccionMapper inspeccionMapper) {
+      InspeccionMapper inspeccionMapper,
+      AsignacionPuenteRepository asignaciones,
+      ResultadoIcRepository resultadoIcRepository) {
     this.inspeccionRepository = inspeccionRepository;
     this.datoTecnicoRepository = datoTecnicoRepository;
     this.puenteRepository = puenteRepository;
     this.versionFormularioRepository = versionFormularioRepository;
     this.userAccountRepository = userAccountRepository;
     this.profesionalRepository = profesionalRepository;
-    this.operacionIdempotenteRepository = operacionIdempotenteRepository;
+    this.operaciones = operaciones;
     this.auditoriaWriter = auditoriaWriter;
     this.objectMapper = objectMapper;
     this.clock = clock;
@@ -216,6 +285,38 @@ public class InspeccionService {
     this.calculoIndiceCondicionService = calculoIndiceCondicionService;
     this.jsonSchemaValidatorService = jsonSchemaValidatorService;
     this.inspeccionMapper = inspeccionMapper;
+    this.asignaciones = asignaciones;
+    this.resultadoIcRepository = resultadoIcRepository;
+  }
+
+  @Autowired(required = false)
+  void setAsignacionPuenteRepository(AsignacionPuenteRepository asignaciones) {
+    this.asignaciones = asignaciones;
+  }
+
+  @Autowired(required = false)
+  public void setMapeoCampoFormularioRepository(
+      MapeoCampoFormularioRepository mapeoCampoFormularioRepository) {
+    this.mapeoCampoFormularioRepository = mapeoCampoFormularioRepository;
+  }
+
+  @Autowired(required = false)
+  public void setArchivoInspeccionRepository(
+      ArchivoInspeccionRepository archivoInspeccionRepository) {
+    this.archivoInspeccionRepository = archivoInspeccionRepository;
+  }
+
+  @Autowired(required = false)
+  public void setOrdenMantenimientoRepository(
+      OrdenMantenimientoRepository ordenMantenimientoRepository) {
+    this.ordenMantenimientoRepository = ordenMantenimientoRepository;
+  }
+
+  /** Conserva el contrato de HU-024 utilizado por los consumidores de HU-028. */
+  @Transactional
+  public IniciarInspeccionResponse iniciarInspeccion(
+      IniciarInspeccionRequest request, UUID usuarioId, String idempotencyKey) {
+    return iniciarInspeccionHu024(request, usuarioId, idempotencyKey);
   }
 
   @Transactional
@@ -224,28 +325,63 @@ public class InspeccionService {
     // 1. Autorización de rol y verificación
     UserAccount user = validarInspector(usuarioId);
 
-    // 2. Idempotencia
     if (idempotencyKey != null && !idempotencyKey.isBlank()) {
-      Optional<OperacionIdempotente> opExistente =
-          operacionIdempotenteRepository.findByUsuarioIdAndClave(usuarioId, idempotencyKey);
-      if (opExistente.isPresent()
-          && "COMPLETADA".equals(opExistente.get().getEstado())
-          && opExistente.get().getEntidadId() != null) {
-        return inspeccionRepository
-            .findConDetallesById(opExistente.get().getEntidadId())
-            .map(this::aResponse)
-            .orElseGet(() -> crearNuevaInspeccion(request, user, idempotencyKey));
-      }
+      var solicitud =
+          new SolicitudOperacion(
+              usuarioId,
+              idempotencyKey,
+              "POST",
+              "/api/v1/inspecciones",
+              calcularHash(request.toString()),
+              "inspeccion",
+              request.id());
+      return operaciones.ejecutar(
+          solicitud,
+          201,
+          () -> crearORecuperar(request, user),
+          IniciarInspeccionResponse::id,
+          nodo -> {
+            if (nodo.has("rolAutor"))
+              return objectMapper.convertValue(nodo, IniciarInspeccionResponse.class);
+            // Compatibilidad con snapshots de HU-024 guardados antes del coordinador común.
+            UUID id = UUID.fromString(nodo.path("id").asText());
+            return inspeccionRepository
+                .findConDetallesById(id)
+                .filter(i -> i.getAutorId().equals(usuarioId) && i.getEliminadoEn() == null)
+                .map(this::aResponse)
+                .orElseThrow(() -> conflictoIdentidad());
+          });
     }
+    return crearORecuperar(request, user);
+  }
 
+  private IniciarInspeccionResponse crearORecuperar(
+      IniciarInspeccionRequest request, UserAccount user) {
     if (request.id() != null) {
-      Optional<Inspeccion> existente = inspeccionRepository.findConDetallesById(request.id());
-      if (existente.isPresent() && existente.get().getAutorId().equals(usuarioId)) {
-        return aResponse(existente.get());
+      operaciones.bloquearEntidad("inspeccion", request.id());
+      var existente = inspeccionRepository.findConDetallesById(request.id());
+      if (existente.isPresent()) {
+        var i = existente.get();
+        if ((i.getHuellaSolicitudInicio() != null
+                && !i.getHuellaSolicitudInicio()
+                    .equals(HuellaSolicitud.calcular(objectMapper.valueToTree(request))))
+            || !i.getAutorId().equals(user.getId())
+            || i.getEliminadoEn() != null
+            || !i.getPuente().getId().equals(request.puenteId())
+            || !i.getFechaInspeccion().equals(request.fechaInspeccion())
+            || !i.getDispositivoId().equals(request.dispositivoId())) throw conflictoIdentidad();
+        return aResponse(i);
       }
     }
+    return crearNuevaInspeccion(request, user);
+  }
 
-    return crearNuevaInspeccion(request, user, idempotencyKey);
+  private ApiException conflictoIdentidad() {
+    return new ApiException(
+        HttpStatus.CONFLICT,
+        "inspeccion_identidad_conflictiva",
+        "Conflicto de inspección",
+        "El identificador de inspección ya corresponde a otra solicitud o no está disponible.");
   }
 
   @Transactional
@@ -287,7 +423,8 @@ public class InspeccionService {
                         HttpStatus.UNPROCESSABLE_ENTITY,
                         "version_no_utilizable",
                         "Versión de formulario no utilizable",
-                        "Solo se pueden iniciar inspecciones con versiones de formulario publicadas"));
+                        "Solo se pueden iniciar inspecciones con versiones de formulario"
+                            + " publicadas"));
 
     JsonNode datos = request.datos();
     if (datos == null || datos.isNull() || datos.isEmpty()) {
@@ -310,8 +447,32 @@ public class InspeccionService {
             ? request.nombreAutorCapturado()
             : "Inspector";
 
+    if (RoleName.ESTUDIANTE.name().equals(rolUsuario) && request.asignacionPuenteId() != null) {
+      if (asignaciones == null
+          || !asignaciones.existsVigenteParaInspeccion(
+              request.asignacionPuenteId(), usuarioId, puente.getId())) {
+        throw new ApiException(
+            HttpStatus.NOT_FOUND,
+            "asignacion_no_encontrada",
+            "Asignación no encontrada",
+            "No existe una asignación vigente del estudiante para este puente.");
+      }
+    }
+
     Inspeccion inspeccion =
         new Inspeccion(puente, version, usuarioId, rolUsuario, nombre, fecha, dispositivo, datos);
+    if (request.asignacionPuenteId() != null) {
+      if (!RoleName.ESTUDIANTE.name().equals(rolUsuario)
+          && !asignaciones.existsVigenteParaInspeccion(
+              request.asignacionPuenteId(), usuarioId, puente.getId())) {
+        throw new ApiException(
+            HttpStatus.NOT_FOUND,
+            "asignacion_no_encontrada",
+            "Asignación no encontrada",
+            "No existe una asignación vigente del autor para este puente.");
+      }
+      inspeccion.setAsignacionPuenteId(request.asignacionPuenteId());
+    }
     InspeccionResumenResponse response =
         inspeccionMapper.toResumenResponse(inspeccionRepository.save(inspeccion));
     return new IniciarInspeccionVersionadaResponse(
@@ -357,6 +518,16 @@ public class InspeccionService {
   @Transactional
   public InspeccionBorradorResponse guardarBorrador(
       UUID id, GuardarBorradorRequest request, UUID usuarioId) {
+    return guardarBorrador(id, request, usuarioId, false, null);
+  }
+
+  @Transactional
+  public InspeccionBorradorResponse guardarBorrador(
+      UUID id,
+      GuardarBorradorRequest request,
+      UUID usuarioId,
+      boolean clientePrevalece,
+      UUID operacionIdempotenteId) {
     Inspeccion inspeccion =
         inspeccionRepository
             .findConDetallesById(id)
@@ -379,10 +550,10 @@ public class InspeccionService {
     // 7. Solo el autor puede editar
     if (!inspeccion.getAutorId().equals(usuarioId)) {
       throw new ApiException(
-          HttpStatus.FORBIDDEN,
-          "acceso_denegado",
-          "Acceso denegado",
-          "Solo el autor puede modificar esta inspección en borrador.");
+          HttpStatus.NOT_FOUND,
+          "inspeccion_no_encontrada",
+          "Inspección no encontrada",
+          "No se encontró la inspección especificada o no tiene acceso a ella.");
     }
 
     // 6. Solo BORRADOR puede editarse
@@ -398,11 +569,35 @@ public class InspeccionService {
     if (request != null
         && request.version() != null
         && !Objects.equals(request.version(), inspeccion.getVersion())) {
-      throw new ApiException(
-          HttpStatus.CONFLICT,
-          "concurrencia_conflicto",
-          "Conflicto de concurrencia",
-          "La inspección fue modificada concurrentemente por otra sesión o dispositivo.");
+      if (!clientePrevalece || operacionIdempotenteId == null || conflictosSincronizacion == null) {
+        throw new ApiException(
+            HttpStatus.CONFLICT,
+            "concurrencia_conflicto",
+            "Conflicto de concurrencia",
+            "La inspección fue modificada concurrentemente por otra sesión o dispositivo.");
+      }
+      var copiaServidor = objectMapper.valueToTree(aBorradorResponse(inspeccion));
+      var conflicto =
+          new ConflictoSincronizacion(
+              UuidV7Generator.generate(),
+              inspeccion.getId(),
+              operacionIdempotenteId,
+              inspeccion.getVersion(),
+              request.version(),
+              copiaServidor,
+              calcularHash(objectMapper.valueToTree(request).toString()),
+              clock.instant());
+      conflictosSincronizacion.save(conflicto);
+      if (auditoriaWriter != null) {
+        auditoriaWriter.registrarEnTransaccion(
+            usuarioId,
+            AccionAuditoria.MODIFICAR,
+            "conflicto_sincronizacion",
+            conflicto.getId(),
+            copiaServidor,
+            objectMapper.valueToTree(request),
+            "HU-059");
+      }
     }
 
     // 9. Fechas futuras o anteriores a la construcción
@@ -473,6 +668,38 @@ public class InspeccionService {
   }
 
   @Transactional(readOnly = true)
+  public List<ConflictoSincronizacionResponse> listarConflictosSincronizacion(
+      UUID inspeccionId, UUID usuarioId) {
+    var inspeccion =
+        inspeccionRepository
+            .findActiveById(inspeccionId)
+            .orElseThrow(
+                () ->
+                    new ApiException(
+                        HttpStatus.NOT_FOUND,
+                        "inspeccion_no_encontrada",
+                        "Inspección no encontrada",
+                        "No existe la inspección solicitada."));
+    if (!inspeccion.getAutorId().equals(usuarioId))
+      throw new ApiException(
+          HttpStatus.NOT_FOUND,
+          "inspeccion_no_encontrada",
+          "Inspección no encontrada",
+          "No existe la inspección solicitada.");
+    if (conflictosSincronizacion == null) return List.of();
+    return conflictosSincronizacion.findByInspeccionIdOrderByDetectadoEnDesc(inspeccionId).stream()
+        .map(
+            c ->
+                new ConflictoSincronizacionResponse(
+                    c.getId(),
+                    c.getVersionServidor(),
+                    c.getVersionCliente(),
+                    c.getCopiaServidor(),
+                    c.getDetectadoEn()))
+        .toList();
+  }
+
+  @Transactional(readOnly = true)
   public InspeccionBorradorResponse obtenerBorrador(UUID id, UUID usuarioId) {
     Inspeccion inspeccion =
         inspeccionRepository
@@ -485,10 +712,15 @@ public class InspeccionService {
                         "Inspección no encontrada",
                         "No se encontró la inspección especificada o no tiene acceso a ella."));
 
-    // Privacidad y edición: 404 para usuarios no autorizados, eliminadas o no editables.
+    boolean autor = inspeccion.getAutorId().equals(usuarioId);
+    boolean catedraticoAsignado = esCatedraticoAsignado(inspeccion, usuarioId);
+    // El autor solo puede editar su borrador. El catedrático asignado puede consultar la
+    // inspección del estudiante durante el ciclo de revisión, siempre en solo lectura.
+    boolean inspeccionDisponibleParaRevision =
+        Set.of("BORRADOR", "ENVIADA", "EN_REVISION").contains(inspeccion.getEstado());
     if (inspeccion.getEliminadoEn() != null
-        || !inspeccion.getAutorId().equals(usuarioId)
-        || !"BORRADOR".equals(inspeccion.getEstado())) {
+        || !(autor && "BORRADOR".equals(inspeccion.getEstado()))
+            && !(catedraticoAsignado && inspeccionDisponibleParaRevision)) {
       throw new ApiException(
           HttpStatus.NOT_FOUND,
           "inspeccion_no_encontrada",
@@ -661,7 +893,7 @@ public class InspeccionService {
   }
 
   private IniciarInspeccionResponse crearNuevaInspeccion(
-      IniciarInspeccionRequest request, UserAccount user, String idempotencyKey) {
+      IniciarInspeccionRequest request, UserAccount user) {
     // 3. Validar puente
     Puente puente =
         puenteRepository
@@ -682,17 +914,41 @@ public class InspeccionService {
           "El puente está inactivo y no admite nuevas inspecciones.");
     }
 
-    // 4. Versión activa de formulario (fijada para la inspección)
+    LocalDate hoyGuatemala = LocalDate.now(clock.withZone(ZONA_GUATEMALA));
+    UUID asignacionPuenteId = null;
+    if (user.getRole().getName() == RoleName.ESTUDIANTE) {
+      if (asignaciones == null) {
+        throw new ApiException(
+            HttpStatus.FORBIDDEN,
+            "puente_no_asignado",
+            "Puente no asignado",
+            "El estudiante no tiene una asignación vigente para este puente.");
+      }
+      asignacionPuenteId =
+          asignaciones
+              .findVigenteParaInspeccion(user.getId(), puente.getId(), hoyGuatemala)
+              .map(AsignacionPuenteRepository.AsignacionInspeccionProjection::getId)
+              .orElseThrow(
+                  () ->
+                      new ApiException(
+                          HttpStatus.FORBIDDEN,
+                          "puente_no_asignado",
+                          "Puente no asignado",
+                          "El estudiante no tiene una asignación vigente para este puente."));
+    }
+
+    // Una captura preparada conserva su versión aunque cambie la activa.
     VersionFormulario versionActiva =
-        versionFormularioRepository
-            .findByActivaTrue()
+        (request.versionFormularioId() == null
+                ? versionFormularioRepository.findByActivaTrue()
+                : versionFormularioRepository.findById(request.versionFormularioId()))
             .orElseThrow(
                 () ->
                     new ApiException(
                         HttpStatus.CONFLICT,
                         "sin_formulario_activo",
                         "Formulario no disponible",
-                        "No existe una versión de formulario activa para iniciar inspecciones."));
+                        "No existe la versión de formulario solicitada para iniciar inspecciones."));
     if (versionActiva.getEstado() != EstadoVersionFormulario.PUBLICADA) {
       throw new ApiException(
           HttpStatus.UNPROCESSABLE_ENTITY,
@@ -708,7 +964,6 @@ public class InspeccionService {
     }
 
     // 5. Validar fechas de inspección
-    LocalDate hoyGuatemala = LocalDate.now(clock.withZone(ZONA_GUATEMALA));
     LocalDate fechaInspeccion =
         request.fechaInspeccion() != null ? request.fechaInspeccion() : hoyGuatemala;
     if (fechaInspeccion.isAfter(hoyGuatemala)) {
@@ -804,6 +1059,9 @@ public class InspeccionService {
             datosPermanentesConfirmadosEn,
             datosIniciales,
             ahora);
+    inspeccion.setHuellaSolicitudInicio(
+        HuellaSolicitud.calcular(objectMapper.valueToTree(request)));
+    inspeccion.setAsignacionPuenteId(asignacionPuenteId);
 
     if (request.confirmarDatosPermanentes() && tecnicoVigente != null) {
       datoTecnico = new InspeccionDatoTecnico(inspeccion, ahora);
@@ -852,29 +1110,7 @@ public class InspeccionService {
         inspeccion.getId(),
         null,
         snapshot,
-        "HU-024");
-
-    // 10. Registro de idempotencia si aplica
-    if (idempotencyKey != null && !idempotencyKey.isBlank()) {
-      String hashSolicitud = calcularHash(request.toString());
-      OperacionIdempotente op =
-          new OperacionIdempotente(
-              UuidV7Generator.generate(),
-              user.getId(),
-              idempotencyKey,
-              "POST",
-              "/api/v1/inspecciones",
-              hashSolicitud,
-              "COMPLETADA",
-              201,
-              snapshot,
-              "inspeccion",
-              inspeccion.getId(),
-              ahora,
-              ahora.plus(Duration.ofDays(7)),
-              ahora);
-      operacionIdempotenteRepository.save(op);
-    }
+        user.getRole().getName() == RoleName.ESTUDIANTE ? "HU-035" : "HU-024");
 
     IniciarInspeccionResponse response = aResponse(inspeccion);
     if (advertenciaGps) {
@@ -947,12 +1183,13 @@ public class InspeccionService {
             "Colegiado no verificado",
             "Tu número de colegiado aún no ha sido verificado por el Administrador.");
       }
-    } else if (role != RoleName.CATEDRATICO) {
+    } else if (role != RoleName.CATEDRATICO && role != RoleName.ESTUDIANTE) {
       throw new ApiException(
           HttpStatus.FORBIDDEN,
           "rol_no_autorizado",
           "Acceso denegado",
-          "Solo Catedráticos y Profesionales externos verificados pueden iniciar inspecciones.");
+          "Solo Estudiantes asignados, Catedráticos y Profesionales externos verificados pueden"
+              + " iniciar inspecciones.");
     }
 
     return user;
@@ -1154,10 +1391,10 @@ public class InspeccionService {
 
     if (!inspeccion.getAutorId().equals(usuarioId)) {
       throw new ApiException(
-          HttpStatus.FORBIDDEN,
-          "acceso_denegado",
-          "Acceso denegado",
-          "Solo el autor puede modificar esta inspección.");
+          HttpStatus.NOT_FOUND,
+          "inspeccion_no_encontrada",
+          "Inspección no encontrada",
+          "No existe la inspección solicitada.");
     }
     if (!"BORRADOR".equalsIgnoreCase(inspeccion.getEstado())) {
       throw new ApiException(
@@ -1190,10 +1427,248 @@ public class InspeccionService {
   }
 
   @Transactional(readOnly = true)
+  public Page<InspeccionPublicadaResumenResponse> listarPublicadasPorPuente(
+      UUID puenteId, int pagina, int tamanio) {
+    if (pagina < 0 || tamanio < 1 || tamanio > 100) {
+      throw new ApiException(
+          HttpStatus.UNPROCESSABLE_ENTITY,
+          "paginacion_invalida",
+          "Paginación inválida",
+          "La página debe ser mayor o igual a 0 y el tamaño debe estar entre 1 y 100.");
+    }
+    return inspeccionRepository.findPublicadasByPuenteId(
+        puenteId,
+        PageRequest.of(
+            pagina, tamanio, Sort.by(Sort.Order.desc("publicadoEn"), Sort.Order.desc("id"))));
+  }
+
+  @Transactional(readOnly = true)
+  public InspeccionPublicadaDetalleResponse consultarPublicada(UUID id) {
+    Inspeccion inspeccion =
+        inspeccionRepository
+            .findPublicadaConDetallesById(id)
+            .orElseThrow(
+                () ->
+                    new ApiException(
+                        HttpStatus.NOT_FOUND,
+                        "inspeccion_no_encontrada",
+                        "Inspección no encontrada",
+                        "No existe la inspección publicada solicitada."));
+    // Leer el resultado de ESTA publicación, nunca el vigente del puente ni un cálculo nuevo.
+    var resultado =
+        resultadoIcRepository != null
+            ? resultadoIcRepository.findPublicacionByInspeccionId(id).orElse(null)
+            : null;
+    UUID correccionId = inspeccionRepository.findCorreccionPublicadaId(id).orElse(null);
+    DatosPermanentesResponse permanentes =
+        inspeccion.getDatoTecnico() == null
+            ? null
+            : aDatosPermanentesResponse(inspeccion.getDatoTecnico());
+    RelacionVersionActivaResponse relacionVersionActiva =
+        determinarRelacionVersionActiva(inspeccion.getVersionFormulario());
+    return inspeccionMapper.toPublicadaDetalle(
+        inspeccion, resultado, permanentes, correccionId, relacionVersionActiva);
+  }
+
+  public RelacionVersionActivaResponse determinarRelacionVersionActiva(
+      VersionFormulario versionInspeccion) {
+    if (versionInspeccion == null) {
+      return null;
+    }
+    if (versionFormularioRepository == null) {
+      return new RelacionVersionActivaResponse(
+          versionInspeccion.isActiva(),
+          versionInspeccion.getCodigo(),
+          null,
+          null,
+          false,
+          0,
+          0,
+          0,
+          Collections.emptyList());
+    }
+    Optional<VersionFormulario> activaOpt = versionFormularioRepository.findByActivaTrue();
+    if (activaOpt.isEmpty()) {
+      return new RelacionVersionActivaResponse(
+          versionInspeccion.isActiva(),
+          versionInspeccion.getCodigo(),
+          null,
+          null,
+          false,
+          0,
+          0,
+          0,
+          Collections.emptyList());
+    }
+
+    VersionFormulario activa = activaOpt.get();
+    boolean esActiva = activa.getId().equals(versionInspeccion.getId());
+    if (esActiva) {
+      return new RelacionVersionActivaResponse(
+          true,
+          versionInspeccion.getCodigo(),
+          activa.getCodigo(),
+          activa.getId(),
+          false,
+          0,
+          0,
+          0,
+          Collections.emptyList());
+    }
+
+    List<MapeoCampoFormulario> mapeos =
+        mapeoCampoFormularioRepository != null
+            ? mapeoCampoFormularioRepository.findAllByVersionOrigenIdAndVersionDestinoId(
+                versionInspeccion.getId(), activa.getId())
+            : Collections.emptyList();
+
+    List<MapeoCampoResponse> mapeosDto =
+        mapeos.stream()
+            .map(
+                m ->
+                    new MapeoCampoResponse(
+                        m.getId(),
+                        m.getVersionOrigen().getId(),
+                        m.getVersionDestino().getId(),
+                        m.getElementoRefOrigen(),
+                        m.getElementoRefDestino(),
+                        m.getTipo(),
+                        m.getObservacion()))
+            .toList();
+
+    int equivalentes =
+        (int) mapeosDto.stream().filter(m -> m.tipo() == TipoMapeoCampo.EQUIVALENTE).count();
+    int nuevos = (int) mapeosDto.stream().filter(m -> m.tipo() == TipoMapeoCampo.NUEVO).count();
+    int eliminados =
+        (int) mapeosDto.stream().filter(m -> m.tipo() == TipoMapeoCampo.ELIMINADO).count();
+
+    return new RelacionVersionActivaResponse(
+        false,
+        versionInspeccion.getCodigo(),
+        activa.getCodigo(),
+        activa.getId(),
+        !mapeosDto.isEmpty(),
+        equivalentes,
+        nuevos,
+        eliminados,
+        mapeosDto);
+  }
+
+  @Transactional(readOnly = true)
+  public ExportacionInspeccionResponse exportarInspeccion(UUID id) {
+    Inspeccion inspeccion =
+        inspeccionRepository
+            .findPublicadaConDetallesById(id)
+            .orElseThrow(
+                () ->
+                    new ApiException(
+                        HttpStatus.NOT_FOUND,
+                        "inspeccion_no_encontrada",
+                        "Inspección no encontrada",
+                        "No existe la inspección publicada solicitada."));
+
+    var resultado =
+        resultadoIcRepository != null
+            ? resultadoIcRepository.findPublicacionByInspeccionId(id).orElse(null)
+            : null;
+    ResultadoIcPublicadoResponse icDto =
+        resultado == null || inspeccionMapper == null
+            ? null
+            : inspeccionMapper.toResultadoPublicado(resultado);
+
+    DatosPermanentesResponse permanentes =
+        inspeccion.getDatoTecnico() == null
+            ? null
+            : aDatosPermanentesResponse(inspeccion.getDatoTecnico());
+
+    RelacionVersionActivaResponse relacion =
+        determinarRelacionVersionActiva(inspeccion.getVersionFormulario());
+
+    Puente puente = inspeccion.getPuente();
+    ExportacionInspeccionResponse.PuenteResumenExportacion puenteDto =
+        new ExportacionInspeccionResponse.PuenteResumenExportacion(
+            puente.getId(),
+            puente.getCodigo(),
+            puente.getNombre(),
+            puente.getMunicipio() != null && puente.getMunicipio().getDepartamento() != null
+                ? puente.getMunicipio().getDepartamento().getNombre()
+                : null,
+            puente.getMunicipio() != null ? puente.getMunicipio().getNombre() : null);
+
+    VersionFormulario vf = inspeccion.getVersionFormulario();
+    ExportacionInspeccionResponse.VersionFormularioExportacion versionDto =
+        new ExportacionInspeccionResponse.VersionFormularioExportacion(
+            vf.getId(), vf.getCodigo(), vf.getEsquema());
+
+    List<ExportacionInspeccionResponse.FotografiaExportacionResponse> fotosDto =
+        archivoInspeccionRepository != null
+            ? archivoInspeccionRepository
+                .findByInspeccionIdAndTipoUsoOrderByCreadoEnAsc(
+                    inspeccion.getId(), TipoUsoArchivo.FOTO_INSPECCION)
+                .stream()
+                .map(
+                    ai ->
+                        new ExportacionInspeccionResponse.FotografiaExportacionResponse(
+                            ai.getArchivo().getId(),
+                            ai.getArchivo().getCategoriaFoto() != null
+                                ? ai.getArchivo().getCategoriaFoto().name()
+                                : null,
+                            ai.getElementoRef(),
+                            ai.getArchivo().getCapturadoEn()))
+                .toList()
+            : Collections.emptyList();
+
+    List<ExportacionInspeccionResponse.PropuestaMantenimientoExportacionResponse> propuestasDto =
+        ordenMantenimientoRepository != null
+            ? ordenMantenimientoRepository
+                .findByInspeccionOrigenIdOrderByCreadoEnAscIdAsc(inspeccion.getId())
+                .stream()
+                .map(
+                    o ->
+                        new ExportacionInspeccionResponse.PropuestaMantenimientoExportacionResponse(
+                            o.getId(),
+                            o.getTipo().name(),
+                            o.getEstado().name(),
+                            o.getDescripcion(),
+                            o.getPrioridadSugerida() != null
+                                ? o.getPrioridadSugerida().name()
+                                : null))
+                .toList()
+            : Collections.emptyList();
+
+    UUID correccionId = inspeccionRepository.findCorreccionPublicadaId(id).orElse(null);
+    String vigencia = correccionId == null ? "VIGENTE" : "SUPERADA";
+
+    return new ExportacionInspeccionResponse(
+        inspeccion.getId(),
+        inspeccion.getFechaInspeccion(),
+        puenteDto,
+        versionDto,
+        relacion,
+        inspeccion.getEstado(),
+        vigencia,
+        inspeccion.getIdentificacionCapturada(),
+        inspeccion.getDatos(),
+        permanentes,
+        icDto,
+        fotosDto,
+        propuestasDto,
+        clock.instant());
+  }
+
+  @Transactional(readOnly = true)
   public InspeccionResumenResponse consultarPorId(UUID inspeccionId, UUID usuarioId) {
     Inspeccion inspeccion = obtenerInspeccionActiva(inspeccionId);
-    if ("BORRADOR".equalsIgnoreCase(inspeccion.getEstado())
-        && !inspeccion.getAutorId().equals(usuarioId)) {
+    boolean academica = RoleName.ESTUDIANTE.name().equals(inspeccion.getRolAutorCreacion());
+    boolean autorizado =
+        inspeccion.getAutorId().equals(usuarioId) || esCatedraticoAsignado(inspeccion, usuarioId);
+    boolean borradorPrivadoNoAcademico =
+        !academica
+            && "BORRADOR".equalsIgnoreCase(inspeccion.getEstado())
+            && !inspeccion.getAutorId().equals(usuarioId);
+    boolean inspeccionAcademicaPrivada =
+        academica && !"PUBLICADA".equalsIgnoreCase(inspeccion.getEstado()) && !autorizado;
+    if (borradorPrivadoNoAcademico || inspeccionAcademicaPrivada) {
       throw new ApiException(
           HttpStatus.NOT_FOUND,
           "inspeccion_no_encontrada",
@@ -1208,6 +1683,12 @@ public class InspeccionService {
             .map(resumen::conSuperadaPor)
             .orElse(resumen)
         : resumen;
+  }
+
+  private boolean esCatedraticoAsignado(Inspeccion inspeccion, UUID usuarioId) {
+    return inspeccion.getAsignacionPuenteId() != null
+        && asignaciones != null
+        && asignaciones.perteneceACatedratico(inspeccion.getAsignacionPuenteId(), usuarioId);
   }
 
   @Transactional(readOnly = true)

@@ -1,0 +1,228 @@
+<div class="salida">
+  <header>
+    <p class="eyebrow">TRABAJO DE CAMPO</p>
+    <h1>Preparar salida</h1>
+    <p>
+      Descarga el formulario activo, los puentes autorizados y sus inspecciones publicadas para
+      llevarlos en este dispositivo.
+    </p>
+  </header>
+
+  @if (!salida.permitida()) {
+  <p role="alert" class="alerta">
+    Tu cuenta no esta autorizada para preparar salidas. Si eres Profesional externo, tu colegiado
+    debe estar verificado.
+  </p>
+  } @else { @if (!conexion.online()) {
+  <p role="status" id="sin-conexion" class="alerta">Necesitas conexion para preparar la salida.</p>
+  } @if (salida.error()) {
+  <p role="alert" class="alerta error">{{ salida.error() }}</p>
+  } @if (mensaje()) {
+  <p role="alert" class="alerta">{{ mensaje() }}</p>
+  } @if (salida.aviso()) {
+  <p role="status" class="alerta">{{ salida.aviso() }}</p>
+  }
+
+  <section class="tarjeta" aria-labelledby="ultima-salida">
+    <h2 id="ultima-salida">Datos en este dispositivo</h2>
+    @if (salida.ultima(); as ultima) { @if (listo()) {
+    <p role="status" class="exito">Listo para trabajar sin conexion</p>
+    }
+    <dl>
+      <div>
+        <dt>Formulario</dt>
+        <dd>{{ ultima.codigoVersionFormulario }}</dd>
+      </div>
+      <div>
+        <dt>Puentes preparados</dt>
+        <dd>{{ ultima.numeroPuentes }}</dd>
+      </div>
+      <div>
+        <dt>Ultima preparacion</dt>
+        <dd>{{ ultima.preparadoEn | date: 'dd/MM/yyyy HH:mm' }}</dd>
+      </div>
+    </dl>
+    <button
+      type="button"
+      class="secundario"
+      [disabled]="salida.ocupada()"
+      (click)="confirmarLimpieza.set(true)"
+    >
+      Quitar datos de este dispositivo
+    </button>
+    @if (confirmarLimpieza()) {
+    <div class="confirmacion" role="group" aria-label="Confirmar limpieza">
+      <p>
+        Se quitaran los datos preparados de tu cuenta. Los datos de otras cuentas se conservan. La
+        accion se bloquea si hay inspecciones o archivos pendientes de sincronizar.
+      </p>
+      <button type="button" [disabled]="salida.ocupada()" (click)="quitar()">
+        Confirmar limpieza
+      </button>
+      <button type="button" class="secundario" (click)="confirmarLimpieza.set(false)">
+        Cancelar
+      </button>
+    </div>
+    } } @else {
+    <p>No hay una salida preparada para esta cuenta en este dispositivo.</p>
+    }
+    <p>
+      Persistencia del navegador: {{ salida.persistente() === null ? 'Sin solicitar en esta sesion'
+      : salida.persistente() ? 'Concedida' : 'No concedida; el navegador podria liberar estos datos'
+      }}.
+    </p>
+    <p>
+      Espacio disponible aproximado: @if (salida.espacio() !== null) { {{ salida.espacio()! /
+      1048576 | number: '1.1-1' }} MB } @else { No disponible en este navegador }
+    </p>
+    @if (pocoEspacio()) {
+    <p role="status" class="alerta">
+      Queda poco espacio para una jornada de trabajo. Libera espacio antes de salir a campo. No
+      elimines datos pendientes de sincronizar.
+    </p>
+    }
+  </section>
+
+  <section class="tarjeta" aria-labelledby="elegir-puentes" [attr.aria-busy]="cargando()">
+    <h2 id="elegir-puentes">{{ estudiante() ? 'Mis puentes asignados' : 'Elegir puentes' }}</h2>
+    <p>
+      {{ estudiante() ? 'La salida incluye todos los puentes de tus asignaciones vigentes. Los
+      filtros solo facilitan la consulta.' : 'Selecciona entre 1 y 200 puentes activos. Tu seleccion
+      se conserva al cambiar de pagina o filtro.' }}
+    </p>
+    <form class="filtros" (ngSubmit)="buscar()">
+      <label for="buscar-salida"
+        >Nombre o codigo
+        <input
+          id="buscar-salida"
+          name="busqueda"
+          [(ngModel)]="busqueda"
+          maxlength="200"
+          [disabled]="bloqueada()"
+        />
+      </label>
+      <label for="departamento-salida"
+        >Departamento
+        <select
+          id="departamento-salida"
+          name="departamento"
+          [(ngModel)]="departamento"
+          [disabled]="bloqueada()"
+        >
+          <option value="">Todos los departamentos</option>
+          @for (d of departamentos(); track d.id) {
+          <option [value]="d.id">{{ d.nombre }}</option>
+          }
+        </select>
+      </label>
+      <button type="submit" [disabled]="bloqueada() || cargando()">Buscar</button>
+    </form>
+    @if (cargando()) {
+    <p role="status">Consultando puentes autorizados...</p>
+    }
+    <ul class="puentes">
+      @for (p of puentes(); track p.id) {
+      <li>
+        @if (!estudiante()) {
+        <label class="elegir" [for]="'salida-' + p.id">
+          <input
+            type="checkbox"
+            [id]="'salida-' + p.id"
+            [checked]="seleccion().includes(p.id)"
+            [disabled]="bloqueada()"
+            (change)="elegir(p.id, $any($event.target).checked)"
+          />
+          <span
+            ><strong>{{ p.codigo }} · {{ p.nombre }}</strong
+            ><small>{{ p.departamento.nombre }}, {{ p.municipio.nombre }}</small></span
+          >
+        </label>
+        } @else {
+        <div class="asignado">
+          <strong>{{ p.codigo }} · {{ p.nombre }}</strong
+          ><small>{{ p.departamento.nombre }}, {{ p.municipio.nombre }}</small>
+        </div>
+        }
+      </li>
+      } @empty { @if (!cargando() && conexion.online()) {
+      <li>No hay puentes autorizados que coincidan con la busqueda.</li>
+      } }
+    </ul>
+    <div class="acciones">
+      <button
+        type="button"
+        class="secundario"
+        [disabled]="bloqueada() || cargando() || pagina() === 0"
+        (click)="buscar(pagina() - 1)"
+      >
+        Anterior
+      </button>
+      <span>Pagina {{ paginas() ? pagina() + 1 : 0 }} de {{ paginas() }}</span>
+      <button
+        type="button"
+        class="secundario"
+        [disabled]="bloqueada() || cargando() || pagina() + 1 >= paginas()"
+        (click)="buscar(pagina() + 1)"
+      >
+        Siguiente
+      </button>
+    </div>
+    @if (!estudiante()) {
+    <p>{{ seleccion().length }} de 200 puentes seleccionados</p>
+    <button
+      type="button"
+      class="secundario"
+      [disabled]="bloqueada() || !seleccion().length"
+      (click)="limpiarSeleccion()"
+    >
+      Limpiar seleccion
+    </button>
+    }
+  </section>
+
+  <section class="tarjeta" aria-labelledby="descarga-salida" [attr.aria-busy]="salida.ocupada()">
+    <h2 id="descarga-salida">Preparar el dispositivo</h2>
+    <p>
+      Consulta el tamano antes de descargar. La estimacion no incluye todos los gastos de
+      almacenamiento del navegador.
+    </p>
+    <div class="acciones">
+      <button
+        type="button"
+        class="secundario"
+        [disabled]="bloqueada() || estimando() || (!estudiante() && !seleccion().length)"
+        (click)="estimar()"
+      >
+        {{ estimando() ? 'Estimando...' : 'Estimar descarga' }}
+      </button>
+      <button
+        type="button"
+        [disabled]="bloqueada() || !estimacion()?.numeroPuentes"
+        [attr.aria-describedby]="!conexion.online() ? 'sin-conexion' : null"
+        (click)="preparar()"
+      >
+        {{ salida.ocupada() ? 'Preparando...' : 'Preparar salida' }}
+      </button>
+    </div>
+    @if (estimacion(); as e) {
+    <p>
+      {{ e.numeroPuentes }} puentes · {{ e.numeroInspeccionesPrevias }} inspecciones previas · {{
+      e.tamanoEstimadoBytes / 1048576 | number: '1.2-2' }} MB aproximados · Formulario {{
+      e.codigoVersionFormulario }}
+    </p>
+    } @if (salida.ocupada()) {
+    <div role="status" aria-live="polite">
+      <p>
+        {{ salida.paso() === 0 ? 'Descargando paquete completo del servidor...' : 'Guardando el
+        paquete completo en este dispositivo...' }}
+      </p>
+      <ol>
+        <li>Formulario {{ salida.paso() > 1 ? 'recibido' : '' }}</li>
+        <li>Puentes {{ salida.paso() > 2 ? 'recibidos' : '' }}</li>
+        <li>Inspecciones previas</li>
+      </ol>
+    </div>
+    }
+  </section>
+  }
+</div>

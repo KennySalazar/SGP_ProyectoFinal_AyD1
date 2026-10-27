@@ -79,6 +79,13 @@ legend {
   color: var(--sgp-navy-900);
 }
 
+/* El icono de comentarios va pegado al nombre de la instancia. */
+.titulo-instancia {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
 .acciones {
   display: flex;
   flex-wrap: wrap;

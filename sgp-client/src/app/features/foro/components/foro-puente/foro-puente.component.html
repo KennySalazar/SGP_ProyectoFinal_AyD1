@@ -1,0 +1,191 @@
+<div class="cabecera">
+  <h2 class="seccion-titulo">
+    <i class="pi pi-comments" aria-hidden="true"></i>
+    {{ 'foro.titulo' | transloco }}
+  </h2>
+  @if (autenticado() && !hiloAbierto()) {
+    <button pButton type="button" (click)="abrirNuevoHilo()">
+      <i class="pi pi-plus" aria-hidden="true"></i
+      ><span>{{ 'foro.nuevoHilo.abrir' | transloco }}</span>
+    </button>
+  }
+</div>
+
+@if (hiloAbierto(); as hiloId) {
+  <app-hilo-foro
+    [hiloId]="hiloId"
+    [comentarioDestacado]="hiloId === hiloInicial() ? comentarioDestacado() : null"
+    (volver)="volverALista()"
+  />
+} @else {
+  <p class="descripcion">{{ 'foro.descripcion' | transloco }}</p>
+
+  @if (!autenticado()) {
+    <p class="aviso" role="note">
+      <i class="pi pi-info-circle" aria-hidden="true"></i>
+      {{ 'foro.sinSesion' | transloco }}
+      <a routerLink="/login">{{ 'foro.iniciarSesion' | transloco }}</a>
+    </p>
+  }
+
+  @if (hiloCreado()) {
+    <p class="confirmacion" role="status">
+      <i class="pi pi-check-circle" aria-hidden="true"></i>
+      {{ 'foro.nuevoHilo.creado' | transloco }}
+    </p>
+  }
+
+  <div class="lista" [attr.aria-busy]="cargando()">
+    @if (cargando() && !pagina()) {
+      @for (fila of [1, 2]; track fila) {
+        <div class="hilo" aria-hidden="true">
+          <p-skeleton width="60%" height="1.1rem" />
+          <p-skeleton width="40%" height="0.85rem" />
+        </div>
+      }
+      <span class="sr-only" role="status">{{ 'foro.cargando' | transloco }}</span>
+    } @else if (error()) {
+      <div class="estado-lista" role="alert">
+        <i class="pi pi-exclamation-circle" aria-hidden="true"></i>
+        <p>{{ 'foro.error' | transloco }}</p>
+        <button pButton type="button" severity="secondary" [outlined]="true" (click)="cargar(0)">
+          <i class="pi pi-refresh" aria-hidden="true"></i
+          ><span>{{ 'foro.reintentar' | transloco }}</span>
+        </button>
+      </div>
+    } @else if (pagina(); as pagina) {
+      @for (hilo of pagina.content; track hilo.id) {
+        <button type="button" class="hilo" (click)="abrirHilo(hilo.id)">
+          <span class="hilo-titulo">
+            <span class="titulo">{{ hilo.titulo }}</span>
+            <p-tag
+              [value]="'foro.categorias.' + hilo.categoria | transloco"
+              [severity]="severidad(hilo.categoria)"
+            />
+            @if (hilo.cerrado) {
+              <p-tag
+                [value]="'foro.hilo.cerrado' | transloco"
+                severity="secondary"
+                icon="pi pi-lock"
+              />
+            }
+          </span>
+          <span class="hilo-meta">
+            {{
+              hilo.autorUsuario
+                ? '@' + hilo.autorUsuario
+                : ('foro.roles.' + hilo.autorRol | transloco)
+            }}
+            · {{ 'foro.abierto' | transloco }} {{ hilo.creadoEn | date: 'dd/MM/yyyy' : zona }} ·
+            {{ 'foro.ultimaActividad' | transloco }}
+            {{ hilo.actualizadoEn | date: 'dd/MM/yyyy HH:mm' : zona }} ·
+            {{
+              (hilo.totalComentarios === 1 ? 'foro.comentarioUno' : 'foro.comentarios')
+                | transloco: { total: hilo.totalComentarios }
+            }}
+          </span>
+        </button>
+      } @empty {
+        <div class="estado-lista" role="status">
+          <i class="pi pi-inbox" aria-hidden="true"></i>
+          <p>
+            {{ (autenticado() ? 'foro.sinHilosAutenticado' : 'foro.sinHilos') | transloco }}
+          </p>
+        </div>
+      }
+      @if (pagina.totalElements > tamanio) {
+        <p-paginator
+          [first]="pagina.number * tamanio"
+          [rows]="tamanio"
+          [totalRecords]="pagina.totalElements"
+          (onPageChange)="cambiarPagina($event)"
+        />
+      }
+    }
+  </div>
+}
+
+<p-dialog
+  [visible]="creando()"
+  (visibleChange)="!$event && cerrarNuevoHilo()"
+  [modal]="true"
+  [style]="{ width: 'min(36rem, 94vw)' }"
+  [draggable]="false"
+  [resizable]="false"
+  [header]="'foro.nuevoHilo.abrir' | transloco"
+>
+  <p>{{ 'foro.nuevoHilo.texto' | transloco: { puente: puente().nombre } }}</p>
+  <form class="formulario" (ngSubmit)="crearHilo()">
+    <label class="ancho">
+      <span>{{ 'foro.nuevoHilo.titulo' | transloco }}</span>
+      <input
+        pInputText
+        name="titulo"
+        [attr.maxlength]="limiteTitulo"
+        [ngModel]="nuevoTitulo()"
+        (ngModelChange)="nuevoTitulo.set($event)"
+      />
+      <small class="contador-texto">{{ nuevoTitulo().length }} / {{ limiteTitulo }}</small>
+      @if (erroresCampo()['titulo']; as error) {
+        <small class="error-campo" role="alert">{{ error }}</small>
+      }
+    </label>
+    <div class="campo ancho">
+      <label for="foro-categoria">{{ 'foro.nuevoHilo.categoria' | transloco }}</label>
+      <p-select
+        inputId="foro-categoria"
+        [options]="categorias"
+        [ngModel]="nuevaCategoria()"
+        (ngModelChange)="nuevaCategoria.set($event)"
+        [ngModelOptions]="{ standalone: true }"
+        [placeholder]="'foro.nuevoHilo.seleccionar' | transloco"
+        appendTo="body"
+        styleClass="w-full"
+      >
+        <ng-template #selectedItem let-valor>{{
+          'foro.categorias.' + valor | transloco
+        }}</ng-template>
+        <ng-template #item let-valor>{{ 'foro.categorias.' + valor | transloco }}</ng-template>
+      </p-select>
+      @if (erroresCampo()['categoria']; as error) {
+        <small class="error-campo" role="alert">{{ error }}</small>
+      }
+    </div>
+    <label class="ancho">
+      <span>{{ 'foro.nuevoHilo.comentario' | transloco }}</span>
+      <textarea
+        pTextarea
+        name="comentario"
+        rows="4"
+        [attr.maxlength]="limiteComentario"
+        [ngModel]="nuevoComentario()"
+        (ngModelChange)="nuevoComentario.set($event)"
+      ></textarea>
+      <small class="contador-texto">{{ nuevoComentario().length }} / {{ limiteComentario }}</small>
+      @if (erroresCampo()['comentario']; as error) {
+        <small class="error-campo" role="alert">{{ error }}</small>
+      }
+    </label>
+    @if (errorCrear(); as error) {
+      <p class="error-dialogo ancho" role="alert">{{ error }}</p>
+    }
+    <div class="dialog-acciones ancho">
+      <button
+        pButton
+        type="button"
+        severity="secondary"
+        [outlined]="true"
+        [disabled]="guardando()"
+        (click)="cerrarNuevoHilo()"
+      >
+        <span>{{ 'common.cancel' | transloco }}</span>
+      </button>
+      <button pButton type="submit" [disabled]="guardando() || !formularioValido()">
+        <i class="pi pi-plus" aria-hidden="true"></i
+        ><span>{{
+          (guardando() ? 'foro.nuevoHilo.creando' : 'foro.nuevoHilo.crear') | transloco
+        }}</span>
+      </button>
+    </div>
+  </form>
+</p-dialog>

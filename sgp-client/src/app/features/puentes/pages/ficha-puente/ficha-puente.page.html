@@ -94,6 +94,7 @@
               {{ p.indiceCondicionActual !== null ? p.indiceCondicionActual :
               ('puentes.ficha.notAvailable' | transloco) }}
             </span>
+            <app-respaldo-ic [puente]="p" />
           </div>
           <div class="condicion-bloque">
             <span class="dato-etiqueta">{{ 'puentes.ficha.lastInspection' | transloco }}</span>
@@ -202,7 +203,8 @@
       <section class="surface-card ficha-seccion">
         <h2 class="seccion-titulo">
           <i class="pi pi-images" aria-hidden="true"></i>
-          {{ 'puentes.ficha.documentationSection' | transloco }}
+          {{ (auth.authenticated() ? 'inspecciones.historial.titulo' :
+          'puentes.ficha.documentationSection') | transloco }}
         </h2>
         @if (!auth.authenticated()) {
         <div class="aviso-restringido" role="status">
@@ -216,11 +218,88 @@
           </div>
         </div>
         } @else {
-        <div class="aviso-vacio" role="status">
-          <i class="pi pi-info-circle" aria-hidden="true"></i>
-          <p>{{ 'puentes.ficha.noDocumentation' | transloco }}</p>
+        <div class="historial-publicado" [attr.aria-busy]="cargandoHistorial()">
+          @if (cargandoHistorial()) {
+          <div class="aviso-vacio" role="status">
+            <i class="pi pi-spin pi-spinner" aria-hidden="true"></i>
+            <p>{{ 'inspecciones.historial.cargando' | transloco }}</p>
+          </div>
+          } @else if (errorHistorial()) {
+          <div class="aviso-vacio" role="alert">
+            <i class="pi pi-exclamation-circle" aria-hidden="true"></i>
+            <p>{{ 'inspecciones.historial.error' | transloco }}</p>
+            <button
+              pButton
+              type="button"
+              severity="secondary"
+              [outlined]="true"
+              (click)="cargarHistorial()"
+            >
+              {{ 'inspecciones.historial.reintentar' | transloco }}
+            </button>
+          </div>
+          } @else if (historial(); as pagina) { @for (inspeccion of pagina.content; track
+          inspeccion.id) {
+          <article class="historial-fila">
+            <dl class="datos-lista">
+              <div class="dato-fila">
+                <dt class="dato-etiqueta">{{ 'inspecciones.consulta.autor' | transloco }}</dt>
+                <dd class="dato-valor">{{ inspeccion.nombreAutor }}</dd>
+              </div>
+              <div class="dato-fila">
+                <dt class="dato-etiqueta">{{ 'inspecciones.consulta.publicacion' | transloco }}</dt>
+                <dd class="dato-valor">
+                  {{ inspeccion.publicadoEn | date:'dd/MM/yyyy HH:mm:ss' }}
+                </dd>
+              </div>
+            </dl>
+            <div class="historial-acciones">
+              <p-tag [value]="'inspecciones.consulta.publicada' | transloco" severity="success" />
+              @if (inspeccion.superadaPorId || inspeccion.vigencia === 'SUPERADA') {
+              <p-tag [value]="'inspecciones.consulta.superada' | transloco" severity="secondary" />
+              }
+              <a
+                pButton
+                severity="secondary"
+                [outlined]="true"
+                [routerLink]="['/inspecciones', inspeccion.id, 'publicada']"
+              >
+                <i class="pi pi-eye" aria-hidden="true"></i>
+                <span>{{ 'inspecciones.historial.verDetalle' | transloco }}</span>
+              </a>
+            </div>
+          </article>
+          } @empty {
+          <div class="aviso-vacio" role="status">
+            <i class="pi pi-info-circle" aria-hidden="true"></i>
+            <p>{{ 'inspecciones.historial.vacio' | transloco }}</p>
+          </div>
+          } @if (pagina.totalElements > 0) {
+          <p-paginator
+            [first]="pagina.number * tamanioHistorial"
+            [rows]="tamanioHistorial"
+            [totalRecords]="pagina.totalElements"
+            (onPageChange)="cambiarPaginaHistorial($event)"
+          />
+          } }
         </div>
         }
+      </section>
+
+      <!-- Seccion 5: Mantenimiento (HU-049) -->
+      @if (auth.authenticated()) {
+      <section class="surface-card ficha-seccion">
+        <app-mantenimiento-puente [puente]="p" />
+      </section>
+      }
+
+      <!-- Seccion 6: Foro del puente (HU-063): lo puede leer cualquiera -->
+      <section class="surface-card ficha-seccion">
+        <app-foro-puente
+          [puente]="p"
+          [hiloInicial]="hiloDelAviso"
+          [comentarioDestacado]="comentarioDelAviso"
+        />
       </section>
     </div>
 

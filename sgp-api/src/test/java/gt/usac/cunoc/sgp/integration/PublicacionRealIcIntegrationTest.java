@@ -2,17 +2,24 @@ package gt.usac.cunoc.sgp.integration;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import gt.usac.cunoc.sgp.common.audit.service.AuditoriaWriter;
 import gt.usac.cunoc.sgp.common.exception.ApiException;
+import gt.usac.cunoc.sgp.common.exception.ApiExceptionHandler;
 import gt.usac.cunoc.sgp.common.security.JwtData;
 import gt.usac.cunoc.sgp.formulario.validation.JsonSchemaValidatorService;
+import gt.usac.cunoc.sgp.inspeccion.controller.TransicionInspeccionController;
 import gt.usac.cunoc.sgp.inspeccion.dto.ConfirmarEstadoIcRequest;
 import gt.usac.cunoc.sgp.inspeccion.mapper.InspeccionMapperImpl;
 import gt.usac.cunoc.sgp.inspeccion.model.EstadoCondicion;
+import gt.usac.cunoc.sgp.inspeccion.model.InspeccionPublicadaEvent;
 import gt.usac.cunoc.sgp.inspeccion.service.*;
+import gt.usac.cunoc.sgp.sync.http.IdempotenciaHttpFilter;
+import gt.usac.cunoc.sgp.sync.repository.OperacionHttpRepository;
+import gt.usac.cunoc.sgp.sync.service.IdempotenciaHttpService;
 import gt.usac.cunoc.sgp.usuario.model.RoleName;
 import java.math.BigDecimal;
 import java.time.Clock;
@@ -22,6 +29,7 @@ import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.CopyOnWriteArrayList;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -33,6 +41,7 @@ import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
+import org.springframework.context.event.EventListener;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -41,6 +50,8 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.validation.beanvalidation.LocalValidatorFactoryBean;
@@ -56,7 +67,10 @@ import org.testcontainers.utility.DockerImageName;
     })
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @Import({
+  IdempotenciaHttpService.class,
+  OperacionHttpRepository.class,
   TransicionInspeccionService.class,
+  ReglasEvidenciaFotografica.class,
   PublicacionIndiceCondicionService.class,
   ConfirmacionEstadoIcService.class,
   PreparadorEntradaIcService.class,
@@ -98,10 +112,13 @@ class PublicacionRealIcIntegrationTest {
     registry.add("spring.flyway.password", postgres::getPassword);
   }
 
+  @Autowired private IdempotenciaHttpService idempotencia;
+  @Autowired private PlatformTransactionManager tm;
   @Autowired private JdbcTemplate jdbc;
   @Autowired private ObjectMapper json;
   @Autowired private TransicionInspeccionService transiciones;
   @Autowired private ConfirmacionEstadoIcService confirmaciones;
+  @Autowired private EventosDePublicacion eventosDePublicacion;
 
   private UUID autorId;
   private UUID puenteId;
@@ -110,6 +127,7 @@ class PublicacionRealIcIntegrationTest {
 
   @BeforeEach
   void preparar() throws Exception {
+    eventosDePublicacion.recibidos.clear();
     autorId = UUID.randomUUID();
     puenteId = UUID.randomUUID();
     versionId = UUID.randomUUID();
@@ -258,6 +276,37 @@ class PublicacionRealIcIntegrationTest {
   }
 
   @Test
+  void hu061RepetirPublicacionHttpConservaRespuestaIcHistorialYEvento() throws Exception {
+    var mvc =
+        MockMvcBuilders.standaloneSetup(new TransicionInspeccionController(transiciones))
+            .setControllerAdvice(new ApiExceptionHandler())
+            .addFilters(new IdempotenciaHttpFilter(idempotencia, json, tm))
+            .build();
+    var ruta = "/api/v1/inspecciones/" + inspeccionId + "/publicar";
+    var primera =
+        mvc.perform(
+                post(ruta)
+                    .servletPath(ruta)
+                    .principal(SecurityContextHolder.getContext().getAuthentication())
+                    .header("Idempotency-Key", "publicacion-hu061"))
+            .andReturn();
+    var repetida =
+        mvc.perform(
+                post(ruta)
+                    .servletPath(ruta)
+                    .principal(SecurityContextHolder.getContext().getAuthentication())
+                    .header("Idempotency-Key", "publicacion-hu061"))
+            .andReturn();
+    assertThat(primera.getResponse().getStatus()).isEqualTo(200);
+    assertThat(repetida.getResponse().getStatus()).isEqualTo(200);
+    assertThat(repetida.getResponse().getHeader("Idempotent-Replay")).isEqualTo("true");
+    assertThat(repetida.getResponse().getContentAsByteArray())
+        .isEqualTo(primera.getResponse().getContentAsByteArray());
+    comprobarPublicacion("50", "Regular", 2);
+    assertThat(eventosDePublicacion.recibidos).hasSize(1);
+  }
+
+  @Test
   void ajusteDelAutorLlegaAlResultadoYAlPuente() {
     var calculo = confirmaciones.consultar(inspeccionId).calculo();
     confirmaciones.confirmar(
@@ -307,6 +356,23 @@ class PublicacionRealIcIntegrationTest {
   }
 
   @Test
+  void publicarEmiteElEventoQueDisparaElMantenimientoSoloSiTodoSeConfirmo() {
+    transiciones.publicar(inspeccionId, autorId);
+
+    assertThat(eventosDePublicacion.recibidos)
+        .containsExactly(new InspeccionPublicadaEvent(inspeccionId, autorId));
+  }
+
+  @Test
+  void unaPublicacionRevertidaNoEmiteElEvento() {
+    jdbc.update("DELETE FROM configuracion_ic_elemento WHERE version_formulario_id=?", versionId);
+
+    assertThrows(ApiException.class, () -> transiciones.publicar(inspeccionId, autorId));
+
+    assertThat(eventosDePublicacion.recibidos).isEmpty();
+  }
+
+  @Test
   void faltaDePesoRevierteEstadosHistorialResultadoYAuditoria() {
     jdbc.update("DELETE FROM configuracion_ic_elemento WHERE version_formulario_id=?", versionId);
     assertThrows(ApiException.class, () -> transiciones.publicar(inspeccionId, autorId));
@@ -350,6 +416,8 @@ class PublicacionRealIcIntegrationTest {
     autenticar(revisorId, RoleName.CATEDRATICO);
     transiciones.iniciarRevision(inspeccionId, revisorId);
     transiciones.aprobar(inspeccionId, revisorId);
+    assertThat(eventosDePublicacion.recibidos)
+        .containsExactly(new InspeccionPublicadaEvent(inspeccionId, revisorId));
     comprobarPublicacion("50", "Bueno", 3);
     var fila =
         jdbc.queryForMap(
@@ -491,8 +559,23 @@ class PublicacionRealIcIntegrationTest {
     }
 
     @Bean
+    EventosDePublicacion eventosDePublicacion() {
+      return new EventosDePublicacion();
+    }
+
+    @Bean
     LocalValidatorFactoryBean validator() {
       return new LocalValidatorFactoryBean();
+    }
+  }
+
+  /** Guarda los eventos de publicación para comprobar quién los recibiría. */
+  static class EventosDePublicacion {
+    final List<InspeccionPublicadaEvent> recibidos = new CopyOnWriteArrayList<>();
+
+    @EventListener
+    public void alPublicarse(InspeccionPublicadaEvent evento) {
+      recibidos.add(evento);
     }
   }
 }

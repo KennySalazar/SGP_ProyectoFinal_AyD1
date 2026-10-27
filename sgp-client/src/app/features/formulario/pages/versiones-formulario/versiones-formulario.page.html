@@ -4,6 +4,7 @@
   <p class="page-description">{{ 'formulario.description' | transloco }}</p>
 </header>
 
+@if (esAdministrador()) {
 <nav class="accesos" [attr.aria-label]="'usuarios.otherTools' | transloco">
   <a pButton severity="secondary" [outlined]="true" routerLink="/admin">
     <i class="pi pi-users" aria-hidden="true"></i>
@@ -22,7 +23,9 @@
     <span>{{ 'auditoria.open' | transloco }}</span>
   </a>
 </nav>
-
+} @if (esAdministrador()) {
+<p role="status">{{ 'formulario.hu050.dosPasos' | transloco }}</p>
+}
 <section class="surface-card lista-card" aria-live="polite">
   <div class="card-header">
     <div>
@@ -30,6 +33,7 @@
       <p class="card-subtitle">{{ 'formulario.tipDraft' | transloco }}</p>
     </div>
     <div class="acciones-toolbar">
+      @if (esAdministrador()) {
       <button
         pButton
         type="button"
@@ -44,6 +48,7 @@
           transloco }}</span
         >
       </button>
+      }
       <button pButton type="button" [disabled]="cargando()" (click)="abrirDialogoNueva()">
         <i class="pi pi-plus" aria-hidden="true"></i>
         <span>{{ 'formulario.newVersion' | transloco }}</span>
@@ -165,6 +170,9 @@
         <option [ngValue]="opt.value">{{ opt.label }}</option>
         }
       </select>
+      @if (!nuevoForm.controls.versionBaseId.value) {
+      <p class="field-hint">{{ 'formulario.crearSinBaseNota' | transloco }}</p>
+      }
     </div>
 
     <div class="dialog-actions">

@@ -15,6 +15,7 @@ export interface AcompananteResponse {
 }
 
 export interface IniciarInspeccionRequest {
+  versionFormularioId?: string;
   id?: string | null;
   puenteId: string;
   fechaInspeccion: string;
@@ -133,7 +134,13 @@ export interface InspeccionBorradorResponse {
 }
 
 export type EstadoInspeccion =
-  'BORRADOR' | 'ENVIADA' | 'EN_REVISION' | 'CAMBIOS_SOLICITADOS' | 'PUBLICADA' | 'RECHAZADA';
+  | 'BORRADOR'
+  | 'ENVIADA'
+  | 'EN_REVISION'
+  | 'CAMBIOS_SOLICITADOS'
+  | 'PUBLICADA'
+  | 'RECHAZADA'
+  | 'PENDIENTE_SYNC';
 
 export interface InspeccionResumenResponse {
   id: string;
@@ -154,9 +161,202 @@ export interface InspeccionResumenResponse {
   ultimaActividadEn?: string | null;
   creadoEn: string;
   actualizadoEn?: string | null;
-  /** En una corrección: la inspección publicada que corrige y el motivo (HU-027). */
   supersedeAId?: string | null;
   motivoCorreccion?: string | null;
-  /** Corrección publicada que supera a esta inspección; nulo si sigue vigente. */
   superadaPorId?: string | null;
+}
+
+export type EstadoCondicionIc = 'BUENO' | 'REGULAR' | 'MALO';
+
+export interface ResultadoCalculoIc {
+  versionFormularioId: string;
+  codigoFormulario: string;
+  versionAlgoritmo: string;
+  hashEntrada: string;
+  indiceCalculado: number;
+  estadoPorRango: EstadoCondicionIc;
+  estadoCalculado: EstadoCondicionIc;
+  sumaPesos: number;
+  sumaCalificacionesPonderadas: number;
+  desglose: {
+    elementoRef: string;
+    peso: number;
+    calificacionAgregada: number;
+    aportePonderado: number;
+    reglaAgregacion: string;
+    instancias: {
+      instanciaId: string | null;
+      rutaDatos: string;
+      existencia: string;
+      incluida: boolean;
+      calificacion: number | null;
+      indicadores: { indicador: string; valorOriginal: string; calificacion: number }[];
+    }[];
+  }[];
+  condicionesAnulacion: {
+    reglaId: string;
+    descripcion: string;
+    elementoRef: string;
+    instanciaId: string | null;
+    rutaDatos: string;
+    indicador: string;
+    valorDetectado: string;
+    estadoResultante: EstadoCondicionIc;
+  }[];
+}
+
+export interface ConfirmacionEstadoIcResponse {
+  inspeccionId: string;
+  calculo: ResultadoCalculoIc;
+  estadoConfirmado: EstadoCondicionIc | null;
+  justificacion: string | null;
+  realizadoPorId: string | null;
+  realizadoEn: string | null;
+  confirmacionVigente: boolean;
+}
+
+export interface ConfirmarEstadoIcRequest {
+  estadoConfirmado: EstadoCondicionIc;
+  hashEntrada: string;
+  justificacion: string | null;
+}
+
+export interface InspeccionPublicadaDetalleResponse {
+  id: string;
+  puenteId: string;
+  puenteNombre: string;
+  versionFormularioId: string;
+  versionFormularioCodigo: string;
+  esquemaFormulario: Record<string, unknown> | null;
+  autorId: string;
+  nombreAutor: string;
+  rolAutor: string;
+  acompanantes: AcompananteResponse[];
+  estado: 'PUBLICADA';
+  fechaInspeccion: string;
+  dispositivoId: string;
+  identificacionCapturada: Record<string, unknown> | null;
+  datos: Record<string, unknown> | null;
+  datosPermanentes: DatosPermanentesResponse | null;
+  creadoEn: string;
+  enviadoEn: string | null;
+  publicadoEn: string;
+  ic: {
+    indiceCalculado: number;
+    estadoCalculado: 'BUENO' | 'REGULAR' | 'MALO';
+    estadoConfirmado: 'BUENO' | 'REGULAR' | 'MALO';
+    justificacionAjuste: string | null;
+  } | null;
+  supersedeAId: string | null;
+  motivoCorreccion: string | null;
+  superadaPorId: string | null;
+  vigencia: 'VIGENTE' | 'SUPERADA';
+  relacionVersionActiva?: RelacionVersionActivaResponse | null;
+}
+
+export interface InspeccionPublicadaResumenResponse {
+  id: string;
+  puenteId: string;
+  autorId: string;
+  nombreAutor: string;
+  fechaInspeccion: string;
+  publicadoEn: string;
+  estado: 'PUBLICADA';
+  superadaPorId?: string | null;
+  vigencia?: 'VIGENTE' | 'SUPERADA';
+}
+
+export interface MapeoCampoRelacion {
+  id: string;
+  elementoRefOrigen: string | null;
+  elementoRefDestino: string | null;
+  tipo: 'EQUIVALENTE' | 'NUEVO' | 'ELIMINADO';
+  observacion: string | null;
+}
+
+export interface RelacionVersionActivaResponse {
+  esVersionActiva: boolean;
+  codigoVersionInspeccion: string;
+  codigoVersionActiva: string | null;
+  versionActivaId: string | null;
+  mapeosDeclarados: boolean;
+  totalEquivalentes: number;
+  totalNuevos: number;
+  totalEliminados: number;
+  mapeos: MapeoCampoRelacion[];
+}
+
+export interface FotografiaExportacion {
+  id: string;
+  categoria: string | null;
+  elementoRef: string | null;
+  capturadoEn: string | null;
+}
+
+export interface PropuestaMantenimientoExportacion {
+  id: string;
+  tipo: string;
+  estado: string;
+  descripcion: string;
+  prioridadSugerida: string | null;
+}
+
+export interface ExportacionInspeccionResponse {
+  id: string;
+  fechaInspeccion: string;
+  puente: {
+    id: string;
+    codigo: string;
+    nombre: string;
+    departamento?: string | null;
+    municipio?: string | null;
+  };
+  versionFormulario: {
+    id: string;
+    codigo: string;
+    esquema: Record<string, unknown> | null;
+  };
+  relacionVersionActiva?: RelacionVersionActivaResponse | null;
+  estado: string;
+  vigencia: string;
+  identificacionCapturada?: Record<string, unknown> | null;
+  datos?: Record<string, unknown> | null;
+  datosPermanentes?: DatosPermanentesResponse | null;
+  ic?: {
+    indiceCalculado: number;
+    estadoCalculado: string;
+    estadoConfirmado: string;
+    justificacionAjuste: string | null;
+  } | null;
+  fotografias: FotografiaExportacion[];
+  propuestasMantenimiento: PropuestaMantenimientoExportacion[];
+  exportadoEn: string;
+}
+
+export interface OrdenMantenimientoDetalleItem {
+  id: string;
+  tipo: string;
+  estado: string;
+  descripcion: string;
+  prioridadSugerida: string;
+  prioridadConfirmada: string;
+  creadoEn: string;
+}
+
+/** Documento PDF de una inspección (HU-070); nunca expone la ruta del almacenamiento. */
+export interface DocumentoInspeccionResponse {
+  id: string;
+  inspeccionId: string;
+  nombreOriginal: string;
+  tamanoBytes: number;
+  subidoPorId: string;
+  subidoEn: string;
+}
+
+export interface ConflictoSincronizacionResponse {
+  id: string;
+  versionServidor: number;
+  versionCliente: number | null;
+  copiaServidor: unknown;
+  detectadoEn: string;
 }

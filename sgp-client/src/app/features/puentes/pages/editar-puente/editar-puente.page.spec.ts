@@ -1,9 +1,10 @@
+import { RespaldoIcComponent } from '../../components/respaldo-ic/respaldo-ic.component';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { Pipe, PipeTransform } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
-import { ActivatedRoute, convertToParamMap } from '@angular/router';
+import { ActivatedRoute, Router, convertToParamMap, provideRouter } from '@angular/router';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { of } from 'rxjs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -25,6 +26,7 @@ describe('EditarPuentePage', () => {
   let fixture: ComponentFixture<EditarPuentePage>;
   let page: EditarPuentePage;
   let http: HttpTestingController;
+  const navigate = vi.fn().mockResolvedValue(true);
 
   const departamento = {
     id: 'departamento-1',
@@ -79,10 +81,12 @@ describe('EditarPuentePage', () => {
 
   beforeEach(() => {
     vi.useFakeTimers();
+    navigate.mockClear();
 
     TestBed.configureTestingModule({
       providers: [
         provideHttpClient(),
+        provideRouter([]),
         provideHttpClientTesting(),
         {
           provide: ActivatedRoute,
@@ -102,6 +106,10 @@ describe('EditarPuentePage', () => {
       ],
     });
 
+    TestBed.overrideComponent(RespaldoIcComponent, {
+      remove: { imports: [TranslocoPipe] },
+      add: { imports: [TraduccionTestPipe] },
+    });
     TestBed.overrideComponent(EditarPuentePage, {
       remove: { imports: [TranslocoPipe] },
       add: { imports: [TraduccionTestPipe] },
@@ -112,6 +120,7 @@ describe('EditarPuentePage', () => {
       add: { imports: [TraduccionTestPipe, SelectorUbicacionStubComponent] },
     });
 
+    vi.spyOn(TestBed.inject(Router), 'navigate').mockImplementation(navigate);
     http = TestBed.inject(HttpTestingController);
     fixture = TestBed.createComponent(EditarPuentePage);
     page = fixture.componentInstance;
@@ -167,18 +176,19 @@ describe('EditarPuentePage', () => {
     http.expectOne('/api/v1/puentes/puente-1').flush(puenteMock);
     fixture.detectChanges();
 
-    // Resolver territorio inicial disparado por valoresIniciales
     vi.advanceTimersByTime(300);
     http.expectOne((r) => r.url === '/api/v1/catalogos/ubicacion').flush(territorio());
     fixture.detectChanges();
 
     expect(formulario().form.getRawValue().nombre).toBe('Puente Amatitlan');
 
-    // Modificar nombre
     formulario().form.controls.nombre.setValue('Puente Amatitlan Renovado');
     fixture.detectChanges();
 
     formulario().enviarFormulario();
+    http.expectNone((req) => req.method === 'PUT');
+    expect(page.mostrarConfirmacionEdicion()).toBe(true);
+    page.confirmarEdicion();
 
     const peticionActualizar = http.expectOne('/api/v1/puentes/puente-1');
     expect(peticionActualizar.request.method).toBe('PUT');
@@ -203,7 +213,51 @@ describe('EditarPuentePage', () => {
 
     expect(page.puente()?.nombre).toBe('Puente Amatitlan Renovado');
     expect(page.puenteActualizado()?.nombre).toBe('Puente Amatitlan Renovado');
-    expect(fixture.debugElement.query(By.css('.feedback.success'))).toBeTruthy();
+    expect(navigate).toHaveBeenCalledWith(['/puentes']);
+  });
+
+  it('cancelar conserva los datos y no envia la actualizacion', () => {
+    http.expectOne('/api/v1/puentes/puente-1').flush(puenteMock);
+    page.actualizar({
+      nombre: 'Nombre editado',
+      departamentoId: departamento.id,
+      municipioId: municipio.id,
+      ruta: puenteMock.ruta,
+      kilometraje: puenteMock.kilometraje,
+      latitud: puenteMock.latitud,
+      longitud: puenteMock.longitud,
+    });
+    expect(page.mostrarConfirmacionEdicion()).toBe(true);
+    page.cancelarEdicion();
+    page.confirmarEdicion();
+    expect(page.mostrarConfirmacionEdicion()).toBe(false);
+    http.expectNone((req) => req.method === 'PUT');
+    expect(navigate).not.toHaveBeenCalled();
+  });
+
+  it('un error al guardar conserva la pantalla y permite reintentar', () => {
+    http.expectOne('/api/v1/puentes/puente-1').flush(puenteMock);
+    const valores = {
+      nombre: 'Nombre editado',
+      departamentoId: departamento.id,
+      municipioId: municipio.id,
+      ruta: puenteMock.ruta,
+      kilometraje: puenteMock.kilometraje,
+      latitud: puenteMock.latitud,
+      longitud: puenteMock.longitud,
+    };
+    page.actualizar(valores);
+    page.confirmarEdicion();
+    page.confirmarEdicion();
+    http
+      .expectOne((req) => req.method === 'PUT')
+      .flush({ detail: 'No se pudo guardar' }, { status: 500, statusText: 'Server Error' });
+    expect(page.errorRegistro()).toBe('No se pudo guardar');
+    expect(page.guardando()).toBe(false);
+    expect(navigate).not.toHaveBeenCalled();
+    page.actualizar(valores);
+    expect(page.mostrarConfirmacionEdicion()).toBe(true);
+    page.cancelarEdicion();
   });
 
   it('gestiona advertencia de cercania y permite confirmar actualizacion', () => {
@@ -217,6 +271,9 @@ describe('EditarPuentePage', () => {
     fixture.detectChanges();
 
     formulario().enviarFormulario();
+    http.expectNone((req) => req.method === 'PUT');
+    expect(page.mostrarConfirmacionEdicion()).toBe(true);
+    page.confirmarEdicion();
 
     const putInicial = http.expectOne('/api/v1/puentes/puente-1');
     putInicial.flush(
@@ -249,7 +306,6 @@ describe('EditarPuentePage', () => {
     expect(page.puntosCercanos().length).toBe(1);
     expect(fixture.debugElement.query(By.css('.proximity'))).toBeTruthy();
 
-    // Confirmar cercanía
     page.confirmarActualizacion();
 
     const putConfirmado = http.expectOne('/api/v1/puentes/puente-1');

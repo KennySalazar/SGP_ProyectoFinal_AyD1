@@ -1,0 +1,224 @@
+<section class="surface-card seguimiento">
+  <h2>{{ 'revision.resultado.titulo' | transloco }}</h2>
+  <p class="privado">{{ 'revision.resultado.privado' | transloco }}</p>
+  @if (!abierto()) {
+    <button pButton type="button" (click)="abrir()">
+      {{ 'revision.resultado.abrir' | transloco }}
+    </button>
+  } @else {
+    @if (ocupado()) {
+      <p role="status">{{ 'revision.resultado.procesando' | transloco }}</p>
+    }
+    @if (error()) {
+      <p class="validation" role="alert">{{ error() }}</p>
+      @if (ciclo()) {
+        <button pButton type="button" [disabled]="ocupado()" (click)="cargar()">
+          {{ 'revision.autor.reintentar' | transloco }}
+        </button>
+      }
+    }
+    @if (ciclo(); as c) {
+      @if (c.veredicto) {
+        <p role="status">
+          {{ 'revision.resultado.veredictos.' + c.veredicto | transloco }}
+        </p>
+        <p>{{ 'revision.resultado.general' | transloco }}: {{ c.observacionGeneral }}</p>
+        @if (c.calificacion !== null) {
+          <p>
+            <strong
+              >{{ 'revision.resultado.calificacion' | transloco }}: {{ c.calificacion }} /
+              100</strong
+            >
+          </p>
+        }
+      }
+      @if (puedeEmitir()) {
+        <form [formGroup]="form" (ngSubmit)="preparar()">
+          <label [for]="'veredicto-' + inspeccionId()"
+            >{{ 'revision.resultado.veredicto' | transloco }}
+            <p-select
+              [inputId]="'veredicto-' + inspeccionId()"
+              [options]="veredictos"
+              formControlName="veredicto"
+            >
+              <ng-template #item let-v>{{
+                'revision.resultado.veredictos.' + v | transloco
+              }}</ng-template>
+              <ng-template #selectedItem let-v>{{
+                'revision.resultado.veredictos.' + v | transloco
+              }}</ng-template>
+            </p-select>
+          </label>
+          <label
+            >{{ 'revision.resultado.calificacion' | transloco }}
+            <input
+              pInputText
+              type="number"
+              min="0"
+              max="100"
+              step="0.01"
+              formControlName="calificacion"
+            />
+          </label>
+          <small>{{ 'revision.resultado.escala' | transloco }}</small>
+          <label
+            >{{ 'revision.resultado.general' | transloco }}
+            <textarea
+              pTextarea
+              formControlName="observacionGeneral"
+              maxlength="2000"
+              rows="4"
+            ></textarea>
+          </label>
+          @if (form.controls.veredicto.value === 'APROBADA') {
+            @if (observaciones()?.pendientes) {
+              <p role="alert">{{ 'revision.resultado.pendientes' | transloco }}</p>
+            }
+            @if (calculo(); as ic) {
+              <app-aprobacion-calibracion [versionId]="ic.calculo.versionFormularioId" />
+              <p>
+                {{ 'revision.resultado.ic' | transloco }}: {{ ic.calculo.indiceCalculado }} ·
+                {{ ic.calculo.estadoCalculado }}
+              </p>
+              <label [for]="'estado-' + inspeccionId()"
+                >{{ 'revision.resultado.estado' | transloco }}
+                <p-select
+                  [inputId]="'estado-' + inspeccionId()"
+                  [options]="estados"
+                  formControlName="estado"
+                />
+              </label>
+              <label
+                >{{ 'revision.resultado.justificacion' | transloco }}
+                <textarea
+                  pTextarea
+                  formControlName="justificacion"
+                  maxlength="10000"
+                  rows="3"
+                ></textarea>
+              </label>
+            }
+          }
+          <button pButton type="submit" [disabled]="!valido()">
+            {{ 'revision.resultado.emitir' | transloco }}
+          </button>
+        </form>
+      }
+      @if (ultimoConCambios()) {
+        <div class="acciones">
+          @if (c.estadoInspeccion === 'CAMBIOS_SOLICITADOS') {
+            <button pButton type="button" [disabled]="ocupado()" (click)="atenderCambios()">
+              {{ 'revision.atencion.atender' | transloco }}
+            </button>
+          }
+          @if (c.estadoInspeccion === 'BORRADOR') {
+            <a pButton [routerLink]="['/inspecciones', c.inspeccionId]">{{
+              'revision.atencion.editar' | transloco
+            }}</a>
+            <p>{{ 'revision.atencion.instrucciones' | transloco }}</p>
+          }
+        </div>
+      }
+      <h3>{{ 'revision.atencion.observaciones' | transloco }}</h3>
+      @for (o of observaciones()?.observaciones ?? []; track o.id) {
+        <article>
+          <p>
+            <strong>{{
+              o.destino?.elementoRef ??
+                o.destino?.categoriaFotografica ??
+                ('revision.detalle.sinAnclaje' | transloco)
+            }}</strong>
+            {{ o.destino?.instanciaElementoId }}
+          </p>
+          <p>{{ o.texto }}</p>
+          <p>{{ 'observaciones.estados.' + o.estado | transloco }}</p>
+          @if (o.estado === 'RESUELTA') {
+            <p>{{ o.respuestaAutor }}</p>
+            <p>
+              {{ 'revision.atencion.resueltoPor' | transloco }}: {{ o.resueltoPorId }} ·
+              {{ o.resueltoEn | date: 'dd/MM/yyyy HH:mm' }}
+            </p>
+          } @else if (puedeResolver()) {
+            <label
+              >{{ 'revision.atencion.respuesta' | transloco }}
+              <textarea
+                pTextarea
+                [formControl]="respuesta(o.id)"
+                rows="2"
+                maxlength="2000"
+              ></textarea>
+            </label>
+            <button
+              pButton
+              type="button"
+              [disabled]="!puedeResolver() || respuesta(o.id).invalid"
+              (click)="resolverObservacion(o.id)"
+            >
+              {{ 'revision.atencion.resolver' | transloco }}
+            </button>
+          }
+        </article>
+      }
+      <h3>{{ 'revision.resultado.historial' | transloco }}</h3>
+      @for (h of historial(); track h.revisionId) {
+        <article>
+          <strong
+            >{{ 'revision.detalle.ciclo' | transloco }} {{ h.numeroCiclo }} ·
+            {{ h.estadoRevision }}</strong
+          >
+          <a
+            pButton
+            severity="secondary"
+            [outlined]="true"
+            [routerLink]="[esAutor() ? '/observaciones' : '/revisiones', h.revisionId]"
+            >{{ 'revision.atencion.abrirCiclo' | transloco }}</a
+          >
+          <p>{{ h.enviadaEn | date: 'dd/MM/yyyy HH:mm' }}</p>
+          @if (h.veredicto) {
+            <p>
+              {{ 'revision.resultado.veredictos.' + h.veredicto | transloco }} ·
+              {{ 'revision.resultado.calificacion' | transloco }}: {{ h.calificacion }} / 100
+            </p>
+            <p>{{ h.observacionGeneral }}</p>
+          }
+        </article>
+      }
+    } @else if (!ocupado()) {
+      <button pButton type="button" (click)="cargar()">
+        {{ 'revision.autor.reintentar' | transloco }}
+      </button>
+    }
+  }
+</section>
+<p-dialog
+  [visible]="confirmando()"
+  (visibleChange)="!$event && !ocupado() && confirmando.set(false)"
+  [modal]="true"
+  [closable]="!ocupado()"
+  [closeOnEscape]="!ocupado()"
+  [draggable]="false"
+  [resizable]="false"
+  [header]="'revision.resultado.confirmar' | transloco"
+  [style]="{ width: 'min(32rem,95vw)' }"
+>
+  <p>{{ 'revision.resultado.confirmarTexto' | transloco }}</p>
+  <p>
+    {{ 'revision.resultado.veredictos.' + form.controls.veredicto.value | transloco }} ·
+    {{ form.controls.calificacion.value }} / 100
+  </p>
+  <div class="acciones">
+    <button
+      pButton
+      type="button"
+      severity="secondary"
+      [outlined]="true"
+      [disabled]="ocupado()"
+      (click)="confirmando.set(false)"
+    >
+      {{ 'common.cancel' | transloco }}
+    </button>
+    <button pButton type="button" [disabled]="!valido()" (click)="emitir()">
+      {{ 'revision.resultado.emitir' | transloco }}
+    </button>
+  </div>
+</p-dialog>

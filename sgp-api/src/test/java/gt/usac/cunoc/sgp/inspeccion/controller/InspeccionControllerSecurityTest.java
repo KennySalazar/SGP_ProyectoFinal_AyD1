@@ -73,7 +73,7 @@ class InspeccionControllerSecurityTest {
 
   @Test
   void iniciarInspeccion_conDatosValidos_retorna201() throws Exception {
-    var auth = autenticar(RoleName.ESTUDIANTE);
+    var auth = autenticar(RoleName.CATEDRATICO);
     UUID puenteId = UUID.randomUUID();
     UUID versionId = UUID.randomUUID();
     UUID inspeccionId = UUID.randomUUID();
@@ -90,7 +90,7 @@ class InspeccionControllerSecurityTest {
             versionId,
             "SIECA-v1",
             USUARIO_ID,
-            "ESTUDIANTE",
+            "CATEDRATICO",
             "Estudiante Inspector",
             "ORIGINAL",
             "BORRADOR",
@@ -100,7 +100,9 @@ class InspeccionControllerSecurityTest {
             Instant.now(),
             Instant.now());
 
-    when(service.iniciarInspeccion(any(), eq(USUARIO_ID), eq("ESTUDIANTE"))).thenReturn(dummy);
+    when(service.iniciarInspeccion(
+            any(IniciarInspeccionVersionadaRequest.class), eq(USUARIO_ID), eq("CATEDRATICO")))
+        .thenReturn(dummy);
 
     mockMvc
         .perform(
@@ -114,13 +116,38 @@ class InspeccionControllerSecurityTest {
   }
 
   @Test
-  void iniciarInspeccion_conVersionNoUtilizable_retorna422Rfc7807() throws Exception {
+  void inicioAcademicoTransmiteAsignacionExplicitaEIdentidadAutenticada() throws Exception {
     var auth = autenticar(RoleName.ESTUDIANTE);
+    var request =
+        new IniciarInspeccionVersionadaRequest(
+            UUID.randomUUID(),
+            UUID.randomUUID(),
+            null,
+            "web",
+            "Estudiante",
+            OBJECT_MAPPER.createObjectNode(),
+            UUID.randomUUID());
+
+    mockMvc
+        .perform(
+            post("/api/v1/inspecciones/iniciar")
+                .principal(auth)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(OBJECT_MAPPER.writeValueAsString(request)))
+        .andExpect(status().isCreated());
+
+    org.mockito.Mockito.verify(service).iniciarInspeccion(request, USUARIO_ID, "ESTUDIANTE");
+  }
+
+  @Test
+  void iniciarInspeccion_conVersionNoUtilizable_retorna422Rfc7807() throws Exception {
+    var auth = autenticar(RoleName.CATEDRATICO);
     IniciarInspeccionVersionadaRequest request =
         new IniciarInspeccionVersionadaRequest(
             UUID.randomUUID(), UUID.randomUUID(), LocalDate.now(), "web", "Inspector", null);
 
-    when(service.iniciarInspeccion(any(), eq(USUARIO_ID), any()))
+    when(service.iniciarInspeccion(
+            any(IniciarInspeccionVersionadaRequest.class), eq(USUARIO_ID), any()))
         .thenThrow(
             new ApiException(
                 HttpStatus.UNPROCESSABLE_ENTITY,
@@ -140,6 +167,22 @@ class InspeccionControllerSecurityTest {
             jsonPath("$.detail")
                 .value(
                     "Solo se pueden iniciar inspecciones con versiones de formulario publicadas"));
+  }
+
+  @Test
+  void estudianteNoPuedeOmitirLaValidacionDeAsignacionConInicioVersionado() throws Exception {
+    var auth = autenticar(RoleName.ESTUDIANTE);
+    IniciarInspeccionVersionadaRequest request =
+        new IniciarInspeccionVersionadaRequest(
+            UUID.randomUUID(), UUID.randomUUID(), LocalDate.now(), "web", "Estudiante", null);
+
+    mockMvc
+        .perform(
+            post("/api/v1/inspecciones/iniciar")
+                .principal(auth)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(OBJECT_MAPPER.writeValueAsString(request)))
+        .andExpect(status().isForbidden());
   }
 
   @Test

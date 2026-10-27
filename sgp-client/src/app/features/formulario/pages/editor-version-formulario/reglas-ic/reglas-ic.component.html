@@ -1,0 +1,82 @@
+<section class="surface-card reglas-card">
+  <h2>{{ 'formulario.reglasIc.titulo' | transloco }}</h2>
+  <p>{{ 'formulario.reglasIc.nota' | transloco }}</p>
+  <p class="nota">{{ 'formulario.reglasIc.maximoMedicion' | transloco }}</p>
+  @if (exito()) {
+    <p class="exito" role="status">{{ 'formulario.reglasIc.guardadas' | transloco }}</p>
+  }
+  <form [formGroup]="formulario" (ngSubmit)="guardar()">
+    @for (grupo of grupos(); track grupo.clave) {
+      <fieldset>
+        <legend>{{ 'formulario.reglasIc.grupos.' + grupo.clave | transloco }}</legend>
+        <div class="campos">
+          @for (campo of grupo.campos; track campo.clave; let i = $index) {
+            <div class="campo">
+              <label [for]="'regla-' + grupo.clave + '-' + i">{{
+                'formulario.reglasIc.campos.' + campo.etiqueta | transloco
+              }}</label>
+              @switch (campo.tipo) {
+                @case ('texto') {
+                  <input
+                    pInputText
+                    [id]="'regla-' + grupo.clave + '-' + i"
+                    [formControlName]="campo.clave"
+                    maxlength="50"
+                  />
+                }
+                @case ('agregacion') {
+                  <p-select
+                    [inputId]="'regla-' + grupo.clave + '-' + i"
+                    [formControlName]="campo.clave"
+                    [options]="[
+                      { label: ('formulario.reglasIc.maximo' | transloco), value: 'MAXIMO' },
+                      { label: ('formulario.reglasIc.promedio' | transloco), value: 'PROMEDIO' },
+                    ]"
+                    optionLabel="label"
+                    optionValue="value"
+                    [fluid]="true"
+                  />
+                }
+                @default {
+                  <p-inputnumber
+                    [readonly]="campo.valorFijo !== undefined"
+                    [inputId]="'regla-' + grupo.clave + '-' + i"
+                    [formControlName]="campo.clave"
+                    [useGrouping]="false"
+                    [maxFractionDigits]="6"
+                    [fluid]="true"
+                  />
+                }
+              }
+            </div>
+          }
+        </div>
+      </fieldset>
+    }
+    @if (errores().length) {
+      <ul class="validacion" role="status">
+        @for (error of errores(); track error) {
+          <li>{{ 'formulario.reglasIc.' + error | transloco }}</li>
+        }
+      </ul>
+    }
+    @if (version().estado === 'BORRADOR') {
+      <button
+        pButton
+        type="button"
+        severity="secondary"
+        [outlined]="true"
+        [disabled]="bloqueado() || guardando()"
+        (click)="restablecer()"
+      >
+        {{ 'formulario.reglasIc.restablecer' | transloco }}
+      </button>
+      <button pButton type="submit" [disabled]="formulario.invalid || bloqueado() || guardando()">
+        {{
+          (guardando() ? 'formulario.reglasIc.guardando' : 'formulario.reglasIc.guardar')
+            | transloco
+        }}
+      </button>
+    }
+  </form>
+</section>

@@ -16,8 +16,10 @@ import { finalize } from 'rxjs';
 import { ProblemDetails } from '../../../../core/models/problem-details';
 import { ApiErrorService } from '../../../../core/services/api-error.service';
 import { AuthCardComponent } from '../../../../shared/components/auth-card/auth-card.component';
+import { ContrasenaVisibleComponent } from '../../../../shared/components/contrasena-visible/contrasena-visible.component';
 import { InvitacionPublica } from '../../models/invitacion.models';
 import { UsuarioApiService } from '../../services/usuario-api.service';
+import { LIMITE_NOMBRE_COMPLETO, PATRON_NOMBRE_USUARIO } from '../../utils/reglas-perfil';
 
 export type EstadoActivacion =
   'validando' | 'lista' | 'vencida' | 'invalida' | 'error' | 'activada';
@@ -32,6 +34,7 @@ function contrasenasIguales(control: AbstractControl): ValidationErrors | null {
   standalone: true,
   imports: [
     ReactiveFormsModule,
+    ContrasenaVisibleComponent,
     RouterLink,
     AuthCardComponent,
     ButtonModule,
@@ -53,6 +56,8 @@ export class ActivarCuentaPage {
   readonly invitacion = signal<InvitacionPublica | null>(null);
   readonly enviando = signal(false);
   readonly errorContrasena = signal<string | null>(null);
+  readonly errorPerfil = signal<string | null>(null);
+  readonly limiteNombre = LIMITE_NOMBRE_COMPLETO;
 
   readonly form = this.fb.nonNullable.group(
     {
@@ -66,6 +71,8 @@ export class ActivarCuentaPage {
         ],
       ],
       confirmacion: ['', [Validators.required]],
+      nombreCompleto: ['', [Validators.required, Validators.maxLength(LIMITE_NOMBRE_COMPLETO)]],
+      nombreUsuario: ['', [Validators.required, Validators.pattern(PATRON_NOMBRE_USUARIO)]],
     },
     { validators: contrasenasIguales },
   );
@@ -98,10 +105,15 @@ export class ActivarCuentaPage {
 
     this.enviando.set(true);
     this.errorContrasena.set(null);
+    this.errorPerfil.set(null);
     this.apiErrors.clear();
 
+    const datos = this.form.getRawValue();
     this.usuarioApi
-      .aceptarInvitacion(this.token, this.form.getRawValue().password)
+      .aceptarInvitacion(this.token, datos.password, {
+        nombreCompleto: datos.nombreCompleto.trim(),
+        nombreUsuario: datos.nombreUsuario.trim(),
+      })
       .pipe(
         finalize(() => this.enviando.set(false)),
         takeUntilDestroyed(this.destroyRef),
@@ -116,6 +128,12 @@ export class ActivarCuentaPage {
           const errorDeContrasena =
             problem?.code === 'contrasena_invalida' ||
             (problem?.errores ?? []).some((item) => item.campo === 'password');
+          if (problem?.code === 'nombre_usuario_en_uso' || problem?.code === 'perfil_invalido') {
+            // El enlace sigue vigente: se corrige el nombre y se vuelve a intentar.
+            this.errorPerfil.set(problem.errores?.[0]?.mensaje ?? problem.detail ?? null);
+            this.apiErrors.clear();
+            return;
+          }
           if (error.status === 400 && errorDeContrasena) {
             this.errorContrasena.set(problem?.detail ?? null);
             this.apiErrors.clear();

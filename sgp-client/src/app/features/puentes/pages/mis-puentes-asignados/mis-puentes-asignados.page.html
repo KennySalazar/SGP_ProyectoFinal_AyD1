@@ -15,18 +15,60 @@
     </button>
   </div>
 
+  <label class="search-control">
+    <span>{{ 'myAssignedBridges.search' | transloco }}</span>
+    <input
+      pInputText
+      type="search"
+      [ngModel]="busqueda()"
+      (ngModelChange)="busqueda.set($event)"
+      [placeholder]="'myAssignedBridges.searchPlaceholder' | transloco"
+    />
+  </label>
+
   @if (cargando()) {
   <p role="status">{{ 'myAssignedBridges.loading' | transloco }}</p>
-  } @else if (puentes().length === 0) {
+  } @else if (puentesFiltrados().length === 0) {
   <p role="status">{{ 'myAssignedBridges.empty' | transloco }}</p>
   } @else {
   <div class="bridge-list">
-    @for (puente of puentes(); track puente.id) {
+    @for (puente of puentesFiltrados(); track puente.id) {
     <article class="bridge-row">
-      <strong>{{ puente.puenteCodigo }} — {{ puente.puenteNombre }}</strong>
-      <span>{{ puente.cursoNombre }} · {{ puente.periodo }}</span>
+      <div>
+        <div class="bridge-title">
+          <strong>{{ puente.puenteCodigo }} — {{ puente.puenteNombre }}</strong>
+          <p-tag
+            [value]="('myAssignedBridges.states.' + estado(puente)) | transloco"
+            [severity]="severidad(puente)"
+          />
+        </div>
+        <span>{{ puente.cursoNombre }} · {{ puente.periodo }}</span>
+      </div>
+      <div class="bridge-actions">
+        @if (!puente.inspeccionId) {
+        <button pButton type="button" (click)="iniciar(puente)" [disabled]="!!cargandoPuente()">
+          <i class="pi pi-play" aria-hidden="true"></i>
+          <span>{{ 'myAssignedBridges.start' | transloco }}</span>
+        </button>
+        } @else if (puente.estadoInspeccion === 'BORRADOR') {
+        <button pButton type="button" (click)="continuar(puente)">
+          <i class="pi pi-pencil" aria-hidden="true"></i>
+          <span>{{ 'myAssignedBridges.continue' | transloco }}</span>
+        </button>
+        } @else {
+        <a class="view-inspections" routerLink="/inspecciones">
+          {{ 'myAssignedBridges.viewInspections' | transloco }}
+        </a>
+        }
+      </div>
     </article>
     }
   </div>
   }
 </section>
+
+<app-iniciar-inspeccion-dialog
+  [(visible)]="mostrarInicio"
+  [puente]="puenteSeleccionado()"
+  (inspeccionIniciada)="cargar()"
+/>

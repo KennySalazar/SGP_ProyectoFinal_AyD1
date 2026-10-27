@@ -1,0 +1,10 @@
+{
+  "vigas": {
+    "existencia": "PRESENTE",
+    "dano": "SEVERO"
+  },
+  "losa": {
+    "existencia": "PRESENTE",
+    "dano": "NO_PRESENTA"
+  }
+}

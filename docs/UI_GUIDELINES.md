@@ -116,6 +116,12 @@ Esta guía reúne las reglas visuales y de experiencia que ya están implementad
 
 ## Accesibilidad
 
+El panel de observaciones conserva por defecto su modo integrado y pasivo. Su modo desplegable
+se coloca en una columna del contenedor en escritorio (sin superponer el formulario) y usa
+Dialog de PrimeNG como hoja inferior modal hasta 640 px. La hoja mantiene el foco dentro;
+el lateral permite volver al formulario con Tab. Ambos reciben foco al abrir, cierran con
+Escape y devuelven el foco al control de apertura si sigue disponible.
+
 - Mantener un único título principal por pantalla y la jerarquía semántica de encabezados existente.
 - Asociar cada input con una etiqueta visible y conservar atributos de autocompletado y teclado virtual adecuados.
 - Incluir texto accesible en controles que puedan mostrarse solo como icono y usar `aria-label` en regiones de navegación cuando corresponda.

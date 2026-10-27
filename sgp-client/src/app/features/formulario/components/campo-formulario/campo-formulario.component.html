@@ -1,5 +1,6 @@
 @let n = nodo();
 @if (n.tipo !== 'uuid') {
+  <app-anclaje-observaciones [nodo]="nodo()" [control]="control()" />
   <div
     class="campo"
     [class.en-grilla]="modoGrilla()"
@@ -20,6 +21,12 @@
           @if (opcional()) {
             <span class="marca-opcional">({{ 'formulario.dinamico.optional' | transloco }})</span>
           }
+          <app-anclaje-comentarios
+            [nodo]="nodo()"
+            [control]="control()"
+            [enTitulo]="true"
+            [enCampo]="true"
+          />
           @if (ayudas().length > 0) {
             <button
               type="button"
@@ -121,24 +128,33 @@
         }
       </fieldset>
     } @else {
-      <label [for]="id">
-        {{ n.titulo }}
-        @if (obligatorio()) {
-          <span class="marca-obligatorio" aria-hidden="true">*</span>
-          <span class="solo-lectores">({{ 'formulario.dinamico.required' | transloco }})</span>
-        }
-        @if (opcional()) {
-          <span class="marca-opcional">({{ 'formulario.dinamico.optional' | transloco }})</span>
-        }
-        @if (n.soloLectura) {
-          <i
-            class="pi pi-lock icono-precargado"
-            aria-hidden="true"
-            [attr.title]="'formulario.dinamico.preloaded' | transloco"
-          ></i>
-          <span class="solo-lectores">{{ 'formulario.dinamico.preloaded' | transloco }}</span>
-        }
-      </label>
+      <!-- El icono va junto a la etiqueta, no dentro: un botón en una etiqueta ensuciaría su nombre. -->
+      <div class="titulo-campo">
+        <label [for]="id">
+          {{ n.titulo }}
+          @if (obligatorio()) {
+            <span class="marca-obligatorio" aria-hidden="true">*</span>
+            <span class="solo-lectores">({{ 'formulario.dinamico.required' | transloco }})</span>
+          }
+          @if (opcional()) {
+            <span class="marca-opcional">({{ 'formulario.dinamico.optional' | transloco }})</span>
+          }
+          @if (n.soloLectura) {
+            <i
+              class="pi pi-lock icono-precargado"
+              aria-hidden="true"
+              [attr.title]="'formulario.dinamico.preloaded' | transloco"
+            ></i>
+            <span class="solo-lectores">{{ 'formulario.dinamico.preloaded' | transloco }}</span>
+          }
+        </label>
+        <app-anclaje-comentarios
+          [nodo]="nodo()"
+          [control]="control()"
+          [enTitulo]="true"
+          [enCampo]="true"
+        />
+      </div>
 
       @switch (n.tipo) {
         @case ('enumerado') {

@@ -16,6 +16,12 @@ public record ResultadoCalculoIc(
     BigDecimal sumaCalificacionesPonderadas,
     List<DesgloseElemento> desglose,
     List<CondicionAnulacion> condicionesAnulacion) {
+  @com.fasterxml.jackson.annotation.JsonProperty(
+      value = "calibracionEndpoint",
+      access = com.fasterxml.jackson.annotation.JsonProperty.Access.READ_ONLY)
+  public String calibracionEndpoint() {
+    return "/api/v1/formularios/" + versionFormularioId + "/estado-calibracion";
+  }
 
   public ResultadoCalculoIc {
     desglose = List.copyOf(desglose);

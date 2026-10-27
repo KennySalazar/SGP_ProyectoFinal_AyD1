@@ -1,7 +1,12 @@
+import { FormularioApiService } from '../../../formulario/services/formulario-api.service';
+import { InspeccionesLocalesService } from '../../../../offline/services/inspecciones-locales.service';
+import { ConnectivityService } from '../../../../offline/services/connectivity.service';
+import { IniciarInspeccionRequest } from '../../models/inspeccion.models';
+import { TranslocoPipe } from '@jsverse/transloco';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { Pipe, PipeTransform, signal } from '@angular/core';
 import { of, throwError } from 'rxjs';
-import { describe, beforeEach, it, expect, vi } from 'vitest';
+import { describe, beforeEach, afterEach, it, expect, vi } from 'vitest';
 import { AuthStore } from '../../../../core/services/auth.store';
 import { UserSession } from '../../../../core/models/auth.models';
 import { PuenteResponse } from '../../../puentes/models/puente.models';
@@ -68,6 +73,19 @@ describe('IniciarInspeccionDialogComponent', () => {
     obtenerDatosPermanentes: vi.fn(),
   };
 
+  const locales = {
+    encolarInicio: vi.fn(async (_actor: string, solicitud: IniciarInspeccionRequest) => ({
+      id: 'operacion',
+      idempotencyKey: solicitud.id,
+    })),
+    confirmarInicio: vi.fn().mockResolvedValue(undefined),
+    marcarOperacionParaIntervencion: vi.fn().mockResolvedValue(undefined),
+    marcarOperacionPendiente: vi.fn().mockResolvedValue(undefined),
+    guardarEsquemaLocal: vi.fn().mockResolvedValue(undefined),
+    obtenerEsquemaActivoLocal: vi.fn().mockResolvedValue({ id: 'version' }),
+    iniciarInspeccionLocal: vi.fn(),
+  };
+
   beforeEach(() => {
     mockApi.iniciarInspeccion.mockReset();
     mockApi.obtenerDatosPermanentes.mockReset();
@@ -76,22 +94,34 @@ describe('IniciarInspeccionDialogComponent', () => {
     TestBed.configureTestingModule({
       imports: [IniciarInspeccionDialogComponent],
       providers: [
+        {
+          provide: FormularioApiService,
+          useValue: { obtenerActiva: () => of({ id: 'version', version: 1, esquema: {} }) },
+        },
+        { provide: InspeccionesLocalesService, useValue: locales },
+        { provide: ConnectivityService, useValue: { online: signal(true) } },
         { provide: AuthStore, useValue: authStoreMock },
         { provide: InspeccionApiService, useValue: mockApi },
       ],
     });
 
     TestBed.overrideComponent(IniciarInspeccionDialogComponent, {
-      remove: { imports: [] },
+      remove: { imports: [TranslocoPipe] },
       add: { imports: [MockTranslocoPipe] },
     });
 
     fixture = TestBed.createComponent(IniciarInspeccionDialogComponent);
     component = fixture.componentInstance;
+    vi.spyOn(component, 'cargarReporte').mockResolvedValue(undefined);
     component.puente = puentePrueba;
   });
 
-  it('inicializa el formulario con la fecha actual y el correo del usuario', () => {
+  afterEach(() => {
+    fixture.destroy();
+    vi.clearAllMocks();
+  });
+
+  it('inicializa el formulario con la fecha actual y el correo del usuario', async () => {
     component.visible = true;
     component.ngOnChanges({
       visible: {
@@ -108,7 +138,7 @@ describe('IniciarInspeccionDialogComponent', () => {
     expect(component.form.get('confirmarDatosPermanentes')?.value).toBe(false);
   });
 
-  it('consulta datos técnicos permanentes si existen para el puente', () => {
+  it('consulta datos técnicos permanentes si existen para el puente', async () => {
     const datosPermanentes: DatosPermanentesResponse = {
       longitudM: 80.5,
       numeroTramos: 3,
@@ -133,7 +163,7 @@ describe('IniciarInspeccionDialogComponent', () => {
     expect(component.datosPermanentes()).toEqual(datosPermanentes);
   });
 
-  it('permite agregar y eliminar acompañantes', () => {
+  it('permite agregar y eliminar acompañantes', async () => {
     component.form.patchValue({
       nombreAcompanante: 'Ing. Carlos López',
       colegiadoAcompanante: '12345',
@@ -151,7 +181,7 @@ describe('IniciarInspeccionDialogComponent', () => {
     expect(component.acompanantes()).toHaveLength(0);
   });
 
-  it('rechaza fecha futura antes de enviar al backend', () => {
+  it('rechaza fecha futura antes de enviar al backend', async () => {
     component.visible = true;
     component.ngOnChanges({
       visible: {
@@ -165,12 +195,14 @@ describe('IniciarInspeccionDialogComponent', () => {
 
     component.form.patchValue({ fechaInspeccion: '2099-01-01' });
     component.iniciarInspeccion();
+    await Promise.resolve();
+    await Promise.resolve();
 
     expect(component.error()).toContain('posterior a la fecha actual');
     expect(mockApi.iniciarInspeccion).not.toHaveBeenCalled();
   });
 
-  it('inicia inspección exitosa y emite inspeccionIniciada con resultado', () => {
+  it('inicia inspección exitosa y emite inspeccionIniciada con resultado', async () => {
     const responseExitosa: IniciarInspeccionResponse = {
       id: '22222222-2222-2222-2222-222222222222',
       puenteId: puentePrueba.id,
@@ -208,6 +240,8 @@ describe('IniciarInspeccionDialogComponent', () => {
     fixture.detectChanges();
 
     component.iniciarInspeccion();
+    await Promise.resolve();
+    await Promise.resolve();
 
     expect(mockApi.iniciarInspeccion).toHaveBeenCalled();
     expect(component.resultado()).toEqual(responseExitosa);
@@ -215,7 +249,7 @@ describe('IniciarInspeccionDialogComponent', () => {
     expect(component.resultado()?.advertenciaGps).toBe(true);
   });
 
-  it('muestra mensaje de error si el backend responde con error', () => {
+  it('muestra mensaje de error si el backend responde con error', async () => {
     mockApi.iniciarInspeccion.mockReturnValue(
       throwError(() => ({
         error: { message: 'El puente se encuentra inactivo.' },
@@ -234,8 +268,74 @@ describe('IniciarInspeccionDialogComponent', () => {
     fixture.detectChanges();
 
     component.iniciarInspeccion();
+    await Promise.resolve();
+    await Promise.resolve();
 
     expect(component.error()).toBe('El puente se encuentra inactivo.');
     expect(component.guardando()).toBe(false);
+  });
+
+  it('conserva la solicitud y la clave en la cola local si se pierde la respuesta de inicio', async () => {
+    mockApi.iniciarInspeccion.mockReturnValue(throwError(() => ({ status: 0 })));
+    locales.iniciarInspeccionLocal.mockImplementation(
+      async (solicitud: IniciarInspeccionRequest) => ({
+        ...solicitud,
+        autorId: 'usr-1',
+        estado: 'BORRADOR',
+      }),
+    );
+    component.form.patchValue({ fechaInspeccion: component.hoy });
+    component.iniciarInspeccion();
+    for (let paso = 0; paso < 6; paso++) await Promise.resolve();
+    const [solicitud, clave] = mockApi.iniciarInspeccion.mock.calls[0];
+    expect(clave).toBe(solicitud.id);
+    expect(clave[14]).toBe('7');
+    expect(locales.iniciarInspeccionLocal).toHaveBeenCalledWith(
+      solicitud,
+      'usr-1',
+      'CATEDRATICO',
+      'catedratico@cunoc.edu.gt',
+      puentePrueba.nombre,
+      puentePrueba.codigo,
+      'Guatemala',
+      puentePrueba.municipio!.nombre,
+      'version',
+      null,
+      true,
+    );
+    expect(component.resultado()?.id).toBe(solicitud.id);
+    expect(component.guardando()).toBe(false);
+    expect(mockApi.iniciarInspeccion).toHaveBeenCalledOnce();
+  });
+
+  it('continúa las fotografías guardadas sin volver a crear la inspección', async () => {
+    const contexto = {
+      id: 'inspeccion-local',
+      autorId: 'usr-1',
+      puenteId: puentePrueba.id,
+    } as IniciarInspeccionResponse;
+    component.pendienteAnterior.set(contexto);
+    component.continuarPendiente();
+    expect(component.resultado()).toEqual(contexto);
+    expect(mockApi.iniciarInspeccion).not.toHaveBeenCalled();
+  });
+  it('permite corregir el formulario y usa otro UUID despues de un error determinista', async () => {
+    mockApi.iniciarInspeccion.mockReturnValue(
+      throwError(() => ({ status: 422, error: { detail: 'Revise la fecha' } })),
+    );
+    component.form.patchValue({ fechaInspeccion: component.hoy });
+    component.iniciarInspeccion();
+    await Promise.resolve();
+    await Promise.resolve();
+    const primera = mockApi.iniciarInspeccion.mock.calls[0];
+    expect(component.form.enabled).toBe(true);
+    component.form.patchValue({ nombreAutor: 'Corregido' });
+    component.iniciarInspeccion();
+    await Promise.resolve();
+    await Promise.resolve();
+    const segunda = mockApi.iniciarInspeccion.mock.calls[1];
+    expect(segunda[0].nombreAutor).toBe('Corregido');
+    expect(segunda[0].id).not.toBe(primera[0].id);
+    expect(segunda[1]).not.toBe(primera[1]);
   });
 });

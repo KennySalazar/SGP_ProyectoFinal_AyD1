@@ -6,6 +6,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.OptimisticLockingFailureException;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ProblemDetail;
@@ -34,6 +35,18 @@ public class ApiExceptionHandler {
       problem.setProperty("errores", exception.getErrores());
     }
     return response(problem, exception.getStatus());
+  }
+
+  @ExceptionHandler(DemasiadasSolicitudesException.class)
+  ResponseEntity<ProblemDetail> handleDemasiadasSolicitudes(
+      DemasiadasSolicitudesException exception, HttpServletRequest request) {
+    ProblemDetail problem =
+        ProblemDetails.create(
+            429, exception.getTitle(), exception.getMessage(), exception.getCode(), request);
+    return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+        .header(HttpHeaders.RETRY_AFTER, Long.toString(exception.getReintentarEnSegundos()))
+        .contentType(MediaType.APPLICATION_PROBLEM_JSON)
+        .body(problem);
   }
 
   @ExceptionHandler(MethodArgumentNotValidException.class)
@@ -104,6 +117,20 @@ public class ApiExceptionHandler {
     return response(problem, HttpStatus.CONFLICT);
   }
 
+  @ExceptionHandler(org.springframework.security.core.AuthenticationException.class)
+  ResponseEntity<ProblemDetail> handleAuthentication(
+      org.springframework.security.core.AuthenticationException exception,
+      HttpServletRequest request) {
+    ProblemDetail problem =
+        ProblemDetails.create(
+            401,
+            "Autenticacion requerida",
+            "Se requiere una sesion valida para realizar esta operacion",
+            "authentication_required",
+            request);
+    return response(problem, HttpStatus.UNAUTHORIZED);
+  }
+
   @ExceptionHandler(AccessDeniedException.class)
   ResponseEntity<ProblemDetail> handleAccessDenied(
       AccessDeniedException exception, HttpServletRequest request) {
@@ -115,6 +142,34 @@ public class ApiExceptionHandler {
             "access_denied",
             request);
     return response(problem, HttpStatus.FORBIDDEN);
+  }
+
+  @ExceptionHandler(org.springframework.web.multipart.MaxUploadSizeExceededException.class)
+  ResponseEntity<ProblemDetail> handleTamano(Exception e, HttpServletRequest request) {
+    return response(
+        ProblemDetails.create(
+            413,
+            "Carga demasiado grande",
+            "El archivo o la petición exceden el tamaño permitido",
+            "carga_demasiado_grande",
+            request),
+        HttpStatus.PAYLOAD_TOO_LARGE);
+  }
+
+  @ExceptionHandler({
+    org.springframework.http.converter.HttpMessageNotReadableException.class,
+    org.springframework.web.multipart.support.MissingServletRequestPartException.class,
+    org.springframework.web.bind.MissingRequestHeaderException.class
+  })
+  ResponseEntity<ProblemDetail> handleMultipart(Exception e, HttpServletRequest request) {
+    return response(
+        ProblemDetails.create(
+            400,
+            "Solicitud inválida",
+            "Faltan partes o los metadatos no tienen un formato válido",
+            "validation_error",
+            request),
+        HttpStatus.BAD_REQUEST);
   }
 
   @ExceptionHandler(Exception.class)

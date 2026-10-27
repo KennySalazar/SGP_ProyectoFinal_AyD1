@@ -1,3 +1,6 @@
+import { provideHttpClient } from '@angular/common/http';
+import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
+import { RespaldoIcComponent } from '../../../components/respaldo-ic/respaldo-ic.component';
 import { TestBed } from '@angular/core/testing';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -12,12 +15,17 @@ const mocks = vi.hoisted(() => ({
     remove: ReturnType<typeof vi.fn>;
     setLngLat: ReturnType<typeof vi.fn>;
   }[],
-  popups: [] as { contenido: HTMLElement; remove: ReturnType<typeof vi.fn> }[],
+  popups: [] as {
+    contenido: HTMLElement;
+    remove: ReturnType<typeof vi.fn>;
+    eventos: Record<string, () => void>;
+  }[],
   opciones: vi.fn(),
   disconnect: vi.fn(),
 }));
 
 vi.mock('maplibre-gl', () => ({
+  getVersion: () => '5.24.0',
   Map: class {
     remove = vi.fn();
     resize = vi.fn();
@@ -43,6 +51,16 @@ vi.mock('maplibre-gl', () => ({
     }
   },
   Popup: class {
+    eventos: Record<string, () => void> = {};
+    on(evento: string, callback: () => void) {
+      this.eventos[evento] = callback;
+      return this;
+    }
+    getElement() {
+      const raiz = document.createElement('div');
+      raiz.append(this.contenido);
+      return raiz;
+    }
     contenido!: HTMLElement;
     remove = vi.fn();
     constructor() {
@@ -91,7 +109,15 @@ describe('Mapa público de puentes', () => {
       },
     );
     TestBed.configureTestingModule({
-      providers: [{ provide: TranslocoService, useValue: { translate: (key: string) => key } }],
+      providers: [
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        { provide: TranslocoService, useValue: { translate: (key: string) => key } },
+      ],
+    });
+    TestBed.overrideComponent(RespaldoIcComponent, {
+      remove: { imports: [TranslocoPipe] },
+      add: { imports: [TraduccionTestPipe] },
     });
     TestBed.overrideComponent(MapaPuentesComponent, {
       remove: { imports: [TranslocoPipe] },
@@ -115,6 +141,35 @@ describe('Mapa público de puentes', () => {
     fixture.detectChanges();
     return fixture;
   }
+
+  it('consulta el respaldo solo al abrir el popup y lo libera al cerrarlo', async () => {
+    const fixture = await abrir([
+      {
+        ...puente(),
+        indiceCondicionActual: 80,
+        versionFormularioIdIcVigente: 'v-historica',
+      },
+    ]);
+    const http = TestBed.inject(HttpTestingController);
+    http.expectNone('/api/v1/puentes/Bueno/estado-calibracion');
+    const popup = mocks.popups[0];
+    popup.eventos['open']();
+    fixture.detectChanges();
+    await fixture.whenStable();
+    http.expectOne('/api/v1/puentes/Bueno/estado-calibracion').flush({
+      versionFormularioId: 'v-historica',
+      estado: 'APROBADA',
+      rotuloCalibracion: 'Aprobada por Mario el 22/10/2026',
+    });
+    fixture.detectChanges();
+    await fixture.whenStable();
+    expect(popup.contenido.textContent).toContain('Aprobada por Mario');
+    expect(popup.contenido.querySelector('app-respaldo-ic')?.parentElement).toBe(popup.contenido);
+    popup.eventos['close']();
+    expect(popup.contenido.querySelector('app-respaldo-ic')).toBeNull();
+    http.verify();
+    fixture.destroy();
+  });
 
   it('excluye inactivos, nulos, no finitos y coordenadas fuera de rango', async () => {
     const fixture = await abrir([
@@ -166,6 +221,25 @@ describe('Mapa público de puentes', () => {
     expect(popup.querySelector('img')).toBeNull();
     expect(popup.textContent).not.toContain('privada.jpg');
     expect(popup.textContent).not.toContain('Daño privado');
+  });
+
+  it.each([0, 80])('conserva el estado Malo del servidor con IC %s', async (indice) => {
+    await abrir([
+      { ...puente('Malo'), indiceCondicionActual: indice, fechaUltimaInspeccion: '2026-10-16' },
+    ]);
+    const popup = mocks.popups[0].contenido;
+    expect(popup.textContent).toContain(`puentes.ficha.conditionIndex: ${indice}`);
+    expect(popup.textContent).toContain('2026-10-16');
+    expect(mocks.marcadores[0].elemento.getAttribute('aria-label')).toContain('Malo');
+  });
+
+  it('muestra ausencia de IC y fecha sin inventar una evaluacion', async () => {
+    await abrir([
+      { ...puente('Sin evaluar'), indiceCondicionActual: null, fechaUltimaInspeccion: null },
+    ]);
+    expect(mocks.popups[0].contenido.textContent).toContain('puentes.ficha.notAvailable');
+    expect(mocks.popups[0].contenido.textContent).toContain('puentes.ficha.noInspections');
+    expect(mocks.popups[0].contenido.textContent).toContain('Sin evaluar');
   });
 
   it('limpia marcadores y popups al actualizar y libera mapa y observador al salir', async () => {

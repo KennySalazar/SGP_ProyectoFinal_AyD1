@@ -15,7 +15,27 @@ export class ApiErrorService implements OnDestroy {
 
     const problem = error.error as (ProblemDetails & { code?: string }) | null;
 
+    const rutaPendiente =
+      problem?.code === 'datos_ic_incompletos' && typeof problem.detail === 'string'
+        ? problem.detail.match(/\/[a-zA-Z0-9_~/-]+/)?.[0]
+        : undefined;
+    const recorrido = rutaPendiente
+      ?.split('/')
+      .filter(Boolean)
+      .map((parte) => parte.replace(/~1/g, '/').replace(/~0/g, '~').replace(/_/g, ' '))
+      .map((parte) => parte.charAt(0).toUpperCase() + parte.slice(1))
+      .join(' > ');
+    const mensajePendiente =
+      problem?.code === 'datos_ic_incompletos'
+        ? this.transloco.translate(
+            recorrido
+              ? 'inspecciones.confirmacionIc.indicadorPendiente'
+              : 'inspecciones.confirmacionIc.datosPendientes',
+            { recorrido },
+          )
+        : null;
     const message =
+      mensajePendiente ??
       problem?.detail ??
       problem?.title ??
       this.transloco.translate('common.operationFailed') ??

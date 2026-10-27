@@ -43,6 +43,36 @@
 
     <dependencies>
         <dependency>
+            <groupId>org.apache.pdfbox</groupId>
+            <artifactId>pdfbox</artifactId>
+            <version>3.0.8</version>
+        </dependency>
+        <dependency>
+            <groupId>software.amazon.awssdk</groupId>
+            <artifactId>s3</artifactId>
+            <version>2.31.78</version>
+            <exclusions>
+                <exclusion>
+                    <groupId>software.amazon.awssdk</groupId>
+                    <artifactId>apache-client</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>software.amazon.awssdk</groupId>
+                    <artifactId>netty-nio-client</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+        <dependency>
+            <groupId>software.amazon.awssdk</groupId>
+            <artifactId>url-connection-client</artifactId>
+            <version>2.31.78</version>
+        </dependency>
+        <dependency>
+            <groupId>com.twelvemonkeys.imageio</groupId>
+            <artifactId>imageio-webp</artifactId>
+            <version>3.12.0</version>
+        </dependency>
+        <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-web</artifactId>
         </dependency>
@@ -185,6 +215,9 @@
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-surefire-plugin</artifactId>
                 <configuration>
+                    <systemPropertyVariables>
+                        <app.formulario.siembra.enabled>false</app.formulario.siembra.enabled>
+                    </systemPropertyVariables>
                     <argLine>@{argLine} -javaagent:${settings.localRepository}/net/bytebuddy/byte-buddy-agent/${byte-buddy.version}/byte-buddy-agent-${byte-buddy.version}.jar</argLine>
                 </configuration>
             </plugin>
@@ -235,6 +268,44 @@
                                         <include>gt.usac.cunoc.sgp.inspeccion.service.ConversorMedicionesIc</include>
                                         <include>gt.usac.cunoc.sgp.inspeccion.service.EvaluadorCondicionesCriticasIc</include>
                                         <include>gt.usac.cunoc.sgp.inspeccion.service.HuellaEntradaIc</include>
+                                    </includes>
+                                    <limits>
+                                        <limit>
+                                            <counter>LINE</counter>
+                                            <value>COVEREDRATIO</value>
+                                            <minimum>1.00</minimum>
+                                        </limit>
+                                        <limit>
+                                            <counter>BRANCH</counter>
+                                            <value>COVEREDRATIO</value>
+                                            <minimum>1.00</minimum>
+                                        </limit>
+                                        <limit>
+                                            <counter>INSTRUCTION</counter>
+                                            <value>COVEREDRATIO</value>
+                                            <minimum>1.00</minimum>
+                                        </limit>
+                                    </limits>
+                                </rule>
+                            </rules>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <!-- HU-047: la máquina de estados de las órdenes exige 100 % (DT-CAL-01). -->
+                        <id>hu047-coverage-check</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>check</goal>
+                        </goals>
+                        <configuration>
+                            <rules>
+                                <rule>
+                                    <element>CLASS</element>
+                                    <includes>
+                                        <include>gt.usac.cunoc.sgp.mantenimiento.model.EstadoOrden</include>
+                                        <include>gt.usac.cunoc.sgp.mantenimiento.model.EventoOrden</include>
+                                        <include>gt.usac.cunoc.sgp.mantenimiento.service.MaquinaEstadosOrden</include>
+                                        <include>gt.usac.cunoc.sgp.mantenimiento.service.TransicionOrdenService</include>
                                     </includes>
                                     <limits>
                                         <limit>

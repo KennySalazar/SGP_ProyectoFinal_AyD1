@@ -1,0 +1,89 @@
+<section class="surface-card comparacion-ic" [attr.aria-busy]="cargando() || recalculando()">
+  <h2>{{ 'inspecciones.recalculo.titulo' | transloco }}</h2>
+  <p>{{ 'inspecciones.recalculo.ayuda' | transloco }}</p>
+  @if (puedeRecalcular()) {
+    <button
+      pButton
+      type="button"
+      class="no-print"
+      data-testid="recalcular-ic"
+      [disabled]="cargando() || recalculando() || !historial()"
+      (click)="recalcular()"
+    >
+      {{
+        (recalculando() ? 'inspecciones.recalculo.procesando' : 'inspecciones.recalculo.accion')
+          | transloco
+      }}
+    </button>
+  }
+  @if (cargando()) {
+    <p role="status">{{ 'inspecciones.recalculo.cargando' | transloco }}</p>
+  }
+  @if (error(); as texto) {
+    <div role="alert">
+      <p>{{ texto }}</p>
+      @if (!historial()) {
+        <button pButton type="button" class="no-print" [disabled]="cargando()" (click)="cargar()">
+          {{ 'inspecciones.recalculo.reintentar' | transloco }}
+        </button>
+      }
+    </div>
+  }
+  @if (mensaje(); as estado) {
+    <p role="status">{{ 'inspecciones.recalculo.' + estado | transloco }}</p>
+  }
+  @if (historial(); as h) {
+    <div class="tabla-ic">
+      <table>
+        <caption>
+          {{
+            'inspecciones.recalculo.comparacion' | transloco
+          }}
+        </caption>
+        <thead>
+          <tr>
+            <th scope="col">{{ 'inspecciones.recalculo.resultado' | transloco }}</th>
+            <th scope="col">{{ 'inspecciones.recalculo.version' | transloco }}</th>
+            <th scope="col">IC</th>
+            <th scope="col">{{ 'inspecciones.recalculo.calculado' | transloco }}</th>
+            <th scope="col">{{ 'inspecciones.recalculo.confirmado' | transloco }}</th>
+            <th scope="col">{{ 'inspecciones.recalculo.fecha' | transloco }}</th>
+            <th scope="col">{{ 'inspecciones.recalculo.solicitante' | transloco }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (r of resultados(); track r.id) {
+            <tr [attr.data-tipo]="r.tipo">
+              <th scope="row">
+                {{
+                  (r.tipo === 'PUBLICACION'
+                    ? 'inspecciones.recalculo.original'
+                    : 'inspecciones.recalculo.recalculado'
+                  ) | transloco
+                }}
+              </th>
+              <td>{{ r.versionConfiguracionCodigo }}</td>
+              <td>{{ r.indiceCalculado | number: '1.2-5' }}</td>
+              <td>{{ 'inspecciones.consulta.estados.' + r.estadoCalculado | transloco }}</td>
+              <td>
+                @if (r.tipo === 'PUBLICACION') {
+                  {{ 'inspecciones.consulta.estados.' + r.estadoConfirmado | transloco }}
+                  @if (r.justificacionAjuste) {
+                    <p>{{ r.justificacionAjuste }}</p>
+                  }
+                } @else {
+                  {{ 'inspecciones.recalculo.noAplica' | transloco }}
+                }
+              </td>
+              <td>{{ r.calculadoEn | date: 'dd/MM/yyyy HH:mm:ss' : '-0600' }}</td>
+              <td>{{ r.solicitadoPorNombre }}</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+    @if (!h.recalculos.length) {
+      <p>{{ 'inspecciones.recalculo.vacio' | transloco }}</p>
+    }
+  }
+</section>

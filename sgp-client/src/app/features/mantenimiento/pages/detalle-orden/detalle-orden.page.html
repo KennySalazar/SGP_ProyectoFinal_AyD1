@@ -1,0 +1,649 @@
+<a class="enlace-volver" routerLink="/mantenimiento/ordenes">
+  <i class="pi pi-arrow-left" aria-hidden="true"></i>
+  <span>{{ 'mantenimiento.ordenes.volver' | transloco }}</span>
+</a>
+
+@if (cargando() && !orden()) {
+<div class="esqueleto-detalle" aria-hidden="true">
+  <p-skeleton width="30%" height="0.9rem" />
+  <p-skeleton width="70%" height="2.2rem" />
+  <div class="detalle-grid">
+    <p-skeleton height="14rem" borderRadius="18px" />
+    <p-skeleton height="14rem" borderRadius="18px" />
+  </div>
+</div>
+<span class="sr-only" role="status">{{ 'mantenimiento.ordenes.cargandoDetalle' | transloco }}</span>
+} @else if (errorCarga()) {
+<div class="estado-error surface-card" role="alert">
+  <i class="pi pi-exclamation-circle" aria-hidden="true"></i>
+  <p>{{ 'mantenimiento.ordenes.errorDetalle' | transloco }}</p>
+  <button pButton type="button" severity="secondary" [outlined]="true" (click)="cargar()">
+    <i class="pi pi-refresh" aria-hidden="true"></i
+    ><span>{{ 'mantenimiento.ordenes.reintentar' | transloco }}</span>
+  </button>
+</div>
+} @else if (orden(); as o) {
+<header class="page-heading encabezado-orden">
+  <div>
+    <p class="page-kicker">
+      {{ 'mantenimiento.ordenes.kickerDetalle' | transloco }} · {{ 'mantenimiento.ordenes.tipos.' +
+      o.tipo | transloco }}
+    </p>
+    <h1 class="page-title">{{ o.descripcion }}</h1>
+    <div class="meta-orden">
+      <p-tag
+        [value]="'mantenimiento.ordenes.estados.' + o.estado | transloco"
+        [severity]="severidad(o.estado)"
+      />
+      <p-tag [value]="'mantenimiento.ordenes.tipos.' + o.tipo | transloco" severity="secondary" />
+      @if (o.reglaProvisional) {
+      <p-tag [value]="'mantenimiento.ordenes.provisional' | transloco" severity="warn" />
+      } @if (puente(); as p) {
+      <span>{{ p.codigo }} · {{ p.nombre }}</span>
+      }
+      <span
+        >{{ 'mantenimiento.ordenes.prioridad' | transloco }}: {{
+        'mantenimiento.ordenes.prioridades.' + o.prioridadConfirmada | transloco }}</span
+      >
+      @if (o.fechaProgramada) {
+      <span
+        >{{ 'mantenimiento.ordenes.programadaPara' | transloco }} {{ o.fechaProgramada | date:
+        'dd/MM/yyyy' }}</span
+      >
+      }
+    </div>
+  </div>
+
+  <div class="acciones-encabezado">
+    @if (puedeCambiarPrioridad()) {
+    <button
+      pButton
+      type="button"
+      severity="secondary"
+      [outlined]="true"
+      (click)="abrirEdicionPrioridad()"
+    >
+      <i class="pi pi-sliders-h" aria-hidden="true"></i
+      ><span>{{ 'mantenimiento.ordenes.editarPrioridad' | transloco }}</span>
+    </button>
+    } @switch (o.estado) { @case ('PROPUESTA') {
+    <button pButton type="button" (click)="abrirAccion('programar')">
+      <i class="pi pi-calendar-plus" aria-hidden="true"></i
+      ><span>{{ 'mantenimiento.ordenes.acciones.programar' | transloco }}</span>
+    </button>
+    <button
+      pButton
+      type="button"
+      severity="danger"
+      [outlined]="true"
+      (click)="abrirAccion('descartar')"
+    >
+      <i class="pi pi-times" aria-hidden="true"></i
+      ><span>{{ 'mantenimiento.ordenes.acciones.descartar' | transloco }}</span>
+    </button>
+    } @case ('PROGRAMADA') {
+    <button pButton type="button" (click)="abrirAccion('iniciar')">
+      <i class="pi pi-play" aria-hidden="true"></i
+      ><span>{{ 'mantenimiento.ordenes.acciones.iniciar' | transloco }}</span>
+    </button>
+    <button
+      pButton
+      type="button"
+      severity="danger"
+      [outlined]="true"
+      (click)="abrirAccion('cancelar')"
+    >
+      <i class="pi pi-ban" aria-hidden="true"></i
+      ><span>{{ 'mantenimiento.ordenes.acciones.cancelar' | transloco }}</span>
+    </button>
+    } @case ('EN_EJECUCION') {
+    <button pButton type="button" severity="success" (click)="abrirAccion('cerrar')">
+      <i class="pi pi-check-circle" aria-hidden="true"></i
+      ><span>{{ 'mantenimiento.ordenes.acciones.cerrar' | transloco }}</span>
+    </button>
+    } }
+  </div>
+</header>
+
+@if (o.motivoCierreSinEjecucion) {
+<div class="aviso surface-card">
+  <i class="pi pi-info-circle" aria-hidden="true"></i>
+  <span
+    ><strong>{{ 'mantenimiento.ordenes.motivoCierre' | transloco }}:</strong> {{
+    o.motivoCierreSinEjecucion }}</span
+  >
+</div>
+}
+
+<div class="detalle-grid">
+  <div class="columna-principal">
+    @if (o.estado === 'EN_EJECUCION' || o.estado === 'EJECUTADA') {
+    <!-- Registro de ejecución (HU-048) -->
+    <section class="surface-card bloque">
+      <div class="bloque-cabecera">
+        <div>
+          <h2>{{ 'mantenimiento.ordenes.ejecucion.titulo' | transloco }}</h2>
+          <p>
+            @if (ejecucion(); as e) { {{ 'mantenimiento.ordenes.ejecucion.iniciada' | transloco }}
+            {{ e.iniciadoEn | date: 'dd/MM/yyyy HH:mm' : zona }} }
+          </p>
+        </div>
+      </div>
+
+      @if (enEjecucion()) {
+      <div class="formulario-ejecucion">
+        <div class="campo">
+          <label for="detalle-1">{{ 'mantenimiento.ordenes.ejecucion.fecha' | transloco }}</label>
+          <p-datepicker
+            inputId="detalle-1"
+            [ngModel]="fechaEjecucion()"
+            (ngModelChange)="fechaEjecucion.set($event); ejecucionGuardada.set(false)"
+            dateFormat="dd/mm/yy"
+            [minDate]="fechaMinimaEjecucion()"
+            [maxDate]="hoy"
+            [showIcon]="true"
+            placeholder="dd/mm/aaaa"
+            styleClass="w-full"
+          />
+        </div>
+
+        <fieldset class="selector-responsable">
+          <legend>{{ 'mantenimiento.ordenes.ejecucion.responsable' | transloco }}</legend>
+          <div class="opciones-responsable" role="radiogroup">
+            <label>
+              <input
+                type="radio"
+                name="modoResponsable"
+                [checked]="modoResponsable() === 'usuario'"
+                (change)="cambiarModoResponsable('usuario')"
+              />
+              <span>{{ 'mantenimiento.ordenes.ejecucion.usuarioSistema' | transloco }}</span>
+            </label>
+            <label>
+              <input
+                type="radio"
+                name="modoResponsable"
+                [checked]="modoResponsable() === 'externo'"
+                (change)="cambiarModoResponsable('externo')"
+              />
+              <span>{{ 'mantenimiento.ordenes.ejecucion.externo' | transloco }}</span>
+            </label>
+          </div>
+          @if (modoResponsable() === 'usuario') {
+          <p-select
+            [options]="responsables()"
+            optionLabel="email"
+            optionValue="id"
+            [filter]="true"
+            filterBy="email"
+            [ngModel]="responsableUsuarioId()"
+            (ngModelChange)="responsableUsuarioId.set($event); ejecucionGuardada.set(false)"
+            [placeholder]="'mantenimiento.ordenes.ejecucion.seleccionarUsuario' | transloco"
+            [ariaLabel]="'mantenimiento.ordenes.ejecucion.usuarioSistema' | transloco"
+            styleClass="w-full"
+          />
+          } @else {
+          <input
+            pInputText
+            maxlength="200"
+            [ngModel]="responsableNombre()"
+            (ngModelChange)="responsableNombre.set($event); ejecucionGuardada.set(false)"
+            [placeholder]="'mantenimiento.ordenes.ejecucion.nombreExterno' | transloco"
+            [attr.aria-label]="'mantenimiento.ordenes.ejecucion.externo' | transloco"
+          />
+          }
+        </fieldset>
+
+        @if (errorEjecucion(); as error) {
+        <p class="mensaje error" role="alert">{{ error.mensaje }}</p>
+        } @if (ejecucionGuardada()) {
+        <p class="confirmacion" role="status">
+          <i class="pi pi-check-circle" aria-hidden="true"></i>
+          {{ 'mantenimiento.ordenes.ejecucion.guardada' | transloco }}
+        </p>
+        }
+        <button
+          pButton
+          type="button"
+          [disabled]="!responsableValido() || guardandoEjecucion()"
+          (click)="guardarEjecucion()"
+        >
+          <i class="pi pi-save" aria-hidden="true"></i
+          ><span
+            >{{ (guardandoEjecucion() ? 'mantenimiento.ordenes.ejecucion.guardando' :
+            'mantenimiento.ordenes.ejecucion.guardar') | transloco }}</span
+          >
+        </button>
+      </div>
+      } @else if (ejecucion(); as e) {
+      <dl class="datos-ejecucion">
+        <div>
+          <dt>{{ 'mantenimiento.ordenes.ejecucion.fecha' | transloco }}</dt>
+          <dd>{{ e.fechaEjecucion | date: 'dd/MM/yyyy' }}</dd>
+        </div>
+        <div>
+          <dt>{{ 'mantenimiento.ordenes.ejecucion.responsable' | transloco }}</dt>
+          <dd>{{ etiquetaResponsable(e) }}</dd>
+        </div>
+      </dl>
+      }
+    </section>
+
+    <!-- Evidencia fotográfica (HU-048) -->
+    <section class="surface-card bloque">
+      <div class="bloque-cabecera">
+        <div>
+          <h2>{{ 'mantenimiento.ordenes.evidencia.titulo' | transloco }}</h2>
+          <p>{{ 'mantenimiento.ordenes.evidencia.descripcion' | transloco }}</p>
+        </div>
+      </div>
+
+      @if (enEjecucion()) {
+      <div class="carga-evidencia">
+        <label>
+          <span>{{ 'mantenimiento.ordenes.evidencia.elemento' | transloco }}</span>
+          <input
+            pInputText
+            maxlength="300"
+            [ngModel]="elementoRef()"
+            (ngModelChange)="elementoRef.set($event)"
+            [placeholder]="'mantenimiento.ordenes.evidencia.elementoPlaceholder' | transloco"
+          />
+        </label>
+        <label class="boton-archivo" [class.deshabilitado]="subiendo()">
+          <input
+            type="file"
+            accept="image/jpeg,image/webp"
+            capture="environment"
+            [disabled]="subiendo()"
+            (change)="seleccionarEvidencia($event)"
+          />
+          <i [class]="subiendo() ? 'pi pi-spin pi-spinner' : 'pi pi-camera'" aria-hidden="true"></i>
+          <span
+            >{{ (subiendo() ? 'mantenimiento.ordenes.evidencia.subiendo' :
+            'mantenimiento.ordenes.evidencia.subir') | transloco }}</span
+          >
+        </label>
+        <small>{{ 'mantenimiento.ordenes.evidencia.nota' | transloco }}</small>
+      </div>
+      @if (errorEvidencia(); as error) {
+      <p class="mensaje error" role="alert">{{ error }}</p>
+      } } @if (evidencias().length === 0) {
+      <p class="mensaje">{{ 'mantenimiento.ordenes.evidencia.vacia' | transloco }}</p>
+      } @else {
+      <ul class="galeria">
+        @for (evidencia of evidencias(); track evidencia.id) {
+        <li>
+          <button
+            type="button"
+            class="miniatura"
+            (click)="ampliar(evidencia)"
+            [attr.aria-label]="'mantenimiento.ordenes.evidencia.ampliar' | transloco"
+          >
+            @if (miniaturas()[evidencia.id]; as url) {
+            <img [src]="url" [alt]="'mantenimiento.ordenes.evidencia.alt' | transloco" />
+            } @else {
+            <i class="pi pi-image" aria-hidden="true"></i>
+            }
+          </button>
+          <div class="miniatura-datos">
+            <span>{{ evidencia.subidoEn | date: 'dd/MM/yyyy HH:mm' : zona }}</span>
+            @if (evidencia.elementoRef) {
+            <small>{{ evidencia.elementoRef }}</small>
+            }
+          </div>
+          @if (enEjecucion()) {
+          <button
+            pButton
+            type="button"
+            severity="danger"
+            [outlined]="true"
+            size="small"
+            (click)="abrirRetiro(evidencia)"
+          >
+            <i class="pi pi-trash" aria-hidden="true"></i
+            ><span>{{ 'mantenimiento.ordenes.evidencia.retirar' | transloco }}</span>
+          </button>
+          }
+        </li>
+        }
+      </ul>
+      }
+    </section>
+    }
+
+    <section class="surface-card bloque">
+      <div class="bloque-cabecera">
+        <h2>{{ 'mantenimiento.ordenes.datosTitulo' | transloco }}</h2>
+      </div>
+      <dl class="datos-orden">
+        <div>
+          <dt>{{ 'mantenimiento.ordenes.tipo' | transloco }}</dt>
+          <dd>{{ 'mantenimiento.ordenes.tipos.' + o.tipo | transloco }}</dd>
+        </div>
+        <div>
+          <dt>{{ 'mantenimiento.ordenes.prioridadSugerida' | transloco }}</dt>
+          <dd>{{ 'mantenimiento.ordenes.prioridades.' + o.prioridadSugerida | transloco }}</dd>
+        </div>
+        <div>
+          <dt>{{ 'mantenimiento.ordenes.prioridadConfirmada' | transloco }}</dt>
+          <dd>{{ 'mantenimiento.ordenes.prioridades.' + o.prioridadConfirmada | transloco }}</dd>
+        </div>
+        @if (puente(); as p) {
+        <div>
+          <dt>{{ 'mantenimiento.ordenes.puente' | transloco }}</dt>
+          <dd>
+            <a [routerLink]="['/puentes', p.id]">{{ p.codigo }} · {{ p.nombre }}</a>
+          </dd>
+        </div>
+        } @if (o.inspeccionOrigenId) {
+        <div>
+          <dt>{{ 'mantenimiento.ordenes.inspeccionOrigen' | transloco }}</dt>
+          <dd>
+            <a [routerLink]="['/inspecciones', o.inspeccionOrigenId, 'publicada']">
+              {{ 'mantenimiento.ordenes.verInspeccion' | transloco }}
+            </a>
+          </dd>
+        </div>
+        } @if (o.elementoRef) {
+        <div>
+          <dt>{{ 'mantenimiento.ordenes.elemento' | transloco }}</dt>
+          <dd class="codigo">{{ o.elementoRef }}</dd>
+        </div>
+        } @if (o.justificacionPrioridad) {
+        <div>
+          <dt>{{ 'mantenimiento.ordenes.justificacion' | transloco }}</dt>
+          <dd>{{ o.justificacionPrioridad }}</dd>
+        </div>
+        }
+        <div>
+          <dt>{{ 'mantenimiento.ordenes.creada' | transloco }}</dt>
+          <dd>{{ o.creadoEn | date: 'dd/MM/yyyy HH:mm' : zona }}</dd>
+        </div>
+        <div class="dato-ancho">
+          <dt>{{ 'mantenimiento.ordenes.descripcionOrden' | transloco }}</dt>
+          <dd>{{ o.descripcion }}</dd>
+        </div>
+      </dl>
+      @if (fundamento().length > 0) {
+      <div class="fundamento">
+        <h3>{{ 'mantenimiento.ordenes.fundamento' | transloco }}</h3>
+        <dl>
+          @for (dato of fundamento(); track dato.clave) {
+          <div>
+            <dt>{{ 'mantenimiento.ordenes.fundamentoCampos.' + dato.clave | transloco }}</dt>
+            <dd class="codigo">{{ dato.valor }}</dd>
+          </div>
+          }
+        </dl>
+      </div>
+      }
+    </section>
+  </div>
+
+  <aside class="surface-card bloque historial">
+    <h2>{{ 'mantenimiento.ordenes.historial' | transloco }}</h2>
+    <ol>
+      @for (fila of historial(); track fila.secuencia) {
+      <li>
+        <strong>{{ 'mantenimiento.ordenes.estados.' + fila.estadoNuevo | transloco }}</strong>
+        <span>{{ fila.creadoEn | date: 'dd/MM/yyyy HH:mm' : zona }}</span>
+        @if (fila.motivo) {
+        <small>{{ fila.motivo }}</small>
+        }
+      </li>
+      }
+    </ol>
+  </aside>
+</div>
+
+<p-dialog
+  [visible]="!!accion()"
+  (visibleChange)="!$event && cerrarDialogo()"
+  [modal]="true"
+  [style]="{ width: 'min(36rem, 94vw)' }"
+  [draggable]="false"
+  [resizable]="false"
+  [header]="'mantenimiento.ordenes.dialogos.' + (accion() ?? 'iniciar') + 'Titulo' | transloco"
+>
+  <p>{{ 'mantenimiento.ordenes.dialogos.' + (accion() ?? 'iniciar') + 'Texto' | transloco }}</p>
+
+  @if (accion() === 'programar') {
+  <div class="campo campo-dialogo">
+    <label for="detalle-2"
+      >{{ 'mantenimiento.ordenes.dialogos.fechaProgramada' | transloco }}</label
+    >
+    <p-datepicker
+      inputId="detalle-2"
+      [ngModel]="fechaProgramada()"
+      (ngModelChange)="fechaProgramada.set($event)"
+      dateFormat="dd/mm/yy"
+      [minDate]="hoy"
+      [showIcon]="true"
+      placeholder="dd/mm/aaaa"
+      appendTo="body"
+      styleClass="w-full"
+      [attr.aria-invalid]="!!errorCampo('fechaProgramada')"
+    />
+    @if (errorCampo('fechaProgramada'); as error) {
+    <small class="error-campo" role="alert">{{ error }}</small>
+    }
+  </div>
+  } @if (accion() === 'descartar' || accion() === 'cancelar') {
+  <label class="campo-dialogo">
+    <span>{{ 'mantenimiento.ordenes.dialogos.motivo' | transloco }}</span>
+    <textarea
+      pTextarea
+      rows="4"
+      maxlength="2000"
+      [ngModel]="motivo()"
+      (ngModelChange)="motivo.set($event)"
+      [attr.aria-invalid]="!!errorCampo('motivo')"
+    ></textarea>
+    @if (errorCampo('motivo'); as error) {
+    <small class="error-campo" role="alert">{{ error }}</small>
+    }
+  </label>
+  } @if (accion() === 'cerrar') {
+  <ul
+    class="requisitos"
+    [attr.aria-label]="'mantenimiento.ordenes.dialogos.requisitos' | transloco"
+  >
+    <li [class.cumplido]="requisitosCierre().fecha">
+      <i
+        [class]="requisitosCierre().fecha ? 'pi pi-check-circle' : 'pi pi-times-circle'"
+        aria-hidden="true"
+      ></i>
+      {{ 'mantenimiento.ordenes.dialogos.requisitoFecha' | transloco }}: {{
+      (requisitosCierre().fecha ? 'mantenimiento.ordenes.dialogos.registrada' :
+      'mantenimiento.ordenes.dialogos.pendiente') | transloco }}
+    </li>
+    <li [class.cumplido]="requisitosCierre().responsable">
+      <i
+        [class]="requisitosCierre().responsable ? 'pi pi-check-circle' : 'pi pi-times-circle'"
+        aria-hidden="true"
+      ></i>
+      {{ 'mantenimiento.ordenes.dialogos.requisitoResponsable' | transloco }}: {{
+      (requisitosCierre().responsable ? 'mantenimiento.ordenes.dialogos.registrado' :
+      'mantenimiento.ordenes.dialogos.pendiente') | transloco }}
+    </li>
+    <li [class.cumplido]="requisitosCierre().evidencias > 0">
+      <i
+        [class]="requisitosCierre().evidencias > 0 ? 'pi pi-check-circle' : 'pi pi-times-circle'"
+        aria-hidden="true"
+      ></i>
+      {{ 'mantenimiento.ordenes.dialogos.requisitoEvidencias' | transloco: { total:
+      requisitosCierre().evidencias } }}
+    </li>
+  </ul>
+  } @if (errorAccion(); as error) { @if (error.campos.length === 0 || erroresGenerales().length > 0)
+  {
+  <div class="error-dialogo" role="alert">
+    <p>{{ error.mensaje }}</p>
+    @if (erroresGenerales().length > 1) {
+    <ul>
+      @for (campo of erroresGenerales(); track campo.campo) {
+      <li>{{ campo.mensaje }}</li>
+      }
+    </ul>
+    }
+  </div>
+  } }
+
+  <div class="dialog-acciones">
+    <button
+      pButton
+      type="button"
+      severity="secondary"
+      [outlined]="true"
+      [disabled]="procesando()"
+      (click)="cerrarDialogo()"
+    >
+      <span>{{ 'common.cancel' | transloco }}</span>
+    </button>
+    <button
+      pButton
+      type="button"
+      [severity]="accion() === 'descartar' || accion() === 'cancelar' ? 'danger' : accion() === 'cerrar' ? 'success' : 'primary'"
+      [disabled]="procesando() || !accionValida()"
+      (click)="confirmarAccion()"
+    >
+      <span
+        >{{ (procesando() ? 'mantenimiento.ordenes.dialogos.procesando' :
+        'mantenimiento.ordenes.acciones.' + (accion() ?? 'iniciar')) | transloco }}</span
+      >
+    </button>
+  </div>
+</p-dialog>
+
+<p-dialog
+  [visible]="!!evidenciaRetirar()"
+  (visibleChange)="!$event && cerrarRetiro()"
+  [modal]="true"
+  [style]="{ width: 'min(32rem, 94vw)' }"
+  [draggable]="false"
+  [resizable]="false"
+  [header]="'mantenimiento.ordenes.evidencia.retirarTitulo' | transloco"
+>
+  <p>{{ 'mantenimiento.ordenes.evidencia.retirarTexto' | transloco }}</p>
+  <label class="campo-dialogo">
+    <span>{{ 'mantenimiento.ordenes.dialogos.motivo' | transloco }}</span>
+    <textarea
+      pTextarea
+      rows="3"
+      maxlength="2000"
+      [ngModel]="motivoRetiro()"
+      (ngModelChange)="motivoRetiro.set($event)"
+    ></textarea>
+  </label>
+  @if (errorRetiro(); as error) {
+  <p class="mensaje error" role="alert">{{ error }}</p>
+  }
+  <div class="dialog-acciones">
+    <button
+      pButton
+      type="button"
+      severity="secondary"
+      [outlined]="true"
+      [disabled]="retirando()"
+      (click)="cerrarRetiro()"
+    >
+      <span>{{ 'common.cancel' | transloco }}</span>
+    </button>
+    <button
+      pButton
+      type="button"
+      severity="danger"
+      [disabled]="retirando() || !motivoRetiro().trim()"
+      (click)="retirarEvidencia()"
+    >
+      <i class="pi pi-trash" aria-hidden="true"></i
+      ><span
+        >{{ (retirando() ? 'mantenimiento.ordenes.evidencia.retirando' :
+        'mantenimiento.ordenes.evidencia.retirar') | transloco }}</span
+      >
+    </button>
+  </div>
+</p-dialog>
+
+<p-dialog
+  [visible]="!!evidenciaAmpliada()"
+  (visibleChange)="!$event && cerrarAmpliada()"
+  [modal]="true"
+  [dismissableMask]="true"
+  [style]="{ width: 'min(60rem, 96vw)' }"
+  [header]="'mantenimiento.ordenes.evidencia.titulo' | transloco"
+>
+  @if (evidenciaAmpliada(); as url) {
+  <img
+    class="imagen-ampliada"
+    [src]="url"
+    [alt]="'mantenimiento.ordenes.evidencia.alt' | transloco"
+  />
+  }
+</p-dialog>
+
+<p-dialog
+  [visible]="editandoPrioridad()"
+  (visibleChange)="!$event && !guardandoPrioridad() && editandoPrioridad.set(false)"
+  [modal]="true"
+  [style]="{ width: 'min(32rem, 94vw)' }"
+  [draggable]="false"
+  [resizable]="false"
+  [header]="'mantenimiento.ordenes.editarPrioridad' | transloco"
+>
+  <p>{{ 'mantenimiento.ordenes.prioridadEditTexto' | transloco }}</p>
+  <label class="campo-dialogo" for="prioridad-confirmada">
+    <span>{{ 'mantenimiento.ordenes.prioridadConfirmada' | transloco }}</span>
+    <p-select
+      inputId="prioridad-confirmada"
+      [options]="opcionesPrioridad"
+      [ngModel]="prioridadNueva()"
+      (ngModelChange)="prioridadNueva.set($event)"
+      styleClass="w-full"
+    >
+      <ng-template #item let-prioridad>
+        {{ 'mantenimiento.ordenes.prioridades.' + prioridad | transloco }}
+      </ng-template>
+      <ng-template #selectedItem let-prioridad>
+        {{ 'mantenimiento.ordenes.prioridades.' + prioridad | transloco }}
+      </ng-template>
+    </p-select>
+  </label>
+  <label class="campo-dialogo">
+    <span>{{ 'mantenimiento.ordenes.justificacion' | transloco }}</span>
+    <textarea
+      pTextarea
+      rows="3"
+      [ngModel]="justificacionNueva()"
+      (ngModelChange)="justificacionNueva.set($event)"
+    ></textarea>
+  </label>
+  @if (errorPrioridad(); as error) {
+  <p class="mensaje error" role="alert">{{ error }}</p>
+  }
+  <div class="dialog-acciones">
+    <button
+      pButton
+      type="button"
+      severity="secondary"
+      [outlined]="true"
+      [disabled]="guardandoPrioridad()"
+      (click)="editandoPrioridad.set(false)"
+    >
+      <span>{{ 'common.cancel' | transloco }}</span>
+    </button>
+    <button
+      pButton
+      type="button"
+      [disabled]="guardandoPrioridad() || !justificacionNueva().trim()"
+      (click)="guardarPrioridad()"
+    >
+      <span
+        >{{ (guardandoPrioridad() ? 'mantenimiento.ordenes.prioridadGuardando' : 'common.save') |
+        transloco }}</span
+      >
+    </button>
+  </div>
+</p-dialog>
+}

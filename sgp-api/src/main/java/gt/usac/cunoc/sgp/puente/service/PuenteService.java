@@ -4,6 +4,7 @@ import gt.usac.cunoc.sgp.common.audit.aspect.Auditable;
 import gt.usac.cunoc.sgp.common.audit.model.AccionAuditoria;
 import gt.usac.cunoc.sgp.common.exception.ApiException;
 import gt.usac.cunoc.sgp.common.util.UuidV7Generator;
+import gt.usac.cunoc.sgp.mantenimiento.service.PlanMantenimientoService;
 import gt.usac.cunoc.sgp.puente.dto.ActualizarPuenteRequest;
 import gt.usac.cunoc.sgp.puente.dto.CrearPuenteRequest;
 import gt.usac.cunoc.sgp.puente.dto.DarBajaPuenteRequest;
@@ -48,6 +49,7 @@ public class PuenteService {
   private final PuenteMapper mapper;
   private final Validator validator;
   private final Clock clock;
+  private final PlanMantenimientoService planesMantenimiento;
 
   public PuenteService(
       DepartamentoRepository departamentos,
@@ -55,13 +57,15 @@ public class PuenteService {
       PuenteRepository puentes,
       PuenteMapper mapper,
       Validator validator,
-      Clock clock) {
+      Clock clock,
+      PlanMantenimientoService planesMantenimiento) {
     this.departamentos = departamentos;
     this.municipios = municipios;
     this.puentes = puentes;
     this.mapper = mapper;
     this.validator = validator;
     this.clock = clock;
+    this.planesMantenimiento = planesMantenimiento;
   }
 
   @Transactional
@@ -141,6 +145,7 @@ public class PuenteService {
             ahora);
 
     Puente guardado = puentes.saveAndFlush(puente);
+    planesMantenimiento.crearPorDefecto(guardado, administradorId);
     return mapper.toAltaResponse(guardado, utm);
   }
 
@@ -308,6 +313,7 @@ public class PuenteService {
     Instant ahora = clock.instant();
     puente.reactivar(ahora);
     Puente guardado = puentes.saveAndFlush(puente);
+    planesMantenimiento.crearPorDefecto(guardado, administradorId);
 
     var utm =
         mapper.toCoordenadaUtmResponse(

@@ -106,6 +106,7 @@ export interface PuenteResponse {
   activo: boolean;
   estadoActual: string;
   indiceCondicionActual: number | null;
+  versionFormularioIdIcVigente?: string | null;
   fechaUltimaInspeccion: string | null;
   creadoEn: string;
 }
@@ -122,6 +123,9 @@ export interface PuenteCatalogoResponse {
   longitud: number | null;
   activo: boolean;
   estadoActual: EstadoPuente;
+  indiceCondicionActual?: number | null;
+  versionFormularioIdIcVigente?: string | null;
+  fechaUltimaInspeccion?: string | null;
 }
 
 export interface ConsultaCatalogoPuentes {
@@ -169,6 +173,8 @@ export interface AsignacionPuenteResponse {
   puenteCodigo: string;
   puenteNombre: string;
   asignadoEn: string;
+  inspeccionId?: string | null;
+  estadoInspeccion?: string | null;
 }
 
 export interface PuenteProblemDetails extends ProblemDetails {

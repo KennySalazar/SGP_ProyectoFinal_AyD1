@@ -21,26 +21,51 @@
   }
   <form [formGroup]="form" (ngSubmit)="activar()">
     <label
-      >{{ 'common.password' | transloco }}<input
+      >{{ 'perfil.nombreCompleto' | transloco }}<input
         pInputText
-        type="password"
-        formControlName="password"
-        autocomplete="new-password"
-        maxlength="72"
-        [placeholder]="'common.minPasswordPlaceholder' | transloco"
+        formControlName="nombreCompleto"
+        autocomplete="name"
+        [attr.maxlength]="limiteNombre"
+        [placeholder]="'perfil.nombreCompletoPlaceholder' | transloco"
     /></label>
+    <label
+      >{{ 'perfil.nombreUsuario' | transloco }}<input
+        pInputText
+        formControlName="nombreUsuario"
+        autocomplete="username"
+        autocapitalize="none"
+        maxlength="30"
+        [placeholder]="'perfil.nombreUsuarioPlaceholder' | transloco"
+    /></label>
+    @if (form.controls.nombreUsuario.touched && form.controls.nombreUsuario.invalid) {
+    <small class="validation">{{ 'perfil.reglaNombreUsuario' | transloco }}</small>
+    } @if (errorPerfil(); as mensaje) {
+    <p class="validation" role="alert">{{ mensaje }}</p>
+    }
+    <p class="note"><i class="pi pi-id-card"></i> {{ 'perfil.notaPublico' | transloco }}</p>
+    <label
+      >{{ 'common.password' | transloco }}<app-contrasena-visible
+        ><input
+          pInputText
+          type="password"
+          formControlName="password"
+          autocomplete="new-password"
+          maxlength="72"
+          [placeholder]="'common.minPasswordPlaceholder' | transloco" /></app-contrasena-visible
+    ></label>
     @if (form.controls.password.touched && form.controls.password.invalid) {
     <small class="validation">{{ 'auth.register.rule' | transloco }}</small>
     }
     <label
-      >{{ 'auth.activation.confirm' | transloco }}<input
-        pInputText
-        type="password"
-        formControlName="confirmacion"
-        autocomplete="new-password"
-        maxlength="72"
-        [placeholder]="'common.confirmPasswordPlaceholder' | transloco"
-    /></label>
+      >{{ 'auth.activation.confirm' | transloco }}<app-contrasena-visible
+        ><input
+          pInputText
+          type="password"
+          formControlName="confirmacion"
+          autocomplete="new-password"
+          maxlength="72"
+          [placeholder]="'common.confirmPasswordPlaceholder' | transloco" /></app-contrasena-visible
+    ></label>
     @if (form.controls.confirmacion.touched && form.hasError('noCoinciden')) {
     <small class="validation">{{ 'auth.activation.mismatch' | transloco }}</small>
     }
