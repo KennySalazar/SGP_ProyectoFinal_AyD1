@@ -37,7 +37,7 @@ export interface PuenteFormValores {
 export type PuenteFormInicial = Pick<
   PuenteFormValores,
   'nombre' | 'ruta' | 'kilometraje' | 'latitud' | 'longitud'
->;
+> & { id?: string };
 
 export interface CrearPuenteRequest extends PuenteFormValores {
   confirmarCercania: boolean;

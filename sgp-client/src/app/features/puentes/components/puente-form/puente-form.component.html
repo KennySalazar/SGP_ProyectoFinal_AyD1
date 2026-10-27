@@ -154,6 +154,14 @@
       </label>
     </div>
 
+    @if (puenteSuperpuesto(); as superpuesto) {
+      <p class="feedback error" role="alert">
+        {{ 'puentes.overlappingLocation' | transloco: { codigo: superpuesto.titulo } }}
+      </p>
+    } @else if (errorUbicacion(); as error) {
+      <p class="feedback error" role="alert">{{ error }}</p>
+    }
+
     <ng-content />
 
     @if (!ocultarAcciones()) {

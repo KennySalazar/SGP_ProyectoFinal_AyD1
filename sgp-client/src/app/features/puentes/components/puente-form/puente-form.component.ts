@@ -29,6 +29,7 @@ import { SelectorUbicacionComponent } from '../../../../shared/components/select
 import {
   CoordenadaGeografica,
   PuntoMapa,
+  calcularDistanciaMetros,
   coordenadaValida,
 } from '../../../../shared/utils/ubicacion-guatemala';
 import {
@@ -104,6 +105,29 @@ export class PuenteFormComponent {
   readonly existentes = signal<PuntoMapa[]>([]);
   readonly resolviendoUbicacion = signal(false);
   readonly errorUbicacion = signal<string | null>(null);
+  private readonly coordenadas = signal<{ latitud: number | null; longitud: number | null }>({
+    latitud: null,
+    longitud: null,
+  });
+
+  readonly puenteSuperpuesto = computed<PuntoMapa | null>(() => {
+    const { latitud: lat, longitud: lon } = this.coordenadas();
+    if (lat === null || lon === null || !coordenadaValida(lat, lon)) {
+      return null;
+    }
+    const idActual = this.valoresIniciales()?.id;
+    return (
+      this.existentes().find((p) => {
+        if (idActual && p.id === idActual) {
+          return false;
+        }
+        return (
+          calcularDistanciaMetros(lat, lon, p.latitud, p.longitud) < 1.0 ||
+          (p.latitud === lat && p.longitud === lon)
+        );
+      }) ?? null
+    );
+  });
 
   readonly zonaUtm = computed(() => this.territorio()?.zonaUtm ?? null);
 
@@ -240,6 +264,8 @@ export class PuenteFormComponent {
       });
 
     this.form.valueChanges.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(() => {
+      const { latitud, longitud } = this.form.getRawValue();
+      this.coordenadas.set({ latitud, longitud });
       this.consultarSiCambioCoordenada();
       this.cambio.emit();
     });
@@ -283,6 +309,7 @@ export class PuenteFormComponent {
       territorio !== null &&
       !this.resolviendoUbicacion() &&
       this.errorUbicacion() === null &&
+      this.puenteSuperpuesto() === null &&
       territorio.latitud === values.latitud &&
       territorio.longitud === values.longitud &&
       territorio.candidatos.some(

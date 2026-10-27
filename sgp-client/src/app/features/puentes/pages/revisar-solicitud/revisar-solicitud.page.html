@@ -98,12 +98,14 @@
       </button>
     </div>
   </section>
-  } @else {
+  } @else { @if (haySuperpuesto()) {
+  <p class="feedback error" role="alert">{{ 'puentes.revision.overlappingBlocked' | transloco }}</p>
+  }
   <div class="actions">
     <button
       pButton
       type="button"
-      [disabled]="procesando()"
+      [disabled]="procesando() || haySuperpuesto()"
       [loading]="procesando()"
       (click)="aprobar()"
     >
