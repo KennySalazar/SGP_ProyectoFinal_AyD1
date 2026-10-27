@@ -18,10 +18,23 @@
       ><span>{{ 'admin.courses.name' | transloco }}</span
       ><input pInputText formControlName="nombre" maxlength="150"
     /></label>
-    <label
-      ><span>{{ 'admin.courses.period' | transloco }}</span
-      ><input pInputText formControlName="periodo" maxlength="50"
-    /></label>
+    <div class="field">
+      <label for="periodoCurso">{{ 'admin.courses.period' | transloco }}</label>
+      <p-select
+        inputId="periodoCurso"
+        formControlName="periodo"
+        [options]="periodos()"
+        optionLabel="etiqueta"
+        optionValue="valor"
+        [placeholder]="'admin.courses.selectPeriod' | transloco"
+      />
+      <small class="periodo-ayuda">{{ 'admin.courses.periodDates' | transloco }}</small>
+      @if (cursoEnEdicion() && !form.controls.periodo.value) {
+      <small class="periodo-ayuda" role="status"
+        >{{ 'admin.courses.legacyPeriod' | transloco }}</small
+      >
+      }
+    </div>
     <div class="field">
       <label for="catedraticoId">{{ 'admin.courses.professor' | transloco }}</label
       ><p-select
@@ -35,11 +48,11 @@
     </div>
     <label
       ><span>{{ 'admin.courses.startDate' | transloco }}</span
-      ><input pInputText type="date" formControlName="fechaInicio"
+      ><input pInputText type="date" formControlName="fechaInicio" [readOnly]="true"
     /></label>
     <label
       ><span>{{ 'admin.courses.endDate' | transloco }}</span
-      ><input pInputText type="date" formControlName="fechaFin"
+      ><input pInputText type="date" formControlName="fechaFin" [readOnly]="true"
     /></label>
     <button pButton type="submit" [disabled]="form.invalid || guardando()">
       {{ (guardando() ? 'admin.courses.saving' : (cursoEnEdicion() ? 'admin.courses.save' :

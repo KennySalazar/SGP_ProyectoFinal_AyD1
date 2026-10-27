@@ -63,10 +63,16 @@ export class AsignacionesPuentesPage {
       .subscribe({
         next: (estudiantes) =>
           this.estudiantes.set(
-            estudiantes.map((estudiante) => ({
-              ...estudiante,
-              etiqueta: `${estudiante.estudianteEmail} — ${estudiante.cursoNombre} (${estudiante.periodo})`,
-            })),
+            estudiantes.map((estudiante) => {
+              const nombre = estudiante.estudianteNombre?.trim();
+              const identidad = nombre
+                ? `${nombre} (${estudiante.estudianteEmail})`
+                : estudiante.estudianteEmail;
+              return {
+                ...estudiante,
+                etiqueta: `${identidad} — ${estudiante.cursoNombre} (${estudiante.periodo})`,
+              };
+            }),
           ),
         error: (error) => this.apiErrors.normalize(error),
       });

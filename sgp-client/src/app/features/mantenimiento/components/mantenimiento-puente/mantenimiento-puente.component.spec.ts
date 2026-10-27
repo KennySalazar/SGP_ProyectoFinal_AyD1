@@ -9,6 +9,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { UserSession } from '../../../../core/models/auth.models';
 import { AuthStore } from '../../../../core/services/auth.store';
 import { PuenteResponse } from '../../../puentes/models/puente.models';
+import { PlanRutinarioComponent } from '../plan-rutinario/plan-rutinario.component';
 import { MantenimientoPuenteComponent } from './mantenimiento-puente.component';
 
 @Pipe({ name: 'transloco' })
@@ -64,12 +65,18 @@ describe('MantenimientoPuenteComponent', () => {
         remove: { imports: [TranslocoPipe] },
         add: { imports: [TraduccionTestPipe] },
       })
+      .overrideComponent(PlanRutinarioComponent, {
+        remove: { imports: [TranslocoPipe] },
+        add: { imports: [TraduccionTestPipe] },
+      })
       .compileComponents();
 
     fixture = TestBed.createComponent(MantenimientoPuenteComponent);
     componente = fixture.componentInstance;
     http = TestBed.inject(HttpTestingController);
     fixture.componentRef.setInput('puente', PUENTE);
+    fixture.detectChanges();
+    http.expectOne('/api/v1/planes-mantenimiento/puente/puente-1').flush(null);
     fixture.detectChanges();
   }
 

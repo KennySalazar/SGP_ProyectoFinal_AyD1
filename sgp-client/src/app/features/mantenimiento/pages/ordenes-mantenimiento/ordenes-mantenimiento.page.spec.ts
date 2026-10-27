@@ -60,6 +60,7 @@ describe('OrdenesMantenimientoPage', () => {
     fixture = TestBed.createComponent(OrdenesMantenimientoPage);
     page = fixture.componentInstance;
     http = TestBed.inject(HttpTestingController);
+    http.expectOne('/api/v1/planes-mantenimiento').flush([]);
     http
       .expectOne((r) => r.url === '/api/v1/puentes')
       .flush({

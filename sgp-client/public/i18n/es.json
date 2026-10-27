@@ -805,7 +805,7 @@
     "bandeja": {
       "kicker": "REVISIÓN ACADÉMICA",
       "title": "Bandeja de revisión",
-      "description": "Consulta y toma únicamente las inspecciones enviadas por estudiantes de tus cursos.",
+      "description": "Revisa las inspecciones enviadas por estudiantes de tus cursos, registra observaciones y emite una decision.",
       "viewSelector": "Vistas de la bandeja de revisión",
       "pendingTab": "Pendientes de revisión",
       "draftsTab": "Borradores en curso",
@@ -820,7 +820,7 @@
       "clear": "Limpiar",
       "apply": "Aplicar filtros",
       "listTitle": "Inspecciones por revisar",
-      "listNote": "Ordenadas desde la fecha de envío más antigua.",
+      "listNote": "Pulsa Revisar inspeccion para abrir el contenido enviado. Si ya comenzaste, pulsa Continuar revision. Ordenadas por fecha de envio.",
       "total": "ciclos",
       "draftsTotal": "borradores",
       "loading": "Cargando bandeja de revisión...",
@@ -830,8 +830,8 @@
       "sent": "Enviada:",
       "days": "días en espera",
       "delayed": "Más de 15 días en espera",
-      "start": "Iniciar revisión",
-      "resume": "Reanudar revisión",
+      "start": "Revisar inspeccion",
+      "resume": "Continuar revision",
       "starting": "Abriendo...",
       "started": "La revisión quedó iniciada y la inspección pasó a En revisión.",
       "resumed": "La revisión ya estaba iniciada; puedes continuar con el mismo ciclo.",
@@ -904,10 +904,15 @@
       "ic": "Índice de condición calculado",
       "estado": "Confirmar o ajustar el estado del puente",
       "justificacion": "Justificación obligatoria si ajusta el estado calculado",
-      "emitir": "Emitir veredicto",
+      "emitir": "Confirmar y enviar veredicto",
       "historial": "Historial privado de revisiones",
       "confirmar": "Confirmar veredicto",
-      "confirmarTexto": "El veredicto cerrará este ciclo. Una aprobación publica la inspección y un rechazo es terminal. Revise su decisión y calificación antes de confirmar."
+      "confirmarTexto": "El veredicto cerrará este ciclo. Una aprobación publica la inspección y un rechazo es terminal. Revise su decisión y calificación antes de confirmar.",
+      "tituloRevisor": "Calificacion y veredicto de la inspeccion",
+      "abrirRevisor": "Abrir calificacion y veredicto",
+      "ayudaRevisor": "Aqui puedes ingresar la nota y elegir aprobar, solicitar cambios o rechazar. Abrir este panel no envia ninguna decision.",
+      "preparar": "Revisar y confirmar decision",
+      "cerrar": "Cerrar panel"
     },
     "atencion": {
       "atender": "Atender cambios",
@@ -1305,7 +1310,10 @@
       "finalize": "Finalizar",
       "edit": "Editar curso",
       "save": "Guardar cambios",
-      "cancel": "Cancelar edición"
+      "cancel": "Cancelar edición",
+      "selectPeriod": "Selecciona el periodo",
+      "periodDates": "Las fechas se calculan segun el periodo y el año indicado: enero a junio o julio a diciembre.",
+      "legacyPeriod": "Este curso tiene un periodo anterior no estandar. Selecciona Periodo 1 o Periodo 2 antes de guardar."
     }
   },
   "invitaciones": {

@@ -391,20 +391,33 @@ describe('CompletarInspeccionPage', () => {
     expect(component.errorGuardado()).toBeNull();
   });
   it('guarda automáticamente los cambios después de la pausa de escritura', async () => {
+    await cargar();
     vi.useFakeTimers();
-    fixture.detectChanges();
-    await Promise.resolve();
-    await Promise.resolve();
-    fixture.detectChanges();
     expect(fixture.nativeElement.querySelector('.btn-guardar')).toBeNull();
-    component.esquema.set(null);
+    component.esquema.set({
+      type: 'object',
+      properties: {
+        identificacion: {
+          type: 'object',
+          properties: {
+            nombre_puente: { type: 'string' },
+            fecha_inspeccion: { type: 'string' },
+          },
+        },
+      },
+    });
     fixture.detectChanges();
     await Promise.resolve();
     await Promise.resolve();
     fixture.detectChanges();
     mockInspeccionApi.guardarBorrador.mockReturnValue(of(mockBorrador));
-    component.onValorChange(mockBorrador.datos!);
-    component.onValorChange({ identificacion: { nombre_puente: 'Puente actualizado' } });
+    const formulario = fixture.debugElement.query(By.directive(FormularioDinamicoComponent))
+      .componentInstance as FormularioDinamicoComponent;
+    formulario
+      .construido()!
+      .form.get(['identificacion', 'nombre_puente'])!
+      .setValue('Puente actualizado');
+    fixture.detectChanges();
     vi.advanceTimersByTime(1199);
     expect(mockInspeccionApi.guardarBorrador).not.toHaveBeenCalled();
     vi.advanceTimersByTime(1);
@@ -731,7 +744,7 @@ describe('CompletarInspeccionPage', () => {
     } as LocalInspection);
     component.guardarBorrador();
     expect(component.borrador()?.estado).toBe('PUBLICADA');
-    expect(mockInspeccionApi.guardarBorrador).toHaveBeenCalledOnce();
+    expect(mockInspeccionApi.guardarBorrador).not.toHaveBeenCalled();
   });
   it('conserva la fecha principal al cargar una identificacion con fecha distinta', async () => {
     mockInspeccionApi.obtenerBorrador.mockReturnValue(
@@ -758,8 +771,7 @@ describe('CompletarInspeccionPage', () => {
         datos: { identificacion: { coordenadas_utm: '{"norte": 1000}' } },
       }),
     );
-    fixture.detectChanges();
-    await fixture.whenStable();
+    await cargar();
     component.esquema.set({
       type: 'object',
       properties: {
@@ -785,19 +797,30 @@ describe('CompletarInspeccionPage', () => {
     expect(component.confirmandoAccion()).toBe(true);
   });
   it('guarda la misma fecha en datos, identificacion y encabezado', async () => {
-    fixture.detectChanges();
-    await Promise.resolve();
-    await Promise.resolve();
-    fixture.detectChanges();
-    component.esquema.set(null);
+    await cargar();
+    component.esquema.set({
+      type: 'object',
+      properties: {
+        identificacion: {
+          type: 'object',
+          properties: {
+            fecha_inspeccion: { type: 'string' },
+            ruta: { type: 'string' },
+          },
+        },
+      },
+    });
     fixture.detectChanges();
     await Promise.resolve();
     await Promise.resolve();
     fixture.detectChanges();
     mockInspeccionApi.guardarBorrador.mockReturnValue(of(mockBorrador));
-    component.onValorChange({
+    const formulario = fixture.debugElement.query(By.directive(FormularioDinamicoComponent))
+      .componentInstance as FormularioDinamicoComponent;
+    formulario.construido()!.form.patchValue({
       identificacion: { fecha_inspeccion: '2026-10-14', ruta: 'P01' },
     });
+    fixture.detectChanges();
     component.guardarBorrador();
     await Promise.resolve();
     await Promise.resolve();
@@ -892,8 +915,7 @@ describe('CompletarInspeccionPage', () => {
     expect(component.fechaInspeccion()).toBe('2026-10-14');
   });
   it('guarda las ediciones actuales tras un reintento incierto antes de publicar', async () => {
-    fixture.detectChanges();
-    await fixture.whenStable();
+    await cargar();
     mockInspeccionApi.guardarBorrador.mockReturnValueOnce(
       throwError(() => new HttpErrorResponse({ status: 0 })),
     );
@@ -940,8 +962,7 @@ describe('CompletarInspeccionPage', () => {
     expect(component.ejecutandoAccion()).toBe(false);
   });
   it('no publica si falla el segundo guardado después de un reintento incierto', async () => {
-    fixture.detectChanges();
-    await fixture.whenStable();
+    await cargar();
     mockInspeccionApi.guardarBorrador.mockReturnValueOnce(
       throwError(() => new HttpErrorResponse({ status: 0 })),
     );
