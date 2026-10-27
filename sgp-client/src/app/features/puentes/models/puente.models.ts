@@ -149,6 +149,7 @@ export interface PuenteCercanoResponse {
 }
 
 export interface EstudianteAsignableResponse {
+  estudianteNombre?: string | null;
   cursoEstudianteId: string;
   estudianteId: string;
   estudianteEmail: string;

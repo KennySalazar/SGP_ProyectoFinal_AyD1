@@ -97,6 +97,7 @@ export class ResultadoRevisionComponent {
   private readonly cancelar = new Subject<void>();
   private readonly fb = inject(FormBuilder);
   private readonly respuestas = new Map<string, FormControl<string>>();
+  readonly esCatedratico = computed(() => this.auth.user()?.role === 'CATEDRATICO');
   readonly abierto = signal(false);
   readonly historial = signal<RevisionResultadoResponse[]>([]);
   readonly ciclo = signal<RevisionResultadoResponse | null>(null);
@@ -229,6 +230,11 @@ export class ResultadoRevisionComponent {
     if (!['CATEDRATICO', 'ESTUDIANTE'].includes(this.auth.user()?.role ?? '')) return;
     this.abierto.set(true);
     this.cargar();
+  }
+  cerrar(): void {
+    if (this.ocupado()) return;
+    this.confirmando.set(false);
+    this.abierto.set(false);
   }
   cargar(): void {
     if (this.ocupado()) return;
