@@ -25,6 +25,35 @@
   font-weight: 650;
   overflow-wrap: anywhere;
 }
+.email-bloqueado {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+.badge-no-editable {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.15rem 0.5rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--sgp-steel-700);
+  background: var(--sgp-surface-soft);
+  border: 1px solid var(--sgp-border);
+  border-radius: 9999px;
+
+  i {
+    font-size: 0.7rem;
+  }
+}
+.readonly-hint {
+  display: block;
+  margin-top: 0.25rem;
+  font-size: 0.78rem;
+  color: var(--sgp-steel-600);
+  font-weight: normal;
+}
 form {
   display: grid;
   gap: 0.9rem;

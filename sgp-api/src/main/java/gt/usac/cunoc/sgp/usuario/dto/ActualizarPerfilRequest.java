@@ -14,4 +14,10 @@ public record ActualizarPerfilRequest(
         String nombreCompleto,
     @NotBlank(message = "El nombre de usuario es obligatorio")
         @Pattern(regexp = ReglasPerfil.PATRON_USUARIO, message = ReglasPerfil.MENSAJE_USUARIO)
-        String nombreUsuario) {}
+        String nombreUsuario,
+    String email) {
+
+  public ActualizarPerfilRequest(String nombreCompleto, String nombreUsuario) {
+    this(nombreCompleto, nombreUsuario, null);
+  }
+}

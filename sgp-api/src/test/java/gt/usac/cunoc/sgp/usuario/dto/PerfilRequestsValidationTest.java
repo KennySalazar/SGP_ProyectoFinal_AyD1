@@ -21,6 +21,14 @@ class PerfilRequestsValidationTest {
     assertThat(campos(new ActualizarPerfilRequest("Ana Reyes", usuario))).isEmpty();
   }
 
+  @Test
+  void requestConEmailOpcionalEsValido() {
+    assertThat(campos(new ActualizarPerfilRequest("Ana Reyes", "ana.reyes", "ana@ejemplo.com")))
+        .isEmpty();
+    assertThat(campos(new ActualizarPerfilRequest("Ana Reyes", "ana.reyes", null))).isEmpty();
+    assertThat(campos(new ActualizarPerfilRequest("Ana Reyes", "ana.reyes"))).isEmpty();
+  }
+
   @ParameterizedTest
   @ValueSource(
       strings = {"", " ", "ab", "ana reyes", ".ana", "ana.", "_ana", "ana-", "a@b.c", "áná"})

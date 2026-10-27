@@ -317,6 +317,19 @@ public class AuthService {
       emailArgIndex = 0)
   public UserResponse actualizarPerfil(String rawEmail, ActualizarPerfilRequest request) {
     UserAccount user = requireUser(rawEmail);
+    if (request.email() != null
+        && !request.email().isBlank()
+        && !EmailNormalizer.normalize(request.email())
+            .equalsIgnoreCase(EmailNormalizer.normalize(user.getEmail()))) {
+      throw new ApiException(
+          HttpStatus.UNPROCESSABLE_ENTITY,
+          "correo_no_editable",
+          "No se puede editar el correo",
+          "El correo electrónico no se puede editar desde el perfil.",
+          java.util.List.of(
+              java.util.Map.of(
+                  "campo", "email", "mensaje", "El correo electrónico no se puede editar.")));
+    }
     perfiles.aplicar(user, request.nombreCompleto(), request.nombreUsuario());
     perfiles.guardar(user);
     return currentUser(rawEmail);

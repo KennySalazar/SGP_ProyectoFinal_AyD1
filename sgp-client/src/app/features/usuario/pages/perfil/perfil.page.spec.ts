@@ -62,10 +62,12 @@ describe('Perfil de la cuenta', () => {
     fixture.destroy();
   });
 
-  it('muestra el correo y el rol y parte vacío en una cuenta sin perfil', () => {
+  it('muestra el correo no editable y el rol y parte vacío en una cuenta sin perfil', () => {
     crear(SESION);
 
     expect(texto()).toContain('ana@ejemplo.com');
+    expect(texto()).toContain('perfil.noEditable');
+    expect(texto()).toContain('perfil.correoNoEditable');
     expect(texto()).toContain('invitaciones.roles.ESTUDIANTE');
     expect(page.form.getRawValue()).toEqual({ nombreCompleto: '', nombreUsuario: '' });
     expect(page.form.invalid).toBe(true);
@@ -139,6 +141,27 @@ describe('Perfil de la cuenta', () => {
     expect(errores.lastMessage()).toBeNull();
     expect(page.guardado()).toBe(false);
     expect(setUser).not.toHaveBeenCalled();
+  });
+
+  it('un intento de editar correo o rechazo de correo se explica con mensaje de error', () => {
+    crear(SESION);
+    page.form.setValue({ nombreCompleto: 'Ana Reyes', nombreUsuario: 'ana.reyes' });
+
+    page.guardar();
+    http.expectOne('/api/v1/auth/me/perfil').flush(
+      {
+        status: 422,
+        code: 'correo_no_editable',
+        detail: 'El correo electrónico no se puede editar desde el perfil.',
+        errores: [{ campo: 'email', mensaje: 'El correo electrónico no se puede editar.' }],
+      },
+      { status: 422, statusText: 'Unprocessable Entity' },
+    );
+    fixture.detectChanges();
+
+    expect(page.errorEmail()).toBe('El correo electrónico no se puede editar.');
+    expect(texto()).toContain('El correo electrónico no se puede editar.');
+    expect(page.guardado()).toBe(false);
   });
 
   it('muestra junto a cada campo lo que rechaza el servidor', () => {

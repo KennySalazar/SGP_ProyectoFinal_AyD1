@@ -133,6 +133,33 @@ class AuthControllerPerfilSecurityTest {
         .andExpect(jsonPath("$.code").value("nombre_usuario_en_uso"));
   }
 
+  @Test
+  void intentoDeEditarCorreoSeRechazaConUnprocessableEntity() throws Exception {
+    when(authService.actualizarPerfil(any(), any()))
+        .thenThrow(
+            new ApiException(
+                HttpStatus.UNPROCESSABLE_ENTITY,
+                "correo_no_editable",
+                "No se puede editar el correo",
+                "El correo electrónico no se puede editar desde el perfil.",
+                java.util.List.of(
+                    java.util.Map.of(
+                        "campo",
+                        "email",
+                        "mensaje",
+                        "El correo electrónico no se puede editar."))));
+
+    mockMvc
+        .perform(
+            put(RUTA)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    "{\"nombreCompleto\":\"Ana Reyes\",\"nombreUsuario\":\"ana.reyes\",\"email\":\"otro@ejemplo.com\"}")
+                .principal(autenticar(RoleName.ESTUDIANTE)))
+        .andExpect(status().isUnprocessableEntity())
+        .andExpect(jsonPath("$.code").value("correo_no_editable"));
+  }
+
   private UserResponse respuesta(RoleName rol) {
     return new UserResponse(
         UUID.randomUUID(),
