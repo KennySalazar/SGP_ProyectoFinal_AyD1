@@ -13,7 +13,12 @@ import {
   signal,
 } from '@angular/core';
 import type { Map as Mapa, Marker, Popup } from 'maplibre-gl';
-import { cargarEstilosMaplibre, resolverMaplibre } from '../../utils/maplibre';
+import {
+  ZOOM_MAXIMO_MAPA,
+  ZOOM_MINIMO_MAPA,
+  cargarEstilosMaplibre,
+  resolverMaplibre,
+} from '../../utils/maplibre';
 import { CoordenadaGeografica, PuntoMapa, coordenadaValida } from '../../utils/ubicacion-guatemala';
 
 // Seis decimales equivalen a ~11 cm: suficiente para ubicar un puente y evita campos de 15 dígitos.
@@ -98,6 +103,8 @@ export class SelectorUbicacionComponent implements AfterViewInit, OnChanges, OnD
         container: this.contenedor.nativeElement,
         center: acercar ? [this.longitud as number, this.latitud as number] : [-90.3, 15.5],
         zoom: acercar ? (this.zoom as number) : 6,
+        minZoom: ZOOM_MINIMO_MAPA,
+        maxZoom: ZOOM_MAXIMO_MAPA,
         renderWorldCopies: false,
         style: {
           version: 8,
@@ -106,6 +113,7 @@ export class SelectorUbicacionComponent implements AfterViewInit, OnChanges, OnD
               type: 'raster',
               tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
               tileSize: 256,
+              maxzoom: ZOOM_MAXIMO_MAPA,
               attribution:
                 '© <a href="https://www.openstreetmap.org/copyright">' +
                 'OpenStreetMap</a> contributors',
