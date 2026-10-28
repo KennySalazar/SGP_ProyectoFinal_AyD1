@@ -54,11 +54,7 @@
   (aprobada)="registrarAprobacion($event)"
 />
 
-@if (ver.reglasEvaluacionIc['calibracion'] && !ver.aprobacionCalibracion) {
-<div class="aviso-activa" role="status">
-  <span>{{ 'formulario.hu050.nota' | transloco }}</span>
-</div>
-} @if (estadoReglas().pendiente) {
+@if (estadoReglas().pendiente) {
 <div class="aviso-activa" role="status">
   <span>{{ 'formulario.reglasIc.pendientes' | transloco }}</span>
   <button
@@ -108,10 +104,20 @@
 <p>
   {{ 'formulario.hu053.fechaCalibracion' | transloco }}: {{ fechaCalibracion(ver.calibradoEn) }}
 </p>
-@if (ver.calibradoPorId) {
+@if (ver.calibradoPorNombre || ver.calibradoPorEmail || ver.aprobacionCalibracion?.aprobadoPorNombre
+|| ver.calibradoPorId) {
 <details>
   <summary>{{ 'formulario.hu053.responsable' | transloco }}</summary>
-  <code>{{ ver.calibradoPorId }}</code>
+  <div style="margin-top: 0.25rem">
+    @if (ver.calibradoPorNombre || ver.aprobacionCalibracion?.aprobadoPorNombre; as nombre) {
+    <div><strong>{{ nombre }}</strong></div>
+    } @if (ver.calibradoPorEmail; as email) {
+    <div><a [href]="'mailto:' + email">{{ email }}</a></div>
+    } @if (!ver.calibradoPorNombre && !ver.calibradoPorEmail &&
+    !ver.aprobacionCalibracion?.aprobadoPorNombre) {
+    <code>{{ ver.calibradoPorId }}</code>
+    }
+  </div>
 </details>
 } }
 <nav class="secciones-nav" role="tablist">
@@ -735,20 +741,46 @@
 } @if (esAdministrador() && seccionActiva() === 'mapeos' && ver.versionAnteriorId) {
 <section class="surface-card editor-card">
   <div class="card-header">
-    <h2 class="card-title">{{ 'formulario.mappingTab' | transloco }}</h2>
-    @if (ver.estado === 'BORRADOR') {
-    <div class="header-acciones">
+    <div>
+      <h2 class="card-title">{{ 'formulario.mappingTab' | transloco }}</h2>
+      <p class="card-subtitle">
+        @if (filtroTipoMapeo() === 'TODOS') { {{ mapeosEditables().length }} {{
+        'formulario.totalMappings' | transloco }} } @else { {{ mapeosFiltrados().length }} de {{
+        mapeosEditables().length }} {{ 'formulario.totalMappings' | transloco }} }
+      </p>
+    </div>
+    <div class="editor-header-actions mapeo-header-acciones">
+      <div class="filtro-tipo-mapeo-wrapper">
+        <i class="pi pi-filter" aria-hidden="true"></i>
+        <select
+          id="filtro-tipo-mapeo"
+          class="sgp-select filtro-tipo-mapeo-select"
+          [value]="filtroTipoMapeo()"
+          (change)="cambiarFiltroTipoMapeo($any($event.target).value)"
+          [attr.aria-label]="'formulario.filterByMappingType' | transloco"
+        >
+          <option value="TODOS">{{ 'formulario.allMappingTypes' | transloco }}</option>
+          <option value="EQUIVALENTE">
+            {{ 'formulario.hu050.tipos.EQUIVALENTE' | transloco }}
+          </option>
+          <option value="NUEVO">{{ 'formulario.hu050.tipos.NUEVO' | transloco }}</option>
+          <option value="ELIMINADO">{{ 'formulario.hu050.tipos.ELIMINADO' | transloco }}</option>
+          <option value="RENOMBRADO">{{ 'formulario.hu050.tipos.RENOMBRADO' | transloco }}</option>
+        </select>
+      </div>
+
+      @if (ver.estado === 'BORRADOR') {
       <button
         pButton
         type="button"
         severity="secondary"
         [outlined]="true"
         [disabled]="!analisisMapeo() || guardandoMapeos() || completandoEquivalencias()"
-        (click)="completarEquivalencias()"
+        (click)="declararMapeosAutomaticos(false)"
       >
         <span
-          >{{ (completandoEquivalencias() ? 'formulario.preparingEquivalences' :
-          'formulario.completeEquivalences') | transloco }}</span
+          >{{ (completandoEquivalencias() ? 'formulario.resolvingMappings' :
+          'formulario.completeAutoMapping') | transloco }}</span
         >
       </button>
       <button
@@ -764,7 +796,8 @@
       <button
         pButton
         type="button"
-        [disabled]="guardandoMapeos() || completandoEquivalencias()"
+        [severity]="hayMapeosSinGuardar() ? 'primary' : 'secondary'"
+        [disabled]="guardandoMapeos() || completandoEquivalencias() || !hayMapeosSinGuardar()"
         (click)="guardarDeclaracionesMapeo()"
       >
         <i class="pi pi-save" aria-hidden="true"></i>
@@ -773,11 +806,18 @@
           transloco }}</span
         >
       </button>
+      }
     </div>
-    }
   </div>
 
-  @if (analisisMapeo(); as analisis) { @if (analisis.mapeoCompleto) {
+  @if (hayMapeosSinGuardar() && ver.estado === 'BORRADOR') {
+  <div class="aviso-cambios-locales" role="status">
+    <div>
+      <i class="pi pi-info-circle" aria-hidden="true"></i>
+      <span>{{ 'formulario.mappingUnsavedChangesNotice' | transloco }}</span>
+    </div>
+  </div>
+  } @if (analisisMapeo(); as analisis) { @if (analisis.mapeoCompleto) {
   <div class="aviso-exito" role="status">
     <i class="pi pi-check-circle" aria-hidden="true"></i>
     <span>{{ 'formulario.mappingComplete' | transloco }}</span>
@@ -785,20 +825,79 @@
   } @else {
   <div class="aviso-error" role="alert">
     <i class="pi pi-exclamation-triangle" aria-hidden="true"></i>
-    <div>
+    <div style="width: 100%">
       <strong>{{ 'formulario.mappingIncomplete' | transloco }}</strong>
-      <ul class="lista-pendientes" style="max-height: 12rem; overflow-y: auto">
-        @for (pend of analisis.camposOrigenSinMapeo; track pend) {
-        <li>{{ 'formulario.sourceField' | transloco }}: {{ nombreCampoMapeo(pend, true) }}</li>
-        } @for (pend of analisis.camposDestinoSinMapeo ?? []; track pend) {
-        <li>{{ 'formulario.targetField' | transloco }}: {{ nombreCampoMapeo(pend) }}</li>
+      @if (camposOrigenSinMapeo().length === 0 && camposDestinoSinMapeo().length === 0) {
+      <p style="margin: 0.5rem 0 0">{{ 'formulario.localMappingsComplete' | transloco }}</p>
+      } @else {
+      <ul class="lista-pendientes" style="max-height: 16rem; overflow-y: auto">
+        @for (pend of camposOrigenSinMapeo(); track pend) {
+        <li class="item-pendiente">
+          <div class="item-pendiente-info">
+            <span class="etiqueta-origen-destino">{{ 'formulario.sourceField' | transloco }}:</span>
+            <strong>{{ nombreCampoMapeo(pend, true) }}</strong>
+            <code class="codigo-ruta">{{ pend }}</code>
+          </div>
+          @if (ver.estado === 'BORRADOR') {
+          <div class="item-pendiente-acciones">
+            <button
+              pButton
+              type="button"
+              size="small"
+              severity="secondary"
+              [outlined]="true"
+              (click)="declararComoEliminado(pend)"
+              title="{{ 'formulario.declareAsDeleted' | transloco }}"
+            >
+              <i class="pi pi-times" aria-hidden="true"></i>
+              <span>{{ 'formulario.declareAsDeleted' | transloco }}</span>
+            </button>
+          </div>
+          }
+        </li>
+        } @for (pend of camposDestinoSinMapeo(); track pend) {
+        <li class="item-pendiente">
+          <div class="item-pendiente-info">
+            <span class="etiqueta-origen-destino">{{ 'formulario.targetField' | transloco }}:</span>
+            <strong>{{ nombreCampoMapeo(pend) }}</strong>
+            <code class="codigo-ruta">{{ pend }}</code>
+          </div>
+          @if (ver.estado === 'BORRADOR') {
+          <div class="item-pendiente-acciones">
+            <button
+              pButton
+              type="button"
+              size="small"
+              severity="secondary"
+              [outlined]="true"
+              (click)="declararComoNuevo(pend)"
+              title="{{ 'formulario.declareAsNew' | transloco }}"
+            >
+              <i class="pi pi-plus" aria-hidden="true"></i>
+              <span>{{ 'formulario.declareAsNew' | transloco }}</span>
+            </button>
+          </div>
+          }
+        </li>
         }
       </ul>
+      }
     </div>
   </div>
   } }
 
-  <p-table [value]="mapeosEditables()" responsiveLayout="scroll" styleClass="p-datatable-sm">
+  <p-table
+    [value]="mapeosFiltrados()"
+    [paginator]="true"
+    [rows]="10"
+    [rowsPerPageOptions]="[10, 20, 50]"
+    [first]="mapeoPrimerElemento()"
+    (onPage)="mapeoPrimerElemento.set($event.first)"
+    [showCurrentPageReport]="true"
+    [currentPageReportTemplate]="'formulario.mappingPageReport' | transloco"
+    responsiveLayout="scroll"
+    styleClass="p-datatable-sm"
+  >
     <ng-template #header>
       <tr>
         <th scope="col">{{ 'formulario.sourceField' | transloco }}</th>
@@ -816,7 +915,10 @@
         <td>{{ nombreCampoMapeo(map.elementoRefOrigen, true) }}</td>
         <td>{{ nombreCampoMapeo(map.elementoRefDestino) }}</td>
         <td>
-          <p-tag [value]="'formulario.hu050.tipos.' + map.tipo | transloco" severity="info"></p-tag>
+          <p-tag
+            [value]="'formulario.hu050.tipos.' + map.tipo | transloco"
+            [severity]="severidadTipoMapeo(map.tipo)"
+          ></p-tag>
         </td>
         <td>{{ map.observacion || '—' }}</td>
         @if (ver.estado === 'BORRADOR') {
@@ -826,7 +928,8 @@
             size="small"
             severity="danger"
             [outlined]="true"
-            (click)="eliminarMapeo(i)"
+            (click)="eliminarMapeo(map)"
+            [attr.aria-label]="('formulario.delete' | transloco) + ': ' + (map.elementoRefDestino || map.elementoRefOrigen)"
           >
             <i class="pi pi-trash" aria-hidden="true"></i>
           </button>
@@ -838,7 +941,10 @@
     <ng-template #emptymessage>
       <tr>
         <td [attr.colspan]="ver.estado === 'BORRADOR' ? 5 : 4" class="tabla-vacia">
-          <p>No se han registrado declaraciones de mapeo aún.</p>
+          <p>
+            @if (filtroTipoMapeo() !== 'TODOS') { No hay declaraciones de mapeo del tipo
+            seleccionado. } @else { No se han registrado declaraciones de mapeo aún. }
+          </p>
         </td>
       </tr>
     </ng-template>
@@ -871,7 +977,7 @@
       </li>
       @if (ver.versionAnteriorId) {
       <li>
-        @if (analisisMapeo()?.mapeoCompleto) {
+        @if (analisisMapeo()?.mapeoCompleto || mapeoLocalCompleto()) {
         <i class="pi pi-check-circle check-ok" aria-hidden="true"></i>
         <span>{{ 'formulario.checkMapping' | transloco }}</span>
         } @else {
@@ -882,6 +988,72 @@
       }
     </ul>
   </div>
+
+  @if (ver.versionAnteriorId && !analisisMapeo()?.mapeoCompleto && !mapeoLocalCompleto()) {
+  <div class="aviso-mapeo-publicar" role="region" aria-label="Resolución de mapeos pendientes">
+    <div class="aviso-mapeo-header">
+      <i class="pi pi-info-circle" aria-hidden="true"></i>
+      <div>
+        <h4 class="aviso-mapeo-titulo">{{ 'formulario.pendingMappingsTitle' | transloco }}</h4>
+        <p class="aviso-mapeo-desc">{{ 'formulario.pendingMappingsDescription' | transloco }}</p>
+      </div>
+    </div>
+
+    @if (camposDestinoSinMapeo().length > 0) {
+    <div class="bloque-campos-pendientes">
+      <span class="etiqueta-pendientes">{{ 'formulario.newFieldsPending' | transloco }}:</span>
+      <ul class="lista-campos-pendientes">
+        @for (c of camposDestinoSinMapeo(); track c) {
+        <li>
+          <span class="nombre-campo">{{ nombreCampoMapeo(c) }}</span>
+          <code class="codigo-ruta">{{ c }}</code>
+        </li>
+        }
+      </ul>
+    </div>
+    } @if (camposOrigenSinMapeo().length > 0) {
+    <div class="bloque-campos-pendientes">
+      <span class="etiqueta-pendientes">{{ 'formulario.sourceFieldsPending' | transloco }}:</span>
+      <ul class="lista-campos-pendientes">
+        @for (c of camposOrigenSinMapeo(); track c) {
+        <li>
+          <span class="nombre-campo">{{ nombreCampoMapeo(c, true) }}</span>
+          <code class="codigo-ruta">{{ c }}</code>
+        </li>
+        }
+      </ul>
+    </div>
+    }
+
+    <div class="aviso-mapeo-acciones">
+      <button
+        pButton
+        type="button"
+        severity="primary"
+        [outlined]="true"
+        (click)="cambiarSeccion('mapeos')"
+      >
+        <i class="pi pi-sliders-h" aria-hidden="true"></i>
+        <span>{{ 'formulario.manageMappingsManually' | transloco }}</span>
+      </button>
+    </div>
+  </div>
+  } @if (ver.versionAnteriorId && !analisisMapeo()?.mapeoCompleto && mapeoLocalCompleto()) {
+  <div class="aviso-inmutable" role="status">
+    <i class="pi pi-check-circle" aria-hidden="true"></i>
+    <span>{{ 'formulario.localMappingsComplete' | transloco }}</span>
+    <button
+      pButton
+      type="button"
+      size="small"
+      [disabled]="guardandoMapeos()"
+      (click)="guardarDeclaracionesMapeo()"
+    >
+      <i class="pi pi-save" aria-hidden="true"></i>
+      <span>{{ 'formulario.saveMappings' | transloco }}</span>
+    </button>
+  </div>
+  }
 
   <div class="publicar-accion">
     <button
@@ -936,7 +1108,7 @@
   [header]="'formulario.addMapping' | transloco"
   [visible]="dialogoNuevoMapeo()"
   [modal]="true"
-  [style]="{ width: '480px' }"
+  [style]="{ width: '520px' }"
   (onHide)="cerrarDialogoNuevoMapeo()"
 >
   <form [formGroup]="nuevoMapeoForm" (ngSubmit)="agregarDeclaracionMapeo()" class="dialog-form">
@@ -944,7 +1116,12 @@
       <label for="tipo-mapeo" class="field-label"
         >{{ 'formulario.mappingType' | transloco }} *</label
       >
-      <select id="tipo-mapeo" class="sgp-select" formControlName="tipo">
+      <select
+        id="tipo-mapeo"
+        class="sgp-select"
+        formControlName="tipo"
+        (change)="onTipoMapeoChange()"
+      >
         @for (t of tiposMapeo; track t.value) {
         <option [value]="t.value">{{ t.label }}</option>
         }
@@ -952,29 +1129,47 @@
     </div>
 
     <div class="form-field">
-      <label for="campo-origen" class="field-label"
-        >{{ 'formulario.sourceField' | transloco }}</label
-      >
-      <input
-        pInputText
-        id="campo-origen"
-        type="text"
-        formControlName="elementoRefOrigen"
-        placeholder="/seccion/campo"
-      />
+      <label for="campo-origen" class="field-label">
+        {{ 'formulario.sourceField' | transloco }} @if (nuevoMapeoForm.controls.tipo.value !==
+        'NUEVO') { * }
+      </label>
+      @if (nuevoMapeoForm.controls.tipo.value === 'NUEVO') {
+      <div class="campo-no-aplica">
+        <i class="pi pi-minus-circle" aria-hidden="true"></i>
+        <span>{{ 'formulario.notApplicableNew' | transloco }}</span>
+      </div>
+      } @else {
+      <select id="campo-origen" class="sgp-select" formControlName="elementoRefOrigen">
+        <option value="">-- {{ 'formulario.selectSourceField' | transloco }} --</option>
+        @for (c of opcionesCamposOrigen(); track c) {
+        <option [value]="c">
+          {{ nombreCampoMapeo(c, true) }} ({{ c }}){{ esCampoOrigenSinMapear(c) ? ' ★' : '' }}
+        </option>
+        }
+      </select>
+      }
     </div>
 
     <div class="form-field">
-      <label for="campo-destino" class="field-label"
-        >{{ 'formulario.targetField' | transloco }}</label
-      >
-      <input
-        pInputText
-        id="campo-destino"
-        type="text"
-        formControlName="elementoRefDestino"
-        placeholder="/seccion/campo"
-      />
+      <label for="campo-destino" class="field-label">
+        {{ 'formulario.targetField' | transloco }} @if (nuevoMapeoForm.controls.tipo.value !==
+        'ELIMINADO') { * }
+      </label>
+      @if (nuevoMapeoForm.controls.tipo.value === 'ELIMINADO') {
+      <div class="campo-no-aplica">
+        <i class="pi pi-minus-circle" aria-hidden="true"></i>
+        <span>{{ 'formulario.notApplicableDeleted' | transloco }}</span>
+      </div>
+      } @else {
+      <select id="campo-destino" class="sgp-select" formControlName="elementoRefDestino">
+        <option value="">-- {{ 'formulario.selectTargetField' | transloco }} --</option>
+        @for (c of opcionesCamposDestino(); track c) {
+        <option [value]="c">
+          {{ nombreCampoMapeo(c) }} ({{ c }}){{ esCampoDestinoSinMapear(c) ? ' ★' : '' }}
+        </option>
+        }
+      </select>
+      }
     </div>
 
     <div class="form-field">
@@ -986,9 +1181,16 @@
         id="observacion-mapeo"
         type="text"
         formControlName="observacion"
-        placeholder="Motivo del cambio"
+        placeholder="Motivo del cambio (opcional)"
       />
     </div>
+
+    @if (errorFormularioMapeo()) {
+    <div class="aviso-error" role="alert">
+      <i class="pi pi-exclamation-circle" aria-hidden="true"></i>
+      <span>{{ errorFormularioMapeo() }}</span>
+    </div>
+    }
 
     <div class="dialog-actions">
       <button
@@ -1130,7 +1332,7 @@
   >
     <div class="form-field">
       <label for="preg-sec" class="field-label"
-        >{{ 'formulario.sectionTitle' | transloco }} *</label
+        >{{ 'formulario.questionSection' | transloco }} *</label
       >
       <select id="preg-sec" class="sgp-select" formControlName="seccionClave">
         @for (sec of seccionesVisuales(); track sec.clave) {

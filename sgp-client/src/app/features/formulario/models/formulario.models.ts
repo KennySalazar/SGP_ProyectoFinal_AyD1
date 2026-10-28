@@ -48,6 +48,8 @@ export interface VersionFormulario {
   publicadoPorId?: string | null;
   publicadoEn?: string | null;
   calibradoPorId?: string | null;
+  calibradoPorNombre?: string | null;
+  calibradoPorEmail?: string | null;
   calibradoEn?: string | null;
   creadoEn: string;
   actualizadoEn: string;

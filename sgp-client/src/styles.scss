@@ -142,3 +142,64 @@ body::before {
   background: var(--sgp-surface, #ffffff);
   color: var(--sgp-navy-900, #0b1f33);
 }
+
+.p-paginator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+}
+
+.p-paginator .p-paginator-pages {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.p-paginator .p-paginator-page,
+.p-paginator .p-paginator-first,
+.p-paginator .p-paginator-prev,
+.p-paginator .p-paginator-next,
+.p-paginator .p-paginator-last {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2.25rem;
+  height: 2.25rem;
+  padding: 0 0.5rem;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--sgp-navy-900, #0b1f33);
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease-in-out;
+
+  &:hover:not(.p-disabled):not(.p-paginator-page-selected) {
+    background: var(--sgp-surface-soft, #f6f9fc);
+    border-color: var(--sgp-border, #d8e2ec);
+  }
+
+  &.p-paginator-page-selected {
+    background: var(--sgp-blue-600, #2563eb);
+    color: #ffffff;
+  }
+
+  &.p-disabled {
+    opacity: 0.4;
+    cursor: default;
+  }
+}
+
+.p-paginator .p-paginator-current {
+  margin-right: 0.75rem;
+  font-size: 0.875rem;
+  color: var(--sgp-steel-700, #40546b);
+}
+
+.p-paginator .p-select {
+  margin-left: 0.5rem;
+}
