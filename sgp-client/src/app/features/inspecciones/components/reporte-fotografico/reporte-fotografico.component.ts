@@ -19,7 +19,7 @@ import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { ButtonModule } from 'primeng/button';
 import { DialogModule } from 'primeng/dialog';
 import { SelectModule } from 'primeng/select';
-import { firstValueFrom } from 'rxjs';
+import { firstValueFrom, Subscription } from 'rxjs';
 import { MarcadorObservacionesComponent } from '../../../formulario/components/observaciones/marcador-observaciones.component';
 import { AuthStore } from '../../../../core/services/auth.store';
 import {
@@ -108,6 +108,12 @@ export class ReporteFotograficoComponent implements OnDestroy {
   private stream: MediaStream | null = null;
   private revision = 0;
   private contextoActual = '';
+  /**
+   * Inventario local en vivo. Se cancela solo al cambiar de contexto: el effect también se
+   * re-ejecuta cuando la sincronización renueva la sesión (auth.user() cambia de objeto), y si se
+   * cancelara ahí la lista de pendientes quedaría congelada hasta recargar.
+   */
+  private inventarioEnVivo?: Subscription;
   private generacionCarga = 0;
   readonly bloqueada = signal(false);
   readonly inventarioCargado = signal(false);
@@ -147,7 +153,7 @@ export class ReporteFotograficoComponent implements OnDestroy {
       .map((conteo) => conteo.categoria),
   );
   constructor() {
-    effect((onCleanup) => {
+    effect(() => {
       const inspeccion = this.contexto();
       const usuario = this.auth.user();
       untracked(() => {
@@ -161,7 +167,7 @@ export class ReporteFotograficoComponent implements OnDestroy {
           inspeccion.estado === 'BORRADOR' &&
           !this.revisionSoloLectura()
         ) {
-          const subscription = this.locales
+          this.inventarioEnVivo = this.locales
             .observarInventario(usuario.id, inspeccion.id)
             .subscribe((inventario) => {
               if (this.auth.user()?.id !== usuario.id || this.contexto().id !== inspeccion.id)
@@ -177,7 +183,6 @@ export class ReporteFotograficoComponent implements OnDestroy {
                 })),
               );
             });
-          onCleanup(() => subscription.unsubscribe());
         }
         if (usuario) void this.recargar(usuario.id, inspeccion.id, this.revision);
       });
@@ -497,6 +502,8 @@ export class ReporteFotograficoComponent implements OnDestroy {
     if (url) URL.revokeObjectURL(url);
   }
   private limpiar() {
+    this.inventarioEnVivo?.unsubscribe();
+    this.inventarioEnVivo = undefined;
     this.fotoLocalARetirar.set(null);
     this.revision++;
     this.cerrarCamara();
