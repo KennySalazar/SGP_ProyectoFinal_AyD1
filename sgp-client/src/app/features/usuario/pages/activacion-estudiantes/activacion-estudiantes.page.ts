@@ -36,6 +36,12 @@ export class ActivacionEstudiantesPage {
     })),
   );
   readonly cursos = signal<CursoDisponibleResponse[]>([]);
+  readonly opcionesCursos = computed(() =>
+    this.cursos().map((curso) => ({
+      id: curso.id,
+      etiqueta: `${curso.nombre} (${curso.periodo})`,
+    })),
+  );
   readonly cargando = signal(false);
   readonly guardando = signal(false);
   readonly exito = signal<string | null>(null);
