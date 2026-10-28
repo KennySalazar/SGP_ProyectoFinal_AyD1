@@ -111,6 +111,7 @@ export class EditarPuentePage {
         next: (puente) => {
           this.puente.set(puente);
           this.valoresIniciales.set({
+            id: puente.id,
             nombre: puente.nombre,
             ruta: puente.ruta,
             kilometraje: puente.kilometraje,

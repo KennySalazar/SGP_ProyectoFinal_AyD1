@@ -20,7 +20,12 @@ import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import type { Map, Marker, Popup } from 'maplibre-gl';
 // La configuración Angular limita los tipos globales; MapLibre requiere este namespace.
 import type {} from 'geojson';
-import { cargarEstilosMaplibre, resolverMaplibre } from '../../../../../shared/utils/maplibre';
+import {
+  ZOOM_MAXIMO_MAPA,
+  ZOOM_MINIMO_MAPA,
+  cargarEstilosMaplibre,
+  resolverMaplibre,
+} from '../../../../../shared/utils/maplibre';
 import { EstadoPuente, PuenteCatalogoResponse } from '../../../models/puente.models';
 
 @Component({
@@ -67,6 +72,8 @@ export class MapaPuentesComponent implements AfterViewInit, OnChanges, OnDestroy
         container: this.contenedor.nativeElement,
         center: [-90.3, 15.7],
         zoom: 6,
+        minZoom: ZOOM_MINIMO_MAPA,
+        maxZoom: ZOOM_MAXIMO_MAPA,
         attributionControl: { compact: false },
         style: {
           version: 8,
@@ -74,7 +81,7 @@ export class MapaPuentesComponent implements AfterViewInit, OnChanges, OnDestroy
             osm: {
               type: 'raster',
               tileSize: 256,
-              maxzoom: 19,
+              maxzoom: ZOOM_MAXIMO_MAPA,
               tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
               attribution:
                 '© <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors',

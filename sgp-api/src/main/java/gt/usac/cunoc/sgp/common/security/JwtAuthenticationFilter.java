@@ -70,7 +70,6 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         && user.isActive()
         && user.isActivated()
         && user.isVerified()
-        && user.getEmail().equals(data.email())
         && user.getRole().getName() == data.role()
         && user.getTokenVersion() == data.tokenVersion();
   }

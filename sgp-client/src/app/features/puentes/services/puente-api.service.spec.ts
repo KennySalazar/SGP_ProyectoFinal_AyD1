@@ -197,10 +197,11 @@ describe('PuenteApiService', () => {
   });
 
   describe('listarPuntosMapa', () => {
-    const puente = (n: number, latitud: number | null = 14.5) => ({
+    const puente = (n: number, latitud: number | null = 14.5, activo = true) => ({
       id: `p${n}`,
       codigo: `GT-01-0101-000${n}`,
       nombre: `Puente ${n}`,
+      activo,
       latitud,
       longitud: latitud === null ? null : -90.5,
     });
@@ -223,10 +224,17 @@ describe('PuenteApiService', () => {
       const request = http.expectOne((req) => req.url === '/api/v1/puentes');
       expect(request.request.params.get('pagina')).toBe('0');
       expect(request.request.params.get('tamanio')).toBe('100');
+      expect(request.request.params.get('todos')).toBe('true');
       request.flush(pagina([puente(1), puente(2, null)], 1));
 
       expect(puntos).toEqual([
-        { id: 'p1', titulo: 'GT-01-0101-0001 — Puente 1', latitud: 14.5, longitud: -90.5 },
+        {
+          id: 'p1',
+          titulo: 'GT-01-0101-0001 — Puente 1',
+          latitud: 14.5,
+          longitud: -90.5,
+          inactivo: false,
+        },
       ]);
     });
 

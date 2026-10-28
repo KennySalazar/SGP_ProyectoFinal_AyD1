@@ -468,6 +468,8 @@
     "descripcion": "Tu nombre de usuario es lo que ven los demás en el foro. Tu nombre completo solo lo ven las personas con sesión.",
     "datosCuenta": "Datos de la cuenta",
     "rol": "Rol",
+    "emailPlaceholder": "correo@ejemplo.com",
+    "reglaEmail": "Ingresa una dirección de correo electrónico válida.",
     "guardar": "Guardar perfil",
     "guardando": "Guardando...",
     "guardado": "Tu perfil se actualizó.",
@@ -495,15 +497,15 @@
   "common": {
     "email": "Correo electronico",
     "emailShort": "Correo",
-    "password": "Contrasena",
+    "password": "Contraseña",
     "showPassword": "Mostrar contraseña",
     "hidePassword": "Ocultar contraseña",
-    "currentPassword": "Contrasena actual",
-    "newPassword": "Nueva contrasena",
+    "currentPassword": "Contraseña actual",
+    "newPassword": "Nueva contraseña",
     "otpCode": "Codigo OTP",
     "emailPlaceholder": "nombre@correo.com",
-    "passwordPlaceholder": "Ingresa tu contrasena",
-    "confirmPasswordPlaceholder": "Confirma tu contrasena",
+    "passwordPlaceholder": "Ingresa tu contraseña",
+    "confirmPasswordPlaceholder": "Confirma tu contraseña",
     "minPasswordPlaceholder": "Minimo 10 caracteres",
     "continue": "Continuar",
     "pending": "Pendiente",
@@ -522,12 +524,14 @@
     "login": {
       "title": "Iniciar sesion",
       "subtitle": "Accede con tu cuenta del Sistema de Gestion de Puentes.",
-      "forgot": "Olvide mi contrasena"
+      "forgot": "Olvide mi contraseña"
     },
     "register": {
       "title": "Crear cuenta",
       "subtitle": "El autorregistro crea una cuenta de Estudiante pendiente de activacion por un Catedratico.",
       "rule": "Minimo 10 caracteres, con al menos una letra y un numero.",
+      "confirm": "Confirmar contraseña",
+      "mismatch": "Las contraseñas no coinciden.",
       "haveAccount": "Ya tengo cuenta"
     },
     "verifyRegistration": {
@@ -543,18 +547,18 @@
       "note": "Usa el codigo mas reciente recibido en tu correo."
     },
     "recovery": {
-      "title": "Recuperar contrasena",
+      "title": "Recuperar contraseña",
       "subtitle": "Solicita un codigo temporal para restablecer tu acceso.",
       "send": "Enviar codigo",
       "sent": "Si el correo esta registrado, recibira un codigo de recuperacion.",
-      "haveCode": "Ya tengo el codigo",
+      "sending": "Enviando...",
       "back": "Volver al inicio de sesion"
     },
     "reset": {
-      "title": "Restablecer contrasena",
-      "subtitle": "Usa el codigo OTP de recuperacion para establecer una nueva contrasena.",
-      "success": "Contrasena restablecida correctamente.",
-      "action": "Restablecer contrasena"
+      "title": "Restablecer contraseña",
+      "subtitle": "Usa el codigo OTP de recuperacion para establecer una nueva contraseña.",
+      "success": "Contraseña restablecida correctamente.",
+      "action": "Restablecer contraseña"
     },
     "activation": {
       "title": "Activar cuenta",
@@ -968,7 +972,8 @@
       "rejectedNote": "Se notificó el motivo al Catedrático y no se creó ningún puente.",
       "decisionFailed": "No se pudo registrar la decisión. Inténtalo de nuevo.",
       "proximityOnlyInactiveNote": "Solo hay puentes inactivos a menos de 100 metros de esta solicitud. Si es el mismo puente, reactívalo desde el catálogo en lugar de aprobarla; si es otro (por ejemplo, uno reconstruido), puedes aprobarla.",
-      "proximityInactiveNote": "Entre los resultados hay puentes inactivos. Si alguno es el mismo puente, reactívalo desde el catálogo en lugar de aprobar esta solicitud."
+      "proximityInactiveNote": "Entre los resultados hay puentes inactivos. Si alguno es el mismo puente, reactívalo desde el catálogo en lugar de aprobar esta solicitud.",
+      "overlappingBlocked": "Existe un puente registrado en esta misma ubicación. No se puede aprobar la solicitud sobre otro puente."
     },
     "solicitud": {
       "title": "Solicitar alta de puente",
@@ -1119,6 +1124,9 @@
     "proximityNote": "Se encontraron puentes a menos de 100 metros. Revisa los resultados y confirma si deseas registrar este puente.",
     "proximityTotal": "Puentes encontrados: {{total}}",
     "proximityLimit": "Se muestran los primeros {{cantidad}} resultados.",
+    "proximityOverlappingNote": "Existe al menos un puente en esta misma ubicación (distancia menor a 1 metro). No está permitido posicionar un puente sobre otro.",
+    "overlappingLocation": "Ya existe un puente registrado en esta misma ubicación ({{codigo}}). No se puede posicionar un puente sobre otro.",
+    "overlapping": "Superpuesto",
     "confirm": "Confirmar y registrar",
     "cancelConfirmation": "Volver al formulario",
     "distance": "Distancia",
@@ -1977,8 +1985,9 @@
       "gpsObtenido": "Lat: {{lat}}, Long: {{lng}} (±{{acc}} m)",
       "gpsNoDisponible": "GPS no disponible o no permitido (se registrará sin ubicación)",
       "fechaInspeccion": "Fecha de inspección",
-      "nombreInspector": "Inspector responsable",
-      "nombreInspectorPlaceholder": "Nombre o firma del inspector",
+      "visitaTitulo": "Datos de la visita",
+      "nombreAcompanante": "Nombre del acompañante",
+      "colegiadoAcompanante": "No. de colegiado",
       "datosPermanentesTitulo": "Datos técnicos permanentes del puente",
       "cargandoPermanentes": "Consultando datos de la última inspección publicada...",
       "permanentesEncontrados": "Se encontraron datos permanentes registrados en la última inspección publicada:",

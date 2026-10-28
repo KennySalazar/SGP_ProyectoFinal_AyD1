@@ -1,5 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { cargarEstilosMaplibre, resolverMaplibre } from './maplibre';
+import {
+  ZOOM_MAXIMO_MAPA,
+  ZOOM_MINIMO_MAPA,
+  cargarEstilosMaplibre,
+  resolverMaplibre,
+} from './maplibre';
 
 describe('Utilidades de MapLibre', () => {
   afterEach(() => {
@@ -48,6 +53,14 @@ describe('Utilidades de MapLibre', () => {
       document.querySelector('link[data-maplibre-estilos]')?.dispatchEvent(new Event('load'));
 
       expect(alCargar).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('Límites de zoom', () => {
+    it('define zoom mínimo y máximo para proteger los mapas de teselas faltantes', () => {
+      expect(ZOOM_MINIMO_MAPA).toBe(5);
+      expect(ZOOM_MAXIMO_MAPA).toBe(18);
+      expect(ZOOM_MINIMO_MAPA).toBeLessThan(ZOOM_MAXIMO_MAPA);
     });
   });
 });

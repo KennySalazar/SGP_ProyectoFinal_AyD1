@@ -178,6 +178,10 @@ describe('SelectorUbicacionComponent: selector de ubicación en el mapa', () => 
     await crear();
 
     expect(mapa().opciones['center']).toEqual([-90.3, 15.5]);
+    expect(mapa().opciones['minZoom']).toBe(5);
+    expect(mapa().opciones['maxZoom']).toBe(18);
+    const estilo = mapa().opciones['style'] as { sources: { osm: { maxzoom: number } } };
+    expect(estilo.sources.osm.maxzoom).toBe(18);
     expect(fixture.componentInstance.errorMapa()).toBe(false);
     expect(mapa().addControl).toHaveBeenCalled();
   });
@@ -248,6 +252,10 @@ describe('SelectorUbicacionComponent: selector de ubicación en el mapa', () => 
     await crear({ zoom: 15 });
 
     expect(mapa().opciones['center']).toEqual([-90.3, 15.5]);
+    expect(mapa().opciones['minZoom']).toBe(5);
+    expect(mapa().opciones['maxZoom']).toBe(18);
+    const estilo = mapa().opciones['style'] as { sources: { osm: { maxzoom: number } } };
+    expect(estilo.sources.osm.maxzoom).toBe(18);
     expect(mapa().opciones['zoom']).toBe(6);
   });
 

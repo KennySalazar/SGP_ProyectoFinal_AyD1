@@ -29,6 +29,8 @@ export class RecoveryResetPage {
   private readonly usuarioApi = inject(UsuarioApiService);
   private readonly route = inject(ActivatedRoute);
   readonly done = signal(false);
+  /** Llega desde la solicitud del código: se avisa que ya se envió al correo. */
+  readonly codigoEnviado = this.route.snapshot.queryParamMap.get('enviado') === '1';
   readonly form = this.fb.nonNullable.group({
     email: [
       this.route.snapshot.queryParamMap.get('email') ?? '',

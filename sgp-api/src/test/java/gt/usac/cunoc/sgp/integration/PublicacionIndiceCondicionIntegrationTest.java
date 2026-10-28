@@ -122,6 +122,23 @@ class PublicacionIndiceCondicionIntegrationTest {
 
     jdbc.update(
         """
+        UPDATE puente SET
+          estado_actual = 'Sin evaluar',
+          indice_condicion_actual = NULL,
+          fecha_ultima_inspeccion = NULL,
+          inspeccion_vigente_id = NULL,
+          resultado_ic_vigente_id = NULL,
+          inspeccion_vigente_publicada_en = NULL
+        """);
+    jdbc.update("DELETE FROM resultado_ic");
+    jdbc.update("DELETE FROM inspeccion");
+    jdbc.update("DELETE FROM auditoria");
+    jdbc.update("DELETE FROM aprobacion_calibracion_ic");
+    jdbc.update("DELETE FROM configuracion_ic_elemento");
+    jdbc.update("DELETE FROM puente");
+
+    jdbc.update(
+        """
                 INSERT INTO usuario (id, email, password_hash, rol_id,
                   verificado, activado, activo, nombre_completo)
                 SELECT ?, ?, 'hash-prueba', id, true, true, true, 'Publicador de prueba'

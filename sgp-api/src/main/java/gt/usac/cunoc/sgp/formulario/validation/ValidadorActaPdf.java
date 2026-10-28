@@ -50,7 +50,7 @@ public class ValidadorActaPdf {
         pagina.getCOSObject();
       }
     } catch (IOException | IllegalArgumentException excepcion) {
-      throw invalido("El contenido real del acta no es un PDF valido o requiere una contrasena.");
+      throw invalido("El contenido real del acta no es un PDF valido o requiere una contraseña.");
     }
     return contenido;
   }
