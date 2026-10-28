@@ -214,6 +214,12 @@ export class InspeccionesLocalesService {
         },
         sincronizado: true,
         actualizacionLocalPendiente: false,
+        intencionFinal:
+          borrador.estado === 'BORRADOR' &&
+          existente?.intencionFinal?.accion === 'enviar' &&
+          existente.intencionFinal.estado === 'CONFIRMADA'
+            ? undefined
+            : existente?.intencionFinal,
       });
       return true;
     });
