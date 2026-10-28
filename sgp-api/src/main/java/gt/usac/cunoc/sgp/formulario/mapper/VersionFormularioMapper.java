@@ -35,6 +35,8 @@ public interface VersionFormularioMapper {
   @Mapping(target = "publicadoPorId", source = "version.publicadoPorId")
   @Mapping(target = "publicadoEn", source = "version.publicadoEn")
   @Mapping(target = "calibradoPorId", source = "version.calibradoPorId")
+  @Mapping(target = "calibradoPorNombre", source = "version.calibradoPorNombre")
+  @Mapping(target = "calibradoPorEmail", source = "version.calibradoPorEmail")
   @Mapping(target = "calibradoEn", source = "version.calibradoEn")
   @Mapping(target = "creadoEn", source = "version.creadoEn")
   @Mapping(target = "actualizadoEn", source = "version.actualizadoEn")

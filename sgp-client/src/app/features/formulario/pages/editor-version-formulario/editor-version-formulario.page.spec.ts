@@ -12,7 +12,7 @@ import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { BehaviorSubject, of, throwError, Subject } from 'rxjs';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiErrorService } from '../../../../core/services/api-error.service';
-import { VersionFormulario } from '../../models/formulario.models';
+import { DeclaracionMapeoRequest, VersionFormulario } from '../../models/formulario.models';
 import { FormularioApiService } from '../../services/formulario-api.service';
 import { EditorVersionFormularioPage } from './editor-version-formulario.page';
 @Pipe({ name: 'transloco', standalone: true })
@@ -581,6 +581,189 @@ describe('EditorVersionFormularioPage', () => {
     expect(component.puedePublicar()).toBe(false);
   });
 
+  it('declararComoNuevo agrega declaracion NUEVO y desbloquea publicacion', () => {
+    component.version.set({ ...mockVersion, versionAnteriorId: 'anterior' });
+    component.analisisMapeo.set({
+      versionDestinoId: 'v-1',
+      versionDestinoCodigo: 'SIECA-v1',
+      camposOrigen: [],
+      camposDestino: ['/nuevo'],
+      mapeosDeclarados: [],
+      camposOrigenSinMapeo: [],
+      camposDestinoSinMapeo: ['/nuevo'],
+      mapeoCompleto: false,
+    });
+    expect(component.puedePublicar()).toBe(false);
+
+    component.declararComoNuevo('/nuevo');
+    expect(component.mapeosEditables()).toEqual([
+      {
+        elementoRefOrigen: null,
+        elementoRefDestino: '/nuevo',
+        tipo: 'NUEVO',
+        observacion: 'Campo nuevo agregado en esta versión',
+      },
+    ]);
+    expect(component.camposDestinoSinMapeo()).toEqual([]);
+    expect(component.mapeoLocalCompleto()).toBe(true);
+    expect(component.puedePublicar()).toBe(true);
+  });
+
+  it('declararComoEliminado agrega declaracion ELIMINADO', () => {
+    component.version.set({ ...mockVersion, versionAnteriorId: 'anterior' });
+    component.analisisMapeo.set({
+      versionDestinoId: 'v-1',
+      versionDestinoCodigo: 'SIECA-v1',
+      camposOrigen: ['/antiguo'],
+      camposDestino: [],
+      mapeosDeclarados: [],
+      camposOrigenSinMapeo: ['/antiguo'],
+      camposDestinoSinMapeo: [],
+      mapeoCompleto: false,
+    });
+    component.declararComoEliminado('/antiguo');
+    expect(component.mapeosEditables()).toEqual([
+      {
+        elementoRefOrigen: '/antiguo',
+        elementoRefDestino: null,
+        tipo: 'ELIMINADO',
+        observacion: 'Campo no presente en esta versión',
+      },
+    ]);
+    expect(component.camposOrigenSinMapeo()).toEqual([]);
+    expect(component.mapeoLocalCompleto()).toBe(true);
+  });
+
+  it('declararMapeosAutomaticos con guardar persiste y actualiza analisis', () => {
+    const anteriorEsquema = {
+      type: 'object',
+      properties: { existente: { type: 'string' } },
+    };
+    apiMock.obtenerPorId.mockReturnValue(
+      of({ ...mockVersion, id: 'anterior', esquema: anteriorEsquema }),
+    );
+    apiMock.guardarMapeos.mockReturnValue(of([]));
+
+    component.version.set({
+      ...mockVersion,
+      versionAnteriorId: 'anterior',
+      esquema: {
+        type: 'object',
+        properties: { existente: { type: 'string' }, nuevaPregunta: { type: 'string' } },
+      },
+    });
+    component.analisisMapeo.set({
+      versionDestinoId: 'v-1',
+      versionDestinoCodigo: 'SIECA-v1',
+      camposOrigen: ['/existente'],
+      camposDestino: ['/existente', '/nuevaPregunta'],
+      mapeosDeclarados: [],
+      camposOrigenSinMapeo: ['/existente'],
+      camposDestinoSinMapeo: ['/existente', '/nuevaPregunta'],
+      mapeoCompleto: false,
+    });
+
+    component.declararMapeosAutomaticos(true);
+
+    expect(apiMock.obtenerPorId).toHaveBeenCalledWith('anterior');
+    expect(apiMock.guardarMapeos).toHaveBeenCalledWith(
+      'v-1',
+      expect.arrayContaining([
+        expect.objectContaining({ elementoRefDestino: '/existente', tipo: 'EQUIVALENTE' }),
+        expect.objectContaining({ elementoRefDestino: '/nuevaPregunta', tipo: 'NUEVO' }),
+      ]),
+    );
+    expect(apiMock.analizarMapeo).toHaveBeenCalledWith('v-1');
+  });
+
+  it('valida coherencia de mapeos en nuevoMapeoForm e impide duplicados', () => {
+    component.analisisMapeo.set({
+      versionDestinoId: 'v-1',
+      versionDestinoCodigo: 'SIECA-v1',
+      camposOrigen: ['/origen'],
+      camposDestino: ['/destino'],
+      mapeosDeclarados: [],
+      camposOrigenSinMapeo: ['/origen'],
+      camposDestinoSinMapeo: ['/destino'],
+      mapeoCompleto: false,
+    });
+
+    // Tipo NUEVO requiere destino y prohibe origen
+    component.abrirDialogoNuevoMapeo('NUEVO', '', '');
+    component.nuevoMapeoForm.patchValue({
+      elementoRefOrigen: '/origen',
+      elementoRefDestino: '/destino',
+    });
+    expect(component.nuevoMapeoForm.invalid).toBe(true);
+
+    component.nuevoMapeoForm.patchValue({ elementoRefOrigen: '', elementoRefDestino: '/destino' });
+    expect(component.nuevoMapeoForm.valid).toBe(true);
+
+    // Tipo ELIMINADO requiere origen y prohibe destino
+    component.nuevoMapeoForm.patchValue({
+      tipo: 'ELIMINADO',
+      elementoRefOrigen: '/origen',
+      elementoRefDestino: '/destino',
+    });
+    expect(component.nuevoMapeoForm.invalid).toBe(true);
+
+    component.nuevoMapeoForm.patchValue({ elementoRefOrigen: '/origen', elementoRefDestino: '' });
+    expect(component.nuevoMapeoForm.valid).toBe(true);
+
+    // Tipo EQUIVALENTE requiere ambos
+    component.nuevoMapeoForm.patchValue({
+      tipo: 'EQUIVALENTE',
+      elementoRefOrigen: '',
+      elementoRefDestino: '/destino',
+    });
+    expect(component.nuevoMapeoForm.invalid).toBe(true);
+
+    component.nuevoMapeoForm.patchValue({
+      tipo: 'EQUIVALENTE',
+      elementoRefOrigen: '/origen',
+      elementoRefDestino: '/destino',
+    });
+    expect(component.nuevoMapeoForm.valid).toBe(true);
+
+    // Agregar mapeo
+    component.agregarDeclaracionMapeo();
+    expect(component.mapeosEditables()).toHaveLength(1);
+
+    // Intentar duplicar destino
+    component.abrirDialogoNuevoMapeo('NUEVO', '/destino', '');
+    component.agregarDeclaracionMapeo();
+    expect(component.errorFormularioMapeo()).toContain(
+      'El campo de la nueva versión ya tiene una declaración asignada',
+    );
+    expect(component.mapeosEditables()).toHaveLength(1);
+  });
+
+  it('muestra aviso guiado en publicar si faltan mapeos y permite resolver con un clic', () => {
+    component.version.set({ ...mockVersion, versionAnteriorId: 'anterior' });
+    component.analisisMapeo.set({
+      versionDestinoId: 'v-1',
+      versionDestinoCodigo: 'SIECA-v1',
+      camposOrigen: [],
+      camposDestino: ['/pregunta_nueva'],
+      mapeosDeclarados: [],
+      camposOrigenSinMapeo: [],
+      camposDestinoSinMapeo: ['/pregunta_nueva'],
+      mapeoCompleto: false,
+    });
+    component.cambiarSeccion('publicar');
+    fixture.detectChanges();
+
+    const bannerPublicar = fixture.nativeElement.querySelector('.aviso-mapeo-publicar');
+    expect(bannerPublicar).toBeTruthy();
+    expect(fixture.nativeElement.textContent).toContain('Pregunta nueva');
+
+    // Al declarar como nuevo, se oculta el banner guiado y habilita publicar
+    component.declararComoNuevo('/pregunta_nueva');
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('.aviso-mapeo-publicar')).toBeFalsy();
+    expect(component.puedePublicar()).toBe(true);
+  });
+
   it('permite calibrar al catedratico pero impide publicar y guardar mapeos', () => {
     vi.spyOn(component.auth, 'user').mockReturnValue({
       role: 'CATEDRATICO',
@@ -707,5 +890,122 @@ describe('EditorVersionFormularioPage', () => {
     expect(component.version()?.pesos).toBe(publicada.pesos);
     expect(apiMock.actualizarBorrador).not.toHaveBeenCalled();
     expect(apiMock.publicar).not.toHaveBeenCalled();
+  });
+
+  it('eliminarMapeo elimina correctamente por objeto o por indice', () => {
+    const mapeo1: DeclaracionMapeoRequest = {
+      elementoRefOrigen: '/origen1',
+      elementoRefDestino: '/destino1',
+      tipo: 'EQUIVALENTE',
+      observacion: null,
+    };
+    const mapeo2: DeclaracionMapeoRequest = {
+      elementoRefOrigen: null,
+      elementoRefDestino: '/destino2',
+      tipo: 'NUEVO',
+      observacion: null,
+    };
+    component.mapeosEditables.set([mapeo1, mapeo2]);
+
+    // Eliminar por objeto
+    component.eliminarMapeo(mapeo1);
+    expect(component.mapeosEditables()).toEqual([mapeo2]);
+
+    // Eliminar por índice
+    component.eliminarMapeo(0);
+    expect(component.mapeosEditables()).toEqual([]);
+  });
+
+  it('filtra los mapeos por tipo seleccionado y resetea la primera pagina', () => {
+    const mapeoNuevo: DeclaracionMapeoRequest = {
+      elementoRefOrigen: null,
+      elementoRefDestino: '/seccion_a/campo1',
+      tipo: 'NUEVO',
+      observacion: null,
+    };
+    const mapeoEliminado: DeclaracionMapeoRequest = {
+      elementoRefOrigen: '/seccion_b/campo2',
+      elementoRefDestino: null,
+      tipo: 'ELIMINADO',
+      observacion: null,
+    };
+    const mapeoEquiv: DeclaracionMapeoRequest = {
+      elementoRefOrigen: '/seccion_c/campo3',
+      elementoRefDestino: '/seccion_c/campo3',
+      tipo: 'EQUIVALENTE',
+      observacion: null,
+    };
+    component.mapeosEditables.set([mapeoNuevo, mapeoEliminado, mapeoEquiv]);
+    component.mapeoPrimerElemento.set(10);
+
+    // Por defecto TODOS
+    expect(component.filtroTipoMapeo()).toBe('TODOS');
+    expect(component.mapeosFiltrados()).toHaveLength(3);
+
+    // Filtrar por NUEVO
+    component.cambiarFiltroTipoMapeo('NUEVO');
+    expect(component.filtroTipoMapeo()).toBe('NUEVO');
+    expect(component.mapeoPrimerElemento()).toBe(0);
+    expect(component.mapeosFiltrados()).toEqual([mapeoNuevo]);
+
+    // Filtrar por ELIMINADO
+    component.cambiarFiltroTipoMapeo('ELIMINADO');
+    expect(component.mapeosFiltrados()).toEqual([mapeoEliminado]);
+
+    // Volver a TODOS
+    component.cambiarFiltroTipoMapeo('TODOS');
+    expect(component.mapeosFiltrados()).toHaveLength(3);
+  });
+
+  it('permite mover una pregunta a otra seccion al editar', () => {
+    component.seccionesVisuales.set([
+      {
+        clave: 'sec_origen',
+        titulo: 'Sección Origen',
+        preguntas: [
+          {
+            clave: 'preg_1',
+            titulo: 'Pregunta 1',
+            tipo: 'string',
+            obligatorio: false,
+          },
+        ],
+      },
+      {
+        clave: 'sec_destino',
+        titulo: 'Sección Destino',
+        preguntas: [],
+      },
+    ]);
+
+    // Abrir para editar preg_1 en sec_origen
+    const p = component.seccionesVisuales()[0].preguntas[0];
+    component.abrirEditarPregunta('sec_origen', p);
+    expect(component.modoPregunta()).toBe('editar');
+
+    // Cambiar sección a sec_destino
+    component.preguntaForm.patchValue({
+      seccionClave: 'sec_destino',
+      titulo: 'Pregunta 1 Modificada',
+    });
+
+    component.guardarPreguntaModal();
+
+    const secOrigen = component.seccionesVisuales().find((s) => s.clave === 'sec_origen');
+    const secDestino = component.seccionesVisuales().find((s) => s.clave === 'sec_destino');
+
+    expect(secOrigen?.preguntas).toHaveLength(0);
+    expect(secDestino?.preguntas).toHaveLength(1);
+    expect(secDestino?.preguntas[0].clave).toBe('preg_1');
+    expect(secDestino?.preguntas[0].titulo).toBe('Pregunta 1 Modificada');
+    expect(component.seccionVisualActiva()).toBe('sec_destino');
+  });
+
+  it('retorna la severidad correcta segun el tipo de mapeo', () => {
+    expect(component.severidadTipoMapeo('NUEVO')).toBe('success');
+    expect(component.severidadTipoMapeo('ELIMINADO')).toBe('danger');
+    expect(component.severidadTipoMapeo('RENOMBRADO')).toBe('warn');
+    expect(component.severidadTipoMapeo('EQUIVALENTE')).toBe('info');
+    expect(component.severidadTipoMapeo('OTRO')).toBe('secondary');
   });
 });

@@ -17,10 +17,12 @@ import {
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import {
+  AbstractControl,
   FormBuilder,
   FormControl,
   FormsModule,
   ReactiveFormsModule,
+  ValidationErrors,
   Validators,
 } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
@@ -34,7 +36,10 @@ import { TableModule } from 'primeng/table';
 import { TagModule } from 'primeng/tag';
 import { TextareaModule } from 'primeng/textarea';
 import { finalize, switchMap } from 'rxjs';
-import { completarEquivalencias } from '../../utils/mapeos-equivalentes';
+import {
+  completarEquivalencias,
+  completarMapeosAutomaticos,
+} from '../../utils/mapeos-equivalentes';
 import { ApiErrorService } from '../../../../core/services/api-error.service';
 import {
   AnalisisMapeo,
@@ -164,6 +169,79 @@ export class EditorVersionFormularioPage implements OnInit {
         JSON.stringify(this.escalaEditable()) !== JSON.stringify(escalaCalibracion(ver)))
     );
   });
+  readonly camposDestinoSinMapeo = computed(() => {
+    const analisis = this.analisisMapeo();
+    if (!analisis) return [];
+    const mapeados = new Set(
+      this.mapeosEditables()
+        .map((m) => m.elementoRefDestino)
+        .filter((r): r is string => !!r),
+    );
+    return analisis.camposDestino.filter((c) => !mapeados.has(c));
+  });
+
+  readonly camposOrigenSinMapeo = computed(() => {
+    const analisis = this.analisisMapeo();
+    if (!analisis) return [];
+    const mapeados = new Set(
+      this.mapeosEditables()
+        .map((m) => m.elementoRefOrigen)
+        .filter((r): r is string => !!r),
+    );
+    return analisis.camposOrigen.filter((c) => !mapeados.has(c));
+  });
+
+  readonly mapeoLocalCompleto = computed(() => {
+    const ver = this.version();
+    if (!ver?.versionAnteriorId) return true;
+    const analisis = this.analisisMapeo();
+    if (!analisis) return false;
+    return this.camposDestinoSinMapeo().length === 0 && this.camposOrigenSinMapeo().length === 0;
+  });
+
+  readonly opcionesCamposOrigen = computed(() => {
+    const analisis = this.analisisMapeo();
+    if (!analisis) return [];
+    const pendientes = this.camposOrigenSinMapeo();
+    const otros = analisis.camposOrigen.filter((c) => !pendientes.includes(c));
+    return [...pendientes, ...otros];
+  });
+
+  readonly opcionesCamposDestino = computed(() => {
+    const analisis = this.analisisMapeo();
+    if (!analisis) return [];
+    const pendientes = this.camposDestinoSinMapeo();
+    const otros = analisis.camposDestino.filter((c) => !pendientes.includes(c));
+    return [...pendientes, ...otros];
+  });
+
+  readonly hayMapeosSinGuardar = computed(() => {
+    const guardados = this.analisisMapeo()?.mapeosDeclarados ?? [];
+    const editables = this.mapeosEditables();
+    if (guardados.length !== editables.length) return true;
+    return (
+      JSON.stringify(editables) !==
+      JSON.stringify(
+        guardados.map((m) => ({
+          elementoRefOrigen: m.elementoRefOrigen,
+          elementoRefDestino: m.elementoRefDestino,
+          tipo: m.tipo,
+          observacion: m.observacion,
+        })),
+      )
+    );
+  });
+
+  readonly errorFormularioMapeo = signal<string | null>(null);
+
+  esCampoOrigenSinMapear(ruta: string): boolean {
+    return this.camposOrigenSinMapeo().includes(ruta);
+  }
+
+  esCampoDestinoSinMapear(ruta: string): boolean {
+    return this.camposDestinoSinMapeo().includes(ruta);
+  }
+
   readonly puedePublicar = computed(() => {
     const ver = this.version();
     return (
@@ -180,8 +258,12 @@ export class EditorVersionFormularioPage implements OnInit {
       !this.guardandoPesos() &&
       !this.guardandoEscala() &&
       !this.guardandoEsquema() &&
+      !this.guardandoMapeos() &&
+      !this.completandoEquivalencias() &&
       !this.publicando() &&
-      (!ver.versionAnteriorId || this.analisisMapeo()?.mapeoCompleto === true)
+      (!ver.versionAnteriorId ||
+        this.analisisMapeo()?.mapeoCompleto === true ||
+        this.mapeoLocalCompleto())
     );
   });
   readonly guardandoMapeos = signal(false);
@@ -192,6 +274,16 @@ export class EditorVersionFormularioPage implements OnInit {
   vinculosTexto = signal<string>('');
   pesosEditables = signal<PesoIcEditable[]>([]);
   mapeosEditables = signal<DeclaracionMapeoRequest[]>([]);
+  filtroTipoMapeo = signal<string>('TODOS');
+  readonly mapeosFiltrados = computed(() => {
+    const filtro = this.filtroTipoMapeo();
+    const lista = this.mapeosEditables();
+    if (!filtro || filtro === 'TODOS') {
+      return lista;
+    }
+    return lista.filter((m) => m.tipo === filtro);
+  });
+  mapeoPrimerElemento = signal<number>(0);
   modoEdicion = signal<'visual' | 'codigo'>('visual');
   seccionesVisuales = signal<SeccionVisual[]>([]);
   seccionVisualActiva = signal<string>('');
@@ -491,12 +583,36 @@ export class EditorVersionFormularioPage implements OnInit {
   dialogoConfirmarPublicar = signal(false);
   dialogoNuevoMapeo = signal(false);
   dialogoNuevaDerivada = signal(false);
-  readonly nuevoMapeoForm = this.fb.nonNullable.group({
-    elementoRefOrigen: [''],
-    elementoRefDestino: [''],
-    tipo: ['EQUIVALENTE' as TipoMapeoCampo, Validators.required],
-    observacion: [''],
-  });
+  private readonly validadorDeclaracionMapeo = (
+    control: AbstractControl,
+  ): ValidationErrors | null => {
+    const tipo = control.get('tipo')?.value as TipoMapeoCampo;
+    const origen = control.get('elementoRefOrigen')?.value?.trim();
+    const destino = control.get('elementoRefDestino')?.value?.trim();
+
+    if (!tipo) return { tipoRequerido: true };
+
+    if (tipo === 'NUEVO') {
+      if (!destino) return { destinoRequerido: true };
+      if (origen) return { origenInvalidoParaNuevo: true };
+    } else if (tipo === 'ELIMINADO') {
+      if (!origen) return { origenRequerido: true };
+      if (destino) return { destinoInvalidoParaEliminado: true };
+    } else {
+      if (!origen) return { origenRequerido: true };
+      if (!destino) return { destinoRequerido: true };
+    }
+    return null;
+  };
+  readonly nuevoMapeoForm = this.fb.nonNullable.group(
+    {
+      elementoRefOrigen: [''],
+      elementoRefDestino: [''],
+      tipo: ['EQUIVALENTE' as TipoMapeoCampo, Validators.required],
+      observacion: [''],
+    },
+    { validators: [this.validadorDeclaracionMapeo] },
+  );
   readonly nuevaDerivadaForm = this.fb.nonNullable.group({
     codigo: ['', [Validators.required, Validators.maxLength(50)]],
   });
@@ -985,9 +1101,31 @@ export class EditorVersionFormularioPage implements OnInit {
     if (this.modoPregunta() === 'crear') {
       sec.preguntas.push(nueva);
     } else {
-      const idx = sec.preguntas.findIndex((p) => p.clave === this.preguntaSeleccionadaClave());
-      if (idx !== -1) {
-        sec.preguntas[idx] = nueva;
+      const seccionOrigen = this.seccionesVisuales().find((s) =>
+        s.preguntas.some((p) => p.clave === this.preguntaSeleccionadaClave()),
+      );
+      if (seccionOrigen && seccionOrigen.clave !== sec.clave) {
+        if (sec.preguntas.some((p) => p.clave === clave)) {
+          this.errorValidacion.set(
+            'Ya existe una pregunta con esa clave en la sección de destino.',
+          );
+          return;
+        }
+        seccionOrigen.preguntas = seccionOrigen.preguntas.filter(
+          (p) => p.clave !== this.preguntaSeleccionadaClave(),
+        );
+        sec.preguntas.push(nueva);
+        this.seccionVisualActiva.set(sec.clave);
+      } else {
+        const targetSec = seccionOrigen || sec;
+        const idx = targetSec.preguntas.findIndex(
+          (p) => p.clave === this.preguntaSeleccionadaClave(),
+        );
+        if (idx !== -1) {
+          targetSec.preguntas[idx] = nueva;
+        } else {
+          targetSec.preguntas.push(nueva);
+        }
       }
     }
     this.seccionesVisuales.set([...this.seccionesVisuales()]);
@@ -1383,38 +1521,250 @@ export class EditorVersionFormularioPage implements OnInit {
       });
   }
 
-  abrirDialogoNuevoMapeo(): void {
+  abrirDialogoNuevoMapeo(
+    tipo: TipoMapeoCampo = 'EQUIVALENTE',
+    campoDestino = '',
+    campoOrigen = '',
+  ): void {
+    this.errorFormularioMapeo.set(null);
     this.nuevoMapeoForm.reset({
-      elementoRefOrigen: '',
-      elementoRefDestino: '',
-      tipo: 'EQUIVALENTE',
-      observacion: '',
+      elementoRefOrigen: campoOrigen,
+      elementoRefDestino: campoDestino,
+      tipo,
+      observacion:
+        tipo === 'NUEVO'
+          ? 'Campo nuevo agregado en esta versión'
+          : tipo === 'ELIMINADO'
+            ? 'Campo no presente en esta versión'
+            : '',
     });
+    this.onTipoMapeoChange();
     this.dialogoNuevoMapeo.set(true);
   }
+
   cerrarDialogoNuevoMapeo(): void {
     this.dialogoNuevoMapeo.set(false);
+    this.errorFormularioMapeo.set(null);
   }
+
+  onTipoMapeoChange(): void {
+    this.errorFormularioMapeo.set(null);
+    const tipo = this.nuevoMapeoForm.controls.tipo.value;
+    if (tipo === 'NUEVO') {
+      this.nuevoMapeoForm.controls.elementoRefOrigen.setValue('');
+      if (!this.nuevoMapeoForm.controls.elementoRefDestino.value) {
+        const pendientes = this.camposDestinoSinMapeo();
+        if (pendientes.length > 0) {
+          this.nuevoMapeoForm.controls.elementoRefDestino.setValue(pendientes[0]);
+        }
+      }
+    } else if (tipo === 'ELIMINADO') {
+      this.nuevoMapeoForm.controls.elementoRefDestino.setValue('');
+      if (!this.nuevoMapeoForm.controls.elementoRefOrigen.value) {
+        const pendientes = this.camposOrigenSinMapeo();
+        if (pendientes.length > 0) {
+          this.nuevoMapeoForm.controls.elementoRefOrigen.setValue(pendientes[0]);
+        }
+      }
+    }
+    this.nuevoMapeoForm.updateValueAndValidity();
+  }
+
   agregarDeclaracionMapeo(): void {
-    if (this.nuevoMapeoForm.invalid) return;
+    if (this.nuevoMapeoForm.invalid) {
+      this.nuevoMapeoForm.markAllAsTouched();
+      return;
+    }
     const val = this.nuevoMapeoForm.getRawValue();
+    const origen = val.elementoRefOrigen?.trim() || null;
+    const destino = val.elementoRefDestino?.trim() || null;
+    const tipo = val.tipo;
+
+    if (destino && this.mapeosEditables().some((m) => m.elementoRefDestino === destino)) {
+      this.errorFormularioMapeo.set(
+        'El campo de la nueva versión ya tiene una declaración asignada.',
+      );
+      return;
+    }
+    if (origen && this.mapeosEditables().some((m) => m.elementoRefOrigen === origen)) {
+      this.errorFormularioMapeo.set(
+        'El campo de la versión anterior ya tiene una declaración asignada.',
+      );
+      return;
+    }
+
     const lista = [
       ...this.mapeosEditables(),
       {
-        elementoRefOrigen: val.elementoRefOrigen?.trim() || null,
-        elementoRefDestino: val.elementoRefDestino?.trim() || null,
-        tipo: val.tipo,
+        elementoRefOrigen: origen,
+        elementoRefDestino: destino,
+        tipo,
         observacion: val.observacion?.trim() || null,
       },
     ];
     this.mapeosEditables.set(lista);
     this.cerrarDialogoNuevoMapeo();
   }
-  eliminarMapeo(index: number): void {
-    const lista = [...this.mapeosEditables()];
-    lista.splice(index, 1);
-    this.mapeosEditables.set(lista);
+
+  declararComoNuevo(rutaDestino: string): void {
+    if (this.mapeosEditables().some((m) => m.elementoRefDestino === rutaDestino)) return;
+    this.mapeosEditables.update((lista) => [
+      ...lista,
+      {
+        elementoRefOrigen: null,
+        elementoRefDestino: rutaDestino,
+        tipo: 'NUEVO',
+        observacion: 'Campo nuevo agregado en esta versión',
+      },
+    ]);
+    this.mensajeExito.set(
+      this.transloco.translate('formulario.fieldDeclaredAsNew', {
+        campo: this.nombreCampoMapeo(rutaDestino),
+      }),
+    );
   }
+
+  declararComoEliminado(rutaOrigen: string): void {
+    if (this.mapeosEditables().some((m) => m.elementoRefOrigen === rutaOrigen)) return;
+    this.mapeosEditables.update((lista) => [
+      ...lista,
+      {
+        elementoRefOrigen: rutaOrigen,
+        elementoRefDestino: null,
+        tipo: 'ELIMINADO',
+        observacion: 'Campo no presente en esta versión',
+      },
+    ]);
+    this.mensajeExito.set(
+      this.transloco.translate('formulario.fieldDeclaredAsDeleted', {
+        campo: this.nombreCampoMapeo(rutaOrigen, true),
+      }),
+    );
+  }
+
+  declararMapeosAutomaticos(guardar = false): void {
+    const version = this.version();
+    const analisis = this.analisisMapeo();
+    if (
+      !version ||
+      version.estado !== 'BORRADOR' ||
+      !version.versionAnteriorId ||
+      !analisis ||
+      this.completandoEquivalencias() ||
+      this.guardandoMapeos()
+    )
+      return;
+    const esquemaActual = JSON.stringify(version.esquema);
+    this.completandoEquivalencias.set(true);
+    this.mensajeExito.set(null);
+    this.formularioApi
+      .obtenerPorId(version.versionAnteriorId)
+      .pipe(
+        takeUntilDestroyed(this.destroyRef),
+        finalize(() => this.completandoEquivalencias.set(false)),
+      )
+      .subscribe({
+        next: (anterior) => {
+          if (
+            this.version()?.id !== version.id ||
+            this.version()?.estado !== 'BORRADOR' ||
+            JSON.stringify(this.version()?.esquema) !== esquemaActual
+          )
+            return;
+          const actuales = this.mapeosEditables();
+          const completos = completarMapeosAutomaticos(
+            analisis,
+            actuales,
+            anterior.esquema,
+            version.esquema,
+          );
+          this.mapeosEditables.set(completos);
+          const cantidadNuevos = completos.length - actuales.length;
+          if (guardar && this.esAdministrador()) {
+            this.guardandoMapeos.set(true);
+            this.formularioApi
+              .guardarMapeos(version.id, completos)
+              .pipe(
+                takeUntilDestroyed(this.destroyRef),
+                finalize(() => this.guardandoMapeos.set(false)),
+              )
+              .subscribe({
+                next: () => {
+                  this.mensajeExito.set(
+                    this.transloco.translate('formulario.autoMappingsSaved', {
+                      cantidad: cantidadNuevos,
+                    }),
+                  );
+                  this.cargarAnalisisMapeos(version.id);
+                },
+                error: (err) =>
+                  this.errorValidacion.set(
+                    mensajeCalibracion(err, (k) => this.transloco.translate(k)),
+                  ),
+              });
+          } else {
+            this.mensajeExito.set(
+              this.transloco.translate('formulario.autoMappingsPrepared', {
+                cantidad: cantidadNuevos,
+              }),
+            );
+          }
+        },
+        error: (err) =>
+          this.errorValidacion.set(mensajeCalibracion(err, (k) => this.transloco.translate(k))),
+      });
+  }
+  eliminarMapeo(target: number | DeclaracionMapeoRequest): void {
+    if (typeof target === 'number') {
+      const itemAEliminar = this.mapeosFiltrados()[target];
+      if (itemAEliminar) {
+        this.mapeosEditables.update((lista) =>
+          lista.filter(
+            (m) =>
+              m !== itemAEliminar &&
+              (m.elementoRefOrigen !== itemAEliminar.elementoRefOrigen ||
+                m.elementoRefDestino !== itemAEliminar.elementoRefDestino ||
+                m.tipo !== itemAEliminar.tipo),
+          ),
+        );
+      }
+    } else {
+      this.mapeosEditables.update((lista) =>
+        lista.filter(
+          (m) =>
+            m !== target &&
+            (m.elementoRefOrigen !== target.elementoRefOrigen ||
+              m.elementoRefDestino !== target.elementoRefDestino ||
+              m.tipo !== target.tipo),
+        ),
+      );
+    }
+    const totalActual = this.mapeosFiltrados().length;
+    if (this.mapeoPrimerElemento() >= totalActual) {
+      this.mapeoPrimerElemento.set(Math.max(0, totalActual - 10));
+    }
+  }
+
+  cambiarFiltroTipoMapeo(tipo: string): void {
+    this.filtroTipoMapeo.set(tipo);
+    this.mapeoPrimerElemento.set(0);
+  }
+
+  severidadTipoMapeo(tipo: string): 'info' | 'warn' | 'success' | 'danger' | 'secondary' {
+    switch (tipo) {
+      case 'NUEVO':
+        return 'success';
+      case 'ELIMINADO':
+        return 'danger';
+      case 'RENOMBRADO':
+        return 'warn';
+      case 'EQUIVALENTE':
+        return 'info';
+      default:
+        return 'secondary';
+    }
+  }
+
   guardarDeclaracionesMapeo(): void {
     if (!this.esAdministrador()) return;
     const ver = this.version();
