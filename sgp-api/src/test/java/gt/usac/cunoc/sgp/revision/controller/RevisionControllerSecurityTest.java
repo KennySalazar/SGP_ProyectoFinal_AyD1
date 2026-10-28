@@ -71,6 +71,35 @@ class RevisionControllerSecurityTest {
   }
 
   @Test
+  void revisadasUsaIdentidadAutenticadaYNoPermiteCache() throws Exception {
+    UUID actor = UUID.randomUUID();
+    mockMvc
+        .perform(
+            get("/api/v1/revisiones/revisadas")
+                .param("pagina", "1")
+                .param("tamanio", "10")
+                .param("revisorId", UUID.randomUUID().toString())
+                .principal(autenticar(RoleName.CATEDRATICO, actor)))
+        .andExpect(status().isOk())
+        .andExpect(
+            org.springframework.test.web.servlet.result.MockMvcResultMatchers.header()
+                .string("Cache-Control", org.hamcrest.Matchers.containsString("no-store")));
+    verify(service).listarResueltas(actor, 1, 10);
+  }
+
+  @Test
+  void otrosRolesNoPuedenConsultarRevisadas() throws Exception {
+    for (RoleName rol :
+        List.of(RoleName.ESTUDIANTE, RoleName.PROFESIONAL_EXTERNO, RoleName.ADMINISTRADOR)) {
+      mockMvc
+          .perform(
+              get("/api/v1/revisiones/revisadas").principal(autenticar(rol, UUID.randomUUID())))
+          .andExpect(status().isForbidden());
+    }
+    verifyNoInteractions(service);
+  }
+
+  @Test
   void catedraticoPuedeIniciarRevisionPropia() throws Exception {
     UUID usuarioId = UUID.randomUUID();
     UUID revisionId = UUID.randomUUID();

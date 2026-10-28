@@ -21,3 +21,6 @@ manual_centro_americano.md
 # Artefactos de pruebas PWA en navegador
 sgp-client/test-results/
 sgp-client/playwright-report/
+
+# Datos locales de prueba de revisión académica
+/tests/fixtures/revision-academica/

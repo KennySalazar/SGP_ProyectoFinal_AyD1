@@ -21,6 +21,14 @@
   >
     {{ 'revision.bandeja.draftsTab' | transloco }}
   </button>
+  <button
+    type="button"
+    [class.active]="vista() === 'revisadas'"
+    [attr.aria-pressed]="vista() === 'revisadas'"
+    (click)="cambiarVista('revisadas')"
+  >
+    {{ 'revision.bandeja.reviewedTab' | transloco }}
+  </button>
 </nav>
 
 @if (vista() === 'pendientes') {
@@ -169,6 +177,70 @@
     [first]="pagina()!.number * pagina()!.size"
     [rows]="pagina()!.size"
     [totalRecords]="pagina()!.totalElements"
+    [rowsPerPageOptions]="[10, 20, 50, 100]"
+    (onPageChange)="cambiarPagina($event)"
+  />
+  }
+</section>
+} @else if (vista() === 'revisadas') {
+<section class="surface-card bandeja" aria-labelledby="titulo-revisadas">
+  <div class="section-head">
+    <div>
+      <h2 id="titulo-revisadas">{{ 'revision.bandeja.reviewedTab' | transloco }}</h2>
+      <p>{{ 'revision.bandeja.reviewedNote' | transloco }}</p>
+    </div>
+    @if (revisadas(); as resultado) {
+    <strong class="total"
+      >{{ resultado.totalElements }} {{ 'revision.bandeja.total' | transloco }}</strong
+    >
+    }
+  </div>
+  @if (cargandoRevisadas()) {
+  <p class="empty" role="status">{{ 'revision.bandeja.loadingReviewed' | transloco }}</p>
+  } @else if (errorRevisadas()) {
+  <p class="validation" role="alert">{{ 'revision.bandeja.errorReviewed' | transloco }}</p>
+  <button pButton type="button" (click)="cargarRevisadas()">
+    {{ 'revision.autor.reintentar' | transloco }}
+  </button>
+  } @else if (revisadas()?.empty) {
+  <p class="empty" role="status">{{ 'revision.bandeja.emptyReviewed' | transloco }}</p>
+  } @else {
+  <div class="review-list">
+    @for (revision of revisadas()?.content ?? []; track revision.revisionId) {
+    <article class="review-row">
+      <div class="review-main">
+        <div class="review-title">
+          <h3>{{ revision.puenteCodigo }} · {{ revision.puenteNombre }}</h3>
+          <p-tag
+            [value]="('revision.resultado.veredictos.' + revision.veredicto) | transloco"
+            severity="secondary"
+          />
+        </div>
+        <p class="student"><strong>{{ revision.estudianteNombre }}</strong></p>
+        <div class="metadata">
+          <span>{{ 'revision.bandeja.cycle' | transloco }} {{ revision.numeroCiclo }}</span>
+          <span
+            >{{ 'revision.bandeja.sent' | transloco }} {{ revision.enviadaEn | date:'dd/MM/yyyy
+            HH:mm' }}</span
+          >
+          <span
+            >{{ 'revision.bandeja.resolved' | transloco }} {{ revision.resueltaEn | date:'dd/MM/yyyy
+            HH:mm' }}</span
+          >
+        </div>
+      </div>
+      <a pButton [routerLink]="['/revisiones', revision.revisionId]">
+        <i class="pi pi-eye" aria-hidden="true"></i>
+        <span>{{ 'revision.bandeja.viewReadOnly' | transloco }}</span>
+      </a>
+    </article>
+    }
+  </div>
+  } @if (revisadas() && !revisadas()!.empty && !errorRevisadas()) {
+  <p-paginator
+    [first]="revisadas()!.number * revisadas()!.size"
+    [rows]="revisadas()!.size"
+    [totalRecords]="revisadas()!.totalElements"
     [rowsPerPageOptions]="[10, 20, 50, 100]"
     (onPageChange)="cambiarPagina($event)"
   />

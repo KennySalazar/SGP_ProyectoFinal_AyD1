@@ -448,6 +448,22 @@ public class VersionFormularioService {
     }
     version.setActualizadoEn(clock.instant());
 
+    if (version.getVersionAnterior() != null) {
+      List<String> camposOrigen =
+          campoExtractor.extraerCampos(version.getVersionAnterior().getEsquema());
+      List<String> camposDestino = campoExtractor.extraerCampos(esquema);
+      Set<String> setOrigen = new HashSet<>(camposOrigen);
+      Set<String> setDestino = new HashSet<>(camposDestino);
+      List<MapeoCampoFormulario> existentes =
+          mapeos.findAllByVersionOrigenIdAndVersionDestinoId(
+              version.getVersionAnterior().getId(), version.getId());
+      List<MapeoCampoFormulario> obsoletos =
+          existentes.stream().filter(m -> !esMapeoValido(m, setOrigen, setDestino)).toList();
+      if (!obsoletos.isEmpty()) {
+        mapeos.deleteAll(obsoletos);
+      }
+    }
+
     VersionFormulario guardada = versiones.save(version);
     return construirRespuestaDetallada(guardada);
   }
@@ -658,17 +674,23 @@ public class VersionFormularioService {
     List<MapeoCampoFormulario> mapeosGuardados =
         mapeos.findAllByVersionOrigenIdAndVersionDestinoId(origen.getId(), destino.getId());
 
+    Set<String> setOrigen = new HashSet<>(camposOrigen);
+    Set<String> setDestino = new HashSet<>(camposDestino);
+
     Set<String> mapeadosOrigen = new HashSet<>();
     Set<String> mapeadosDestino = new HashSet<>();
+    List<MapeoCampoResponse> mapeosDeclarados = new ArrayList<>();
     for (MapeoCampoFormulario m : mapeosGuardados) {
-      if (m.getElementoRefDestino() != null) {
-        mapeadosDestino.add(m.getElementoRefDestino());
-      }
-      if (m.getElementoRefOrigen() != null) {
-        mapeadosOrigen.add(m.getElementoRefOrigen());
+      if (esMapeoValido(m, setOrigen, setDestino)) {
+        mapeosDeclarados.add(mapper.toMapeoResponse(m));
+        if (m.getElementoRefDestino() != null) {
+          mapeadosDestino.add(m.getElementoRefDestino());
+        }
+        if (m.getElementoRefOrigen() != null) {
+          mapeadosOrigen.add(m.getElementoRefOrigen());
+        }
       }
     }
-
     List<String> pendientes =
         camposOrigen.stream().filter(c -> !mapeadosOrigen.contains(c)).toList();
 
@@ -679,7 +701,7 @@ public class VersionFormularioService {
         destino.getCodigo(),
         camposOrigen,
         camposDestino,
-        mapeosGuardados.stream().map(mapper::toMapeoResponse).toList(),
+        mapeosDeclarados,
         pendientes,
         pendientes.isEmpty() && camposDestino.stream().allMatch(mapeadosDestino::contains));
   }
@@ -871,6 +893,26 @@ public class VersionFormularioService {
           "Pesos incompletos",
           "Falta configurar el peso de los siguientes elementos: " + String.join(", ", pendientes));
     }
+  }
+
+  private boolean esMapeoValido(
+      MapeoCampoFormulario m, Set<String> camposOrigen, Set<String> camposDestino) {
+    if (m.getTipo() == null) return false;
+    return switch (m.getTipo()) {
+      case EQUIVALENTE, RENOMBRADO ->
+          m.getElementoRefOrigen() != null
+              && camposOrigen.contains(m.getElementoRefOrigen())
+              && m.getElementoRefDestino() != null
+              && camposDestino.contains(m.getElementoRefDestino());
+      case NUEVO ->
+          m.getElementoRefOrigen() == null
+              && m.getElementoRefDestino() != null
+              && camposDestino.contains(m.getElementoRefDestino());
+      case ELIMINADO ->
+          m.getElementoRefDestino() == null
+              && m.getElementoRefOrigen() != null
+              && camposOrigen.contains(m.getElementoRefOrigen());
+    };
   }
 
   private void validarCoherenciaMapeo(DeclaracionMapeoRequest d) {
@@ -1151,6 +1193,7 @@ public class VersionFormularioService {
     version.setCalibradoPorId(usuarioId);
     version.setCalibradoEn(clock.instant());
     version.setActualizadoEn(clock.instant());
+
     return construirRespuestaDetallada(versiones.save(version));
   }
 

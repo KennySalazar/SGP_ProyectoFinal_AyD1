@@ -9,4 +9,7 @@ public record CicloObservacionesResponse(
     UUID inspeccionId,
     int numeroCiclo,
     String estadoRevision,
-    Instant enviadaEn) {}
+    Instant enviadaEn,
+    String fechaInspeccion,
+    String puenteNombre,
+    String puenteCodigo) {}

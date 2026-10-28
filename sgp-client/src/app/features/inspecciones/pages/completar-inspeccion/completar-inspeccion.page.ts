@@ -216,6 +216,8 @@ export class CompletarInspeccionPage implements OnInit {
         if (local?.intencionFinal?.estado === 'CONFIRMADA') {
           this.resultadoAccion.set(local.intencionFinal.resultado ?? null);
           this.borrador.update((b) => (b ? { ...b, estado: local.estado } : b));
+        } else if (local?.estado === 'BORRADOR' && !local.intencionFinal) {
+          this.resultadoAccion.set(null);
         }
       });
     this.cambios.pipe(debounceTime(1200), takeUntilDestroyed(this.destroyRef)).subscribe(() => {

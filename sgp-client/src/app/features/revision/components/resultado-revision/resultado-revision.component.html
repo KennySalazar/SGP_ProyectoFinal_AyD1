@@ -1,19 +1,23 @@
 <section class="surface-card seguimiento">
   <h2>
     {{
-      (esCatedratico() ? 'revision.resultado.tituloRevisor' : 'revision.resultado.titulo')
-        | transloco
+      (esCatedratico() && !soloLectura()
+        ? 'revision.resultado.tituloRevisor'
+        : 'revision.resultado.titulo'
+      ) | transloco
     }}
   </h2>
   <p class="privado">{{ 'revision.resultado.privado' | transloco }}</p>
-  @if (esCatedratico()) {
+  @if (esCatedratico() && !soloLectura()) {
     <p>{{ 'revision.resultado.ayudaRevisor' | transloco }}</p>
   }
   @if (!abierto()) {
     <button pButton type="button" (click)="abrir()">
       {{
-        (esCatedratico() ? 'revision.resultado.abrirRevisor' : 'revision.resultado.abrir')
-          | transloco
+        (esCatedratico() && !soloLectura()
+          ? 'revision.resultado.abrirRevisor'
+          : 'revision.resultado.abrir'
+        ) | transloco
       }}
     </button>
   } @else {
@@ -188,7 +192,7 @@
         <article>
           <strong
             >{{ 'revision.detalle.ciclo' | transloco }} {{ h.numeroCiclo }} ·
-            {{ h.estadoRevision }}</strong
+            {{ 'revision.detalle.estados.' + h.estadoRevision | transloco }}</strong
           >
           <a
             pButton
@@ -198,6 +202,12 @@
             >{{ 'revision.atencion.abrirCiclo' | transloco }}</a
           >
           <p>{{ h.enviadaEn | date: 'dd/MM/yyyy HH:mm' }}</p>
+          @if (h.resueltaEn) {
+            <p>
+              {{ 'revision.bandeja.resolved' | transloco }}
+              {{ h.resueltaEn | date: 'dd/MM/yyyy HH:mm' }}
+            </p>
+          }
           @if (h.veredicto) {
             <p>
               {{ 'revision.resultado.veredictos.' + h.veredicto | transloco }} ·

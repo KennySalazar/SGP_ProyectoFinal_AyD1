@@ -395,4 +395,40 @@ describe('Reporte fotográfico', () => {
 
     expect(anterior.observed).toBe(false);
   });
+
+  it('una foto confirmada por la sincronización muestra su miniatura sin recargar', async () => {
+    const inventario = new Subject<{
+      pendientes: FotografiaPendiente[];
+      confirmadas: FotografiaResponse[];
+    }>();
+    locales.observarInventario.mockReturnValue(inventario);
+    api.contenidoFotografia.mockReturnValue(of(new Blob(['miniatura'], { type: 'image/jpeg' })));
+    fixture.componentRef.setInput('inspeccion', {
+      id: 'en-vivo',
+      autorId: 'autor',
+      puenteId: 'puente',
+      estado: 'BORRADOR',
+    });
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    // La recarga inicial (lista del servidor) termina antes de que confirme la sincronización.
+    await vi.waitFor(() => expect(api.listarFotografias).toHaveBeenCalledWith('en-vivo'));
+    await fixture.whenStable();
+
+    inventario.next({ pendientes: [], confirmadas: [{ ...foto, id: 'nueva' }] });
+
+    await vi.waitFor(() =>
+      expect(fixture.componentInstance.confirmadas()[0]?.miniatura).toBe('blob:prueba'),
+    );
+    expect(api.contenidoFotografia).toHaveBeenCalledWith('en-vivo', 'nueva', true);
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('img')?.getAttribute('src')).toBe('blob:prueba');
+
+    // Otra emisión con la misma foto no la vuelve a descargar.
+    api.contenidoFotografia.mockClear();
+    inventario.next({ pendientes: [], confirmadas: [{ ...foto, id: 'nueva' }] });
+    await fixture.whenStable();
+    expect(api.contenidoFotografia).not.toHaveBeenCalled();
+  });
 });

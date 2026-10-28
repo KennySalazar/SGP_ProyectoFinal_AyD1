@@ -90,6 +90,7 @@ export class ResultadoRevisionComponent {
   readonly inspeccionId = input.required<string>();
   readonly revisionId = input<string | null>(null);
   readonly actualizado = output<void>();
+  readonly soloLectura = input(false);
   private readonly api = inject(RevisionApiService);
   private readonly auth = inject(AuthStore);
   private readonly i18n = inject(TranslocoService);
@@ -127,6 +128,7 @@ export class ResultadoRevisionComponent {
       !!c &&
       u?.role === 'CATEDRATICO' &&
       u.id === c.revisorId &&
+      !this.soloLectura() &&
       c.estadoRevision === 'EN_CURSO' &&
       c.estadoInspeccion === 'EN_REVISION'
     );
@@ -138,6 +140,7 @@ export class ResultadoRevisionComponent {
     const c = this.ciclo();
     return (
       !!c &&
+      !this.soloLectura() &&
       this.esAutor() &&
       c.revisionId === this.historial()[0]?.revisionId &&
       c.veredicto === 'CAMBIOS_SOLICITADOS' &&
