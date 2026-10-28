@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>EventoInspeccion.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">sgp-api</a> &gt; <a href="index.source.html" class="el_package">gt.usac.cunoc.sgp.inspeccion.model</a> &gt; <span class="el_source">EventoInspeccion.java</span></div><h1>EventoInspeccion.java</h1><pre class="source lang-java linenums">package gt.usac.cunoc.sgp.inspeccion.model;
+
+/**
+ * Acciones que cambian el estado de una inspección, cada una con su único origen y destino válidos
+ * (RN-INS-04, RN-REV-02, RN-REV-06).
+ */
+<span class="fc" id="L7">public enum EventoInspeccion {</span>
+<span class="fc" id="L8">  ENVIAR(EstadoInspeccion.BORRADOR, EstadoInspeccion.ENVIADA),</span>
+<span class="fc" id="L9">  INICIAR_REVISION(EstadoInspeccion.ENVIADA, EstadoInspeccion.EN_REVISION),</span>
+<span class="fc" id="L10">  APROBAR(EstadoInspeccion.EN_REVISION, EstadoInspeccion.PUBLICADA),</span>
+<span class="fc" id="L11">  SOLICITAR_CAMBIOS(EstadoInspeccion.EN_REVISION, EstadoInspeccion.CAMBIOS_SOLICITADOS),</span>
+<span class="fc" id="L12">  RECHAZAR(EstadoInspeccion.EN_REVISION, EstadoInspeccion.RECHAZADA),</span>
+<span class="fc" id="L13">  DEVOLVER_A_BORRADOR(EstadoInspeccion.CAMBIOS_SOLICITADOS, EstadoInspeccion.BORRADOR),</span>
+  /** Catedrático o Profesional externo verificado: se publica sin revisión previa (RN-REV-02). */
+<span class="fc" id="L15">  PUBLICAR_SIN_REVISION(EstadoInspeccion.ENVIADA, EstadoInspeccion.PUBLICADA);</span>
+
+  private final EstadoInspeccion origen;
+  private final EstadoInspeccion destino;
+
+<span class="fc" id="L20">  EventoInspeccion(EstadoInspeccion origen, EstadoInspeccion destino) {</span>
+<span class="fc" id="L21">    this.origen = origen;</span>
+<span class="fc" id="L22">    this.destino = destino;</span>
+<span class="fc" id="L23">  }</span>
+
+  public EstadoInspeccion origen() {
+<span class="fc" id="L26">    return origen;</span>
+  }
+
+  public EstadoInspeccion destino() {
+<span class="fc" id="L30">    return destino;</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

@@ -1,0 +1,523 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>EjecucionOrdenService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">sgp-api</a> &gt; <a href="index.source.html" class="el_package">gt.usac.cunoc.sgp.mantenimiento.service</a> &gt; <span class="el_source">EjecucionOrdenService.java</span></div><h1>EjecucionOrdenService.java</h1><pre class="source lang-java linenums">package gt.usac.cunoc.sgp.mantenimiento.service;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import gt.usac.cunoc.sgp.archivo.entity.Archivo;
+import gt.usac.cunoc.sgp.archivo.entity.ArchivoEvidenciaMantenimiento;
+import gt.usac.cunoc.sgp.archivo.model.ClavesImagen;
+import gt.usac.cunoc.sgp.archivo.model.EstadoArchivo;
+import gt.usac.cunoc.sgp.archivo.model.ImagenProcesada;
+import gt.usac.cunoc.sgp.archivo.model.TipoUsoArchivo;
+import gt.usac.cunoc.sgp.archivo.repository.ArchivoEvidenciaMantenimientoRepository;
+import gt.usac.cunoc.sgp.archivo.repository.ArchivoRepository;
+import gt.usac.cunoc.sgp.archivo.service.AlmacenamientoArchivos;
+import gt.usac.cunoc.sgp.archivo.service.ObjetosImagenService;
+import gt.usac.cunoc.sgp.archivo.service.ProcesadorImagenes;
+import gt.usac.cunoc.sgp.common.audit.model.AccionAuditoria;
+import gt.usac.cunoc.sgp.common.audit.service.AuditoriaWriter;
+import gt.usac.cunoc.sgp.common.exception.ApiException;
+import gt.usac.cunoc.sgp.common.util.UuidV7Generator;
+import gt.usac.cunoc.sgp.mantenimiento.dto.EjecucionOrdenResponse;
+import gt.usac.cunoc.sgp.mantenimiento.dto.EvidenciaMantenimientoResponse;
+import gt.usac.cunoc.sgp.mantenimiento.dto.RegistrarEjecucionRequest;
+import gt.usac.cunoc.sgp.mantenimiento.dto.ResponsableDisponibleResponse;
+import gt.usac.cunoc.sgp.mantenimiento.dto.RetirarEvidenciaRequest;
+import gt.usac.cunoc.sgp.mantenimiento.entity.OrdenMantenimiento;
+import gt.usac.cunoc.sgp.mantenimiento.entity.OrdenMantenimientoEjecucion;
+import gt.usac.cunoc.sgp.mantenimiento.mapper.OrdenMantenimientoMapper;
+import gt.usac.cunoc.sgp.mantenimiento.model.EstadoOrden;
+import gt.usac.cunoc.sgp.mantenimiento.repository.OrdenMantenimientoEjecucionRepository;
+import gt.usac.cunoc.sgp.mantenimiento.repository.OrdenMantenimientoRepository;
+import gt.usac.cunoc.sgp.usuario.entity.UserAccount;
+import gt.usac.cunoc.sgp.usuario.repository.UserAccountRepository;
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
+import org.springframework.http.HttpStatus;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
+import org.springframework.web.multipart.MultipartFile;
+
+/**
+ * Registro de la ejecución de una orden: responsable, fecha y fotografías de evidencia (HU-048,
+ * RN-MTO-05, RN-ARC-02, DT-SEC-08). No cambia el estado de la orden; el cierre como ejecutada pasa
+ * por {@link TransicionOrdenService}.
+ */
+@Service
+public class EjecucionOrdenService {
+
+  static final long TAMANO_MAXIMO_BYTES = 20L * 1024 * 1024;
+  static final int MAXIMO_EVIDENCIAS = 30;
+  static final int LONGITUD_MAXIMA_RESPONSABLE = 200;
+  static final int LONGITUD_MAXIMA_ELEMENTO = 300;
+  static final String ENTIDAD_EJECUCION = &quot;orden_mantenimiento_ejecucion&quot;;
+  static final String ENTIDAD_ARCHIVO = &quot;archivo&quot;;
+
+<span class="fc" id="L69">  private static final DateTimeFormatter FORMATO_FECHA = DateTimeFormatter.ofPattern(&quot;dd/MM/yyyy&quot;);</span>
+  private static final int MAXIMO_RESPONSABLES = 200;
+
+  private final OrdenMantenimientoRepository ordenes;
+  private final OrdenMantenimientoEjecucionRepository ejecuciones;
+  private final ArchivoRepository archivos;
+  private final ArchivoEvidenciaMantenimientoRepository evidencias;
+  private final UserAccountRepository usuarios;
+  private final ProcesadorImagenes procesador;
+  private final ObjetosImagenService objetos;
+  private final AlmacenamientoArchivos almacenamiento;
+  private final AuditoriaWriter auditoria;
+  private final OrdenMantenimientoMapper mapper;
+  private final ObjectMapper json;
+  private final Clock clock;
+  private final TransactionTemplate tx;
+
+  public EjecucionOrdenService(
+      OrdenMantenimientoRepository ordenes,
+      OrdenMantenimientoEjecucionRepository ejecuciones,
+      ArchivoRepository archivos,
+      ArchivoEvidenciaMantenimientoRepository evidencias,
+      UserAccountRepository usuarios,
+      ProcesadorImagenes procesador,
+      ObjetosImagenService objetos,
+      AlmacenamientoArchivos almacenamiento,
+      AuditoriaWriter auditoria,
+      OrdenMantenimientoMapper mapper,
+      ObjectMapper json,
+      Clock clock,
+<span class="fc" id="L99">      PlatformTransactionManager transactionManager) {</span>
+<span class="fc" id="L100">    this.ordenes = ordenes;</span>
+<span class="fc" id="L101">    this.ejecuciones = ejecuciones;</span>
+<span class="fc" id="L102">    this.archivos = archivos;</span>
+<span class="fc" id="L103">    this.evidencias = evidencias;</span>
+<span class="fc" id="L104">    this.usuarios = usuarios;</span>
+<span class="fc" id="L105">    this.procesador = procesador;</span>
+<span class="fc" id="L106">    this.objetos = objetos;</span>
+<span class="fc" id="L107">    this.almacenamiento = almacenamiento;</span>
+<span class="fc" id="L108">    this.auditoria = auditoria;</span>
+<span class="fc" id="L109">    this.mapper = mapper;</span>
+<span class="fc" id="L110">    this.json = json;</span>
+<span class="fc" id="L111">    this.clock = clock;</span>
+<span class="fc" id="L112">    this.tx = new TransactionTemplate(transactionManager);</span>
+<span class="fc" id="L113">  }</span>
+
+  @Transactional(readOnly = true)
+  public EjecucionOrdenResponse obtenerEjecucion(UUID ordenId) {
+<span class="fc" id="L117">    exigirOrden(ordenId);</span>
+<span class="fc" id="L118">    OrdenMantenimientoEjecucion ejecucion =</span>
+        ejecuciones
+<span class="fc" id="L120">            .findById(ordenId)</span>
+<span class="fc" id="L121">            .orElseThrow(</span>
+                () -&gt;
+<span class="nc" id="L123">                    new ApiException(</span>
+                        HttpStatus.NOT_FOUND,
+                        &quot;ejecucion_no_encontrada&quot;,
+                        &quot;Ejecución no encontrada&quot;,
+                        &quot;La orden &quot; + ordenId + &quot; todavía no ha iniciado su ejecución.&quot;));
+<span class="fc" id="L128">    return aRespuesta(ejecucion);</span>
+  }
+
+  /**
+   * Registra la fecha de ejecución y el responsable de una orden EN_EJECUCION. La fecha puede
+   * quedar pendiente hasta el cierre; el responsable no.
+   */
+  @Transactional
+  public EjecucionOrdenResponse registrarEjecucion(
+      UUID ordenId, RegistrarEjecucionRequest request, UUID usuarioId) {
+<span class="pc bpc" id="L138" title="1 of 2 branches missed.">    if (request == null) {</span>
+<span class="nc" id="L139">      throw invalida(&quot;responsable&quot;, &quot;Indique la fecha de ejecución y el responsable.&quot;);</span>
+    }
+<span class="fc" id="L141">    bloquearEnEjecucion(ordenId);</span>
+<span class="fc" id="L142">    String nombre = limpiar(request.responsableNombre());</span>
+<span class="pc bpc" id="L143" title="1 of 4 branches missed.">    if (nombre != null &amp;&amp; nombre.length() &gt; LONGITUD_MAXIMA_RESPONSABLE) {</span>
+<span class="nc" id="L144">      throw invalida(</span>
+          &quot;responsableNombre&quot;,
+          &quot;El nombre del responsable no puede exceder &quot;
+              + LONGITUD_MAXIMA_RESPONSABLE
+              + &quot; caracteres.&quot;);
+    }
+<span class="fc bfc" id="L150" title="All 4 branches covered.">    if (request.responsableUsuarioId() == null &amp;&amp; nombre == null) {</span>
+<span class="fc" id="L151">      throw invalida(</span>
+          &quot;responsable&quot;,
+          &quot;Indique un usuario del sistema o el nombre de la persona o empresa responsable.&quot;);
+    }
+<span class="fc bfc" id="L155" title="All 2 branches covered.">    if (request.responsableUsuarioId() != null</span>
+        &amp;&amp; !usuarios
+<span class="fc" id="L157">            .findById(request.responsableUsuarioId())</span>
+<span class="fc" id="L158">            .map(UserAccount::isActive)</span>
+<span class="pc bpc" id="L159" title="1 of 2 branches missed.">            .orElse(false)) {</span>
+<span class="nc" id="L160">      throw invalida(&quot;responsableUsuarioId&quot;, &quot;El usuario responsable no existe o está inactivo.&quot;);</span>
+    }
+
+<span class="fc" id="L163">    OrdenMantenimientoEjecucion ejecucion = exigirEjecucion(ordenId);</span>
+<span class="pc bpc" id="L164" title="1 of 2 branches missed.">    if (request.fechaEjecucion() != null) {</span>
+<span class="fc" id="L165">      validarFecha(request.fechaEjecucion(), ejecucion.getIniciadoEn());</span>
+    }
+
+<span class="fc" id="L168">    ObjectNode antes = instantanea(ejecucion);</span>
+<span class="fc" id="L169">    ejecucion.registrar(</span>
+<span class="fc" id="L170">        request.fechaEjecucion(), request.responsableUsuarioId(), nombre, clock.instant());</span>
+    try {
+<span class="fc" id="L172">      ejecuciones.saveAndFlush(ejecucion);</span>
+<span class="nc" id="L173">    } catch (DataIntegrityViolationException e) {</span>
+<span class="nc" id="L174">      throw invalida(</span>
+          &quot;fechaEjecucion&quot;,
+          &quot;La fecha de ejecución no puede ser anterior al día en que se inició la ejecución.&quot;);
+<span class="fc" id="L177">    }</span>
+<span class="fc" id="L178">    auditoria.registrarEnTransaccion(</span>
+        usuarioId,
+        AccionAuditoria.MODIFICAR,
+        ENTIDAD_EJECUCION,
+        ordenId,
+        antes,
+<span class="fc" id="L184">        instantanea(ejecucion),</span>
+        null);
+<span class="fc" id="L186">    return aRespuesta(ejecucion);</span>
+  }
+
+  /** Usuarios activos que pueden figurar como responsables de la intervención. */
+  @Transactional(readOnly = true)
+  public List&lt;ResponsableDisponibleResponse&gt; listarResponsables() {
+<span class="nc" id="L192">    return usuarios</span>
+<span class="nc" id="L193">        .findByRolYEstado(null, &quot;ACTIVO&quot;, PageRequest.of(0, MAXIMO_RESPONSABLES, Sort.by(&quot;email&quot;)))</span>
+<span class="nc" id="L194">        .stream()</span>
+<span class="nc" id="L195">        .map(u -&gt; new ResponsableDisponibleResponse(u.getId(), u.getEmail(), u.getRole().getName()))</span>
+<span class="nc" id="L196">        .toList();</span>
+  }
+
+  @Transactional(readOnly = true)
+  public List&lt;EvidenciaMantenimientoResponse&gt; listarEvidencias(UUID ordenId) {
+<span class="fc" id="L201">    exigirOrden(ordenId);</span>
+<span class="fc" id="L202">    return evidencias</span>
+<span class="fc" id="L203">        .findByOrdenMantenimientoIdAndArchivo_EstadoOrderByCreadoEnAsc(</span>
+            ordenId, EstadoArchivo.DISPONIBLE)
+<span class="fc" id="L205">        .stream()</span>
+<span class="fc" id="L206">        .map(mapper::toEvidenciaResponse)</span>
+<span class="fc" id="L207">        .toList();</span>
+  }
+
+  /**
+   * Valida el contenido real de la imagen (JPEG o WebP), la normaliza con miniatura, la guarda con
+   * un nombre generado por el servidor y la liga a la orden. Si el almacenamiento falla responde
+   * 503 y no registra nada.
+   */
+  public EvidenciaMantenimientoResponse adjuntarEvidencia(
+      UUID ordenId, String elementoRef, MultipartFile fichero, UUID usuarioId) {
+<span class="fc" id="L217">    String elemento = limpiar(elementoRef);</span>
+<span class="pc bpc" id="L218" title="1 of 4 branches missed.">    if (elemento != null &amp;&amp; elemento.length() &gt; LONGITUD_MAXIMA_ELEMENTO) {</span>
+<span class="nc" id="L219">      throw invalida(</span>
+          &quot;elementoRef&quot;,
+          &quot;La referencia del elemento no puede exceder &quot;
+              + LONGITUD_MAXIMA_ELEMENTO
+              + &quot; caracteres.&quot;);
+    }
+<span class="fc" id="L225">    tx.executeWithoutResult(t -&gt; validarCapacidad(exigirEnEjecucion(exigirOrden(ordenId))));</span>
+<span class="pc bpc" id="L226" title="2 of 4 branches missed.">    if (fichero == null || fichero.isEmpty()) {</span>
+<span class="nc" id="L227">      throw evidenciaInvalida(&quot;Seleccione una fotografía de evidencia.&quot;);</span>
+    }
+<span class="pc bpc" id="L229" title="1 of 2 branches missed.">    if (fichero.getSize() &gt; TAMANO_MAXIMO_BYTES) {</span>
+<span class="nc" id="L230">      throw new ApiException(</span>
+          HttpStatus.UNPROCESSABLE_ENTITY,
+          &quot;evidencia_demasiado_grande&quot;,
+          &quot;Evidencia demasiado grande&quot;,
+          &quot;La fotografía de evidencia no puede exceder 20 MB.&quot;);
+    }
+
+<span class="fc" id="L237">    Path temporal = null;</span>
+<span class="fc" id="L238">    ClavesImagen claves = null;</span>
+    try {
+<span class="fc" id="L240">      temporal = Files.createTempFile(&quot;sgp-evidencia-&quot;, &quot;.tmp&quot;);</span>
+<span class="fc" id="L241">      fichero.transferTo(temporal);</span>
+<span class="fc" id="L242">      ImagenProcesada imagen = procesador.procesar(temporal);</span>
+<span class="fc" id="L243">      claves = objetos.nuevasClaves();</span>
+<span class="fc" id="L244">      objetos.guardar(claves, imagen);</span>
+<span class="fc" id="L245">      final ClavesImagen guardadas = claves;</span>
+<span class="fc" id="L246">      EvidenciaMantenimientoResponse respuesta =</span>
+<span class="fc" id="L247">          tx.execute(t -&gt; registrarEvidencia(ordenId, elemento, imagen, guardadas, usuarioId));</span>
+<span class="fc" id="L248">      claves = null;</span>
+<span class="fc" id="L249">      return respuesta;</span>
+<span class="fc" id="L250">    } catch (IOException e) {</span>
+<span class="fc" id="L251">      throw almacenamientoNoDisponible(&quot;No se pudo almacenar la fotografía de evidencia.&quot;);</span>
+    } finally {
+<span class="fc bfc" id="L253" title="All 2 branches covered.">      if (claves != null) {</span>
+        try {
+<span class="fc" id="L255">          objetos.eliminar(claves);</span>
+<span class="nc" id="L256">        } catch (IOException | RuntimeException e) {</span>
+          /* Un objeto huérfano no tiene vínculo de negocio y no se sirve. */
+<span class="fc" id="L258">        }</span>
+      }
+<span class="pc bpc" id="L260" title="1 of 2 branches missed.">      if (temporal != null) {</span>
+        try {
+<span class="fc" id="L262">          Files.deleteIfExists(temporal);</span>
+<span class="nc" id="L263">        } catch (IOException e) {</span>
+<span class="nc" id="L264">          temporal.toFile().deleteOnExit();</span>
+<span class="fc" id="L265">        }</span>
+      }
+    }
+  }
+
+  /** Retira una evidencia subida por error; deja de contar para el cierre. */
+  @Transactional
+  public void retirarEvidencia(
+      UUID ordenId, UUID evidenciaId, RetirarEvidenciaRequest request, UUID usuarioId) {
+<span class="pc bpc" id="L274" title="1 of 2 branches missed.">    String motivo = request == null ? null : limpiar(request.motivo());</span>
+<span class="pc bpc" id="L275" title="1 of 2 branches missed.">    if (motivo == null) {</span>
+<span class="nc" id="L276">      throw invalida(&quot;motivo&quot;, &quot;El motivo del retiro es obligatorio.&quot;);</span>
+    }
+<span class="pc bpc" id="L278" title="1 of 2 branches missed.">    if (motivo.length() &gt; TransicionOrdenService.LONGITUD_MAXIMA_MOTIVO) {</span>
+<span class="nc" id="L279">      throw invalida(</span>
+          &quot;motivo&quot;,
+          &quot;El motivo no puede exceder &quot;
+              + TransicionOrdenService.LONGITUD_MAXIMA_MOTIVO
+              + &quot; caracteres.&quot;);
+    }
+<span class="fc" id="L285">    bloquearEnEjecucion(ordenId);</span>
+<span class="fc" id="L286">    ArchivoEvidenciaMantenimiento evidencia = exigirEvidencia(ordenId, evidenciaId);</span>
+<span class="fc" id="L287">    Archivo archivo = evidencia.getArchivo();</span>
+<span class="pc bpc" id="L288" title="1 of 2 branches missed.">    if (archivo.getEstado() != EstadoArchivo.DISPONIBLE) {</span>
+<span class="nc" id="L289">      throw new ApiException(</span>
+          HttpStatus.CONFLICT,
+          &quot;evidencia_retirada&quot;,
+          &quot;Evidencia retirada&quot;,
+          &quot;La evidencia ya fue retirada.&quot;);
+    }
+<span class="fc" id="L295">    archivo.retirar(clock.instant(), motivo);</span>
+<span class="fc" id="L296">    archivos.saveAndFlush(archivo);</span>
+<span class="fc" id="L297">    auditoria.registrarEnTransaccion(</span>
+        usuarioId,
+        AccionAuditoria.CAMBIAR_ESTADO,
+        ENTIDAD_ARCHIVO,
+        evidenciaId,
+<span class="fc" id="L302">        json.createObjectNode().put(&quot;estado&quot;, EstadoArchivo.DISPONIBLE.name()),</span>
+<span class="fc" id="L303">        json.createObjectNode()</span>
+<span class="fc" id="L304">            .put(&quot;estado&quot;, EstadoArchivo.RETIRADO.name())</span>
+<span class="fc" id="L305">            .put(&quot;motivo&quot;, motivo)</span>
+<span class="fc" id="L306">            .put(&quot;ordenId&quot;, ordenId.toString()),</span>
+        null);
+<span class="fc" id="L308">  }</span>
+
+  /** Contenido de una evidencia disponible, servido solo por el extremo autorizado. */
+  public InputStream contenidoEvidencia(UUID ordenId, UUID evidenciaId, boolean miniatura) {
+<span class="fc" id="L312">    String clave =</span>
+<span class="fc" id="L313">        tx.execute(</span>
+            t -&gt; {
+<span class="fc" id="L315">              Archivo archivo = exigirEvidencia(ordenId, evidenciaId).getArchivo();</span>
+<span class="pc bpc" id="L316" title="1 of 2 branches missed.">              if (archivo.getEstado() != EstadoArchivo.DISPONIBLE) {</span>
+<span class="nc" id="L317">                throw evidenciaNoEncontrada();</span>
+              }
+<span class="pc bpc" id="L319" title="1 of 2 branches missed.">              return miniatura</span>
+<span class="fc" id="L320">                  ? archivo.getClaveObjetoMiniatura()</span>
+<span class="nc" id="L321">                  : archivo.getClaveObjetoOriginal();</span>
+            });
+    try {
+<span class="fc" id="L324">      return almacenamiento.abrir(clave);</span>
+<span class="nc" id="L325">    } catch (IOException e) {</span>
+<span class="nc" id="L326">      throw almacenamientoNoDisponible(&quot;No se pudo recuperar la fotografía de evidencia.&quot;);</span>
+    }
+  }
+
+  /**
+   * Valida que la fecha no sea futura ni anterior al día en que se inició la ejecución, ambos en
+   * hora de Guatemala.
+   */
+  void validarFecha(LocalDate fecha, Instant iniciadoEn) {
+<span class="fc" id="L335">    LocalDate hoy = LocalDate.now(clock.withZone(TransicionOrdenService.ZONA_GUATEMALA));</span>
+<span class="fc bfc" id="L336" title="All 2 branches covered.">    if (fecha.isAfter(hoy)) {</span>
+<span class="fc" id="L337">      throw invalida(&quot;fechaEjecucion&quot;, &quot;La fecha de ejecución no puede ser futura.&quot;);</span>
+    }
+<span class="fc" id="L339">    LocalDate inicio = iniciadoEn.atZone(TransicionOrdenService.ZONA_GUATEMALA).toLocalDate();</span>
+<span class="fc bfc" id="L340" title="All 2 branches covered.">    if (fecha.isBefore(inicio)) {</span>
+<span class="fc" id="L341">      throw invalida(</span>
+          &quot;fechaEjecucion&quot;,
+          &quot;La fecha de ejecución no puede ser anterior al inicio de la ejecución (&quot;
+<span class="fc" id="L344">              + FORMATO_FECHA.format(inicio)</span>
+              + &quot;).&quot;);
+    }
+<span class="fc" id="L347">  }</span>
+
+  private EvidenciaMantenimientoResponse registrarEvidencia(
+      UUID ordenId,
+      String elementoRef,
+      ImagenProcesada imagen,
+      ClavesImagen claves,
+      UUID usuarioId) {
+<span class="fc" id="L355">    validarCapacidad(bloquearEnEjecucion(ordenId));</span>
+<span class="fc" id="L356">    Instant ahora = clock.instant();</span>
+<span class="fc" id="L357">    Archivo archivo =</span>
+        new Archivo(
+<span class="fc" id="L359">            UuidV7Generator.generate(),</span>
+            TipoUsoArchivo.EVIDENCIA_MANTENIMIENTO,
+            null,
+            null,
+<span class="fc" id="L363">            claves.original(),</span>
+<span class="fc" id="L364">            claves.original(),</span>
+<span class="fc" id="L365">            claves.miniatura(),</span>
+<span class="fc" id="L366">            imagen.mimeReal(),</span>
+<span class="fc" id="L367">            imagen.original().length,</span>
+<span class="fc" id="L368">            imagen.checksumSha256(),</span>
+<span class="fc" id="L369">            imagen.anchoPx(),</span>
+<span class="fc" id="L370">            imagen.altoPx(),</span>
+            null,
+            null,
+            usuarioId,
+            ahora);
+<span class="fc" id="L375">    archivos.saveAndFlush(archivo);</span>
+<span class="fc" id="L376">    ArchivoEvidenciaMantenimiento evidencia =</span>
+<span class="fc" id="L377">        evidencias.saveAndFlush(</span>
+            new ArchivoEvidenciaMantenimiento(archivo, ordenId, elementoRef, ahora));
+
+<span class="fc" id="L380">    ObjectNode despues =</span>
+<span class="fc" id="L381">        json.createObjectNode()</span>
+<span class="fc" id="L382">            .put(&quot;tipoUso&quot;, TipoUsoArchivo.EVIDENCIA_MANTENIMIENTO.name())</span>
+<span class="fc" id="L383">            .put(&quot;estado&quot;, EstadoArchivo.DISPONIBLE.name())</span>
+<span class="fc" id="L384">            .put(&quot;ordenId&quot;, ordenId.toString());</span>
+<span class="fc bfc" id="L385" title="All 2 branches covered.">    if (elementoRef != null) {</span>
+<span class="fc" id="L386">      despues.put(&quot;elementoRef&quot;, elementoRef);</span>
+    }
+<span class="fc" id="L388">    auditoria.registrarEnTransaccion(</span>
+<span class="fc" id="L389">        usuarioId, AccionAuditoria.CREAR, ENTIDAD_ARCHIVO, archivo.getId(), null, despues, null);</span>
+<span class="fc" id="L390">    return mapper.toEvidenciaResponse(evidencia);</span>
+  }
+
+  private void validarCapacidad(OrdenMantenimiento orden) {
+<span class="pc bpc" id="L394" title="1 of 2 branches missed.">    if (evidencias.countByOrdenMantenimientoIdAndArchivo_Estado(</span>
+<span class="fc" id="L395">            orden.getId(), EstadoArchivo.DISPONIBLE)</span>
+        &gt;= MAXIMO_EVIDENCIAS) {
+<span class="nc" id="L397">      throw new ApiException(</span>
+          HttpStatus.UNPROCESSABLE_ENTITY,
+          &quot;limite_evidencias&quot;,
+          &quot;Límite de evidencias&quot;,
+          &quot;Una orden admite hasta &quot; + MAXIMO_EVIDENCIAS + &quot; fotografías de evidencia.&quot;);
+    }
+<span class="fc" id="L403">  }</span>
+
+  private OrdenMantenimiento bloquearEnEjecucion(UUID ordenId) {
+<span class="fc" id="L406">    return exigirEnEjecucion(</span>
+<span class="pc" id="L407">        ordenes.findByIdForUpdate(ordenId).orElseThrow(() -&gt; ordenNoEncontrada(ordenId)));</span>
+  }
+
+  private OrdenMantenimiento exigirOrden(UUID ordenId) {
+<span class="pc" id="L411">    return ordenes.findById(ordenId).orElseThrow(() -&gt; ordenNoEncontrada(ordenId));</span>
+  }
+
+  /** Lo ejecutado es inmutable; antes de iniciar no hay ejecución que registrar. */
+  private static OrdenMantenimiento exigirEnEjecucion(OrdenMantenimiento orden) {
+<span class="fc bfc" id="L416" title="All 2 branches covered.">    if (orden.getEstado() == EstadoOrden.EJECUTADA) {</span>
+<span class="fc" id="L417">      throw new ApiException(</span>
+          HttpStatus.CONFLICT,
+          &quot;ejecucion_inmutable&quot;,
+          &quot;Orden ejecutada&quot;,
+          &quot;La orden ya fue ejecutada; su fecha, responsable y evidencia no se pueden modificar.&quot;);
+    }
+<span class="fc bfc" id="L423" title="All 2 branches covered.">    if (orden.getEstado() != EstadoOrden.EN_EJECUCION) {</span>
+<span class="fc" id="L424">      throw new ApiException(</span>
+          HttpStatus.CONFLICT,
+          &quot;orden_no_en_ejecucion&quot;,
+          &quot;Orden no en ejecución&quot;,
+          &quot;La orden está &quot;
+<span class="fc" id="L429">              + orden.getEstado().name()</span>
+              + &quot;; solo se registra la ejecución de una orden EN_EJECUCION.&quot;);
+    }
+<span class="fc" id="L432">    return orden;</span>
+  }
+
+  private OrdenMantenimientoEjecucion exigirEjecucion(UUID ordenId) {
+<span class="fc" id="L436">    return ejecuciones</span>
+<span class="fc" id="L437">        .findById(ordenId)</span>
+<span class="fc" id="L438">        .orElseThrow(</span>
+            () -&gt;
+<span class="nc" id="L440">                new ApiException(</span>
+                    HttpStatus.CONFLICT,
+                    &quot;ejecucion_no_iniciada&quot;,
+                    &quot;Ejecución no iniciada&quot;,
+                    &quot;La orden no tiene registro de ejecución.&quot;));
+  }
+
+  private ArchivoEvidenciaMantenimiento exigirEvidencia(UUID ordenId, UUID evidenciaId) {
+<span class="fc" id="L448">    return evidencias</span>
+<span class="fc" id="L449">        .findByOrdenMantenimientoIdAndArchivoId(ordenId, evidenciaId)</span>
+<span class="fc" id="L450">        .orElseThrow(EjecucionOrdenService::evidenciaNoEncontrada);</span>
+  }
+
+  private EjecucionOrdenResponse aRespuesta(OrdenMantenimientoEjecucion ejecucion) {
+    String email =
+<span class="fc bfc" id="L455" title="All 2 branches covered.">        ejecucion.getResponsableUsuarioId() == null</span>
+<span class="fc" id="L456">            ? null</span>
+            : usuarios
+<span class="fc" id="L458">                .findById(ejecucion.getResponsableUsuarioId())</span>
+<span class="fc" id="L459">                .map(UserAccount::getEmail)</span>
+<span class="fc" id="L460">                .orElse(null);</span>
+<span class="fc" id="L461">    return mapper.toEjecucionResponse(ejecucion, email);</span>
+  }
+
+  private ObjectNode instantanea(OrdenMantenimientoEjecucion ejecucion) {
+<span class="fc" id="L465">    ObjectNode nodo = json.createObjectNode();</span>
+<span class="fc" id="L466">    nodo.put(</span>
+        &quot;fechaEjecucion&quot;,
+<span class="fc bfc" id="L468" title="All 2 branches covered.">        ejecucion.getFechaEjecucion() == null ? null : ejecucion.getFechaEjecucion().toString());</span>
+<span class="fc" id="L469">    nodo.put(</span>
+        &quot;responsableUsuarioId&quot;,
+<span class="fc bfc" id="L471" title="All 2 branches covered.">        ejecucion.getResponsableUsuarioId() == null</span>
+<span class="fc" id="L472">            ? null</span>
+<span class="fc" id="L473">            : ejecucion.getResponsableUsuarioId().toString());</span>
+<span class="fc" id="L474">    nodo.put(&quot;responsableNombre&quot;, ejecucion.getResponsableNombre());</span>
+<span class="fc" id="L475">    return nodo;</span>
+  }
+
+  private static String limpiar(String valor) {
+<span class="fc bfc" id="L479" title="All 4 branches covered.">    return valor == null || valor.isBlank() ? null : valor.strip();</span>
+  }
+
+  private static ApiException ordenNoEncontrada(UUID ordenId) {
+<span class="nc" id="L483">    return new ApiException(</span>
+        HttpStatus.NOT_FOUND,
+        &quot;orden_no_encontrada&quot;,
+        &quot;Orden no encontrada&quot;,
+        &quot;No existe la orden de mantenimiento &quot; + ordenId);
+  }
+
+  private static ApiException evidenciaNoEncontrada() {
+<span class="nc" id="L491">    return new ApiException(</span>
+        HttpStatus.NOT_FOUND,
+        &quot;evidencia_no_encontrada&quot;,
+        &quot;Evidencia no encontrada&quot;,
+        &quot;No existe la evidencia solicitada.&quot;);
+  }
+
+  private static ApiException evidenciaInvalida(String mensaje) {
+<span class="nc" id="L499">    return new ApiException(</span>
+        HttpStatus.UNPROCESSABLE_ENTITY,
+        &quot;contenido_fotografico_invalido&quot;,
+        &quot;Imagen inválida&quot;,
+        mensaje);
+  }
+
+  private static ApiException almacenamientoNoDisponible(String mensaje) {
+<span class="fc" id="L507">    return new ApiException(</span>
+        HttpStatus.SERVICE_UNAVAILABLE,
+        &quot;almacenamiento_no_disponible&quot;,
+        &quot;Almacenamiento no disponible&quot;,
+        mensaje + &quot; Intente de nuevo más tarde.&quot;);
+  }
+
+  private static ApiException invalida(String campo, String mensaje) {
+<span class="fc" id="L515">    return new ApiException(</span>
+        HttpStatus.UNPROCESSABLE_ENTITY,
+        &quot;solicitud_invalida&quot;,
+        &quot;Solicitud invalida&quot;,
+        mensaje,
+<span class="fc" id="L520">        List.of(Map.of(&quot;campo&quot;, campo, &quot;mensaje&quot;, mensaje)));</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

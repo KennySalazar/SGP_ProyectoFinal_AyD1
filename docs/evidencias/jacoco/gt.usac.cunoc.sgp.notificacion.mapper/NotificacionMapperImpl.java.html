@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>NotificacionMapperImpl.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">sgp-api</a> &gt; <a href="index.source.html" class="el_package">gt.usac.cunoc.sgp.notificacion.mapper</a> &gt; <span class="el_source">NotificacionMapperImpl.java</span></div><h1>NotificacionMapperImpl.java</h1><pre class="source lang-java linenums">package gt.usac.cunoc.sgp.notificacion.mapper;
+
+import gt.usac.cunoc.sgp.notificacion.dto.NotificacionResponse;
+import gt.usac.cunoc.sgp.notificacion.entity.Notificacion;
+import java.time.Instant;
+import java.util.UUID;
+import javax.annotation.processing.Generated;
+import org.springframework.stereotype.Component;
+
+@Generated(
+    value = &quot;org.mapstruct.ap.MappingProcessor&quot;,
+    date = &quot;2026-10-27T23:39:18-0600&quot;,
+    comments = &quot;version: 1.6.3, compiler: javac, environment: Java 25.0.4.1 (Debian)&quot;
+)
+@Component
+<span class="fc" id="L16">public class NotificacionMapperImpl implements NotificacionMapper {</span>
+
+    @Override
+    public NotificacionResponse toResponse(Notificacion notificacion) {
+<span class="nc bnc" id="L20" title="All 2 branches missed.">        if ( notificacion == null ) {</span>
+<span class="nc" id="L21">            return null;</span>
+        }
+
+<span class="nc" id="L24">        UUID id = null;</span>
+<span class="nc" id="L25">        String tipo = null;</span>
+<span class="nc" id="L26">        String titulo = null;</span>
+<span class="nc" id="L27">        String mensaje = null;</span>
+<span class="nc" id="L28">        String entidad = null;</span>
+<span class="nc" id="L29">        UUID entidadId = null;</span>
+<span class="nc" id="L30">        String claveEvento = null;</span>
+<span class="nc" id="L31">        Instant leidoEn = null;</span>
+<span class="nc" id="L32">        Instant creadoEn = null;</span>
+
+<span class="nc" id="L34">        id = notificacion.getId();</span>
+<span class="nc" id="L35">        tipo = notificacion.getTipo();</span>
+<span class="nc" id="L36">        titulo = notificacion.getTitulo();</span>
+<span class="nc" id="L37">        mensaje = notificacion.getMensaje();</span>
+<span class="nc" id="L38">        entidad = notificacion.getEntidad();</span>
+<span class="nc" id="L39">        entidadId = notificacion.getEntidadId();</span>
+<span class="nc" id="L40">        claveEvento = notificacion.getClaveEvento();</span>
+<span class="nc" id="L41">        leidoEn = notificacion.getLeidoEn();</span>
+<span class="nc" id="L42">        creadoEn = notificacion.getCreadoEn();</span>
+
+<span class="nc bnc" id="L44" title="All 2 branches missed.">        boolean leido = notificacion.getLeidoEn() != null;</span>
+
+<span class="nc" id="L46">        NotificacionResponse notificacionResponse = new NotificacionResponse( id, tipo, titulo, mensaje, entidad, entidadId, claveEvento, leidoEn, creadoEn, leido );</span>
+
+<span class="nc" id="L48">        return notificacionResponse;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

@@ -1,0 +1,190 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ApiExceptionHandler.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">sgp-api</a> &gt; <a href="index.source.html" class="el_package">gt.usac.cunoc.sgp.common.exception</a> &gt; <span class="el_source">ApiExceptionHandler.java</span></div><h1>ApiExceptionHandler.java</h1><pre class="source lang-java linenums">package gt.usac.cunoc.sgp.common.exception;
+
+import jakarta.servlet.http.HttpServletRequest;
+import java.util.List;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.OptimisticLockingFailureException;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.ProblemDetail;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+
+@RestControllerAdvice
+<span class="fc" id="L21">public class ApiExceptionHandler {</span>
+
+<span class="fc" id="L23">  private static final Logger LOGGER = LoggerFactory.getLogger(ApiExceptionHandler.class);</span>
+
+  @ExceptionHandler(ApiException.class)
+  ResponseEntity&lt;ProblemDetail&gt; handleApi(ApiException exception, HttpServletRequest request) {
+<span class="fc" id="L27">    ProblemDetail problem =</span>
+<span class="fc" id="L28">        ProblemDetails.create(</span>
+<span class="fc" id="L29">            exception.getStatus().value(),</span>
+<span class="fc" id="L30">            exception.getTitle(),</span>
+<span class="fc" id="L31">            exception.getMessage(),</span>
+<span class="fc" id="L32">            exception.getCode(),</span>
+            request);
+<span class="pc bpc" id="L34" title="1 of 4 branches missed.">    if (exception.getErrores() != null &amp;&amp; !exception.getErrores().isEmpty()) {</span>
+<span class="fc" id="L35">      problem.setProperty(&quot;errores&quot;, exception.getErrores());</span>
+    }
+<span class="fc" id="L37">    return response(problem, exception.getStatus());</span>
+  }
+
+  @ExceptionHandler(DemasiadasSolicitudesException.class)
+  ResponseEntity&lt;ProblemDetail&gt; handleDemasiadasSolicitudes(
+      DemasiadasSolicitudesException exception, HttpServletRequest request) {
+<span class="fc" id="L43">    ProblemDetail problem =</span>
+<span class="fc" id="L44">        ProblemDetails.create(</span>
+<span class="fc" id="L45">            429, exception.getTitle(), exception.getMessage(), exception.getCode(), request);</span>
+<span class="fc" id="L46">    return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)</span>
+<span class="fc" id="L47">        .header(HttpHeaders.RETRY_AFTER, Long.toString(exception.getReintentarEnSegundos()))</span>
+<span class="fc" id="L48">        .contentType(MediaType.APPLICATION_PROBLEM_JSON)</span>
+<span class="fc" id="L49">        .body(problem);</span>
+  }
+
+  @ExceptionHandler(MethodArgumentNotValidException.class)
+  ResponseEntity&lt;ProblemDetail&gt; handleValidation(
+      MethodArgumentNotValidException exception, HttpServletRequest request) {
+<span class="fc" id="L55">    ProblemDetail problem =</span>
+<span class="fc" id="L56">        ProblemDetails.create(</span>
+            400,
+            &quot;Solicitud invalida&quot;,
+            &quot;La solicitud contiene datos invalidos&quot;,
+            &quot;validation_error&quot;,
+            request);
+<span class="fc" id="L62">    List&lt;Object&gt; errores =</span>
+<span class="fc" id="L63">        exception.getBindingResult().getFieldErrors().stream()</span>
+<span class="fc" id="L64">            .map(</span>
+                error -&gt;
+<span class="fc" id="L66">                    java.util.Map.of(</span>
+                        &quot;campo&quot;,
+<span class="fc" id="L68">                        error.getField(),</span>
+                        &quot;mensaje&quot;,
+<span class="pc bpc" id="L70" title="1 of 2 branches missed.">                        error.getDefaultMessage() == null ? &quot;Invalido&quot; : error.getDefaultMessage()))</span>
+<span class="fc" id="L71">            .map(value -&gt; (Object) value)</span>
+<span class="fc" id="L72">            .toList();</span>
+<span class="fc" id="L73">    problem.setProperty(&quot;errores&quot;, errores);</span>
+<span class="fc" id="L74">    return response(problem, HttpStatus.BAD_REQUEST);</span>
+  }
+
+  /** Un parámetro de ruta o consulta con formato inválido (por ejemplo un UUID mal formado). */
+  @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+  ResponseEntity&lt;ProblemDetail&gt; handleTipoInvalido(
+      MethodArgumentTypeMismatchException exception, HttpServletRequest request) {
+<span class="fc" id="L81">    ProblemDetail problem =</span>
+<span class="fc" id="L82">        ProblemDetails.create(</span>
+            400,
+            &quot;Solicitud invalida&quot;,
+            &quot;La solicitud contiene datos invalidos&quot;,
+            &quot;validation_error&quot;,
+            request);
+<span class="fc" id="L88">    problem.setProperty(</span>
+        &quot;errores&quot;,
+<span class="fc" id="L90">        List.of(java.util.Map.of(&quot;campo&quot;, exception.getName(), &quot;mensaje&quot;, &quot;Valor invalido&quot;)));</span>
+<span class="fc" id="L91">    return response(problem, HttpStatus.BAD_REQUEST);</span>
+  }
+
+  @ExceptionHandler(DataIntegrityViolationException.class)
+  ResponseEntity&lt;ProblemDetail&gt; handleConflict(
+      DataIntegrityViolationException exception, HttpServletRequest request) {
+<span class="nc" id="L97">    ProblemDetail problem =</span>
+<span class="nc" id="L98">        ProblemDetails.create(</span>
+            409,
+            &quot;Conflicto de datos&quot;,
+            &quot;La operacion entra en conflicto con los datos existentes&quot;,
+            &quot;data_conflict&quot;,
+            request);
+<span class="nc" id="L104">    return response(problem, HttpStatus.CONFLICT);</span>
+  }
+
+  @ExceptionHandler(OptimisticLockingFailureException.class)
+  ResponseEntity&lt;ProblemDetail&gt; handleOptimisticLock(
+      OptimisticLockingFailureException exception, HttpServletRequest request) {
+<span class="nc" id="L110">    ProblemDetail problem =</span>
+<span class="nc" id="L111">        ProblemDetails.create(</span>
+            409,
+            &quot;Conflicto de concurrencia&quot;,
+            &quot;La inspección fue modificada concurrentemente por otra sesión o dispositivo&quot;,
+            &quot;concurrencia_conflicto&quot;,
+            request);
+<span class="nc" id="L117">    return response(problem, HttpStatus.CONFLICT);</span>
+  }
+
+  @ExceptionHandler(org.springframework.security.core.AuthenticationException.class)
+  ResponseEntity&lt;ProblemDetail&gt; handleAuthentication(
+      org.springframework.security.core.AuthenticationException exception,
+      HttpServletRequest request) {
+<span class="fc" id="L124">    ProblemDetail problem =</span>
+<span class="fc" id="L125">        ProblemDetails.create(</span>
+            401,
+            &quot;Autenticacion requerida&quot;,
+            &quot;Se requiere una sesion valida para realizar esta operacion&quot;,
+            &quot;authentication_required&quot;,
+            request);
+<span class="fc" id="L131">    return response(problem, HttpStatus.UNAUTHORIZED);</span>
+  }
+
+  @ExceptionHandler(AccessDeniedException.class)
+  ResponseEntity&lt;ProblemDetail&gt; handleAccessDenied(
+      AccessDeniedException exception, HttpServletRequest request) {
+<span class="fc" id="L137">    ProblemDetail problem =</span>
+<span class="fc" id="L138">        ProblemDetails.create(</span>
+            403,
+            &quot;Acceso denegado&quot;,
+            &quot;No tiene permisos para realizar esta operacion&quot;,
+            &quot;access_denied&quot;,
+            request);
+<span class="fc" id="L144">    return response(problem, HttpStatus.FORBIDDEN);</span>
+  }
+
+  @ExceptionHandler(org.springframework.web.multipart.MaxUploadSizeExceededException.class)
+  ResponseEntity&lt;ProblemDetail&gt; handleTamano(Exception e, HttpServletRequest request) {
+<span class="fc" id="L149">    return response(</span>
+<span class="fc" id="L150">        ProblemDetails.create(</span>
+            413,
+            &quot;Carga demasiado grande&quot;,
+            &quot;El archivo o la petición exceden el tamaño permitido&quot;,
+            &quot;carga_demasiado_grande&quot;,
+            request),
+        HttpStatus.PAYLOAD_TOO_LARGE);
+  }
+
+  @ExceptionHandler({
+    org.springframework.http.converter.HttpMessageNotReadableException.class,
+    org.springframework.web.multipart.support.MissingServletRequestPartException.class,
+    org.springframework.web.bind.MissingRequestHeaderException.class
+  })
+  ResponseEntity&lt;ProblemDetail&gt; handleMultipart(Exception e, HttpServletRequest request) {
+<span class="fc" id="L165">    return response(</span>
+<span class="fc" id="L166">        ProblemDetails.create(</span>
+            400,
+            &quot;Solicitud inválida&quot;,
+            &quot;Faltan partes o los metadatos no tienen un formato válido&quot;,
+            &quot;validation_error&quot;,
+            request),
+        HttpStatus.BAD_REQUEST);
+  }
+
+  @ExceptionHandler(Exception.class)
+  ResponseEntity&lt;ProblemDetail&gt; handleUnexpected(Exception exception, HttpServletRequest request) {
+<span class="nc" id="L177">    LOGGER.error(&quot;Unexpected API failure&quot;, exception);</span>
+<span class="nc" id="L178">    ProblemDetail problem =</span>
+<span class="nc" id="L179">        ProblemDetails.create(</span>
+            500, &quot;Error interno&quot;, &quot;Ocurrio un error interno&quot;, &quot;internal_error&quot;, request);
+<span class="nc" id="L181">    return response(problem, HttpStatus.INTERNAL_SERVER_ERROR);</span>
+  }
+
+  private ResponseEntity&lt;ProblemDetail&gt; response(ProblemDetail problem, HttpStatus status) {
+<span class="fc" id="L185">    return ResponseEntity.status(status)</span>
+<span class="fc" id="L186">        .contentType(MediaType.APPLICATION_PROBLEM_JSON)</span>
+<span class="fc" id="L187">        .body(problem);</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

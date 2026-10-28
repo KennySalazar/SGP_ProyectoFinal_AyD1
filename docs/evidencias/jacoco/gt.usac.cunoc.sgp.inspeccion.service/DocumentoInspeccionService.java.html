@@ -1,0 +1,304 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DocumentoInspeccionService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">sgp-api</a> &gt; <a href="index.source.html" class="el_package">gt.usac.cunoc.sgp.inspeccion.service</a> &gt; <span class="el_source">DocumentoInspeccionService.java</span></div><h1>DocumentoInspeccionService.java</h1><pre class="source lang-java linenums">package gt.usac.cunoc.sgp.inspeccion.service;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import gt.usac.cunoc.sgp.archivo.entity.Archivo;
+import gt.usac.cunoc.sgp.archivo.entity.ArchivoInspeccion;
+import gt.usac.cunoc.sgp.archivo.model.EstadoArchivo;
+import gt.usac.cunoc.sgp.archivo.model.TipoUsoArchivo;
+import gt.usac.cunoc.sgp.archivo.repository.ArchivoInspeccionRepository;
+import gt.usac.cunoc.sgp.archivo.repository.ArchivoRepository;
+import gt.usac.cunoc.sgp.archivo.service.AlmacenamientoArchivos;
+import gt.usac.cunoc.sgp.archivo.service.ProcesadorImagenes;
+import gt.usac.cunoc.sgp.common.audit.model.AccionAuditoria;
+import gt.usac.cunoc.sgp.common.audit.service.AuditoriaWriter;
+import gt.usac.cunoc.sgp.common.exception.ApiException;
+import gt.usac.cunoc.sgp.common.util.UuidV7Generator;
+import gt.usac.cunoc.sgp.inspeccion.dto.DocumentoInspeccionResponse;
+import gt.usac.cunoc.sgp.inspeccion.entity.Inspeccion;
+import gt.usac.cunoc.sgp.inspeccion.repository.InspeccionRepository;
+import gt.usac.cunoc.sgp.inspeccion.validation.ValidadorDocumentoPdf;
+import gt.usac.cunoc.sgp.usuario.model.RoleName;
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.time.Clock;
+import java.time.Instant;
+import java.util.List;
+import java.util.UUID;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpStatus;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.web.multipart.MultipartFile;
+
+/**
+ * Documentos PDF de una inspección (HU-070, RN-ARC-04, RN-ARC-05, DT-SEC-08, DT-SEC-09). Solo el
+ * autor adjunta o retira, y únicamente en borrador; después del envío quedan fijos como las
+ * fotografías. El contenido vive en el almacenamiento de objetos; la base solo guarda la
+ * referencia.
+ */
+@Service
+public class DocumentoInspeccionService {
+
+  static final int MAXIMO_DOCUMENTOS = 10;
+
+<span class="fc" id="L48">  private static final Logger LOG = LoggerFactory.getLogger(DocumentoInspeccionService.class);</span>
+  private static final String NOMBRE_POR_DEFECTO = &quot;documento.pdf&quot;;
+
+  private final InspeccionRepository inspecciones;
+  private final ArchivoRepository archivos;
+  private final ArchivoInspeccionRepository vinculos;
+  private final AlmacenamientoArchivos almacenamiento;
+  private final ValidadorDocumentoPdf validador;
+  private final FotografiaService fotografias;
+  private final AuditoriaWriter auditoria;
+  private final ObjectMapper json;
+  private final Clock clock;
+
+  public DocumentoInspeccionService(
+      InspeccionRepository inspecciones,
+      ArchivoRepository archivos,
+      ArchivoInspeccionRepository vinculos,
+      AlmacenamientoArchivos almacenamiento,
+      ValidadorDocumentoPdf validador,
+      FotografiaService fotografias,
+      AuditoriaWriter auditoria,
+      ObjectMapper json,
+<span class="fc" id="L70">      Clock clock) {</span>
+<span class="fc" id="L71">    this.inspecciones = inspecciones;</span>
+<span class="fc" id="L72">    this.archivos = archivos;</span>
+<span class="fc" id="L73">    this.vinculos = vinculos;</span>
+<span class="fc" id="L74">    this.almacenamiento = almacenamiento;</span>
+<span class="fc" id="L75">    this.validador = validador;</span>
+<span class="fc" id="L76">    this.fotografias = fotografias;</span>
+<span class="fc" id="L77">    this.auditoria = auditoria;</span>
+<span class="fc" id="L78">    this.json = json;</span>
+<span class="fc" id="L79">    this.clock = clock;</span>
+<span class="fc" id="L80">  }</span>
+
+  /**
+   * Guarda el PDF con un nombre generado por el servidor y registra su referencia en la misma
+   * transacción. Si la base falla, se elimina el objeto; si falla el almacenamiento, no queda
+   * ningún registro y se puede reintentar.
+   */
+  @Transactional
+  public DocumentoInspeccionResponse adjuntar(
+      UUID inspeccionId, UUID actor, MultipartFile fichero) {
+<span class="fc" id="L90">    Inspeccion inspeccion = editable(inspeccionId, actor);</span>
+<span class="fc" id="L91">    long disponibles =</span>
+<span class="fc" id="L92">        vinculos.countByInspeccionIdAndTipoUsoAndArchivo_Estado(</span>
+            inspeccionId, TipoUsoArchivo.DOCUMENTO_INSPECCION, EstadoArchivo.DISPONIBLE);
+<span class="fc bfc" id="L94" title="All 2 branches covered.">    if (disponibles &gt;= MAXIMO_DOCUMENTOS) {</span>
+<span class="fc" id="L95">      throw error(</span>
+          HttpStatus.UNPROCESSABLE_ENTITY,
+          &quot;limite_documentos&quot;,
+          &quot;Una inspección admite hasta &quot; + MAXIMO_DOCUMENTOS + &quot; documentos PDF.&quot;);
+    }
+<span class="fc" id="L100">    byte[] contenido = validador.validar(fichero);</span>
+
+<span class="fc" id="L102">    UUID id = UuidV7Generator.generate();</span>
+<span class="fc" id="L103">    String clave = &quot;documento-&quot; + inspeccionId + &quot;-&quot; + id + &quot;.pdf&quot;;</span>
+<span class="fc" id="L104">    TransactionSynchronizationManager.registerSynchronization(</span>
+<span class="fc" id="L105">        new TransactionSynchronization() {</span>
+          @Override
+          public void afterCompletion(int estado) {
+<span class="fc bfc" id="L108" title="All 2 branches covered.">            if (estado == STATUS_ROLLED_BACK) {</span>
+<span class="fc" id="L109">              eliminarObjeto(clave);</span>
+            }
+<span class="fc" id="L111">          }</span>
+        });
+    try {
+<span class="fc" id="L114">      almacenamiento.guardar(</span>
+          clave, new ByteArrayInputStream(contenido), contenido.length, &quot;application/pdf&quot;);
+<span class="fc" id="L116">    } catch (IOException e) {</span>
+<span class="fc" id="L117">      throw error(</span>
+          HttpStatus.SERVICE_UNAVAILABLE,
+          &quot;almacenamiento_no_disponible&quot;,
+          &quot;No fue posible guardar el documento. Intente nuevamente.&quot;);
+<span class="fc" id="L121">    }</span>
+
+<span class="fc" id="L123">    Instant ahora = clock.instant();</span>
+<span class="fc" id="L124">    String nombre = nombreSeguro(fichero.getOriginalFilename());</span>
+<span class="fc" id="L125">    Archivo archivo =</span>
+        new Archivo(
+            id,
+            TipoUsoArchivo.DOCUMENTO_INSPECCION,
+            null,
+            nombre,
+            id + &quot;.pdf&quot;,
+            clave,
+            null,
+            &quot;application/pdf&quot;,
+            contenido.length,
+<span class="fc" id="L136">            ProcesadorImagenes.checksum(contenido),</span>
+            null,
+            null,
+            null,
+            null,
+            actor,
+            ahora);
+<span class="fc" id="L143">    archivos.saveAndFlush(archivo);</span>
+<span class="fc" id="L144">    ArchivoInspeccion vinculo = new ArchivoInspeccion(archivo, inspeccion, null, null, ahora);</span>
+<span class="fc" id="L145">    vinculos.saveAndFlush(vinculo);</span>
+<span class="fc" id="L146">    auditoria.registrarEnTransaccion(</span>
+        actor,
+        AccionAuditoria.CREAR,
+        &quot;archivo&quot;,
+        id,
+        null,
+<span class="fc" id="L152">        json.createObjectNode()</span>
+<span class="fc" id="L153">            .put(&quot;tipoUso&quot;, TipoUsoArchivo.DOCUMENTO_INSPECCION.name())</span>
+<span class="fc" id="L154">            .put(&quot;inspeccionId&quot;, inspeccionId.toString())</span>
+<span class="fc" id="L155">            .put(&quot;nombreOriginal&quot;, nombre)</span>
+<span class="fc" id="L156">            .put(&quot;tamanoBytes&quot;, contenido.length),</span>
+        null);
+<span class="fc" id="L158">    return aRespuesta(vinculo);</span>
+  }
+
+  /** Documentos disponibles, con las mismas reglas de lectura que las fotografías. */
+  @Transactional(readOnly = true)
+  public List&lt;DocumentoInspeccionResponse&gt; listar(UUID inspeccionId, UUID actor, RoleName rol) {
+<span class="fc" id="L164">    fotografias.autorizarLectura(inspeccionId, actor, rol);</span>
+<span class="fc" id="L165">    return vinculos</span>
+<span class="fc" id="L166">        .findByInspeccionIdAndTipoUsoOrderByCreadoEnAsc(</span>
+            inspeccionId, TipoUsoArchivo.DOCUMENTO_INSPECCION)
+<span class="fc" id="L168">        .stream()</span>
+<span class="fc bfc" id="L169" title="All 2 branches covered.">        .filter(v -&gt; v.getArchivo().getEstado() == EstadoArchivo.DISPONIBLE)</span>
+<span class="fc" id="L170">        .map(this::aRespuesta)</span>
+<span class="fc" id="L171">        .toList();</span>
+  }
+
+  /** Contenido para la descarga, con el nombre original saneado; nunca la ruta del objeto. */
+  @Transactional(readOnly = true)
+  public Descarga descargar(UUID inspeccionId, UUID documentoId, UUID actor, RoleName rol) {
+<span class="fc" id="L177">    Archivo archivo = consultarDisponible(inspeccionId, documentoId, actor, rol);</span>
+    try {
+<span class="fc" id="L179">      return new Descarga(almacenamiento.abrir(archivo.getClaveObjetoOriginal()), nombre(archivo));</span>
+<span class="nc" id="L180">    } catch (IOException e) {</span>
+<span class="nc" id="L181">      throw error(</span>
+          HttpStatus.SERVICE_UNAVAILABLE,
+          &quot;almacenamiento_no_disponible&quot;,
+          &quot;No fue posible recuperar el documento. Intente nuevamente.&quot;);
+    }
+  }
+
+  /** Retira un documento de un borrador propio; deja de listarse y de descargarse. */
+  @Transactional
+  public void retirar(UUID inspeccionId, UUID documentoId, UUID actor) {
+<span class="fc" id="L191">    editable(inspeccionId, actor);</span>
+<span class="fc" id="L192">    ArchivoInspeccion vinculo =</span>
+        vinculos
+<span class="fc" id="L194">            .findByInspeccionIdAndArchivoIdAndTipoUso(</span>
+                inspeccionId, documentoId, TipoUsoArchivo.DOCUMENTO_INSPECCION)
+<span class="pc bpc" id="L196" title="1 of 2 branches missed.">            .filter(v -&gt; v.getArchivo().getEstado() == EstadoArchivo.DISPONIBLE)</span>
+<span class="fc" id="L197">            .orElseThrow(DocumentoInspeccionService::noEncontrado);</span>
+<span class="fc" id="L198">    Archivo archivo = vinculo.getArchivo();</span>
+<span class="fc" id="L199">    archivo.retirar(clock.instant());</span>
+<span class="fc" id="L200">    archivos.saveAndFlush(archivo);</span>
+<span class="fc" id="L201">    auditoria.registrarEnTransaccion(</span>
+        actor,
+        AccionAuditoria.CAMBIAR_ESTADO,
+        &quot;archivo&quot;,
+        documentoId,
+<span class="fc" id="L206">        json.createObjectNode().put(&quot;estado&quot;, EstadoArchivo.DISPONIBLE.name()),</span>
+<span class="fc" id="L207">        json.createObjectNode()</span>
+<span class="fc" id="L208">            .put(&quot;estado&quot;, EstadoArchivo.RETIRADO.name())</span>
+<span class="fc" id="L209">            .put(&quot;inspeccionId&quot;, inspeccionId.toString()),</span>
+        null);
+<span class="fc" id="L211">  }</span>
+
+  /** Contenido del documento y nombre con que se entrega. */
+<span class="fc" id="L214">  public record Descarga(InputStream contenido, String nombre) {}</span>
+
+  private Archivo consultarDisponible(
+      UUID inspeccionId, UUID documentoId, UUID actor, RoleName rol) {
+<span class="fc" id="L218">    fotografias.autorizarLectura(inspeccionId, actor, rol);</span>
+<span class="fc" id="L219">    return vinculos</span>
+<span class="fc" id="L220">        .findByInspeccionIdAndArchivoIdAndTipoUso(</span>
+            inspeccionId, documentoId, TipoUsoArchivo.DOCUMENTO_INSPECCION)
+<span class="fc" id="L222">        .map(ArchivoInspeccion::getArchivo)</span>
+<span class="fc bfc" id="L223" title="All 2 branches covered.">        .filter(a -&gt; a.getEstado() == EstadoArchivo.DISPONIBLE)</span>
+<span class="fc" id="L224">        .orElseThrow(DocumentoInspeccionService::noEncontrado);</span>
+  }
+
+  /** Bloquea la inspección y exige que sea un borrador del propio actor. */
+  private Inspeccion editable(UUID inspeccionId, UUID actor) {
+<span class="pc bpc" id="L229" title="1 of 2 branches missed.">    if (actor == null) {</span>
+<span class="nc" id="L230">      throw error(</span>
+          HttpStatus.UNAUTHORIZED, &quot;autenticacion_requerida&quot;, &quot;Se requiere una sesión válida.&quot;);
+    }
+<span class="fc" id="L233">    Inspeccion inspeccion =</span>
+        inspecciones
+<span class="fc" id="L235">            .findByIdAndEliminadoEnIsNullForUpdate(inspeccionId)</span>
+<span class="fc" id="L236">            .orElseThrow(</span>
+                () -&gt;
+<span class="nc" id="L238">                    error(</span>
+                        HttpStatus.NOT_FOUND,
+                        &quot;inspeccion_no_encontrada&quot;,
+                        &quot;Inspección no encontrada.&quot;));
+<span class="fc bfc" id="L242" title="All 2 branches covered.">    if (!inspeccion.getAutorId().equals(actor)) {</span>
+<span class="fc" id="L243">      throw error(</span>
+          HttpStatus.FORBIDDEN,
+          &quot;documento_no_autorizado&quot;,
+          &quot;Solo el autor de la inspección puede adjuntar o retirar documentos.&quot;);
+    }
+<span class="fc bfc" id="L248" title="All 2 branches covered.">    if (!&quot;BORRADOR&quot;.equals(inspeccion.getEstado())) {</span>
+<span class="fc" id="L249">      throw error(</span>
+          HttpStatus.CONFLICT,
+          &quot;estado_inspeccion_no_permite_archivos&quot;,
+          &quot;Los documentos solo se modifican en un borrador; después del envío quedan fijos.&quot;);
+    }
+<span class="fc" id="L254">    return inspeccion;</span>
+  }
+
+  private DocumentoInspeccionResponse aRespuesta(ArchivoInspeccion vinculo) {
+<span class="fc" id="L258">    Archivo archivo = vinculo.getArchivo();</span>
+<span class="fc" id="L259">    return new DocumentoInspeccionResponse(</span>
+<span class="fc" id="L260">        archivo.getId(),</span>
+<span class="fc" id="L261">        vinculo.getInspeccion().getId(),</span>
+<span class="fc" id="L262">        nombre(archivo),</span>
+<span class="fc" id="L263">        archivo.getTamanoBytes(),</span>
+<span class="fc" id="L264">        archivo.getSubidoPorId(),</span>
+<span class="fc" id="L265">        archivo.getConfirmadoEn());</span>
+  }
+
+  private static String nombre(Archivo archivo) {
+<span class="pc bpc" id="L269" title="1 of 2 branches missed.">    return archivo.getNombreOriginal() == null ? NOMBRE_POR_DEFECTO : archivo.getNombreOriginal();</span>
+  }
+
+  /** Quita la ruta y los caracteres de control del nombre del cliente y asegura la extensión. */
+  static String nombreSeguro(String nombre) {
+<span class="pc bpc" id="L274" title="1 of 2 branches missed.">    if (nombre == null) {</span>
+<span class="nc" id="L275">      return NOMBRE_POR_DEFECTO;</span>
+    }
+<span class="fc" id="L277">    String seguro = nombre.replace('\\', '/');</span>
+<span class="fc" id="L278">    seguro = seguro.substring(seguro.lastIndexOf('/') + 1).replaceAll(&quot;[\\p{Cntrl}\&quot;]&quot;, &quot;&quot;).strip();</span>
+<span class="pc bpc" id="L279" title="1 of 2 branches missed.">    if (seguro.isEmpty()) {</span>
+<span class="nc" id="L280">      return NOMBRE_POR_DEFECTO;</span>
+    }
+<span class="pc bpc" id="L282" title="1 of 2 branches missed.">    if (!seguro.toLowerCase(java.util.Locale.ROOT).endsWith(&quot;.pdf&quot;)) {</span>
+<span class="fc" id="L283">      seguro = seguro + &quot;.pdf&quot;;</span>
+    }
+<span class="pc bpc" id="L285" title="1 of 2 branches missed.">    return seguro.length() &lt;= 255 ? seguro : seguro.substring(seguro.length() - 255);</span>
+  }
+
+  private void eliminarObjeto(String clave) {
+    try {
+<span class="fc" id="L290">      almacenamiento.eliminar(clave);</span>
+<span class="nc" id="L291">    } catch (IOException | RuntimeException e) {</span>
+<span class="nc" id="L292">      LOG.error(&quot;No fue posible eliminar el documento tras el rollback: {}&quot;, clave, e);</span>
+<span class="fc" id="L293">    }</span>
+<span class="fc" id="L294">  }</span>
+
+  private static ApiException noEncontrado() {
+<span class="fc" id="L297">    return error(HttpStatus.NOT_FOUND, &quot;documento_no_encontrado&quot;, &quot;Documento no encontrado.&quot;);</span>
+  }
+
+  private static ApiException error(HttpStatus status, String codigo, String detalle) {
+<span class="fc" id="L301">    return new ApiException(status, codigo, &quot;Documento de inspección&quot;, detalle);</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

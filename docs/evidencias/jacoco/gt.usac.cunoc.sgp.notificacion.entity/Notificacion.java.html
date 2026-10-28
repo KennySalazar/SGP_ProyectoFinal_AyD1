@@ -1,0 +1,116 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Notificacion.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">sgp-api</a> &gt; <a href="index.source.html" class="el_package">gt.usac.cunoc.sgp.notificacion.entity</a> &gt; <span class="el_source">Notificacion.java</span></div><h1>Notificacion.java</h1><pre class="source lang-java linenums">package gt.usac.cunoc.sgp.notificacion.entity;
+
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.Id;
+import jakarta.persistence.Table;
+import java.time.Instant;
+import java.util.UUID;
+
+@Entity
+@Table(name = &quot;notificacion&quot;)
+public class Notificacion {
+
+  @Id private UUID id;
+
+  @Column(name = &quot;usuario_id&quot;, nullable = false, updatable = false)
+  private UUID usuarioId;
+
+  @Column(nullable = false, length = 50, updatable = false)
+  private String tipo;
+
+  @Column(nullable = false, length = 200, updatable = false)
+  private String titulo;
+
+  @Column(nullable = false, columnDefinition = &quot;text&quot;, updatable = false)
+  private String mensaje;
+
+  @Column(length = 100, updatable = false)
+  private String entidad;
+
+  @Column(name = &quot;entidad_id&quot;, updatable = false)
+  private UUID entidadId;
+
+  @Column(name = &quot;clave_evento&quot;, nullable = false, length = 250, updatable = false)
+  private String claveEvento;
+
+  @Column(name = &quot;leido_en&quot;)
+  private Instant leidoEn;
+
+  @Column(name = &quot;creado_en&quot;, nullable = false, updatable = false)
+  private Instant creadoEn;
+
+<span class="fc" id="L43">  protected Notificacion() {}</span>
+
+  public Notificacion(
+      UUID id,
+      UUID usuarioId,
+      String tipo,
+      String titulo,
+      String mensaje,
+      String entidad,
+      UUID entidadId,
+      String claveEvento,
+<span class="fc" id="L54">      Instant creadoEn) {</span>
+<span class="fc" id="L55">    this.id = id;</span>
+<span class="fc" id="L56">    this.usuarioId = usuarioId;</span>
+<span class="fc" id="L57">    this.tipo = tipo;</span>
+<span class="fc" id="L58">    this.titulo = titulo;</span>
+<span class="fc" id="L59">    this.mensaje = mensaje;</span>
+<span class="fc" id="L60">    this.entidad = entidad;</span>
+<span class="fc" id="L61">    this.entidadId = entidadId;</span>
+<span class="fc" id="L62">    this.claveEvento = claveEvento;</span>
+<span class="fc" id="L63">    this.creadoEn = creadoEn;</span>
+<span class="fc" id="L64">  }</span>
+
+  public UUID getId() {
+<span class="fc" id="L67">    return id;</span>
+  }
+
+  public UUID getUsuarioId() {
+<span class="fc" id="L71">    return usuarioId;</span>
+  }
+
+  public String getTipo() {
+<span class="fc" id="L75">    return tipo;</span>
+  }
+
+  public String getTitulo() {
+<span class="fc" id="L79">    return titulo;</span>
+  }
+
+  public String getMensaje() {
+<span class="fc" id="L83">    return mensaje;</span>
+  }
+
+  public String getEntidad() {
+<span class="fc" id="L87">    return entidad;</span>
+  }
+
+  public UUID getEntidadId() {
+<span class="fc" id="L91">    return entidadId;</span>
+  }
+
+  public String getClaveEvento() {
+<span class="fc" id="L95">    return claveEvento;</span>
+  }
+
+  public Instant getLeidoEn() {
+<span class="fc" id="L99">    return leidoEn;</span>
+  }
+
+  public Instant getCreadoEn() {
+<span class="fc" id="L103">    return creadoEn;</span>
+  }
+
+  public void marcarLeida(Instant ahora) {
+<span class="pc bpc" id="L107" title="1 of 2 branches missed.">    if (this.leidoEn == null) {</span>
+<span class="fc" id="L108">      this.leidoEn = ahora;</span>
+    }
+<span class="fc" id="L110">  }</span>
+
+  public boolean isLeida() {
+<span class="fc bfc" id="L113" title="All 2 branches covered.">    return this.leidoEn != null;</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ActualizarPerfilRequest.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">sgp-api</a> &gt; <a href="index.source.html" class="el_package">gt.usac.cunoc.sgp.usuario.dto</a> &gt; <span class="el_source">ActualizarPerfilRequest.java</span></div><h1>ActualizarPerfilRequest.java</h1><pre class="source lang-java linenums">package gt.usac.cunoc.sgp.usuario.dto;
+
+import gt.usac.cunoc.sgp.usuario.validation.ReglasPerfil;
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Size;
+
+/** Nombre completo, nombre de usuario y correo electrónico de la cuenta que inició sesión. */
+<span class="fc" id="L10">public record ActualizarPerfilRequest(</span>
+    @NotBlank(message = &quot;El nombre completo es obligatorio&quot;)
+        @Size(
+            max = ReglasPerfil.NOMBRE_COMPLETO_MAXIMO,
+            message = &quot;El nombre completo no debe superar 200 caracteres&quot;)
+        String nombreCompleto,
+    @NotBlank(message = &quot;El nombre de usuario es obligatorio&quot;)
+        @Pattern(regexp = ReglasPerfil.PATRON_USUARIO, message = ReglasPerfil.MENSAJE_USUARIO)
+        String nombreUsuario,
+    @Email(message = &quot;El correo electrónico no es válido&quot;)
+        @Size(max = 320, message = &quot;El correo no puede tener más de 320 caracteres&quot;)
+        String email) {
+
+  public ActualizarPerfilRequest(String nombreCompleto, String nombreUsuario) {
+<span class="fc" id="L24">    this(nombreCompleto, nombreUsuario, null);</span>
+<span class="fc" id="L25">  }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

@@ -1,0 +1,287 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Puente.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">sgp-api</a> &gt; <a href="index.source.html" class="el_package">gt.usac.cunoc.sgp.puente.entity</a> &gt; <span class="el_source">Puente.java</span></div><h1>Puente.java</h1><pre class="source lang-java linenums">package gt.usac.cunoc.sgp.puente.entity;
+
+import gt.usac.cunoc.sgp.inspeccion.model.EstadoCondicion;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Table;
+import jakarta.persistence.Version;
+import java.math.BigDecimal;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.util.Objects;
+import java.util.UUID;
+import org.hibernate.annotations.Formula;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
+import org.locationtech.jts.geom.Point;
+
+@Entity
+@Table(name = &quot;puente&quot;)
+public class Puente {
+
+  @Id private UUID id;
+
+  @Column(nullable = false, unique = true, length = 40, updatable = false)
+  private String codigo;
+
+  @Column(name = &quot;correlativo_municipal&quot;, nullable = false, updatable = false)
+  private int correlativoMunicipal;
+
+  @ManyToOne(fetch = FetchType.LAZY, optional = false)
+  @JoinColumn(name = &quot;municipio_id&quot;, nullable = false)
+  private Municipio municipio;
+
+  @Column(nullable = false, length = 200)
+  private String nombre;
+
+  @Column(nullable = false, length = 100)
+  private String ruta;
+
+  @Column(precision = 10, scale = 3)
+  private BigDecimal kilometraje;
+
+  @JdbcTypeCode(SqlTypes.GEOGRAPHY)
+  @Column(nullable = false, columnDefinition = &quot;geography(Point,4326)&quot;)
+  private Point ubicacion;
+
+  @Column(nullable = false)
+  private boolean activo;
+
+  @Column(name = &quot;inactivado_en&quot;)
+  private Instant inactivadoEn;
+
+  @Column(name = &quot;inactivado_por_id&quot;)
+  private UUID inactivadoPorId;
+
+  @Column(name = &quot;motivo_inactivacion&quot;, length = 1000)
+  private String motivoInactivacion;
+
+<span class="fc" id="L63">  @Column(name = &quot;estado_actual&quot;, nullable = false, length = 20)</span>
+  private String estadoActual = &quot;Sin evaluar&quot;;
+
+  @Column(name = &quot;indice_condicion_actual&quot;, precision = 8, scale = 5)
+  private BigDecimal indiceCondicionActual;
+
+  @Column(name = &quot;fecha_ultima_inspeccion&quot;)
+  private LocalDate fechaUltimaInspeccion;
+
+  @Column(name = &quot;inspeccion_vigente_id&quot;)
+  private UUID inspeccionVigenteId;
+
+  @Column(name = &quot;resultado_ic_vigente_id&quot;)
+  private UUID resultadoIcVigenteId;
+
+  @Formula(
+      &quot;&quot;&quot;
+          (select r.version_configuracion_id from resultado_ic r
+           where r.id = resultado_ic_vigente_id and r.inspeccion_id = inspeccion_vigente_id)
+          &quot;&quot;&quot;)
+  private UUID versionFormularioIdIcVigente;
+
+  @Column(name = &quot;inspeccion_vigente_publicada_en&quot;)
+  private Instant inspeccionVigentePublicadaEn;
+
+  @Column(name = &quot;creado_por_id&quot;, nullable = false, updatable = false)
+  private UUID creadoPorId;
+
+  @Column(name = &quot;creado_en&quot;, nullable = false, updatable = false)
+  private Instant creadoEn;
+
+  @Column(name = &quot;actualizado_en&quot;, nullable = false)
+  private Instant actualizadoEn;
+
+  @Version
+  @Column(nullable = false)
+  private long version;
+
+<span class="fc" id="L101">  protected Puente() {}</span>
+
+  public Puente(
+      UUID id,
+      String codigo,
+      int correlativoMunicipal,
+      Municipio municipio,
+      String nombre,
+      String ruta,
+      BigDecimal kilometraje,
+      Point ubicacion,
+      UUID creadoPorId,
+<span class="fc" id="L113">      Instant creadoEn) {</span>
+<span class="fc" id="L114">    this.id = id;</span>
+<span class="fc" id="L115">    this.codigo = codigo;</span>
+<span class="fc" id="L116">    this.correlativoMunicipal = correlativoMunicipal;</span>
+<span class="fc" id="L117">    this.municipio = municipio;</span>
+<span class="fc" id="L118">    this.nombre = nombre;</span>
+<span class="fc" id="L119">    this.ruta = ruta;</span>
+<span class="fc" id="L120">    this.kilometraje = kilometraje;</span>
+<span class="fc" id="L121">    this.ubicacion = ubicacion;</span>
+<span class="fc" id="L122">    this.activo = true;</span>
+<span class="fc" id="L123">    this.creadoPorId = creadoPorId;</span>
+<span class="fc" id="L124">    this.creadoEn = creadoEn;</span>
+<span class="fc" id="L125">    this.actualizadoEn = creadoEn;</span>
+<span class="fc" id="L126">  }</span>
+
+  public void actualizarEstadoPorPublicacion(
+      UUID inspeccionId,
+      UUID resultadoId,
+      EstadoCondicion estado,
+      BigDecimal indice,
+      LocalDate fechaInspeccion,
+      Instant publicadaEn,
+      Instant ahora) {
+<span class="fc" id="L136">    Objects.requireNonNull(inspeccionId, &quot;La inspeccion es obligatoria&quot;);</span>
+<span class="fc" id="L137">    Objects.requireNonNull(resultadoId, &quot;El resultado es obligatorio&quot;);</span>
+<span class="fc" id="L138">    Objects.requireNonNull(estado, &quot;El estado es obligatorio&quot;);</span>
+<span class="fc" id="L139">    Objects.requireNonNull(indice, &quot;El indice es obligatorio&quot;);</span>
+<span class="fc" id="L140">    Objects.requireNonNull(fechaInspeccion, &quot;La fecha de inspeccion es obligatoria&quot;);</span>
+<span class="fc" id="L141">    Objects.requireNonNull(publicadaEn, &quot;La fecha de publicacion es obligatoria&quot;);</span>
+<span class="fc" id="L142">    Objects.requireNonNull(ahora, &quot;La fecha de actualizacion es obligatoria&quot;);</span>
+
+<span class="pc bpc" id="L144" title="2 of 4 branches missed.">    if (indice.signum() &lt; 0 || indice.compareTo(BigDecimal.valueOf(100)) &gt; 0) {</span>
+<span class="nc" id="L145">      throw new IllegalArgumentException(&quot;El indice debe estar entre 0 y 100&quot;);</span>
+    }
+
+<span class="fc" id="L148">    String estadoFinal =</span>
+<span class="fc bfc" id="L149" title="All 3 branches covered.">        switch (estado) {</span>
+<span class="fc" id="L150">          case BUENO -&gt; &quot;Bueno&quot;;</span>
+<span class="fc" id="L151">          case REGULAR -&gt; &quot;Regular&quot;;</span>
+<span class="fc" id="L152">          case MALO -&gt; &quot;Malo&quot;;</span>
+        };
+
+<span class="fc" id="L155">    this.estadoActual = estadoFinal;</span>
+<span class="fc" id="L156">    this.indiceCondicionActual = indice;</span>
+<span class="fc" id="L157">    this.fechaUltimaInspeccion = fechaInspeccion;</span>
+<span class="fc" id="L158">    this.inspeccionVigenteId = inspeccionId;</span>
+<span class="fc" id="L159">    this.resultadoIcVigenteId = resultadoId;</span>
+<span class="fc" id="L160">    this.inspeccionVigentePublicadaEn = publicadaEn;</span>
+<span class="fc" id="L161">    this.actualizadoEn = ahora;</span>
+<span class="fc" id="L162">  }</span>
+
+  public UUID getId() {
+<span class="fc" id="L165">    return id;</span>
+  }
+
+  public String getCodigo() {
+<span class="fc" id="L169">    return codigo;</span>
+  }
+
+  public int getCorrelativoMunicipal() {
+<span class="nc" id="L173">    return correlativoMunicipal;</span>
+  }
+
+  public Municipio getMunicipio() {
+<span class="fc" id="L177">    return municipio;</span>
+  }
+
+  public String getNombre() {
+<span class="fc" id="L181">    return nombre;</span>
+  }
+
+  public String getRuta() {
+<span class="fc" id="L185">    return ruta;</span>
+  }
+
+  public BigDecimal getKilometraje() {
+<span class="fc" id="L189">    return kilometraje;</span>
+  }
+
+  public Point getUbicacion() {
+<span class="fc" id="L193">    return ubicacion;</span>
+  }
+
+  public boolean isActivo() {
+<span class="fc" id="L197">    return activo;</span>
+  }
+
+  public Instant getInactivadoEn() {
+<span class="fc" id="L201">    return inactivadoEn;</span>
+  }
+
+  public UUID getInactivadoPorId() {
+<span class="fc" id="L205">    return inactivadoPorId;</span>
+  }
+
+  public String getMotivoInactivacion() {
+<span class="fc" id="L209">    return motivoInactivacion;</span>
+  }
+
+  public String getEstadoActual() {
+<span class="fc" id="L213">    return estadoActual;</span>
+  }
+
+  public BigDecimal getIndiceCondicionActual() {
+<span class="fc" id="L217">    return indiceCondicionActual;</span>
+  }
+
+  public LocalDate getFechaUltimaInspeccion() {
+<span class="fc" id="L221">    return fechaUltimaInspeccion;</span>
+  }
+
+  public UUID getInspeccionVigenteId() {
+<span class="fc" id="L225">    return inspeccionVigenteId;</span>
+  }
+
+  public UUID getResultadoIcVigenteId() {
+<span class="fc" id="L229">    return resultadoIcVigenteId;</span>
+  }
+
+  public UUID getVersionFormularioIdIcVigente() {
+<span class="fc" id="L233">    return versionFormularioIdIcVigente;</span>
+  }
+
+  public Instant getInspeccionVigentePublicadaEn() {
+<span class="fc" id="L237">    return inspeccionVigentePublicadaEn;</span>
+  }
+
+  public void darDeBaja(String motivo, UUID usuarioId, Instant ahora) {
+<span class="fc" id="L241">    this.activo = false;</span>
+<span class="fc" id="L242">    this.motivoInactivacion = motivo;</span>
+<span class="fc" id="L243">    this.inactivadoPorId = usuarioId;</span>
+<span class="fc" id="L244">    this.inactivadoEn = ahora;</span>
+<span class="fc" id="L245">    this.actualizadoEn = ahora;</span>
+<span class="fc" id="L246">  }</span>
+
+  public void reactivar(Instant ahora) {
+<span class="fc" id="L249">    this.activo = true;</span>
+<span class="fc" id="L250">    this.motivoInactivacion = null;</span>
+<span class="fc" id="L251">    this.inactivadoPorId = null;</span>
+<span class="fc" id="L252">    this.inactivadoEn = null;</span>
+<span class="fc" id="L253">    this.actualizadoEn = ahora;</span>
+<span class="fc" id="L254">  }</span>
+
+  public void actualizarDatosGenerales(
+      String nombre,
+      String ruta,
+      BigDecimal kilometraje,
+      Municipio municipio,
+      Point ubicacion,
+      Instant ahora) {
+<span class="fc" id="L263">    this.nombre = nombre;</span>
+<span class="fc" id="L264">    this.ruta = ruta;</span>
+<span class="fc" id="L265">    this.kilometraje = kilometraje;</span>
+<span class="fc" id="L266">    this.municipio = municipio;</span>
+<span class="fc" id="L267">    this.ubicacion = ubicacion;</span>
+<span class="fc" id="L268">    this.actualizadoEn = ahora;</span>
+<span class="fc" id="L269">  }</span>
+
+  public UUID getCreadoPorId() {
+<span class="nc" id="L272">    return creadoPorId;</span>
+  }
+
+  public Instant getCreadoEn() {
+<span class="fc" id="L276">    return creadoEn;</span>
+  }
+
+  public Instant getActualizadoEn() {
+<span class="nc" id="L280">    return actualizadoEn;</span>
+  }
+
+  public long getVersion() {
+<span class="fc" id="L284">    return version;</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

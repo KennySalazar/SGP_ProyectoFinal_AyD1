@@ -13,9 +13,14 @@ fueron validados para la revisión
 La terminación HTTPS sobre IP se integró a `develop` mediante `e006c19`, se
 instaló en EC2 y respondió correctamente desde un navegador y mediante las rutas
 de salud, frontend y API. El temporizador de renovación está habilitado y su
-servicio se ejecutó sin error; aún falta observar una renovación efectiva.
-La configuración y el despliegue de producción permanecen fuera del alcance de
-esta historia.
+servicio se ejecutó sin error. El usuario informó que ambos entornos funcionaban
+el 27 de octubre de 2026; no se registraron fechas del certificado vigente ni
+una evidencia directa de renovación.
+La configuración y el despliegue de producción quedaron fuera del alcance de
+esta historia inicial. Los avances posteriores se documentan en
+[producción](../deployment/PRODUCCION_AWS.md) y el
+[ADR-0004](0004-despliegue-automatico-produccion-desde-main.md), que reemplaza
+la promoción manual prevista aquí.
 
 ## Contexto
 
@@ -24,15 +29,13 @@ contenedorizadas, Nginx como único punto de entrada, PostgreSQL/PostGIS,
 almacenamiento de objetos, configuración externa y trazabilidad entre commit,
 imagen y despliegue.
 
-El enunciado propone cuatro servicios en Docker Compose: Nginx, backend,
-PostgreSQL y MinIO. La sección 9.4 permite adaptar esos lineamientos a un
-proveedor de nube pública. Además, el auxiliar aclaró que los archivos no pueden
-residir en el mismo servidor de la aplicación. El equipo eligió AWS y dispone de
-créditos limitados, por lo que debe evitar componentes innecesarios.
+La arquitectura de referencia contempla cuatro servicios en Docker Compose:
+Nginx, backend, PostgreSQL y MinIO. Para el despliegue en nube se requiere que
+los archivos residan fuera del servidor de aplicación. El equipo eligió AWS y
+dispone de créditos limitados, por lo que debe evitar componentes innecesarios.
 
-El backend todavía no implementa `AlmacenamientoArchivos` ni consume MinIO o S3.
-La infraestructura debe reflejar esa limitación sin agregar credenciales o
-variables que el código aún no utiliza.
+Al adoptarse la decisión, la integración de archivos estaba pendiente. Su estado
+posterior se registra en la sección de implementación, sin alterar la decisión.
 
 ## Problema
 
@@ -98,7 +101,7 @@ claves AWS estáticas ni compilar Java o Angular en EC2.
 - **Certificado autofirmado:** descartado porque los clientes no lo consideran
   una identidad pública válida.
 - **ALB o un servicio adicional:** descartado por costo y complejidad para este
-  staging académico.
+  ambiente de staging.
 - **Nginx del host y certificado IP de Let's Encrypt:** elegido. Mantiene el
   contenedor en loopback, permite ACME `webroot` y no requiere dominio.
 - **Certbot de DNF:** descartado porque la versión disponible en Amazon Linux
@@ -121,8 +124,8 @@ claves AWS estáticas ni compilar Java o Angular en EC2.
    desarrollo local.
 5. Usar una RDS PostgreSQL 16 privada y Single-AZ con las bases `sgp_staging` y
    `sgp_prod`, cada una con usuario migrador y usuario de aplicación propios. Se
-   acepta la ausencia de conmutación automática para reducir costos en el
-   contexto académico y con los créditos disponibles.
+   acepta la ausencia de conmutación automática para reducir costos y ajustarse
+   a los créditos disponibles.
 6. Crear `postgis`, `pg_trgm` y `uuid-ossp` una vez como administrador de RDS.
    Para crear la base con el migrador como propietario y configurar sus
    privilegios predeterminados, el administrador recibe membresía temporal,
@@ -133,7 +136,7 @@ claves AWS estáticas ni compilar Java o Angular en EC2.
    recibir `rds_superuser`.
 7. Usar un bucket S3 privado por ambiente. La EC2 accederá mediante un rol IAM
    de mínimo privilegio y credenciales temporales; nunca mediante access keys en
-   `.env`. La integración se habilitará cuando exista en el backend.
+   `.env`. La integración posterior se describe en la sección de implementación.
 8. Exigir IMDSv2 y configurar hop limit `2` para que un SDK dentro de Docker
    pueda obtener credenciales del rol de instancia.
 9. Construir backend y frontend en GitHub Actions para `linux/amd64` y
@@ -162,13 +165,22 @@ claves AWS estáticas ni compilar Java o Angular en EC2.
     perfil `shortlived` de Let's Encrypt con Certbot 5.8.0 en Docker y un
     temporizador systemd de comprobación dos veces al día. La instalación real
     y la ejecución del servicio de comprobación quedaron validadas el 15 de
-    octubre de 2026; todavía no se ha observado una renovación efectiva.
+    octubre de 2026. El funcionamiento informado posteriormente no incluye una
+    comprobación directa de las fechas del certificado.
 16. Conservar para staging la IPv4 pública dinámica observada y no asignar una
-    Elastic IP, dado el plazo académico hasta el 28 de octubre de 2026. Se acepta
+    Elastic IP, considerando el plazo previsto hasta el 28 de octubre de 2026. Se acepta
     que detener e iniciar EC2 puede cambiar la IP y obligar a actualizar URLs y
     emitir otro certificado.
 
 ### Estado de implementación en AWS
+
+El 27 de octubre de 2026 se corrigió la falta de permisos S3 mediante una política
+IAM asociada al rol de la EC2 de staging, con `PutObject`, `GetObject` y
+`DeleteObject`. Se verificaron estas operaciones con un archivo de diagnóstico y
+las cargas de fotos y PDF en la aplicación. El permiso `DeleteObject` resolvió
+el 403 observado durante un rollback de PDF; el usuario confirmó que la
+corrección IAM también resolvió los 409 anteriores. Véase
+[staging](../deployment/STAGING_AWS.md).
 
 En `us-east-1` se confirmaron los siguientes recursos de staging:
 
@@ -177,10 +189,12 @@ En `us-east-1` se confirmaron los siguientes recursos de staging:
 - `sgp-rds-sg` (`sg-0ab8d04a2ef4d3db8`), con PostgreSQL TCP 5432 permitido solo
   desde el Security Group anterior.
 - `sgp-staging-archivos-ayd1-2026-gt01`, bucket con bloqueo de acceso público,
-  ACL deshabilitadas y SSE-S3. Está vacío; versionado y Object Lock están
+  ACL deshabilitadas y SSE-S3. Creado vacío; versionado y Object Lock estaban
   deshabilitados y no tiene política personalizada ni CORS.
 - `sgp-staging-ec2-role`, confiado a EC2 y con
-  `AmazonSSMManagedInstanceCore`. Todavía no concede acceso a S3.
+  `AmazonSSMManagedInstanceCore` y, desde el 27 de octubre de 2026,
+  `sgp-staging-s3-objects-policy` para `PutObject`, `GetObject` y
+  `DeleteObject` sobre objetos del bucket de staging.
 - `sgp-rds-private-rt` (`rtb-0bd589b3134333454`), tabla no principal con solo
   la ruta local `172.31.0.0/16` y sin salida mediante Internet Gateway o NAT.
 - `sgp-rds-private-1a` (`subnet-0e261924496a742c8`, `172.31.96.0/24`,
@@ -214,9 +228,12 @@ demostró autenticación de aplicación, Flyway, validación del esquema y respu
 HTTP 200 del frontend, `/healthz` y `/api/v1/puentes?size=1`. El rol OIDC
 `arn:aws:iam::416086757987:role/sgp-staging-github-actions-role` es distinto del
 rol de instancia y su asunción quedó validada después de corregir el sujeto de
-confianza al identificador inmutable. `sgp_staging` está operativa; no se creó
-`sgp_prod`. Sigue pendiente una comprobación administrativa independiente de
-TLS `verify-full` y extensiones.
+confianza al identificador inmutable. `sgp_staging` está operativa. En la etapa
+inicial no se creó `sgp_prod`; posteriormente, la guía de
+[producción](../deployment/PRODUCCION_AWS.md) documentó su preparación con
+`verify-full` y la consulta de extensiones. El usuario indicó posteriormente
+que la comprobación independiente de `verify-full` y extensiones en staging fue
+verificada, sin registrar fecha ni evidencia técnica adicional.
 
 El Nginx `1.30.5` del host atiende TCP 80/443 y reenvía al contenedor ligado a
 `127.0.0.1:8088`; backend 8090 y PostgreSQL 5432 no están publicados. Certbot
@@ -227,17 +244,15 @@ el 15 hasta el 22 de octubre de 2026. HTTP redirigió con 301 y `/`, `/healthz` 
 procesó la configuración y conservó Nginx saludable, pero no renovó porque el
 certificado todavía no estaba dentro de la ventana de renovación.
 
-### Excepción operativa de respaldos
+### Respaldos de la base de datos
 
-El diseño conserva el requisito de 30 días de respaldos automáticos. La cuenta
-rechazó ese valor porque supera el máximo disponible en su plan gratuito y no se
-autorizó migrar a un plan de pago. Para que AWS aceptara la creación, se redujo
-temporalmente la retención a 1 día, con copia de etiquetas habilitada y sin
-replicación entre regiones.
-
-Esta excepción no modifica el requisito original: la retención de 30 días, los
-12 respaldos mensuales mediante AWS Backup y la prueba de restauración siguen
-pendientes.
+La [guía de respaldos](../deployment/RESPALDO_Y_RESTAURACION.md) documenta
+volcados diarios con `pg_dump` a S3, con eliminación de diarios a los 30 días y
+copias mensuales a los 365 días. El 17 de octubre de 2026 se documentó una prueba
+de restauración exitosa en producción. La retención automática de RDS de un día
+es un complemento; DT-DEP-07 no exige AWS Backup ni 30 días de retención de RDS.
+La guía señala una limitación operativa si la EC2 está apagada el primer día del
+mes. DT-DEP-08 exige repetir y documentar la prueba al menos cada semestre.
 
 ## Justificación
 
@@ -278,56 +293,43 @@ promover los mismos digests entre ambientes sin reconstruir artefactos.
 - Staging y producción comparten capacidad y disponibilidad de una RDS.
 - Single-AZ reduce el costo, pero no ofrece conmutación automática ante la falla
   de la zona que aloje la instancia.
-- El plan gratuito limita la retención automática aplicada a 1 día. Este valor
-  no satisface los 30 días del diseño ni sustituye los respaldos mensuales o la
-  prueba de restauración.
-- `t4g.micro` puede sufrir presión de memoria y debe medirse.
-- El backend no puede validar todavía el flujo de archivos en S3.
-- El bucket de staging no tiene versionado ni Object Lock; la recuperación ante
-  borrados y los respaldos permanecen fuera de esta historia.
+- El plan gratuito limita a 1 día la retención automática de RDS; los volcados a
+  S3 se documentan por separado.
+- El usuario informó que el rendimiento de la instancia es satisfactorio; no se
+  registró una medición de memoria ni sus condiciones.
+- Las cargas de fotos y PDF se probaron en staging; otros flujos de archivos
+  aún necesitan validación.
 - Un PAT classic con `read:packages` puede leer otros paquetes privados a los
   que tenga acceso la cuenta y requiere rotación manual.
-- `sslmode=require` cifra la conexión RDS, pero la verificación de identidad con
-  `verify-full` requiere distribuir y probar el bundle CA.
 - El acceso a credenciales IAM desde contenedores requiere configurar IMDSv2 de
   forma consciente; un hop limit incorrecto impediría acceder a S3.
 
 ## Limitaciones
 
-- La aplicación ya se desplegó y superó las comprobaciones técnicas básicas,
-  pero no las pruebas funcionales completas ni los flujos dependientes de SMTP.
-- RDS está operativa para el backend y Flyway; falta una prueba administrativa
-  de `verify-full` y una consulta directa de extensiones.
+- El usuario informó que se realizaron pruebas funcionales, incluidas las de
+  correo; no se registraron fecha, casos ni resultados detallados.
 - El host EC2, OIDC, Systems Manager y HTTPS público están validados. La compra
   de dominio, una zona DNS pública y Elastic IP se descartaron para staging.
-- No incluye Compose ni despliegue de producción.
-- Solo existe una retención automática solicitada de 1 día en RDS. La política
-  requerida de respaldos, restauración y la retención centralizada de logs no
-  están implementadas.
-- S3 está decidido como servicio, pero su integración de aplicación permanece
-  pendiente de la funcionalidad de archivos.
-- Brotli no está implementado. HSTS tampoco está habilitado por la dependencia
-  de una IP dinámica y certificados de corta duración; DT-SEC-10 requiere una
-  excepción aceptada o una solución operativa estable.
-- El bucket S3 existe, pero la aplicación todavía no lo consume.
+- Esta historia no incluyó Compose ni despliegue de producción; el trabajo
+  posterior se documenta en la guía de producción y el ADR-0004.
 - La publicación multi-arquitectura, descarga ARM64, GHCR, OIDC, SSM y el primer
   despliegue ya cuentan con validación real.
-- La renovación automática está programada y su servicio se ejecutó con éxito,
-  pero todavía no existe evidencia de una renovación efectiva.
+- La renovación automática está programada. El funcionamiento de los entornos
+  informado por el usuario no identifica el certificado servido ni confirma por
+  sí solo una renovación efectiva.
 
-## Relación con el enunciado
+## Relación con los requisitos de despliegue
 
 La decisión conserva Docker Compose, Nginx, imágenes independientes,
 configuración externa, healthchecks, reinicio automático, Flyway y separación de
-ambientes. Se desvía de DT-DEP-01 al usar RDS y S3 administrados en vez de
-contenedores PostgreSQL/MinIO en el servidor; la sección 9.4 permite adaptar el
-despliegue a nube pública y la aclaración del auxiliar exige que los archivos no
-residan en EC2.
+ambientes. La solución adapta DT-DEP-01 al usar RDS y S3 administrados en vez de
+contenedores PostgreSQL/MinIO en el servidor, de acuerdo con la adaptación a
+nube pública y el requisito de mantener los archivos fuera de EC2.
 
 S3 mantiene una API de almacenamiento de objetos compatible con la intención de
-DT-ALM. MinIO continúa en desarrollo local. La interfaz intercambiable de
-DT-ALM-03 sigue pendiente en el backend y no se declara implementada. El estado
-y el traspaso de esa futura HU se documentan en
+DT-ALM. MinIO continúa en desarrollo local. La interfaz intercambiable
+`AlmacenamientoArchivos` y el adaptador S3 ya existen. Su estado y el traspaso
+se documentan en
 [`GUIA_INTEGRACION_S3.md`](../deployment/GUIA_INTEGRACION_S3.md).
 
 ## Referencias

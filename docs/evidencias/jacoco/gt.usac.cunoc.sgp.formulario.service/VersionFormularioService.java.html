@@ -1,0 +1,1494 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>VersionFormularioService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">sgp-api</a> &gt; <a href="index.source.html" class="el_package">gt.usac.cunoc.sgp.formulario.service</a> &gt; <span class="el_source">VersionFormularioService.java</span></div><h1>VersionFormularioService.java</h1><pre class="source lang-java linenums">package gt.usac.cunoc.sgp.formulario.service;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import gt.usac.cunoc.sgp.common.audit.aspect.Auditable;
+import gt.usac.cunoc.sgp.common.audit.model.AccionAuditoria;
+import gt.usac.cunoc.sgp.common.exception.ApiException;
+import gt.usac.cunoc.sgp.formulario.dto.AnalisisMapeoResponse;
+import gt.usac.cunoc.sgp.formulario.dto.AprobacionCalibracionResponse;
+import gt.usac.cunoc.sgp.formulario.dto.ConfiguracionIcElementoRequest;
+import gt.usac.cunoc.sgp.formulario.dto.ConfiguracionIcElementoResponse;
+import gt.usac.cunoc.sgp.formulario.dto.CrearVersionRequest;
+import gt.usac.cunoc.sgp.formulario.dto.DeclaracionMapeoRequest;
+import gt.usac.cunoc.sgp.formulario.dto.FormularioActivoResponse;
+import gt.usac.cunoc.sgp.formulario.dto.MapeoCampoResponse;
+import gt.usac.cunoc.sgp.formulario.dto.PublicarVersionRequest;
+import gt.usac.cunoc.sgp.formulario.dto.VersionFormularioResponse;
+import gt.usac.cunoc.sgp.formulario.dto.VersionFormularioResumenResponse;
+import gt.usac.cunoc.sgp.formulario.entity.ConfiguracionIcElemento;
+import gt.usac.cunoc.sgp.formulario.entity.MapeoCampoFormulario;
+import gt.usac.cunoc.sgp.formulario.entity.VersionFormulario;
+import gt.usac.cunoc.sgp.formulario.mapper.VersionFormularioMapper;
+import gt.usac.cunoc.sgp.formulario.model.EstadoVersionFormulario;
+import gt.usac.cunoc.sgp.formulario.model.TipoMapeoCampo;
+import gt.usac.cunoc.sgp.formulario.repository.AprobacionCalibracionRepository;
+import gt.usac.cunoc.sgp.formulario.repository.ConfiguracionIcElementoRepository;
+import gt.usac.cunoc.sgp.formulario.repository.MapeoCampoFormularioRepository;
+import gt.usac.cunoc.sgp.formulario.repository.VersionFormularioRepository;
+import gt.usac.cunoc.sgp.formulario.validation.CampoSchemaExtractor;
+import gt.usac.cunoc.sgp.formulario.validation.JsonSchemaValidatorService;
+import gt.usac.cunoc.sgp.formulario.validation.ValidadorReglasCriticasIc;
+import gt.usac.cunoc.sgp.notificacion.service.AvisosAcademicosService;
+import java.io.InputStream;
+import java.security.MessageDigest;
+import java.time.Clock;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+import java.util.UUID;
+import org.springframework.core.io.ClassPathResource;
+import org.springframework.http.HttpStatus;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+@Service
+public class VersionFormularioService {
+
+  private final VersionFormularioRepository versiones;
+  private final MapeoCampoFormularioRepository mapeos;
+  private final ConfiguracionIcElementoRepository configuracionesIc;
+  private final VersionFormularioMapper mapper;
+  private final JsonSchemaValidatorService schemaValidator;
+  private final CampoSchemaExtractor campoExtractor;
+  private final ObjectMapper objectMapper;
+  private final Clock clock;
+  private final AvisosAcademicosService avisosAcademicos;
+  private final AprobacionCalibracionRepository aprobaciones;
+
+  public VersionFormularioService(
+      VersionFormularioRepository versiones,
+      MapeoCampoFormularioRepository mapeos,
+      ConfiguracionIcElementoRepository configuracionesIc,
+      VersionFormularioMapper mapper,
+      JsonSchemaValidatorService schemaValidator,
+      CampoSchemaExtractor campoExtractor,
+      ObjectMapper objectMapper,
+      Clock clock,
+      AprobacionCalibracionRepository aprobaciones,
+<span class="fc" id="L73">      AvisosAcademicosService avisosAcademicos) {</span>
+<span class="fc" id="L74">    this.versiones = versiones;</span>
+<span class="fc" id="L75">    this.mapeos = mapeos;</span>
+<span class="fc" id="L76">    this.configuracionesIc = configuracionesIc;</span>
+<span class="fc" id="L77">    this.mapper = mapper;</span>
+<span class="fc" id="L78">    this.schemaValidator = schemaValidator;</span>
+<span class="fc" id="L79">    this.campoExtractor = campoExtractor;</span>
+<span class="fc" id="L80">    this.objectMapper = objectMapper;</span>
+<span class="fc" id="L81">    this.clock = clock;</span>
+<span class="fc" id="L82">    this.aprobaciones = aprobaciones;</span>
+<span class="fc" id="L83">    this.avisosAcademicos = avisosAcademicos;</span>
+<span class="fc" id="L84">  }</span>
+
+  @Transactional(readOnly = true)
+  @PreAuthorize(&quot;hasAnyRole('ADMINISTRADOR', 'CATEDRATICO')&quot;)
+  public List&lt;VersionFormularioResumenResponse&gt; listarVersiones() {
+<span class="fc" id="L89">    return versiones.findAllByOrderByCreadoEnDesc().stream()</span>
+<span class="fc" id="L90">        .map(mapper::toResumenResponse)</span>
+<span class="fc" id="L91">        .toList();</span>
+  }
+
+  @Transactional(readOnly = true)
+  @PreAuthorize(&quot;hasAnyRole('ADMINISTRADOR', 'CATEDRATICO')&quot;)
+  public VersionFormularioResponse obtenerPorId(UUID id) {
+<span class="fc" id="L97">    VersionFormulario version =</span>
+        versiones
+<span class="fc" id="L99">            .findById(id)</span>
+<span class="fc" id="L100">            .orElseThrow(</span>
+                () -&gt;
+<span class="fc" id="L102">                    new ApiException(</span>
+                        HttpStatus.NOT_FOUND,
+                        &quot;version_no_encontrada&quot;,
+                        &quot;Versión no encontrada&quot;,
+                        &quot;No existe una versión de formulario con identificador &quot; + id));
+
+<span class="fc" id="L108">    return construirRespuestaDetallada(version);</span>
+  }
+
+  @Transactional(readOnly = true)
+  @PreAuthorize(&quot;isAuthenticated()&quot;)
+  public FormularioActivoResponse obtenerActiva() {
+<span class="fc" id="L114">    VersionFormulario activa =</span>
+        versiones
+<span class="fc" id="L116">            .findByActivaTrue()</span>
+<span class="fc" id="L117">            .orElseThrow(</span>
+                () -&gt;
+<span class="nc" id="L119">                    new ApiException(</span>
+                        HttpStatus.NOT_FOUND,
+                        &quot;formulario_activo_no_encontrado&quot;,
+                        &quot;Formulario activo no encontrado&quot;,
+                        &quot;No existe actualmente una versión de formulario activa en el sistema&quot;));
+
+<span class="fc" id="L125">    return mapper.toActivoResponse(activa);</span>
+  }
+
+  /**
+   * Esquema de una versión publicada (activa o anterior) para mostrar una inspección con la
+   * estructura con la que se levantó (RN-FRM-05). Los borradores no se exponen.
+   */
+  @Transactional(readOnly = true)
+  @PreAuthorize(&quot;isAuthenticated()&quot;)
+  public FormularioActivoResponse obtenerPublicadaPorId(UUID id) {
+<span class="fc" id="L135">    VersionFormulario version =</span>
+        versiones
+<span class="fc" id="L137">            .findById(id)</span>
+<span class="fc bfc" id="L138" title="All 2 branches covered.">            .filter(candidata -&gt; candidata.getEstado() == EstadoVersionFormulario.PUBLICADA)</span>
+<span class="fc" id="L139">            .orElseThrow(</span>
+                () -&gt;
+<span class="fc" id="L141">                    new ApiException(</span>
+                        HttpStatus.NOT_FOUND,
+                        &quot;version_no_encontrada&quot;,
+                        &quot;Versión no encontrada&quot;,
+                        &quot;No existe una versión publicada con identificador &quot; + id));
+
+<span class="fc" id="L147">    return mapper.toActivoResponse(version);</span>
+  }
+
+  @Transactional
+  @PreAuthorize(&quot;hasAnyRole('ADMINISTRADOR', 'CATEDRATICO')&quot;)
+  @Auditable(accion = AccionAuditoria.CREAR, entidad = &quot;version_formulario&quot;)
+  public VersionFormularioResponse crear(CrearVersionRequest request, UUID usuarioId) {
+<span class="pc bpc" id="L154" title="1 of 2 branches missed.">    if (Boolean.TRUE.equals(request.cargarPlantillaInicial())) {</span>
+<span class="nc" id="L155">      return cargarPlantillaSiecaInicial(request.codigo(), usuarioId);</span>
+    }
+
+<span class="pc bpc" id="L158" title="1 of 2 branches missed.">    if (versiones.existsByCodigo(request.codigo())) {</span>
+<span class="nc" id="L159">      throw new ApiException(</span>
+          HttpStatus.CONFLICT,
+          &quot;codigo_duplicado&quot;,
+          &quot;Código de versión duplicado&quot;,
+<span class="nc" id="L163">          &quot;Ya existe una versión con el código '&quot; + request.codigo() + &quot;'&quot;);</span>
+    }
+
+<span class="fc" id="L166">    Instant ahora = clock.instant();</span>
+<span class="fc" id="L167">    UUID id = UUID.randomUUID();</span>
+<span class="fc" id="L168">    VersionFormulario versionAnterior = null;</span>
+    JsonNode esquema;
+    JsonNode vinculos;
+    JsonNode reglas;
+<span class="fc" id="L172">    List&lt;ConfiguracionIcElemento&gt; pesosIniciales = new ArrayList&lt;&gt;();</span>
+
+<span class="pc bpc" id="L174" title="1 of 2 branches missed.">    if (request.versionBaseId() != null) {</span>
+<span class="fc" id="L175">      VersionFormulario base =</span>
+          versiones
+<span class="fc" id="L177">              .findById(request.versionBaseId())</span>
+<span class="fc" id="L178">              .orElseThrow(</span>
+                  () -&gt;
+<span class="nc" id="L180">                      new ApiException(</span>
+                          HttpStatus.NOT_FOUND,
+                          &quot;version_base_no_encontrada&quot;,
+                          &quot;Versión base no encontrada&quot;,
+                          &quot;No existe la versión base especificada&quot;));
+<span class="fc" id="L185">      versionAnterior = base;</span>
+<span class="pc bpc" id="L186" title="1 of 2 branches missed.">      esquema = request.esquema() != null ? request.esquema() : base.getEsquema();</span>
+      vinculos =
+<span class="pc bpc" id="L188" title="1 of 2 branches missed.">          request.vinculosAlmacenamiento() != null</span>
+<span class="nc" id="L189">              ? request.vinculosAlmacenamiento()</span>
+<span class="fc" id="L190">              : base.getVinculosAlmacenamiento();</span>
+      reglas =
+<span class="pc bpc" id="L192" title="1 of 2 branches missed.">          request.reglasEvaluacionIc() != null</span>
+<span class="nc" id="L193">              ? request.reglasEvaluacionIc()</span>
+<span class="fc" id="L194">              : base.getReglasEvaluacionIc();</span>
+
+      // Copiar pesos de la versión base para agilizar la nueva versión
+<span class="fc" id="L197">      List&lt;ConfiguracionIcElemento&gt; pesosBase =</span>
+<span class="fc" id="L198">          configuracionesIc.findAllByVersionFormularioId(base.getId());</span>
+<span class="fc bfc" id="L199" title="All 2 branches covered.">      for (ConfiguracionIcElemento p : pesosBase) {</span>
+<span class="fc" id="L200">        pesosIniciales.add(</span>
+            new ConfiguracionIcElemento(
+<span class="fc" id="L202">                UUID.randomUUID(),</span>
+                null,
+<span class="fc" id="L204">                p.getElementoRef(),</span>
+<span class="fc" id="L205">                p.getPeso(),</span>
+<span class="fc" id="L206">                p.getDescripcion(),</span>
+                ahora));
+<span class="fc" id="L208">      }</span>
+<span class="fc" id="L209">    } else {</span>
+<span class="nc" id="L210">      esquema = request.esquema();</span>
+      vinculos =
+<span class="nc bnc" id="L212" title="All 2 branches missed.">          request.vinculosAlmacenamiento() != null</span>
+<span class="nc" id="L213">              ? request.vinculosAlmacenamiento()</span>
+<span class="nc" id="L214">              : objectMapper.createObjectNode();</span>
+      reglas =
+<span class="nc bnc" id="L216" title="All 2 branches missed.">          request.reglasEvaluacionIc() != null</span>
+<span class="nc" id="L217">              ? request.reglasEvaluacionIc()</span>
+<span class="nc" id="L218">              : objectMapper.createObjectNode();</span>
+    }
+
+<span class="fc" id="L221">    schemaValidator.validarEsquema(esquema);</span>
+
+<span class="fc" id="L223">    VersionFormulario nuevaVersion =</span>
+        new VersionFormulario(
+            id,
+<span class="fc" id="L226">            request.codigo(),</span>
+            EstadoVersionFormulario.BORRADOR,
+            false,
+            esquema,
+            vinculos,
+            reglas,
+            versionAnterior,
+            usuarioId,
+            ahora,
+            ahora);
+
+<span class="fc" id="L237">    VersionFormulario guardada = versiones.save(nuevaVersion);</span>
+
+<span class="fc bfc" id="L239" title="All 2 branches covered.">    for (ConfiguracionIcElemento p : pesosIniciales) {</span>
+<span class="fc" id="L240">      ConfiguracionIcElemento conRelacion =</span>
+          new ConfiguracionIcElemento(
+<span class="fc" id="L242">              p.getId(), guardada, p.getElementoRef(), p.getPeso(), p.getDescripcion(), ahora);</span>
+<span class="fc" id="L243">      configuracionesIc.save(conRelacion);</span>
+<span class="fc" id="L244">    }</span>
+
+<span class="fc" id="L246">    return construirRespuestaDetallada(guardada);</span>
+  }
+
+  @Transactional
+  @PreAuthorize(&quot;hasRole('ADMINISTRADOR')&quot;)
+  @Auditable(accion = AccionAuditoria.CREAR, entidad = &quot;version_formulario&quot;)
+  public VersionFormularioResponse cargarPlantillaSiecaInicial(String codigo, UUID usuarioId) {
+<span class="pc bpc" id="L253" title="2 of 4 branches missed.">    String codigoFinal = (codigo != null &amp;&amp; !codigo.isBlank()) ? codigo : &quot;SIECA-v1&quot;;</span>
+
+<span class="fc bfc" id="L255" title="All 2 branches covered.">    if (versiones.existsByCodigo(codigoFinal)) {</span>
+<span class="fc" id="L256">      throw new ApiException(</span>
+          HttpStatus.CONFLICT,
+          &quot;codigo_duplicado&quot;,
+          &quot;Código de versión duplicado&quot;,
+          &quot;Ya existe una versión con el código '&quot; + codigoFinal + &quot;'&quot;);
+    }
+
+    JsonNode esquema;
+    JsonNode vinculos;
+    JsonNode elementosIcNode;
+
+    try {
+<span class="fc" id="L268">      try (InputStream is =</span>
+<span class="fc" id="L269">          new ClassPathResource(&quot;formulario/sieca-v1/esquema.schema.json&quot;).getInputStream()) {</span>
+<span class="fc" id="L270">        esquema = objectMapper.readTree(is);</span>
+      }
+<span class="fc" id="L272">      try (InputStream is =</span>
+          new ClassPathResource(&quot;formulario/sieca-v1/vinculos-almacenamiento.json&quot;)
+<span class="fc" id="L274">              .getInputStream()) {</span>
+<span class="fc" id="L275">        vinculos = objectMapper.readTree(is);</span>
+      }
+<span class="fc" id="L277">      try (InputStream is =</span>
+<span class="fc" id="L278">          new ClassPathResource(&quot;formulario/sieca-v1/elementos-ic.json&quot;).getInputStream()) {</span>
+<span class="fc" id="L279">        elementosIcNode = objectMapper.readTree(is);</span>
+      }
+<span class="nc" id="L281">    } catch (Exception e) {</span>
+<span class="nc" id="L282">      throw new IllegalStateException(</span>
+          &quot;No fue posible cargar los archivos de plantilla SIECA v1&quot;, e);
+<span class="fc" id="L284">    }</span>
+
+<span class="fc" id="L286">    schemaValidator.validarEsquema(esquema);</span>
+
+<span class="fc" id="L288">    Instant ahora = clock.instant();</span>
+<span class="fc" id="L289">    UUID id = UUID.randomUUID();</span>
+
+<span class="fc" id="L291">    VersionFormulario anterior = versiones.findByActivaTrue().orElse(null);</span>
+
+<span class="fc" id="L293">    VersionFormulario versionInicial =</span>
+        new VersionFormulario(
+            id,
+            codigoFinal,
+            EstadoVersionFormulario.BORRADOR,
+            false,
+            esquema,
+            vinculos,
+            elementosIcNode,
+            anterior,
+            usuarioId,
+            ahora,
+            ahora);
+
+<span class="fc" id="L307">    VersionFormulario guardada = versiones.save(versionInicial);</span>
+
+<span class="pc bpc" id="L309" title="2 of 4 branches missed.">    if (elementosIcNode.has(&quot;elementos&quot;) &amp;&amp; elementosIcNode.get(&quot;elementos&quot;).isArray()) {</span>
+<span class="fc bfc" id="L310" title="All 2 branches covered.">      for (JsonNode elem : elementosIcNode.get(&quot;elementos&quot;)) {</span>
+<span class="fc" id="L311">        JsonNode pesoConfigurado = elem.get(&quot;peso&quot;);</span>
+
+<span class="pc bpc" id="L313" title="2 of 4 branches missed.">        if (pesoConfigurado == null || pesoConfigurado.isNull()) {</span>
+<span class="nc" id="L314">          continue;</span>
+        }
+
+<span class="pc bpc" id="L317" title="2 of 4 branches missed.">        if (!pesoConfigurado.isNumber() || pesoConfigurado.decimalValue().signum() &lt;= 0) {</span>
+<span class="nc" id="L318">          throw new ApiException(</span>
+              HttpStatus.UNPROCESSABLE_ENTITY,
+              &quot;peso_invalido&quot;,
+              &quot;Peso invalido&quot;,
+<span class="nc" id="L322">              &quot;La plantilla contiene un peso invalido para &quot; + elem.path(&quot;elemento_ref&quot;).asText());</span>
+        }
+
+<span class="fc" id="L325">        String referencia = elem.path(&quot;elemento_ref&quot;).asText();</span>
+
+<span class="pc bpc" id="L327" title="1 of 2 branches missed.">        if (referencia.isBlank()) {</span>
+<span class="nc" id="L328">          throw new ApiException(</span>
+              HttpStatus.UNPROCESSABLE_ENTITY,
+              &quot;referencia_elemento_invalida&quot;,
+              &quot;Referencia invalida&quot;,
+              &quot;La plantilla contiene un peso sin referencia de elemento.&quot;);
+        }
+
+<span class="pc bpc" id="L335" title="1 of 2 branches missed.">        String nombre = elem.hasNonNull(&quot;nombre&quot;) ? elem.get(&quot;nombre&quot;).asText() : referencia;</span>
+
+<span class="fc" id="L337">        ConfiguracionIcElemento configuracion =</span>
+            new ConfiguracionIcElemento(
+<span class="fc" id="L339">                UUID.randomUUID(),</span>
+                guardada,
+                referencia,
+<span class="fc" id="L342">                pesoConfigurado.decimalValue(),</span>
+                nombre,
+                ahora);
+
+<span class="fc" id="L346">        configuracionesIc.save(configuracion);</span>
+<span class="fc" id="L347">      }</span>
+    }
+
+<span class="fc bfc" id="L350" title="All 2 branches covered.">    if (anterior != null) {</span>
+<span class="fc" id="L351">      Set&lt;String&gt; origen =</span>
+<span class="fc" id="L352">          new java.util.LinkedHashSet&lt;&gt;(campoExtractor.extraerCampos(anterior.getEsquema()));</span>
+<span class="fc" id="L353">      Set&lt;String&gt; destino = new java.util.LinkedHashSet&lt;&gt;(campoExtractor.extraerCampos(esquema));</span>
+<span class="fc" id="L354">      List&lt;MapeoCampoFormulario&gt; declaraciones = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L355" title="All 2 branches covered.">      for (String campo : origen) {</span>
+<span class="fc" id="L356">        boolean equivalente = destino.contains(campo);</span>
+<span class="fc" id="L357">        declaraciones.add(</span>
+            new MapeoCampoFormulario(
+<span class="fc" id="L359">                UUID.randomUUID(),</span>
+                anterior,
+                guardada,
+                campo,
+<span class="pc bpc" id="L363" title="1 of 2 branches missed.">                equivalente ? campo : null,</span>
+<span class="pc bpc" id="L364" title="1 of 2 branches missed.">                equivalente ? TipoMapeoCampo.EQUIVALENTE : TipoMapeoCampo.ELIMINADO,</span>
+                &quot;Declaracion inicial desde plantilla SIECA; revisar antes de publicar&quot;,
+                usuarioId,
+                ahora));
+<span class="fc" id="L368">      }</span>
+<span class="fc bfc" id="L369" title="All 2 branches covered.">      for (String campo : destino) {</span>
+<span class="pc bpc" id="L370" title="1 of 2 branches missed.">        if (!origen.contains(campo)) {</span>
+<span class="nc" id="L371">          declaraciones.add(</span>
+              new MapeoCampoFormulario(
+<span class="nc" id="L373">                  UUID.randomUUID(),</span>
+                  anterior,
+                  guardada,
+                  null,
+                  campo,
+                  TipoMapeoCampo.NUEVO,
+                  &quot;Campo nuevo de plantilla SIECA&quot;,
+                  usuarioId,
+                  ahora));
+        }
+<span class="fc" id="L383">      }</span>
+<span class="fc" id="L384">      mapeos.saveAll(declaraciones);</span>
+    }
+
+<span class="fc" id="L387">    return construirRespuestaDetallada(guardada);</span>
+  }
+
+  @Transactional
+  @PreAuthorize(&quot;hasAnyRole('ADMINISTRADOR', 'CATEDRATICO')&quot;)
+  @Auditable(
+      accion = AccionAuditoria.MODIFICAR,
+      entidad = &quot;version_formulario&quot;,
+      idArg = &quot;id&quot;,
+      tipo = VersionFormulario.class,
+      recargarPosteriores = true)
+  public VersionFormularioResponse actualizarBorrador(
+      UUID id,
+      JsonNode esquema,
+      JsonNode vinculosAlmacenamiento,
+      JsonNode reglasEvaluacionIc,
+      String nuevoCodigo,
+      UUID usuarioId) {
+<span class="fc" id="L405">    VersionFormulario version =</span>
+        versiones
+<span class="fc" id="L407">            .findById(id)</span>
+<span class="fc" id="L408">            .orElseThrow(</span>
+                () -&gt;
+<span class="nc" id="L410">                    new ApiException(</span>
+                        HttpStatus.NOT_FOUND,
+                        &quot;version_no_encontrada&quot;,
+                        &quot;Versión no encontrada&quot;,
+                        &quot;No existe una versión con identificador &quot; + id));
+
+<span class="fc bfc" id="L416" title="All 2 branches covered.">    if (version.getEstado() == EstadoVersionFormulario.PUBLICADA) {</span>
+<span class="fc" id="L417">      throw new ApiException(</span>
+          HttpStatus.CONFLICT,
+          &quot;version_inmutable&quot;,
+          &quot;Versión inmutable&quot;,
+          &quot;Una versión publicada no puede ser modificada. Cree una nueva versión a partir de ella (RN-FRM-03).&quot;);
+    }
+
+<span class="fc" id="L424">    schemaValidator.validarEsquema(esquema);</span>
+<span class="pc bpc" id="L425" title="1 of 2 branches missed.">    if (reglasEvaluacionIc != null) {</span>
+<span class="fc" id="L426">      gt.usac.cunoc.sgp.formulario.validation.ValidadorCalibracionIc.validar(reglasEvaluacionIc);</span>
+    }
+
+<span class="pc bpc" id="L429" title="2 of 6 branches missed.">    if (nuevoCodigo != null &amp;&amp; !nuevoCodigo.isBlank() &amp;&amp; !nuevoCodigo.equals(version.getCodigo())) {</span>
+<span class="nc bnc" id="L430" title="All 2 branches missed.">      if (versiones.existsByCodigo(nuevoCodigo)) {</span>
+<span class="nc" id="L431">        throw new ApiException(</span>
+            HttpStatus.CONFLICT,
+            &quot;codigo_duplicado&quot;,
+            &quot;Código duplicado&quot;,
+            &quot;Ya existe otra versión con el código '&quot; + nuevoCodigo + &quot;'&quot;);
+      }
+<span class="nc" id="L437">      version.setCodigo(nuevoCodigo);</span>
+    }
+
+<span class="fc" id="L440">    version.setEsquema(esquema);</span>
+<span class="pc bpc" id="L441" title="1 of 2 branches missed.">    if (vinculosAlmacenamiento != null) {</span>
+<span class="nc" id="L442">      version.setVinculosAlmacenamiento(vinculosAlmacenamiento);</span>
+    }
+<span class="pc bpc" id="L444" title="1 of 2 branches missed.">    if (reglasEvaluacionIc != null) {</span>
+<span class="fc" id="L445">      version.setReglasEvaluacionIc(reglasEvaluacionIc.deepCopy());</span>
+<span class="fc" id="L446">      version.setCalibradoPorId(usuarioId);</span>
+<span class="fc" id="L447">      version.setCalibradoEn(clock.instant());</span>
+    }
+<span class="fc" id="L449">    version.setActualizadoEn(clock.instant());</span>
+
+<span class="fc" id="L451">    VersionFormulario guardada = versiones.save(version);</span>
+<span class="fc" id="L452">    return construirRespuestaDetallada(guardada);</span>
+  }
+
+  @Transactional
+  @PreAuthorize(&quot;hasAnyRole('ADMINISTRADOR', 'CATEDRATICO')&quot;)
+  @Auditable(
+      accion = AccionAuditoria.MODIFICAR,
+      entidad = &quot;version_formulario&quot;,
+      idArg = &quot;id&quot;,
+      tipo = VersionFormulario.class,
+      recargarPosteriores = true)
+  public List&lt;ConfiguracionIcElementoResponse&gt; calibrarPesos(
+      UUID id, List&lt;ConfiguracionIcElementoRequest&gt; nuevosPesos, UUID usuarioId) {
+
+<span class="fc" id="L466">    VersionFormulario version =</span>
+        versiones
+<span class="fc" id="L468">            .findById(id)</span>
+<span class="fc" id="L469">            .orElseThrow(</span>
+                () -&gt;
+<span class="nc" id="L471">                    new ApiException(</span>
+                        HttpStatus.NOT_FOUND,
+                        &quot;version_no_encontrada&quot;,
+                        &quot;Version no encontrada&quot;,
+                        &quot;No existe una version con identificador &quot; + id));
+
+<span class="fc bfc" id="L477" title="All 2 branches covered.">    if (version.getEstado() == EstadoVersionFormulario.PUBLICADA) {</span>
+<span class="fc" id="L478">      throw new ApiException(</span>
+          HttpStatus.CONFLICT,
+          &quot;version_inmutable&quot;,
+          &quot;Version inmutable&quot;,
+          &quot;Los pesos de una version publicada estan congelados. Cree una nueva version.&quot;);
+    }
+
+<span class="pc bpc" id="L485" title="2 of 4 branches missed.">    if (nuevosPesos == null || nuevosPesos.isEmpty()) {</span>
+<span class="nc" id="L486">      throw new ApiException(</span>
+          HttpStatus.UNPROCESSABLE_ENTITY,
+          &quot;pesos_incompletos&quot;,
+          &quot;Pesos incompletos&quot;,
+          &quot;Debe indicar al menos un elemento con su peso.&quot;);
+    }
+
+<span class="fc" id="L493">    Set&lt;String&gt; referencias = new HashSet&lt;&gt;();</span>
+<span class="fc" id="L494">    List&lt;ConfiguracionIcElemento&gt; lista = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L495">    Instant ahora = clock.instant();</span>
+
+<span class="fc bfc" id="L497" title="All 2 branches covered.">    for (ConfiguracionIcElementoRequest req : nuevosPesos) {</span>
+<span class="pc bpc" id="L498" title="1 of 2 branches missed.">      if (req == null) {</span>
+<span class="nc" id="L499">        throw new ApiException(</span>
+            HttpStatus.UNPROCESSABLE_ENTITY,
+            &quot;configuracion_ic_invalida&quot;,
+            &quot;Configuracion invalida&quot;,
+            &quot;La lista de pesos no puede contener elementos nulos.&quot;);
+      }
+
+<span class="pc bpc" id="L506" title="1 of 4 branches missed.">      if (req.peso() == null || req.peso().signum() &lt;= 0) {</span>
+<span class="fc" id="L507">        throw new ApiException(</span>
+            HttpStatus.UNPROCESSABLE_ENTITY,
+            &quot;peso_invalido&quot;,
+            &quot;Peso invalido&quot;,
+<span class="fc" id="L511">            &quot;El peso para '&quot; + req.elementoRef() + &quot;' debe ser mayor a cero.&quot;,</span>
+<span class="fc" id="L512">            java.util.List.of(</span>
+<span class="fc" id="L513">                java.util.Map.of(&quot;campo&quot;, &quot;peso&quot;, &quot;mensaje&quot;, &quot;Debe ser mayor a cero.&quot;)));</span>
+      }
+
+<span class="pc bpc" id="L516" title="2 of 4 branches missed.">      if (req.peso().scale() &gt; 6 || req.peso().precision() - req.peso().scale() &gt; 6) {</span>
+<span class="nc" id="L517">        throw new ApiException(</span>
+            HttpStatus.UNPROCESSABLE_ENTITY,
+            &quot;peso_invalido&quot;,
+            &quot;Peso invalido&quot;,
+            &quot;El peso para '&quot;
+<span class="nc" id="L522">                + req.elementoRef()</span>
+                + &quot;' admite hasta 6 digitos enteros y 6 decimales.&quot;);
+      }
+
+<span class="pc bpc" id="L526" title="1 of 2 branches missed.">      if (req.elementoRef() == null</span>
+<span class="pc bpc" id="L527" title="1 of 2 branches missed.">          || req.elementoRef().isBlank()</span>
+<span class="pc bpc" id="L528" title="1 of 2 branches missed.">          || req.elementoRef().length() &gt; 300</span>
+<span class="pc bpc" id="L529" title="1 of 2 branches missed.">          || !req.elementoRef().startsWith(&quot;/&quot;)</span>
+<span class="pc bpc" id="L530" title="1 of 2 branches missed.">          || req.elementoRef().length() == 1) {</span>
+<span class="nc" id="L531">        throw new ApiException(</span>
+            HttpStatus.UNPROCESSABLE_ENTITY,
+            &quot;referencia_elemento_invalida&quot;,
+            &quot;Referencia invalida&quot;,
+            &quot;Cada elemento requiere una referencia que comience con / y no supere 300 caracteres.&quot;);
+      }
+
+<span class="fc" id="L538">      String referencia = req.elementoRef().strip();</span>
+
+<span class="fc bfc" id="L540" title="All 2 branches covered.">      if (!referencias.add(referencia)) {</span>
+<span class="fc" id="L541">        throw new ApiException(</span>
+            HttpStatus.UNPROCESSABLE_ENTITY,
+            &quot;elemento_ic_duplicado&quot;,
+            &quot;Elemento duplicado&quot;,
+            &quot;La referencia aparece mas de una vez: &quot; + referencia);
+      }
+
+<span class="pc bpc" id="L548" title="1 of 2 branches missed.">      if (req.descripcion() == null</span>
+<span class="pc bpc" id="L549" title="1 of 2 branches missed.">          || req.descripcion().isBlank()</span>
+<span class="pc bpc" id="L550" title="1 of 2 branches missed.">          || req.descripcion().length() &gt; 500) {</span>
+<span class="nc" id="L551">        throw new ApiException(</span>
+            HttpStatus.UNPROCESSABLE_ENTITY,
+            &quot;descripcion_elemento_invalida&quot;,
+            &quot;Descripcion invalida&quot;,
+            &quot;El elemento &quot; + referencia + &quot; requiere una descripcion de hasta 500 caracteres.&quot;);
+      }
+
+<span class="fc" id="L558">      lista.add(</span>
+          new ConfiguracionIcElemento(
+<span class="fc" id="L560">              UUID.randomUUID(),</span>
+              version,
+              referencia,
+<span class="fc" id="L563">              req.peso(),</span>
+<span class="fc" id="L564">              req.descripcion().strip(),</span>
+              ahora));
+<span class="fc" id="L566">    }</span>
+
+<span class="fc" id="L568">    configuracionesIc.deleteAllByVersionFormularioId(id);</span>
+<span class="fc" id="L569">    configuracionesIc.saveAll(lista);</span>
+
+<span class="fc" id="L571">    version.setCalibradoPorId(usuarioId);</span>
+<span class="fc" id="L572">    version.setCalibradoEn(ahora);</span>
+<span class="fc" id="L573">    version.setActualizadoEn(ahora);</span>
+<span class="fc" id="L574">    versiones.save(version);</span>
+
+<span class="fc" id="L576">    return lista.stream().map(mapper::toIcElementoResponse).toList();</span>
+  }
+
+  @Transactional
+  @PreAuthorize(&quot;hasRole('ADMINISTRADOR')&quot;)
+  public List&lt;MapeoCampoResponse&gt; guardarMapeos(
+      UUID versionDestinoId, List&lt;DeclaracionMapeoRequest&gt; declaraciones, UUID usuarioId) {
+<span class="fc" id="L583">    VersionFormulario destino =</span>
+        versiones
+<span class="fc" id="L585">            .findById(versionDestinoId)</span>
+<span class="fc" id="L586">            .orElseThrow(</span>
+                () -&gt;
+<span class="nc" id="L588">                    new ApiException(</span>
+                        HttpStatus.NOT_FOUND,
+                        &quot;version_no_encontrada&quot;,
+                        &quot;Versión no encontrada&quot;,
+                        &quot;No existe la versión con identificador &quot; + versionDestinoId));
+
+<span class="pc bpc" id="L594" title="1 of 2 branches missed.">    if (destino.getVersionAnterior() == null) {</span>
+<span class="nc" id="L595">      throw new ApiException(</span>
+          HttpStatus.BAD_REQUEST,
+          &quot;sin_version_anterior&quot;,
+          &quot;Sin versión anterior&quot;,
+          &quot;La versión no tiene una versión anterior asociada para declarar mapeos.&quot;);
+    }
+
+<span class="fc" id="L602">    VersionFormulario origen = destino.getVersionAnterior();</span>
+<span class="fc" id="L603">    mapeos.deleteAllByVersionOrigenIdAndVersionDestinoId(origen.getId(), destino.getId());</span>
+
+<span class="fc" id="L605">    Instant ahora = clock.instant();</span>
+<span class="fc" id="L606">    List&lt;MapeoCampoFormulario&gt; entidadesMapeo = new ArrayList&lt;&gt;();</span>
+
+<span class="fc bfc" id="L608" title="All 2 branches covered.">    for (DeclaracionMapeoRequest d : declaraciones) {</span>
+<span class="fc" id="L609">      validarCoherenciaMapeo(d);</span>
+<span class="fc" id="L610">      entidadesMapeo.add(</span>
+          new MapeoCampoFormulario(
+<span class="fc" id="L612">              UUID.randomUUID(),</span>
+              origen,
+              destino,
+<span class="fc" id="L615">              d.elementoRefOrigen(),</span>
+<span class="fc" id="L616">              d.elementoRefDestino(),</span>
+<span class="fc" id="L617">              d.tipo(),</span>
+<span class="fc" id="L618">              d.observacion(),</span>
+              usuarioId,
+              ahora));
+<span class="fc" id="L621">    }</span>
+
+<span class="fc" id="L623">    List&lt;MapeoCampoFormulario&gt; guardados = mapeos.saveAll(entidadesMapeo);</span>
+<span class="fc" id="L624">    return guardados.stream().map(mapper::toMapeoResponse).toList();</span>
+  }
+
+  @Transactional(readOnly = true)
+  @PreAuthorize(&quot;hasAnyRole('ADMINISTRADOR', 'CATEDRATICO')&quot;)
+  public AnalisisMapeoResponse analizarMapeo(UUID versionDestinoId) {
+<span class="fc" id="L630">    VersionFormulario destino =</span>
+        versiones
+<span class="fc" id="L632">            .findById(versionDestinoId)</span>
+<span class="fc" id="L633">            .orElseThrow(</span>
+                () -&gt;
+<span class="nc" id="L635">                    new ApiException(</span>
+                        HttpStatus.NOT_FOUND,
+                        &quot;version_no_encontrada&quot;,
+                        &quot;Versión no encontrada&quot;,
+                        &quot;No existe la versión con identificador &quot; + versionDestinoId));
+
+<span class="pc bpc" id="L641" title="1 of 2 branches missed.">    if (destino.getVersionAnterior() == null) {</span>
+<span class="nc" id="L642">      return new AnalisisMapeoResponse(</span>
+          null,
+          null,
+<span class="nc" id="L645">          destino.getId(),</span>
+<span class="nc" id="L646">          destino.getCodigo(),</span>
+<span class="nc" id="L647">          Collections.emptyList(),</span>
+<span class="nc" id="L648">          campoExtractor.extraerCampos(destino.getEsquema()),</span>
+<span class="nc" id="L649">          Collections.emptyList(),</span>
+<span class="nc" id="L650">          Collections.emptyList(),</span>
+          true);
+    }
+
+<span class="fc" id="L654">    VersionFormulario origen = destino.getVersionAnterior();</span>
+<span class="fc" id="L655">    List&lt;String&gt; camposOrigen = campoExtractor.extraerCampos(origen.getEsquema());</span>
+<span class="fc" id="L656">    List&lt;String&gt; camposDestino = campoExtractor.extraerCampos(destino.getEsquema());</span>
+
+<span class="fc" id="L658">    List&lt;MapeoCampoFormulario&gt; mapeosGuardados =</span>
+<span class="fc" id="L659">        mapeos.findAllByVersionOrigenIdAndVersionDestinoId(origen.getId(), destino.getId());</span>
+
+<span class="fc" id="L661">    Set&lt;String&gt; mapeadosOrigen = new HashSet&lt;&gt;();</span>
+<span class="fc" id="L662">    Set&lt;String&gt; mapeadosDestino = new HashSet&lt;&gt;();</span>
+<span class="fc bfc" id="L663" title="All 2 branches covered.">    for (MapeoCampoFormulario m : mapeosGuardados) {</span>
+<span class="fc bfc" id="L664" title="All 2 branches covered.">      if (m.getElementoRefDestino() != null) {</span>
+<span class="fc" id="L665">        mapeadosDestino.add(m.getElementoRefDestino());</span>
+      }
+<span class="fc bfc" id="L667" title="All 2 branches covered.">      if (m.getElementoRefOrigen() != null) {</span>
+<span class="fc" id="L668">        mapeadosOrigen.add(m.getElementoRefOrigen());</span>
+      }
+<span class="fc" id="L670">    }</span>
+
+<span class="fc" id="L672">    List&lt;String&gt; pendientes =</span>
+<span class="fc bfc" id="L673" title="All 2 branches covered.">        camposOrigen.stream().filter(c -&gt; !mapeadosOrigen.contains(c)).toList();</span>
+
+<span class="fc" id="L675">    return new AnalisisMapeoResponse(</span>
+<span class="fc" id="L676">        origen.getId(),</span>
+<span class="fc" id="L677">        origen.getCodigo(),</span>
+<span class="fc" id="L678">        destino.getId(),</span>
+<span class="fc" id="L679">        destino.getCodigo(),</span>
+        camposOrigen,
+        camposDestino,
+<span class="fc" id="L682">        mapeosGuardados.stream().map(mapper::toMapeoResponse).toList(),</span>
+        pendientes,
+<span class="fc bfc" id="L684" title="All 4 branches covered.">        pendientes.isEmpty() &amp;&amp; camposDestino.stream().allMatch(mapeadosDestino::contains));</span>
+  }
+
+  @Transactional
+  @PreAuthorize(&quot;hasRole('ADMINISTRADOR')&quot;)
+  @Auditable(accion = AccionAuditoria.CAMBIAR_ESTADO, entidad = &quot;version_formulario&quot;)
+  public VersionFormularioResponse publicar(
+      UUID id, PublicarVersionRequest request, UUID usuarioId) {
+
+<span class="fc" id="L693">    VersionFormulario version =</span>
+        versiones
+<span class="fc" id="L695">            .findById(id)</span>
+<span class="fc" id="L696">            .orElseThrow(</span>
+                () -&gt;
+<span class="nc" id="L698">                    new ApiException(</span>
+                        HttpStatus.NOT_FOUND,
+                        &quot;version_no_encontrada&quot;,
+                        &quot;Versión no encontrada&quot;,
+                        &quot;No existe una versión con identificador &quot; + id));
+
+<span class="pc bpc" id="L704" title="1 of 2 branches missed.">    if (version.getEstado() == EstadoVersionFormulario.PUBLICADA) {</span>
+<span class="nc" id="L705">      throw new ApiException(</span>
+          HttpStatus.CONFLICT,
+          &quot;version_ya_publicada&quot;,
+          &quot;Versión ya publicada&quot;,
+<span class="nc" id="L709">          &quot;La versión '&quot; + version.getCodigo() + &quot;' ya fue publicada previamente.&quot;);</span>
+    }
+
+    // 1. Validar esquema
+<span class="fc" id="L713">    schemaValidator.validarEsquema(version.getEsquema());</span>
+
+    // 2. Si hay mapeos en el request, guardarlos
+<span class="pc bpc" id="L716" title="2 of 6 branches missed.">    if (request != null &amp;&amp; request.mapeos() != null &amp;&amp; !request.mapeos().isEmpty()) {</span>
+<span class="fc" id="L717">      guardarMapeos(version.getId(), request.mapeos(), usuarioId);</span>
+    }
+
+    // 3. Validar mapeo de campos con la versión anterior (RN-FRM-06)
+<span class="fc bfc" id="L721" title="All 2 branches covered.">    if (version.getVersionAnterior() != null) {</span>
+<span class="fc" id="L722">      AnalisisMapeoResponse analisis = analizarMapeo(version.getId());</span>
+<span class="fc bfc" id="L723" title="All 2 branches covered.">      if (!analisis.mapeoCompleto()) {</span>
+<span class="fc" id="L724">        throw new ApiException(</span>
+            HttpStatus.UNPROCESSABLE_ENTITY,
+            &quot;mapeo_incompleto&quot;,
+            &quot;Mapeo de campos incompleto&quot;,
+            &quot;Debe declarar para cada campo de la versión anterior si es equivalente, renombrado, nuevo o eliminado. Faltan por declarar: &quot;
+<span class="fc" id="L729">                + analisis.camposOrigenSinMapeo()</span>
+                + &quot;; campos destino sin declarar: &quot;
+<span class="fc" id="L731">                + analisis.camposDestinoSinMapeo());</span>
+      }
+    }
+
+<span class="fc" id="L735">    validarPesosParaPublicacion(version);</span>
+<span class="fc" id="L736">    validarEscalaParaPublicacion(version);</span>
+<span class="fc" id="L737">    validarReglasParaPublicacion(version);</span>
+<span class="fc" id="L738">    validarConversionesParaPublicacion(version);</span>
+<span class="fc" id="L739">    ValidadorReglasCriticasIc.validarCatalogo(</span>
+<span class="fc" id="L740">        version.getReglasEvaluacionIc().get(&quot;reglas_evaluacion_ic&quot;),</span>
+<span class="fc" id="L741">        version.getReglasEvaluacionIc());</span>
+
+<span class="fc" id="L743">    Instant ahora = clock.instant();</span>
+
+<span class="fc" id="L745">    JsonNode algoritmoNode =</span>
+<span class="fc" id="L746">        version.getReglasEvaluacionIc().at(&quot;/reglas_evaluacion_ic/version_algoritmo&quot;);</span>
+
+<span class="pc bpc" id="L748" title="1 of 2 branches missed.">    if (!algoritmoNode.isTextual()</span>
+<span class="pc bpc" id="L749" title="1 of 2 branches missed.">        || algoritmoNode.asText().isBlank()</span>
+<span class="pc bpc" id="L750" title="1 of 2 branches missed.">        || algoritmoNode.asText().length() &gt; 50) {</span>
+<span class="nc" id="L751">      throw new ApiException(</span>
+          HttpStatus.UNPROCESSABLE_ENTITY,
+          &quot;configuracion_ic_incompleta&quot;,
+          &quot;Algoritmo IC invalido&quot;,
+          &quot;Debe configurar version_algoritmo con un identificador de hasta 50 caracteres.&quot;);
+    }
+
+<span class="fc" id="L758">    String versionAlgoritmo = algoritmoNode.asText();</span>
+
+    // 5. Desactivar versión activa anterior asegurando que solo exista una activa (RN-FRM-04)
+<span class="fc" id="L761">    versiones.desactivarTodas();</span>
+<span class="fc" id="L762">    versiones.flush();</span>
+
+    // 6. Publicar y activar
+<span class="fc" id="L765">    String hash = calcularSha256(version.getEsquema());</span>
+<span class="fc" id="L766">    version.setHashContenido(hash);</span>
+<span class="fc" id="L767">    version.setVersionAlgoritmoIc(versionAlgoritmo);</span>
+<span class="fc" id="L768">    version.setEstado(EstadoVersionFormulario.PUBLICADA);</span>
+<span class="fc" id="L769">    version.setActiva(true);</span>
+<span class="fc" id="L770">    version.setPublicadoPorId(usuarioId);</span>
+<span class="fc" id="L771">    version.setPublicadoEn(ahora);</span>
+<span class="fc" id="L772">    version.setActualizadoEn(ahora);</span>
+
+<span class="fc" id="L774">    VersionFormulario publicada = versiones.saveAndFlush(version);</span>
+<span class="fc" id="L775">    avisosAcademicos.calibracionPendiente(publicada.getId());</span>
+<span class="fc" id="L776">    return construirRespuestaDetallada(publicada);</span>
+  }
+
+  @Transactional(propagation = org.springframework.transaction.annotation.Propagation.MANDATORY)
+  public VersionFormularioResponse sembrarPlantillaInicial(String codigo, UUID usuarioId) {
+<span class="fc" id="L781">    var creada = cargarPlantillaSiecaInicial(codigo, usuarioId);</span>
+<span class="fc" id="L782">    return publicar(creada.id(), null, usuarioId);</span>
+  }
+
+  private void validarPesosParaPublicacion(VersionFormulario version) {
+<span class="fc" id="L786">    JsonNode catalogo = version.getReglasEvaluacionIc();</span>
+<span class="pc bpc" id="L787" title="1 of 2 branches missed.">    JsonNode elementos = catalogo == null ? null : catalogo.get(&quot;elementos&quot;);</span>
+
+<span class="pc bpc" id="L789" title="3 of 6 branches missed.">    if (elementos == null || !elementos.isArray() || elementos.isEmpty()) {</span>
+<span class="nc" id="L790">      throw new ApiException(</span>
+          HttpStatus.UNPROCESSABLE_ENTITY,
+          &quot;catalogo_ic_incompleto&quot;,
+          &quot;Catalogo IC incompleto&quot;,
+          &quot;La version requiere un catalogo de elementos evaluables para verificar sus pesos.&quot;);
+    }
+
+<span class="fc" id="L797">    Set&lt;String&gt; esperados = new java.util.TreeSet&lt;&gt;();</span>
+
+<span class="fc bfc" id="L799" title="All 2 branches covered.">    for (JsonNode elemento : elementos) {</span>
+<span class="fc" id="L800">      JsonNode referenciaNode = elemento.get(&quot;elemento_ref&quot;);</span>
+
+<span class="pc bpc" id="L802" title="1 of 2 branches missed.">      if (referenciaNode == null</span>
+<span class="pc bpc" id="L803" title="1 of 2 branches missed.">          || !referenciaNode.isTextual()</span>
+<span class="pc bpc" id="L804" title="1 of 2 branches missed.">          || referenciaNode.asText().isBlank()</span>
+<span class="pc bpc" id="L805" title="1 of 2 branches missed.">          || !referenciaNode.asText().startsWith(&quot;/&quot;)</span>
+<span class="pc bpc" id="L806" title="1 of 2 branches missed.">          || referenciaNode.asText().length() == 1</span>
+<span class="pc bpc" id="L807" title="1 of 2 branches missed.">          || referenciaNode.asText().length() &gt; 300) {</span>
+<span class="nc" id="L808">        throw new ApiException(</span>
+            HttpStatus.UNPROCESSABLE_ENTITY,
+            &quot;referencia_elemento_invalida&quot;,
+            &quot;Referencia invalida&quot;,
+            &quot;El catalogo contiene un elemento sin una referencia valida.&quot;);
+      }
+
+<span class="fc" id="L815">      String referencia = referenciaNode.asText();</span>
+
+<span class="pc bpc" id="L817" title="2 of 4 branches missed.">      if (!referencia.equals(referencia.strip()) || !esperados.add(referencia)) {</span>
+<span class="nc" id="L818">        throw new ApiException(</span>
+            HttpStatus.UNPROCESSABLE_ENTITY,
+            &quot;catalogo_ic_invalido&quot;,
+            &quot;Catalogo IC invalido&quot;,
+            &quot;La referencia esta duplicada o contiene espacios externos: &quot; + referencia);
+      }
+<span class="fc" id="L824">    }</span>
+
+<span class="fc" id="L826">    List&lt;ConfiguracionIcElemento&gt; pesos =</span>
+<span class="fc" id="L827">        configuracionesIc.findAllByVersionFormularioId(version.getId());</span>
+
+<span class="fc" id="L829">    Set&lt;String&gt; configurados = new HashSet&lt;&gt;();</span>
+
+<span class="fc bfc" id="L831" title="All 2 branches covered.">    for (ConfiguracionIcElemento configuracion : pesos) {</span>
+<span class="fc" id="L832">      String referencia = configuracion.getElementoRef();</span>
+
+<span class="pc bpc" id="L834" title="2 of 4 branches missed.">      if (referencia == null || !esperados.contains(referencia)) {</span>
+<span class="nc" id="L835">        throw new ApiException(</span>
+            HttpStatus.UNPROCESSABLE_ENTITY,
+            &quot;elemento_ic_desconocido&quot;,
+            &quot;Elemento IC desconocido&quot;,
+            &quot;El peso corresponde a un elemento que no pertenece al catalogo: &quot; + referencia);
+      }
+
+<span class="pc bpc" id="L842" title="1 of 2 branches missed.">      if (!configurados.add(referencia)) {</span>
+<span class="nc" id="L843">        throw new ApiException(</span>
+            HttpStatus.UNPROCESSABLE_ENTITY,
+            &quot;elemento_ic_duplicado&quot;,
+            &quot;Elemento duplicado&quot;,
+            &quot;Existe mas de un peso para el elemento &quot; + referencia);
+      }
+
+<span class="pc bpc" id="L850" title="1 of 2 branches missed.">      if (configuracion.getPeso() == null</span>
+<span class="pc bpc" id="L851" title="1 of 2 branches missed.">          || configuracion.getPeso().signum() &lt;= 0</span>
+<span class="pc bpc" id="L852" title="1 of 2 branches missed.">          || configuracion.getPeso().scale() &gt; 6</span>
+<span class="pc bpc" id="L853" title="1 of 2 branches missed.">          || configuracion.getPeso().precision() - configuracion.getPeso().scale() &gt; 6) {</span>
+<span class="nc" id="L854">        throw new ApiException(</span>
+            HttpStatus.UNPROCESSABLE_ENTITY,
+            &quot;peso_invalido&quot;,
+            &quot;Peso invalido&quot;,
+            &quot;El elemento &quot;
+                + referencia
+                + &quot; requiere un peso positivo con hasta 6 digitos enteros y 6 decimales.&quot;);
+      }
+<span class="fc" id="L862">    }</span>
+
+<span class="fc" id="L864">    Set&lt;String&gt; pendientes = new java.util.TreeSet&lt;&gt;(esperados);</span>
+<span class="fc" id="L865">    pendientes.removeAll(configurados);</span>
+
+<span class="fc bfc" id="L867" title="All 2 branches covered.">    if (!pendientes.isEmpty()) {</span>
+<span class="fc" id="L868">      throw new ApiException(</span>
+          HttpStatus.UNPROCESSABLE_ENTITY,
+          &quot;pesos_incompletos&quot;,
+          &quot;Pesos incompletos&quot;,
+<span class="fc" id="L872">          &quot;Falta configurar el peso de los siguientes elementos: &quot; + String.join(&quot;, &quot;, pendientes));</span>
+    }
+<span class="fc" id="L874">  }</span>
+
+  private void validarCoherenciaMapeo(DeclaracionMapeoRequest d) {
+<span class="fc bfc" id="L877" title="All 2 branches covered.">    if (d.tipo() == TipoMapeoCampo.NUEVO) {</span>
+<span class="pc bpc" id="L878" title="1 of 4 branches missed.">      if (d.elementoRefOrigen() != null || d.elementoRefDestino() == null) {</span>
+<span class="fc" id="L879">        throw new ApiException(</span>
+            HttpStatus.UNPROCESSABLE_ENTITY,
+            &quot;mapeo_incoherente&quot;,
+            &quot;Mapeo incoherente&quot;,
+            &quot;Un campo NUEVO no debe tener origen y requiere referencia de destino.&quot;);
+      }
+<span class="pc bpc" id="L885" title="1 of 2 branches missed.">    } else if (d.tipo() == TipoMapeoCampo.ELIMINADO) {</span>
+<span class="pc bpc" id="L886" title="2 of 4 branches missed.">      if (d.elementoRefOrigen() == null || d.elementoRefDestino() != null) {</span>
+<span class="nc" id="L887">        throw new ApiException(</span>
+            HttpStatus.UNPROCESSABLE_ENTITY,
+            &quot;mapeo_incoherente&quot;,
+            &quot;Mapeo incoherente&quot;,
+            &quot;Un campo ELIMINADO requiere referencia de origen y no debe tener destino.&quot;);
+      }
+    } else {
+<span class="nc bnc" id="L894" title="All 4 branches missed.">      if (d.elementoRefOrigen() == null || d.elementoRefDestino() == null) {</span>
+<span class="nc" id="L895">        throw new ApiException(</span>
+            HttpStatus.UNPROCESSABLE_ENTITY,
+            &quot;mapeo_incoherente&quot;,
+            &quot;Mapeo incoherente&quot;,
+            &quot;Un campo &quot;
+<span class="nc" id="L900">                + d.tipo()</span>
+                + &quot; requiere tanto referencia de origen como referencia de destino.&quot;);
+      }
+    }
+<span class="fc" id="L904">  }</span>
+
+  private String calcularSha256(JsonNode jsonNode) {
+    try {
+<span class="fc" id="L908">      byte[] bytes = objectMapper.writeValueAsBytes(jsonNode);</span>
+<span class="fc" id="L909">      MessageDigest digest = MessageDigest.getInstance(&quot;SHA-256&quot;);</span>
+<span class="fc" id="L910">      byte[] hash = digest.digest(bytes);</span>
+<span class="fc" id="L911">      StringBuilder hex = new StringBuilder();</span>
+<span class="fc bfc" id="L912" title="All 2 branches covered.">      for (byte b : hash) {</span>
+<span class="fc" id="L913">        hex.append(String.format(&quot;%02x&quot;, b));</span>
+      }
+<span class="fc" id="L915">      return hex.toString();</span>
+<span class="nc" id="L916">    } catch (Exception e) {</span>
+<span class="nc" id="L917">      throw new IllegalStateException(&quot;Error al calcular hash SHA-256&quot;, e);</span>
+    }
+  }
+
+  private VersionFormularioResponse construirRespuestaDetallada(VersionFormulario version) {
+<span class="fc" id="L922">    List&lt;ConfiguracionIcElementoResponse&gt; listaPesos =</span>
+<span class="fc" id="L923">        configuracionesIc.findAllByVersionFormularioId(version.getId()).stream()</span>
+<span class="fc" id="L924">            .map(mapper::toIcElementoResponse)</span>
+<span class="fc" id="L925">            .toList();</span>
+
+    List&lt;MapeoCampoResponse&gt; listaMapeos =
+<span class="fc bfc" id="L928" title="All 2 branches covered.">        version.getVersionAnterior() != null</span>
+            ? mapeos
+<span class="fc" id="L930">                .findAllByVersionOrigenIdAndVersionDestinoId(</span>
+<span class="fc" id="L931">                    version.getVersionAnterior().getId(), version.getId())</span>
+<span class="fc" id="L932">                .stream()</span>
+<span class="fc" id="L933">                .map(mapper::toMapeoResponse)</span>
+<span class="fc" id="L934">                .toList()</span>
+<span class="fc" id="L935">            : Collections.emptyList();</span>
+
+<span class="fc" id="L937">    var aprobacion =</span>
+        aprobaciones
+<span class="fc" id="L939">            .findByVersionFormularioId(version.getId())</span>
+<span class="fc" id="L940">            .map(AprobacionCalibracionResponse::de)</span>
+<span class="fc" id="L941">            .orElse(null);</span>
+<span class="fc" id="L942">    return mapper.toResponse(version, listaPesos, listaMapeos, aprobacion);</span>
+  }
+
+  @Transactional
+  @PreAuthorize(&quot;hasAnyRole('ADMINISTRADOR', 'CATEDRATICO')&quot;)
+  @Auditable(
+      accion = AccionAuditoria.MODIFICAR,
+      entidad = &quot;version_formulario&quot;,
+      idArg = &quot;id&quot;,
+      tipo = VersionFormulario.class,
+      recargarPosteriores = true)
+  public VersionFormularioResponse configurarEscala(
+      UUID id, gt.usac.cunoc.sgp.formulario.dto.ConfigurarEscalaIcRequest request, UUID usuarioId) {
+<span class="fc" id="L955">    VersionFormulario version =</span>
+        versiones
+<span class="fc" id="L957">            .findById(id)</span>
+<span class="fc" id="L958">            .orElseThrow(</span>
+                () -&gt;
+<span class="nc" id="L960">                    new ApiException(</span>
+                        HttpStatus.NOT_FOUND,
+                        &quot;version_no_encontrada&quot;,
+                        &quot;Version no encontrada&quot;,
+                        &quot;No existe una version con identificador &quot; + id));
+
+<span class="fc bfc" id="L966" title="All 2 branches covered.">    if (version.getEstado() == EstadoVersionFormulario.PUBLICADA) {</span>
+<span class="fc" id="L967">      throw new ApiException(</span>
+          HttpStatus.CONFLICT,
+          &quot;version_inmutable&quot;,
+          &quot;Version inmutable&quot;,
+          &quot;La escala de una version publicada no puede modificarse. Cree una nueva version.&quot;);
+    }
+
+<span class="fc" id="L974">    Set&lt;String&gt; niveles = Set.of(&quot;NO_PRESENTA&quot;, &quot;LEVE&quot;, &quot;MODERADO&quot;, &quot;SEVERO&quot;);</span>
+
+<span class="pc bpc" id="L976" title="1 of 2 branches missed.">    if (request == null</span>
+<span class="pc bpc" id="L977" title="1 of 2 branches missed.">        || request.valores() == null</span>
+<span class="fc bfc" id="L978" title="All 2 branches covered.">        || !request.valores().keySet().equals(niveles)) {</span>
+<span class="fc" id="L979">      throw new ApiException(</span>
+          HttpStatus.UNPROCESSABLE_ENTITY,
+          &quot;escala_incompleta&quot;,
+          &quot;Escala incompleta&quot;,
+          &quot;Debe configurar exactamente los niveles NO_PRESENTA, LEVE, MODERADO y SEVERO.&quot;);
+    }
+
+<span class="fc bfc" id="L986" title="All 2 branches covered.">    for (String nivel : niveles) {</span>
+<span class="fc" id="L987">      java.math.BigDecimal valor = request.valores().get(nivel);</span>
+
+<span class="pc bpc" id="L989" title="1 of 2 branches missed.">      if (valor == null</span>
+<span class="fc bfc" id="L990" title="All 2 branches covered.">          || valor.signum() &lt; 0</span>
+<span class="fc bfc" id="L991" title="All 2 branches covered.">          || valor.compareTo(java.math.BigDecimal.valueOf(4)) &gt; 0) {</span>
+<span class="fc" id="L992">        throw new ApiException(</span>
+            HttpStatus.UNPROCESSABLE_ENTITY,
+            &quot;severidad_invalida&quot;,
+            &quot;Severidad invalida&quot;,
+            &quot;El nivel &quot; + nivel + &quot; requiere un valor entre 0 y 4.&quot;);
+      }
+<span class="fc" id="L998">    }</span>
+
+<span class="fc bfc" id="L1000" title="All 2 branches covered.">    if (request.valores().get(&quot;NO_PRESENTA&quot;).signum() != 0) {</span>
+<span class="fc" id="L1001">      throw new ApiException(</span>
+          HttpStatus.UNPROCESSABLE_ENTITY,
+          &quot;severidad_invalida&quot;,
+          &quot;Severidad invalida&quot;,
+          &quot;El nivel NO_PRESENTA debe tener valor 0.&quot;);
+    }
+
+<span class="fc" id="L1008">    JsonNode configuracionActual = version.getReglasEvaluacionIc();</span>
+
+<span class="pc bpc" id="L1010" title="2 of 4 branches missed.">    if (configuracionActual == null || !configuracionActual.isObject()) {</span>
+<span class="nc" id="L1011">      throw new ApiException(</span>
+          HttpStatus.UNPROCESSABLE_ENTITY,
+          &quot;configuracion_ic_invalida&quot;,
+          &quot;Configuracion IC invalida&quot;,
+          &quot;La version requiere una configuracion IC de tipo objeto.&quot;);
+    }
+
+<span class="fc" id="L1018">    com.fasterxml.jackson.databind.node.ObjectNode configuracion = configuracionActual.deepCopy();</span>
+
+<span class="fc" id="L1020">    JsonNode reglasActuales = configuracion.get(&quot;reglas_evaluacion_ic&quot;);</span>
+
+<span class="pc bpc" id="L1022" title="2 of 4 branches missed.">    if (reglasActuales != null &amp;&amp; !reglasActuales.isObject()) {</span>
+<span class="nc" id="L1023">      throw new ApiException(</span>
+          HttpStatus.UNPROCESSABLE_ENTITY,
+          &quot;configuracion_ic_invalida&quot;,
+          &quot;Configuracion IC invalida&quot;,
+          &quot;Las reglas de evaluacion IC deben ser un objeto.&quot;);
+    }
+
+    com.fasterxml.jackson.databind.node.ObjectNode reglas =
+<span class="pc bpc" id="L1031" title="1 of 2 branches missed.">        reglasActuales == null</span>
+<span class="nc" id="L1032">            ? objectMapper.createObjectNode()</span>
+<span class="fc" id="L1033">            : (com.fasterxml.jackson.databind.node.ObjectNode) reglasActuales;</span>
+
+<span class="fc" id="L1035">    com.fasterxml.jackson.databind.node.ObjectNode escala = objectMapper.createObjectNode();</span>
+
+<span class="fc bfc" id="L1037" title="All 2 branches covered.">    for (String nivel : niveles.stream().sorted().toList()) {</span>
+<span class="fc" id="L1038">      escala.put(nivel, request.valores().get(nivel));</span>
+<span class="fc" id="L1039">    }</span>
+
+    try {
+<span class="fc" id="L1042">      reglas.set(&quot;escala_severidad&quot;, objectMapper.readTree(escala.toString()));</span>
+<span class="nc" id="L1043">    } catch (com.fasterxml.jackson.core.JsonProcessingException e) {</span>
+<span class="nc" id="L1044">      throw new IllegalStateException(&quot;No se pudo serializar la escala del IC&quot;, e);</span>
+<span class="fc" id="L1045">    }</span>
+<span class="fc" id="L1046">    configuracion.set(&quot;reglas_evaluacion_ic&quot;, reglas);</span>
+
+<span class="fc" id="L1048">    Instant ahora = clock.instant();</span>
+<span class="fc" id="L1049">    version.setReglasEvaluacionIc(configuracion);</span>
+<span class="fc" id="L1050">    version.setCalibradoPorId(usuarioId);</span>
+<span class="fc" id="L1051">    version.setCalibradoEn(ahora);</span>
+<span class="fc" id="L1052">    version.setActualizadoEn(ahora);</span>
+
+<span class="fc" id="L1054">    return construirRespuestaDetallada(versiones.save(version));</span>
+  }
+
+  private void validarEscalaParaPublicacion(VersionFormulario version) {
+<span class="fc" id="L1058">    JsonNode configuracion = version.getReglasEvaluacionIc();</span>
+    JsonNode escala =
+<span class="pc bpc" id="L1060" title="1 of 2 branches missed.">        configuracion == null ? null : configuracion.at(&quot;/reglas_evaluacion_ic/escala_severidad&quot;);</span>
+
+<span class="fc" id="L1062">    List&lt;String&gt; niveles = List.of(&quot;NO_PRESENTA&quot;, &quot;LEVE&quot;, &quot;MODERADO&quot;, &quot;SEVERO&quot;);</span>
+<span class="fc" id="L1063">    List&lt;String&gt; pendientes = new ArrayList&lt;&gt;();</span>
+
+<span class="fc bfc" id="L1065" title="All 2 branches covered.">    for (String nivel : niveles) {</span>
+<span class="pc bpc" id="L1066" title="1 of 2 branches missed.">      JsonNode valor = escala == null ? null : escala.get(nivel);</span>
+
+<span class="pc bpc" id="L1068" title="2 of 4 branches missed.">      if (valor == null || valor.isNull()) {</span>
+<span class="nc" id="L1069">        pendientes.add(nivel);</span>
+<span class="nc" id="L1070">        continue;</span>
+      }
+
+<span class="pc bpc" id="L1073" title="1 of 2 branches missed.">      if (!valor.isNumber()</span>
+<span class="pc bpc" id="L1074" title="1 of 2 branches missed.">          || valor.decimalValue().signum() &lt; 0</span>
+<span class="pc bpc" id="L1075" title="1 of 2 branches missed.">          || valor.decimalValue().compareTo(java.math.BigDecimal.valueOf(4)) &gt; 0) {</span>
+<span class="nc" id="L1076">        throw new ApiException(</span>
+            HttpStatus.UNPROCESSABLE_ENTITY,
+            &quot;severidad_invalida&quot;,
+            &quot;Severidad invalida&quot;,
+            &quot;El nivel &quot; + nivel + &quot; requiere un valor numerico entre 0 y 4.&quot;);
+      }
+
+<span class="pc bpc" id="L1083" title="1 of 4 branches missed.">      if (&quot;NO_PRESENTA&quot;.equals(nivel) &amp;&amp; valor.decimalValue().signum() != 0) {</span>
+<span class="nc" id="L1084">        throw new ApiException(</span>
+            HttpStatus.UNPROCESSABLE_ENTITY,
+            &quot;severidad_invalida&quot;,
+            &quot;Severidad invalida&quot;,
+            &quot;El nivel NO_PRESENTA debe tener valor 0.&quot;);
+      }
+<span class="fc" id="L1090">    }</span>
+
+<span class="pc bpc" id="L1092" title="1 of 2 branches missed.">    if (!pendientes.isEmpty()) {</span>
+<span class="nc" id="L1093">      throw new ApiException(</span>
+          HttpStatus.UNPROCESSABLE_ENTITY,
+          &quot;escala_incompleta&quot;,
+          &quot;Escala incompleta&quot;,
+<span class="nc" id="L1097">          &quot;Falta configurar los siguientes niveles: &quot; + String.join(&quot;, &quot;, pendientes));</span>
+    }
+<span class="fc" id="L1099">  }</span>
+
+  @Transactional
+  @PreAuthorize(&quot;hasAnyRole('ADMINISTRADOR', 'CATEDRATICO')&quot;)
+  @Auditable(
+      accion = AccionAuditoria.MODIFICAR,
+      entidad = &quot;version_formulario&quot;,
+      idArg = &quot;id&quot;,
+      tipo = VersionFormulario.class,
+      recargarPosteriores = true)
+  public VersionFormularioResponse configurarReglasCriticas(
+      UUID id,
+      gt.usac.cunoc.sgp.formulario.dto.ConfigurarReglasCriticasIcRequest request,
+      UUID usuarioId) {
+<span class="fc" id="L1113">    VersionFormulario version =</span>
+        versiones
+<span class="fc" id="L1115">            .findById(id)</span>
+<span class="fc" id="L1116">            .orElseThrow(</span>
+                () -&gt;
+<span class="nc" id="L1118">                    new ApiException(</span>
+                        HttpStatus.NOT_FOUND,
+                        &quot;version_no_encontrada&quot;,
+                        &quot;Version no encontrada&quot;,
+                        &quot;No existe la version de formulario solicitada.&quot;));
+<span class="fc bfc" id="L1123" title="All 2 branches covered.">    if (version.getEstado() != EstadoVersionFormulario.BORRADOR) {</span>
+<span class="fc" id="L1124">      throw new ApiException(</span>
+          HttpStatus.CONFLICT,
+          &quot;version_inmutable&quot;,
+          &quot;Version inmutable&quot;,
+          &quot;Las reglas de una version publicada no pueden modificarse. Cree una nueva version.&quot;);
+    }
+<span class="pc bpc" id="L1130" title="2 of 4 branches missed.">    if (request == null || request.reglasAnulacion() == null) {</span>
+<span class="nc" id="L1131">      throw new ApiException(</span>
+          HttpStatus.UNPROCESSABLE_ENTITY,
+          &quot;reglas_anulacion_ic_invalidas&quot;,
+          &quot;Reglas de anulacion del IC invalidas&quot;,
+          &quot;Debe indicar las reglas criticas completas.&quot;);
+    }
+<span class="fc" id="L1137">    JsonNode actual = version.getReglasEvaluacionIc();</span>
+<span class="pc bpc" id="L1138" title="3 of 6 branches missed.">    if (actual == null || !actual.isObject() || !actual.path(&quot;reglas_evaluacion_ic&quot;).isObject()) {</span>
+<span class="nc" id="L1139">      throw new ApiException(</span>
+          HttpStatus.UNPROCESSABLE_ENTITY,
+          &quot;configuracion_ic_invalida&quot;,
+          &quot;Configuracion IC invalida&quot;,
+          &quot;La version no contiene reglas de evaluacion IC.&quot;);
+    }
+<span class="fc" id="L1145">    com.fasterxml.jackson.databind.node.ObjectNode copia = actual.deepCopy();</span>
+<span class="fc" id="L1146">    com.fasterxml.jackson.databind.node.ObjectNode reglas =</span>
+<span class="fc" id="L1147">        (com.fasterxml.jackson.databind.node.ObjectNode) copia.get(&quot;reglas_evaluacion_ic&quot;);</span>
+<span class="fc" id="L1148">    reglas.set(&quot;reglas_anulacion&quot;, request.reglasAnulacion().deepCopy());</span>
+<span class="fc" id="L1149">    ValidadorReglasCriticasIc.validarCatalogo(reglas, copia);</span>
+<span class="fc" id="L1150">    version.setReglasEvaluacionIc(copia);</span>
+<span class="fc" id="L1151">    version.setCalibradoPorId(usuarioId);</span>
+<span class="fc" id="L1152">    version.setCalibradoEn(clock.instant());</span>
+<span class="fc" id="L1153">    version.setActualizadoEn(clock.instant());</span>
+<span class="fc" id="L1154">    return construirRespuestaDetallada(versiones.save(version));</span>
+  }
+
+  @Transactional(readOnly = true)
+  public void validarRespuestas(UUID versionId, JsonNode datos, Boolean esBorrador) {
+<span class="nc" id="L1159">    VersionFormulario version =</span>
+        versiones
+<span class="nc" id="L1161">            .findById(versionId)</span>
+<span class="nc" id="L1162">            .orElseThrow(</span>
+                () -&gt;
+<span class="nc" id="L1164">                    new ApiException(</span>
+                        HttpStatus.NOT_FOUND,
+                        &quot;version_no_encontrada&quot;,
+                        &quot;Version no encontrada&quot;,
+                        &quot;No existe una version con identificador &quot; + versionId));
+
+<span class="nc bnc" id="L1170" title="All 4 branches missed.">    boolean modoBorrador = esBorrador == null || esBorrador;</span>
+<span class="nc" id="L1171">    schemaValidator.validarRespuestas(version.getEsquema(), datos, modoBorrador);</span>
+<span class="nc" id="L1172">  }</span>
+
+  private void validarReglasParaPublicacion(VersionFormulario version) {
+<span class="fc" id="L1175">    JsonNode configuracion = version.getReglasEvaluacionIc();</span>
+    JsonNode reglas =
+<span class="pc bpc" id="L1177" title="1 of 2 branches missed.">        configuracion == null</span>
+<span class="nc" id="L1178">            ? com.fasterxml.jackson.databind.node.MissingNode.getInstance()</span>
+<span class="fc" id="L1179">            : configuracion.path(&quot;reglas_evaluacion_ic&quot;);</span>
+
+<span class="fc" id="L1181">    List&lt;String&gt; pendientes = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L1182">    List&lt;String&gt; invalidas = new ArrayList&lt;&gt;();</span>
+
+<span class="fc bfc" id="L1184" title="All 2 branches covered.">    for (String campo : List.of(&quot;indicadores_de_un_elemento&quot;, &quot;instancias_repetibles&quot;)) {</span>
+<span class="fc" id="L1185">      JsonNode valor = reglas.path(&quot;agregacion&quot;).path(campo);</span>
+<span class="fc" id="L1186">      String referencia = &quot;agregacion.&quot; + campo;</span>
+
+<span class="pc bpc" id="L1188" title="1 of 2 branches missed.">      if (valor.isMissingNode()</span>
+<span class="fc bfc" id="L1189" title="All 2 branches covered.">          || valor.isNull()</span>
+<span class="pc bpc" id="L1190" title="2 of 4 branches missed.">          || (valor.isTextual() &amp;&amp; valor.asText().isBlank())) {</span>
+<span class="fc" id="L1191">        pendientes.add(referencia);</span>
+<span class="pc bpc" id="L1192" title="2 of 4 branches missed.">      } else if (!valor.isTextual() || !Set.of(&quot;MAXIMO&quot;, &quot;PROMEDIO&quot;).contains(valor.asText())) {</span>
+<span class="nc" id="L1193">        invalidas.add(referencia + &quot;: debe ser MAXIMO o PROMEDIO&quot;);</span>
+      }
+<span class="fc" id="L1195">    }</span>
+
+    for (String campo :
+<span class="fc bfc" id="L1198" title="All 2 branches covered.">        List.of(&quot;elementos_ausentes_portantes&quot;, &quot;elementos_ausentes_no_portantes&quot;)) {</span>
+<span class="fc" id="L1199">      validarCalificacionConfigurada(</span>
+<span class="fc" id="L1200">          reglas.path(&quot;agregacion&quot;).path(campo), &quot;agregacion.&quot; + campo, pendientes, invalidas);</span>
+<span class="fc" id="L1201">    }</span>
+
+<span class="fc" id="L1203">    JsonNode rangos = reglas.path(&quot;rangos_estado&quot;);</span>
+
+<span class="fc bfc" id="L1205" title="All 2 branches covered.">    for (String estado : List.of(&quot;BUENO&quot;, &quot;REGULAR&quot;, &quot;MALO&quot;)) {</span>
+<span class="fc" id="L1206">      JsonNode valor = rangos.path(estado);</span>
+
+<span class="pc bpc" id="L1208" title="2 of 4 branches missed.">      if (valor.isMissingNode() || valor.isNull()) {</span>
+<span class="nc" id="L1209">        pendientes.add(&quot;rangos_estado.&quot; + estado);</span>
+<span class="pc bpc" id="L1210" title="1 of 2 branches missed.">      } else if (!valor.isNumber()) {</span>
+<span class="nc" id="L1211">        invalidas.add(&quot;rangos_estado.&quot; + estado + &quot;: debe ser numerico&quot;);</span>
+      }
+<span class="fc" id="L1213">    }</span>
+
+<span class="pc bpc" id="L1215" title="1 of 2 branches missed.">    if (rangos.path(&quot;BUENO&quot;).isNumber()</span>
+<span class="pc bpc" id="L1216" title="1 of 2 branches missed.">        &amp;&amp; rangos.path(&quot;REGULAR&quot;).isNumber()</span>
+<span class="pc bpc" id="L1217" title="1 of 2 branches missed.">        &amp;&amp; rangos.path(&quot;MALO&quot;).isNumber()) {</span>
+<span class="fc" id="L1218">      java.math.BigDecimal bueno = rangos.path(&quot;BUENO&quot;).decimalValue();</span>
+<span class="fc" id="L1219">      java.math.BigDecimal regular = rangos.path(&quot;REGULAR&quot;).decimalValue();</span>
+<span class="fc" id="L1220">      java.math.BigDecimal malo = rangos.path(&quot;MALO&quot;).decimalValue();</span>
+
+<span class="pc bpc" id="L1222" title="1 of 2 branches missed.">      if (malo.signum() != 0</span>
+<span class="pc bpc" id="L1223" title="1 of 2 branches missed.">          || regular.compareTo(malo) &lt;= 0</span>
+<span class="pc bpc" id="L1224" title="1 of 2 branches missed.">          || bueno.compareTo(regular) &lt;= 0</span>
+<span class="pc bpc" id="L1225" title="1 of 2 branches missed.">          || bueno.compareTo(java.math.BigDecimal.valueOf(100)) &gt; 0) {</span>
+<span class="nc" id="L1226">        invalidas.add(&quot;rangos_estado: debe cumplir MALO = 0 &lt; REGULAR &lt; BUENO &lt;= 100&quot;);</span>
+      }
+    }
+
+<span class="pc bpc" id="L1230" title="1 of 4 branches missed.">    if (!pendientes.isEmpty() || !invalidas.isEmpty()) {</span>
+<span class="fc" id="L1231">      List&lt;String&gt; detalles = new ArrayList&lt;&gt;();</span>
+
+<span class="pc bpc" id="L1233" title="1 of 2 branches missed.">      if (!pendientes.isEmpty()) {</span>
+<span class="fc" id="L1234">        detalles.add(&quot;Falta configurar: &quot; + String.join(&quot;, &quot;, pendientes));</span>
+      }
+
+<span class="pc bpc" id="L1237" title="1 of 2 branches missed.">      if (!invalidas.isEmpty()) {</span>
+<span class="nc" id="L1238">        detalles.add(&quot;Configuracion invalida: &quot; + String.join(&quot;; &quot;, invalidas));</span>
+      }
+
+<span class="fc" id="L1241">      throw new ApiException(</span>
+          HttpStatus.UNPROCESSABLE_ENTITY,
+          &quot;reglas_ic_invalidas&quot;,
+          &quot;Reglas del IC incompletas o invalidas&quot;,
+<span class="fc" id="L1245">          String.join(&quot;. &quot;, detalles));</span>
+    }
+<span class="fc" id="L1247">  }</span>
+
+  private void validarCalificacionConfigurada(
+      JsonNode valor, String referencia, List&lt;String&gt; pendientes, List&lt;String&gt; invalidas) {
+<span class="pc bpc" id="L1251" title="2 of 4 branches missed.">    if (valor.isMissingNode() || valor.isNull()) {</span>
+<span class="nc" id="L1252">      pendientes.add(referencia);</span>
+<span class="nc" id="L1253">      return;</span>
+    }
+
+<span class="pc bpc" id="L1256" title="1 of 2 branches missed.">    if (!valor.isNumber()</span>
+<span class="pc bpc" id="L1257" title="1 of 2 branches missed.">        || valor.decimalValue().signum() &lt; 0</span>
+<span class="pc bpc" id="L1258" title="1 of 2 branches missed.">        || valor.decimalValue().compareTo(java.math.BigDecimal.valueOf(4)) &gt; 0) {</span>
+<span class="nc" id="L1259">      invalidas.add(referencia + &quot;: requiere una calificacion numerica entre 0 y 4&quot;);</span>
+    }
+<span class="fc" id="L1261">  }</span>
+
+  private void validarConversionesParaPublicacion(VersionFormulario version) {
+<span class="fc" id="L1264">    JsonNode configuracion = version.getReglasEvaluacionIc();</span>
+<span class="fc" id="L1265">    JsonNode conversiones =</span>
+<span class="fc" id="L1266">        configuracion.path(&quot;reglas_evaluacion_ic&quot;).path(&quot;conversion_indicadores&quot;);</span>
+
+<span class="fc" id="L1268">    Set&lt;String&gt; booleanos = new java.util.TreeSet&lt;&gt;();</span>
+<span class="fc" id="L1269">    Set&lt;String&gt; numericos = new java.util.TreeSet&lt;&gt;();</span>
+<span class="fc" id="L1270">    Set&lt;String&gt; enumerados = new java.util.TreeSet&lt;&gt;();</span>
+<span class="fc" id="L1271">    List&lt;String&gt; errores = new ArrayList&lt;&gt;();</span>
+
+<span class="fc bfc" id="L1273" title="All 2 branches covered.">    for (JsonNode elemento : configuracion.path(&quot;elementos&quot;)) {</span>
+<span class="fc" id="L1274">      String referencia = elemento.path(&quot;elemento_ref&quot;).asText();</span>
+
+<span class="fc bfc" id="L1276" title="All 2 branches covered.">      for (JsonNode indicador : elemento.path(&quot;indicadores&quot;)) {</span>
+<span class="fc" id="L1277">        String nombre = indicador.asText();</span>
+
+<span class="fc bfc" id="L1279" title="All 4 branches covered.">        if (&quot;falta_elemento&quot;.equals(nombre) || &quot;junta_limpia&quot;.equals(nombre)) {</span>
+<span class="fc" id="L1280">          booleanos.add(&quot;junta.&quot; + nombre);</span>
+<span class="fc bfc" id="L1281" title="All 2 branches covered.">        } else if (&quot;buen_estado&quot;.equals(nombre)) {</span>
+<span class="fc" id="L1282">          booleanos.add(&quot;losa.buen_estado&quot;);</span>
+<span class="fc bfc" id="L1283" title="All 2 branches covered.">        } else if (&quot;existe&quot;.equals(nombre)) {</span>
+<span class="fc bfc" id="L1284" title="All 2 branches covered.">          if (referencia.startsWith(&quot;/otros/senalizacion/&quot;)) {</span>
+<span class="fc" id="L1285">            booleanos.add(&quot;senal.existe&quot;);</span>
+<span class="pc bpc" id="L1286" title="1 of 2 branches missed.">          } else if (&quot;/otros/drenajes_aledanos&quot;.equals(referencia)) {</span>
+<span class="fc" id="L1287">            booleanos.add(&quot;drenaje_aledano.existe&quot;);</span>
+          }
+<span class="fc bfc" id="L1289" title="All 4 branches covered.">        } else if (&quot;golpeado_longitud_m&quot;.equals(nombre) || &quot;golpeados_cantidad&quot;.equals(nombre)) {</span>
+<span class="fc" id="L1290">          numericos.add(nombre);</span>
+<span class="fc bfc" id="L1291" title="All 4 branches covered.">        } else if (&quot;aguas_arriba&quot;.equals(nombre) || &quot;aguas_abajo&quot;.equals(nombre)) {</span>
+<span class="fc" id="L1292">          enumerados.add(&quot;socavacion.nivel&quot;);</span>
+<span class="fc bfc" id="L1293" title="All 2 branches covered.">        } else if (&quot;condiciones&quot;.equals(nombre)) {</span>
+<span class="fc" id="L1294">          enumerados.add(&quot;condicionesCauce&quot;);</span>
+<span class="fc bfc" id="L1295" title="All 2 branches covered.">        } else if (&quot;estado&quot;.equals(nombre)) {</span>
+<span class="fc" id="L1296">          enumerados.add(</span>
+<span class="fc bfc" id="L1297" title="All 2 branches covered.">              referencia.startsWith(&quot;/superestructura/drenaje&quot;)</span>
+<span class="fc" id="L1298">                  ? &quot;drenaje.estado&quot;</span>
+<span class="fc" id="L1299">                  : &quot;estado_bueno_malo&quot;);</span>
+        }
+<span class="fc" id="L1301">      }</span>
+<span class="fc" id="L1302">    }</span>
+
+<span class="fc bfc" id="L1304" title="All 2 branches covered.">    for (String clave : booleanos) {</span>
+<span class="fc bfc" id="L1305" title="All 2 branches covered.">      for (String valor : List.of(&quot;true&quot;, &quot;false&quot;)) {</span>
+<span class="fc" id="L1306">        String equivalencia = clave + &quot;=&quot; + valor;</span>
+<span class="fc" id="L1307">        validarEquivalenciaParaPublicacion(</span>
+<span class="fc" id="L1308">            conversiones.path(&quot;booleanos&quot;).path(equivalencia),</span>
+            &quot;conversion_indicadores.booleanos.&quot; + equivalencia,
+            errores);
+<span class="fc" id="L1311">      }</span>
+<span class="fc" id="L1312">    }</span>
+
+<span class="fc bfc" id="L1314" title="All 2 branches covered.">    for (String familia : enumerados) {</span>
+      List&lt;String&gt; categorias =
+<span class="pc bpc" id="L1316" title="1 of 5 branches missed.">          switch (familia) {</span>
+            case &quot;socavacion.nivel&quot; -&gt;
+<span class="fc" id="L1318">                List.of(&quot;NO_HAY&quot;, &quot;SIN_EXPOSICION&quot;, &quot;CON_EXPOSICION&quot;, &quot;ASENTAMIENTO_ESTRUCTURA&quot;);</span>
+            case &quot;condicionesCauce&quot; -&gt;
+<span class="fc" id="L1320">                List.of(&quot;LIMPIO&quot;, &quot;ASOLVADO_SEDIMENTADO&quot;, &quot;EROSIONADO&quot;, &quot;OTRO&quot;);</span>
+<span class="fc" id="L1321">            case &quot;drenaje.estado&quot; -&gt; List.of(&quot;LIMPIOS&quot;, &quot;OBSTRUIDOS&quot;);</span>
+<span class="fc" id="L1322">            case &quot;estado_bueno_malo&quot; -&gt; List.of(&quot;BUENO&quot;, &quot;MALO&quot;);</span>
+<span class="nc" id="L1323">            default -&gt; List.of();</span>
+          };
+
+<span class="fc bfc" id="L1326" title="All 2 branches covered.">      for (String categoria : categorias) {</span>
+<span class="fc" id="L1327">        validarEquivalenciaParaPublicacion(</span>
+<span class="fc" id="L1328">            conversiones.path(&quot;enumerados&quot;).path(familia).path(categoria),</span>
+            &quot;conversion_indicadores.enumerados.&quot; + familia + &quot;.&quot; + categoria,
+            errores);
+<span class="fc" id="L1331">      }</span>
+<span class="fc" id="L1332">    }</span>
+
+<span class="fc bfc" id="L1334" title="All 2 branches covered.">    for (String indicador : numericos) {</span>
+<span class="fc bfc" id="L1335" title="All 2 branches covered.">      String campo = &quot;golpeado_longitud_m&quot;.equals(indicador) ? &quot;umbrales_m&quot; : &quot;umbrales&quot;;</span>
+<span class="fc" id="L1336">      String ruta = &quot;conversion_indicadores.numericos.&quot; + indicador + &quot;.&quot; + campo;</span>
+<span class="fc" id="L1337">      JsonNode umbrales = conversiones.path(&quot;numericos&quot;).path(indicador).path(campo);</span>
+
+<span class="fc" id="L1339">      List&lt;java.math.BigDecimal&gt; valores = new ArrayList&lt;&gt;();</span>
+
+<span class="fc bfc" id="L1341" title="All 2 branches covered.">      for (String nivel : List.of(&quot;LEVE&quot;, &quot;MODERADO&quot;, &quot;SEVERO&quot;)) {</span>
+<span class="fc" id="L1342">        JsonNode valor = umbrales.path(nivel);</span>
+
+<span class="pc bpc" id="L1344" title="1 of 2 branches missed.">        if (!valor.isNumber()) {</span>
+<span class="nc" id="L1345">          errores.add(ruta + &quot;.&quot; + nivel + &quot; requiere un valor numerico&quot;);</span>
+        } else {
+<span class="fc" id="L1347">          valores.add(valor.decimalValue());</span>
+        }
+<span class="fc" id="L1349">      }</span>
+
+<span class="pc bpc" id="L1351" title="1 of 2 branches missed.">      if (valores.size() == 3</span>
+<span class="pc bpc" id="L1352" title="1 of 2 branches missed.">          &amp;&amp; (valores.get(0).signum() &lt;= 0</span>
+<span class="fc bfc" id="L1353" title="All 2 branches covered.">              || valores.get(1).compareTo(valores.get(0)) &lt;= 0</span>
+<span class="pc bpc" id="L1354" title="1 of 2 branches missed.">              || valores.get(2).compareTo(valores.get(1)) &lt;= 0)) {</span>
+<span class="fc" id="L1355">        errores.add(ruta + &quot; debe cumplir 0 &lt; LEVE &lt; MODERADO &lt; SEVERO&quot;);</span>
+      }
+<span class="fc" id="L1357">    }</span>
+
+<span class="fc bfc" id="L1359" title="All 2 branches covered.">    if (!errores.isEmpty()) {</span>
+<span class="fc" id="L1360">      throw new ApiException(</span>
+          HttpStatus.UNPROCESSABLE_ENTITY,
+          &quot;conversiones_ic_invalidas&quot;,
+          &quot;Conversiones del IC incompletas o invalidas&quot;,
+<span class="fc" id="L1364">          String.join(&quot;; &quot;, errores));</span>
+    }
+<span class="fc" id="L1366">  }</span>
+
+  private void validarEquivalenciaParaPublicacion(
+      JsonNode valor, String referencia, List&lt;String&gt; errores) {
+<span class="fc bfc" id="L1370" title="All 2 branches covered.">    if (!valor.isNumber()</span>
+<span class="pc bpc" id="L1371" title="1 of 2 branches missed.">        || valor.decimalValue().signum() &lt; 0</span>
+<span class="pc bpc" id="L1372" title="1 of 2 branches missed.">        || valor.decimalValue().compareTo(java.math.BigDecimal.valueOf(4)) &gt; 0) {</span>
+<span class="fc" id="L1373">      errores.add(referencia + &quot; requiere una calificacion numerica entre 0 y 4&quot;);</span>
+    }
+<span class="fc" id="L1375">  }</span>
+
+  @Transactional
+  @PreAuthorize(&quot;hasAnyRole('ADMINISTRADOR', 'CATEDRATICO')&quot;)
+  @Auditable(
+      accion = AccionAuditoria.MODIFICAR,
+      entidad = &quot;version_formulario&quot;,
+      idArg = &quot;id&quot;,
+      tipo = VersionFormulario.class,
+      recargarPosteriores = true)
+  public VersionFormularioResponse actualizarBorrador(
+      UUID id,
+      JsonNode esquema,
+      JsonNode vinculosAlmacenamiento,
+      JsonNode reglasEvaluacionIc,
+      String nuevoCodigo,
+      UUID usuarioId,
+      long versionEsperada) {
+<span class="fc" id="L1393">    exigirVersionCalibracion(id, versionEsperada);</span>
+<span class="fc" id="L1394">    actualizarBorrador(</span>
+        id, esquema, vinculosAlmacenamiento, reglasEvaluacionIc, nuevoCodigo, usuarioId);
+<span class="fc" id="L1396">    finalizarCalibracion(id, versionEsperada);</span>
+<span class="fc" id="L1397">    return construirRespuestaDetallada(versiones.findById(id).orElseThrow());</span>
+  }
+
+  @Transactional
+  @PreAuthorize(&quot;hasAnyRole('ADMINISTRADOR', 'CATEDRATICO')&quot;)
+  @Auditable(
+      accion = AccionAuditoria.MODIFICAR,
+      entidad = &quot;version_formulario&quot;,
+      idArg = &quot;id&quot;,
+      tipo = VersionFormulario.class,
+      recargarPosteriores = true)
+  public List&lt;ConfiguracionIcElementoResponse&gt; calibrarPesos(
+      UUID id,
+      List&lt;ConfiguracionIcElementoRequest&gt; nuevosPesos,
+      UUID usuarioId,
+      long versionEsperada) {
+<span class="fc" id="L1413">    exigirVersionCalibracion(id, versionEsperada);</span>
+<span class="fc" id="L1414">    var respuesta = calibrarPesos(id, nuevosPesos, usuarioId);</span>
+<span class="fc" id="L1415">    finalizarCalibracion(id, versionEsperada);</span>
+<span class="fc" id="L1416">    return respuesta;</span>
+  }
+
+  @Transactional
+  @PreAuthorize(&quot;hasAnyRole('ADMINISTRADOR', 'CATEDRATICO')&quot;)
+  @Auditable(
+      accion = AccionAuditoria.MODIFICAR,
+      entidad = &quot;version_formulario&quot;,
+      idArg = &quot;id&quot;,
+      tipo = VersionFormulario.class,
+      recargarPosteriores = true)
+  public VersionFormularioResponse configurarEscala(
+      UUID id,
+      gt.usac.cunoc.sgp.formulario.dto.ConfigurarEscalaIcRequest request,
+      UUID usuarioId,
+      long versionEsperada) {
+<span class="fc" id="L1432">    exigirVersionCalibracion(id, versionEsperada);</span>
+<span class="fc" id="L1433">    configurarEscala(id, request, usuarioId);</span>
+<span class="fc" id="L1434">    finalizarCalibracion(id, versionEsperada);</span>
+<span class="fc" id="L1435">    return construirRespuestaDetallada(versiones.findById(id).orElseThrow());</span>
+  }
+
+  @Transactional
+  @PreAuthorize(&quot;hasAnyRole('ADMINISTRADOR', 'CATEDRATICO')&quot;)
+  @Auditable(
+      accion = AccionAuditoria.MODIFICAR,
+      entidad = &quot;version_formulario&quot;,
+      idArg = &quot;id&quot;,
+      tipo = VersionFormulario.class,
+      recargarPosteriores = true)
+  public VersionFormularioResponse configurarReglasCriticas(
+      UUID id,
+      gt.usac.cunoc.sgp.formulario.dto.ConfigurarReglasCriticasIcRequest request,
+      UUID usuarioId,
+      long versionEsperada) {
+<span class="fc" id="L1451">    exigirVersionCalibracion(id, versionEsperada);</span>
+<span class="fc" id="L1452">    configurarReglasCriticas(id, request, usuarioId);</span>
+<span class="fc" id="L1453">    finalizarCalibracion(id, versionEsperada);</span>
+<span class="fc" id="L1454">    return construirRespuestaDetallada(versiones.findById(id).orElseThrow());</span>
+  }
+
+  private void finalizarCalibracion(UUID id, long versionEsperada) {
+<span class="fc" id="L1458">    versiones.flush();</span>
+<span class="fc" id="L1459">    var version = versiones.findById(id).orElseThrow();</span>
+<span class="fc bfc" id="L1460" title="All 2 branches covered.">    if (version.getVersion() == versionEsperada) {</span>
+<span class="pc bpc" id="L1461" title="1 of 2 branches missed.">      if (versiones.incrementarVersionCalibracion(version.getId(), versionEsperada) != 1) {</span>
+<span class="nc" id="L1462">        throw new IllegalStateException(&quot;No se pudo incrementar la version de calibracion&quot;);</span>
+      }
+    }
+<span class="fc" id="L1465">  }</span>
+
+  private void exigirVersionCalibracion(UUID id, long versionEsperada) {
+<span class="fc" id="L1468">    var version =</span>
+        versiones
+<span class="fc" id="L1470">            .findByIdForUpdate(id)</span>
+<span class="fc" id="L1471">            .orElseThrow(</span>
+                () -&gt;
+<span class="nc" id="L1473">                    new ApiException(</span>
+                        HttpStatus.NOT_FOUND,
+                        &quot;version_no_encontrada&quot;,
+                        &quot;Version no encontrada&quot;,
+                        &quot;No existe la version de formulario solicitada.&quot;));
+<span class="fc bfc" id="L1478" title="All 2 branches covered.">    if (version.getEstado() != EstadoVersionFormulario.BORRADOR) {</span>
+<span class="fc" id="L1479">      throw new ApiException(</span>
+          HttpStatus.CONFLICT,
+          &quot;version_inmutable&quot;,
+          &quot;Version inmutable&quot;,
+          &quot;La version publicada no puede modificarse. Cree una version nueva.&quot;);
+    }
+<span class="fc bfc" id="L1485" title="All 2 branches covered.">    if (version.getVersion() != versionEsperada) {</span>
+<span class="fc" id="L1486">      throw new ApiException(</span>
+          HttpStatus.CONFLICT,
+          &quot;concurrencia_conflicto&quot;,
+          &quot;Conflicto de version&quot;,
+          &quot;La version fue modificada por otro usuario. Recargue antes de guardar.&quot;);
+    }
+<span class="fc" id="L1492">  }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

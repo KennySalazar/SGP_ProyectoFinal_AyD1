@@ -1,0 +1,161 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ActivacionEstudianteService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">sgp-api</a> &gt; <a href="index.source.html" class="el_package">gt.usac.cunoc.sgp.usuario.service</a> &gt; <span class="el_source">ActivacionEstudianteService.java</span></div><h1>ActivacionEstudianteService.java</h1><pre class="source lang-java linenums">package gt.usac.cunoc.sgp.usuario.service;
+
+import gt.usac.cunoc.sgp.common.audit.AuditService;
+import gt.usac.cunoc.sgp.common.exception.ApiException;
+import gt.usac.cunoc.sgp.curso.entity.Curso;
+import gt.usac.cunoc.sgp.curso.entity.CursoEstudiante;
+import gt.usac.cunoc.sgp.curso.repository.CursoEstudianteRepository;
+import gt.usac.cunoc.sgp.curso.repository.CursoRepository;
+import gt.usac.cunoc.sgp.usuario.dto.ActivarEstudianteRequest;
+import gt.usac.cunoc.sgp.usuario.dto.CursoDisponibleResponse;
+import gt.usac.cunoc.sgp.usuario.dto.EstudiantePendienteResponse;
+import gt.usac.cunoc.sgp.usuario.dto.MessageResponse;
+import gt.usac.cunoc.sgp.usuario.entity.UserAccount;
+import gt.usac.cunoc.sgp.usuario.model.RoleName;
+import gt.usac.cunoc.sgp.usuario.repository.UserAccountRepository;
+import java.time.Clock;
+import java.time.Instant;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+import org.springframework.http.HttpStatus;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+@Service
+@Transactional(readOnly = true)
+@PreAuthorize(&quot;hasRole('CATEDRATICO')&quot;)
+public class ActivacionEstudianteService {
+
+  private final UserAccountRepository usuarios;
+  private final CursoRepository cursos;
+  private final CursoEstudianteRepository inscripciones;
+  private final AuditService auditoria;
+  private final Clock clock;
+
+  public ActivacionEstudianteService(
+      UserAccountRepository usuarios,
+      CursoRepository cursos,
+      CursoEstudianteRepository inscripciones,
+      AuditService auditoria,
+<span class="fc" id="L42">      Clock clock) {</span>
+<span class="fc" id="L43">    this.usuarios = usuarios;</span>
+<span class="fc" id="L44">    this.cursos = cursos;</span>
+<span class="fc" id="L45">    this.inscripciones = inscripciones;</span>
+<span class="fc" id="L46">    this.auditoria = auditoria;</span>
+<span class="fc" id="L47">    this.clock = clock;</span>
+<span class="fc" id="L48">  }</span>
+
+  public List&lt;EstudiantePendienteResponse&gt; listarPendientes() {
+<span class="nc" id="L51">    return usuarios</span>
+<span class="nc" id="L52">        .findByRole_NameAndActiveTrueAndVerifiedTrueAndActivatedFalseOrderByEmailAsc(</span>
+            RoleName.ESTUDIANTE)
+<span class="nc" id="L54">        .stream()</span>
+<span class="nc" id="L55">        .map(</span>
+            estudiante -&gt;
+<span class="nc" id="L57">                new EstudiantePendienteResponse(</span>
+<span class="nc" id="L58">                    estudiante.getId(),</span>
+<span class="nc" id="L59">                    estudiante.getEmail(),</span>
+<span class="nc" id="L60">                    estudiante.getNombreCompleto(),</span>
+<span class="nc" id="L61">                    estudiante.getNombreUsuario()))</span>
+<span class="nc" id="L62">        .toList();</span>
+  }
+
+  public List&lt;CursoDisponibleResponse&gt; listarCursosVigentes(String emailCatedratico) {
+<span class="nc" id="L66">    UserAccount catedratico = buscarCatedratico(emailCatedratico);</span>
+<span class="nc" id="L67">    return cursos.findByCatedratico_IdAndActivoTrueOrderByPeriodoDesc(catedratico.getId()).stream()</span>
+<span class="nc" id="L68">        .map(</span>
+            curso -&gt;
+<span class="nc" id="L70">                new CursoDisponibleResponse(</span>
+<span class="nc" id="L71">                    curso.getId(), curso.getAsignatura().getNombre(), curso.getPeriodo()))</span>
+<span class="nc" id="L72">        .toList();</span>
+  }
+
+  @Transactional
+  public MessageResponse activar(String emailCatedratico, ActivarEstudianteRequest request) {
+<span class="fc" id="L77">    UserAccount catedratico = buscarCatedratico(emailCatedratico);</span>
+<span class="fc" id="L78">    UserAccount estudiante = buscarEstudiante(request.estudianteId());</span>
+<span class="fc" id="L79">    Curso curso = buscarCursoDelCatedratico(request.cursoId(), catedratico.getId());</span>
+
+<span class="fc bfc" id="L81" title="All 2 branches covered.">    if (!curso.isActivo()) {</span>
+<span class="fc" id="L82">      throw new ApiException(</span>
+          HttpStatus.UNPROCESSABLE_ENTITY,
+          &quot;curso_finalizado&quot;,
+          &quot;Curso finalizado&quot;,
+          &quot;No es posible vincular estudiantes a un curso finalizado&quot;);
+    }
+<span class="fc bfc" id="L88" title="All 2 branches covered.">    if (inscripciones.existsByEstudiante_IdAndEstado(estudiante.getId(), &quot;ACTIVO&quot;)) {</span>
+<span class="fc" id="L89">      throw new ApiException(</span>
+          HttpStatus.CONFLICT,
+          &quot;estudiante_ya_activado&quot;,
+          &quot;Estudiante ya activado&quot;,
+          &quot;El estudiante ya se encuentra activo y vinculado a un curso&quot;);
+    }
+<span class="pc bpc" id="L95" title="1 of 2 branches missed.">    if (estudiante.isActivated()) {</span>
+<span class="nc" id="L96">      throw new ApiException(</span>
+          HttpStatus.UNPROCESSABLE_ENTITY,
+          &quot;estudiante_no_pendiente&quot;,
+          &quot;Estudiante no pendiente&quot;,
+          &quot;La cuenta ya no se encuentra pendiente de activacion&quot;);
+    }
+
+<span class="fc" id="L103">    Instant ahora = clock.instant();</span>
+<span class="fc" id="L104">    CursoEstudiante inscripcion =</span>
+<span class="fc" id="L105">        inscripciones.save(</span>
+<span class="fc" id="L106">            new CursoEstudiante(curso, estudiante, request.seccion().trim(), catedratico, ahora));</span>
+<span class="fc" id="L107">    estudiante.activate();</span>
+<span class="fc" id="L108">    auditoria.register(</span>
+<span class="fc" id="L109">        catedratico.getId(),</span>
+        &quot;ACTIVAR_ESTUDIANTE&quot;,
+        &quot;curso_estudiante&quot;,
+<span class="fc" id="L112">        inscripcion.getId(),</span>
+<span class="fc" id="L113">        Map.of(</span>
+<span class="fc" id="L114">            &quot;estudianteId&quot;, estudiante.getId(),</span>
+<span class="fc" id="L115">            &quot;cursoId&quot;, curso.getId(),</span>
+<span class="fc" id="L116">            &quot;seccion&quot;, request.seccion().trim()),</span>
+        ahora);
+<span class="fc" id="L118">    return new MessageResponse(&quot;Estudiante activado y vinculado al curso correctamente&quot;);</span>
+  }
+
+  private UserAccount buscarCatedratico(String email) {
+<span class="fc" id="L122">    return usuarios</span>
+<span class="fc" id="L123">        .findByEmail(email)</span>
+<span class="fc" id="L124">        .filter(</span>
+<span class="pc bpc" id="L125" title="2 of 4 branches missed.">            usuario -&gt; usuario.isActive() &amp;&amp; usuario.getRole().getName() == RoleName.CATEDRATICO)</span>
+<span class="fc" id="L126">        .orElseThrow(</span>
+            () -&gt;
+<span class="nc" id="L128">                new ApiException(</span>
+                    HttpStatus.FORBIDDEN,
+                    &quot;catedratico_invalido&quot;,
+                    &quot;Catedratico invalido&quot;,
+                    &quot;Solo un catedratico activo puede activar estudiantes&quot;));
+  }
+
+  private UserAccount buscarEstudiante(UUID id) {
+<span class="fc" id="L136">    return usuarios</span>
+<span class="fc" id="L137">        .findWithRoleById(id)</span>
+<span class="fc" id="L138">        .filter(</span>
+<span class="pc bpc" id="L139" title="2 of 4 branches missed.">            usuario -&gt; usuario.getRole().getName() == RoleName.ESTUDIANTE &amp;&amp; usuario.isVerified())</span>
+<span class="fc" id="L140">        .orElseThrow(</span>
+            () -&gt;
+<span class="nc" id="L142">                new ApiException(</span>
+                    HttpStatus.UNPROCESSABLE_ENTITY,
+                    &quot;estudiante_no_pendiente&quot;,
+                    &quot;Estudiante no pendiente&quot;,
+                    &quot;La cuenta debe ser un estudiante verificado pendiente de activacion&quot;));
+  }
+
+  private Curso buscarCursoDelCatedratico(UUID id, UUID catedraticoId) {
+<span class="fc" id="L150">    return cursos</span>
+<span class="fc" id="L151">        .findByIdAndCatedratico_Id(id, catedraticoId)</span>
+<span class="fc" id="L152">        .orElseThrow(</span>
+            () -&gt;
+<span class="fc" id="L154">                new ApiException(</span>
+                    HttpStatus.NOT_FOUND,
+                    &quot;curso_no_encontrado&quot;,
+                    &quot;Curso no encontrado&quot;,
+                    &quot;No existe un curso asignado al catedratico solicitado&quot;));
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

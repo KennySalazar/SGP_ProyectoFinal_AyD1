@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>OtpEmailService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">sgp-api</a> &gt; <a href="index.source.html" class="el_package">gt.usac.cunoc.sgp.usuario.service</a> &gt; <span class="el_source">OtpEmailService.java</span></div><h1>OtpEmailService.java</h1><pre class="source lang-java linenums">package gt.usac.cunoc.sgp.usuario.service;
+
+import gt.usac.cunoc.sgp.common.mail.EmailService;
+import gt.usac.cunoc.sgp.usuario.model.OtpPurpose;
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
+import org.springframework.stereotype.Service;
+
+@Service
+public class OtpEmailService {
+
+<span class="fc" id="L13">  private static final DateTimeFormatter FORMAT =</span>
+<span class="fc" id="L14">      DateTimeFormatter.ofPattern(&quot;dd/MM/yyyy HH:mm&quot;).withZone(ZoneId.of(&quot;America/Guatemala&quot;));</span>
+
+  private final EmailService emailService;
+
+<span class="nc" id="L18">  public OtpEmailService(EmailService emailService) {</span>
+<span class="nc" id="L19">    this.emailService = emailService;</span>
+<span class="nc" id="L20">  }</span>
+
+  public void sendOtp(String recipient, OtpPurpose purpose, String code, Instant expiresAt) {
+<span class="nc" id="L23">    emailService.send(</span>
+        recipient,
+<span class="nc" id="L25">        subjectFor(purpose),</span>
+        &quot;Su codigo de verificacion es: &quot;
+            + code
+            + &quot;\nExpira: &quot;
+<span class="nc" id="L29">            + FORMAT.format(expiresAt)</span>
+            + &quot;\nSi no solicito esta operacion, ignore este mensaje.&quot;);
+<span class="nc" id="L31">  }</span>
+
+  private String subjectFor(OtpPurpose purpose) {
+<span class="nc bnc" id="L34" title="All 5 branches missed.">    return switch (purpose) {</span>
+<span class="nc" id="L35">      case REGISTRO -&gt; &quot;SGP - Verificacion de registro&quot;;</span>
+<span class="nc" id="L36">      case LOGIN_2FA -&gt; &quot;SGP - Codigo de inicio de sesion&quot;;</span>
+<span class="nc" id="L37">      case RECUPERACION_PASSWORD -&gt; &quot;SGP - Recuperacion de contraseña&quot;;</span>
+<span class="nc" id="L38">      case ACTIVAR_2FA -&gt; &quot;SGP - Activacion de 2FA&quot;;</span>
+<span class="nc" id="L39">      case DESACTIVAR_2FA -&gt; &quot;SGP - Desactivacion de 2FA&quot;;</span>
+    };
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

@@ -1,0 +1,206 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ReglaMantenimiento.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">sgp-api</a> &gt; <a href="index.source.html" class="el_package">gt.usac.cunoc.sgp.mantenimiento.entity</a> &gt; <span class="el_source">ReglaMantenimiento.java</span></div><h1>ReglaMantenimiento.java</h1><pre class="source lang-java linenums">package gt.usac.cunoc.sgp.mantenimiento.entity;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import gt.usac.cunoc.sgp.formulario.entity.VersionFormulario;
+import gt.usac.cunoc.sgp.mantenimiento.model.PrioridadOrden;
+import gt.usac.cunoc.sgp.mantenimiento.model.TipoOrden;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Table;
+import java.time.Instant;
+import java.util.Objects;
+import java.util.UUID;
+import org.hibernate.annotations.Formula;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
+
+/**
+ * Entidad que representa una regla versionada del catálogo daño -&gt; intervención (HU-045, RN-MTO-02,
+ * RN-MTO-03).
+ */
+@Entity
+@Table(name = &quot;regla_mantenimiento&quot;)
+public class ReglaMantenimiento {
+
+  @Id private UUID id;
+
+  @Column(nullable = false, length = 80)
+  private String codigo;
+
+  @Column(name = &quot;numero_revision&quot;, nullable = false)
+  private Integer numeroRevision;
+
+  @ManyToOne(fetch = FetchType.LAZY)
+  @JoinColumn(name = &quot;version_formulario_id&quot;, nullable = false)
+  private VersionFormulario versionFormulario;
+
+  @Column(name = &quot;elemento_ref&quot;, nullable = false, length = 300)
+  private String elementoRef;
+
+  @JdbcTypeCode(SqlTypes.JSON)
+  @Column(name = &quot;condicion&quot;, nullable = false)
+  private JsonNode condicion;
+
+  @Enumerated(EnumType.STRING)
+  @Column(name = &quot;tipo_mantenimiento&quot;, nullable = false, length = 20)
+  private TipoOrden tipoMantenimiento;
+
+  @Column(name = &quot;intervencion_sugerida&quot;, nullable = false, columnDefinition = &quot;TEXT&quot;)
+  private String intervencionSugerida;
+
+  @JdbcTypeCode(SqlTypes.JSON)
+  @Column(name = &quot;regla_prioridad&quot;, nullable = false)
+  private JsonNode reglaPrioridad;
+
+  @Column(nullable = false)
+  private boolean activa;
+
+  @Column(name = &quot;creado_por_id&quot;, nullable = false)
+  private UUID creadoPorId;
+
+  @Column(name = &quot;validado_por_id&quot;)
+  private UUID validadoPorId;
+
+  @Formula(
+      &quot;(SELECT COALESCE(NULLIF(TRIM(u.nombre_completo), ''), u.email) FROM usuario u WHERE u.id = validado_por_id)&quot;)
+  private String validadoPorNombre;
+
+  @Column(name = &quot;validado_en&quot;)
+  private Instant validadoEn;
+
+  @Column(name = &quot;creado_en&quot;, nullable = false)
+  private Instant creadoEn;
+
+<span class="fc" id="L80">  protected ReglaMantenimiento() {}</span>
+
+  public ReglaMantenimiento(
+      UUID id,
+      String codigo,
+      Integer numeroRevision,
+      VersionFormulario versionFormulario,
+      String elementoRef,
+      JsonNode condicion,
+      TipoOrden tipoMantenimiento,
+      String intervencionSugerida,
+      JsonNode reglaPrioridad,
+      boolean activa,
+      UUID creadoPorId,
+      UUID validadoPorId,
+      Instant validadoEn,
+<span class="fc" id="L96">      Instant creadoEn) {</span>
+<span class="fc" id="L97">    this.id = id;</span>
+<span class="fc" id="L98">    this.codigo = codigo;</span>
+<span class="fc" id="L99">    this.numeroRevision = numeroRevision;</span>
+<span class="fc" id="L100">    this.versionFormulario = versionFormulario;</span>
+<span class="fc" id="L101">    this.elementoRef = elementoRef;</span>
+<span class="fc" id="L102">    this.condicion = condicion;</span>
+<span class="fc" id="L103">    this.tipoMantenimiento = tipoMantenimiento;</span>
+<span class="fc" id="L104">    this.intervencionSugerida = intervencionSugerida;</span>
+<span class="fc" id="L105">    this.reglaPrioridad = reglaPrioridad;</span>
+<span class="fc" id="L106">    this.activa = activa;</span>
+<span class="fc" id="L107">    this.creadoPorId = creadoPorId;</span>
+<span class="fc" id="L108">    this.validadoPorId = validadoPorId;</span>
+<span class="fc" id="L109">    this.validadoEn = validadoEn;</span>
+<span class="fc" id="L110">    this.creadoEn = creadoEn;</span>
+<span class="fc" id="L111">  }</span>
+
+  public boolean isProvisional() {
+<span class="pc bpc" id="L114" title="1 of 4 branches missed.">    return validadoPorId == null || validadoEn == null;</span>
+  }
+
+  public void validar(UUID usuarioId, Instant ahora) {
+<span class="pc bpc" id="L118" title="1 of 2 branches missed.">    if (!isProvisional()) return;</span>
+<span class="fc" id="L119">    this.validadoPorId = Objects.requireNonNull(usuarioId, &quot;usuarioId no puede ser nulo&quot;);</span>
+<span class="fc" id="L120">    this.validadoEn = Objects.requireNonNull(ahora, &quot;fecha de validación no puede ser nula&quot;);</span>
+<span class="fc" id="L121">  }</span>
+
+  public void activar() {
+<span class="nc" id="L124">    this.activa = true;</span>
+<span class="nc" id="L125">  }</span>
+
+  public void desactivar() {
+<span class="nc" id="L128">    this.activa = false;</span>
+<span class="nc" id="L129">  }</span>
+
+  public UUID getId() {
+<span class="fc" id="L132">    return id;</span>
+  }
+
+  public String getCodigo() {
+<span class="fc" id="L136">    return codigo;</span>
+  }
+
+  public Integer getNumeroRevision() {
+<span class="fc" id="L140">    return numeroRevision;</span>
+  }
+
+  public VersionFormulario getVersionFormulario() {
+<span class="fc" id="L144">    return versionFormulario;</span>
+  }
+
+  public String getElementoRef() {
+<span class="fc" id="L148">    return elementoRef;</span>
+  }
+
+  public JsonNode getCondicion() {
+<span class="fc" id="L152">    return condicion;</span>
+  }
+
+  public TipoOrden getTipoMantenimiento() {
+<span class="fc" id="L156">    return tipoMantenimiento;</span>
+  }
+
+  public String getIntervencionSugerida() {
+<span class="fc" id="L160">    return intervencionSugerida;</span>
+  }
+
+  public JsonNode getReglaPrioridad() {
+<span class="fc" id="L164">    return reglaPrioridad;</span>
+  }
+
+  public PrioridadOrden getPrioridadBase() {
+<span class="pc bpc" id="L168" title="2 of 4 branches missed.">    if (reglaPrioridad != null &amp;&amp; reglaPrioridad.hasNonNull(&quot;prioridad_base&quot;)) {</span>
+      try {
+<span class="fc" id="L170">        return PrioridadOrden.valueOf(reglaPrioridad.get(&quot;prioridad_base&quot;).asText());</span>
+<span class="nc" id="L171">      } catch (IllegalArgumentException e) {</span>
+<span class="nc" id="L172">        return PrioridadOrden.MEDIA;</span>
+      }
+    }
+<span class="nc" id="L175">    return PrioridadOrden.MEDIA;</span>
+  }
+
+  public boolean isActiva() {
+<span class="fc" id="L179">    return activa;</span>
+  }
+
+  public void setActiva(boolean activa) {
+<span class="nc" id="L183">    this.activa = activa;</span>
+<span class="nc" id="L184">  }</span>
+
+  public UUID getCreadoPorId() {
+<span class="fc" id="L187">    return creadoPorId;</span>
+  }
+
+  public UUID getValidadoPorId() {
+<span class="fc" id="L191">    return validadoPorId;</span>
+  }
+
+  public String getValidadoPorNombre() {
+<span class="fc" id="L195">    return validadoPorNombre;</span>
+  }
+
+  public Instant getValidadoEn() {
+<span class="fc" id="L199">    return validadoEn;</span>
+  }
+
+  public Instant getCreadoEn() {
+<span class="fc" id="L203">    return creadoEn;</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

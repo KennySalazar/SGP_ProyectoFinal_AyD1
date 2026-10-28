@@ -1,0 +1,175 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>MotorPonderacionIc.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">sgp-api</a> &gt; <a href="index.source.html" class="el_package">gt.usac.cunoc.sgp.inspeccion.service</a> &gt; <span class="el_source">MotorPonderacionIc.java</span></div><h1>MotorPonderacionIc.java</h1><pre class="source lang-java linenums">package gt.usac.cunoc.sgp.inspeccion.service;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import gt.usac.cunoc.sgp.common.exception.ApiException;
+import gt.usac.cunoc.sgp.inspeccion.model.EntradaCalculoIc;
+import gt.usac.cunoc.sgp.inspeccion.model.EstadoCondicion;
+import gt.usac.cunoc.sgp.inspeccion.model.ResultadoCalculoIc;
+import gt.usac.cunoc.sgp.inspeccion.model.ResultadoCalculoIc.CondicionAnulacion;
+import gt.usac.cunoc.sgp.inspeccion.model.ResultadoCalculoIc.DesgloseElemento;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.util.List;
+import org.springframework.http.HttpStatus;
+import org.springframework.stereotype.Service;
+
+@Service
+public class MotorPonderacionIc {
+
+<span class="fc" id="L19">  private static final BigDecimal CIEN = new BigDecimal(&quot;100&quot;);</span>
+<span class="fc" id="L20">  private static final BigDecimal CUATRO = new BigDecimal(&quot;4&quot;);</span>
+
+  private final AgregadorCalificacionesIc agregador;
+
+<span class="fc" id="L24">  public MotorPonderacionIc(AgregadorCalificacionesIc agregador) {</span>
+<span class="fc" id="L25">    this.agregador = agregador;</span>
+<span class="fc" id="L26">  }</span>
+
+  public ResultadoCalculoIc calcular(
+      EntradaCalculoIc entrada,
+      List&lt;DesgloseElemento&gt; desglose,
+      List&lt;CondicionAnulacion&gt; condiciones,
+      String hashEntrada) {
+
+<span class="fc bfc" id="L34" title="All 4 branches covered.">    if (entrada == null || entrada.versionFormularioId() == null) {</span>
+<span class="fc" id="L35">      throw error(&quot;configuracion_ic_incompleta&quot;, &quot;Falta identificar la version del formulario&quot;);</span>
+    }
+
+<span class="fc bfc" id="L38" title="All 4 branches covered.">    if (entrada.codigoFormulario() == null || entrada.codigoFormulario().isBlank()) {</span>
+<span class="fc" id="L39">      throw error(&quot;configuracion_ic_incompleta&quot;, &quot;Falta el codigo de la version del formulario&quot;);</span>
+    }
+
+<span class="fc bfc" id="L42" title="All 4 branches covered.">    if (entrada.versionAlgoritmo() == null || entrada.versionAlgoritmo().isBlank()) {</span>
+<span class="fc" id="L43">      throw error(&quot;configuracion_ic_incompleta&quot;, &quot;Falta la version del algoritmo de calculo&quot;);</span>
+    }
+
+<span class="fc bfc" id="L46" title="All 4 branches covered.">    if (hashEntrada == null || !hashEntrada.matches(&quot;[0-9a-f]{64}&quot;)) {</span>
+<span class="fc" id="L47">      throw error(&quot;hash_entrada_ic_invalido&quot;, &quot;El hash de entrada debe ser SHA-256 hexadecimal&quot;);</span>
+    }
+
+<span class="fc bfc" id="L50" title="All 4 branches covered.">    if (desglose == null || desglose.isEmpty()) {</span>
+<span class="fc" id="L51">      throw error(&quot;sin_elementos_evaluados_ic&quot;, &quot;No hay elementos evaluados para calcular el IC&quot;);</span>
+    }
+
+<span class="fc bfc" id="L54" title="All 2 branches covered.">    if (condiciones == null) {</span>
+<span class="fc" id="L55">      throw error(&quot;datos_ic_invalidos&quot;, &quot;La lista de condiciones de anulacion es obligatoria&quot;);</span>
+    }
+
+<span class="fc" id="L58">    BigDecimal sumaPesos = BigDecimal.ZERO;</span>
+<span class="fc" id="L59">    BigDecimal sumaPonderada = BigDecimal.ZERO;</span>
+
+<span class="fc bfc" id="L61" title="All 2 branches covered.">    for (DesgloseElemento elemento : desglose) {</span>
+<span class="fc bfc" id="L62" title="All 2 branches covered.">      if (elemento == null) {</span>
+<span class="fc" id="L63">        throw error(&quot;datos_ic_invalidos&quot;, &quot;El desglose contiene un elemento nulo&quot;);</span>
+      }
+
+<span class="fc" id="L66">      BigDecimal peso = elemento.peso();</span>
+
+<span class="fc bfc" id="L68" title="All 4 branches covered.">      if (peso == null || peso.signum() &lt;= 0) {</span>
+<span class="fc" id="L69">        throw error(</span>
+            &quot;configuracion_ic_incompleta&quot;,
+<span class="fc" id="L71">            &quot;El elemento &quot; + elemento.elementoRef() + &quot; requiere un peso positivo&quot;);</span>
+      }
+
+<span class="fc" id="L74">      agregador.validarCalificacion(elemento.calificacionAgregada(), elemento.elementoRef());</span>
+
+<span class="fc" id="L76">      BigDecimal aporte = elemento.calificacionAgregada().multiply(peso);</span>
+
+<span class="fc bfc" id="L78" title="All 4 branches covered.">      if (elemento.aportePonderado() == null || elemento.aportePonderado().compareTo(aporte) != 0) {</span>
+<span class="fc" id="L79">        throw error(</span>
+            &quot;desglose_ic_incongruente&quot;,
+<span class="fc" id="L81">            &quot;El aporte ponderado no coincide en &quot; + elemento.elementoRef());</span>
+      }
+
+<span class="fc" id="L84">      sumaPesos = sumaPesos.add(peso);</span>
+<span class="fc" id="L85">      sumaPonderada = sumaPonderada.add(aporte);</span>
+<span class="fc" id="L86">    }</span>
+
+<span class="fc" id="L88">    BigDecimal denominador = CUATRO.multiply(sumaPesos);</span>
+
+<span class="fc" id="L90">    BigDecimal indice =</span>
+        denominador
+<span class="fc" id="L92">            .subtract(sumaPonderada)</span>
+<span class="fc" id="L93">            .multiply(CIEN)</span>
+<span class="fc" id="L94">            .divide(denominador, 5, RoundingMode.HALF_UP);</span>
+
+<span class="fc" id="L96">    EstadoCondicion estadoPorRango = clasificar(indice, entrada.reglasEvaluacion());</span>
+
+<span class="fc bfc" id="L98" title="All 2 branches covered.">    for (CondicionAnulacion condicion : condiciones) {</span>
+<span class="fc bfc" id="L99" title="All 4 branches covered.">      if (condicion == null || condicion.estadoResultante() != EstadoCondicion.MALO) {</span>
+<span class="fc" id="L100">        throw error(</span>
+            &quot;regla_anulacion_ic_invalida&quot;, &quot;Las condiciones criticas deben forzar el estado MALO&quot;);
+      }
+<span class="fc" id="L103">    }</span>
+
+<span class="fc bfc" id="L105" title="All 2 branches covered.">    EstadoCondicion estadoCalculado = condiciones.isEmpty() ? estadoPorRango : EstadoCondicion.MALO;</span>
+
+<span class="fc" id="L107">    return new ResultadoCalculoIc(</span>
+<span class="fc" id="L108">        entrada.versionFormularioId(),</span>
+<span class="fc" id="L109">        entrada.codigoFormulario(),</span>
+<span class="fc" id="L110">        entrada.versionAlgoritmo(),</span>
+        hashEntrada,
+        indice,
+        estadoPorRango,
+        estadoCalculado,
+        sumaPesos,
+        sumaPonderada,
+        desglose,
+        condiciones);
+  }
+
+  private EstadoCondicion clasificar(BigDecimal indice, JsonNode reglas) {
+<span class="fc bfc" id="L122" title="All 4 branches covered.">    if (reglas == null || !reglas.isObject()) {</span>
+<span class="fc" id="L123">      throw error(&quot;configuracion_ic_incompleta&quot;, &quot;Faltan las reglas de evaluacion del IC&quot;);</span>
+    }
+
+<span class="fc" id="L126">    JsonNode rangos = reglas.get(&quot;rangos_estado&quot;);</span>
+
+<span class="fc bfc" id="L128" title="All 4 branches covered.">    if (rangos == null || !rangos.isObject()) {</span>
+<span class="fc" id="L129">      throw error(&quot;configuracion_ic_incompleta&quot;, &quot;Faltan los rangos del estado del IC&quot;);</span>
+    }
+
+<span class="fc" id="L132">    BigDecimal bueno = leerLimite(rangos, &quot;BUENO&quot;);</span>
+<span class="fc" id="L133">    BigDecimal regular = leerLimite(rangos, &quot;REGULAR&quot;);</span>
+<span class="fc" id="L134">    BigDecimal malo = leerLimite(rangos, &quot;MALO&quot;);</span>
+
+<span class="fc bfc" id="L136" title="All 2 branches covered.">    if (malo.signum() != 0</span>
+<span class="fc bfc" id="L137" title="All 2 branches covered.">        || regular.compareTo(malo) &lt;= 0</span>
+<span class="fc bfc" id="L138" title="All 2 branches covered.">        || bueno.compareTo(regular) &lt;= 0</span>
+<span class="fc bfc" id="L139" title="All 2 branches covered.">        || bueno.compareTo(CIEN) &gt; 0) {</span>
+<span class="fc" id="L140">      throw error(</span>
+          &quot;rangos_ic_invalidos&quot;, &quot;Los limites deben cumplir MALO = 0 &lt; REGULAR &lt; BUENO &lt;= 100&quot;);
+    }
+
+<span class="fc bfc" id="L144" title="All 2 branches covered.">    if (indice.compareTo(bueno) &gt;= 0) {</span>
+<span class="fc" id="L145">      return EstadoCondicion.BUENO;</span>
+    }
+
+<span class="fc bfc" id="L148" title="All 2 branches covered.">    if (indice.compareTo(regular) &gt;= 0) {</span>
+<span class="fc" id="L149">      return EstadoCondicion.REGULAR;</span>
+    }
+
+<span class="fc" id="L152">    return EstadoCondicion.MALO;</span>
+  }
+
+  private BigDecimal leerLimite(JsonNode rangos, String estado) {
+<span class="fc" id="L156">    JsonNode limite = rangos.get(estado);</span>
+
+<span class="fc bfc" id="L158" title="All 4 branches covered.">    if (limite == null || !limite.isNumber()) {</span>
+<span class="fc" id="L159">      throw error(</span>
+          &quot;configuracion_ic_incompleta&quot;,
+          &quot;Falta configurar el limite numerico del estado &quot; + estado);
+    }
+
+<span class="fc" id="L164">    return limite.decimalValue();</span>
+  }
+
+  private ApiException error(String codigo, String detalle) {
+<span class="fc" id="L168">    return new ApiException(</span>
+        HttpStatus.UNPROCESSABLE_ENTITY,
+        codigo,
+        &quot;Calculo del indice de condicion invalido&quot;,
+        detalle);
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

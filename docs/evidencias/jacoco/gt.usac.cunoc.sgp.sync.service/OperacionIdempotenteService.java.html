@@ -1,0 +1,230 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>OperacionIdempotenteService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">sgp-api</a> &gt; <a href="index.source.html" class="el_package">gt.usac.cunoc.sgp.sync.service</a> &gt; <span class="el_source">OperacionIdempotenteService.java</span></div><h1>OperacionIdempotenteService.java</h1><pre class="source lang-java linenums">package gt.usac.cunoc.sgp.sync.service;
+
+import com.fasterxml.jackson.databind.*;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import gt.usac.cunoc.sgp.common.exception.ApiException;
+import gt.usac.cunoc.sgp.common.util.UuidV7Generator;
+import gt.usac.cunoc.sgp.sync.entity.OperacionIdempotente;
+import gt.usac.cunoc.sgp.sync.model.*;
+import gt.usac.cunoc.sgp.sync.repository.OperacionIdempotenteRepository;
+import java.time.*;
+import java.util.*;
+import java.util.function.*;
+import org.springframework.http.HttpStatus;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.*;
+
+@Service
+public class OperacionIdempotenteService {
+  private final OperacionIdempotenteRepository repositorio;
+  private final JdbcTemplate jdbc;
+  private final ObjectMapper json;
+  private final Clock clock;
+
+  public OperacionIdempotenteService(
+      OperacionIdempotenteRepository repositorio,
+      JdbcTemplate jdbc,
+      ObjectMapper json,
+<span class="fc" id="L29">      Clock clock) {</span>
+<span class="fc" id="L30">    this.repositorio = repositorio;</span>
+<span class="fc" id="L31">    this.jdbc = jdbc;</span>
+<span class="fc" id="L32">    this.json = json;</span>
+<span class="fc" id="L33">    this.clock = clock;</span>
+<span class="fc" id="L34">  }</span>
+
+  private void bloquear(SolicitudOperacion s) {
+<span class="fc" id="L37">    bloquear(&quot;operacion:&quot; + s.usuarioId() + &quot;:&quot; + s.clave());</span>
+<span class="fc" id="L38">  }</span>
+
+  private void bloquear(String identidad) {
+<span class="fc" id="L41">    jdbc.query(&quot;select pg_advisory_xact_lock(hashtextextended(?,0))&quot;, rs -&gt; {}, identidad);</span>
+<span class="fc" id="L42">  }</span>
+
+  @Transactional(propagation = Propagation.MANDATORY)
+  public void bloquearEntidad(String entidad, UUID id) {
+<span class="fc" id="L46">    bloquear(&quot;entidad:&quot; + entidad + &quot;:&quot; + id);</span>
+<span class="fc" id="L47">  }</span>
+
+  private void comprobar(OperacionIdempotente o, SolicitudOperacion s) {
+<span class="fc bfc" id="L50" title="All 2 branches covered.">    if (!o.getMetodo().equals(s.metodo())</span>
+<span class="fc bfc" id="L51" title="All 2 branches covered.">        || !o.getRuta().equals(s.ruta())</span>
+<span class="fc bfc" id="L52" title="All 2 branches covered.">        || !o.getHashSolicitud().equals(s.hashSolicitud())</span>
+<span class="fc bfc" id="L53" title="All 2 branches covered.">        || !Objects.equals(o.getEntidad(), s.entidad())</span>
+<span class="fc bfc" id="L54" title="All 4 branches covered.">        || (s.entidadId() != null &amp;&amp; !s.entidadId().equals(o.getEntidadId())))</span>
+<span class="fc" id="L55">      throw conflicto(&quot;idempotencia_solicitud_distinta&quot;);</span>
+<span class="fc" id="L56">  }</span>
+
+  private ApiException conflicto(String code) {
+<span class="fc" id="L59">    return new ApiException(</span>
+        HttpStatus.CONFLICT,
+        code,
+        &quot;Conflicto de operación&quot;,
+        &quot;La clave o el intento no corresponden a una operación disponible con esta solicitud.&quot;);
+  }
+
+  private OperacionIdempotente nueva(SolicitudOperacion s) {
+<span class="fc" id="L67">    Instant ahora = clock.instant();</span>
+<span class="fc" id="L68">    return new OperacionIdempotente(</span>
+<span class="fc" id="L69">        UuidV7Generator.generate(),</span>
+<span class="fc" id="L70">        s.usuarioId(),</span>
+<span class="fc" id="L71">        s.clave(),</span>
+<span class="fc" id="L72">        s.metodo(),</span>
+<span class="fc" id="L73">        s.ruta(),</span>
+<span class="fc" id="L74">        s.hashSolicitud(),</span>
+        &quot;EN_PROCESO&quot;,
+        null,
+        null,
+<span class="fc" id="L78">        s.entidad(),</span>
+<span class="fc" id="L79">        s.entidadId(),</span>
+        null,
+<span class="fc" id="L81">        ahora.plus(Duration.ofMinutes(15)),</span>
+        ahora);
+  }
+
+  /**
+   * Operación exclusivamente de BD: reserva, acción y respuesta se confirman o revierten juntas.
+   */
+  @Transactional(propagation = Propagation.MANDATORY)
+  public &lt;T&gt; T ejecutar(
+      SolicitudOperacion s,
+      Class&lt;T&gt; tipo,
+      int codigo,
+      Supplier&lt;T&gt; accion,
+      Function&lt;T, UUID&gt; destino) {
+<span class="fc" id="L95">    return ejecutar(s, codigo, accion, destino, nodo -&gt; json.convertValue(nodo, tipo));</span>
+  }
+
+  @Transactional(propagation = Propagation.MANDATORY)
+  public &lt;T&gt; T ejecutar(
+      SolicitudOperacion s,
+      int codigo,
+      Supplier&lt;T&gt; accion,
+      Function&lt;T, UUID&gt; destino,
+      Function&lt;JsonNode, T&gt; reproducir) {
+<span class="fc" id="L105">    bloquear(s);</span>
+<span class="fc" id="L106">    var existente = repositorio.findByUsuarioIdAndClave(s.usuarioId(), s.clave());</span>
+<span class="fc bfc" id="L107" title="All 2 branches covered.">    if (existente.isPresent()) {</span>
+<span class="fc" id="L108">      var op = existente.get();</span>
+<span class="fc" id="L109">      comprobar(op, s);</span>
+<span class="pc bpc" id="L110" title="1 of 2 branches missed.">      if (!&quot;COMPLETADA&quot;.equals(op.getEstado())) throw conflicto(&quot;operacion_en_proceso&quot;);</span>
+<span class="fc" id="L111">      return reproducir.apply(op.getRespuesta().deepCopy());</span>
+    }
+<span class="fc" id="L113">    var op = repositorio.saveAndFlush(nueva(s));</span>
+<span class="fc" id="L114">    T resultado = accion.get();</span>
+<span class="fc" id="L115">    op.completar(json.valueToTree(resultado), codigo, destino.apply(resultado), clock.instant());</span>
+<span class="fc" id="L116">    return resultado;</span>
+  }
+
+  /** Reserva duradera para transferencias externas. El JSON conserva las claves del intento. */
+  @Transactional(propagation = Propagation.REQUIRES_NEW)
+  public ReservaOperacion reservar(SolicitudOperacion s, JsonNode recursos) {
+<span class="fc" id="L122">    bloquear(s);</span>
+<span class="fc" id="L123">    var op = repositorio.findByUsuarioIdAndClave(s.usuarioId(), s.clave()).orElse(null);</span>
+<span class="fc bfc" id="L124" title="All 2 branches covered.">    if (op != null) {</span>
+<span class="fc" id="L125">      comprobar(op, s);</span>
+<span class="fc bfc" id="L126" title="All 2 branches covered.">      if (&quot;COMPLETADA&quot;.equals(op.getEstado()))</span>
+<span class="fc" id="L127">        return new ReservaOperacion(op.getId(), null, op.getExpiraEn(), true, op.getRespuesta());</span>
+<span class="pc bpc" id="L128" title="1 of 4 branches missed.">      if (op.getRespuesta() == null || !op.getRespuesta().path(&quot;recuperada&quot;).asBoolean(false))</span>
+<span class="fc" id="L129">        throw conflicto(&quot;operacion_en_proceso&quot;);</span>
+    } else {
+<span class="fc" id="L131">      op = nueva(s);</span>
+    }
+<span class="fc" id="L133">    UUID intento = UUID.randomUUID();</span>
+<span class="fc" id="L134">    ObjectNode manifiesto =</span>
+<span class="fc" id="L135">        json.createObjectNode().put(&quot;intentoId&quot;, intento.toString()).put(&quot;recuperada&quot;, false);</span>
+<span class="fc" id="L136">    manifiesto.set(&quot;recursos&quot;, recursos.deepCopy());</span>
+<span class="fc" id="L137">    op.iniciarIntento(manifiesto, clock.instant().plus(Duration.ofMinutes(15)));</span>
+<span class="fc" id="L138">    repositorio.saveAndFlush(op);</span>
+<span class="fc" id="L139">    return new ReservaOperacion(op.getId(), intento, op.getExpiraEn(), false, null);</span>
+  }
+
+  /** El llamador guarda las asociaciones de negocio en esta misma transacción. */
+  @Transactional(propagation = Propagation.MANDATORY)
+  public void completar(ReservaOperacion reserva, JsonNode respuesta, int codigo, UUID entidadId) {
+<span class="fc" id="L145">    var op =</span>
+        repositorio
+<span class="fc" id="L147">            .findByIdForUpdate(reserva.operacionId())</span>
+<span class="pc" id="L148">            .orElseThrow(() -&gt; conflicto(&quot;operacion_no_encontrada&quot;));</span>
+<span class="pc bpc" id="L149" title="1 of 2 branches missed.">    if (!&quot;EN_PROCESO&quot;.equals(op.getEstado())</span>
+<span class="pc bpc" id="L150" title="1 of 2 branches missed.">        || op.getExpiraEn() == null</span>
+<span class="pc bpc" id="L151" title="1 of 2 branches missed.">        || !op.getExpiraEn().isAfter(clock.instant())</span>
+<span class="fc bfc" id="L152" title="All 2 branches covered.">        || !Objects.equals(</span>
+<span class="fc" id="L153">            op.getRespuesta().path(&quot;intentoId&quot;).asText(),</span>
+<span class="pc bpc" id="L154" title="1 of 2 branches missed.">            reserva.intentoId() == null ? null : reserva.intentoId().toString())</span>
+<span class="pc bpc" id="L155" title="1 of 2 branches missed.">        || op.getRespuesta().path(&quot;recuperada&quot;).asBoolean()</span>
+<span class="pc bpc" id="L156" title="2 of 4 branches missed.">        || (op.getEntidadId() != null &amp;&amp; !op.getEntidadId().equals(entidadId)))</span>
+<span class="fc" id="L157">      throw conflicto(&quot;intento_no_vigente&quot;);</span>
+<span class="fc" id="L158">    op.completar(respuesta, codigo, entidadId, clock.instant());</span>
+<span class="fc" id="L159">  }</span>
+
+  @Transactional(readOnly = true)
+  public List&lt;UUID&gt; vencidas() {
+<span class="fc" id="L163">    return repositorio.findVencidas(clock.instant());</span>
+  }
+
+  /** La limpieza falla con excepción: se conserva el manifiesto para volver a intentarlo. */
+  @Transactional(propagation = Propagation.REQUIRES_NEW)
+  public boolean recuperar(UUID id, Consumer&lt;JsonNode&gt; limpiar) {
+<span class="fc" id="L169">    var op =</span>
+<span class="pc" id="L170">        repositorio.findByIdForUpdate(id).orElseThrow(() -&gt; conflicto(&quot;operacion_no_encontrada&quot;));</span>
+<span class="fc bfc" id="L171" title="All 2 branches covered.">    if (!&quot;EN_PROCESO&quot;.equals(op.getEstado())</span>
+<span class="pc bpc" id="L172" title="1 of 2 branches missed.">        || op.getExpiraEn() == null</span>
+<span class="fc bfc" id="L173" title="All 2 branches covered.">        || op.getExpiraEn().isAfter(clock.instant())) return false;</span>
+<span class="pc bpc" id="L174" title="2 of 4 branches missed.">    if (op.getRespuesta() == null || !op.getRespuesta().has(&quot;recursos&quot;)) return false;</span>
+<span class="fc" id="L175">    limpiar.accept(op.getRespuesta().get(&quot;recursos&quot;).deepCopy());</span>
+<span class="fc" id="L176">    var manifiesto = (ObjectNode) op.getRespuesta().deepCopy();</span>
+<span class="fc" id="L177">    manifiesto.put(&quot;recuperada&quot;, true);</span>
+<span class="fc" id="L178">    op.marcarRecuperada(manifiesto);</span>
+<span class="fc" id="L179">    return true;</span>
+  }
+
+  @Transactional(readOnly = true)
+  public Optional&lt;JsonNode&gt; buscarCompletada(SolicitudOperacion solicitud) {
+<span class="fc" id="L184">    return repositorio</span>
+<span class="fc" id="L185">        .findByUsuarioIdAndClave(solicitud.usuarioId(), solicitud.clave())</span>
+<span class="fc" id="L186">        .map(</span>
+            op -&gt; {
+<span class="fc" id="L188">              comprobar(op, solicitud);</span>
+<span class="fc bfc" id="L189" title="All 2 branches covered.">              return &quot;COMPLETADA&quot;.equals(op.getEstado()) ? op.getRespuesta().deepCopy() : null;</span>
+            });
+  }
+
+  /** Solo después de compensar los objetos del intento propio; permite reintento inmediato. */
+  @Transactional(propagation = Propagation.REQUIRES_NEW)
+  public void liberar(ReservaOperacion reserva) {
+<span class="nc" id="L196">    var op =</span>
+        repositorio
+<span class="nc" id="L198">            .findByIdForUpdate(reserva.operacionId())</span>
+<span class="nc" id="L199">            .orElseThrow(() -&gt; conflicto(&quot;operacion_no_encontrada&quot;));</span>
+<span class="nc bnc" id="L200" title="All 2 branches missed.">    if (&quot;EN_PROCESO&quot;.equals(op.getEstado())</span>
+<span class="nc bnc" id="L201" title="All 2 branches missed.">        &amp;&amp; Objects.equals(</span>
+<span class="nc" id="L202">            op.getRespuesta().path(&quot;intentoId&quot;).asText(), reserva.intentoId().toString())) {</span>
+<span class="nc" id="L203">      var manifiesto = (ObjectNode) op.getRespuesta().deepCopy();</span>
+<span class="nc" id="L204">      manifiesto.put(&quot;recuperada&quot;, true);</span>
+<span class="nc" id="L205">      op.marcarRecuperada(manifiesto);</span>
+    }
+<span class="nc" id="L207">  }</span>
+
+  /**
+   * Comprueba el resultado bajo bloqueo antes de eliminar objetos, incluso si el commit fue
+   * ambiguo.
+   */
+  @Transactional(propagation = Propagation.REQUIRES_NEW)
+  public boolean compensar(ReservaOperacion reserva, Runnable limpieza) {
+<span class="fc" id="L215">    var op =</span>
+        repositorio
+<span class="fc" id="L217">            .findByIdForUpdate(reserva.operacionId())</span>
+<span class="pc" id="L218">            .orElseThrow(() -&gt; conflicto(&quot;operacion_no_encontrada&quot;));</span>
+<span class="fc bfc" id="L219" title="All 2 branches covered.">    if (!&quot;EN_PROCESO&quot;.equals(op.getEstado())</span>
+<span class="pc bpc" id="L220" title="1 of 2 branches missed.">        || !Objects.equals(</span>
+<span class="fc" id="L221">            op.getRespuesta().path(&quot;intentoId&quot;).asText(), reserva.intentoId().toString()))</span>
+<span class="fc" id="L222">      return false;</span>
+<span class="fc" id="L223">    limpieza.run();</span>
+<span class="fc" id="L224">    var manifiesto = (ObjectNode) op.getRespuesta().deepCopy();</span>
+<span class="fc" id="L225">    manifiesto.put(&quot;recuperada&quot;, true);</span>
+<span class="fc" id="L226">    op.marcarRecuperada(manifiesto);</span>
+<span class="fc" id="L227">    return true;</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

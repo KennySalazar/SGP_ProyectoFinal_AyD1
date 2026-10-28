@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ObjetosImagenService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">sgp-api</a> &gt; <a href="index.source.html" class="el_package">gt.usac.cunoc.sgp.archivo.service</a> &gt; <span class="el_source">ObjetosImagenService.java</span></div><h1>ObjetosImagenService.java</h1><pre class="source lang-java linenums">package gt.usac.cunoc.sgp.archivo.service;
+
+import gt.usac.cunoc.sgp.archivo.model.*;
+import gt.usac.cunoc.sgp.common.util.UuidV7Generator;
+import java.io.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.UUID;
+import org.springframework.stereotype.Service;
+
+@Service
+public class ObjetosImagenService {
+  private final AlmacenamientoArchivos almacenamiento;
+
+<span class="fc" id="L15">  public ObjetosImagenService(AlmacenamientoArchivos almacenamiento) {</span>
+<span class="fc" id="L16">    this.almacenamiento = almacenamiento;</span>
+<span class="fc" id="L17">  }</span>
+
+  public ClavesImagen nuevasClaves() {
+<span class="fc" id="L20">    String prefijo = UuidV7Generator.generate() + &quot;-&quot; + UUID.randomUUID();</span>
+<span class="fc" id="L21">    return new ClavesImagen(prefijo + &quot;.jpg&quot;, prefijo + &quot;-mini.jpg&quot;);</span>
+  }
+
+  /** Las claves deben reservarse antes de escribir y ser exclusivas de este intento. */
+  public void guardar(ClavesImagen claves, ImagenProcesada imagen) throws IOException {
+<span class="fc" id="L26">    var escritos = new ArrayList&lt;String&gt;();</span>
+    try {
+<span class="fc" id="L28">      guardarVerificado(claves.original(), imagen.original(), escritos);</span>
+<span class="fc" id="L29">      guardarVerificado(claves.miniatura(), imagen.miniatura(), escritos);</span>
+<span class="fc" id="L30">    } catch (IOException | RuntimeException e) {</span>
+<span class="fc bfc" id="L31" title="All 2 branches covered.">      for (String clave : escritos) {</span>
+        try {
+<span class="fc" id="L33">          almacenamiento.eliminar(clave);</span>
+<span class="nc" id="L34">        } catch (IOException limpieza) {</span>
+<span class="nc" id="L35">          e.addSuppressed(limpieza);</span>
+<span class="fc" id="L36">        }</span>
+<span class="fc" id="L37">      }</span>
+<span class="fc" id="L38">      throw e;</span>
+<span class="fc" id="L39">    }</span>
+<span class="fc" id="L40">  }</span>
+
+  private void guardarVerificado(String clave, byte[] bytes, List&lt;String&gt; escritos)
+      throws IOException {
+<span class="fc" id="L44">    almacenamiento.guardar(clave, new ByteArrayInputStream(bytes), bytes.length, &quot;image/jpeg&quot;);</span>
+<span class="fc" id="L45">    escritos.add(clave);</span>
+<span class="fc" id="L46">    try (var entrada = almacenamiento.abrir(clave)) {</span>
+<span class="fc" id="L47">      byte[] leidos = entrada.readNBytes(bytes.length + 1);</span>
+<span class="pc bpc" id="L48" title="1 of 2 branches missed.">      if (!ProcesadorImagenes.checksum(bytes).equals(ProcesadorImagenes.checksum(leidos)))</span>
+<span class="nc" id="L49">        throw new IOException(&quot;El objeto almacenado no coincide con el contenido procesado&quot;);</span>
+    }
+<span class="fc" id="L51">  }</span>
+
+  public void eliminar(ClavesImagen claves) throws IOException {
+<span class="fc" id="L54">    IOException fallo = null;</span>
+<span class="fc bfc" id="L55" title="All 2 branches covered.">    for (String clave : new String[] {claves.original(), claves.miniatura()}) {</span>
+      try {
+<span class="fc" id="L57">        almacenamiento.eliminar(clave);</span>
+<span class="fc" id="L58">      } catch (IOException e) {</span>
+<span class="pc bpc" id="L59" title="1 of 2 branches missed.">        if (fallo == null) fallo = e;</span>
+<span class="nc" id="L60">        else fallo.addSuppressed(e);</span>
+<span class="fc" id="L61">      }</span>
+    }
+<span class="fc bfc" id="L63" title="All 2 branches covered.">    if (fallo != null) throw fallo;</span>
+<span class="fc" id="L64">  }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ActaCalibracionController.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">sgp-api</a> &gt; <a href="index.source.html" class="el_package">gt.usac.cunoc.sgp.formulario.controller</a> &gt; <span class="el_source">ActaCalibracionController.java</span></div><h1>ActaCalibracionController.java</h1><pre class="source lang-java linenums">package gt.usac.cunoc.sgp.formulario.controller;
+
+import gt.usac.cunoc.sgp.common.exception.ApiException;
+import gt.usac.cunoc.sgp.common.security.JwtData;
+import gt.usac.cunoc.sgp.formulario.dto.EstadoActaCalibracionResponse;
+import gt.usac.cunoc.sgp.formulario.service.ActaCalibracionService;
+import java.util.UUID;
+import org.springframework.http.CacheControl;
+import org.springframework.http.ContentDisposition;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
+
+@RestController
+@RequestMapping(&quot;/api/v1/formularios/{id}/acta-calibracion&quot;)
+@PreAuthorize(&quot;hasAnyRole('ADMINISTRADOR', 'CATEDRATICO')&quot;)
+public class ActaCalibracionController {
+  private final ActaCalibracionService service;
+
+<span class="fc" id="L24">  public ActaCalibracionController(ActaCalibracionService service) {</span>
+<span class="fc" id="L25">    this.service = service;</span>
+<span class="fc" id="L26">  }</span>
+
+  @GetMapping
+  public EstadoActaCalibracionResponse consultar(@PathVariable UUID id) {
+<span class="fc" id="L30">    return service.consultar(id);</span>
+  }
+
+  @PutMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+  public EstadoActaCalibracionResponse adjuntar(
+      @PathVariable UUID id,
+      @RequestPart(&quot;archivo&quot;) MultipartFile archivo,
+      @RequestHeader(value = &quot;If-Match&quot;, required = false) String versionEsperada,
+      Authentication authentication) {
+<span class="pc bpc" id="L39" title="2 of 4 branches missed.">    if (authentication == null || !(authentication.getDetails() instanceof JwtData datos)) {</span>
+<span class="nc" id="L40">      throw new ApiException(</span>
+          HttpStatus.UNAUTHORIZED,
+          &quot;authentication_required&quot;,
+          &quot;Autenticacion requerida&quot;,
+          &quot;Se requiere una sesion valida.&quot;);
+    }
+<span class="fc" id="L46">    return service.adjuntar(</span>
+        id,
+        archivo,
+<span class="fc" id="L49">        datos.userId(),</span>
+<span class="fc" id="L50">        gt.usac.cunoc.sgp.formulario.validation.VersionCalibracionHttp.exigir(versionEsperada));</span>
+  }
+
+  @GetMapping(&quot;/contenido&quot;)
+  public ResponseEntity&lt;byte[]&gt; descargar(@PathVariable UUID id) {
+<span class="fc" id="L55">    byte[] contenido = service.descargar(id);</span>
+<span class="fc" id="L56">    return ResponseEntity.ok()</span>
+<span class="fc" id="L57">        .contentType(MediaType.APPLICATION_PDF)</span>
+<span class="fc" id="L58">        .contentLength(contenido.length)</span>
+<span class="fc" id="L59">        .cacheControl(CacheControl.noStore().cachePrivate())</span>
+<span class="fc" id="L60">        .header(&quot;X-Content-Type-Options&quot;, &quot;nosniff&quot;)</span>
+<span class="fc" id="L61">        .header(</span>
+            &quot;Content-Disposition&quot;,
+<span class="fc" id="L63">            ContentDisposition.attachment().filename(&quot;acta-&quot; + id + &quot;.pdf&quot;).build().toString())</span>
+<span class="fc" id="L64">        .body(contenido);</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

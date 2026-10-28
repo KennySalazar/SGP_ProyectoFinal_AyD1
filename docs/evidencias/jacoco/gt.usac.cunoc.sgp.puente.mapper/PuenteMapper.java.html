@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PuenteMapper.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">sgp-api</a> &gt; <a href="index.source.html" class="el_package">gt.usac.cunoc.sgp.puente.mapper</a> &gt; <span class="el_source">PuenteMapper.java</span></div><h1>PuenteMapper.java</h1><pre class="source lang-java linenums">package gt.usac.cunoc.sgp.puente.mapper;
+
+import gt.usac.cunoc.sgp.puente.dto.CoordenadaUtmResponse;
+import gt.usac.cunoc.sgp.puente.dto.DepartamentoResponse;
+import gt.usac.cunoc.sgp.puente.dto.MunicipioResponse;
+import gt.usac.cunoc.sgp.puente.dto.PuenteCatalogoResponse;
+import gt.usac.cunoc.sgp.puente.dto.PuenteCercanoResponse;
+import gt.usac.cunoc.sgp.puente.dto.PuenteResponse;
+import gt.usac.cunoc.sgp.puente.dto.SolicitudAltaPuenteResponse;
+import gt.usac.cunoc.sgp.puente.entity.Departamento;
+import gt.usac.cunoc.sgp.puente.entity.Municipio;
+import gt.usac.cunoc.sgp.puente.entity.Puente;
+import gt.usac.cunoc.sgp.puente.entity.SolicitudAltaPuente;
+import gt.usac.cunoc.sgp.puente.repository.PuenteRepository.CoordenadaUtmProjection;
+import gt.usac.cunoc.sgp.puente.repository.PuenteRepository.PuenteCercanoProjection;
+import java.time.Instant;
+import java.time.OffsetDateTime;
+import java.time.ZoneId;
+import org.mapstruct.Mapper;
+import org.mapstruct.Mapping;
+import org.mapstruct.ReportingPolicy;
+
+@Mapper(componentModel = &quot;spring&quot;, unmappedTargetPolicy = ReportingPolicy.ERROR)
+public interface PuenteMapper {
+
+  @Mapping(target = &quot;departamento&quot;, source = &quot;municipio.departamento&quot;)
+  @Mapping(target = &quot;latitud&quot;, expression = &quot;java(puente.getUbicacion().getY())&quot;)
+  @Mapping(target = &quot;longitud&quot;, expression = &quot;java(puente.getUbicacion().getX())&quot;)
+  @Mapping(target = &quot;estadoActual&quot;, source = &quot;estadoActual&quot;)
+  @Mapping(target = &quot;indiceCondicionActual&quot;, source = &quot;indiceCondicionActual&quot;)
+  @Mapping(target = &quot;fechaUltimaInspeccion&quot;, source = &quot;fechaUltimaInspeccion&quot;)
+  PuenteCatalogoResponse toCatalogoResponse(Puente puente);
+
+  DepartamentoResponse toDepartamentoResponse(Departamento departamento);
+
+  @Mapping(target = &quot;departamentoId&quot;, source = &quot;departamento.id&quot;)
+  MunicipioResponse toMunicipioResponse(Municipio municipio);
+
+  PuenteCercanoResponse toPuenteCercanoResponse(PuenteCercanoProjection cercano);
+
+  @Mapping(target = &quot;hemisferio&quot;, constant = &quot;N&quot;)
+  CoordenadaUtmResponse toCoordenadaUtmResponse(CoordenadaUtmProjection coordenada);
+
+  @Mapping(target = &quot;departamento&quot;, source = &quot;puente.municipio.departamento&quot;)
+  @Mapping(target = &quot;latitud&quot;, expression = &quot;java(puente.getUbicacion().getY())&quot;)
+  @Mapping(target = &quot;longitud&quot;, expression = &quot;java(puente.getUbicacion().getX())&quot;)
+  @Mapping(target = &quot;utm&quot;, source = &quot;utm&quot;)
+  @Mapping(target = &quot;estadoActual&quot;, source = &quot;puente.estadoActual&quot;)
+  @Mapping(target = &quot;indiceCondicionActual&quot;, source = &quot;puente.indiceCondicionActual&quot;)
+  @Mapping(target = &quot;fechaUltimaInspeccion&quot;, source = &quot;puente.fechaUltimaInspeccion&quot;)
+  @Mapping(
+      target = &quot;creadoEn&quot;,
+      expression =
+          &quot;java(puente.getCreadoEn().atZone(java.time.ZoneId.of(\&quot;America/Guatemala\&quot;)).toOffsetDateTime())&quot;)
+  PuenteResponse toAltaResponse(Puente puente, CoordenadaUtmResponse utm);
+
+  @Mapping(target = &quot;nombre&quot;, source = &quot;nombrePropuesto&quot;)
+  @Mapping(target = &quot;departamento&quot;, source = &quot;municipio.departamento&quot;)
+  @Mapping(target = &quot;latitud&quot;, expression = &quot;java(solicitud.getUbicacion().getY())&quot;)
+  @Mapping(target = &quot;longitud&quot;, expression = &quot;java(solicitud.getUbicacion().getX())&quot;)
+  @Mapping(
+      target = &quot;puenteCreadoId&quot;,
+      expression =
+          &quot;java(solicitud.getPuenteCreado() == null ? null : solicitud.getPuenteCreado().getId())&quot;)
+  @Mapping(
+      target = &quot;puenteCreadoCodigo&quot;,
+      expression =
+          &quot;java(solicitud.getPuenteCreado() == null ? null : solicitud.getPuenteCreado().getCodigo())&quot;)
+  SolicitudAltaPuenteResponse toSolicitudResponse(SolicitudAltaPuente solicitud);
+
+  default OffsetDateTime aHoraGuatemala(Instant instante) {
+<span class="fc bfc" id="L72" title="All 2 branches covered.">    return instante == null</span>
+<span class="fc" id="L73">        ? null</span>
+<span class="fc" id="L74">        : instante.atZone(ZoneId.of(&quot;America/Guatemala&quot;)).toOffsetDateTime();</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

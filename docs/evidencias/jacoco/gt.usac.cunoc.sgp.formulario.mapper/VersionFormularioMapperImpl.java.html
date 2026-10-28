@@ -1,0 +1,245 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>VersionFormularioMapperImpl.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">sgp-api</a> &gt; <a href="index.source.html" class="el_package">gt.usac.cunoc.sgp.formulario.mapper</a> &gt; <span class="el_source">VersionFormularioMapperImpl.java</span></div><h1>VersionFormularioMapperImpl.java</h1><pre class="source lang-java linenums">package gt.usac.cunoc.sgp.formulario.mapper;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import gt.usac.cunoc.sgp.formulario.dto.AprobacionCalibracionResponse;
+import gt.usac.cunoc.sgp.formulario.dto.ConfiguracionIcElementoResponse;
+import gt.usac.cunoc.sgp.formulario.dto.FormularioActivoResponse;
+import gt.usac.cunoc.sgp.formulario.dto.MapeoCampoResponse;
+import gt.usac.cunoc.sgp.formulario.dto.VersionFormularioResponse;
+import gt.usac.cunoc.sgp.formulario.dto.VersionFormularioResumenResponse;
+import gt.usac.cunoc.sgp.formulario.entity.ConfiguracionIcElemento;
+import gt.usac.cunoc.sgp.formulario.entity.MapeoCampoFormulario;
+import gt.usac.cunoc.sgp.formulario.entity.VersionFormulario;
+import gt.usac.cunoc.sgp.formulario.model.EstadoVersionFormulario;
+import gt.usac.cunoc.sgp.formulario.model.TipoMapeoCampo;
+import java.math.BigDecimal;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.UUID;
+import javax.annotation.processing.Generated;
+import org.springframework.stereotype.Component;
+
+@Generated(
+    value = &quot;org.mapstruct.ap.MappingProcessor&quot;,
+    date = &quot;2026-10-27T23:39:18-0600&quot;,
+    comments = &quot;version: 1.6.3, compiler: javac, environment: Java 25.0.4.1 (Debian)&quot;
+)
+@Component
+<span class="fc" id="L29">public class VersionFormularioMapperImpl implements VersionFormularioMapper {</span>
+
+    @Override
+    public VersionFormularioResumenResponse toResumenResponse(VersionFormulario version) {
+<span class="pc bpc" id="L33" title="1 of 2 branches missed.">        if ( version == null ) {</span>
+<span class="nc" id="L34">            return null;</span>
+        }
+
+<span class="fc" id="L37">        UUID versionAnteriorId = null;</span>
+<span class="fc" id="L38">        String versionAnteriorCodigo = null;</span>
+<span class="fc" id="L39">        UUID id = null;</span>
+<span class="fc" id="L40">        String codigo = null;</span>
+<span class="fc" id="L41">        EstadoVersionFormulario estado = null;</span>
+<span class="fc" id="L42">        boolean activa = false;</span>
+<span class="fc" id="L43">        String hashContenido = null;</span>
+<span class="fc" id="L44">        String versionAlgoritmoIc = null;</span>
+<span class="fc" id="L45">        UUID creadoPorId = null;</span>
+<span class="fc" id="L46">        UUID publicadoPorId = null;</span>
+<span class="fc" id="L47">        Instant publicadoEn = null;</span>
+<span class="fc" id="L48">        UUID calibradoPorId = null;</span>
+<span class="fc" id="L49">        Instant calibradoEn = null;</span>
+<span class="fc" id="L50">        Instant creadoEn = null;</span>
+<span class="fc" id="L51">        Instant actualizadoEn = null;</span>
+<span class="fc" id="L52">        long version1 = 0L;</span>
+
+<span class="fc" id="L54">        versionAnteriorId = versionVersionAnteriorId( version );</span>
+<span class="fc" id="L55">        versionAnteriorCodigo = versionVersionAnteriorCodigo( version );</span>
+<span class="fc" id="L56">        id = version.getId();</span>
+<span class="fc" id="L57">        codigo = version.getCodigo();</span>
+<span class="fc" id="L58">        estado = version.getEstado();</span>
+<span class="fc" id="L59">        activa = version.isActiva();</span>
+<span class="fc" id="L60">        hashContenido = version.getHashContenido();</span>
+<span class="fc" id="L61">        versionAlgoritmoIc = version.getVersionAlgoritmoIc();</span>
+<span class="fc" id="L62">        creadoPorId = version.getCreadoPorId();</span>
+<span class="fc" id="L63">        publicadoPorId = version.getPublicadoPorId();</span>
+<span class="fc" id="L64">        publicadoEn = version.getPublicadoEn();</span>
+<span class="fc" id="L65">        calibradoPorId = version.getCalibradoPorId();</span>
+<span class="fc" id="L66">        calibradoEn = version.getCalibradoEn();</span>
+<span class="fc" id="L67">        creadoEn = version.getCreadoEn();</span>
+<span class="fc" id="L68">        actualizadoEn = version.getActualizadoEn();</span>
+<span class="fc" id="L69">        version1 = version.getVersion();</span>
+
+<span class="fc" id="L71">        VersionFormularioResumenResponse versionFormularioResumenResponse = new VersionFormularioResumenResponse( id, codigo, estado, activa, hashContenido, versionAlgoritmoIc, versionAnteriorId, versionAnteriorCodigo, creadoPorId, publicadoPorId, publicadoEn, calibradoPorId, calibradoEn, creadoEn, actualizadoEn, version1 );</span>
+
+<span class="fc" id="L73">        return versionFormularioResumenResponse;</span>
+    }
+
+    @Override
+    public VersionFormularioResponse toResponse(VersionFormulario version, List&lt;ConfiguracionIcElementoResponse&gt; pesos, List&lt;MapeoCampoResponse&gt; mapeos) {
+<span class="pc bpc" id="L78" title="5 of 6 branches missed.">        if ( version == null &amp;&amp; pesos == null &amp;&amp; mapeos == null ) {</span>
+<span class="nc" id="L79">            return null;</span>
+        }
+
+<span class="fc" id="L82">        UUID versionAnteriorId = null;</span>
+<span class="fc" id="L83">        String versionAnteriorCodigo = null;</span>
+<span class="fc" id="L84">        UUID id = null;</span>
+<span class="fc" id="L85">        String codigo = null;</span>
+<span class="fc" id="L86">        EstadoVersionFormulario estado = null;</span>
+<span class="fc" id="L87">        boolean activa = false;</span>
+<span class="fc" id="L88">        JsonNode esquema = null;</span>
+<span class="fc" id="L89">        JsonNode vinculosAlmacenamiento = null;</span>
+<span class="fc" id="L90">        JsonNode reglasEvaluacionIc = null;</span>
+<span class="fc" id="L91">        String hashContenido = null;</span>
+<span class="fc" id="L92">        String versionAlgoritmoIc = null;</span>
+<span class="fc" id="L93">        UUID creadoPorId = null;</span>
+<span class="fc" id="L94">        UUID publicadoPorId = null;</span>
+<span class="fc" id="L95">        Instant publicadoEn = null;</span>
+<span class="fc" id="L96">        UUID calibradoPorId = null;</span>
+<span class="fc" id="L97">        Instant calibradoEn = null;</span>
+<span class="fc" id="L98">        Instant creadoEn = null;</span>
+<span class="fc" id="L99">        Instant actualizadoEn = null;</span>
+<span class="fc" id="L100">        long version1 = 0L;</span>
+<span class="pc bpc" id="L101" title="1 of 2 branches missed.">        if ( version != null ) {</span>
+<span class="fc" id="L102">            versionAnteriorId = versionVersionAnteriorId( version );</span>
+<span class="fc" id="L103">            versionAnteriorCodigo = versionVersionAnteriorCodigo( version );</span>
+<span class="fc" id="L104">            id = version.getId();</span>
+<span class="fc" id="L105">            codigo = version.getCodigo();</span>
+<span class="fc" id="L106">            estado = version.getEstado();</span>
+<span class="fc" id="L107">            activa = version.isActiva();</span>
+<span class="fc" id="L108">            esquema = version.getEsquema();</span>
+<span class="fc" id="L109">            vinculosAlmacenamiento = version.getVinculosAlmacenamiento();</span>
+<span class="fc" id="L110">            reglasEvaluacionIc = version.getReglasEvaluacionIc();</span>
+<span class="fc" id="L111">            hashContenido = version.getHashContenido();</span>
+<span class="fc" id="L112">            versionAlgoritmoIc = version.getVersionAlgoritmoIc();</span>
+<span class="fc" id="L113">            creadoPorId = version.getCreadoPorId();</span>
+<span class="fc" id="L114">            publicadoPorId = version.getPublicadoPorId();</span>
+<span class="fc" id="L115">            publicadoEn = version.getPublicadoEn();</span>
+<span class="fc" id="L116">            calibradoPorId = version.getCalibradoPorId();</span>
+<span class="fc" id="L117">            calibradoEn = version.getCalibradoEn();</span>
+<span class="fc" id="L118">            creadoEn = version.getCreadoEn();</span>
+<span class="fc" id="L119">            actualizadoEn = version.getActualizadoEn();</span>
+<span class="fc" id="L120">            version1 = version.getVersion();</span>
+        }
+<span class="fc" id="L122">        List&lt;ConfiguracionIcElementoResponse&gt; pesos1 = null;</span>
+<span class="fc" id="L123">        List&lt;ConfiguracionIcElementoResponse&gt; list = pesos;</span>
+<span class="pc bpc" id="L124" title="1 of 2 branches missed.">        if ( list != null ) {</span>
+<span class="fc" id="L125">            pesos1 = new ArrayList&lt;ConfiguracionIcElementoResponse&gt;( list );</span>
+        }
+<span class="fc" id="L127">        List&lt;MapeoCampoResponse&gt; mapeos1 = null;</span>
+<span class="fc" id="L128">        List&lt;MapeoCampoResponse&gt; list1 = mapeos;</span>
+<span class="pc bpc" id="L129" title="1 of 2 branches missed.">        if ( list1 != null ) {</span>
+<span class="fc" id="L130">            mapeos1 = new ArrayList&lt;MapeoCampoResponse&gt;( list1 );</span>
+        }
+
+<span class="fc" id="L133">        AprobacionCalibracionResponse aprobacionCalibracion = null;</span>
+
+<span class="fc" id="L135">        VersionFormularioResponse versionFormularioResponse = new VersionFormularioResponse( id, codigo, estado, activa, esquema, vinculosAlmacenamiento, reglasEvaluacionIc, hashContenido, versionAlgoritmoIc, versionAnteriorId, versionAnteriorCodigo, creadoPorId, publicadoPorId, publicadoEn, calibradoPorId, calibradoEn, creadoEn, actualizadoEn, version1, pesos1, mapeos1, aprobacionCalibracion );</span>
+
+<span class="fc" id="L137">        return versionFormularioResponse;</span>
+    }
+
+    @Override
+    public FormularioActivoResponse toActivoResponse(VersionFormulario version) {
+<span class="pc bpc" id="L142" title="1 of 2 branches missed.">        if ( version == null ) {</span>
+<span class="nc" id="L143">            return null;</span>
+        }
+
+<span class="fc" id="L146">        UUID id = null;</span>
+<span class="fc" id="L147">        String codigo = null;</span>
+<span class="fc" id="L148">        long version1 = 0L;</span>
+<span class="fc" id="L149">        JsonNode esquema = null;</span>
+<span class="fc" id="L150">        String hashContenido = null;</span>
+<span class="fc" id="L151">        Instant publicadoEn = null;</span>
+
+<span class="fc" id="L153">        id = version.getId();</span>
+<span class="fc" id="L154">        codigo = version.getCodigo();</span>
+<span class="fc" id="L155">        version1 = version.getVersion();</span>
+<span class="fc" id="L156">        esquema = version.getEsquema();</span>
+<span class="fc" id="L157">        hashContenido = version.getHashContenido();</span>
+<span class="fc" id="L158">        publicadoEn = version.getPublicadoEn();</span>
+
+<span class="fc" id="L160">        FormularioActivoResponse formularioActivoResponse = new FormularioActivoResponse( id, codigo, version1, esquema, hashContenido, publicadoEn );</span>
+
+<span class="fc" id="L162">        return formularioActivoResponse;</span>
+    }
+
+    @Override
+    public MapeoCampoResponse toMapeoResponse(MapeoCampoFormulario mapeo) {
+<span class="pc bpc" id="L167" title="1 of 2 branches missed.">        if ( mapeo == null ) {</span>
+<span class="nc" id="L168">            return null;</span>
+        }
+
+<span class="fc" id="L171">        UUID versionOrigenId = null;</span>
+<span class="fc" id="L172">        UUID versionDestinoId = null;</span>
+<span class="fc" id="L173">        UUID id = null;</span>
+<span class="fc" id="L174">        String elementoRefOrigen = null;</span>
+<span class="fc" id="L175">        String elementoRefDestino = null;</span>
+<span class="fc" id="L176">        TipoMapeoCampo tipo = null;</span>
+<span class="fc" id="L177">        String observacion = null;</span>
+
+<span class="fc" id="L179">        versionOrigenId = mapeoVersionOrigenId( mapeo );</span>
+<span class="fc" id="L180">        versionDestinoId = mapeoVersionDestinoId( mapeo );</span>
+<span class="fc" id="L181">        id = mapeo.getId();</span>
+<span class="fc" id="L182">        elementoRefOrigen = mapeo.getElementoRefOrigen();</span>
+<span class="fc" id="L183">        elementoRefDestino = mapeo.getElementoRefDestino();</span>
+<span class="fc" id="L184">        tipo = mapeo.getTipo();</span>
+<span class="fc" id="L185">        observacion = mapeo.getObservacion();</span>
+
+<span class="fc" id="L187">        MapeoCampoResponse mapeoCampoResponse = new MapeoCampoResponse( id, versionOrigenId, versionDestinoId, elementoRefOrigen, elementoRefDestino, tipo, observacion );</span>
+
+<span class="fc" id="L189">        return mapeoCampoResponse;</span>
+    }
+
+    @Override
+    public ConfiguracionIcElementoResponse toIcElementoResponse(ConfiguracionIcElemento elemento) {
+<span class="pc bpc" id="L194" title="1 of 2 branches missed.">        if ( elemento == null ) {</span>
+<span class="nc" id="L195">            return null;</span>
+        }
+
+<span class="fc" id="L198">        UUID id = null;</span>
+<span class="fc" id="L199">        String elementoRef = null;</span>
+<span class="fc" id="L200">        BigDecimal peso = null;</span>
+<span class="fc" id="L201">        String descripcion = null;</span>
+
+<span class="fc" id="L203">        id = elemento.getId();</span>
+<span class="fc" id="L204">        elementoRef = elemento.getElementoRef();</span>
+<span class="fc" id="L205">        peso = elemento.getPeso();</span>
+<span class="fc" id="L206">        descripcion = elemento.getDescripcion();</span>
+
+<span class="fc" id="L208">        ConfiguracionIcElementoResponse configuracionIcElementoResponse = new ConfiguracionIcElementoResponse( id, elementoRef, peso, descripcion );</span>
+
+<span class="fc" id="L210">        return configuracionIcElementoResponse;</span>
+    }
+
+    private UUID versionVersionAnteriorId(VersionFormulario versionFormulario) {
+<span class="fc" id="L214">        VersionFormulario versionAnterior = versionFormulario.getVersionAnterior();</span>
+<span class="fc bfc" id="L215" title="All 2 branches covered.">        if ( versionAnterior == null ) {</span>
+<span class="fc" id="L216">            return null;</span>
+        }
+<span class="fc" id="L218">        return versionAnterior.getId();</span>
+    }
+
+    private String versionVersionAnteriorCodigo(VersionFormulario versionFormulario) {
+<span class="fc" id="L222">        VersionFormulario versionAnterior = versionFormulario.getVersionAnterior();</span>
+<span class="fc bfc" id="L223" title="All 2 branches covered.">        if ( versionAnterior == null ) {</span>
+<span class="fc" id="L224">            return null;</span>
+        }
+<span class="fc" id="L226">        return versionAnterior.getCodigo();</span>
+    }
+
+    private UUID mapeoVersionOrigenId(MapeoCampoFormulario mapeoCampoFormulario) {
+<span class="fc" id="L230">        VersionFormulario versionOrigen = mapeoCampoFormulario.getVersionOrigen();</span>
+<span class="pc bpc" id="L231" title="1 of 2 branches missed.">        if ( versionOrigen == null ) {</span>
+<span class="nc" id="L232">            return null;</span>
+        }
+<span class="fc" id="L234">        return versionOrigen.getId();</span>
+    }
+
+    private UUID mapeoVersionDestinoId(MapeoCampoFormulario mapeoCampoFormulario) {
+<span class="fc" id="L238">        VersionFormulario versionDestino = mapeoCampoFormulario.getVersionDestino();</span>
+<span class="pc bpc" id="L239" title="1 of 2 branches missed.">        if ( versionDestino == null ) {</span>
+<span class="nc" id="L240">            return null;</span>
+        }
+<span class="fc" id="L242">        return versionDestino.getId();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

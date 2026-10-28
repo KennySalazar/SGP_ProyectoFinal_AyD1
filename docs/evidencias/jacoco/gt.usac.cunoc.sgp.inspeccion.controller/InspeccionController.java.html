@@ -1,0 +1,291 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>InspeccionController.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">sgp-api</a> &gt; <a href="index.source.html" class="el_package">gt.usac.cunoc.sgp.inspeccion.controller</a> &gt; <span class="el_source">InspeccionController.java</span></div><h1>InspeccionController.java</h1><pre class="source lang-java linenums">package gt.usac.cunoc.sgp.inspeccion.controller;
+
+import gt.usac.cunoc.sgp.common.exception.ApiException;
+import gt.usac.cunoc.sgp.common.security.JwtData;
+import gt.usac.cunoc.sgp.inspeccion.dto.ConflictoSincronizacionResponse;
+import gt.usac.cunoc.sgp.inspeccion.dto.DatosPermanentesResponse;
+import gt.usac.cunoc.sgp.inspeccion.dto.ExportacionInspeccionResponse;
+import gt.usac.cunoc.sgp.inspeccion.dto.GuardarBorradorRequest;
+import gt.usac.cunoc.sgp.inspeccion.dto.GuardarRespuestasRequest;
+import gt.usac.cunoc.sgp.inspeccion.dto.IniciarInspeccionRequest;
+import gt.usac.cunoc.sgp.inspeccion.dto.IniciarInspeccionResponse;
+import gt.usac.cunoc.sgp.inspeccion.dto.IniciarInspeccionVersionadaRequest;
+import gt.usac.cunoc.sgp.inspeccion.dto.IniciarInspeccionVersionadaResponse;
+import gt.usac.cunoc.sgp.inspeccion.dto.InspeccionBorradorResponse;
+import gt.usac.cunoc.sgp.inspeccion.dto.InspeccionPublicadaDetalleResponse;
+import gt.usac.cunoc.sgp.inspeccion.dto.InspeccionPublicadaResumenResponse;
+import gt.usac.cunoc.sgp.inspeccion.dto.InspeccionResumenResponse;
+import gt.usac.cunoc.sgp.inspeccion.dto.ValidarRespuestasRequest;
+import gt.usac.cunoc.sgp.inspeccion.service.InspeccionService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import java.net.URI;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+import org.springframework.data.domain.Page;
+import org.springframework.http.ContentDisposition;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+@RequestMapping(&quot;/api/v1/inspecciones&quot;)
+@SecurityRequirement(name = &quot;bearerAuth&quot;)
+@Tag(name = &quot;Inspecciones&quot;, description = &quot;Gestión e inicio de inspecciones de puentes&quot;)
+public class InspeccionController {
+
+  private final InspeccionService inspeccionService;
+
+<span class="fc" id="L54">  public InspeccionController(InspeccionService inspeccionService) {</span>
+<span class="fc" id="L55">    this.inspeccionService = inspeccionService;</span>
+<span class="fc" id="L56">  }</span>
+
+  @PostMapping
+  @PreAuthorize(&quot;isAuthenticated()&quot;)
+  @Operation(
+      summary = &quot;Iniciar una inspección técnica de puente&quot;,
+      description =
+          &quot;Crea una inspección en estado BORRADOR para un puente activo usando la versión activa de&quot;
+              + &quot; formulario. Los Estudiantes requieren una asignación académica vigente; también&quot;
+              + &quot; está disponible para Catedráticos y Profesionales externos verificados. Soporta&quot;
+              + &quot; idempotencia mediante el encabezado Idempotency-Key y el UUID de cliente.&quot;,
+      security = @SecurityRequirement(name = &quot;bearerAuth&quot;))
+  public ResponseEntity&lt;IniciarInspeccionResponse&gt; iniciarInspeccion(
+      @RequestHeader(value = &quot;Idempotency-Key&quot;, required = false) String idempotencyKey,
+      @Valid @RequestBody IniciarInspeccionRequest request,
+      Authentication authentication) {
+<span class="fc" id="L72">    UUID usuarioId = usuarioId(authentication);</span>
+<span class="fc" id="L73">    IniciarInspeccionResponse response =</span>
+<span class="fc" id="L74">        inspeccionService.iniciarInspeccionHu024(request, usuarioId, idempotencyKey);</span>
+<span class="fc" id="L75">    return ResponseEntity.created(URI.create(&quot;/api/v1/inspecciones/&quot; + response.id()))</span>
+<span class="fc" id="L76">        .body(response);</span>
+  }
+
+  @PostMapping(&quot;/iniciar&quot;)
+  @PreAuthorize(&quot;isAuthenticated()&quot;)
+  @Operation(
+      summary = &quot;Iniciar una inspección con una versión publicada específica&quot;,
+      description =
+          &quot;Crea una inspección en BORRADOR con la versión publicada indicada y valida las&quot;
+              + &quot; respuestas iniciales contra su esquema. Los Estudiantes requieren una asignación&quot;
+              + &quot; académica vigente. No sustituye la versión solicitada por la versión activa.&quot;,
+      security = @SecurityRequirement(name = &quot;bearerAuth&quot;))
+  public ResponseEntity&lt;IniciarInspeccionVersionadaResponse&gt; iniciarConVersion(
+      @Valid @RequestBody IniciarInspeccionVersionadaRequest request,
+      Authentication authentication) {
+<span class="fc" id="L91">    UUID usuarioId = usuarioId(authentication);</span>
+<span class="fc" id="L92">    String rolUsuario = rol(authentication);</span>
+<span class="fc bfc" id="L93" title="All 4 branches covered.">    if (&quot;ESTUDIANTE&quot;.equals(rolUsuario) &amp;&amp; request.asignacionPuenteId() == null) {</span>
+<span class="fc" id="L94">      throw new ApiException(</span>
+          HttpStatus.FORBIDDEN,
+          &quot;puente_no_asignado&quot;,
+          &quot;Puente no asignado&quot;,
+          &quot;El estudiante debe indicar una asignación vigente para iniciar la inspección.&quot;);
+    }
+<span class="fc" id="L100">    var response = inspeccionService.iniciarInspeccion(request, usuarioId, rolUsuario);</span>
+<span class="fc" id="L101">    return ResponseEntity.status(HttpStatus.CREATED).body(response);</span>
+  }
+
+  @GetMapping(&quot;/puentes/{puenteId}/datos-permanentes&quot;)
+  @PreAuthorize(&quot;isAuthenticated()&quot;)
+  @Operation(
+      summary = &quot;Consultar datos permanentes de la última inspección publicada&quot;,
+      description =
+          &quot;Obtiene los datos técnicos permanentes (dimensiones, materiales, tipología, año de&quot;
+              + &quot; construcción) del puente para la confirmación explícita de precarga al iniciar&quot;
+              + &quot; una inspección.&quot;,
+      security = @SecurityRequirement(name = &quot;bearerAuth&quot;))
+  public ResponseEntity&lt;DatosPermanentesResponse&gt; obtenerDatosPermanentes(
+      @PathVariable UUID puenteId) {
+<span class="fc" id="L115">    return inspeccionService</span>
+<span class="fc" id="L116">        .obtenerDatosPermanentesVigentes(puenteId)</span>
+<span class="fc" id="L117">        .map(ResponseEntity::ok)</span>
+<span class="pc" id="L118">        .orElseGet(() -&gt; ResponseEntity.noContent().build());</span>
+  }
+
+  @PutMapping(&quot;/{id}/borrador&quot;)
+  @PreAuthorize(&quot;isAuthenticated()&quot;)
+  @Operation(
+      summary = &quot;Guardar avances parciales de una inspección en borrador&quot;,
+      description =
+          &quot;Persiste los datos válidos ingresados permitiendo campos pendientes. Solo el autor puede&quot;
+              + &quot; editar, únicamente en estado BORRADOR, y se rechazan modificaciones obsoletas&quot;
+              + &quot; (409).&quot;,
+      security = @SecurityRequirement(name = &quot;bearerAuth&quot;))
+  public ResponseEntity&lt;InspeccionBorradorResponse&gt; guardarBorrador(
+      @PathVariable UUID id,
+      @RequestBody GuardarBorradorRequest request,
+      @RequestHeader(value = &quot;X-Sync-Conflict-Policy&quot;, required = false) String politicaConflicto,
+      Authentication authentication,
+      jakarta.servlet.http.HttpServletRequest servletRequest) {
+<span class="fc" id="L136">    UUID usuarioId = usuarioId(authentication);</span>
+<span class="fc" id="L137">    boolean clientePrevalece = &quot;client-wins&quot;.equals(politicaConflicto);</span>
+    InspeccionBorradorResponse response;
+<span class="pc bpc" id="L139" title="1 of 2 branches missed.">    if (clientePrevalece) {</span>
+<span class="nc" id="L140">      UUID operacionId = (UUID) servletRequest.getAttribute(&quot;operacionIdempotenteId&quot;);</span>
+<span class="nc" id="L141">      response = inspeccionService.guardarBorrador(id, request, usuarioId, true, operacionId);</span>
+<span class="nc" id="L142">    } else {</span>
+<span class="fc" id="L143">      response = inspeccionService.guardarBorrador(id, request, usuarioId);</span>
+    }
+<span class="fc" id="L145">    return ResponseEntity.ok(response);</span>
+  }
+
+  @GetMapping(&quot;/{id}/conflictos-sincronizacion&quot;)
+  @PreAuthorize(&quot;isAuthenticated()&quot;)
+  public List&lt;ConflictoSincronizacionResponse&gt; listarConflictosSincronizacion(
+      @PathVariable UUID id, Authentication authentication) {
+<span class="nc" id="L152">    return inspeccionService.listarConflictosSincronizacion(id, usuarioId(authentication));</span>
+  }
+
+  @GetMapping(&quot;/{id}/borrador&quot;)
+  @PreAuthorize(&quot;isAuthenticated()&quot;)
+  @Operation(
+      summary = &quot;Consultar borrador de una inspección para reanudar edición&quot;,
+      description =
+          &quot;Retorna la información guardada del borrador, el avance en las ocho secciones y el&quot;
+              + &quot; cálculo de IC preliminar si aplica. Es privado: usuarios no autorizados reciben&quot;
+              + &quot; 404.&quot;,
+      security = @SecurityRequirement(name = &quot;bearerAuth&quot;))
+  public ResponseEntity&lt;InspeccionBorradorResponse&gt; obtenerBorrador(
+      @PathVariable UUID id, Authentication authentication) {
+<span class="fc" id="L166">    UUID usuarioId = usuarioId(authentication);</span>
+<span class="fc" id="L167">    return ResponseEntity.ok(inspeccionService.obtenerBorrador(id, usuarioId));</span>
+  }
+
+  @GetMapping
+  @PreAuthorize(&quot;isAuthenticated()&quot;)
+  @Operation(
+      summary = &quot;Listar inspecciones del inspector autenticado&quot;,
+      description =
+          &quot;Retorna la lista paginada de inspecciones no eliminadas del inspector autenticado, con&quot;
+              + &quot; filtro opcional por estado. Página desde 0, tamaño entre 1 y 100. Orden&quot;
+              + &quot; descendente por última actividad y fecha de creación.&quot;,
+      security = @SecurityRequirement(name = &quot;bearerAuth&quot;))
+  public ResponseEntity&lt;Page&lt;InspeccionResumenResponse&gt;&gt; listarMisInspecciones(
+      @RequestParam(required = false) String estado,
+      @RequestParam(defaultValue = &quot;0&quot;) int pagina,
+      @RequestParam(defaultValue = &quot;20&quot;) int tamanio,
+      Authentication authentication) {
+<span class="nc" id="L184">    UUID usuarioId = usuarioId(authentication);</span>
+<span class="nc" id="L185">    Page&lt;InspeccionResumenResponse&gt; response =</span>
+<span class="nc" id="L186">        inspeccionService.listarMisInspecciones(usuarioId, estado, pagina, tamanio);</span>
+<span class="nc" id="L187">    return ResponseEntity.ok(response);</span>
+  }
+
+  @DeleteMapping({&quot;/{id}&quot;, &quot;/{id}/borrador&quot;})
+  @PreAuthorize(&quot;isAuthenticated()&quot;)
+  @Operation(
+      summary = &quot;Eliminar lógicamente un borrador de inspección&quot;,
+      description =
+          &quot;Elimina lógicamente un borrador propio. Retorna 404 si no existe o pertenece a otro&quot;
+              + &quot; usuario. Retorna 409 si la inspección está publicada o no es borrador. Retorna&quot;
+              + &quot; 204 en caso exitoso.&quot;,
+      security = @SecurityRequirement(name = &quot;bearerAuth&quot;))
+  public ResponseEntity&lt;Void&gt; eliminarBorrador(
+      @PathVariable UUID id, Authentication authentication) {
+<span class="nc" id="L201">    UUID usuarioId = usuarioId(authentication);</span>
+<span class="nc" id="L202">    inspeccionService.eliminarBorrador(id, usuarioId);</span>
+<span class="nc" id="L203">    return ResponseEntity.noContent().build();</span>
+  }
+
+  @GetMapping(&quot;/puentes/{puenteId}/publicadas&quot;)
+  @PreAuthorize(&quot;isAuthenticated()&quot;)
+  @Operation(summary = &quot;Consultar historial paginado de inspecciones publicadas de un puente&quot;)
+  public ResponseEntity&lt;Page&lt;InspeccionPublicadaResumenResponse&gt;&gt; listarPublicadas(
+      @PathVariable UUID puenteId,
+      @RequestParam(defaultValue = &quot;0&quot;) int pagina,
+      @RequestParam(defaultValue = &quot;20&quot;) int tamanio) {
+<span class="fc" id="L213">    return ResponseEntity.ok(</span>
+<span class="fc" id="L214">        inspeccionService.listarPublicadasPorPuente(puenteId, pagina, tamanio));</span>
+  }
+
+  @GetMapping(&quot;/{id}/publicada&quot;)
+  @PreAuthorize(&quot;isAuthenticated()&quot;)
+  @Operation(summary = &quot;Consultar detalle publicado con versión original e IC persistido&quot;)
+  public ResponseEntity&lt;InspeccionPublicadaDetalleResponse&gt; consultarPublicada(
+      @PathVariable UUID id) {
+<span class="fc" id="L222">    return ResponseEntity.ok(inspeccionService.consultarPublicada(id));</span>
+  }
+
+  @GetMapping(&quot;/{id}/exportar&quot;)
+  @PreAuthorize(&quot;isAuthenticated()&quot;)
+  @Operation(
+      summary = &quot;Exportar inspección publicada con esquema original y datos técnicos&quot;,
+      description =
+          &quot;Descarga un archivo JSON estructurado y sanitizado con los datos capturados y el esquema&quot;
+              + &quot; de la versión original con que se levantó. Excluye datos de otros usuarios y&quot;
+              + &quot; referencias internas.&quot;,
+      security = @SecurityRequirement(name = &quot;bearerAuth&quot;))
+  public ResponseEntity&lt;ExportacionInspeccionResponse&gt; exportar(@PathVariable UUID id) {
+<span class="fc" id="L235">    ExportacionInspeccionResponse exportacion = inspeccionService.exportarInspeccion(id);</span>
+<span class="fc" id="L236">    return ResponseEntity.ok()</span>
+<span class="fc" id="L237">        .header(</span>
+            HttpHeaders.CONTENT_DISPOSITION,
+<span class="fc" id="L239">            ContentDisposition.attachment()</span>
+<span class="fc" id="L240">                .filename(&quot;inspeccion-&quot; + id + &quot;.json&quot;)</span>
+<span class="fc" id="L241">                .build()</span>
+<span class="fc" id="L242">                .toString())</span>
+<span class="fc" id="L243">        .body(exportacion);</span>
+  }
+
+  @GetMapping(&quot;/{id}&quot;)
+  @PreAuthorize(&quot;isAuthenticated()&quot;)
+  public ResponseEntity&lt;InspeccionResumenResponse&gt; consultar(
+      @PathVariable UUID id, Authentication authentication) {
+<span class="nc" id="L250">    return ResponseEntity.ok(inspeccionService.consultarPorId(id, usuarioId(authentication)));</span>
+  }
+
+  @PutMapping({&quot;/{id}&quot;, &quot;/{id}/datos&quot;})
+  @PreAuthorize(&quot;isAuthenticated()&quot;)
+  public ResponseEntity&lt;InspeccionResumenResponse&gt; guardarRespuestas(
+      @PathVariable UUID id,
+      @Valid @RequestBody GuardarRespuestasRequest request,
+      Authentication authentication) {
+<span class="pc" id="L259">    return ResponseEntity.ok(</span>
+<span class="nc" id="L260">        inspeccionService.guardarRespuestas(id, request, usuarioId(authentication)));</span>
+  }
+
+  @PostMapping(&quot;/{id}/validar&quot;)
+  @PreAuthorize(&quot;isAuthenticated()&quot;)
+  public ResponseEntity&lt;Map&lt;String, Object&gt;&gt; validar(
+      @PathVariable UUID id,
+      @Valid @RequestBody ValidarRespuestasRequest request,
+      Authentication authentication) {
+<span class="fc" id="L269">    inspeccionService.validarRespuestasInspeccion(</span>
+<span class="fc" id="L270">        id, request.datos(), request.esBorrador(), usuarioId(authentication));</span>
+<span class="fc" id="L271">    return ResponseEntity.ok(Map.of(&quot;valido&quot;, true, &quot;mensaje&quot;, &quot;Las respuestas son válidas&quot;));</span>
+  }
+
+  private UUID usuarioId(Authentication authentication) {
+<span class="pc bpc" id="L275" title="2 of 4 branches missed.">    if (authentication == null || !(authentication.getDetails() instanceof JwtData jwtData)) {</span>
+<span class="nc" id="L276">      throw new ApiException(</span>
+          HttpStatus.UNAUTHORIZED,
+          &quot;autenticacion_requerida&quot;,
+          &quot;Autenticación requerida&quot;,
+          &quot;Se requiere una sesión válida para iniciar inspecciones.&quot;);
+    }
+<span class="fc" id="L282">    return jwtData.userId();</span>
+  }
+
+  private String rol(Authentication authentication) {
+<span class="pc bpc" id="L286" title="2 of 4 branches missed.">    return authentication != null &amp;&amp; authentication.getDetails() instanceof JwtData jwtData</span>
+<span class="pc bpc" id="L287" title="1 of 2 branches missed.">        ? jwtData.role() != null ? jwtData.role().name() : &quot;INSPECTOR&quot;</span>
+<span class="nc" id="L288">        : &quot;INSPECTOR&quot;;</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

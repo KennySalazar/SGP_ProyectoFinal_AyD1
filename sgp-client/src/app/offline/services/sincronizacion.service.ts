@@ -253,11 +253,31 @@ export class SincronizacionService implements OnDestroy {
   private async procesar(item: SyncQueueItem, propietarioId: string): Promise<void> {
     for (let intento = item.intentos; intento < 5; intento++) {
       if (this.auth.user()?.id !== propietarioId || !this.connectivity.online()) return;
-      await sgpDb.cola_sync.update(item.id, {
-        estado: 'ENVIANDO',
-        intentos: intento + 1,
-        iniciadoEn: new Date().toISOString(),
-      });
+      if (item.operacion === 'CREAR_INSPECCION') {
+        // Comparte la transacción de cola con el descarte local: solo uno puede ganar.
+        const reclamada = await sgpDb.transaction('rw', sgpDb.cola_sync, async () => {
+          const actual = await sgpDb.cola_sync.get(item.id);
+          if (
+            !actual ||
+            actual.propietarioId !== propietarioId ||
+            (actual.estado ?? 'PENDIENTE') !== 'PENDIENTE'
+          )
+            return false;
+          await sgpDb.cola_sync.update(item.id, {
+            estado: 'ENVIANDO',
+            intentos: intento + 1,
+            iniciadoEn: new Date().toISOString(),
+          });
+          return true;
+        });
+        if (!reclamada) return;
+      } else {
+        await sgpDb.cola_sync.update(item.id, {
+          estado: 'ENVIANDO',
+          intentos: intento + 1,
+          iniciadoEn: new Date().toISOString(),
+        });
+      }
       try {
         if (item.operacion === 'CREAR_INSPECCION') {
           const respuesta = await firstValueFrom(

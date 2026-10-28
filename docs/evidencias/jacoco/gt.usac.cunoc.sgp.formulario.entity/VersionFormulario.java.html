@@ -1,0 +1,252 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>VersionFormulario.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">sgp-api</a> &gt; <a href="index.source.html" class="el_package">gt.usac.cunoc.sgp.formulario.entity</a> &gt; <span class="el_source">VersionFormulario.java</span></div><h1>VersionFormulario.java</h1><pre class="source lang-java linenums">package gt.usac.cunoc.sgp.formulario.entity;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import gt.usac.cunoc.sgp.formulario.model.EstadoVersionFormulario;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Table;
+import jakarta.persistence.Version;
+import java.time.Instant;
+import java.util.Objects;
+import java.util.UUID;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
+
+@Entity
+@Table(name = &quot;version_formulario&quot;)
+public class VersionFormulario {
+
+  @Id private UUID id;
+
+  @Column(nullable = false, unique = true, length = 50)
+  private String codigo;
+
+  @Enumerated(EnumType.STRING)
+  @Column(nullable = false, length = 20)
+  private EstadoVersionFormulario estado;
+
+  @Column(nullable = false)
+  private boolean activa;
+
+  @JdbcTypeCode(SqlTypes.JSON)
+  @Column(nullable = false)
+  private JsonNode esquema;
+
+  @JdbcTypeCode(SqlTypes.JSON)
+  @Column(name = &quot;vinculos_almacenamiento&quot;, nullable = false)
+  private JsonNode vinculosAlmacenamiento;
+
+  @JdbcTypeCode(SqlTypes.JSON)
+  @Column(name = &quot;reglas_evaluacion_ic&quot;, nullable = false)
+  private JsonNode reglasEvaluacionIc;
+
+  @Column(name = &quot;hash_contenido&quot;, length = 64)
+  private String hashContenido;
+
+  @Column(name = &quot;version_algoritmo_ic&quot;, length = 50)
+  private String versionAlgoritmoIc;
+
+  @ManyToOne(fetch = FetchType.LAZY)
+  @JoinColumn(name = &quot;version_anterior_id&quot;)
+  private VersionFormulario versionAnterior;
+
+  @Column(name = &quot;creado_por_id&quot;, nullable = false)
+  private UUID creadoPorId;
+
+  @Column(name = &quot;publicado_por_id&quot;)
+  private UUID publicadoPorId;
+
+  @Column(name = &quot;publicado_en&quot;)
+  private Instant publicadoEn;
+
+  @Column(name = &quot;calibrado_por_id&quot;)
+  private UUID calibradoPorId;
+
+  @Column(name = &quot;calibrado_en&quot;)
+  private Instant calibradoEn;
+
+  @Column(name = &quot;creado_en&quot;, nullable = false, updatable = false)
+  private Instant creadoEn;
+
+  @Column(name = &quot;actualizado_en&quot;, nullable = false)
+  private Instant actualizadoEn;
+
+  @Version
+  @Column(nullable = false)
+  private long version;
+
+<span class="fc" id="L84">  protected VersionFormulario() {}</span>
+
+  public VersionFormulario(
+      UUID id,
+      String codigo,
+      EstadoVersionFormulario estado,
+      boolean activa,
+      JsonNode esquema,
+      JsonNode vinculosAlmacenamiento,
+      JsonNode reglasEvaluacionIc,
+      VersionFormulario versionAnterior,
+      UUID creadoPorId,
+      Instant creadoEn,
+<span class="fc" id="L97">      Instant actualizadoEn) {</span>
+<span class="fc" id="L98">    this.id = id;</span>
+<span class="fc" id="L99">    this.codigo = codigo;</span>
+<span class="fc" id="L100">    this.estado = estado;</span>
+<span class="fc" id="L101">    this.activa = activa;</span>
+<span class="fc" id="L102">    this.esquema = esquema;</span>
+<span class="fc" id="L103">    this.vinculosAlmacenamiento = vinculosAlmacenamiento;</span>
+<span class="fc" id="L104">    this.reglasEvaluacionIc = reglasEvaluacionIc;</span>
+<span class="fc" id="L105">    this.versionAnterior = versionAnterior;</span>
+<span class="fc" id="L106">    this.creadoPorId = creadoPorId;</span>
+<span class="fc" id="L107">    this.creadoEn = creadoEn;</span>
+<span class="fc" id="L108">    this.actualizadoEn = actualizadoEn;</span>
+<span class="fc" id="L109">  }</span>
+
+  public UUID getId() {
+<span class="fc" id="L112">    return id;</span>
+  }
+
+  public String getCodigo() {
+<span class="fc" id="L116">    return codigo;</span>
+  }
+
+  public void setCodigo(String codigo) {
+<span class="nc" id="L120">    this.codigo = codigo;</span>
+<span class="nc" id="L121">  }</span>
+
+  public EstadoVersionFormulario getEstado() {
+<span class="fc" id="L124">    return estado;</span>
+  }
+
+  public void setEstado(EstadoVersionFormulario estado) {
+<span class="fc" id="L128">    this.estado = estado;</span>
+<span class="fc" id="L129">  }</span>
+
+  public boolean isActiva() {
+<span class="fc" id="L132">    return activa;</span>
+  }
+
+  public void setActiva(boolean activa) {
+<span class="fc" id="L136">    this.activa = activa;</span>
+<span class="fc" id="L137">  }</span>
+
+  public JsonNode getEsquema() {
+<span class="fc" id="L140">    return esquema;</span>
+  }
+
+  public void setEsquema(JsonNode esquema) {
+<span class="fc" id="L144">    this.esquema = esquema;</span>
+<span class="fc" id="L145">  }</span>
+
+  public JsonNode getVinculosAlmacenamiento() {
+<span class="fc" id="L148">    return vinculosAlmacenamiento;</span>
+  }
+
+  public void setVinculosAlmacenamiento(JsonNode vinculosAlmacenamiento) {
+<span class="nc" id="L152">    this.vinculosAlmacenamiento = vinculosAlmacenamiento;</span>
+<span class="nc" id="L153">  }</span>
+
+  public JsonNode getReglasEvaluacionIc() {
+<span class="fc" id="L156">    return reglasEvaluacionIc;</span>
+  }
+
+  public void setReglasEvaluacionIc(JsonNode reglasEvaluacionIc) {
+<span class="fc" id="L160">    this.reglasEvaluacionIc = reglasEvaluacionIc;</span>
+<span class="fc" id="L161">  }</span>
+
+  public String getHashContenido() {
+<span class="fc" id="L164">    return hashContenido;</span>
+  }
+
+  public void setHashContenido(String hashContenido) {
+<span class="fc" id="L168">    this.hashContenido = hashContenido;</span>
+<span class="fc" id="L169">  }</span>
+
+  public String getVersionAlgoritmoIc() {
+<span class="fc" id="L172">    return versionAlgoritmoIc;</span>
+  }
+
+  public void setVersionAlgoritmoIc(String versionAlgoritmoIc) {
+<span class="fc" id="L176">    this.versionAlgoritmoIc = versionAlgoritmoIc;</span>
+<span class="fc" id="L177">  }</span>
+
+  public VersionFormulario getVersionAnterior() {
+<span class="fc" id="L180">    return versionAnterior;</span>
+  }
+
+  public void setVersionAnterior(VersionFormulario versionAnterior) {
+<span class="fc" id="L184">    this.versionAnterior = versionAnterior;</span>
+<span class="fc" id="L185">  }</span>
+
+  public UUID getCreadoPorId() {
+<span class="fc" id="L188">    return creadoPorId;</span>
+  }
+
+  public UUID getPublicadoPorId() {
+<span class="fc" id="L192">    return publicadoPorId;</span>
+  }
+
+  public void setPublicadoPorId(UUID publicadoPorId) {
+<span class="fc" id="L196">    this.publicadoPorId = publicadoPorId;</span>
+<span class="fc" id="L197">  }</span>
+
+  public Instant getPublicadoEn() {
+<span class="fc" id="L200">    return publicadoEn;</span>
+  }
+
+  public void setPublicadoEn(Instant publicadoEn) {
+<span class="fc" id="L204">    this.publicadoEn = publicadoEn;</span>
+<span class="fc" id="L205">  }</span>
+
+  public UUID getCalibradoPorId() {
+<span class="fc" id="L208">    return calibradoPorId;</span>
+  }
+
+  public void setCalibradoPorId(UUID calibradoPorId) {
+<span class="fc" id="L212">    this.calibradoPorId = calibradoPorId;</span>
+<span class="fc" id="L213">  }</span>
+
+  public Instant getCalibradoEn() {
+<span class="fc" id="L216">    return calibradoEn;</span>
+  }
+
+  public void setCalibradoEn(Instant calibradoEn) {
+<span class="fc" id="L220">    this.calibradoEn = calibradoEn;</span>
+<span class="fc" id="L221">  }</span>
+
+  public Instant getCreadoEn() {
+<span class="fc" id="L224">    return creadoEn;</span>
+  }
+
+  public Instant getActualizadoEn() {
+<span class="fc" id="L228">    return actualizadoEn;</span>
+  }
+
+  public void setActualizadoEn(Instant actualizadoEn) {
+<span class="fc" id="L232">    this.actualizadoEn = actualizadoEn;</span>
+<span class="fc" id="L233">  }</span>
+
+  public long getVersion() {
+<span class="fc" id="L236">    return version;</span>
+  }
+
+  @Override
+  public boolean equals(Object o) {
+<span class="nc bnc" id="L241" title="All 2 branches missed.">    if (this == o) return true;</span>
+<span class="nc bnc" id="L242" title="All 4 branches missed.">    if (o == null || getClass() != o.getClass()) return false;</span>
+<span class="nc" id="L243">    VersionFormulario that = (VersionFormulario) o;</span>
+<span class="nc" id="L244">    return Objects.equals(id, that.id);</span>
+  }
+
+  @Override
+  public int hashCode() {
+<span class="nc" id="L249">    return Objects.hash(id);</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

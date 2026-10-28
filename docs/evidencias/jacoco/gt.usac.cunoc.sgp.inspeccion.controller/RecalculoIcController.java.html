@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RecalculoIcController.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">sgp-api</a> &gt; <a href="index.source.html" class="el_package">gt.usac.cunoc.sgp.inspeccion.controller</a> &gt; <span class="el_source">RecalculoIcController.java</span></div><h1>RecalculoIcController.java</h1><pre class="source lang-java linenums">package gt.usac.cunoc.sgp.inspeccion.controller;
+
+import gt.usac.cunoc.sgp.common.exception.ApiException;
+import gt.usac.cunoc.sgp.common.security.JwtData;
+import gt.usac.cunoc.sgp.inspeccion.dto.ComparacionIcResponse;
+import gt.usac.cunoc.sgp.inspeccion.dto.ResultadoIcHistorialResponse;
+import gt.usac.cunoc.sgp.inspeccion.service.RecalculoIcService;
+import java.util.UUID;
+import org.springframework.http.CacheControl;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.*;
+
+@RestController
+@RequestMapping(&quot;/api/v1/inspecciones/{id}&quot;)
+public class RecalculoIcController {
+  private final RecalculoIcService servicio;
+
+<span class="fc" id="L21">  public RecalculoIcController(RecalculoIcService servicio) {</span>
+<span class="fc" id="L22">    this.servicio = servicio;</span>
+<span class="fc" id="L23">  }</span>
+
+  @PostMapping(&quot;/recalculos-ic&quot;)
+  @PreAuthorize(&quot;hasAnyRole('ADMINISTRADOR', 'CATEDRATICO')&quot;)
+  public ResponseEntity&lt;ResultadoIcHistorialResponse&gt; recalcular(
+      @PathVariable UUID id, Authentication autenticacion) {
+<span class="pc bpc" id="L29" title="1 of 4 branches missed.">    if (autenticacion == null || !(autenticacion.getDetails() instanceof JwtData datos))</span>
+<span class="fc" id="L30">      throw new ApiException(</span>
+          HttpStatus.UNAUTHORIZED,
+          &quot;authentication_required&quot;,
+          &quot;Autenticacion requerida&quot;,
+          &quot;Se requiere una sesion valida.&quot;);
+<span class="fc" id="L35">    return ResponseEntity.ok()</span>
+<span class="fc" id="L36">        .cacheControl(CacheControl.noStore())</span>
+<span class="fc" id="L37">        .body(servicio.recalcular(id, datos.userId()));</span>
+  }
+
+  @GetMapping(&quot;/resultados-ic&quot;)
+  @PreAuthorize(&quot;isAuthenticated()&quot;)
+  public ResponseEntity&lt;ComparacionIcResponse&gt; historial(@PathVariable UUID id) {
+<span class="fc" id="L43">    return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(servicio.historial(id));</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

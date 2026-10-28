@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ArchivoEvidenciaMantenimiento.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">sgp-api</a> &gt; <a href="index.source.html" class="el_package">gt.usac.cunoc.sgp.archivo.entity</a> &gt; <span class="el_source">ArchivoEvidenciaMantenimiento.java</span></div><h1>ArchivoEvidenciaMantenimiento.java</h1><pre class="source lang-java linenums">package gt.usac.cunoc.sgp.archivo.entity;
+
+import gt.usac.cunoc.sgp.archivo.model.TipoUsoArchivo;
+import jakarta.persistence.*;
+import java.time.Instant;
+import java.util.UUID;
+
+/** Vínculo de una fotografía de evidencia con una orden de mantenimiento (HU-048). */
+@Entity
+@Table(name = &quot;archivo_evidencia_mantenimiento&quot;)
+public class ArchivoEvidenciaMantenimiento
+    implements org.springframework.data.domain.Persistable&lt;UUID&gt; {
+<span class="fc" id="L13">  @Transient private boolean nuevo = true;</span>
+
+  @PostLoad
+  @PostPersist
+  void persistido() {
+<span class="fc" id="L18">    nuevo = false;</span>
+<span class="fc" id="L19">  }</span>
+
+  public boolean isNew() {
+<span class="fc" id="L22">    return nuevo;</span>
+  }
+
+  @Id
+  @Column(name = &quot;archivo_id&quot;)
+  private UUID archivoId;
+
+  @OneToOne(fetch = FetchType.LAZY, optional = false)
+  @JoinColumn(name = &quot;archivo_id&quot;, insertable = false, updatable = false)
+  private Archivo archivo;
+
+  @Enumerated(EnumType.STRING)
+  @Column(name = &quot;tipo_uso&quot;, nullable = false, length = 30)
+  private TipoUsoArchivo tipoUso;
+
+  @Column(name = &quot;orden_mantenimiento_id&quot;, nullable = false)
+  private UUID ordenMantenimientoId;
+
+  @Column(name = &quot;elemento_ref&quot;, length = 300)
+  private String elementoRef;
+
+  @Column(name = &quot;creado_en&quot;, nullable = false)
+  private Instant creadoEn;
+
+  public UUID getId() {
+<span class="nc" id="L47">    return archivoId;</span>
+  }
+
+<span class="fc" id="L50">  protected ArchivoEvidenciaMantenimiento() {}</span>
+
+  public ArchivoEvidenciaMantenimiento(
+<span class="fc" id="L53">      Archivo archivo, UUID ordenMantenimientoId, String elementoRef, Instant creadoEn) {</span>
+<span class="fc" id="L54">    this.archivo = archivo;</span>
+<span class="fc" id="L55">    this.archivoId = archivo.getId();</span>
+<span class="fc" id="L56">    this.tipoUso = archivo.getTipoUso();</span>
+<span class="fc" id="L57">    this.ordenMantenimientoId = ordenMantenimientoId;</span>
+<span class="fc" id="L58">    this.elementoRef = elementoRef;</span>
+<span class="fc" id="L59">    this.creadoEn = creadoEn;</span>
+<span class="fc" id="L60">  }</span>
+
+  public UUID getArchivoId() {
+<span class="fc" id="L63">    return archivoId;</span>
+  }
+
+  public Archivo getArchivo() {
+<span class="fc" id="L67">    return archivo;</span>
+  }
+
+  public TipoUsoArchivo getTipoUso() {
+<span class="nc" id="L71">    return tipoUso;</span>
+  }
+
+  public UUID getOrdenMantenimientoId() {
+<span class="fc" id="L75">    return ordenMantenimientoId;</span>
+  }
+
+  public String getElementoRef() {
+<span class="fc" id="L79">    return elementoRef;</span>
+  }
+
+  public Instant getCreadoEn() {
+<span class="fc" id="L83">    return creadoEn;</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

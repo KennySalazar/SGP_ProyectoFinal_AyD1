@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ValidadorDocumentoPdf.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">sgp-api</a> &gt; <a href="index.source.html" class="el_package">gt.usac.cunoc.sgp.inspeccion.validation</a> &gt; <span class="el_source">ValidadorDocumentoPdf.java</span></div><h1>ValidadorDocumentoPdf.java</h1><pre class="source lang-java linenums">package gt.usac.cunoc.sgp.inspeccion.validation;
+
+import gt.usac.cunoc.sgp.common.exception.ApiException;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import org.apache.pdfbox.io.RandomAccessReadBuffer;
+import org.apache.pdfbox.pdfparser.PDFParser;
+import org.springframework.http.HttpStatus;
+import org.springframework.stereotype.Component;
+import org.springframework.web.multipart.MultipartFile;
+
+/**
+ * Valida el tipo real de un documento de inspección (DT-SEC-08, RN-ARC-04): la firma binaria {@code
+ * %PDF-} y que PDFBox lo pueda leer, sin confiar en la extensión ni en el tipo declarado.
+ */
+@Component
+<span class="fc" id="L17">public class ValidadorDocumentoPdf {</span>
+
+  public static final int MAXIMO_BYTES = 20 * 1024 * 1024;
+
+  /** Devuelve el contenido ya validado; 413 si excede 20 MB y 422 si no es un PDF legible. */
+  public byte[] validar(MultipartFile archivo) {
+<span class="pc bpc" id="L23" title="2 of 4 branches missed.">    if (archivo == null || archivo.isEmpty()) {</span>
+<span class="nc" id="L24">      throw invalido(&quot;Seleccione un documento PDF con contenido.&quot;);</span>
+    }
+<span class="fc bfc" id="L26" title="All 2 branches covered.">    if (archivo.getSize() &gt; MAXIMO_BYTES) {</span>
+<span class="fc" id="L27">      throw demasiadoGrande();</span>
+    }
+    byte[] contenido;
+<span class="fc" id="L30">    try (var entrada = archivo.getInputStream()) {</span>
+<span class="fc" id="L31">      contenido = entrada.readNBytes(MAXIMO_BYTES + 1);</span>
+<span class="nc" id="L32">    } catch (IOException excepcion) {</span>
+<span class="nc" id="L33">      throw invalido(&quot;No fue posible leer el documento adjunto.&quot;);</span>
+<span class="fc" id="L34">    }</span>
+<span class="pc bpc" id="L35" title="1 of 2 branches missed.">    if (contenido.length &gt; MAXIMO_BYTES) {</span>
+<span class="nc" id="L36">      throw demasiadoGrande();</span>
+    }
+<span class="pc bpc" id="L38" title="1 of 2 branches missed.">    if (contenido.length &lt; 5</span>
+<span class="fc bfc" id="L39" title="All 2 branches covered.">        || !&quot;%PDF-&quot;.equals(new String(contenido, 0, 5, StandardCharsets.US_ASCII))) {</span>
+<span class="fc" id="L40">      throw invalido(&quot;El contenido real del archivo no corresponde a un documento PDF.&quot;);</span>
+    }
+<span class="fc" id="L42">    try (var fuente = new RandomAccessReadBuffer(contenido);</span>
+<span class="fc" id="L43">        var documento = new PDFParser(fuente).parse(false)) {</span>
+<span class="pc bpc" id="L44" title="2 of 4 branches missed.">      if (documento.isEncrypted() || documento.getNumberOfPages() == 0) {</span>
+<span class="nc" id="L45">        throw invalido(&quot;El documento debe ser un PDF legible, sin contraseña y con páginas.&quot;);</span>
+      }
+<span class="fc" id="L47">    } catch (IOException | IllegalArgumentException excepcion) {</span>
+<span class="fc" id="L48">      throw invalido(&quot;El archivo no es un PDF válido o requiere una contraseña.&quot;);</span>
+<span class="fc" id="L49">    }</span>
+<span class="fc" id="L50">    return contenido;</span>
+  }
+
+  private static ApiException demasiadoGrande() {
+<span class="fc" id="L54">    return new ApiException(</span>
+        HttpStatus.PAYLOAD_TOO_LARGE,
+        &quot;documento_demasiado_grande&quot;,
+        &quot;Documento demasiado grande&quot;,
+        &quot;Cada documento PDF admite hasta 20 MB.&quot;);
+  }
+
+  private static ApiException invalido(String detalle) {
+<span class="fc" id="L62">    return new ApiException(</span>
+        HttpStatus.UNPROCESSABLE_ENTITY,
+        &quot;documento_pdf_invalido&quot;,
+        &quot;Documento PDF inválido&quot;,
+        detalle);
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>LimiteTasaForo.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">sgp-api</a> &gt; <a href="index.source.html" class="el_package">gt.usac.cunoc.sgp.foro.service</a> &gt; <span class="el_source">LimiteTasaForo.java</span></div><h1>LimiteTasaForo.java</h1><pre class="source lang-java linenums">package gt.usac.cunoc.sgp.foro.service;
+
+import gt.usac.cunoc.sgp.common.exception.DemasiadasSolicitudesException;
+import gt.usac.cunoc.sgp.foro.repository.ForoComentarioRepository;
+import gt.usac.cunoc.sgp.foro.repository.ForoHiloRepository;
+import java.time.Clock;
+import java.time.Duration;
+import java.time.Instant;
+import java.util.List;
+import java.util.UUID;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.stereotype.Component;
+
+/**
+ * Límite de tasa del foro por usuario (HU-066, DT-SEC-07): unos pocos hilos y comentarios por
+ * minuto. Se cuenta lo publicado en la base de datos, así un usuario que lo supera no afecta a los
+ * demás y el límite vale igual en todas las instancias. Quien lo supera recibe 429 con el tiempo de
+ * espera en {@code Retry-After}.
+ *
+ * &lt;p&gt;Es un límite blando: dos publicaciones exactamente simultáneas del mismo usuario pueden pasar
+ * a la vez; lo que importa es frenar la ráfaga.
+ */
+@Component
+public class LimiteTasaForo {
+
+  /** Ventana deslizante en que se cuentan las publicaciones. */
+<span class="fc" id="L27">  static final Duration VENTANA = Duration.ofMinutes(1);</span>
+
+  /** Hilos que un usuario puede abrir por minuto. */
+  static final int HILOS_POR_MINUTO = 3;
+
+  /** Comentarios que un usuario puede publicar por minuto, incluido el primero de cada hilo. */
+  static final int COMENTARIOS_POR_MINUTO = 10;
+
+  private final ForoHiloRepository hilos;
+  private final ForoComentarioRepository comentarios;
+  private final Clock clock;
+
+<span class="fc" id="L39">  LimiteTasaForo(ForoHiloRepository hilos, ForoComentarioRepository comentarios, Clock clock) {</span>
+<span class="fc" id="L40">    this.hilos = hilos;</span>
+<span class="fc" id="L41">    this.comentarios = comentarios;</span>
+<span class="fc" id="L42">    this.clock = clock;</span>
+<span class="fc" id="L43">  }</span>
+
+  /** Abrir un hilo también publica su primer comentario: se exigen los dos límites. */
+  void exigirParaHilo(UUID usuarioId) {
+<span class="fc" id="L47">    Instant ahora = clock.instant();</span>
+<span class="fc" id="L48">    exigir(</span>
+<span class="fc" id="L49">        hilos.abiertosDesde(usuarioId, ahora.minus(VENTANA), PageRequest.of(0, HILOS_POR_MINUTO)),</span>
+        HILOS_POR_MINUTO,
+        ahora,
+        &quot;Abriste demasiados hilos en poco tiempo. Espera un momento antes de abrir otro.&quot;);
+<span class="fc" id="L53">    exigirParaComentario(usuarioId);</span>
+<span class="fc" id="L54">  }</span>
+
+  void exigirParaComentario(UUID usuarioId) {
+<span class="fc" id="L57">    Instant ahora = clock.instant();</span>
+<span class="fc" id="L58">    exigir(</span>
+<span class="fc" id="L59">        comentarios.publicadosDesde(</span>
+<span class="fc" id="L60">            usuarioId, ahora.minus(VENTANA), PageRequest.of(0, COMENTARIOS_POR_MINUTO)),</span>
+        COMENTARIOS_POR_MINUTO,
+        ahora,
+        &quot;Publicaste demasiados comentarios en poco tiempo. Espera un momento antes de comentar&quot;
+            + &quot; de nuevo.&quot;);
+<span class="fc" id="L65">  }</span>
+
+  /**
+   * {@code recientes} son las publicaciones de la ventana, de la más nueva a la más vieja, a lo
+   * sumo {@code limite}. Si ya está lleno, se podrá publicar cuando la más vieja salga de la
+   * ventana.
+   */
+  private void exigir(List&lt;Instant&gt; recientes, int limite, Instant ahora, String mensaje) {
+<span class="fc bfc" id="L73" title="All 2 branches covered.">    if (recientes.size() &lt; limite) return;</span>
+<span class="fc" id="L74">    Instant libre = recientes.get(limite - 1).plus(VENTANA);</span>
+<span class="fc" id="L75">    long segundos = (Duration.between(ahora, libre).toMillis() + 999) / 1000;</span>
+<span class="fc" id="L76">    throw new DemasiadasSolicitudesException(&quot;limite_foro_excedido&quot;, mensaje, segundos);</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

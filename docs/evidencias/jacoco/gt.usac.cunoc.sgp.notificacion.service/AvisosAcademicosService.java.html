@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AvisosAcademicosService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">sgp-api</a> &gt; <a href="index.source.html" class="el_package">gt.usac.cunoc.sgp.notificacion.service</a> &gt; <span class="el_source">AvisosAcademicosService.java</span></div><h1>AvisosAcademicosService.java</h1><pre class="source lang-java linenums">package gt.usac.cunoc.sgp.notificacion.service;
+
+import gt.usac.cunoc.sgp.formulario.model.EstadoVersionFormulario;
+import gt.usac.cunoc.sgp.formulario.repository.AprobacionCalibracionRepository;
+import gt.usac.cunoc.sgp.formulario.repository.VersionFormularioRepository;
+import gt.usac.cunoc.sgp.mantenimiento.repository.ReglaMantenimientoRepository;
+import gt.usac.cunoc.sgp.usuario.model.RoleName;
+import gt.usac.cunoc.sgp.usuario.repository.UserAccountRepository;
+import java.util.UUID;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+@Service
+public class AvisosAcademicosService {
+  private final VersionFormularioRepository versiones;
+  private final AprobacionCalibracionRepository aprobaciones;
+  private final ReglaMantenimientoRepository reglas;
+  private final UserAccountRepository usuarios;
+  private final NotificacionService notificaciones;
+
+  public AvisosAcademicosService(
+      VersionFormularioRepository versiones,
+      AprobacionCalibracionRepository aprobaciones,
+      ReglaMantenimientoRepository reglas,
+      UserAccountRepository usuarios,
+<span class="fc" id="L26">      NotificacionService notificaciones) {</span>
+<span class="fc" id="L27">    this.versiones = versiones;</span>
+<span class="fc" id="L28">    this.aprobaciones = aprobaciones;</span>
+<span class="fc" id="L29">    this.reglas = reglas;</span>
+<span class="fc" id="L30">    this.usuarios = usuarios;</span>
+<span class="fc" id="L31">    this.notificaciones = notificaciones;</span>
+<span class="fc" id="L32">  }</span>
+
+  @Transactional
+  public void calibracionPendiente(UUID versionId) {
+<span class="fc" id="L36">    var version = versiones.findById(versionId).orElse(null);</span>
+<span class="pc bpc" id="L37" title="1 of 2 branches missed.">    if (version == null</span>
+<span class="fc bfc" id="L38" title="All 2 branches covered.">        || version.getEstado() != EstadoVersionFormulario.PUBLICADA</span>
+<span class="fc bfc" id="L39" title="All 2 branches covered.">        || aprobaciones.existsByVersionFormularioId(versionId)) return;</span>
+<span class="fc" id="L40">    avisar(</span>
+        versionId,
+        &quot;CALIBRACION_PENDIENTE&quot;,
+        &quot;Calibracion pendiente de aprobacion&quot;,
+        &quot;Hay una version publicada pendiente de respaldo academico. Consulte el editor de la version.&quot;,
+        &quot;version_formulario&quot;,
+        &quot;calibracion-pendiente:&quot;);
+<span class="fc" id="L47">  }</span>
+
+  @Transactional
+  public void reglasPendientes(UUID versionId) {
+<span class="fc bfc" id="L51" title="All 2 branches covered.">    if (!reglas.tieneReglasPendientes(versionId)) return;</span>
+<span class="fc" id="L52">    avisar(</span>
+        versionId,
+        &quot;REGLAS_PENDIENTES_VALIDAR&quot;,
+        &quot;Reglas pendientes de validacion&quot;,
+        &quot;Hay reglas activas pendientes de validacion academica. Consulte el catalogo de mantenimiento.&quot;,
+        &quot;catalogo_reglas&quot;,
+        &quot;reglas-pendientes-validar:&quot;);
+<span class="fc" id="L59">  }</span>
+
+  @Transactional
+  public void revisarPendientes() {
+<span class="fc bfc" id="L63" title="All 2 branches covered.">    for (var version : versiones.findPublicadasSinAprobacion())</span>
+<span class="fc" id="L64">      calibracionPendiente(version.getId());</span>
+<span class="fc bfc" id="L65" title="All 2 branches covered.">    for (var versionId : reglas.findVersionesConReglasPendientes()) reglasPendientes(versionId);</span>
+<span class="fc" id="L66">  }</span>
+
+  private void avisar(
+      UUID versionId, String tipo, String titulo, String mensaje, String entidad, String prefijo) {
+<span class="fc bfc" id="L70" title="All 2 branches covered.">    for (var usuario : usuarios.findIdsActivosPorRol(RoleName.CATEDRATICO)) {</span>
+<span class="fc" id="L71">      notificaciones.notificar(</span>
+          usuario, tipo, titulo, mensaje, entidad, versionId, prefijo + versionId);
+<span class="fc" id="L73">    }</span>
+<span class="fc" id="L74">  }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

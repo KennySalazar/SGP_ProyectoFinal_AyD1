@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AsignacionPuente.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">sgp-api</a> &gt; <a href="index.source.html" class="el_package">gt.usac.cunoc.sgp.puente.entity</a> &gt; <span class="el_source">AsignacionPuente.java</span></div><h1>AsignacionPuente.java</h1><pre class="source lang-java linenums">package gt.usac.cunoc.sgp.puente.entity;
+
+import gt.usac.cunoc.sgp.common.util.UuidV7Generator;
+import gt.usac.cunoc.sgp.curso.entity.CursoEstudiante;
+import gt.usac.cunoc.sgp.usuario.entity.UserAccount;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Table;
+import java.time.Instant;
+import java.util.UUID;
+
+@Entity
+@Table(name = &quot;asignacion_puente&quot;)
+public class AsignacionPuente {
+
+  @Id private UUID id;
+
+  @ManyToOne(fetch = FetchType.LAZY, optional = false)
+  @JoinColumn(name = &quot;curso_estudiante_id&quot;, nullable = false)
+  private CursoEstudiante cursoEstudiante;
+
+  @ManyToOne(fetch = FetchType.LAZY, optional = false)
+  @JoinColumn(name = &quot;puente_id&quot;, nullable = false)
+  private Puente puente;
+
+  @ManyToOne(fetch = FetchType.LAZY, optional = false)
+  @JoinColumn(name = &quot;asignado_por_id&quot;, nullable = false)
+  private UserAccount asignadoPor;
+
+  @Column(name = &quot;asignado_en&quot;, nullable = false, updatable = false)
+  private Instant asignadoEn;
+
+  @Column(name = &quot;revocado_en&quot;)
+  private Instant revocadoEn;
+
+  @Column(name = &quot;motivo_revocacion&quot;, length = 1000)
+  private String motivoRevocacion;
+
+  @Column(name = &quot;creado_en&quot;, nullable = false, updatable = false)
+  private Instant creadoEn;
+
+<span class="nc" id="L46">  protected AsignacionPuente() {}</span>
+
+  public AsignacionPuente(
+<span class="fc" id="L49">      CursoEstudiante cursoEstudiante, Puente puente, UserAccount asignadoPor, Instant ahora) {</span>
+<span class="fc" id="L50">    this.id = UuidV7Generator.generate();</span>
+<span class="fc" id="L51">    this.cursoEstudiante = cursoEstudiante;</span>
+<span class="fc" id="L52">    this.puente = puente;</span>
+<span class="fc" id="L53">    this.asignadoPor = asignadoPor;</span>
+<span class="fc" id="L54">    this.asignadoEn = ahora;</span>
+<span class="fc" id="L55">    this.creadoEn = ahora;</span>
+<span class="fc" id="L56">  }</span>
+
+  public void revocar(String motivo, Instant ahora) {
+<span class="nc" id="L59">    this.revocadoEn = ahora;</span>
+<span class="nc" id="L60">    this.motivoRevocacion = motivo;</span>
+<span class="nc" id="L61">  }</span>
+
+  public UUID getId() {
+<span class="fc" id="L64">    return id;</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

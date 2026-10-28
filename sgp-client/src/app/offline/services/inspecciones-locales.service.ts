@@ -424,10 +424,46 @@ export class InspeccionesLocalesService {
     };
   }
 
+  /** Solo una creación que nunca se intentó enviar puede descartarse sin contactar al servidor. */
+  async esBorradorSoloLocal(id: string): Promise<boolean> {
+    const local = await this.obtenerInspeccionLocal(id);
+    const operaciones = await sgpDb.cola_sync.where('entityId').equals(id).toArray();
+    const creaciones = operaciones.filter((item) => item.operacion === 'CREAR_INSPECCION');
+    if (
+      creaciones.some((item) => item.estado !== 'PENDIENTE' || item.intentos > 0 || item.iniciadoEn)
+    )
+      throw new Error('creacionPendiente');
+    return !!local && !local.sincronizado && local.estado === 'BORRADOR' && creaciones.length > 0;
+  }
+
+  /** Retira atómicamente los datos locales tras confirmar que el borrador remoto ya no existe. */
+  async confirmarEliminacionRemota(id: string, propietarioId: string): Promise<void> {
+    await sgpDb.transaction('rw', sgpDb.inspecciones, sgpDb.cola_sync, sgpDb.fotos, async () => {
+      const local = await sgpDb.inspecciones.get(id);
+      const fotos = await sgpDb.fotos.where('inspeccionId').equals(id).toArray();
+      const ids = new Set([id, ...fotos.map((foto) => foto.id)]);
+      const operaciones = (await sgpDb.cola_sync.toArray()).filter((item) =>
+        ids.has(item.entityId),
+      );
+      if (
+        this.auth.user()?.id !== propietarioId ||
+        (local && local.propietarioId !== propietarioId) ||
+        fotos.some((foto) => foto.propietarioId !== propietarioId) ||
+        operaciones.some((item) => item.propietarioId !== propietarioId)
+      )
+        throw new Error('offline.hu061.notEditable');
+      if (operaciones.some((item) => item.operacion === 'CREAR_INSPECCION'))
+        throw new Error('creacionPendiente');
+      await sgpDb.cola_sync.bulkDelete(operaciones.map((item) => item.id));
+      await sgpDb.fotos.bulkDelete(fotos.map((foto) => foto.id));
+      await sgpDb.inspecciones.delete(id);
+    });
+  }
+
   /**
    * Elimina una inspección local de Dexie si no ha sido sincronizada.
    */
-  async eliminarInspeccionLocal(id: string): Promise<void> {
+  async eliminarInspeccionLocal(id: string, exigirCreacionPendiente = false): Promise<void> {
     const propietarioId = this.auth.user()?.id;
     await sgpDb.transaction('rw', sgpDb.inspecciones, sgpDb.cola_sync, sgpDb.fotos, async () => {
       const local = await sgpDb.inspecciones.get(id);
@@ -444,6 +480,11 @@ export class InspeccionesLocalesService {
         ids.has(item.entityId),
       );
       if (
+        exigirCreacionPendiente &&
+        (local.sincronizado || !operaciones.some((item) => item.operacion === 'CREAR_INSPECCION'))
+      )
+        throw new Error('creacionPendiente');
+      if (
         fotos.some((foto) => foto.propietarioId !== propietarioId) ||
         operaciones.some(
           (item) =>
@@ -453,7 +494,7 @@ export class InspeccionesLocalesService {
             item.iniciadoEn,
         )
       )
-        throw new Error('envioIncierto');
+        throw new Error(exigirCreacionPendiente ? 'creacionPendiente' : 'envioIncierto');
       await sgpDb.cola_sync.bulkDelete(operaciones.map((item) => item.id));
       await sgpDb.fotos.bulkDelete(fotos.map((foto) => foto.id));
       await sgpDb.inspecciones.delete(id);

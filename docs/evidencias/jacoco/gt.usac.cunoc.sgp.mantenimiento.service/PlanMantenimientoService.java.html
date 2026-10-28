@@ -1,0 +1,240 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PlanMantenimientoService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">sgp-api</a> &gt; <a href="index.source.html" class="el_package">gt.usac.cunoc.sgp.mantenimiento.service</a> &gt; <span class="el_source">PlanMantenimientoService.java</span></div><h1>PlanMantenimientoService.java</h1><pre class="source lang-java linenums">package gt.usac.cunoc.sgp.mantenimiento.service;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import gt.usac.cunoc.sgp.common.audit.model.AccionAuditoria;
+import gt.usac.cunoc.sgp.common.audit.service.AuditoriaWriter;
+import gt.usac.cunoc.sgp.common.exception.ApiException;
+import gt.usac.cunoc.sgp.common.util.UuidV7Generator;
+import gt.usac.cunoc.sgp.mantenimiento.dto.ActividadPlanMantenimientoResponse;
+import gt.usac.cunoc.sgp.mantenimiento.dto.ActualizarPlanMantenimientoRequest;
+import gt.usac.cunoc.sgp.mantenimiento.dto.PlanMantenimientoResponse;
+import gt.usac.cunoc.sgp.mantenimiento.entity.PlanMantenimientoRutinario;
+import gt.usac.cunoc.sgp.mantenimiento.repository.PlanMantenimientoRutinarioRepository;
+import gt.usac.cunoc.sgp.puente.entity.Puente;
+import gt.usac.cunoc.sgp.puente.repository.PuenteRepository;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.time.temporal.ChronoUnit;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+import org.springframework.http.HttpStatus;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+@Service
+public class PlanMantenimientoService {
+
+  static final String ENTIDAD = &quot;plan_mantenimiento_rutinario&quot;;
+  static final String PROCESO_BACKFILL = &quot;hu068-backfill-planes-rutinarios&quot;;
+<span class="fc" id="L34">  private static final ZoneId ZONA_GUATEMALA = ZoneId.of(&quot;America/Guatemala&quot;);</span>
+
+  private final PlanMantenimientoRutinarioRepository planes;
+  private final PuenteRepository puentes;
+  private final OrdenCicloPlanService ciclos;
+  private final AuditoriaWriter auditoria;
+  private final ObjectMapper json;
+  private final Clock clock;
+
+  public PlanMantenimientoService(
+      PlanMantenimientoRutinarioRepository planes,
+      PuenteRepository puentes,
+      OrdenCicloPlanService ciclos,
+      AuditoriaWriter auditoria,
+      ObjectMapper json,
+<span class="fc" id="L49">      Clock clock) {</span>
+<span class="fc" id="L50">    this.planes = planes;</span>
+<span class="fc" id="L51">    this.puentes = puentes;</span>
+<span class="fc" id="L52">    this.ciclos = ciclos;</span>
+<span class="fc" id="L53">    this.auditoria = auditoria;</span>
+<span class="fc" id="L54">    this.json = json;</span>
+<span class="fc" id="L55">    this.clock = clock;</span>
+<span class="fc" id="L56">  }</span>
+
+  @Transactional
+  public PlanMantenimientoRutinario crearPorDefecto(Puente puente, UUID actorId) {
+<span class="fc bfc" id="L60" title="All 2 branches covered.">    if (!puente.isActivo()) return null;</span>
+<span class="fc" id="L61">    return planes.findByPuenteId(puente.getId()).orElseGet(() -&gt; crear(puente, actorId, null));</span>
+  }
+
+  /** Reconciliación idempotente de puentes activos antiguos, también usada al arrancar el job. */
+  @Transactional
+  public void crearPlanesFaltantes() {
+<span class="fc bfc" id="L67" title="All 2 branches covered.">    for (UUID puenteId : planes.findActiveBridgesWithoutPlan()) {</span>
+<span class="fc" id="L68">      Puente puente = puentes.findByIdForUpdate(puenteId).orElse(null);</span>
+<span class="pc bpc" id="L69" title="3 of 6 branches missed.">      if (puente == null || !puente.isActivo() || planes.existsByPuente_Id(puenteId)) continue;</span>
+<span class="fc" id="L70">      crear(puente, null, PROCESO_BACKFILL);</span>
+<span class="fc" id="L71">    }</span>
+<span class="fc" id="L72">  }</span>
+
+  @Transactional(readOnly = true)
+  public PlanMantenimientoResponse obtenerPorPuente(UUID puenteId) {
+<span class="nc" id="L76">    return planes.findByPuenteId(puenteId).map(this::respuesta).orElseThrow(this::noEncontrado);</span>
+  }
+
+  @Transactional(readOnly = true)
+  public List&lt;PlanMantenimientoResponse&gt; listar() {
+<span class="nc" id="L81">    return planes.findAllForListing().stream().map(this::respuesta).toList();</span>
+  }
+
+  @Transactional
+  public PlanMantenimientoResponse actualizar(
+      UUID puenteId, ActualizarPlanMantenimientoRequest request, UUID actorId) {
+<span class="pc bpc" id="L87" title="1 of 2 branches missed.">    if (request.periodicidadMeses() == null</span>
+<span class="fc bfc" id="L88" title="All 2 branches covered.">        || request.periodicidadMeses() &lt; 1</span>
+<span class="pc bpc" id="L89" title="1 of 2 branches missed.">        || request.periodicidadMeses() &gt; 12) {</span>
+<span class="fc" id="L90">      throw new ApiException(</span>
+          HttpStatus.UNPROCESSABLE_ENTITY,
+          &quot;periodicidad_plan_invalida&quot;,
+          &quot;Periodicidad inválida&quot;,
+          &quot;La periodicidad debe estar entre 1 y 12 meses.&quot;,
+<span class="fc" id="L95">          List.of(Map.of(&quot;campo&quot;, &quot;periodicidadMeses&quot;, &quot;mensaje&quot;, &quot;Use un valor entre 1 y 12.&quot;)));</span>
+    }
+<span class="nc" id="L97">    PlanMantenimientoRutinario plan =</span>
+<span class="nc" id="L98">        planes.findByPuenteIdForUpdate(puenteId).orElseThrow(this::noEncontrado);</span>
+<span class="nc bnc" id="L99" title="All 2 branches missed.">    if (plan.getVersion() != request.version()) {</span>
+<span class="nc" id="L100">      throw new ApiException(</span>
+          HttpStatus.CONFLICT,
+          &quot;version_plan_desactualizada&quot;,
+          &quot;El plan cambió&quot;,
+          &quot;Recargue el plan antes de guardar los cambios.&quot;);
+    }
+
+<span class="nc" id="L107">    ObjectNode antes = snapshot(plan);</span>
+<span class="nc" id="L108">    List&lt;String&gt; actividades = request.actividades().stream().map(String::strip).toList();</span>
+<span class="nc" id="L109">    plan.actualizar(request.periodicidadMeses().shortValue(), actividades, clock.instant());</span>
+<span class="nc" id="L110">    PlanMantenimientoRutinario guardado = planes.saveAndFlush(plan);</span>
+<span class="nc" id="L111">    auditoria.registrarEnTransaccion(</span>
+        actorId,
+        AccionAuditoria.MODIFICAR,
+        ENTIDAD,
+<span class="nc" id="L115">        guardado.getId(),</span>
+        antes,
+<span class="nc" id="L117">        snapshot(guardado),</span>
+        null);
+<span class="nc" id="L119">    return respuesta(guardado);</span>
+  }
+
+  @Transactional
+  public void generarCiclosVencidos() {
+<span class="nc" id="L124">    crearPlanesFaltantes();</span>
+<span class="nc" id="L125">    LocalDate hoy = LocalDate.now(clock.withZone(ZONA_GUATEMALA));</span>
+<span class="nc bnc" id="L126" title="All 2 branches missed.">    for (PlanMantenimientoRutinario plan : planes.findDueCandidates()) {</span>
+<span class="nc" id="L127">      generarCiclos(plan, hoy);</span>
+<span class="nc" id="L128">    }</span>
+<span class="nc" id="L129">  }</span>
+
+  private void generarCiclos(PlanMantenimientoRutinario plan, LocalDate hoy) {
+<span class="nc" id="L132">    LocalDate inicio = plan.getFechaInicio();</span>
+<span class="nc" id="L133">    int periodo = plan.getPeriodicidadMeses();</span>
+<span class="nc" id="L134">    long mesesTranscurridos =</span>
+<span class="nc" id="L135">        ChronoUnit.MONTHS.between(inicio.withDayOfMonth(1), hoy.withDayOfMonth(1));</span>
+<span class="nc" id="L136">    int ultimoMesCicloVencido = (int) (mesesTranscurridos / periodo) * periodo;</span>
+<span class="nc bnc" id="L137" title="All 2 branches missed.">    if (ultimoMesCicloVencido &lt; periodo</span>
+<span class="nc bnc" id="L138" title="All 2 branches missed.">        || !planes.lockBridgeActive(plan.getPuente().getId()).orElse(false)) {</span>
+<span class="nc" id="L139">      return;</span>
+    }
+<span class="nc bnc" id="L141" title="All 2 branches missed.">    for (int ciclo = periodo; ciclo &lt;= ultimoMesCicloVencido; ciclo += periodo) {</span>
+<span class="nc" id="L142">      LocalDate fechaCiclo = inicio.plusMonths(ciclo);</span>
+<span class="nc bnc" id="L143" title="All 4 branches missed.">      if (fechaCiclo.isAfter(hoy) || ciclos.existe(plan.getId(), ciclo)) continue;</span>
+<span class="nc" id="L144">      ciclos.generar(plan, ciclo, fechaCiclo);</span>
+    }
+<span class="nc" id="L146">  }</span>
+
+  private PlanMantenimientoRutinario crear(Puente puente, UUID actorId, String proceso) {
+<span class="fc" id="L149">    Instant ahora = clock.instant();</span>
+<span class="fc" id="L150">    PlanMantenimientoRutinario plan =</span>
+<span class="fc" id="L151">        planes.save(</span>
+            new PlanMantenimientoRutinario(
+<span class="fc" id="L153">                UuidV7Generator.generate(),</span>
+                puente,
+<span class="fc" id="L155">                LocalDate.now(clock.withZone(ZONA_GUATEMALA)),</span>
+                ahora));
+<span class="fc" id="L157">    auditoria.registrarEnTransaccion(</span>
+<span class="fc" id="L158">        actorId, AccionAuditoria.CREAR, ENTIDAD, plan.getId(), null, snapshot(plan), proceso);</span>
+<span class="fc" id="L159">    return plan;</span>
+  }
+
+  private PlanMantenimientoResponse respuesta(PlanMantenimientoRutinario plan) {
+<span class="nc" id="L163">    var puente = plan.getPuente();</span>
+<span class="nc" id="L164">    int periodo = plan.getPeriodicidadMeses();</span>
+<span class="nc bnc" id="L165" title="All 4 branches missed.">    if (!puente.isActivo() || !plan.isActivo()) {</span>
+<span class="nc" id="L166">      return new PlanMantenimientoResponse(</span>
+<span class="nc" id="L167">          plan.getId(),</span>
+<span class="nc" id="L168">          puente.getId(),</span>
+<span class="nc" id="L169">          puente.getCodigo(),</span>
+<span class="nc" id="L170">          puente.getNombre(),</span>
+<span class="nc" id="L171">          puente.isActivo(),</span>
+<span class="nc" id="L172">          plan.getPeriodicidadMeses(),</span>
+<span class="nc" id="L173">          plan.getFechaInicio(),</span>
+          null,
+          null,
+<span class="nc" id="L176">          plan.getResponsableUsuarioId(),</span>
+<span class="nc" id="L177">          plan.getAprobadoPorId(),</span>
+<span class="nc" id="L178">          plan.getAprobadoEn(),</span>
+<span class="nc" id="L179">          plan.getActividades().stream()</span>
+<span class="nc" id="L180">              .map(</span>
+                  a -&gt;
+<span class="nc" id="L182">                      new ActividadPlanMantenimientoResponse(</span>
+<span class="nc" id="L183">                          a.getId(), a.getPosicion(), a.getDescripcion()))</span>
+<span class="nc" id="L184">              .toList(),</span>
+<span class="nc" id="L185">          plan.getVersion());</span>
+    }
+<span class="nc" id="L187">    long meses =</span>
+<span class="nc" id="L188">        Math.max(</span>
+            0,
+<span class="nc" id="L190">            ChronoUnit.MONTHS.between(</span>
+<span class="nc" id="L191">                plan.getFechaInicio().withDayOfMonth(1),</span>
+<span class="nc" id="L192">                LocalDate.now(clock.withZone(ZONA_GUATEMALA)).withDayOfMonth(1)));</span>
+<span class="nc" id="L193">    int ultimoCicloVencido = Math.toIntExact((meses / periodo) * periodo);</span>
+<span class="nc" id="L194">    int ciclo = periodo;</span>
+<span class="nc bnc" id="L195" title="All 4 branches missed.">    while (ciclo &lt;= ultimoCicloVencido &amp;&amp; ciclos.existe(plan.getId(), ciclo)) {</span>
+<span class="nc" id="L196">      ciclo += periodo;</span>
+    }
+<span class="nc bnc" id="L198" title="All 2 branches missed.">    if (ciclo &gt; ultimoCicloVencido) ciclo = ultimoCicloVencido + periodo;</span>
+<span class="nc" id="L199">    return new PlanMantenimientoResponse(</span>
+<span class="nc" id="L200">        plan.getId(),</span>
+<span class="nc" id="L201">        puente.getId(),</span>
+<span class="nc" id="L202">        puente.getCodigo(),</span>
+<span class="nc" id="L203">        puente.getNombre(),</span>
+<span class="nc" id="L204">        puente.isActivo(),</span>
+        periodo,
+<span class="nc" id="L206">        plan.getFechaInicio(),</span>
+<span class="nc" id="L207">        ciclo,</span>
+<span class="nc" id="L208">        plan.getFechaInicio().plusMonths(ciclo),</span>
+<span class="nc" id="L209">        plan.getResponsableUsuarioId(),</span>
+<span class="nc" id="L210">        plan.getAprobadoPorId(),</span>
+<span class="nc" id="L211">        plan.getAprobadoEn(),</span>
+<span class="nc" id="L212">        plan.getActividades().stream()</span>
+<span class="nc" id="L213">            .map(</span>
+                a -&gt;
+<span class="nc" id="L215">                    new ActividadPlanMantenimientoResponse(</span>
+<span class="nc" id="L216">                        a.getId(), a.getPosicion(), a.getDescripcion()))</span>
+<span class="nc" id="L217">            .toList(),</span>
+<span class="nc" id="L218">        plan.getVersion());</span>
+  }
+
+  private ObjectNode snapshot(PlanMantenimientoRutinario plan) {
+<span class="fc" id="L222">    ObjectNode node =</span>
+<span class="fc" id="L223">        json.createObjectNode()</span>
+<span class="fc" id="L224">            .put(&quot;puenteId&quot;, plan.getPuente().getId().toString())</span>
+<span class="fc" id="L225">            .put(&quot;periodicidadMeses&quot;, plan.getPeriodicidadMeses())</span>
+<span class="fc" id="L226">            .put(&quot;fechaInicio&quot;, plan.getFechaInicio().toString());</span>
+<span class="fc" id="L227">    ArrayNode actividades = node.putArray(&quot;actividades&quot;);</span>
+<span class="pc" id="L228">    plan.getActividades().forEach(a -&gt; actividades.add(a.getDescripcion()));</span>
+<span class="fc" id="L229">    return node;</span>
+  }
+
+  private ApiException noEncontrado() {
+<span class="nc" id="L233">    return new ApiException(</span>
+        HttpStatus.NOT_FOUND,
+        &quot;plan_mantenimiento_no_encontrado&quot;,
+        &quot;Plan no encontrado&quot;,
+        &quot;No existe un plan rutinario para el puente solicitado.&quot;);
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

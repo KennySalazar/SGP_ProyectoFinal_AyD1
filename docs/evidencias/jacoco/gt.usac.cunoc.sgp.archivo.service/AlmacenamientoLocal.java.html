@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AlmacenamientoLocal.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">sgp-api</a> &gt; <a href="index.source.html" class="el_package">gt.usac.cunoc.sgp.archivo.service</a> &gt; <span class="el_source">AlmacenamientoLocal.java</span></div><h1>AlmacenamientoLocal.java</h1><pre class="source lang-java linenums">package gt.usac.cunoc.sgp.archivo.service;
+
+import java.io.*;
+import java.nio.file.*;
+
+public class AlmacenamientoLocal implements AlmacenamientoArchivos {
+  private final Path raiz;
+  private final boolean permisosPosix;
+
+<span class="fc" id="L10">  public AlmacenamientoLocal(Path directorio) throws IOException {</span>
+<span class="fc" id="L11">    Files.createDirectories(directorio);</span>
+<span class="pc bpc" id="L12" title="1 of 2 branches missed.">    if (Files.isSymbolicLink(directorio))</span>
+<span class="nc" id="L13">      throw new IOException(&quot;Directorio de almacenamiento no permitido&quot;);</span>
+<span class="fc" id="L14">    raiz = directorio.toRealPath();</span>
+<span class="fc" id="L15">    permisosPosix =</span>
+<span class="fc" id="L16">        Files.getFileStore(raiz)</span>
+<span class="fc" id="L17">            .supportsFileAttributeView(java.nio.file.attribute.PosixFileAttributeView.class);</span>
+<span class="fc" id="L18">  }</span>
+
+  private Path destino(String clave) {
+<span class="fc" id="L21">    return raiz.resolve(ClaveObjeto.validar(clave));</span>
+  }
+
+  public void guardar(String clave, InputStream contenido, long tamano, String mime)
+      throws IOException {
+<span class="pc bpc" id="L26" title="1 of 2 branches missed.">    if (tamano &lt;= 0) throw new IOException(&quot;Tamaño de objeto inválido&quot;);</span>
+<span class="fc" id="L27">    Path destino = destino(clave), temporal = raiz.resolve(clave + &quot;.pendiente&quot;);</span>
+<span class="pc bpc" id="L28" title="1 of 2 branches missed.">    if (permisosPosix) {</span>
+<span class="fc" id="L29">      Files.createFile(</span>
+          temporal,
+<span class="fc" id="L31">          java.nio.file.attribute.PosixFilePermissions.asFileAttribute(</span>
+<span class="fc" id="L32">              java.nio.file.attribute.PosixFilePermissions.fromString(&quot;rw-------&quot;)));</span>
+    } else {
+<span class="nc" id="L34">      Files.createFile(temporal);</span>
+    }
+    try {
+<span class="fc" id="L37">      long escritos = 0;</span>
+<span class="fc" id="L38">      try (var salida = Files.newOutputStream(temporal)) {</span>
+<span class="fc" id="L39">        byte[] buffer = new byte[8192];</span>
+        int n;
+<span class="fc bfc" id="L41" title="All 2 branches covered.">        while ((n = contenido.read(buffer)) != -1) {</span>
+<span class="fc" id="L42">          escritos += n;</span>
+<span class="pc bpc" id="L43" title="1 of 2 branches missed.">          if (escritos &gt; tamano) throw new IOException(&quot;Longitud de objeto excedida&quot;);</span>
+<span class="fc" id="L44">          salida.write(buffer, 0, n);</span>
+        }
+      }
+<span class="fc bfc" id="L47" title="All 2 branches covered.">      if (escritos != tamano) throw new IOException(&quot;Longitud de objeto diferente a la declarada&quot;);</span>
+<span class="fc" id="L48">      Files.createLink(destino, temporal);</span>
+    } finally {
+<span class="fc" id="L50">      Files.deleteIfExists(temporal);</span>
+    }
+<span class="fc" id="L52">  }</span>
+
+  public InputStream abrir(String clave) throws IOException {
+<span class="fc" id="L55">    return Files.newInputStream(destino(clave), LinkOption.NOFOLLOW_LINKS);</span>
+  }
+
+  public boolean existe(String clave) {
+<span class="fc" id="L59">    return Files.isRegularFile(destino(clave), LinkOption.NOFOLLOW_LINKS);</span>
+  }
+
+  public void eliminar(String clave) throws IOException {
+<span class="fc" id="L63">    Files.deleteIfExists(destino(clave));</span>
+<span class="fc" id="L64">    Files.deleteIfExists(raiz.resolve(ClaveObjeto.validar(clave) + &quot;.pendiente&quot;));</span>
+<span class="fc" id="L65">  }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

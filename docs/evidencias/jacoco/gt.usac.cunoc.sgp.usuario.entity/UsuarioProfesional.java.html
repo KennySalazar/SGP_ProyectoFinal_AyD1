@@ -1,0 +1,116 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>UsuarioProfesional.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">sgp-api</a> &gt; <a href="index.source.html" class="el_package">gt.usac.cunoc.sgp.usuario.entity</a> &gt; <span class="el_source">UsuarioProfesional.java</span></div><h1>UsuarioProfesional.java</h1><pre class="source lang-java linenums">package gt.usac.cunoc.sgp.usuario.entity;
+
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.MapsId;
+import jakarta.persistence.OneToOne;
+import jakarta.persistence.Table;
+import jakarta.persistence.Version;
+import java.time.Instant;
+import java.util.UUID;
+
+/** Datos exclusivos del Profesional Externo: su colegiado y la verificación del Administrador. */
+@Entity
+@Table(name = &quot;usuario_profesional&quot;)
+public class UsuarioProfesional {
+
+  @Id
+  @Column(name = &quot;usuario_id&quot;)
+  private UUID usuarioId;
+
+  @MapsId
+  @OneToOne(fetch = FetchType.LAZY, optional = false)
+  @JoinColumn(name = &quot;usuario_id&quot;)
+  private UserAccount usuario;
+
+  @Column(name = &quot;numero_colegiado&quot;, nullable = false, unique = true, length = 50)
+  private String numeroColegiado;
+
+  @Column(name = &quot;colegiado_verificado_en&quot;)
+  private Instant colegiadoVerificadoEn;
+
+  @Column(name = &quot;colegiado_verificado_por_id&quot;)
+  private UUID colegiadoVerificadoPorId;
+
+  @Column(name = &quot;creado_en&quot;, nullable = false, updatable = false)
+  private Instant creadoEn;
+
+  @Column(name = &quot;actualizado_en&quot;, nullable = false)
+  private Instant actualizadoEn;
+
+  @Version
+  @Column(nullable = false)
+  private long version;
+
+<span class="fc" id="L48">  protected UsuarioProfesional() {}</span>
+
+<span class="fc" id="L50">  public UsuarioProfesional(UserAccount usuario, String numeroColegiado, Instant creadoEn) {</span>
+<span class="fc" id="L51">    this.usuario = usuario;</span>
+<span class="fc" id="L52">    this.numeroColegiado = numeroColegiado;</span>
+<span class="fc" id="L53">    this.creadoEn = creadoEn;</span>
+<span class="fc" id="L54">    this.actualizadoEn = creadoEn;</span>
+<span class="fc" id="L55">  }</span>
+
+  public boolean isColegiadoVerificado() {
+<span class="fc bfc" id="L58" title="All 2 branches covered.">    return colegiadoVerificadoEn != null;</span>
+  }
+
+  public void verificarColegiado(UUID administradorId, Instant ahora) {
+<span class="pc bpc" id="L62" title="1 of 2 branches missed.">    if (isColegiadoVerificado()) {</span>
+<span class="nc" id="L63">      throw new IllegalStateException(&quot;El colegiado ya fue verificado&quot;);</span>
+    }
+<span class="fc" id="L65">    this.colegiadoVerificadoEn = ahora;</span>
+<span class="fc" id="L66">    this.colegiadoVerificadoPorId = administradorId;</span>
+<span class="fc" id="L67">    this.actualizadoEn = ahora;</span>
+<span class="fc" id="L68">  }</span>
+
+  /**
+   * Asigna otro número de colegiado. Un número distinto pierde la verificación anterior, porque el
+   * Administrador debe validarlo de nuevo (RN-USR-04).
+   */
+  public void reasignarColegiado(String numeroColegiado, Instant ahora) {
+<span class="pc bpc" id="L75" title="1 of 2 branches missed.">    if (numeroColegiado.equals(this.numeroColegiado)) {</span>
+<span class="nc" id="L76">      return;</span>
+    }
+<span class="fc" id="L78">    this.numeroColegiado = numeroColegiado;</span>
+<span class="fc" id="L79">    this.colegiadoVerificadoEn = null;</span>
+<span class="fc" id="L80">    this.colegiadoVerificadoPorId = null;</span>
+<span class="fc" id="L81">    this.actualizadoEn = ahora;</span>
+<span class="fc" id="L82">  }</span>
+
+  public UUID getUsuarioId() {
+<span class="fc" id="L85">    return usuarioId;</span>
+  }
+
+  public UserAccount getUsuario() {
+<span class="fc" id="L89">    return usuario;</span>
+  }
+
+  public String getNumeroColegiado() {
+<span class="fc" id="L93">    return numeroColegiado;</span>
+  }
+
+  public Instant getColegiadoVerificadoEn() {
+<span class="fc" id="L97">    return colegiadoVerificadoEn;</span>
+  }
+
+  public UUID getColegiadoVerificadoPorId() {
+<span class="fc" id="L101">    return colegiadoVerificadoPorId;</span>
+  }
+
+  public Instant getCreadoEn() {
+<span class="fc" id="L105">    return creadoEn;</span>
+  }
+
+  public Instant getActualizadoEn() {
+<span class="nc" id="L109">    return actualizadoEn;</span>
+  }
+
+  public long getVersion() {
+<span class="nc" id="L113">    return version;</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

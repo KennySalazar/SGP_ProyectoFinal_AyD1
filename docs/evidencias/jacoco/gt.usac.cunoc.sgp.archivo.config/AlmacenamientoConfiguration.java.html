@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AlmacenamientoConfiguration.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">sgp-api</a> &gt; <a href="index.source.html" class="el_package">gt.usac.cunoc.sgp.archivo.config</a> &gt; <span class="el_source">AlmacenamientoConfiguration.java</span></div><h1>AlmacenamientoConfiguration.java</h1><pre class="source lang-java linenums">package gt.usac.cunoc.sgp.archivo.config;
+
+import gt.usac.cunoc.sgp.archivo.service.*;
+import java.io.IOException;
+import java.net.URI;
+import java.nio.file.Path;
+import java.time.Duration;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.context.annotation.*;
+import software.amazon.awssdk.auth.credentials.*;
+import software.amazon.awssdk.http.urlconnection.UrlConnectionHttpClient;
+import software.amazon.awssdk.regions.Region;
+import software.amazon.awssdk.services.s3.S3Client;
+
+@Configuration
+<span class="fc" id="L17">public class AlmacenamientoConfiguration {</span>
+  @Bean
+  @ConditionalOnProperty(
+      name = &quot;app.archivos.proveedor&quot;,
+      havingValue = &quot;local&quot;,
+      matchIfMissing = true)
+  AlmacenamientoArchivos local(@Value(&quot;${app.archivos.local.directorio}&quot;) String directorio)
+      throws IOException {
+<span class="fc" id="L25">    return new AlmacenamientoLocal(Path.of(directorio));</span>
+  }
+
+  @Bean(destroyMethod = &quot;close&quot;)
+  @ConditionalOnProperty(name = &quot;app.archivos.proveedor&quot;, havingValue = &quot;s3&quot;)
+  S3Client cliente(
+      @Value(&quot;${app.archivos.s3.region:us-east-1}&quot;) String region,
+      @Value(&quot;${app.archivos.s3.endpoint:}&quot;) String endpoint,
+      @Value(&quot;${app.archivos.s3.access-key:}&quot;) String accessKey,
+      @Value(&quot;${app.archivos.s3.secret-key:}&quot;) String secretKey) {
+    var builder =
+<span class="fc" id="L36">        S3Client.builder()</span>
+<span class="fc" id="L37">            .overrideConfiguration(</span>
+                c -&gt;
+<span class="fc" id="L39">                    c.apiCallTimeout(Duration.ofMinutes(2))</span>
+<span class="fc" id="L40">                        .apiCallAttemptTimeout(Duration.ofSeconds(90)))</span>
+<span class="fc" id="L41">            .region(Region.of(region))</span>
+<span class="fc" id="L42">            .httpClientBuilder(</span>
+<span class="fc" id="L43">                UrlConnectionHttpClient.builder()</span>
+<span class="fc" id="L44">                    .connectionTimeout(Duration.ofSeconds(10))</span>
+<span class="fc" id="L45">                    .socketTimeout(Duration.ofSeconds(60)));</span>
+<span class="fc bfc" id="L46" title="All 2 branches covered.">    if (!endpoint.isBlank()) {</span>
+<span class="fc bfc" id="L47" title="All 2 branches covered.">      if (accessKey.isBlank() != secretKey.isBlank())</span>
+<span class="fc" id="L48">        throw new IllegalArgumentException(&quot;Las dos credenciales MinIO deben configurarse juntas&quot;);</span>
+<span class="fc" id="L49">      builder.endpointOverride(URI.create(endpoint)).forcePathStyle(true);</span>
+<span class="pc bpc" id="L50" title="2 of 4 branches missed.">      if (!accessKey.isBlank() &amp;&amp; !secretKey.isBlank())</span>
+<span class="fc" id="L51">        builder.credentialsProvider(</span>
+<span class="fc" id="L52">            StaticCredentialsProvider.create(AwsBasicCredentials.create(accessKey, secretKey)));</span>
+<span class="pc bpc" id="L53" title="1 of 4 branches missed.">    } else if (!accessKey.isBlank() || !secretKey.isBlank())</span>
+<span class="fc" id="L54">      throw new IllegalArgumentException(</span>
+          &quot;Las credenciales explícitas solo se admiten para endpoint local MinIO&quot;);
+    // Sin credenciales explícitas, el SDK usa su cadena por defecto, incluido el rol IAM de EC2.
+<span class="fc" id="L57">    return builder.build();</span>
+  }
+
+  @Bean
+  @ConditionalOnProperty(name = &quot;app.archivos.proveedor&quot;, havingValue = &quot;s3&quot;)
+  AlmacenamientoArchivos s3(S3Client cliente, @Value(&quot;${app.archivos.s3.bucket}&quot;) String bucket) {
+<span class="fc bfc" id="L63" title="All 2 branches covered.">    if (bucket.isBlank()) throw new IllegalArgumentException(&quot;El bucket privado es obligatorio&quot;);</span>
+<span class="fc" id="L64">    return new AlmacenamientoS3(cliente, bucket);</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

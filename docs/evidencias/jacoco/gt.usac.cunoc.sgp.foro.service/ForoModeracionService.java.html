@@ -1,0 +1,305 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ForoModeracionService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">sgp-api</a> &gt; <a href="index.source.html" class="el_package">gt.usac.cunoc.sgp.foro.service</a> &gt; <span class="el_source">ForoModeracionService.java</span></div><h1>ForoModeracionService.java</h1><pre class="source lang-java linenums">package gt.usac.cunoc.sgp.foro.service;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import gt.usac.cunoc.sgp.common.audit.model.AccionAuditoria;
+import gt.usac.cunoc.sgp.common.audit.service.AuditoriaWriter;
+import gt.usac.cunoc.sgp.common.exception.ApiException;
+import gt.usac.cunoc.sgp.foro.dto.ComentarioResponse;
+import gt.usac.cunoc.sgp.foro.dto.EditarComentarioRequest;
+import gt.usac.cunoc.sgp.foro.dto.HiloResponse;
+import gt.usac.cunoc.sgp.foro.dto.InspeccionSinRevisionResponse;
+import gt.usac.cunoc.sgp.foro.dto.MotivoModeracionRequest;
+import gt.usac.cunoc.sgp.foro.entity.ForoComentario;
+import gt.usac.cunoc.sgp.foro.mapper.ForoMapper;
+import gt.usac.cunoc.sgp.foro.repository.ForoAutorRepository;
+import gt.usac.cunoc.sgp.foro.repository.ForoAutorRepository.Autor;
+import gt.usac.cunoc.sgp.foro.repository.ForoComentarioRepository;
+import gt.usac.cunoc.sgp.foro.repository.ForoHiloRepository;
+import gt.usac.cunoc.sgp.foro.repository.ForoModeracionRepository;
+import java.time.Clock;
+import java.time.Instant;
+import java.util.List;
+import java.util.Set;
+import java.util.UUID;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.http.HttpStatus;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+/**
+ * Edición, eliminación y moderación del foro (HU-065). El autor edita su comentario dentro del
+ * plazo que decide la hora del servidor y lo elimina dejando la marca (RN-FOR-05). El Catedrático y
+ * el Administrador ocultan comentarios y cierran hilos con un motivo (RN-FOR-08) y revisan a
+ * posteriori las inspecciones publicadas sin revisión (RN-REV-02). Todo queda en la bitácora con
+ * los valores anterior y posterior (RN-USR-09).
+ *
+ * &lt;p&gt;Qué rol puede moderar lo decide el controlador; aquí se decide qué le corresponde al autor.
+ */
+@Service
+public class ForoModeracionService {
+
+  /** Longitud máxima del motivo de una moderación. */
+  static final int LONGITUD_MAXIMA_MOTIVO = 500;
+
+  private final ForoHiloRepository hilos;
+  private final ForoComentarioRepository comentarios;
+  private final ForoAutorRepository autores;
+  private final ForoModeracionRepository moderacion;
+  private final ForoService foro;
+  private final AvisosForo avisos;
+  private final AuditoriaWriter auditoria;
+  private final ForoMapper mapper;
+  private final ObjectMapper json;
+  private final Clock clock;
+
+  public ForoModeracionService(
+      ForoHiloRepository hilos,
+      ForoComentarioRepository comentarios,
+      ForoAutorRepository autores,
+      ForoModeracionRepository moderacion,
+      ForoService foro,
+      AvisosForo avisos,
+      AuditoriaWriter auditoria,
+      ForoMapper mapper,
+      ObjectMapper json,
+<span class="fc" id="L67">      Clock clock) {</span>
+<span class="fc" id="L68">    this.hilos = hilos;</span>
+<span class="fc" id="L69">    this.comentarios = comentarios;</span>
+<span class="fc" id="L70">    this.autores = autores;</span>
+<span class="fc" id="L71">    this.moderacion = moderacion;</span>
+<span class="fc" id="L72">    this.foro = foro;</span>
+<span class="fc" id="L73">    this.avisos = avisos;</span>
+<span class="fc" id="L74">    this.auditoria = auditoria;</span>
+<span class="fc" id="L75">    this.mapper = mapper;</span>
+<span class="fc" id="L76">    this.json = json;</span>
+<span class="fc" id="L77">    this.clock = clock;</span>
+<span class="fc" id="L78">  }</span>
+
+  /**
+   * El autor cambia el texto de su comentario. Solo dentro de los 15 minutos siguientes a
+   * publicarlo, contados con la hora del servidor: la del cliente no cuenta (RN-FOR-05). Si la
+   * edición agrega menciones, solo se avisa a los nuevos mencionados (RN-FOR-10).
+   */
+  @Transactional
+  public ComentarioResponse editar(
+      UUID comentarioId, EditarComentarioRequest request, UUID usuarioId) {
+<span class="fc" id="L88">    ForoComentario comentario = delAutor(comentarioId, usuarioId);</span>
+<span class="fc" id="L89">    exigirModificable(comentario);</span>
+<span class="fc" id="L90">    String contenido = ContenidoForo.limpiarComentario(request.contenido());</span>
+<span class="fc bfc" id="L91" title="All 4 branches covered.">    if (contenido == null || contenido.length() &gt; ContenidoForo.LONGITUD_MAXIMA_COMENTARIO) {</span>
+      String mensaje =
+<span class="fc bfc" id="L93" title="All 2 branches covered.">          contenido == null</span>
+<span class="fc" id="L94">              ? &quot;El comentario es obligatorio.&quot;</span>
+              : &quot;El comentario no puede exceder &quot;
+                  + ContenidoForo.LONGITUD_MAXIMA_COMENTARIO
+<span class="fc" id="L97">                  + &quot; caracteres.&quot;;</span>
+<span class="fc" id="L98">      throw new ApiException(</span>
+          HttpStatus.UNPROCESSABLE_ENTITY,
+          &quot;comentario_invalido&quot;,
+          &quot;Comentario inválido&quot;,
+          mensaje,
+<span class="fc" id="L103">          List.of(ContenidoForo.error(&quot;contenido&quot;, mensaje)));</span>
+    }
+<span class="fc" id="L105">    Instant ahora = clock.instant();</span>
+<span class="fc bfc" id="L106" title="All 2 branches covered.">    if (ahora.isAfter(comentario.getEditableHasta())) {</span>
+<span class="fc" id="L107">      throw new ApiException(</span>
+          HttpStatus.CONFLICT,
+          &quot;plazo_edicion_vencido&quot;,
+          &quot;Plazo de edición vencido&quot;,
+          &quot;Un comentario solo se puede editar en los 15 minutos siguientes a publicarlo.&quot;);
+    }
+<span class="pc bpc" id="L113" title="1 of 2 branches missed.">    if (contenido.equals(comentario.getContenido())) return respuesta(comentario, false);</span>
+
+<span class="fc" id="L115">    ObjectNode antes = json.createObjectNode().put(&quot;contenido&quot;, comentario.getContenido());</span>
+<span class="fc" id="L116">    comentario.editar(contenido, ahora);</span>
+<span class="fc" id="L117">    comentarios.saveAndFlush(comentario);</span>
+<span class="fc" id="L118">    auditoria.registrarEnTransaccion(</span>
+        usuarioId,
+        AccionAuditoria.MODIFICAR,
+        &quot;foro_comentario&quot;,
+<span class="fc" id="L122">        comentario.getId(),</span>
+        antes,
+<span class="fc" id="L124">        json.createObjectNode().put(&quot;contenido&quot;, contenido),</span>
+        null);
+<span class="fc" id="L126">    avisos.avisarMenciones(hilos.findById(comentario.getHiloId()).orElseThrow(), comentario);</span>
+<span class="fc" id="L127">    return respuesta(comentario, false);</span>
+  }
+
+  /**
+   * El autor elimina su comentario: queda la marca «comentario eliminado» y sus respuestas se
+   * conservan (RN-FOR-05). Eliminar uno ya eliminado no cambia nada.
+   */
+  @Transactional
+  public ComentarioResponse eliminar(UUID comentarioId, UUID usuarioId) {
+<span class="fc" id="L136">    ForoComentario comentario = delAutor(comentarioId, usuarioId);</span>
+<span class="fc bfc" id="L137" title="All 2 branches covered.">    if (comentario.isEliminado()) return respuesta(comentario, false);</span>
+<span class="fc" id="L138">    exigirModificable(comentario);</span>
+
+<span class="fc" id="L140">    comentario.eliminar(clock.instant());</span>
+<span class="fc" id="L141">    comentarios.saveAndFlush(comentario);</span>
+<span class="fc" id="L142">    auditoria.registrarEnTransaccion(</span>
+        usuarioId,
+        AccionAuditoria.MODIFICAR,
+        &quot;foro_comentario&quot;,
+<span class="fc" id="L146">        comentario.getId(),</span>
+<span class="fc" id="L147">        json.createObjectNode().put(&quot;contenido&quot;, comentario.getContenido()).put(&quot;eliminado&quot;, false),</span>
+<span class="fc" id="L148">        json.createObjectNode().put(&quot;eliminado&quot;, true),</span>
+        null);
+<span class="fc" id="L150">    return respuesta(comentario, false);</span>
+  }
+
+  /**
+   * Un moderador oculta un comentario con un motivo (RN-FOR-08). Los demás ven «Oculto por
+   * moderación» en su lugar; los moderadores, el texto y el motivo. También en un hilo cerrado.
+   */
+  @Transactional
+  public ComentarioResponse ocultar(
+      UUID comentarioId, MotivoModeracionRequest request, UUID moderadorId) {
+<span class="fc" id="L160">    String motivo = motivo(request);</span>
+<span class="fc" id="L161">    ForoComentario comentario = visible(comentarioId);</span>
+<span class="fc bfc" id="L162" title="All 2 branches covered.">    if (comentario.isEliminado()) throw comentarioEliminado();</span>
+<span class="fc bfc" id="L163" title="All 2 branches covered.">    if (comentario.isOculto()) {</span>
+<span class="fc" id="L164">      throw new ApiException(</span>
+          HttpStatus.CONFLICT,
+          &quot;comentario_oculto&quot;,
+          &quot;Comentario oculto&quot;,
+          &quot;El comentario ya está oculto por moderación.&quot;);
+    }
+
+<span class="fc" id="L171">    comentario.ocultar(moderadorId, motivo, clock.instant());</span>
+<span class="fc" id="L172">    comentarios.saveAndFlush(comentario);</span>
+<span class="fc" id="L173">    auditoria.registrarEnTransaccion(</span>
+        moderadorId,
+        AccionAuditoria.MODERAR,
+        &quot;foro_comentario&quot;,
+<span class="fc" id="L177">        comentario.getId(),</span>
+<span class="fc" id="L178">        json.createObjectNode().put(&quot;oculto&quot;, false),</span>
+<span class="fc" id="L179">        json.createObjectNode().put(&quot;oculto&quot;, true).put(&quot;motivo&quot;, motivo),</span>
+        null);
+<span class="fc" id="L181">    return respuesta(comentario, true);</span>
+  }
+
+  /**
+   * Un moderador cierra un hilo con un motivo (RN-FOR-08): sigue visible para lectura, pero ya no
+   * admite comentarios.
+   */
+  @Transactional
+  public HiloResponse cerrar(UUID hiloId, MotivoModeracionRequest request, UUID moderadorId) {
+<span class="fc" id="L190">    String motivo = motivo(request);</span>
+<span class="fc" id="L191">    foro.obtenerHilo(hiloId);</span>
+<span class="fc bfc" id="L192" title="All 2 branches covered.">    if (hilos.cerrar(hiloId, moderadorId, motivo, clock.instant()) == 0) {</span>
+<span class="fc" id="L193">      throw new ApiException(</span>
+          HttpStatus.CONFLICT, &quot;hilo_cerrado&quot;, &quot;Hilo cerrado&quot;, &quot;El hilo ya está cerrado.&quot;);
+    }
+<span class="fc" id="L196">    auditoria.registrarEnTransaccion(</span>
+        moderadorId,
+        AccionAuditoria.MODERAR,
+        &quot;foro_hilo&quot;,
+        hiloId,
+<span class="fc" id="L201">        json.createObjectNode().put(&quot;cerrado&quot;, false),</span>
+<span class="fc" id="L202">        json.createObjectNode().put(&quot;cerrado&quot;, true).put(&quot;motivo&quot;, motivo),</span>
+        null);
+<span class="fc" id="L204">    return foro.obtenerHilo(hiloId);</span>
+  }
+
+  /**
+   * Inspecciones publicadas sin revisión previa por su autor Catedrático o Profesional externo, de
+   * las más recientes a las más antiguas, con su hilo para moderarlas a posteriori (RN-REV-02).
+   */
+  @Transactional(readOnly = true)
+  public Page&lt;InspeccionSinRevisionResponse&gt; listarInspeccionesSinRevision(
+      int pagina, int tamanio) {
+<span class="fc" id="L214">    ContenidoForo.validarPaginacion(pagina, tamanio);</span>
+<span class="fc" id="L215">    return moderacion</span>
+<span class="fc" id="L216">        .listarInspeccionesSinRevision(PageRequest.of(pagina, tamanio))</span>
+<span class="fc" id="L217">        .map(mapper::toInspeccionSinRevisionResponse);</span>
+  }
+
+  /** El comentario de un hilo visible; si no existe o su puente está inactivo, 404. */
+  private ForoComentario visible(UUID comentarioId) {
+<span class="fc" id="L222">    ForoComentario comentario =</span>
+        comentarios
+<span class="fc" id="L224">            .findById(comentarioId)</span>
+<span class="fc" id="L225">            .orElseThrow(</span>
+                () -&gt;
+<span class="fc" id="L227">                    new ApiException(</span>
+                        HttpStatus.NOT_FOUND,
+                        &quot;comentario_no_encontrado&quot;,
+                        &quot;Comentario no encontrado&quot;,
+                        &quot;El comentario no existe.&quot;));
+<span class="fc" id="L232">    foro.obtenerHilo(comentario.getHiloId());</span>
+<span class="fc" id="L233">    return comentario;</span>
+  }
+
+  /** Solo el autor edita o elimina su comentario; cualquier otro recibe 403 (RN-FOR-05). */
+  private ForoComentario delAutor(UUID comentarioId, UUID usuarioId) {
+<span class="fc" id="L238">    ForoComentario comentario = visible(comentarioId);</span>
+<span class="fc bfc" id="L239" title="All 2 branches covered.">    if (!comentario.getAutorId().equals(usuarioId)) {</span>
+<span class="fc" id="L240">      throw new ApiException(</span>
+          HttpStatus.FORBIDDEN,
+          &quot;comentario_ajeno&quot;,
+          &quot;Comentario ajeno&quot;,
+          &quot;Solo el autor puede editar o eliminar su comentario.&quot;);
+    }
+<span class="fc" id="L246">    return comentario;</span>
+  }
+
+  /**
+   * Un comentario eliminado u oculto por moderación ya no cambia, ni uno de un hilo cerrado: así se
+   * conserva lo que el moderador vio y decidió.
+   */
+  private void exigirModificable(ForoComentario comentario) {
+<span class="fc bfc" id="L254" title="All 2 branches covered.">    if (comentario.isEliminado()) throw comentarioEliminado();</span>
+<span class="fc bfc" id="L255" title="All 2 branches covered.">    if (comentario.isOculto()) {</span>
+<span class="fc" id="L256">      throw new ApiException(</span>
+          HttpStatus.CONFLICT,
+          &quot;comentario_oculto&quot;,
+          &quot;Comentario oculto&quot;,
+          &quot;El comentario está oculto por moderación y ya no se puede modificar.&quot;);
+    }
+<span class="fc bfc" id="L262" title="All 4 branches covered.">    if (hilos.findById(comentario.getHiloId()).map(h -&gt; h.getCerradoEn() != null).orElse(false)) {</span>
+<span class="fc" id="L263">      throw new ApiException(</span>
+          HttpStatus.CONFLICT,
+          &quot;hilo_cerrado&quot;,
+          &quot;Hilo cerrado&quot;,
+          &quot;El hilo está cerrado y sus comentarios ya no se pueden modificar.&quot;);
+    }
+<span class="fc" id="L269">  }</span>
+
+  /** El motivo es obligatorio: sin él, 422 (RN-FOR-08). */
+  private String motivo(MotivoModeracionRequest request) {
+<span class="fc bfc" id="L273" title="All 2 branches covered.">    String motivo = request == null ? null : ContenidoForo.limpiarComentario(request.motivo());</span>
+<span class="fc" id="L274">    String mensaje = null;</span>
+<span class="fc bfc" id="L275" title="All 2 branches covered.">    if (motivo == null) {</span>
+<span class="fc" id="L276">      mensaje = &quot;Indica el motivo de la moderación.&quot;;</span>
+<span class="pc bpc" id="L277" title="1 of 2 branches missed.">    } else if (motivo.length() &gt; LONGITUD_MAXIMA_MOTIVO) {</span>
+<span class="nc" id="L278">      mensaje = &quot;El motivo no puede exceder &quot; + LONGITUD_MAXIMA_MOTIVO + &quot; caracteres.&quot;;</span>
+    }
+<span class="fc bfc" id="L280" title="All 2 branches covered.">    if (mensaje != null) {</span>
+<span class="fc" id="L281">      throw new ApiException(</span>
+          HttpStatus.UNPROCESSABLE_ENTITY,
+          &quot;motivo_requerido&quot;,
+          &quot;Motivo requerido&quot;,
+          mensaje,
+<span class="fc" id="L286">          List.of(ContenidoForo.error(&quot;motivo&quot;, mensaje)));</span>
+    }
+<span class="fc" id="L288">    return motivo;</span>
+  }
+
+  private ComentarioResponse respuesta(ForoComentario comentario, boolean moderador) {
+<span class="fc" id="L292">    Autor autor =</span>
+<span class="fc" id="L293">        autores.buscarPorIds(Set.of(comentario.getAutorId())).stream().findFirst().orElse(null);</span>
+<span class="fc" id="L294">    return mapper.toComentarioResponse(comentario, autor, moderador);</span>
+  }
+
+  private static ApiException comentarioEliminado() {
+<span class="fc" id="L298">    return new ApiException(</span>
+        HttpStatus.CONFLICT,
+        &quot;comentario_eliminado&quot;,
+        &quot;Comentario eliminado&quot;,
+        &quot;El comentario fue eliminado.&quot;);
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

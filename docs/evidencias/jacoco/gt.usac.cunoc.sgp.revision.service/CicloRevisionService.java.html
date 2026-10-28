@@ -1,0 +1,147 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CicloRevisionService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">sgp-api</a> &gt; <a href="index.source.html" class="el_package">gt.usac.cunoc.sgp.revision.service</a> &gt; <span class="el_source">CicloRevisionService.java</span></div><h1>CicloRevisionService.java</h1><pre class="source lang-java linenums">package gt.usac.cunoc.sgp.revision.service;
+
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import gt.usac.cunoc.sgp.common.exception.ApiException;
+import gt.usac.cunoc.sgp.common.util.UuidV7Generator;
+import gt.usac.cunoc.sgp.inspeccion.entity.Inspeccion;
+import gt.usac.cunoc.sgp.notificacion.service.NotificacionService;
+import gt.usac.cunoc.sgp.puente.repository.AsignacionPuenteRepository;
+import gt.usac.cunoc.sgp.revision.entity.Revision;
+import gt.usac.cunoc.sgp.revision.model.EstadoObservacion;
+import gt.usac.cunoc.sgp.revision.repository.ObservacionRevisionRepository;
+import gt.usac.cunoc.sgp.revision.repository.RevisionRepository;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.util.HexFormat;
+import org.springframework.http.HttpStatus;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
+
+/** Crea el snapshot y el ciclo que nacen en cada envío de una inspección estudiantil. */
+@Service
+public class CicloRevisionService {
+
+<span class="fc" id="L32">  private static final ZoneId ZONA_GUATEMALA = ZoneId.of(&quot;America/Guatemala&quot;);</span>
+
+  private final RevisionRepository revisiones;
+  private final ObservacionRevisionRepository observaciones;
+  private final AsignacionPuenteRepository asignaciones;
+  private final NotificacionService notificaciones;
+  private final ObjectMapper json;
+  private final Clock clock;
+
+  public CicloRevisionService(
+      RevisionRepository revisiones,
+      ObservacionRevisionRepository observaciones,
+      AsignacionPuenteRepository asignaciones,
+      NotificacionService notificaciones,
+      ObjectMapper json,
+<span class="fc" id="L47">      Clock clock) {</span>
+<span class="fc" id="L48">    this.revisiones = revisiones;</span>
+<span class="fc" id="L49">    this.observaciones = observaciones;</span>
+<span class="fc" id="L50">    this.asignaciones = asignaciones;</span>
+<span class="fc" id="L51">    this.notificaciones = notificaciones;</span>
+<span class="fc" id="L52">    this.json = json;</span>
+<span class="fc" id="L53">    this.clock = clock;</span>
+<span class="fc" id="L54">  }</span>
+
+  @Transactional(propagation = Propagation.MANDATORY)
+  public Revision crearParaEnvio(Inspeccion inspeccion) {
+<span class="fc" id="L58">    var anterior =</span>
+<span class="fc" id="L59">        revisiones.findFirstByInspeccionIdOrderByNumeroCicloDesc(inspeccion.getId()).orElse(null);</span>
+<span class="fc bfc" id="L60" title="All 2 branches covered.">    if (anterior != null) {</span>
+<span class="pc bpc" id="L61" title="1 of 2 branches missed.">      if (!&quot;RESUELTA&quot;.equals(anterior.getEstado())</span>
+<span class="pc bpc" id="L62" title="1 of 2 branches missed.">          || !&quot;CAMBIOS_SOLICITADOS&quot;.equals(anterior.getVeredicto()))</span>
+<span class="nc" id="L63">        throw new ApiException(</span>
+            HttpStatus.CONFLICT,
+            &quot;ciclo_no_reenviable&quot;,
+            &quot;Reenvío no permitido&quot;,
+            &quot;El último ciclo debe estar resuelto con cambios solicitados.&quot;);
+<span class="fc bfc" id="L68" title="All 2 branches covered.">      if (observaciones.countByRevisionIdAndEstado(anterior.getId(), EstadoObservacion.PENDIENTE)</span>
+          &gt; 0)
+<span class="fc" id="L70">        throw new ApiException(</span>
+            HttpStatus.UNPROCESSABLE_ENTITY,
+            &quot;observaciones_pendientes&quot;,
+            &quot;Observaciones pendientes&quot;,
+            &quot;Debe resolver todas las observaciones del último ciclo antes de reenviar.&quot;);
+    }
+<span class="pc bpc" id="L76" title="1 of 2 branches missed.">    if (inspeccion.getAsignacionPuenteId() == null) {</span>
+<span class="nc bnc" id="L77" title="All 2 branches missed.">      if (anterior != null)</span>
+<span class="nc" id="L78">        throw new ApiException(</span>
+            HttpStatus.CONFLICT,
+            &quot;revision_sin_asignacion&quot;,
+            &quot;Asignación requerida&quot;,
+            &quot;El ciclo no cuenta con una asignación académica para reenviar.&quot;);
+<span class="nc" id="L83">      return null;</span>
+    }
+
+<span class="fc" id="L86">    LocalDate hoy = LocalDate.now(clock.withZone(ZONA_GUATEMALA));</span>
+<span class="fc" id="L87">    var asignacion =</span>
+        asignaciones
+<span class="fc" id="L89">            .findVigentePorId(inspeccion.getAsignacionPuenteId(), inspeccion.getAutorId(), hoy)</span>
+<span class="fc" id="L90">            .orElseThrow(</span>
+                () -&gt;
+<span class="nc" id="L92">                    new ApiException(</span>
+                        HttpStatus.FORBIDDEN,
+                        &quot;asignacion_no_vigente&quot;,
+                        &quot;Asignación no vigente&quot;,
+                        &quot;La asignación del puente fue revocada, la inscripción no está activa o el curso finalizó.&quot;));
+
+<span class="fc" id="L98">    Instant ahora = clock.instant();</span>
+<span class="fc" id="L99">    ObjectNode contenido = json.createObjectNode();</span>
+<span class="fc" id="L100">    contenido.put(&quot;inspeccionId&quot;, inspeccion.getId().toString());</span>
+<span class="fc" id="L101">    contenido.put(&quot;puenteId&quot;, inspeccion.getPuente().getId().toString());</span>
+<span class="fc" id="L102">    contenido.put(&quot;versionFormularioId&quot;, inspeccion.getVersionFormulario().getId().toString());</span>
+<span class="fc" id="L103">    contenido.put(&quot;fechaInspeccion&quot;, inspeccion.getFechaInspeccion().toString());</span>
+<span class="fc" id="L104">    contenido.put(&quot;autorId&quot;, inspeccion.getAutorId().toString());</span>
+<span class="fc" id="L105">    contenido.set(</span>
+        &quot;identificacionCapturada&quot;,
+<span class="pc bpc" id="L107" title="1 of 2 branches missed.">        inspeccion.getIdentificacionCapturada() == null</span>
+<span class="fc" id="L108">            ? json.nullNode()</span>
+<span class="nc" id="L109">            : inspeccion.getIdentificacionCapturada().deepCopy());</span>
+<span class="fc" id="L110">    contenido.set(</span>
+        &quot;datos&quot;,
+<span class="pc bpc" id="L112" title="1 of 2 branches missed.">        inspeccion.getDatos() == null ? json.createObjectNode() : inspeccion.getDatos().deepCopy());</span>
+
+<span class="fc" id="L114">    Revision revision =</span>
+<span class="fc" id="L115">        revisiones.save(</span>
+            new Revision(
+<span class="fc" id="L117">                UuidV7Generator.generate(),</span>
+                inspeccion,
+<span class="fc" id="L119">                revisiones.ultimoCiclo(inspeccion.getId()) + 1,</span>
+<span class="fc bfc" id="L120" title="All 2 branches covered.">                anterior == null ? asignacion.getCatedraticoId() : anterior.getRevisorId(),</span>
+                ahora,
+<span class="pc bpc" id="L122" title="1 of 2 branches missed.">                inspeccion.getVersion() == null ? 0 : inspeccion.getVersion(),</span>
+                contenido,
+<span class="fc" id="L124">                hash(contenido)));</span>
+
+<span class="fc" id="L126">    notificaciones.registrar(</span>
+<span class="fc" id="L127">        revision.getRevisorId(),</span>
+        &quot;INSPECCION_ENVIADA&quot;,
+        &quot;Inspección enviada para revisión&quot;,
+<span class="fc" id="L130">        &quot;Un estudiante envió la inspección del puente &quot; + inspeccion.getPuente().getCodigo() + &quot;.&quot;,</span>
+<span class="fc bfc" id="L131" title="All 2 branches covered.">        anterior == null ? &quot;inspeccion&quot; : &quot;revision&quot;,</span>
+<span class="fc bfc" id="L132" title="All 2 branches covered.">        anterior == null ? inspeccion.getId() : revision.getId(),</span>
+<span class="fc" id="L133">        &quot;revision-enviada:&quot; + revision.getId());</span>
+<span class="fc" id="L134">    return revision;</span>
+  }
+
+  private String hash(ObjectNode contenido) {
+    try {
+<span class="fc" id="L139">      byte[] bytes = json.writeValueAsString(contenido).getBytes(StandardCharsets.UTF_8);</span>
+<span class="fc" id="L140">      return HexFormat.of().formatHex(MessageDigest.getInstance(&quot;SHA-256&quot;).digest(bytes));</span>
+<span class="nc" id="L141">    } catch (NoSuchAlgorithmException | JsonProcessingException ex) {</span>
+<span class="nc" id="L142">      throw new IllegalStateException(</span>
+          &quot;No fue posible calcular la huella del contenido enviado&quot;, ex);
+    }
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

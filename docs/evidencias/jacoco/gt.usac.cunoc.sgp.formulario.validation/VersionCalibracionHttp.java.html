@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>VersionCalibracionHttp.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">sgp-api</a> &gt; <a href="index.source.html" class="el_package">gt.usac.cunoc.sgp.formulario.validation</a> &gt; <span class="el_source">VersionCalibracionHttp.java</span></div><h1>VersionCalibracionHttp.java</h1><pre class="source lang-java linenums">package gt.usac.cunoc.sgp.formulario.validation;
+
+import gt.usac.cunoc.sgp.common.exception.ApiException;
+import org.springframework.http.HttpStatus;
+
+public final class VersionCalibracionHttp {
+  private VersionCalibracionHttp() {}
+
+  public static long exigir(String valor) {
+<span class="pc bpc" id="L10" title="1 of 4 branches missed.">    if (valor == null || valor.isBlank()) {</span>
+<span class="fc" id="L11">      throw new ApiException(</span>
+          HttpStatus.PRECONDITION_REQUIRED,
+          &quot;version_calibracion_requerida&quot;,
+          &quot;Version requerida&quot;,
+          &quot;Envie If-Match con la version consultada antes de guardar.&quot;);
+    }
+<span class="fc" id="L17">    String version = valor.strip();</span>
+<span class="fc bfc" id="L18" title="All 2 branches covered.">    if (version.matches(&quot;\&quot;[0-9]+\&quot;&quot;)) version = version.substring(1, version.length() - 1);</span>
+    try {
+<span class="fc bfc" id="L20" title="All 2 branches covered.">      if (!version.matches(&quot;[0-9]+&quot;)) throw new NumberFormatException();</span>
+<span class="fc" id="L21">      return Long.parseLong(version);</span>
+<span class="fc" id="L22">    } catch (NumberFormatException e) {</span>
+<span class="fc" id="L23">      throw new ApiException(</span>
+          HttpStatus.BAD_REQUEST,
+          &quot;version_calibracion_invalida&quot;,
+          &quot;Version invalida&quot;,
+          &quot;If-Match debe contener una unica version numerica no negativa.&quot;);
+    }
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

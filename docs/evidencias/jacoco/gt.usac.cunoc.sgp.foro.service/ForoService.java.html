@@ -1,0 +1,518 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ForoService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">sgp-api</a> &gt; <a href="index.source.html" class="el_package">gt.usac.cunoc.sgp.foro.service</a> &gt; <span class="el_source">ForoService.java</span></div><h1>ForoService.java</h1><pre class="source lang-java linenums">package gt.usac.cunoc.sgp.foro.service;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import gt.usac.cunoc.sgp.common.audit.model.AccionAuditoria;
+import gt.usac.cunoc.sgp.common.audit.service.AuditoriaWriter;
+import gt.usac.cunoc.sgp.common.exception.ApiException;
+import gt.usac.cunoc.sgp.common.util.UuidV7Generator;
+import gt.usac.cunoc.sgp.foro.dto.ComentarioResponse;
+import gt.usac.cunoc.sgp.foro.dto.CrearComentarioRequest;
+import gt.usac.cunoc.sgp.foro.dto.CrearHiloRequest;
+import gt.usac.cunoc.sgp.foro.dto.HiloResponse;
+import gt.usac.cunoc.sgp.foro.entity.ForoComentario;
+import gt.usac.cunoc.sgp.foro.entity.ForoHilo;
+import gt.usac.cunoc.sgp.foro.mapper.ForoMapper;
+import gt.usac.cunoc.sgp.foro.model.CategoriaHilo;
+import gt.usac.cunoc.sgp.foro.repository.ForoAutorRepository;
+import gt.usac.cunoc.sgp.foro.repository.ForoAutorRepository.Autor;
+import gt.usac.cunoc.sgp.foro.repository.ForoComentarioRepository;
+import gt.usac.cunoc.sgp.foro.repository.ForoComentarioRepository.TotalPorHilo;
+import gt.usac.cunoc.sgp.foro.repository.ForoHiloRepository;
+import gt.usac.cunoc.sgp.inspeccion.entity.Inspeccion;
+import gt.usac.cunoc.sgp.inspeccion.repository.InspeccionRepository;
+import gt.usac.cunoc.sgp.puente.entity.Puente;
+import gt.usac.cunoc.sgp.puente.repository.PuenteRepository;
+import gt.usac.cunoc.sgp.usuario.model.RoleName;
+import java.time.Clock;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+import java.util.stream.Collectors;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
+import org.springframework.http.HttpStatus;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+/**
+ * Foro por puente (HU-063): hilos permanentes clasificados por categoría (RN-FOR-01, RN-FOR-06) y
+ * comentarios con un solo nivel de respuesta (RN-FOR-04). Lo puede leer cualquiera; para participar
+ * hace falta una sesión (RN-FOR-09), lo que decide el controlador.
+ *
+ * &lt;p&gt;Los comentarios del hilo de una inspección publicada pueden anclarse a un campo o elemento
+ * (HU-064, RN-FOR-02). Ese hilo solo existe para inspecciones PUBLICADAS (RN-FOR-03), un estado
+ * terminal que la base de datos no deja borrar.
+ *
+ * &lt;p&gt;Lo que se ve de un comentario eliminado u oculto depende de quién lee: el Catedrático y el
+ * Administrador moderan el foro y ven el texto oculto con su motivo (HU-065, RN-FOR-08).
+ */
+@Service
+public class ForoService {
+
+  private final ForoHiloRepository hilos;
+  private final ForoComentarioRepository comentarios;
+  private final ForoAutorRepository autores;
+  private final PuenteRepository puentes;
+  private final InspeccionRepository inspecciones;
+  private final AnclajeComentarioForo anclajes;
+  private final LimiteTasaForo limites;
+  private final AvisosForo avisos;
+  private final AuditoriaWriter auditoria;
+  private final ForoMapper mapper;
+  private final ObjectMapper json;
+  private final Clock clock;
+
+  public ForoService(
+      ForoHiloRepository hilos,
+      ForoComentarioRepository comentarios,
+      ForoAutorRepository autores,
+      PuenteRepository puentes,
+      InspeccionRepository inspecciones,
+      AnclajeComentarioForo anclajes,
+      LimiteTasaForo limites,
+      AvisosForo avisos,
+      AuditoriaWriter auditoria,
+      ForoMapper mapper,
+      ObjectMapper json,
+<span class="fc" id="L84">      Clock clock) {</span>
+<span class="fc" id="L85">    this.hilos = hilos;</span>
+<span class="fc" id="L86">    this.comentarios = comentarios;</span>
+<span class="fc" id="L87">    this.autores = autores;</span>
+<span class="fc" id="L88">    this.puentes = puentes;</span>
+<span class="fc" id="L89">    this.inspecciones = inspecciones;</span>
+<span class="fc" id="L90">    this.anclajes = anclajes;</span>
+<span class="fc" id="L91">    this.limites = limites;</span>
+<span class="fc" id="L92">    this.avisos = avisos;</span>
+<span class="fc" id="L93">    this.auditoria = auditoria;</span>
+<span class="fc" id="L94">    this.mapper = mapper;</span>
+<span class="fc" id="L95">    this.json = json;</span>
+<span class="fc" id="L96">    this.clock = clock;</span>
+<span class="fc" id="L97">  }</span>
+
+  /** Hilos propios de un puente, del de actividad más reciente al más antiguo. */
+  @Transactional(readOnly = true)
+  public Page&lt;HiloResponse&gt; listarHilosDePuente(UUID puenteId, int pagina, int tamanio) {
+<span class="fc" id="L102">    ContenidoForo.validarPaginacion(pagina, tamanio);</span>
+<span class="fc" id="L103">    puenteActivo(puenteId);</span>
+<span class="fc" id="L104">    Page&lt;ForoHilo&gt; resultado =</span>
+<span class="fc" id="L105">        hilos.findByPuenteIdAndInspeccionIdIsNull(</span>
+            puenteId,
+<span class="fc" id="L107">            PageRequest.of(</span>
+<span class="fc" id="L108">                pagina, tamanio, Sort.by(Sort.Order.desc(&quot;actualizadoEn&quot;), Sort.Order.desc(&quot;id&quot;))));</span>
+<span class="fc" id="L109">    List&lt;ForoHilo&gt; filas = resultado.getContent();</span>
+    Map&lt;UUID, Long&gt; totales =
+<span class="fc bfc" id="L111" title="All 2 branches covered.">        filas.isEmpty()</span>
+<span class="fc" id="L112">            ? Map.of()</span>
+<span class="fc" id="L113">            : comentarios.contarPorHilos(filas.stream().map(ForoHilo::getId).toList()).stream()</span>
+<span class="fc" id="L114">                .collect(Collectors.toMap(TotalPorHilo::getHiloId, TotalPorHilo::getTotal));</span>
+<span class="fc" id="L115">    Map&lt;UUID, Autor&gt; autoresPorId = autoresDe(filas.stream().map(ForoHilo::getAutorId).toList());</span>
+<span class="fc" id="L116">    return resultado.map(</span>
+        h -&gt;
+<span class="fc" id="L118">            mapper.toHiloResponse(</span>
+<span class="fc" id="L119">                h, autoresPorId.get(h.getAutorId()), totales.getOrDefault(h.getId(), 0L)));</span>
+  }
+
+  /**
+   * Abre un hilo en un puente activo con su primer comentario. Valida todo y responde un único 422
+   * con el detalle. Respeta el límite de tasa (429) y avisa a los mencionados y, si es una alerta
+   * sobre un puente en estado Malo, a los Catedráticos y Administradores (HU-066).
+   */
+  @Transactional
+  public HiloResponse crearHilo(UUID puenteId, CrearHiloRequest request, UUID usuarioId) {
+<span class="fc" id="L129">    Puente puente = puenteActivo(puenteId);</span>
+<span class="fc" id="L130">    limites.exigirParaHilo(usuarioId);</span>
+<span class="fc" id="L131">    List&lt;Map&lt;String, String&gt;&gt; errores = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L132">    String titulo = ContenidoForo.limpiarTitulo(request.titulo());</span>
+<span class="fc bfc" id="L133" title="All 2 branches covered.">    if (titulo == null) {</span>
+<span class="fc" id="L134">      errores.add(ContenidoForo.error(&quot;titulo&quot;, &quot;El título es obligatorio.&quot;));</span>
+<span class="fc bfc" id="L135" title="All 2 branches covered.">    } else if (titulo.length() &gt; ContenidoForo.LONGITUD_MAXIMA_TITULO) {</span>
+<span class="fc" id="L136">      errores.add(</span>
+<span class="fc" id="L137">          ContenidoForo.error(</span>
+              &quot;titulo&quot;,
+              &quot;El título no puede exceder &quot;
+                  + ContenidoForo.LONGITUD_MAXIMA_TITULO
+                  + &quot; caracteres.&quot;));
+    }
+<span class="fc" id="L143">    CategoriaHilo categoria = categoria(request.categoria(), errores);</span>
+<span class="fc" id="L144">    String comentario = ContenidoForo.limpiarComentario(request.comentario());</span>
+<span class="fc" id="L145">    validarComentario(comentario, &quot;comentario&quot;, errores);</span>
+<span class="fc bfc" id="L146" title="All 2 branches covered.">    if (!errores.isEmpty()) {</span>
+<span class="fc" id="L147">      throw new ApiException(</span>
+          HttpStatus.UNPROCESSABLE_ENTITY,
+          &quot;hilo_invalido&quot;,
+          &quot;Hilo inválido&quot;,
+          &quot;El hilo contiene datos inválidos.&quot;,
+          errores);
+    }
+
+<span class="fc" id="L155">    Instant ahora = clock.instant();</span>
+<span class="fc" id="L156">    ForoHilo hilo =</span>
+<span class="fc" id="L157">        hilos.save(</span>
+            new ForoHilo(
+<span class="fc" id="L159">                UuidV7Generator.generate(), puenteId, null, usuarioId, categoria, titulo, ahora));</span>
+<span class="fc" id="L160">    auditoria.registrarEnTransaccion(</span>
+<span class="fc" id="L161">        usuarioId, AccionAuditoria.CREAR, &quot;foro_hilo&quot;, hilo.getId(), null, instantanea(hilo), null);</span>
+<span class="fc" id="L162">    avisos.avisarMenciones(hilo, registrarComentario(hilo, comentario, null, usuarioId));</span>
+<span class="fc" id="L163">    avisos.avisarAlerta(hilo, puente);</span>
+<span class="fc" id="L164">    return mapper.toHiloResponse(hilo, autoresDe(List.of(usuarioId)).get(usuarioId), 1L);</span>
+  }
+
+  /**
+   * Un comentario, visto por quien lee: lo usa quien abre el aviso de una mención para llegar a su
+   * hilo (HU-066). 404 si no existe o su puente está inactivo.
+   */
+  @Transactional(readOnly = true)
+  public ComentarioResponse obtenerComentario(UUID comentarioId, RoleName lector) {
+<span class="nc" id="L173">    ForoComentario comentario =</span>
+        comentarios
+<span class="nc" id="L175">            .findById(comentarioId)</span>
+<span class="nc" id="L176">            .orElseThrow(</span>
+                () -&gt;
+<span class="nc" id="L178">                    new ApiException(</span>
+                        HttpStatus.NOT_FOUND,
+                        &quot;comentario_no_encontrado&quot;,
+                        &quot;Comentario no encontrado&quot;,
+                        &quot;El comentario no existe.&quot;));
+<span class="nc" id="L183">    hiloVisible(comentario.getHiloId());</span>
+<span class="nc" id="L184">    return mapper.toComentarioResponse(</span>
+        comentario,
+<span class="nc" id="L186">        autoresDe(List.of(comentario.getAutorId())).get(comentario.getAutorId()),</span>
+<span class="nc" id="L187">        esModerador(lector));</span>
+  }
+
+  @Transactional(readOnly = true)
+  public HiloResponse obtenerHilo(UUID hiloId) {
+<span class="fc" id="L192">    ForoHilo hilo = hiloVisible(hiloId);</span>
+<span class="fc" id="L193">    long total =</span>
+<span class="fc" id="L194">        comentarios.contarPorHilos(List.of(hiloId)).stream()</span>
+<span class="fc" id="L195">            .mapToLong(TotalPorHilo::getTotal)</span>
+<span class="fc" id="L196">            .sum();</span>
+<span class="fc" id="L197">    return mapper.toHiloResponse(</span>
+<span class="fc" id="L198">        hilo, autoresDe(List.of(hilo.getAutorId())).get(hilo.getAutorId()), total);</span>
+  }
+
+  /**
+   * Comentarios y respuestas de un hilo en una sola lista, de los más antiguos a los más nuevos.
+   * Una respuesta siempre llega después de su comentario principal, así que quien la muestra puede
+   * agruparla bajo él a medida que carga páginas.
+   */
+  public Page&lt;ComentarioResponse&gt; listarComentarios(UUID hiloId, int pagina, int tamanio) {
+<span class="fc" id="L207">    return listarComentarios(hiloId, pagina, tamanio, FiltroComentarios.NINGUNO);</span>
+  }
+
+  /** Si quien lee modera el foro: ve los comentarios ocultos y su motivo (RN-FOR-08). */
+  private static boolean esModerador(RoleName rol) {
+<span class="fc bfc" id="L212" title="All 4 branches covered.">    return rol == RoleName.CATEDRATICO || rol == RoleName.ADMINISTRADOR;</span>
+  }
+
+  /** Los comentarios de un campo o elemento; sin {@code elementoRef}, todos los del hilo. */
+  public Page&lt;ComentarioResponse&gt; listarComentarios(
+      UUID hiloId, int pagina, int tamanio, String elementoRef, UUID instanciaElementoId) {
+<span class="fc" id="L218">    return listarComentarios(</span>
+<span class="fc" id="L219">        hiloId, pagina, tamanio, FiltroComentarios.porElemento(elementoRef, instanciaElementoId));</span>
+  }
+
+  /** Los comentarios con el filtro pedido, vistos por alguien que no modera el foro. */
+  public Page&lt;ComentarioResponse&gt; listarComentarios(
+      UUID hiloId, int pagina, int tamanio, FiltroComentarios filtro) {
+<span class="fc" id="L225">    return listarComentariosPara(hiloId, pagina, tamanio, filtro, null);</span>
+  }
+
+  /**
+   * Los comentarios de un hilo, más antiguos primero, con el filtro pedido. Con {@code elementoRef}
+   * solo los anclados a ese campo o elemento: sin instancia, los del elemento sin instancia; con
+   * ella, los de esa instancia. Con {@code seccion} los de esa sección y todo lo que contiene; con
+   * {@code soloGenerales}, los que no están anclados. Dos filtros a la vez se rechazan con 422.
+   *
+   * &lt;p&gt;{@code lector} es el rol de quien lee, o nulo si es un visitante. Los eliminados y ocultos
+   * siguen en la lista para no romper el hilo, sin su texto salvo los ocultos para un moderador.
+   */
+  @Transactional(readOnly = true)
+  public Page&lt;ComentarioResponse&gt; listarComentariosPara(
+      UUID hiloId, int pagina, int tamanio, FiltroComentarios filtro, RoleName lector) {
+<span class="fc" id="L240">    ContenidoForo.validarPaginacion(pagina, tamanio);</span>
+<span class="fc" id="L241">    String ref = ContenidoForo.limpiarReferencia(filtro.elementoRef());</span>
+<span class="fc" id="L242">    String seccion = ContenidoForo.limpiarReferencia(filtro.seccion());</span>
+<span class="fc" id="L243">    validarFiltro(ref, filtro.instanciaElementoId(), seccion, filtro.soloGenerales());</span>
+<span class="fc" id="L244">    ForoHilo hilo = hiloVisible(hiloId);</span>
+<span class="fc" id="L245">    PageRequest paginacion =</span>
+<span class="fc" id="L246">        PageRequest.of(pagina, tamanio, Sort.by(Sort.Order.asc(&quot;creadoEn&quot;), Sort.Order.asc(&quot;id&quot;)));</span>
+    Page&lt;ForoComentario&gt; resultado;
+<span class="fc bfc" id="L248" title="All 2 branches covered.">    if (filtro.soloGenerales()) {</span>
+<span class="fc" id="L249">      resultado = comentarios.findByHiloIdAndElementoRefIsNull(hilo.getId(), paginacion);</span>
+<span class="fc bfc" id="L250" title="All 2 branches covered.">    } else if (seccion != null) {</span>
+<span class="fc" id="L251">      String raiz = &quot;/&quot; + seccion;</span>
+<span class="fc" id="L252">      resultado =</span>
+<span class="fc" id="L253">          comentarios.findBySeccion(</span>
+<span class="fc" id="L254">              hilo.getId(), raiz, ContenidoForo.escaparLike(raiz) + &quot;/%&quot;, paginacion);</span>
+<span class="fc bfc" id="L255" title="All 2 branches covered.">    } else if (ref == null) {</span>
+<span class="fc" id="L256">      resultado = comentarios.findByHiloId(hilo.getId(), paginacion);</span>
+<span class="fc bfc" id="L257" title="All 2 branches covered.">    } else if (filtro.instanciaElementoId() == null) {</span>
+<span class="fc" id="L258">      resultado =</span>
+<span class="fc" id="L259">          comentarios.findByHiloIdAndElementoRefAndInstanciaElementoIdIsNull(</span>
+<span class="fc" id="L260">              hilo.getId(), ref, paginacion);</span>
+    } else {
+<span class="fc" id="L262">      resultado =</span>
+<span class="fc" id="L263">          comentarios.findByHiloIdAndElementoRefAndInstanciaElementoId(</span>
+<span class="fc" id="L264">              hilo.getId(), ref, filtro.instanciaElementoId(), paginacion);</span>
+    }
+<span class="fc" id="L266">    Map&lt;UUID, Autor&gt; autoresPorId =</span>
+<span class="fc" id="L267">        autoresDe(resultado.getContent().stream().map(ForoComentario::getAutorId).toList());</span>
+<span class="fc" id="L268">    boolean moderador = esModerador(lector);</span>
+<span class="fc" id="L269">    return resultado.map(</span>
+<span class="fc" id="L270">        c -&gt; mapper.toComentarioResponse(c, autoresPorId.get(c.getAutorId()), moderador));</span>
+  }
+
+  private void validarFiltro(String ref, UUID instancia, String seccion, boolean soloGenerales) {
+<span class="fc" id="L274">    List&lt;Map&lt;String, String&gt;&gt; errores = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L275" title="All 4 branches covered.">    if (ref == null &amp;&amp; instancia != null) {</span>
+<span class="fc" id="L276">      errores.add(</span>
+<span class="fc" id="L277">          ContenidoForo.error(</span>
+              &quot;elementoRef&quot;, &quot;La instancia exige indicar el elemento al que pertenece.&quot;));
+    }
+<span class="fc bfc" id="L280" title="All 6 branches covered.">    int filtros = (ref != null ? 1 : 0) + (seccion != null ? 1 : 0) + (soloGenerales ? 1 : 0);</span>
+<span class="fc bfc" id="L281" title="All 2 branches covered.">    if (filtros &gt; 1) {</span>
+<span class="fc" id="L282">      errores.add(</span>
+<span class="fc" id="L283">          ContenidoForo.error(</span>
+              &quot;filtro&quot;, &quot;Usa un solo filtro a la vez: un elemento, una sección o los generales.&quot;));
+    }
+<span class="pc bpc" id="L286" title="1 of 6 branches missed.">    if (seccion != null &amp;&amp; (seccion.contains(&quot;/&quot;) || seccion.length() &gt; 100)) {</span>
+<span class="fc" id="L287">      errores.add(</span>
+<span class="fc" id="L288">          ContenidoForo.error(</span>
+              &quot;seccion&quot;, &quot;La sección es la clave de una sola sección, sin barras (hasta 100).&quot;));
+    }
+<span class="fc bfc" id="L291" title="All 2 branches covered.">    if (!errores.isEmpty()) {</span>
+<span class="fc" id="L292">      throw new ApiException(</span>
+          HttpStatus.UNPROCESSABLE_ENTITY,
+          &quot;filtro_invalido&quot;,
+          &quot;Filtro inválido&quot;,
+<span class="fc" id="L296">          errores.get(0).get(&quot;mensaje&quot;),</span>
+          errores);
+    }
+<span class="fc" id="L299">  }</span>
+
+  /**
+   * Agrega un comentario a un hilo, o una respuesta si indica el comentario principal. En el hilo
+   * de una inspección el comentario principal puede anclarse a un campo o elemento; la respuesta
+   * hereda el ancla de su comentario.
+   */
+  @Transactional
+  public ComentarioResponse crearComentario(
+      UUID hiloId, CrearComentarioRequest request, UUID usuarioId) {
+<span class="fc" id="L309">    ForoHilo hilo = hiloVisible(hiloId);</span>
+<span class="fc" id="L310">    limites.exigirParaComentario(usuarioId);</span>
+<span class="fc" id="L311">    List&lt;Map&lt;String, String&gt;&gt; errores = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L312">    String contenido = ContenidoForo.limpiarComentario(request.contenido());</span>
+<span class="fc" id="L313">    validarComentario(contenido, &quot;contenido&quot;, errores);</span>
+<span class="fc" id="L314">    String elementoRef = ContenidoForo.limpiarReferencia(request.elementoRef());</span>
+<span class="fc" id="L315">    UUID instanciaElementoId = request.instanciaElementoId();</span>
+<span class="fc bfc" id="L316" title="All 2 branches covered.">    if (request.padreId() != null) {</span>
+<span class="fc" id="L317">      var padre = comentarios.findByIdAndHiloId(request.padreId(), hiloId);</span>
+<span class="fc bfc" id="L318" title="All 2 branches covered.">      if (padre.isEmpty()) {</span>
+<span class="fc" id="L319">        errores.add(</span>
+<span class="fc" id="L320">            ContenidoForo.error(</span>
+                &quot;padreId&quot;, &quot;El comentario al que responde no existe en este hilo.&quot;));
+<span class="fc bfc" id="L322" title="All 2 branches covered.">      } else if (padre.get().getPadreId() != null) {</span>
+<span class="fc" id="L323">        errores.add(</span>
+<span class="fc" id="L324">            ContenidoForo.error(</span>
+                &quot;padreId&quot;,
+                &quot;Solo se puede responder a un comentario principal, no a una respuesta.&quot;));
+      }
+<span class="pc bpc" id="L328" title="1 of 4 branches missed.">      if (elementoRef != null || instanciaElementoId != null) {</span>
+<span class="fc" id="L329">        errores.add(</span>
+<span class="fc" id="L330">            ContenidoForo.error(</span>
+                &quot;elementoRef&quot;,
+                &quot;Una respuesta toma el elemento del comentario al que responde; no lleva ancla&quot;
+                    + &quot; propia.&quot;));
+      }
+<span class="fc" id="L335">      elementoRef = padre.map(ForoComentario::getElementoRef).orElse(null);</span>
+<span class="fc" id="L336">      instanciaElementoId = padre.map(ForoComentario::getInstanciaElementoId).orElse(null);</span>
+<span class="fc" id="L337">    } else {</span>
+<span class="fc" id="L338">      validarAncla(hilo, elementoRef, instanciaElementoId, errores);</span>
+    }
+<span class="fc bfc" id="L340" title="All 2 branches covered.">    if (!errores.isEmpty()) {</span>
+<span class="fc" id="L341">      throw new ApiException(</span>
+          HttpStatus.UNPROCESSABLE_ENTITY,
+          &quot;comentario_invalido&quot;,
+          &quot;Comentario inválido&quot;,
+          &quot;El comentario contiene datos inválidos.&quot;,
+          errores);
+    }
+<span class="fc bfc" id="L348" title="All 2 branches covered.">    if (hilo.getCerradoEn() != null) throw hiloCerrado();</span>
+<span class="fc" id="L349">    ForoComentario comentario =</span>
+<span class="fc" id="L350">        registrarComentario(</span>
+<span class="fc" id="L351">            hilo, contenido, request.padreId(), elementoRef, instanciaElementoId, usuarioId);</span>
+<span class="fc" id="L352">    avisos.avisarMenciones(hilo, comentario);</span>
+<span class="fc" id="L353">    return mapper.toComentarioResponse(</span>
+<span class="fc" id="L354">        comentario, autoresDe(List.of(usuarioId)).get(usuarioId), false);</span>
+  }
+
+  /**
+   * Un ancla exige el hilo de una inspección y un elemento que exista en el esquema con que se
+   * levantó esa inspección (RN-FOR-02). Sin ancla no hay nada que comprobar.
+   */
+  private void validarAncla(
+      ForoHilo hilo,
+      String elementoRef,
+      UUID instanciaElementoId,
+      List&lt;Map&lt;String, String&gt;&gt; errores) {
+<span class="fc bfc" id="L366" title="All 4 branches covered.">    if (elementoRef == null &amp;&amp; instanciaElementoId == null) return;</span>
+<span class="fc bfc" id="L367" title="All 2 branches covered.">    if (elementoRef == null) {</span>
+<span class="fc" id="L368">      errores.add(</span>
+<span class="fc" id="L369">          ContenidoForo.error(</span>
+              &quot;elementoRef&quot;, &quot;La instancia exige indicar el elemento al que pertenece.&quot;));
+<span class="fc bfc" id="L371" title="All 2 branches covered.">    } else if (hilo.getInspeccionId() == null) {</span>
+<span class="fc" id="L372">      errores.add(</span>
+<span class="fc" id="L373">          ContenidoForo.error(</span>
+              &quot;elementoRef&quot;,
+              &quot;Solo los comentarios del hilo de una inspección pueden anclarse a un elemento.&quot;));
+    } else {
+<span class="fc" id="L377">      Inspeccion inspeccion =</span>
+          inspecciones
+<span class="fc" id="L379">              .findByIdAndEliminadoEnIsNull(hilo.getInspeccionId())</span>
+<span class="fc" id="L380">              .orElseThrow(ForoService::hiloNoEncontrado);</span>
+<span class="fc" id="L381">      anclajes.validar(inspeccion, elementoRef, instanciaElementoId, errores);</span>
+    }
+<span class="fc" id="L383">  }</span>
+
+  private ForoComentario registrarComentario(
+      ForoHilo hilo, String contenido, UUID padreId, UUID usuarioId) {
+<span class="fc" id="L387">    return registrarComentario(hilo, contenido, padreId, null, null, usuarioId);</span>
+  }
+
+  private ForoComentario registrarComentario(
+      ForoHilo hilo,
+      String contenido,
+      UUID padreId,
+      String elementoRef,
+      UUID instanciaElementoId,
+      UUID usuarioId) {
+<span class="fc" id="L397">    Instant ahora = clock.instant();</span>
+    // Si un moderador lo cerró después de leerlo, el hilo ya no admite el comentario (RN-FOR-08).
+<span class="pc bpc" id="L399" title="1 of 2 branches missed.">    if (hilos.registrarActividad(hilo.getId(), ahora) == 0) throw hiloCerrado();</span>
+<span class="fc" id="L400">    ForoComentario comentario =</span>
+<span class="fc" id="L401">        comentarios.save(</span>
+            new ForoComentario(
+<span class="fc" id="L403">                UuidV7Generator.generate(),</span>
+<span class="fc" id="L404">                hilo.getId(),</span>
+                usuarioId,
+                padreId,
+                elementoRef,
+                instanciaElementoId,
+                contenido,
+                ahora));
+<span class="fc" id="L411">    auditoria.registrarEnTransaccion(</span>
+        usuarioId,
+        AccionAuditoria.CREAR,
+        &quot;foro_comentario&quot;,
+<span class="fc" id="L415">        comentario.getId(),</span>
+        null,
+<span class="fc" id="L417">        instantanea(comentario),</span>
+        null);
+<span class="fc" id="L419">    return comentario;</span>
+  }
+
+  private void validarComentario(
+      String contenido, String campo, List&lt;Map&lt;String, String&gt;&gt; errores) {
+<span class="fc bfc" id="L424" title="All 2 branches covered.">    if (contenido == null) {</span>
+<span class="fc" id="L425">      errores.add(ContenidoForo.error(campo, &quot;El comentario es obligatorio.&quot;));</span>
+<span class="fc bfc" id="L426" title="All 2 branches covered.">    } else if (contenido.length() &gt; ContenidoForo.LONGITUD_MAXIMA_COMENTARIO) {</span>
+<span class="fc" id="L427">      errores.add(</span>
+<span class="fc" id="L428">          ContenidoForo.error(</span>
+              campo,
+              &quot;El comentario no puede exceder &quot;
+                  + ContenidoForo.LONGITUD_MAXIMA_COMENTARIO
+                  + &quot; caracteres.&quot;));
+    }
+<span class="fc" id="L434">  }</span>
+
+  private CategoriaHilo categoria(String valor, List&lt;Map&lt;String, String&gt;&gt; errores) {
+<span class="pc bpc" id="L437" title="1 of 2 branches missed.">    String texto = valor == null ? &quot;&quot; : valor.strip();</span>
+    try {
+<span class="fc" id="L439">      return CategoriaHilo.valueOf(texto);</span>
+<span class="fc" id="L440">    } catch (IllegalArgumentException e) {</span>
+<span class="fc" id="L441">      errores.add(</span>
+<span class="fc" id="L442">          ContenidoForo.error(</span>
+              &quot;categoria&quot;,
+<span class="pc bpc" id="L444" title="1 of 2 branches missed.">              texto.isEmpty()</span>
+<span class="nc" id="L445">                  ? &quot;La categoría es obligatoria.&quot;</span>
+                  : &quot;La categoría debe ser una de: &quot;
+<span class="fc" id="L447">                      + Arrays.stream(CategoriaHilo.values())</span>
+<span class="fc" id="L448">                          .map(Enum::name)</span>
+<span class="fc" id="L449">                          .collect(Collectors.joining(&quot;, &quot;))</span>
+                      + &quot;.&quot;));
+<span class="fc" id="L451">      return null;</span>
+    }
+  }
+
+  private Puente puenteActivo(UUID puenteId) {
+<span class="fc" id="L456">    return puentes</span>
+<span class="fc" id="L457">        .findById(puenteId)</span>
+<span class="fc" id="L458">        .filter(Puente::isActivo)</span>
+<span class="fc" id="L459">        .orElseThrow(</span>
+            () -&gt;
+<span class="fc" id="L461">                new ApiException(</span>
+                    HttpStatus.NOT_FOUND,
+                    &quot;puente_no_encontrado&quot;,
+                    &quot;Puente no encontrado&quot;,
+                    &quot;El puente no existe o está inactivo.&quot;));
+  }
+
+  /** El hilo de un puente activo; si no existe o el puente está inactivo, 404. */
+  private ForoHilo hiloVisible(UUID hiloId) {
+<span class="fc" id="L470">    ForoHilo hilo = hilos.findById(hiloId).orElseThrow(ForoService::hiloNoEncontrado);</span>
+<span class="fc" id="L471">    puenteActivo(hilo.getPuenteId());</span>
+<span class="fc" id="L472">    return hilo;</span>
+  }
+
+  private static ApiException hiloCerrado() {
+<span class="fc" id="L476">    return new ApiException(</span>
+        HttpStatus.CONFLICT,
+        &quot;hilo_cerrado&quot;,
+        &quot;Hilo cerrado&quot;,
+        &quot;El hilo está cerrado y ya no admite comentarios.&quot;);
+  }
+
+  private static ApiException hiloNoEncontrado() {
+<span class="fc" id="L484">    return new ApiException(</span>
+        HttpStatus.NOT_FOUND, &quot;hilo_no_encontrado&quot;, &quot;Hilo no encontrado&quot;, &quot;El hilo no existe.&quot;);
+  }
+
+  private Map&lt;UUID, Autor&gt; autoresDe(Collection&lt;UUID&gt; ids) {
+<span class="fc bfc" id="L489" title="All 2 branches covered.">    if (ids.isEmpty()) return Map.of();</span>
+<span class="fc" id="L490">    return autores.buscarPorIds(new HashSet&lt;&gt;(ids)).stream()</span>
+<span class="fc" id="L491">        .collect(Collectors.toMap(Autor::getId, autor -&gt; autor));</span>
+  }
+
+  private ObjectNode instantanea(ForoHilo hilo) {
+<span class="fc" id="L495">    ObjectNode nodo = json.createObjectNode();</span>
+<span class="fc" id="L496">    nodo.put(&quot;puenteId&quot;, hilo.getPuenteId().toString());</span>
+<span class="fc" id="L497">    nodo.put(&quot;categoria&quot;, hilo.getCategoria().name());</span>
+<span class="fc" id="L498">    nodo.put(&quot;titulo&quot;, hilo.getTitulo());</span>
+<span class="fc" id="L499">    return nodo;</span>
+  }
+
+  private ObjectNode instantanea(ForoComentario comentario) {
+<span class="fc" id="L503">    ObjectNode nodo = json.createObjectNode();</span>
+<span class="fc" id="L504">    nodo.put(&quot;hiloId&quot;, comentario.getHiloId().toString());</span>
+<span class="fc bfc" id="L505" title="All 2 branches covered.">    if (comentario.getPadreId() != null) {</span>
+<span class="fc" id="L506">      nodo.put(&quot;padreId&quot;, comentario.getPadreId().toString());</span>
+    }
+<span class="fc bfc" id="L508" title="All 2 branches covered.">    if (comentario.getElementoRef() != null) {</span>
+<span class="fc" id="L509">      nodo.put(&quot;elementoRef&quot;, comentario.getElementoRef());</span>
+    }
+<span class="fc bfc" id="L511" title="All 2 branches covered.">    if (comentario.getInstanciaElementoId() != null) {</span>
+<span class="fc" id="L512">      nodo.put(&quot;instanciaElementoId&quot;, comentario.getInstanciaElementoId().toString());</span>
+    }
+<span class="fc" id="L514">    nodo.put(&quot;contenido&quot;, comentario.getContenido());</span>
+<span class="fc" id="L515">    return nodo;</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

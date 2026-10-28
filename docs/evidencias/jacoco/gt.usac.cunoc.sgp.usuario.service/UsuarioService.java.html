@@ -1,0 +1,234 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>UsuarioService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">sgp-api</a> &gt; <a href="index.source.html" class="el_package">gt.usac.cunoc.sgp.usuario.service</a> &gt; <span class="el_source">UsuarioService.java</span></div><h1>UsuarioService.java</h1><pre class="source lang-java linenums">package gt.usac.cunoc.sgp.usuario.service;
+
+import gt.usac.cunoc.sgp.common.audit.aspect.Auditable;
+import gt.usac.cunoc.sgp.common.audit.model.AccionAuditoria;
+import gt.usac.cunoc.sgp.common.exception.ApiException;
+import gt.usac.cunoc.sgp.usuario.dto.CambiarRolRequest;
+import gt.usac.cunoc.sgp.usuario.dto.DesactivarUsuarioRequest;
+import gt.usac.cunoc.sgp.usuario.dto.UsuarioResponse;
+import gt.usac.cunoc.sgp.usuario.entity.Role;
+import gt.usac.cunoc.sgp.usuario.entity.UserAccount;
+import gt.usac.cunoc.sgp.usuario.entity.UsuarioProfesional;
+import gt.usac.cunoc.sgp.usuario.mapper.UsuarioMapper;
+import gt.usac.cunoc.sgp.usuario.model.EstadoUsuario;
+import gt.usac.cunoc.sgp.usuario.model.RoleName;
+import gt.usac.cunoc.sgp.usuario.repository.RoleRepository;
+import gt.usac.cunoc.sgp.usuario.repository.UserAccountRepository;
+import java.time.Clock;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
+import org.springframework.http.HttpStatus;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+/** Gestión de cuentas por el Administrador: listado, baja lógica, reactivación y cambio de rol. */
+@Service
+public class UsuarioService {
+
+  private static final String ENTIDAD = &quot;usuario&quot;;
+
+  private final UserAccountRepository users;
+  private final RoleRepository roles;
+  private final ProfesionalService profesionales;
+  private final RefreshTokenService refreshTokens;
+  private final UsuarioMapper mapper;
+  private final Clock clock;
+
+  public UsuarioService(
+      UserAccountRepository users,
+      RoleRepository roles,
+      ProfesionalService profesionales,
+      RefreshTokenService refreshTokens,
+      UsuarioMapper mapper,
+<span class="fc" id="L48">      Clock clock) {</span>
+<span class="fc" id="L49">    this.users = users;</span>
+<span class="fc" id="L50">    this.roles = roles;</span>
+<span class="fc" id="L51">    this.profesionales = profesionales;</span>
+<span class="fc" id="L52">    this.refreshTokens = refreshTokens;</span>
+<span class="fc" id="L53">    this.mapper = mapper;</span>
+<span class="fc" id="L54">    this.clock = clock;</span>
+<span class="fc" id="L55">  }</span>
+
+  @Transactional(readOnly = true)
+  @PreAuthorize(&quot;hasRole('ADMINISTRADOR')&quot;)
+  public Page&lt;UsuarioResponse&gt; listar(RoleName rol, EstadoUsuario estado, int pagina, int tamanio) {
+<span class="fc bfc" id="L60" title="All 6 branches covered.">    if (pagina &lt; 0 || tamanio &lt; 1 || tamanio &gt; 100) {</span>
+<span class="fc" id="L61">      throw new ApiException(</span>
+          HttpStatus.UNPROCESSABLE_ENTITY,
+          &quot;paginacion_invalida&quot;,
+          &quot;Paginación inválida&quot;,
+          &quot;La página debe ser mayor o igual a 0 y el tamaño debe estar entre 1 y 100.&quot;);
+    }
+<span class="fc" id="L67">    var pageable =</span>
+<span class="fc" id="L68">        PageRequest.of(pagina, tamanio, Sort.by(Sort.Order.asc(&quot;email&quot;), Sort.Order.asc(&quot;id&quot;)));</span>
+<span class="fc" id="L69">    Page&lt;UserAccount&gt; resultado =</span>
+<span class="fc bfc" id="L70" title="All 2 branches covered.">        users.findByRolYEstado(rol, estado == null ? null : estado.name(), pageable);</span>
+<span class="fc" id="L71">    Map&lt;UUID, UsuarioProfesional&gt; colegiados =</span>
+<span class="fc" id="L72">        profesionales.profesionalesDe(</span>
+<span class="fc" id="L73">            resultado.getContent().stream()</span>
+<span class="fc bfc" id="L74" title="All 2 branches covered.">                .filter(usuario -&gt; usuario.getRole().getName() == RoleName.PROFESIONAL_EXTERNO)</span>
+<span class="fc" id="L75">                .map(UserAccount::getId)</span>
+<span class="fc" id="L76">                .toList());</span>
+
+<span class="fc" id="L78">    return resultado.map(usuario -&gt; respuesta(usuario, colegiados.get(usuario.getId())));</span>
+  }
+
+  /**
+   * Baja lógica (RN-USR-08): la cuenta nunca se elimina, así sus inspecciones y comentarios siguen
+   * atribuidos. Se cierran sus sesiones abiertas.
+   */
+  @Transactional
+  @PreAuthorize(&quot;hasRole('ADMINISTRADOR')&quot;)
+  @Auditable(
+      accion = AccionAuditoria.CAMBIAR_ESTADO,
+      entidad = ENTIDAD,
+      tipo = UserAccount.class,
+      idArg = &quot;usuarioId&quot;)
+  public void desactivar(UUID usuarioId, DesactivarUsuarioRequest request, UUID administradorId) {
+<span class="fc bfc" id="L93" title="All 2 branches covered.">    if (usuarioId.equals(administradorId)) {</span>
+<span class="fc" id="L94">      throw new ApiException(</span>
+          HttpStatus.UNPROCESSABLE_ENTITY,
+          &quot;autodesactivacion_no_permitida&quot;,
+          &quot;Operacion no permitida&quot;,
+          &quot;Un administrador no puede desactivar su propia cuenta.&quot;);
+    }
+<span class="fc" id="L100">    UserAccount usuario = usuarioParaModificar(usuarioId);</span>
+<span class="fc bfc" id="L101" title="All 2 branches covered.">    if (!usuario.isActive()) {</span>
+<span class="fc" id="L102">      throw new ApiException(</span>
+          HttpStatus.CONFLICT,
+          &quot;usuario_ya_inactivo&quot;,
+          &quot;Usuario ya inactivo&quot;,
+          &quot;La cuenta ya se encuentra desactivada.&quot;);
+    }
+
+    String motivo =
+<span class="pc bpc" id="L110" title="2 of 6 branches missed.">        request == null || request.motivo() == null || request.motivo().isBlank()</span>
+<span class="fc" id="L111">            ? null</span>
+<span class="fc" id="L112">            : request.motivo().strip();</span>
+<span class="fc" id="L113">    usuario.desactivar(administradorId, motivo, clock.instant());</span>
+<span class="fc" id="L114">    refreshTokens.revokeAll(usuario);</span>
+<span class="fc" id="L115">    users.saveAndFlush(usuario);</span>
+<span class="fc" id="L116">  }</span>
+
+  @Transactional
+  @PreAuthorize(&quot;hasRole('ADMINISTRADOR')&quot;)
+  @Auditable(
+      accion = AccionAuditoria.CAMBIAR_ESTADO,
+      entidad = ENTIDAD,
+      tipo = UserAccount.class,
+      idArg = &quot;usuarioId&quot;)
+  public void reactivar(UUID usuarioId) {
+<span class="fc" id="L126">    UserAccount usuario = usuarioParaModificar(usuarioId);</span>
+<span class="fc bfc" id="L127" title="All 2 branches covered.">    if (usuario.isActive()) {</span>
+<span class="fc" id="L128">      throw new ApiException(</span>
+          HttpStatus.CONFLICT,
+          &quot;usuario_ya_activo&quot;,
+          &quot;Usuario ya activo&quot;,
+          &quot;La cuenta no se encuentra desactivada.&quot;);
+    }
+<span class="fc" id="L134">    usuario.reactivar();</span>
+<span class="fc" id="L135">    users.saveAndFlush(usuario);</span>
+<span class="fc" id="L136">  }</span>
+
+  /**
+   * Cambia el rol global (RN-USR-05). Pasar a Profesional Externo exige el número de colegiado, que
+   * queda pendiente de verificación (RN-USR-04). Se cierran las sesiones para que el usuario vuelva
+   * a ingresar con los permisos del nuevo rol.
+   */
+  @Transactional
+  @PreAuthorize(&quot;hasRole('ADMINISTRADOR')&quot;)
+  @Auditable(
+      accion = AccionAuditoria.MODIFICAR,
+      entidad = ENTIDAD,
+      tipo = UserAccount.class,
+      idArg = &quot;usuarioId&quot;)
+  public void cambiarRol(UUID usuarioId, CambiarRolRequest request, UUID administradorId) {
+<span class="fc bfc" id="L151" title="All 2 branches covered.">    if (usuarioId.equals(administradorId)) {</span>
+<span class="fc" id="L152">      throw new ApiException(</span>
+          HttpStatus.UNPROCESSABLE_ENTITY,
+          &quot;cambio_rol_propio_no_permitido&quot;,
+          &quot;Operacion no permitida&quot;,
+          &quot;Un administrador no puede cambiar su propio rol.&quot;);
+    }
+<span class="fc" id="L158">    String numeroColegiado =</span>
+<span class="fc" id="L159">        ProfesionalService.colegiadoParaRol(request.rol(), request.numeroColegiado());</span>
+
+<span class="fc" id="L161">    UserAccount usuario = usuarioParaModificar(usuarioId);</span>
+<span class="fc bfc" id="L162" title="All 2 branches covered.">    if (usuario.getRole().getName() == request.rol()) {</span>
+<span class="fc" id="L163">      throw new ApiException(</span>
+          HttpStatus.CONFLICT,
+          &quot;rol_sin_cambios&quot;,
+          &quot;Rol sin cambios&quot;,
+          &quot;El usuario ya tiene el rol indicado.&quot;);
+    }
+
+<span class="fc" id="L170">    Role rol =</span>
+        roles
+<span class="fc" id="L172">            .findByName(request.rol())</span>
+<span class="pc" id="L173">            .orElseThrow(() -&gt; new IllegalStateException(&quot;Falta el rol &quot; + request.rol()));</span>
+<span class="fc" id="L174">    usuario.setRole(rol);</span>
+<span class="fc" id="L175">    usuario.incrementTokenVersion();</span>
+<span class="fc" id="L176">    refreshTokens.revokeAll(usuario);</span>
+<span class="fc" id="L177">    users.saveAndFlush(usuario);</span>
+
+<span class="fc bfc" id="L179" title="All 2 branches covered.">    if (numeroColegiado != null) {</span>
+<span class="fc" id="L180">      profesionales.asignarColegiado(usuarioId, numeroColegiado);</span>
+    }
+<span class="fc" id="L182">  }</span>
+
+  /**
+   * Estado actual de una cuenta. Las operaciones auditadas no devuelven datos para que la bitácora
+   * compare el mismo formato antes y después; el controlador consulta aquí la respuesta.
+   */
+  @Transactional(readOnly = true)
+  @PreAuthorize(&quot;hasRole('ADMINISTRADOR')&quot;)
+  public UsuarioResponse obtener(UUID usuarioId) {
+<span class="fc" id="L191">    return respuesta(</span>
+        users
+<span class="fc" id="L193">            .findWithRoleById(usuarioId)</span>
+<span class="fc" id="L194">            .orElseThrow(</span>
+                () -&gt;
+<span class="fc" id="L196">                    new ApiException(</span>
+                        HttpStatus.NOT_FOUND,
+                        &quot;usuario_no_encontrado&quot;,
+                        &quot;Usuario no encontrado&quot;,
+                        &quot;No existe un usuario con el identificador proporcionado.&quot;)));
+  }
+
+  private UserAccount usuarioParaModificar(UUID usuarioId) {
+<span class="fc" id="L204">    return users</span>
+<span class="fc" id="L205">        .findByIdForUpdate(usuarioId)</span>
+<span class="fc" id="L206">        .orElseThrow(</span>
+            () -&gt;
+<span class="fc" id="L208">                new ApiException(</span>
+                    HttpStatus.NOT_FOUND,
+                    &quot;usuario_no_encontrado&quot;,
+                    &quot;Usuario no encontrado&quot;,
+                    &quot;No existe un usuario con el identificador proporcionado.&quot;));
+  }
+
+  private UsuarioResponse respuesta(UserAccount usuario) {
+    UsuarioProfesional profesional =
+<span class="fc bfc" id="L217" title="All 2 branches covered.">        usuario.getRole().getName() == RoleName.PROFESIONAL_EXTERNO</span>
+<span class="fc" id="L218">            ? profesionales.profesionalesDe(List.of(usuario.getId())).get(usuario.getId())</span>
+<span class="fc" id="L219">            : null;</span>
+<span class="fc" id="L220">    return respuesta(usuario, profesional);</span>
+  }
+
+  private UsuarioResponse respuesta(UserAccount usuario, UsuarioProfesional profesional) {
+<span class="fc" id="L224">    return mapper.toResponse(usuario, estadoDe(usuario), profesional);</span>
+  }
+
+  static EstadoUsuario estadoDe(UserAccount usuario) {
+<span class="fc bfc" id="L228" title="All 2 branches covered.">    if (!usuario.isActive()) return EstadoUsuario.INACTIVO;</span>
+<span class="fc bfc" id="L229" title="All 4 branches covered.">    return usuario.isActivated() &amp;&amp; usuario.isVerified()</span>
+<span class="fc" id="L230">        ? EstadoUsuario.ACTIVO</span>
+<span class="fc" id="L231">        : EstadoUsuario.PENDIENTE;</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

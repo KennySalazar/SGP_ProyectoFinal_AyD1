@@ -1,0 +1,138 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>MapeoCampoFormulario.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">sgp-api</a> &gt; <a href="index.source.html" class="el_package">gt.usac.cunoc.sgp.formulario.entity</a> &gt; <span class="el_source">MapeoCampoFormulario.java</span></div><h1>MapeoCampoFormulario.java</h1><pre class="source lang-java linenums">package gt.usac.cunoc.sgp.formulario.entity;
+
+import gt.usac.cunoc.sgp.formulario.model.TipoMapeoCampo;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Table;
+import java.time.Instant;
+import java.util.Objects;
+import java.util.UUID;
+
+@Entity
+@Table(name = &quot;mapeo_campo_formulario&quot;)
+public class MapeoCampoFormulario {
+
+  @Id private UUID id;
+
+  @ManyToOne(fetch = FetchType.LAZY, optional = false)
+  @JoinColumn(name = &quot;version_origen_id&quot;, nullable = false)
+  private VersionFormulario versionOrigen;
+
+  @ManyToOne(fetch = FetchType.LAZY, optional = false)
+  @JoinColumn(name = &quot;version_destino_id&quot;, nullable = false)
+  private VersionFormulario versionDestino;
+
+  @Column(name = &quot;elemento_ref_origen&quot;, length = 300)
+  private String elementoRefOrigen;
+
+  @Column(name = &quot;elemento_ref_destino&quot;, length = 300)
+  private String elementoRefDestino;
+
+  @Enumerated(EnumType.STRING)
+  @Column(nullable = false, length = 20)
+  private TipoMapeoCampo tipo;
+
+  @Column(columnDefinition = &quot;text&quot;)
+  private String observacion;
+
+  @Column(name = &quot;creado_por_id&quot;, nullable = false)
+  private UUID creadoPorId;
+
+  @Column(name = &quot;creado_en&quot;, nullable = false, updatable = false)
+  private Instant creadoEn;
+
+<span class="fc" id="L50">  protected MapeoCampoFormulario() {}</span>
+
+  public MapeoCampoFormulario(
+      UUID id,
+      VersionFormulario versionOrigen,
+      VersionFormulario versionDestino,
+      String elementoRefOrigen,
+      String elementoRefDestino,
+      TipoMapeoCampo tipo,
+      String observacion,
+      UUID creadoPorId,
+<span class="fc" id="L61">      Instant creadoEn) {</span>
+<span class="fc" id="L62">    this.id = id;</span>
+<span class="fc" id="L63">    this.versionOrigen = versionOrigen;</span>
+<span class="fc" id="L64">    this.versionDestino = versionDestino;</span>
+<span class="fc" id="L65">    this.elementoRefOrigen = elementoRefOrigen;</span>
+<span class="fc" id="L66">    this.elementoRefDestino = elementoRefDestino;</span>
+<span class="fc" id="L67">    this.tipo = tipo;</span>
+<span class="fc" id="L68">    this.observacion = observacion;</span>
+<span class="fc" id="L69">    this.creadoPorId = creadoPorId;</span>
+<span class="fc" id="L70">    this.creadoEn = creadoEn;</span>
+<span class="fc" id="L71">  }</span>
+
+  public UUID getId() {
+<span class="fc" id="L74">    return id;</span>
+  }
+
+  public VersionFormulario getVersionOrigen() {
+<span class="fc" id="L78">    return versionOrigen;</span>
+  }
+
+  public VersionFormulario getVersionDestino() {
+<span class="fc" id="L82">    return versionDestino;</span>
+  }
+
+  public String getElementoRefOrigen() {
+<span class="fc" id="L86">    return elementoRefOrigen;</span>
+  }
+
+  public void setElementoRefOrigen(String elementoRefOrigen) {
+<span class="nc" id="L90">    this.elementoRefOrigen = elementoRefOrigen;</span>
+<span class="nc" id="L91">  }</span>
+
+  public String getElementoRefDestino() {
+<span class="fc" id="L94">    return elementoRefDestino;</span>
+  }
+
+  public void setElementoRefDestino(String elementoRefDestino) {
+<span class="nc" id="L98">    this.elementoRefDestino = elementoRefDestino;</span>
+<span class="nc" id="L99">  }</span>
+
+  public TipoMapeoCampo getTipo() {
+<span class="fc" id="L102">    return tipo;</span>
+  }
+
+  public void setTipo(TipoMapeoCampo tipo) {
+<span class="nc" id="L106">    this.tipo = tipo;</span>
+<span class="nc" id="L107">  }</span>
+
+  public String getObservacion() {
+<span class="fc" id="L110">    return observacion;</span>
+  }
+
+  public void setObservacion(String observacion) {
+<span class="nc" id="L114">    this.observacion = observacion;</span>
+<span class="nc" id="L115">  }</span>
+
+  public UUID getCreadoPorId() {
+<span class="nc" id="L118">    return creadoPorId;</span>
+  }
+
+  public Instant getCreadoEn() {
+<span class="nc" id="L122">    return creadoEn;</span>
+  }
+
+  @Override
+  public boolean equals(Object o) {
+<span class="nc bnc" id="L127" title="All 2 branches missed.">    if (this == o) return true;</span>
+<span class="nc bnc" id="L128" title="All 4 branches missed.">    if (o == null || getClass() != o.getClass()) return false;</span>
+<span class="nc" id="L129">    MapeoCampoFormulario that = (MapeoCampoFormulario) o;</span>
+<span class="nc" id="L130">    return Objects.equals(id, that.id);</span>
+  }
+
+  @Override
+  public int hashCode() {
+<span class="nc" id="L135">    return Objects.hash(id);</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

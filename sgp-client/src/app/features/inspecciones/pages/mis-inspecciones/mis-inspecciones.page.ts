@@ -11,7 +11,7 @@ import { PaginatorModule, PaginatorState } from 'primeng/paginator';
 import { SelectModule } from 'primeng/select';
 import { TagModule } from 'primeng/tag';
 import { TextareaModule } from 'primeng/textarea';
-import { finalize } from 'rxjs';
+import { catchError, finalize, from, of, switchMap, throwError } from 'rxjs';
 import {
   PaginaResponse,
   PuenteCatalogoResponse,
@@ -350,25 +350,32 @@ export class MisInspeccionesPage {
     this.eliminando.set(true);
     this.errorEliminar.set(null);
 
-    // Si es un borrador que solo existe localmente (PENDIENTE_SYNC)
-    if ((inspeccion.estado as string) === 'PENDIENTE_SYNC' || !this.connectivity.online()) {
-      this.inspeccionesLocales
-        .eliminarInspeccionLocal(inspeccion.id)
-        .then(() => {
-          this.eliminando.set(false);
-          this.inspeccionEliminar.set(null);
-          this.cargar(this.pagina()?.number ?? 0);
-        })
-        .catch(() => {
-          this.eliminando.set(false);
-          this.errorEliminar.set('delete');
-        });
+    const propietarioId = this.auth.user()?.id;
+    if (!propietarioId) {
+      this.eliminando.set(false);
+      this.errorEliminar.set('delete');
       return;
     }
 
-    this.inspeccionesApi
-      .eliminarBorrador(inspeccion.id)
+    from(this.inspeccionesLocales.esBorradorSoloLocal(inspeccion.id))
       .pipe(
+        switchMap((soloLocal) => {
+          if (soloLocal)
+            return from(this.inspeccionesLocales.eliminarInspeccionLocal(inspeccion.id, true));
+          // Un borrador remoto requiere confirmación del servidor incluso si tiene cambios locales.
+          if (!this.connectivity.online()) return throwError(() => new Error('offline'));
+          return this.inspeccionesApi.eliminarBorrador(inspeccion.id).pipe(
+            // Permite reintentar si el servidor ya lo eliminó y falló la limpieza local.
+            catchError((err: HttpErrorResponse) =>
+              err.status === 404 ? of(undefined) : throwError(() => err),
+            ),
+            switchMap(() =>
+              from(
+                this.inspeccionesLocales.confirmarEliminacionRemota(inspeccion.id, propietarioId),
+              ),
+            ),
+          );
+        }),
         takeUntilDestroyed(this.destroyRef),
         finalize(() => this.eliminando.set(false)),
       )
@@ -377,7 +384,10 @@ export class MisInspeccionesPage {
           this.inspeccionEliminar.set(null);
           this.cargar(this.pagina()?.number ?? 0);
         },
-        error: () => this.errorEliminar.set('delete'),
+        error: (err: Error) =>
+          this.errorEliminar.set(
+            err.message === 'creacionPendiente' ? 'creationPending' : 'delete',
+          ),
       });
   }
 

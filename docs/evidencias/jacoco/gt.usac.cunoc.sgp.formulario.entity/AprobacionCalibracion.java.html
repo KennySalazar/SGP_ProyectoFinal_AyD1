@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AprobacionCalibracion.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">sgp-api</a> &gt; <a href="index.source.html" class="el_package">gt.usac.cunoc.sgp.formulario.entity</a> &gt; <span class="el_source">AprobacionCalibracion.java</span></div><h1>AprobacionCalibracion.java</h1><pre class="source lang-java linenums">package gt.usac.cunoc.sgp.formulario.entity;
+
+import jakarta.persistence.*;
+import java.time.Instant;
+import java.util.UUID;
+import org.hibernate.annotations.Formula;
+import org.hibernate.annotations.Immutable;
+
+@Entity
+@Immutable
+@Table(name = &quot;aprobacion_calibracion_ic&quot;)
+public class AprobacionCalibracion {
+  @Id private UUID id;
+
+  @OneToOne(fetch = FetchType.LAZY, optional = false)
+  @JoinColumn(name = &quot;version_formulario_id&quot;, nullable = false, unique = true, updatable = false)
+  private VersionFormulario versionFormulario;
+
+  @Column(name = &quot;aprobado_por_id&quot;, nullable = false, updatable = false)
+  private UUID aprobadoPorId;
+
+  @Column(name = &quot;aprobado_por_nombre&quot;, nullable = false, length = 320, updatable = false)
+  private String aprobadoPorNombre;
+
+  @Formula(
+      &quot;&quot;&quot;
+          (case when position('@' in aprobado_por_nombre) &gt; 0 then
+            coalesce((select nullif(trim(u.nombre_completo), '') from usuario u
+                      where u.id = aprobado_por_id), aprobado_por_nombre)
+            else aprobado_por_nombre end)
+          &quot;&quot;&quot;)
+  private String nombreAprobadorVisible;
+
+  @Column(name = &quot;aprobado_en&quot;, nullable = false, updatable = false)
+  private Instant aprobadoEn;
+
+  @Column(length = 2000, updatable = false)
+  private String observaciones;
+
+<span class="fc" id="L40">  protected AprobacionCalibracion() {}</span>
+
+  public AprobacionCalibracion(
+      UUID id,
+      VersionFormulario versionFormulario,
+      UUID aprobadoPorId,
+      String aprobadoPorNombre,
+      Instant aprobadoEn,
+<span class="fc" id="L48">      String observaciones) {</span>
+<span class="fc" id="L49">    this.id = id;</span>
+<span class="fc" id="L50">    this.versionFormulario = versionFormulario;</span>
+<span class="fc" id="L51">    this.aprobadoPorId = aprobadoPorId;</span>
+<span class="fc" id="L52">    this.aprobadoPorNombre = aprobadoPorNombre;</span>
+<span class="fc" id="L53">    this.aprobadoEn = aprobadoEn;</span>
+<span class="fc" id="L54">    this.observaciones = observaciones;</span>
+<span class="fc" id="L55">  }</span>
+
+  public UUID getId() {
+<span class="fc" id="L58">    return id;</span>
+  }
+
+  public VersionFormulario getVersionFormulario() {
+<span class="fc" id="L62">    return versionFormulario;</span>
+  }
+
+  public UUID getAprobadoPorId() {
+<span class="fc" id="L66">    return aprobadoPorId;</span>
+  }
+
+  public String getAprobadoPorNombre() {
+<span class="nc" id="L70">    return aprobadoPorNombre;</span>
+  }
+
+  public String getNombreAprobadorVisible() {
+<span class="pc bpc" id="L74" title="1 of 4 branches missed.">    return nombreAprobadorVisible == null || nombreAprobadorVisible.isBlank()</span>
+<span class="fc" id="L75">        ? aprobadoPorNombre</span>
+<span class="fc" id="L76">        : nombreAprobadorVisible;</span>
+  }
+
+  public Instant getAprobadoEn() {
+<span class="fc" id="L80">    return aprobadoEn;</span>
+  }
+
+  public String getObservaciones() {
+<span class="fc" id="L84">    return observaciones;</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

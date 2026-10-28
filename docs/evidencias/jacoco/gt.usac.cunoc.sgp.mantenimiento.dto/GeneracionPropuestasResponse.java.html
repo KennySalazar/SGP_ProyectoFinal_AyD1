@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>GeneracionPropuestasResponse.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">sgp-api</a> &gt; <a href="index.source.html" class="el_package">gt.usac.cunoc.sgp.mantenimiento.dto</a> &gt; <span class="el_source">GeneracionPropuestasResponse.java</span></div><h1>GeneracionPropuestasResponse.java</h1><pre class="source lang-java linenums">package gt.usac.cunoc.sgp.mantenimiento.dto;
+
+import java.util.UUID;
+
+/**
+ * Resultado de generar las propuestas de mantenimiento de una inspección publicada (HU-046).
+ *
+ * @param inspeccionId la inspección evaluada
+ * @param reglasEvaluadas reglas activas de la versión del formulario con que se levantó
+ * @param creadas propuestas nuevas, siempre en estado PROPUESTA
+ * @param yaGeneradas condiciones cumplidas cuya propuesta ya existía de una generación anterior
+ * @param omitidasPorOrdenAbierta condiciones cumplidas que ya tienen una orden en curso en el mismo
+ *     puente, elemento y regla
+ * @param reglasConError reglas que no se pudieron evaluar; no impiden evaluar las demás
+ */
+<span class="fc" id="L16">public record GeneracionPropuestasResponse(</span>
+    UUID inspeccionId,
+    int reglasEvaluadas,
+    int creadas,
+    int yaGeneradas,
+    int omitidasPorOrdenAbierta,
+    int reglasConError) {}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

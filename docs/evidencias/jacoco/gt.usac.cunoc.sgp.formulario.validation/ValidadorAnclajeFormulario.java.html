@@ -1,0 +1,144 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ValidadorAnclajeFormulario.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">sgp-api</a> &gt; <a href="index.source.html" class="el_package">gt.usac.cunoc.sgp.formulario.validation</a> &gt; <span class="el_source">ValidadorAnclajeFormulario.java</span></div><h1>ValidadorAnclajeFormulario.java</h1><pre class="source lang-java linenums">package gt.usac.cunoc.sgp.formulario.validation;
+
+import static gt.usac.cunoc.sgp.formulario.validation.AnclajeInvalidoException.Motivo.*;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.MissingNode;
+import java.util.HashSet;
+import java.util.Set;
+import java.util.UUID;
+import org.springframework.stereotype.Component;
+
+/** Valida exclusivamente contra el esquema histórico y los datos proporcionados, sin mutarlos. */
+@Component
+<span class="fc" id="L14">public class ValidadorAnclajeFormulario {</span>
+  /**
+   * La ruta canónica comienza por {@code /}, no contiene índices ni segmentos vacíos. El UUID es
+   * obligatorio incluso si el destino es el propio arreglo de objetos; un arreglo escalar es un
+   * campo y no exige UUID. Solo se inspeccionan los identificadores del repetible recorrido.
+   */
+  public void validar(JsonNode esquemaHistorico, JsonNode datos, String ref, UUID instancia) {
+<span class="fc" id="L21">    validar(esquemaHistorico, datos, ref, instancia, false);</span>
+<span class="fc" id="L22">  }</span>
+
+  /**
+   * Compatibilidad explícita con HU-028: conserva su sintaxis y el tratamiento de cualquier {@code
+   * items} como repetible, incluso los arreglos escalares. El adaptador conserva su error HTTP.
+   */
+  public void validarFotografiaHu028(
+      JsonNode esquemaHistorico, JsonNode datos, String ref, UUID instancia) {
+<span class="fc" id="L30">    validar(esquemaHistorico, datos, ref, instancia, true);</span>
+<span class="fc" id="L31">  }</span>
+
+  private void validar(JsonNode raiz, JsonNode datos, String ref, UUID instancia, boolean hu028) {
+<span class="fc bfc" id="L34" title="All 2 branches covered.">    if (ref == null) {</span>
+<span class="pc bpc" id="L35" title="3 of 4 branches missed.">      if (hu028 &amp;&amp; instancia == null) return;</span>
+<span class="fc" id="L36">      throw error(RUTA_INVALIDA);</span>
+    }
+<span class="fc bfc" id="L38" title="All 6 branches covered.">    if (!ref.startsWith(&quot;/&quot;) || ref.length() &lt; 2 || ref.length() &gt; 300) {</span>
+<span class="fc" id="L39">      throw error(RUTA_INVALIDA);</span>
+    }
+<span class="fc bfc" id="L41" title="All 6 branches covered.">    if (hu028 ? ref.matches(&quot;.*~(?![01]).*&quot;) : !escapesValidos(ref)) {</span>
+<span class="fc" id="L42">      throw error(RUTA_INVALIDA);</span>
+    }
+<span class="fc" id="L44">    JsonNode esquema = raiz;</span>
+<span class="fc bfc" id="L45" title="All 4 branches covered.">    if (!hu028 &amp;&amp; datos == null) datos = MissingNode.getInstance();</span>
+<span class="fc" id="L46">    boolean repetible = false;</span>
+<span class="fc bfc" id="L47" title="All 2 branches covered.">    for (String segmento : ref.substring(1).split(&quot;/&quot;, -1)) {</span>
+<span class="fc bfc" id="L48" title="All 4 branches covered.">      if (!hu028 &amp;&amp; segmento.isEmpty()) throw error(RUTA_INVALIDA);</span>
+<span class="fc" id="L49">      esquema = resolver(raiz, esquema, hu028);</span>
+<span class="fc bfc" id="L50" title="All 2 branches covered.">      if (esRepetible(raiz, esquema, hu028)) {</span>
+<span class="fc bfc" id="L51" title="All 2 branches covered.">        if (repetible) throw error(REPETIBLE_ANIDADO_NO_SOPORTADO);</span>
+<span class="fc" id="L52">        repetible = true;</span>
+<span class="fc" id="L53">        datos = buscarInstancia(datos, instancia, hu028);</span>
+<span class="fc" id="L54">        esquema = resolver(raiz, esquema.path(&quot;items&quot;), hu028);</span>
+      }
+<span class="fc" id="L56">      String propiedad = segmento.replace(&quot;~1&quot;, &quot;/&quot;).replace(&quot;~0&quot;, &quot;~&quot;);</span>
+<span class="fc" id="L57">      esquema = esquema.path(&quot;properties&quot;).path(propiedad);</span>
+<span class="fc" id="L58">      datos = datos.path(propiedad);</span>
+<span class="fc bfc" id="L59" title="All 2 branches covered.">      if (esquema.isMissingNode()) throw error(ELEMENTO_INEXISTENTE);</span>
+    }
+<span class="fc" id="L61">    esquema = resolver(raiz, esquema, hu028);</span>
+<span class="fc bfc" id="L62" title="All 2 branches covered.">    if (esRepetible(raiz, esquema, hu028)) {</span>
+<span class="fc bfc" id="L63" title="All 2 branches covered.">      if (repetible) throw error(REPETIBLE_ANIDADO_NO_SOPORTADO);</span>
+<span class="fc" id="L64">      repetible = true;</span>
+<span class="fc" id="L65">      buscarInstancia(datos, instancia, hu028);</span>
+    }
+<span class="fc bfc" id="L67" title="All 4 branches covered.">    if (!repetible &amp;&amp; instancia != null) throw error(INSTANCIA_NO_PERMITIDA);</span>
+<span class="fc" id="L68">  }</span>
+
+  private boolean esRepetible(JsonNode raiz, JsonNode esquema, boolean hu028) {
+<span class="fc bfc" id="L71" title="All 2 branches covered.">    if (!esquema.has(&quot;items&quot;)) return false;</span>
+<span class="fc bfc" id="L72" title="All 2 branches covered.">    if (hu028) return true;</span>
+<span class="fc" id="L73">    JsonNode item = resolver(raiz, esquema.path(&quot;items&quot;), false);</span>
+<span class="fc bfc" id="L74" title="All 2 branches covered.">    if (item.has(&quot;items&quot;)) throw error(REPETIBLE_ANIDADO_NO_SOPORTADO);</span>
+<span class="pc bpc" id="L75" title="1 of 4 branches missed.">    return &quot;object&quot;.equals(item.path(&quot;type&quot;).asText()) || item.has(&quot;properties&quot;);</span>
+  }
+
+  private JsonNode buscarInstancia(JsonNode datos, UUID id, boolean hu028) {
+<span class="fc bfc" id="L79" title="All 2 branches covered.">    if (id == null) throw error(INSTANCIA_REQUERIDA);</span>
+<span class="pc bpc" id="L80" title="1 of 4 branches missed.">    if (datos == null || !datos.isArray()) throw error(DATOS_REPETIBLE_INVALIDOS);</span>
+<span class="fc" id="L81">    JsonNode encontrada = null;</span>
+<span class="fc" id="L82">    Set&lt;UUID&gt; identificadores = new HashSet&lt;&gt;();</span>
+<span class="fc bfc" id="L83" title="All 2 branches covered.">    for (JsonNode dato : datos) {</span>
+      boolean coincide;
+<span class="fc bfc" id="L85" title="All 2 branches covered.">      if (hu028) {</span>
+<span class="fc" id="L86">        coincide = id.toString().equals(dato.path(&quot;instancia_id&quot;).asText());</span>
+      } else {
+<span class="fc" id="L88">        String texto = dato.path(&quot;instancia_id&quot;).asText();</span>
+        UUID identificador;
+        try {
+<span class="fc" id="L91">          identificador = UUID.fromString(texto);</span>
+<span class="pc bpc" id="L92" title="1 of 2 branches missed.">          if (!identificador.toString().equalsIgnoreCase(texto)) {</span>
+<span class="nc" id="L93">            throw error(DATOS_REPETIBLE_INVALIDOS);</span>
+          }
+<span class="fc" id="L95">        } catch (IllegalArgumentException e) {</span>
+<span class="fc" id="L96">          throw error(DATOS_REPETIBLE_INVALIDOS);</span>
+<span class="fc" id="L97">        }</span>
+<span class="fc bfc" id="L98" title="All 2 branches covered.">        if (!identificadores.add(identificador)) throw error(INSTANCIA_DUPLICADA);</span>
+<span class="fc" id="L99">        coincide = id.equals(identificador);</span>
+      }
+<span class="fc bfc" id="L101" title="All 2 branches covered.">      if (coincide) {</span>
+<span class="fc bfc" id="L102" title="All 2 branches covered.">        if (encontrada != null) throw error(INSTANCIA_DUPLICADA);</span>
+<span class="fc" id="L103">        encontrada = dato;</span>
+      }
+<span class="fc" id="L105">    }</span>
+<span class="fc bfc" id="L106" title="All 2 branches covered.">    if (encontrada == null) throw error(INSTANCIA_NO_ENCONTRADA);</span>
+<span class="fc" id="L107">    return encontrada;</span>
+  }
+
+  private JsonNode resolver(JsonNode raiz, JsonNode nodo, boolean hu028) {
+<span class="pc bpc" id="L111" title="2 of 6 branches missed.">    if (!hu028 &amp;&amp; (nodo == null || !nodo.isObject())) {</span>
+<span class="nc" id="L112">      throw error(REFERENCIA_ESQUEMA_INVALIDA);</span>
+    }
+<span class="fc bfc" id="L114" title="All 2 branches covered.">    for (int profundidad = 0; nodo.has(&quot;$ref&quot;); profundidad++) {</span>
+<span class="fc" id="L115">      String ref = nodo.path(&quot;$ref&quot;).asText();</span>
+<span class="fc bfc" id="L116" title="All 8 branches covered.">      if (profundidad &gt;= 32 || !ref.startsWith(&quot;#/&quot;) || (!hu028 &amp;&amp; !escapesValidos(ref))) {</span>
+<span class="fc" id="L117">        throw error(REFERENCIA_ESQUEMA_INVALIDA);</span>
+      }
+      try {
+<span class="fc" id="L120">        nodo = raiz.at(ref.substring(1));</span>
+<span class="nc" id="L121">      } catch (IllegalArgumentException e) {</span>
+<span class="nc" id="L122">        throw error(REFERENCIA_ESQUEMA_INVALIDA);</span>
+<span class="fc" id="L123">      }</span>
+<span class="pc bpc" id="L124" title="1 of 6 branches missed.">      if (nodo.isMissingNode() || (!hu028 &amp;&amp; !nodo.isObject())) {</span>
+<span class="fc" id="L125">        throw error(REFERENCIA_ESQUEMA_INVALIDA);</span>
+      }
+    }
+<span class="fc" id="L128">    return nodo;</span>
+  }
+
+  private boolean escapesValidos(String ref) {
+<span class="fc bfc" id="L132" title="All 2 branches covered.">    for (int i = 0; i &lt; ref.length(); i++) {</span>
+<span class="fc bfc" id="L133" title="All 2 branches covered.">      if (ref.charAt(i) == '~') {</span>
+<span class="fc bfc" id="L134" title="All 6 branches covered.">        if (++i == ref.length() || (ref.charAt(i) != '0' &amp;&amp; ref.charAt(i) != '1')) return false;</span>
+      }
+    }
+<span class="fc" id="L137">    return true;</span>
+  }
+
+  private AnclajeInvalidoException error(AnclajeInvalidoException.Motivo motivo) {
+<span class="fc" id="L141">    return new AnclajeInvalidoException(motivo);</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

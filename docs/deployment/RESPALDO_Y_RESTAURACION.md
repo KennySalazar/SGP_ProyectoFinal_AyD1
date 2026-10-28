@@ -8,7 +8,6 @@
 | DT-DEP-07: 30 respaldos diarios | Cada volcado se sube a `diarios/<base>/`; el ciclo de vida del bucket los elimina a los 30 días. |
 | DT-DEP-07: 12 respaldos mensuales | El día 1 de cada mes (UTC) se sube además una copia a `mensuales/<base>/`, que se elimina a los 365 días. |
 | DT-DEP-08: prueba de restauración | `restore-test.sh` restaura un volcado en una base temporal y muestra comprobaciones. Primera prueba exitosa el 17 de octubre de 2026 (sección 5). |
-| DT-ALM-05: archivos | Pendiente: el backend aún no guarda archivos en S3. Cuando exista el bucket de archivos de producción, se activará su versionado con un ciclo de vida equivalente. |
 
 Este esquema no depende de la retención de respaldos automáticos de RDS, que el
 plan gratuito de la cuenta limita a 1 día (ver ADR-0002). Esa retención sigue
@@ -92,15 +91,9 @@ Antes de guardarlo en S3, el script verifica que el volcado sea legible con
 `pg_restore --list`. Si `pg_dump`, la verificación o la subida fallan, el
 servicio termina con error y queda registrado en `journalctl`.
 
-Limitación: si la instancia está apagada el día 1 del mes, `Persistent=true`
-ejecuta el respaldo pendiente al encenderla, pero ese día ya no es el 1 y no se
-genera la copia mensual. En ese caso, copie a mano el diario más cercano a
-`mensuales/sgp_prod/sgp_prod-AAAA-MM.dump`.
-
 ## 5. Prueba de restauración (DT-DEP-08)
 
-Se debe ejecutar al menos una vez por semestre y después de cualquier cambio en
-este procedimiento. En Session Manager:
+En Session Manager:
 
 ```bash
 sudo /opt/sgp/backup/restore-test.sh

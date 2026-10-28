@@ -6,7 +6,7 @@ Aceptada como punto de partida del proyecto.
 
 ## Contexto
 
-El enunciado exige una SPA Angular desacoplada de una API REST Spring Boot, organizacion por dominio, PostgreSQL con PostGIS, migraciones Flyway, autenticacion JWT stateless, operacion PWA/offline y despliegue contenedorizado.
+El SGP requiere una aplicación Angular desacoplada de una API REST con Spring Boot, organización por dominio, PostgreSQL con PostGIS, migraciones Flyway, autenticación JWT sin estado, operación PWA/offline y despliegue en contenedores.
 
 ## Decision
 

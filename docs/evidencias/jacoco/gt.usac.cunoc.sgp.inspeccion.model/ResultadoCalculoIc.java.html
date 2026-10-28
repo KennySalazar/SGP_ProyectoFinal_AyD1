@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ResultadoCalculoIc.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">sgp-api</a> &gt; <a href="index.source.html" class="el_package">gt.usac.cunoc.sgp.inspeccion.model</a> &gt; <span class="el_source">ResultadoCalculoIc.java</span></div><h1>ResultadoCalculoIc.java</h1><pre class="source lang-java linenums">package gt.usac.cunoc.sgp.inspeccion.model;
+
+import java.math.BigDecimal;
+import java.util.List;
+import java.util.UUID;
+
+public record ResultadoCalculoIc(
+    UUID versionFormularioId,
+    String codigoFormulario,
+    String versionAlgoritmo,
+    String hashEntrada,
+    BigDecimal indiceCalculado,
+    EstadoCondicion estadoPorRango,
+    EstadoCondicion estadoCalculado,
+    BigDecimal sumaPesos,
+    BigDecimal sumaCalificacionesPonderadas,
+    List&lt;DesgloseElemento&gt; desglose,
+    List&lt;CondicionAnulacion&gt; condicionesAnulacion) {
+  @com.fasterxml.jackson.annotation.JsonProperty(
+      value = &quot;calibracionEndpoint&quot;,
+      access = com.fasterxml.jackson.annotation.JsonProperty.Access.READ_ONLY)
+  public String calibracionEndpoint() {
+<span class="fc" id="L23">    return &quot;/api/v1/formularios/&quot; + versionFormularioId + &quot;/estado-calibracion&quot;;</span>
+  }
+
+<span class="fc" id="L26">  public ResultadoCalculoIc {</span>
+<span class="fc" id="L27">    desglose = List.copyOf(desglose);</span>
+<span class="fc" id="L28">    condicionesAnulacion = List.copyOf(condicionesAnulacion);</span>
+<span class="fc" id="L29">  }</span>
+
+  public record DesgloseElemento(
+      String elementoRef,
+      BigDecimal peso,
+      BigDecimal calificacionAgregada,
+      BigDecimal aportePonderado,
+      String reglaAgregacion,
+      List&lt;DesgloseInstancia&gt; instancias) {
+
+<span class="fc" id="L39">    public DesgloseElemento {</span>
+<span class="fc" id="L40">      instancias = List.copyOf(instancias);</span>
+<span class="fc" id="L41">    }</span>
+  }
+
+  public record DesgloseInstancia(
+      UUID instanciaId,
+      String rutaDatos,
+      String existencia,
+      boolean incluida,
+      BigDecimal calificacion,
+      List&lt;DesgloseIndicador&gt; indicadores) {
+
+<span class="fc" id="L52">    public DesgloseInstancia {</span>
+<span class="fc" id="L53">      indicadores = List.copyOf(indicadores);</span>
+<span class="fc" id="L54">    }</span>
+  }
+
+<span class="fc" id="L57">  public record DesgloseIndicador(</span>
+      String indicador, String valorOriginal, BigDecimal calificacion) {}
+
+<span class="fc" id="L60">  public record CondicionAnulacion(</span>
+      String reglaId,
+      String descripcion,
+      String elementoRef,
+      UUID instanciaId,
+      String rutaDatos,
+      String indicador,
+      String valorDetectado,
+      EstadoCondicion estadoResultante) {}
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>
