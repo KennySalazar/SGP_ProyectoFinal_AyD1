@@ -1,0 +1,211 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ValidadorReglasCriticasIc.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">sgp-api</a> &gt; <a href="index.source.html" class="el_package">gt.usac.cunoc.sgp.formulario.validation</a> &gt; <span class="el_source">ValidadorReglasCriticasIc.java</span></div><h1>ValidadorReglasCriticasIc.java</h1><pre class="source lang-java linenums">package gt.usac.cunoc.sgp.formulario.validation;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import gt.usac.cunoc.sgp.common.exception.ApiException;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+import org.springframework.http.HttpStatus;
+
+public final class ValidadorReglasCriticasIc {
+  private ValidadorReglasCriticasIc() {}
+
+<span class="fc" id="L14">  public record CondicionCritica(</span>
+      String id,
+      String descripcion,
+      List&lt;String&gt; elementos,
+      List&lt;String&gt; indicadores,
+      List&lt;String&gt; valores) {}
+
+  public static List&lt;CondicionCritica&gt; validar(JsonNode reglas) {
+<span class="fc bfc" id="L22" title="All 4 branches covered.">    if (reglas == null || !reglas.isObject()) {</span>
+<span class="fc" id="L23">      throw error(&quot;Faltan las reglas de evaluacion del IC&quot;);</span>
+    }
+<span class="fc" id="L25">    JsonNode anulaciones = reglas.get(&quot;reglas_anulacion&quot;);</span>
+<span class="fc bfc" id="L26" title="All 4 branches covered.">    if (anulaciones == null || !anulaciones.isArray()) {</span>
+<span class="fc" id="L27">      throw error(&quot;Falta configurar reglas_anulacion como una lista&quot;);</span>
+    }
+<span class="fc" id="L29">    List&lt;CondicionCritica&gt; condiciones = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L30">    Set&lt;String&gt; ids = new HashSet&lt;&gt;();</span>
+<span class="fc bfc" id="L31" title="All 2 branches covered.">    for (JsonNode regla : anulaciones) {</span>
+<span class="fc bfc" id="L32" title="All 2 branches covered.">      if (!regla.isObject()) {</span>
+<span class="fc" id="L33">        throw error(&quot;Cada regla de anulacion debe ser un objeto&quot;);</span>
+      }
+<span class="fc" id="L35">      String id = texto(regla.get(&quot;id&quot;), &quot;id&quot;);</span>
+<span class="fc bfc" id="L36" title="All 2 branches covered.">      if (!ids.add(id)) {</span>
+<span class="fc" id="L37">        throw error(&quot;Identificador de regla duplicado: &quot; + id);</span>
+      }
+<span class="fc" id="L39">      String descripcion = texto(regla.get(&quot;descripcion&quot;), &quot;descripcion de &quot; + id);</span>
+<span class="fc bfc" id="L40" title="All 2 branches covered.">      if (!&quot;MALO&quot;.equals(texto(regla.get(&quot;estado_resultante&quot;), &quot;estado_resultante de &quot; + id))) {</span>
+<span class="fc" id="L41">        throw error(&quot;La regla &quot; + id + &quot; debe tener estado_resultante MALO&quot;);</span>
+      }
+<span class="fc bfc" id="L43" title="All 2 branches covered.">      if (regla.hasNonNull(&quot;pendiente&quot;)</span>
+<span class="fc bfc" id="L44" title="All 2 branches covered.">          &amp;&amp; !(reglas.path(&quot;calibracion_provisional&quot;).isBoolean()</span>
+<span class="fc bfc" id="L45" title="All 2 branches covered.">              &amp;&amp; reglas.path(&quot;calibracion_provisional&quot;).booleanValue()</span>
+<span class="fc bfc" id="L46" title="All 2 branches covered.">              &amp;&amp; Set.of(&quot;RN-IC-05a&quot;, &quot;RN-IC-05c&quot;).contains(id)</span>
+<span class="pc bpc" id="L47" title="1 of 2 branches missed.">              &amp;&amp; regla.path(&quot;pendiente&quot;).isTextual()</span>
+<span class="pc bpc" id="L48" title="1 of 2 branches missed.">              &amp;&amp; !regla.path(&quot;pendiente&quot;).asText().isBlank())) {</span>
+<span class="fc" id="L49">        throw error(&quot;La regla &quot; + id + &quot; tiene una decision pendiente de calibracion&quot;);</span>
+      }
+<span class="fc" id="L51">      List&lt;String&gt; elementos = lista(regla.get(&quot;elementos&quot;), &quot;elementos de &quot; + id);</span>
+<span class="fc" id="L52">      elementos.forEach(ValidadorReglasCriticasIc::validarReferencia);</span>
+<span class="fc" id="L53">      JsonNode condicion = regla.get(&quot;condicion&quot;);</span>
+<span class="fc bfc" id="L54" title="All 6 branches covered.">      if (condicion == null || !condicion.isObject() || condicion.isEmpty()) {</span>
+<span class="fc" id="L55">        throw error(&quot;Falta configurar la condicion de la regla &quot; + id);</span>
+      }
+<span class="fc bfc" id="L57" title="All 2 branches covered.">      if (directa(condicion)) {</span>
+<span class="fc" id="L58">        condiciones.add(condicion(id, descripcion, elementos, condicion));</span>
+      } else {
+<span class="fc" id="L60">        Set&lt;String&gt; cubiertos = new HashSet&lt;&gt;();</span>
+<span class="fc" id="L61">        var grupos = condicion.fields();</span>
+<span class="fc bfc" id="L62" title="All 2 branches covered.">        while (grupos.hasNext()) {</span>
+<span class="fc" id="L63">          var grupo = grupos.next();</span>
+<span class="fc" id="L64">          JsonNode definicion = grupo.getValue();</span>
+<span class="pc bpc" id="L65" title="1 of 4 branches missed.">          if (!definicion.isObject() || !directa(definicion)) {</span>
+<span class="fc" id="L66">            throw error(&quot;El grupo &quot; + grupo.getKey() + &quot; de la regla &quot; + id + &quot; es invalido&quot;);</span>
+          }
+<span class="fc" id="L68">          List&lt;String&gt; referencias =</span>
+<span class="fc" id="L69">              lista(definicion.get(&quot;elementos&quot;), &quot;elementos del grupo &quot; + id);</span>
+<span class="fc bfc" id="L70" title="All 2 branches covered.">          if (!elementos.containsAll(referencias)) {</span>
+<span class="fc" id="L71">            throw error(&quot;El grupo de la regla &quot; + id + &quot; contiene un elemento no declarado&quot;);</span>
+          }
+<span class="fc" id="L73">          cubiertos.addAll(referencias);</span>
+<span class="fc" id="L74">          condiciones.add(condicion(id, descripcion, referencias, definicion));</span>
+<span class="fc" id="L75">        }</span>
+<span class="pc bpc" id="L76" title="1 of 2 branches missed.">        if (!cubiertos.containsAll(elementos)) {</span>
+<span class="nc" id="L77">          throw error(&quot;La regla &quot; + id + &quot; contiene elementos sin grupo de condicion&quot;);</span>
+        }
+      }
+<span class="fc" id="L80">    }</span>
+<span class="fc" id="L81">    return List.copyOf(condiciones);</span>
+  }
+
+  public static void validarCatalogo(JsonNode reglas, JsonNode catalogo) {
+<span class="fc" id="L85">    List&lt;CondicionCritica&gt; condiciones = validar(reglas);</span>
+<span class="fc bfc" id="L86" title="All 2 branches covered.">    if (&quot;sieca-v1&quot;.equals(catalogo.path(&quot;formulario&quot;).asText())) {</span>
+<span class="fc" id="L87">      Set&lt;String&gt; presentes = new HashSet&lt;&gt;();</span>
+<span class="fc" id="L88">      condiciones.forEach(condicion -&gt; presentes.add(condicion.id()));</span>
+<span class="fc bfc" id="L89" title="All 2 branches covered.">      if (!presentes.containsAll(Set.of(&quot;RN-IC-05a&quot;, &quot;RN-IC-05b&quot;, &quot;RN-IC-05c&quot;, &quot;RN-IC-05d&quot;))) {</span>
+<span class="fc" id="L90">        throw error(</span>
+            &quot;La plantilla SIECA requiere las reglas RN-IC-05a, RN-IC-05b, RN-IC-05c y RN-IC-05d&quot;);
+      }
+    }
+<span class="fc bfc" id="L94" title="All 2 branches covered.">    for (CondicionCritica condicion : condiciones) {</span>
+<span class="fc bfc" id="L95" title="All 2 branches covered.">      for (String referencia : condicion.elementos()) {</span>
+<span class="fc" id="L96">        JsonNode encontrado = null;</span>
+<span class="fc bfc" id="L97" title="All 2 branches covered.">        for (JsonNode elemento : catalogo.path(&quot;elementos&quot;)) {</span>
+<span class="fc bfc" id="L98" title="All 2 branches covered.">          if (referencia.equals(elemento.path(&quot;elemento_ref&quot;).asText())) {</span>
+<span class="fc" id="L99">            encontrado = elemento;</span>
+<span class="fc" id="L100">            break;</span>
+          }
+<span class="fc" id="L102">        }</span>
+<span class="fc bfc" id="L103" title="All 2 branches covered.">        if (encontrado == null) {</span>
+<span class="fc" id="L104">          throw error(</span>
+<span class="fc" id="L105">              &quot;La regla &quot; + condicion.id() + &quot; usa un elemento fuera del catalogo: &quot; + referencia);</span>
+        }
+<span class="fc bfc" id="L107" title="All 2 branches covered.">        for (String indicador : condicion.indicadores()) {</span>
+<span class="fc bfc" id="L108" title="All 2 branches covered.">          if (&quot;existencia&quot;.equals(indicador)) {</span>
+<span class="fc" id="L109">            continue;</span>
+          }
+<span class="fc" id="L111">          boolean existe = false;</span>
+<span class="fc bfc" id="L112" title="All 2 branches covered.">          for (JsonNode configurado : encontrado.path(&quot;indicadores&quot;)) {</span>
+<span class="fc bfc" id="L113" title="All 2 branches covered.">            if (indicador.equals(configurado.asText())) {</span>
+<span class="fc" id="L114">              existe = true;</span>
+<span class="fc" id="L115">              break;</span>
+            }
+<span class="fc" id="L117">          }</span>
+<span class="fc bfc" id="L118" title="All 2 branches covered.">          if (!existe) {</span>
+<span class="fc" id="L119">            throw error(</span>
+                &quot;La regla &quot;
+<span class="fc" id="L121">                    + condicion.id()</span>
+                    + &quot; usa un indicador fuera del catalogo: &quot;
+                    + referencia
+                    + &quot;/&quot;
+                    + indicador);
+          }
+<span class="fc" id="L127">        }</span>
+<span class="fc" id="L128">      }</span>
+<span class="fc" id="L129">    }</span>
+<span class="fc" id="L130">  }</span>
+
+  private static CondicionCritica condicion(
+      String id, String descripcion, List&lt;String&gt; elementos, JsonNode nodo) {
+    int alternativas =
+<span class="fc bfc" id="L135" title="All 2 branches covered.">        (nodo.has(&quot;campo&quot;) ? 1 : 0)</span>
+<span class="fc bfc" id="L136" title="All 2 branches covered.">            + (nodo.has(&quot;indicador&quot;) ? 1 : 0)</span>
+<span class="fc bfc" id="L137" title="All 2 branches covered.">            + (nodo.has(&quot;indicadores&quot;) ? 1 : 0);</span>
+<span class="fc bfc" id="L138" title="All 2 branches covered.">    if (alternativas != 1) {</span>
+<span class="fc" id="L139">      throw error(&quot;La regla &quot; + id + &quot; requiere exactamente campo, indicador o indicadores&quot;);</span>
+    }
+    List&lt;String&gt; indicadores;
+    List&lt;String&gt; valores;
+<span class="fc bfc" id="L143" title="All 2 branches covered.">    if (nodo.has(&quot;campo&quot;)) {</span>
+<span class="pc bpc" id="L144" title="1 of 2 branches missed.">      if (nodo.has(&quot;algun_valor_en&quot;)) {</span>
+<span class="nc" id="L145">        throw error(&quot;La condicion de campo de &quot; + id + &quot; solo admite igual_a&quot;);</span>
+      }
+<span class="fc" id="L147">      indicadores = List.of(texto(nodo.get(&quot;campo&quot;), &quot;campo de &quot; + id));</span>
+<span class="fc" id="L148">      valores = List.of(texto(nodo.get(&quot;igual_a&quot;), &quot;igual_a de &quot; + id));</span>
+    } else {
+<span class="pc bpc" id="L150" title="1 of 2 branches missed.">      if (nodo.has(&quot;igual_a&quot;)) {</span>
+<span class="nc" id="L151">        throw error(&quot;La condicion de indicadores de &quot; + id + &quot; solo admite algun_valor_en&quot;);</span>
+      }
+      indicadores =
+<span class="fc bfc" id="L154" title="All 2 branches covered.">          nodo.has(&quot;indicador&quot;)</span>
+<span class="fc" id="L155">              ? List.of(texto(nodo.get(&quot;indicador&quot;), &quot;indicador de &quot; + id))</span>
+<span class="fc" id="L156">              : lista(nodo.get(&quot;indicadores&quot;), &quot;indicadores de &quot; + id);</span>
+<span class="fc" id="L157">      valores = lista(nodo.get(&quot;algun_valor_en&quot;), &quot;algun_valor_en de &quot; + id);</span>
+    }
+<span class="fc" id="L159">    return new CondicionCritica(id, descripcion, List.copyOf(elementos), indicadores, valores);</span>
+  }
+
+  private static boolean directa(JsonNode nodo) {
+<span class="fc bfc" id="L163" title="All 6 branches covered.">    return nodo.has(&quot;campo&quot;) || nodo.has(&quot;indicador&quot;) || nodo.has(&quot;indicadores&quot;);</span>
+  }
+
+  private static List&lt;String&gt; lista(JsonNode nodo, String referencia) {
+<span class="fc bfc" id="L167" title="All 6 branches covered.">    if (nodo == null || !nodo.isArray() || nodo.isEmpty()) {</span>
+<span class="fc" id="L168">      throw error(&quot;Falta configurar una lista no vacia en &quot; + referencia);</span>
+    }
+<span class="fc" id="L170">    List&lt;String&gt; valores = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L171">    Set&lt;String&gt; unicos = new HashSet&lt;&gt;();</span>
+<span class="fc bfc" id="L172" title="All 2 branches covered.">    for (JsonNode item : nodo) {</span>
+<span class="fc" id="L173">      String valor = texto(item, referencia);</span>
+<span class="pc bpc" id="L174" title="1 of 2 branches missed.">      if (!unicos.add(valor)) {</span>
+<span class="nc" id="L175">        throw error(&quot;Valor duplicado en &quot; + referencia + &quot;: &quot; + valor);</span>
+      }
+<span class="fc" id="L177">      valores.add(valor);</span>
+<span class="fc" id="L178">    }</span>
+<span class="fc" id="L179">    return List.copyOf(valores);</span>
+  }
+
+  private static void validarReferencia(String referencia) {
+<span class="fc bfc" id="L183" title="All 2 branches covered.">    if (!referencia.startsWith(&quot;/&quot;)</span>
+<span class="fc bfc" id="L184" title="All 2 branches covered.">        || referencia.length() &lt; 2</span>
+<span class="pc bpc" id="L185" title="1 of 2 branches missed.">        || referencia.length() &gt; 300</span>
+<span class="fc bfc" id="L186" title="All 2 branches covered.">        || referencia.contains(&quot;//&quot;)</span>
+<span class="fc bfc" id="L187" title="All 2 branches covered.">        || referencia.endsWith(&quot;/&quot;)</span>
+<span class="fc bfc" id="L188" title="All 2 branches covered.">        || referencia.matches(&quot;.*~(?![01]).*&quot;)) {</span>
+<span class="fc" id="L189">      throw error(&quot;Referencia de elemento invalida: &quot; + referencia);</span>
+    }
+<span class="fc" id="L191">  }</span>
+
+  private static String texto(JsonNode valor, String referencia) {
+<span class="fc bfc" id="L194" title="All 2 branches covered.">    if (valor == null</span>
+<span class="fc bfc" id="L195" title="All 2 branches covered.">        || !valor.isTextual()</span>
+<span class="fc bfc" id="L196" title="All 2 branches covered.">        || valor.textValue().isBlank()</span>
+<span class="pc bpc" id="L197" title="1 of 2 branches missed.">        || !valor.textValue().equals(valor.textValue().strip())) {</span>
+<span class="fc" id="L198">      throw error(&quot;Falta configurar un texto valido en &quot; + referencia);</span>
+    }
+<span class="fc" id="L200">    return valor.textValue();</span>
+  }
+
+  private static ApiException error(String detalle) {
+<span class="fc" id="L204">    return new ApiException(</span>
+        HttpStatus.UNPROCESSABLE_ENTITY,
+        &quot;reglas_anulacion_ic_invalidas&quot;,
+        &quot;Reglas de anulacion del IC invalidas&quot;,
+        detalle);
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

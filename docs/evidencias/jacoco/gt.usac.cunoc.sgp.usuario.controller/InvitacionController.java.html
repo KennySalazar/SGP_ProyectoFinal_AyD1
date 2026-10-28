@@ -1,0 +1,121 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>InvitacionController.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">sgp-api</a> &gt; <a href="index.source.html" class="el_package">gt.usac.cunoc.sgp.usuario.controller</a> &gt; <span class="el_source">InvitacionController.java</span></div><h1>InvitacionController.java</h1><pre class="source lang-java linenums">package gt.usac.cunoc.sgp.usuario.controller;
+
+import gt.usac.cunoc.sgp.common.exception.ApiException;
+import gt.usac.cunoc.sgp.common.security.JwtData;
+import gt.usac.cunoc.sgp.usuario.dto.AceptarInvitacionRequest;
+import gt.usac.cunoc.sgp.usuario.dto.CrearInvitacionRequest;
+import gt.usac.cunoc.sgp.usuario.dto.InvitacionPublicaResponse;
+import gt.usac.cunoc.sgp.usuario.dto.InvitacionResponse;
+import gt.usac.cunoc.sgp.usuario.dto.MessageResponse;
+import gt.usac.cunoc.sgp.usuario.dto.TokenInvitacionRequest;
+import gt.usac.cunoc.sgp.usuario.model.EstadoInvitacion;
+import gt.usac.cunoc.sgp.usuario.service.InvitacionService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import java.util.UUID;
+import org.springframework.data.domain.Page;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+@RequestMapping(&quot;/api/v1/invitaciones&quot;)
+@Tag(name = &quot;Invitaciones&quot;, description = &quot;Alta de cuentas por invitación del Administrador&quot;)
+public class InvitacionController {
+
+  private final InvitacionService invitacionService;
+
+<span class="fc" id="L38">  public InvitacionController(InvitacionService invitacionService) {</span>
+<span class="fc" id="L39">    this.invitacionService = invitacionService;</span>
+<span class="fc" id="L40">  }</span>
+
+  @PostMapping
+  @PreAuthorize(&quot;hasRole('ADMINISTRADOR')&quot;)
+  @SecurityRequirement(name = &quot;bearerAuth&quot;)
+  @Operation(
+      summary = &quot;Invitar a un usuario&quot;,
+      description =
+          &quot;Solo administradores. Crea la cuenta pendiente de invitación y envía un enlace de &quot;
+              + &quot;activación de un solo uso y vigencia limitada. Por ahora solo admite el rol &quot;
+              + &quot;CATEDRATICO. Un correo ya registrado responde 409.&quot;)
+  public ResponseEntity&lt;InvitacionResponse&gt; invitar(
+      @Valid @RequestBody CrearInvitacionRequest request, Authentication authentication) {
+<span class="fc" id="L53">    InvitacionResponse response =</span>
+<span class="fc" id="L54">        invitacionService.invitar(request, administradorId(authentication));</span>
+<span class="fc" id="L55">    return ResponseEntity.status(HttpStatus.CREATED).body(response);</span>
+  }
+
+  @GetMapping
+  @PreAuthorize(&quot;hasRole('ADMINISTRADOR')&quot;)
+  @SecurityRequirement(name = &quot;bearerAuth&quot;)
+  @Operation(
+      summary = &quot;Listar invitaciones&quot;,
+      description =
+          &quot;Solo administradores. Filtro opcional por estado (PENDIENTE, VENCIDA, ACEPTADA, &quot;
+              + &quot;CANCELADA). Página desde 0, tamaño entre 1 y 100. Orden por fecha de creación &quot;
+              + &quot;descendente.&quot;)
+  public Page&lt;InvitacionResponse&gt; listar(
+      @RequestParam(required = false) EstadoInvitacion estado,
+      @RequestParam(defaultValue = &quot;0&quot;) int pagina,
+      @RequestParam(defaultValue = &quot;20&quot;) int tamanio) {
+<span class="fc" id="L71">    return invitacionService.listar(estado, pagina, tamanio);</span>
+  }
+
+  @PostMapping(&quot;/{id}/reenvio&quot;)
+  @PreAuthorize(&quot;hasRole('ADMINISTRADOR')&quot;)
+  @SecurityRequirement(name = &quot;bearerAuth&quot;)
+  @Operation(
+      summary = &quot;Reenviar una invitación&quot;,
+      description =
+          &quot;Solo administradores. Cancela el enlace anterior (pendiente o vencido) y envía uno &quot;
+              + &quot;nuevo con vigencia renovada.&quot;)
+  public ResponseEntity&lt;InvitacionResponse&gt; reenviar(
+      @PathVariable UUID id, Authentication authentication) {
+<span class="fc" id="L84">    InvitacionResponse response = invitacionService.reenviar(id, administradorId(authentication));</span>
+<span class="fc" id="L85">    return ResponseEntity.status(HttpStatus.CREATED).body(response);</span>
+  }
+
+  @PostMapping(&quot;/validacion&quot;)
+  @PreAuthorize(&quot;permitAll()&quot;)
+  @Operation(
+      summary = &quot;Validar un enlace de invitación&quot;,
+      description =
+          &quot;Acceso sin autenticación. Devuelve el correo y el rol de la invitación. Un enlace &quot;
+              + &quot;vencido responde 410; uno inválido o ya utilizado, 400.&quot;)
+  public InvitacionPublicaResponse validar(@Valid @RequestBody TokenInvitacionRequest request) {
+<span class="fc" id="L96">    return invitacionService.validar(request);</span>
+  }
+
+  @PostMapping(&quot;/aceptacion&quot;)
+  @PreAuthorize(&quot;permitAll()&quot;)
+  @Operation(
+      summary = &quot;Aceptar una invitación&quot;,
+      description =
+          &quot;Acceso sin autenticación. Define la contraseña (mínimo 10 caracteres con letra y &quot;
+              + &quot;dígito) y activa la cuenta con el rol de la invitación.&quot;)
+  public MessageResponse aceptar(@Valid @RequestBody AceptarInvitacionRequest request) {
+<span class="fc" id="L107">    return invitacionService.aceptar(request);</span>
+  }
+
+  private UUID administradorId(Authentication authentication) {
+<span class="pc bpc" id="L111" title="2 of 4 branches missed.">    if (authentication == null || !(authentication.getDetails() instanceof JwtData jwtData)) {</span>
+<span class="nc" id="L112">      throw new ApiException(</span>
+          HttpStatus.UNAUTHORIZED,
+          &quot;authentication_required&quot;,
+          &quot;Autenticación requerida&quot;,
+          &quot;Se requiere una sesión válida para gestionar invitaciones.&quot;);
+    }
+<span class="fc" id="L118">    return jwtData.userId();</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

@@ -78,6 +78,9 @@ import org.testcontainers.utility.DockerImageName;
   InspeccionMapperImpl.class,
   JsonSchemaValidatorService.class,
   VeredictoRevisionService.class,
+  gt.usac.cunoc.sgp.revision.service.RevisionService.class,
+  gt.usac.cunoc.sgp.revision.service.RevisionDetalleService.class,
+  gt.usac.cunoc.sgp.revision.service.RevisionIndicePreliminarService.class,
   gt.usac.cunoc.sgp.revision.service.ObservacionService.class,
   gt.usac.cunoc.sgp.formulario.validation.ValidadorAnclajeFormulario.class,
   gt.usac.cunoc.sgp.inspeccion.validation.ValidadorCategoriaFotografica.class,
@@ -122,6 +125,8 @@ class VeredictoRevisionIntegrationTest {
   @Autowired private gt.usac.cunoc.sgp.revision.repository.RevisionRepository revisiones;
   @Autowired private gt.usac.cunoc.sgp.revision.service.AtencionObservacionesService atencion;
   @Autowired private gt.usac.cunoc.sgp.revision.service.ObservacionService observacionesService;
+  @Autowired private gt.usac.cunoc.sgp.revision.service.RevisionService bandejas;
+  @Autowired private gt.usac.cunoc.sgp.revision.service.RevisionDetalleService detalles;
   private UUID cicloId;
   private UUID revisorId;
 
@@ -555,6 +560,32 @@ class VeredictoRevisionIntegrationTest {
         "update inspeccion set asignacion_puente_id=? where id=?", asignacion, inspeccionId);
   }
 
+  @ParameterizedTest
+  @ValueSource(strings = {"APROBADA", "RECHAZADA", "CAMBIOS_SOLICITADOS"})
+  void veredictoMantieneRevisionAccesibleEnRevisadas(String veredicto) {
+    assertThat(bandejas.listarResueltas(revisorId, 0, 20)).isEmpty();
+    veredictos.emitir(cicloId, revisorId, solicitud(VeredictoRevision.valueOf(veredicto)));
+    var pagina = bandejas.listarResueltas(revisorId, 0, 1);
+    assertThat(pagina.getTotalElements()).isEqualTo(1);
+    assertThat(pagina.getContent())
+        .extracting(RevisionResueltaResponse::revisionId)
+        .containsExactly(cicloId);
+    assertThat(pagina.getContent().getFirst().veredicto()).isEqualTo(veredicto);
+    assertThat(detalles.obtener(cicloId, revisorId).estadoRevision()).isEqualTo("RESUELTA");
+    assertThat(veredictos.resultado(cicloId, revisorId).calificacion())
+        .isEqualByComparingTo("87.65");
+    UUID otro = UUID.randomUUID();
+    crearUsuario(otro, "CATEDRATICO");
+    autenticar(otro, RoleName.CATEDRATICO);
+    assertThat(bandejas.listarResueltas(otro, 0, 20)).isEmpty();
+    assertThatThrownBy(() -> detalles.obtener(cicloId, otro)).isInstanceOf(ApiException.class);
+    assertThatThrownBy(() -> veredictos.resultado(cicloId, otro)).isInstanceOf(ApiException.class);
+    assertThatThrownBy(() -> veredictos.historial(inspeccionId, otro))
+        .isInstanceOf(ApiException.class);
+    assertThatThrownBy(() -> observacionesService.listar(cicloId, otro))
+        .isInstanceOf(ApiException.class);
+  }
+
   @Test
   void atenderResolverYReenviarConservaElCicloAnteriorYNotificaUnaVez() {
     asignarPuente();
@@ -623,6 +654,24 @@ class VeredictoRevisionIntegrationTest {
         .extracting(RevisionResultadoResponse::numeroCiclo)
         .containsExactly(2, 1);
     assertThat(veredictos.resultado(cicloId, autorId).calificacion()).isEqualByComparingTo("87.65");
+    assertThat(bandejas.listarResueltas(revisorId, 0, 20).getContent())
+        .extracting(RevisionResueltaResponse::revisionId)
+        .containsExactly(cicloId);
+    autenticar(revisorId, RoleName.CATEDRATICO);
+    assertThat(detalles.obtener(cicloId, revisorId).estadoRevision()).isEqualTo("RESUELTA");
+    assertThat(veredictos.historial(inspeccionId, revisorId))
+        .extracting(RevisionResultadoResponse::numeroCiclo)
+        .containsExactly(2, 1);
+    assertThat(veredictos.resultado(cicloId, revisorId).calificacion())
+        .isEqualByComparingTo("87.65");
+    assertThat(observacionesService.listar(cicloId, revisorId).observaciones())
+        .anySatisfy(
+            o -> {
+              assertThat(o.id()).isEqualTo(obs);
+              assertThat(o.respuestaAutor()).isEqualTo("Corregido en formulario");
+              assertThat(o.resueltoPorId()).isEqualTo(autorId);
+            });
+    autenticar(autorId, RoleName.ESTUDIANTE);
     assertThatThrownBy(
             () ->
                 atencion.resolver(

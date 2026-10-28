@@ -1,0 +1,292 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AsignacionPuenteService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">sgp-api</a> &gt; <a href="index.source.html" class="el_package">gt.usac.cunoc.sgp.puente.service</a> &gt; <span class="el_source">AsignacionPuenteService.java</span></div><h1>AsignacionPuenteService.java</h1><pre class="source lang-java linenums">package gt.usac.cunoc.sgp.puente.service;
+
+import gt.usac.cunoc.sgp.common.audit.AuditService;
+import gt.usac.cunoc.sgp.common.exception.ApiException;
+import gt.usac.cunoc.sgp.curso.repository.CursoEstudianteRepository;
+import gt.usac.cunoc.sgp.inspeccion.entity.Inspeccion;
+import gt.usac.cunoc.sgp.inspeccion.repository.InspeccionRepository;
+import gt.usac.cunoc.sgp.puente.dto.AsignacionPuenteResponse;
+import gt.usac.cunoc.sgp.puente.dto.AsignarPuenteRequest;
+import gt.usac.cunoc.sgp.puente.dto.EstudianteAsignableResponse;
+import gt.usac.cunoc.sgp.puente.dto.PuenteAsignableResponse;
+import gt.usac.cunoc.sgp.puente.dto.RevocarAsignacionPuenteRequest;
+import gt.usac.cunoc.sgp.puente.entity.AsignacionPuente;
+import gt.usac.cunoc.sgp.puente.entity.Puente;
+import gt.usac.cunoc.sgp.puente.repository.AsignacionPuenteRepository;
+import gt.usac.cunoc.sgp.puente.repository.PuenteRepository;
+import gt.usac.cunoc.sgp.usuario.dto.MessageResponse;
+import gt.usac.cunoc.sgp.usuario.entity.UserAccount;
+import gt.usac.cunoc.sgp.usuario.model.RoleName;
+import gt.usac.cunoc.sgp.usuario.repository.UserAccountRepository;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+@Service
+@Transactional(readOnly = true)
+public class AsignacionPuenteService {
+
+<span class="fc" id="L38">  private static final ZoneId ZONA_GUATEMALA = ZoneId.of(&quot;America/Guatemala&quot;);</span>
+
+  private final UserAccountRepository usuarios;
+  private final CursoEstudianteRepository inscripciones;
+  private final PuenteRepository puentes;
+  private final AsignacionPuenteRepository asignaciones;
+  private final InspeccionRepository inspecciones;
+  private final AuditService auditoria;
+  private final Clock clock;
+
+  public AsignacionPuenteService(
+      UserAccountRepository usuarios,
+      CursoEstudianteRepository inscripciones,
+      PuenteRepository puentes,
+      AsignacionPuenteRepository asignaciones,
+      AuditService auditoria,
+      Clock clock) {
+<span class="fc" id="L55">    this(usuarios, inscripciones, puentes, asignaciones, null, auditoria, clock);</span>
+<span class="fc" id="L56">  }</span>
+
+  @Autowired
+  public AsignacionPuenteService(
+      UserAccountRepository usuarios,
+      CursoEstudianteRepository inscripciones,
+      PuenteRepository puentes,
+      AsignacionPuenteRepository asignaciones,
+      InspeccionRepository inspecciones,
+      AuditService auditoria,
+<span class="fc" id="L66">      Clock clock) {</span>
+<span class="fc" id="L67">    this.usuarios = usuarios;</span>
+<span class="fc" id="L68">    this.inscripciones = inscripciones;</span>
+<span class="fc" id="L69">    this.puentes = puentes;</span>
+<span class="fc" id="L70">    this.asignaciones = asignaciones;</span>
+<span class="fc" id="L71">    this.inspecciones = inspecciones;</span>
+<span class="fc" id="L72">    this.auditoria = auditoria;</span>
+<span class="fc" id="L73">    this.clock = clock;</span>
+<span class="fc" id="L74">  }</span>
+
+  @PreAuthorize(&quot;hasRole('CATEDRATICO')&quot;)
+  public List&lt;EstudianteAsignableResponse&gt; listarEstudiantesAsignables(String emailCatedratico) {
+<span class="fc" id="L78">    UserAccount catedratico = buscarCatedratico(emailCatedratico);</span>
+<span class="fc" id="L79">    return asignaciones.findEstudiantesAsignables(catedratico.getId()).stream()</span>
+<span class="fc" id="L80">        .map(</span>
+            inscripcion -&gt;
+<span class="fc" id="L82">                new EstudianteAsignableResponse(</span>
+<span class="fc" id="L83">                    inscripcion.getCursoEstudianteId(),</span>
+<span class="fc" id="L84">                    inscripcion.getEstudianteId(),</span>
+<span class="fc" id="L85">                    inscripcion.getEstudianteEmail(),</span>
+<span class="fc" id="L86">                    inscripcion.getCursoId(),</span>
+<span class="fc" id="L87">                    inscripcion.getCursoNombre(),</span>
+<span class="fc" id="L88">                    inscripcion.getPeriodo(),</span>
+<span class="fc" id="L89">                    inscripcion.getEstudianteNombre()))</span>
+<span class="fc" id="L90">        .toList();</span>
+  }
+
+  @PreAuthorize(&quot;hasRole('CATEDRATICO')&quot;)
+  public List&lt;PuenteAsignableResponse&gt; listarPuentesAsignables(String emailCatedratico) {
+<span class="nc" id="L95">    buscarCatedratico(emailCatedratico);</span>
+<span class="nc" id="L96">    return puentes</span>
+<span class="nc" id="L97">        .findCatalogoActivo(null, org.springframework.data.domain.Pageable.unpaged())</span>
+<span class="nc" id="L98">        .stream()</span>
+<span class="nc" id="L99">        .map(</span>
+            puente -&gt;
+<span class="nc" id="L101">                new PuenteAsignableResponse(puente.getId(), puente.getCodigo(), puente.getNombre()))</span>
+<span class="nc" id="L102">        .toList();</span>
+  }
+
+  @PreAuthorize(&quot;hasRole('CATEDRATICO')&quot;)
+  public List&lt;AsignacionPuenteResponse&gt; listarAsignaciones(String emailCatedratico) {
+<span class="nc" id="L107">    return asignaciones</span>
+<span class="nc" id="L108">        .findActivasByCatedraticoId(buscarCatedratico(emailCatedratico).getId())</span>
+<span class="nc" id="L109">        .stream()</span>
+<span class="nc" id="L110">        .map(this::respuesta)</span>
+<span class="nc" id="L111">        .toList();</span>
+  }
+
+  @Transactional
+  @PreAuthorize(&quot;hasRole('CATEDRATICO')&quot;)
+  public MessageResponse asignar(String emailCatedratico, AsignarPuenteRequest request) {
+<span class="fc" id="L117">    UserAccount catedratico = buscarCatedratico(emailCatedratico);</span>
+<span class="fc" id="L118">    var inscripcion =</span>
+        asignaciones
+<span class="fc" id="L120">            .findInscripcionParaAsignacion(request.cursoEstudianteId(), catedratico.getId())</span>
+<span class="pc" id="L121">            .orElseThrow(() -&gt; inscripcionNoEncontrada());</span>
+<span class="fc" id="L122">    validarInscripcion(inscripcion);</span>
+<span class="fc" id="L123">    Puente puente =</span>
+        puentes
+<span class="fc" id="L125">            .findById(request.puenteId())</span>
+<span class="fc" id="L126">            .orElseThrow(</span>
+                () -&gt;
+<span class="nc" id="L128">                    new ApiException(</span>
+                        HttpStatus.NOT_FOUND,
+                        &quot;puente_no_encontrado&quot;,
+                        &quot;Puente no encontrado&quot;,
+                        &quot;No existe el puente solicitado&quot;));
+<span class="fc bfc" id="L133" title="All 2 branches covered.">    if (!puente.isActivo()) {</span>
+<span class="fc" id="L134">      throw new ApiException(</span>
+          HttpStatus.UNPROCESSABLE_ENTITY,
+          &quot;puente_inactivo&quot;,
+          &quot;Puente inactivo&quot;,
+          &quot;No es posible asignar un puente inactivo&quot;);
+    }
+<span class="pc bpc" id="L140" title="1 of 2 branches missed.">    if (asignaciones.existsByCursoEstudiante_IdAndPuente_IdAndRevocadoEnIsNull(</span>
+<span class="fc" id="L141">        request.cursoEstudianteId(), request.puenteId())) {</span>
+<span class="nc" id="L142">      throw new ApiException(</span>
+          HttpStatus.CONFLICT,
+          &quot;puente_ya_asignado&quot;,
+          &quot;Puente ya asignado&quot;,
+          &quot;El puente ya está asignado a este estudiante en el curso actual&quot;);
+    }
+
+<span class="fc" id="L149">    Instant ahora = clock.instant();</span>
+<span class="fc" id="L150">    AsignacionPuente asignacion =</span>
+<span class="fc" id="L151">        asignaciones.save(</span>
+            new AsignacionPuente(
+<span class="fc" id="L153">                inscripciones.getReferenceById(inscripcion.getId()), puente, catedratico, ahora));</span>
+<span class="fc" id="L154">    auditoria.register(</span>
+<span class="fc" id="L155">        catedratico.getId(),</span>
+        &quot;ASIGNAR_PUENTE&quot;,
+        &quot;asignacion_puente&quot;,
+<span class="fc" id="L158">        asignacion.getId(),</span>
+<span class="fc" id="L159">        Map.of(</span>
+<span class="fc" id="L160">            &quot;cursoEstudianteId&quot;, request.cursoEstudianteId(),</span>
+<span class="fc" id="L161">            &quot;puenteId&quot;, puente.getId(),</span>
+<span class="fc" id="L162">            &quot;cursoId&quot;, inscripcion.getCursoId()),</span>
+        ahora);
+<span class="fc" id="L164">    return new MessageResponse(&quot;Puente asignado al estudiante correctamente&quot;);</span>
+  }
+
+  @Transactional
+  @PreAuthorize(&quot;hasRole('CATEDRATICO')&quot;)
+  public MessageResponse revocar(
+      String emailCatedratico, UUID asignacionId, RevocarAsignacionPuenteRequest request) {
+<span class="fc" id="L171">    UserAccount catedratico = buscarCatedratico(emailCatedratico);</span>
+<span class="fc" id="L172">    AsignacionPuente asignacion =</span>
+        asignaciones
+<span class="fc" id="L174">            .findByIdAndCursoEstudiante_Curso_Catedratico_IdAndRevocadoEnIsNull(</span>
+<span class="fc" id="L175">                asignacionId, catedratico.getId())</span>
+<span class="fc" id="L176">            .orElseThrow(</span>
+                () -&gt;
+<span class="nc" id="L178">                    new ApiException(</span>
+                        HttpStatus.NOT_FOUND,
+                        &quot;asignacion_no_encontrada&quot;,
+                        &quot;Asignación no encontrada&quot;,
+                        &quot;No existe una asignación activa para revocar&quot;));
+<span class="fc" id="L183">    Instant ahora = clock.instant();</span>
+<span class="fc" id="L184">    String motivo = request.motivo().trim();</span>
+<span class="fc" id="L185">    asignacion.revocar(motivo, ahora);</span>
+<span class="fc" id="L186">    auditoria.register(</span>
+<span class="fc" id="L187">        catedratico.getId(),</span>
+        &quot;REVOCAR_ASIGNACION_PUENTE&quot;,
+        &quot;asignacion_puente&quot;,
+<span class="fc" id="L190">        asignacion.getId(),</span>
+<span class="fc" id="L191">        Map.of(&quot;revocadoEn&quot;, ahora.toString(), &quot;motivoRevocacion&quot;, motivo),</span>
+        ahora);
+<span class="fc" id="L193">    return new MessageResponse(&quot;Asignación de puente revocada correctamente&quot;);</span>
+  }
+
+  @PreAuthorize(&quot;hasRole('ESTUDIANTE')&quot;)
+  public List&lt;AsignacionPuenteResponse&gt; listarMisPuentes(String emailEstudiante) {
+<span class="nc" id="L198">    UserAccount estudiante = buscarEstudianteActivo(emailEstudiante);</span>
+<span class="nc" id="L199">    LocalDate hoy = LocalDate.now(clock.withZone(ZONA_GUATEMALA));</span>
+<span class="nc" id="L200">    return asignaciones.findVigentesByEstudianteId(estudiante.getId(), hoy).stream()</span>
+<span class="nc" id="L201">        .map(this::respuesta)</span>
+<span class="nc" id="L202">        .toList();</span>
+  }
+
+  private void validarInscripcion(
+      AsignacionPuenteRepository.InscripcionAsignableProjection inscripcion) {
+<span class="fc bfc" id="L207" title="All 2 branches covered.">    if (!inscripcion.getCursoActivo()) {</span>
+<span class="fc" id="L208">      throw new ApiException(</span>
+          HttpStatus.UNPROCESSABLE_ENTITY,
+          &quot;curso_finalizado&quot;,
+          &quot;Curso finalizado&quot;,
+          &quot;No es posible asignar puentes en un curso finalizado&quot;);
+    }
+<span class="pc bpc" id="L214" title="1 of 2 branches missed.">    if (!&quot;ACTIVO&quot;.equals(inscripcion.getEstado())) {</span>
+<span class="nc" id="L215">      throw new ApiException(</span>
+          HttpStatus.UNPROCESSABLE_ENTITY,
+          &quot;estudiante_no_vinculado&quot;,
+          &quot;Estudiante no vinculado&quot;,
+          &quot;El estudiante no tiene una vinculación activa con el curso&quot;);
+    }
+<span class="pc bpc" id="L221" title="2 of 4 branches missed.">    if (!inscripcion.getEstudianteActivo() || !inscripcion.getEstudianteActivado()) {</span>
+<span class="nc" id="L222">      throw new ApiException(</span>
+          HttpStatus.UNPROCESSABLE_ENTITY,
+          &quot;estudiante_inactivo&quot;,
+          &quot;Estudiante inactivo&quot;,
+          &quot;El estudiante debe estar activo para recibir asignaciones&quot;);
+    }
+<span class="fc" id="L228">  }</span>
+
+  private ApiException inscripcionNoEncontrada() {
+<span class="nc" id="L231">    return new ApiException(</span>
+        HttpStatus.NOT_FOUND,
+        &quot;inscripcion_no_encontrada&quot;,
+        &quot;Inscripción no encontrada&quot;,
+        &quot;El estudiante no está vinculado a uno de tus cursos&quot;);
+  }
+
+  private UserAccount buscarCatedratico(String email) {
+<span class="fc" id="L239">    return usuarios</span>
+<span class="fc" id="L240">        .findByEmail(email)</span>
+<span class="fc" id="L241">        .filter(</span>
+<span class="pc bpc" id="L242" title="2 of 4 branches missed.">            usuario -&gt; usuario.isActive() &amp;&amp; usuario.getRole().getName() == RoleName.CATEDRATICO)</span>
+<span class="fc" id="L243">        .orElseThrow(</span>
+            () -&gt;
+<span class="nc" id="L245">                new ApiException(</span>
+                    HttpStatus.FORBIDDEN,
+                    &quot;catedratico_invalido&quot;,
+                    &quot;Catedratico invalido&quot;,
+                    &quot;Solo un catedratico activo puede gestionar asignaciones&quot;));
+  }
+
+  private UserAccount buscarEstudianteActivo(String email) {
+<span class="nc" id="L253">    return usuarios</span>
+<span class="nc" id="L254">        .findByEmail(email)</span>
+<span class="nc" id="L255">        .filter(</span>
+            usuario -&gt;
+<span class="nc bnc" id="L257" title="All 2 branches missed.">                usuario.isActive()</span>
+<span class="nc bnc" id="L258" title="All 2 branches missed.">                    &amp;&amp; usuario.isActivated()</span>
+<span class="nc bnc" id="L259" title="All 2 branches missed.">                    &amp;&amp; usuario.getRole().getName() == RoleName.ESTUDIANTE)</span>
+<span class="nc" id="L260">        .orElseThrow(</span>
+            () -&gt;
+<span class="nc" id="L262">                new ApiException(</span>
+                    HttpStatus.FORBIDDEN,
+                    &quot;estudiante_invalido&quot;,
+                    &quot;Estudiante invalido&quot;,
+                    &quot;Solo un estudiante activo puede consultar sus asignaciones&quot;));
+  }
+
+  private AsignacionPuenteResponse respuesta(
+      AsignacionPuenteRepository.AsignacionPuenteProjection asignacion) {
+    Inspeccion inspeccion =
+<span class="nc bnc" id="L272" title="All 2 branches missed.">        inspecciones == null</span>
+<span class="nc" id="L273">            ? null</span>
+            : inspecciones
+<span class="nc" id="L275">                .findTopByAsignacionPuenteIdAndEliminadoEnIsNullOrderByCreadoEnDesc(</span>
+<span class="nc" id="L276">                    asignacion.getId())</span>
+<span class="nc" id="L277">                .orElse(null);</span>
+<span class="nc" id="L278">    return new AsignacionPuenteResponse(</span>
+<span class="nc" id="L279">        asignacion.getId(),</span>
+<span class="nc" id="L280">        asignacion.getCursoEstudianteId(),</span>
+<span class="nc" id="L281">        asignacion.getEstudianteEmail(),</span>
+<span class="nc" id="L282">        asignacion.getCursoNombre(),</span>
+<span class="nc" id="L283">        asignacion.getPeriodo(),</span>
+<span class="nc" id="L284">        asignacion.getPuenteId(),</span>
+<span class="nc" id="L285">        asignacion.getPuenteCodigo(),</span>
+<span class="nc" id="L286">        asignacion.getPuenteNombre(),</span>
+<span class="nc" id="L287">        asignacion.getAsignadoEn(),</span>
+<span class="nc bnc" id="L288" title="All 2 branches missed.">        inspeccion != null ? inspeccion.getId() : null,</span>
+<span class="nc bnc" id="L289" title="All 2 branches missed.">        inspeccion != null ? inspeccion.getEstado() : null);</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AuditLog.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">sgp-api</a> &gt; <a href="index.source.html" class="el_package">gt.usac.cunoc.sgp.common.audit</a> &gt; <span class="el_source">AuditLog.java</span></div><h1>AuditLog.java</h1><pre class="source lang-java linenums">package gt.usac.cunoc.sgp.common.audit;
+
+import gt.usac.cunoc.sgp.common.util.UuidV7Generator;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.Id;
+import jakarta.persistence.Table;
+import java.time.Instant;
+import java.util.Map;
+import java.util.UUID;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
+
+@Entity
+@Table(name = &quot;auditoria&quot;)
+public class AuditLog {
+
+  @Id private UUID id;
+
+  @Column(name = &quot;usuario_id&quot;)
+  private UUID userId;
+
+  @Column(name = &quot;accion&quot;, nullable = false, length = 100)
+  private String action;
+
+  @Column(name = &quot;entidad&quot;, nullable = false, length = 100)
+  private String entity;
+
+  @Column(name = &quot;entidad_id&quot;)
+  private UUID entityId;
+
+  @JdbcTypeCode(SqlTypes.JSON)
+  @Column(name = &quot;valores_posteriores&quot;, columnDefinition = &quot;jsonb&quot;)
+  private Map&lt;String, Object&gt; valuesAfter;
+
+  @Column(name = &quot;creado_en&quot;, nullable = false)
+  private Instant createdAt;
+
+<span class="nc" id="L39">  protected AuditLog() {}</span>
+
+  public AuditLog(
+      UUID userId,
+      String action,
+      String entity,
+      UUID entityId,
+      Map&lt;String, Object&gt; valuesAfter,
+<span class="nc" id="L47">      Instant now) {</span>
+<span class="nc" id="L48">    this.id = UuidV7Generator.generate();</span>
+<span class="nc" id="L49">    this.userId = userId;</span>
+<span class="nc" id="L50">    this.action = action;</span>
+<span class="nc" id="L51">    this.entity = entity;</span>
+<span class="nc" id="L52">    this.entityId = entityId;</span>
+<span class="nc" id="L53">    this.valuesAfter = valuesAfter;</span>
+<span class="nc" id="L54">    this.createdAt = now;</span>
+<span class="nc" id="L55">  }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

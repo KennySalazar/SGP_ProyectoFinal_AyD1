@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>JwtAuthenticationFilter.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">sgp-api</a> &gt; <a href="index.source.html" class="el_package">gt.usac.cunoc.sgp.common.security</a> &gt; <span class="el_source">JwtAuthenticationFilter.java</span></div><h1>JwtAuthenticationFilter.java</h1><pre class="source lang-java linenums">package gt.usac.cunoc.sgp.common.security;
+
+import gt.usac.cunoc.sgp.usuario.entity.UserAccount;
+import gt.usac.cunoc.sgp.usuario.repository.UserAccountRepository;
+import jakarta.servlet.FilterChain;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import java.io.IOException;
+import java.util.List;
+import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.web.AuthenticationEntryPoint;
+import org.springframework.stereotype.Component;
+import org.springframework.web.filter.OncePerRequestFilter;
+
+@Component
+public class JwtAuthenticationFilter extends OncePerRequestFilter {
+
+  private final JwtService jwtService;
+  private final UserAccountRepository users;
+  private final AuthenticationEntryPoint authenticationEntryPoint;
+
+  public JwtAuthenticationFilter(
+      JwtService jwtService,
+      UserAccountRepository users,
+<span class="fc" id="L29">      AuthenticationEntryPoint authenticationEntryPoint) {</span>
+<span class="fc" id="L30">    this.jwtService = jwtService;</span>
+<span class="fc" id="L31">    this.users = users;</span>
+<span class="fc" id="L32">    this.authenticationEntryPoint = authenticationEntryPoint;</span>
+<span class="fc" id="L33">  }</span>
+
+  @Override
+  protected void doFilterInternal(
+      HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
+      throws ServletException, IOException {
+<span class="fc" id="L39">    String authorization = request.getHeader(&quot;Authorization&quot;);</span>
+<span class="pc bpc" id="L40" title="1 of 4 branches missed.">    if (authorization == null || authorization.isBlank()) {</span>
+<span class="fc" id="L41">      filterChain.doFilter(request, response);</span>
+<span class="fc" id="L42">      return;</span>
+    }
+<span class="pc bpc" id="L44" title="1 of 2 branches missed.">    if (!authorization.startsWith(&quot;Bearer &quot;)) {</span>
+<span class="nc" id="L45">      authenticationEntryPoint.commence(</span>
+          request, response, new BadCredentialsException(&quot;Bearer invalido&quot;));
+<span class="nc" id="L47">      return;</span>
+    }
+<span class="fc" id="L49">    JwtData data = jwtService.parse(authorization.substring(7).trim()).orElse(null);</span>
+<span class="fc bfc" id="L50" title="All 2 branches covered.">    UserAccount user = data == null ? null : users.findWithRoleById(data.userId()).orElse(null);</span>
+<span class="fc bfc" id="L51" title="All 2 branches covered.">    if (!isValid(data, user)) {</span>
+<span class="fc" id="L52">      SecurityContextHolder.clearContext();</span>
+<span class="fc" id="L53">      authenticationEntryPoint.commence(</span>
+          request, response, new BadCredentialsException(&quot;JWT invalido&quot;));
+<span class="fc" id="L55">      return;</span>
+    }
+<span class="fc" id="L57">    UsernamePasswordAuthenticationToken authentication =</span>
+        new UsernamePasswordAuthenticationToken(
+<span class="fc" id="L59">            user.getEmail(),</span>
+            null,
+<span class="fc" id="L61">            List.of(new SimpleGrantedAuthority(&quot;ROLE_&quot; + user.getRole().getName().name())));</span>
+<span class="fc" id="L62">    authentication.setDetails(data);</span>
+<span class="fc" id="L63">    SecurityContextHolder.getContext().setAuthentication(authentication);</span>
+<span class="fc" id="L64">    filterChain.doFilter(request, response);</span>
+<span class="fc" id="L65">  }</span>
+
+  private boolean isValid(JwtData data, UserAccount user) {
+<span class="pc bpc" id="L68" title="1 of 4 branches missed.">    return data != null</span>
+        &amp;&amp; user != null
+<span class="fc bfc" id="L70" title="All 2 branches covered.">        &amp;&amp; user.isActive()</span>
+<span class="fc bfc" id="L71" title="All 2 branches covered.">        &amp;&amp; user.isActivated()</span>
+<span class="pc bpc" id="L72" title="1 of 2 branches missed.">        &amp;&amp; user.isVerified()</span>
+<span class="pc bpc" id="L73" title="1 of 2 branches missed.">        &amp;&amp; user.getRole().getName() == data.role()</span>
+<span class="fc bfc" id="L74" title="All 2 branches covered.">        &amp;&amp; user.getTokenVersion() == data.tokenVersion();</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

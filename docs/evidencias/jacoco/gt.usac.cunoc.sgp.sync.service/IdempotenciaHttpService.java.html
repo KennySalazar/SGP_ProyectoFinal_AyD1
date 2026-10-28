@@ -1,0 +1,122 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>IdempotenciaHttpService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">sgp-api</a> &gt; <a href="index.source.html" class="el_package">gt.usac.cunoc.sgp.sync.service</a> &gt; <span class="el_source">IdempotenciaHttpService.java</span></div><h1>IdempotenciaHttpService.java</h1><pre class="source lang-java linenums">package gt.usac.cunoc.sgp.sync.service;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import gt.usac.cunoc.sgp.common.audit.model.AccionAuditoria;
+import gt.usac.cunoc.sgp.common.audit.service.AuditoriaWriter;
+import gt.usac.cunoc.sgp.common.exception.ApiException;
+import gt.usac.cunoc.sgp.common.util.UuidV7Generator;
+import gt.usac.cunoc.sgp.sync.http.ReservaIdempotente;
+import gt.usac.cunoc.sgp.sync.http.RespuestaIdempotente;
+import gt.usac.cunoc.sgp.sync.repository.OperacionHttpRepository;
+import java.time.Clock;
+import java.time.Duration;
+import java.util.Base64;
+import java.util.LinkedHashMap;
+import java.util.UUID;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpStatus;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
+
+@Service
+public class IdempotenciaHttpService {
+<span class="fc" id="L26">  private static final Logger LOGGER = LoggerFactory.getLogger(IdempotenciaHttpService.class);</span>
+  private final OperacionHttpRepository repositorio;
+  private final ObjectMapper json;
+  private final Clock clock;
+  private final AuditoriaWriter auditoria;
+
+  public IdempotenciaHttpService(
+      OperacionHttpRepository repositorio,
+      ObjectMapper json,
+      Clock clock,
+<span class="fc" id="L36">      AuditoriaWriter auditoria) {</span>
+<span class="fc" id="L37">    this.repositorio = repositorio;</span>
+<span class="fc" id="L38">    this.json = json;</span>
+<span class="fc" id="L39">    this.clock = clock;</span>
+<span class="fc" id="L40">    this.auditoria = auditoria;</span>
+<span class="fc" id="L41">  }</span>
+
+  @Transactional(propagation = Propagation.REQUIRES_NEW)
+  public ReservaIdempotente reservar(
+      UUID usuario, String clave, String metodo, String ruta, String huella) {
+<span class="pc bpc" id="L46" title="1 of 2 branches missed.">    if (!repositorio.bloquear(usuario, clave)) throw enProceso();</span>
+<span class="fc" id="L47">    var filas = repositorio.buscar(usuario, clave);</span>
+<span class="fc bfc" id="L48" title="All 2 branches covered.">    if (!filas.isEmpty()) {</span>
+<span class="fc" id="L49">      var fila = filas.getFirst();</span>
+<span class="fc bfc" id="L50" title="All 2 branches covered.">      if (!metodo.equals(fila.get(&quot;metodo&quot;))</span>
+<span class="fc bfc" id="L51" title="All 2 branches covered.">          || !ruta.equals(fila.get(&quot;ruta&quot;))</span>
+<span class="fc bfc" id="L52" title="All 2 branches covered.">          || !huella.equals(fila.get(&quot;hash_solicitud&quot;))</span>
+<span class="pc bpc" id="L53" title="1 of 2 branches missed.">          || !&quot;http_hu043&quot;.equals(fila.get(&quot;entidad&quot;))) {</span>
+<span class="fc" id="L54">        throw new ApiException(</span>
+            HttpStatus.UNPROCESSABLE_ENTITY,
+            &quot;idempotencia_solicitud_distinta&quot;,
+            &quot;Clave utilizada&quot;,
+            &quot;La clave ya se uso con otra solicitud. Utilice una clave nueva.&quot;);
+      }
+<span class="fc bfc" id="L60" title="All 2 branches covered.">      if (!&quot;COMPLETADA&quot;.equals(fila.get(&quot;estado&quot;))) throw enProceso();</span>
+      try {
+<span class="fc" id="L62">        JsonNode valor = json.readTree(fila.get(&quot;respuesta&quot;).toString());</span>
+<span class="fc" id="L63">        var encabezados = new LinkedHashMap&lt;String, String&gt;();</span>
+<span class="fc" id="L64">        valor</span>
+<span class="fc" id="L65">            .path(&quot;encabezados&quot;)</span>
+<span class="fc" id="L66">            .fields()</span>
+<span class="fc" id="L67">            .forEachRemaining(e -&gt; encabezados.put(e.getKey(), e.getValue().asText()));</span>
+<span class="fc" id="L68">        return new ReservaIdempotente(</span>
+<span class="fc" id="L69">            (UUID) fila.get(&quot;id&quot;),</span>
+            new RespuestaIdempotente(
+<span class="fc" id="L71">                ((Number) fila.get(&quot;codigo_respuesta&quot;)).intValue(),</span>
+<span class="fc" id="L72">                Base64.getDecoder().decode(valor.path(&quot;cuerpoBase64&quot;).asText()),</span>
+                encabezados));
+<span class="nc" id="L74">      } catch (java.io.IOException | IllegalArgumentException e) {</span>
+<span class="nc" id="L75">        throw new IllegalStateException(&quot;No se pudo recuperar la respuesta idempotente&quot;, e);</span>
+      }
+    }
+<span class="fc" id="L78">    UUID id = UuidV7Generator.generate();</span>
+<span class="fc" id="L79">    var ahora = clock.instant();</span>
+<span class="fc" id="L80">    repositorio.insertar(</span>
+<span class="fc" id="L81">        id, usuario, clave, metodo, ruta, huella, ahora, ahora.plus(Duration.ofDays(7)));</span>
+<span class="fc" id="L82">    return new ReservaIdempotente(id, null);</span>
+  }
+
+  @Transactional(propagation = Propagation.MANDATORY)
+  public void completar(UUID id, UUID usuario, String clave, RespuestaIdempotente respuesta) {
+<span class="fc" id="L87">    var valor = json.createObjectNode();</span>
+<span class="fc" id="L88">    valor.put(&quot;cuerpoBase64&quot;, Base64.getEncoder().encodeToString(respuesta.cuerpo()));</span>
+<span class="fc" id="L89">    valor.set(&quot;encabezados&quot;, json.valueToTree(respuesta.encabezados()));</span>
+<span class="fc" id="L90">    int filas =</span>
+<span class="fc" id="L91">        repositorio.completar(id, usuario, respuesta.codigo(), valor.toString(), clock.instant());</span>
+<span class="pc bpc" id="L92" title="1 of 2 branches missed.">    if (filas != 1) throw new IllegalStateException(&quot;La reserva idempotente no esta disponible&quot;);</span>
+<span class="fc" id="L93">    auditoria.registrarEnTransaccion(</span>
+        usuario,
+        AccionAuditoria.MODIFICAR,
+        &quot;operacion_idempotente&quot;,
+        id,
+        null,
+<span class="fc" id="L99">        json.createObjectNode().put(&quot;clave&quot;, clave).put(&quot;codigo&quot;, respuesta.codigo()),</span>
+        &quot;HU-043&quot;);
+<span class="fc" id="L101">    LOGGER.info(&quot;Idempotencia usuario={} clave={} codigo={}&quot;, usuario, clave, respuesta.codigo());</span>
+<span class="fc" id="L102">  }</span>
+
+  @Transactional(propagation = Propagation.REQUIRES_NEW)
+  public void completarError(UUID id, UUID usuario, String clave, RespuestaIdempotente respuesta) {
+<span class="fc" id="L106">    completar(id, usuario, clave, respuesta);</span>
+<span class="fc" id="L107">  }</span>
+
+  @Transactional(propagation = Propagation.REQUIRES_NEW)
+  public void liberar(UUID id) {
+<span class="fc" id="L111">    repositorio.liberar(id);</span>
+<span class="fc" id="L112">  }</span>
+
+  private ApiException enProceso() {
+<span class="fc" id="L115">    return new ApiException(</span>
+        HttpStatus.CONFLICT,
+        &quot;operacion_en_proceso&quot;,
+        &quot;Operacion en proceso&quot;,
+        &quot;La operacion sigue en proceso. Reintente con la misma clave.&quot;);
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

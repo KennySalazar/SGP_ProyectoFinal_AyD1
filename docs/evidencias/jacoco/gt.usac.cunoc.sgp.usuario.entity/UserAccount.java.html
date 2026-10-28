@@ -1,0 +1,259 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>UserAccount.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">sgp-api</a> &gt; <a href="index.source.html" class="el_package">gt.usac.cunoc.sgp.usuario.entity</a> &gt; <span class="el_source">UserAccount.java</span></div><h1>UserAccount.java</h1><pre class="source lang-java linenums">package gt.usac.cunoc.sgp.usuario.entity;
+
+import gt.usac.cunoc.sgp.common.util.UuidV7Generator;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.PrePersist;
+import jakarta.persistence.PreUpdate;
+import jakarta.persistence.Table;
+import jakarta.persistence.Version;
+import java.time.Duration;
+import java.time.Instant;
+import java.util.UUID;
+
+@Entity
+@Table(name = &quot;usuario&quot;)
+public class UserAccount {
+
+<span class="fc" id="L22">  private static final Duration LOGIN_WINDOW = Duration.ofMinutes(15);</span>
+<span class="fc" id="L23">  private static final Duration LOCK_DURATION = Duration.ofMinutes(15);</span>
+  private static final int MAX_FAILED_LOGIN_ATTEMPTS = 5;
+
+  @Id private UUID id;
+
+  @Column(nullable = false, unique = true, length = 320)
+  private String email;
+
+  @Column(name = &quot;password_hash&quot;, nullable = false, length = 100)
+  private String passwordHash;
+
+  @Column(name = &quot;verificado&quot;, nullable = false)
+  private boolean verified;
+
+  @Column(name = &quot;activado&quot;, nullable = false)
+  private boolean activated;
+
+  @Column(name = &quot;activo&quot;, nullable = false)
+  private boolean active;
+
+  @Column(name = &quot;two_factor_habilitado&quot;, nullable = false)
+  private boolean twoFactorEnabled;
+
+  @Column(name = &quot;token_version&quot;, nullable = false)
+  private int tokenVersion;
+
+  @Column(name = &quot;intentos_login_fallidos&quot;, nullable = false)
+  private int failedLoginAttempts;
+
+  @Column(name = &quot;ventana_intentos_iniciada_en&quot;)
+  private Instant failedLoginWindowStartedAt;
+
+  @Column(name = &quot;bloqueado_hasta&quot;)
+  private Instant lockedUntil;
+
+  @ManyToOne(fetch = FetchType.LAZY, optional = false)
+  @JoinColumn(name = &quot;rol_id&quot;, nullable = false)
+  private Role role;
+
+  /** Nulo en las cuentas anteriores a que el perfil fuera obligatorio. */
+  @Column(name = &quot;nombre_completo&quot;, length = 200)
+  private String nombreCompleto;
+
+  /** Identidad visible en el foro y base de las menciones; única sin distinguir mayúsculas. */
+  @Column(name = &quot;nombre_usuario&quot;, length = 60)
+  private String nombreUsuario;
+
+  @Column(name = &quot;desactivado_en&quot;)
+  private Instant desactivadoEn;
+
+  @Column(name = &quot;desactivado_por_id&quot;)
+  private UUID desactivadoPorId;
+
+  @Column(name = &quot;motivo_desactivacion&quot;, length = 1000)
+  private String motivoDesactivacion;
+
+  @Column(name = &quot;creado_en&quot;, nullable = false, updatable = false)
+  private Instant createdAt;
+
+  @Column(name = &quot;actualizado_en&quot;, nullable = false)
+  private Instant updatedAt;
+
+  @Version private long version;
+
+<span class="fc" id="L87">  protected UserAccount() {}</span>
+
+  public UserAccount(
+<span class="fc" id="L90">      String email, String passwordHash, Role role, boolean verified, boolean activated) {</span>
+<span class="fc" id="L91">    this.id = UuidV7Generator.generate();</span>
+<span class="fc" id="L92">    this.email = email;</span>
+<span class="fc" id="L93">    this.passwordHash = passwordHash;</span>
+<span class="fc" id="L94">    this.role = role;</span>
+<span class="fc" id="L95">    this.verified = verified;</span>
+<span class="fc" id="L96">    this.activated = activated;</span>
+<span class="fc" id="L97">    this.active = true;</span>
+<span class="fc" id="L98">    this.twoFactorEnabled = false;</span>
+<span class="fc" id="L99">  }</span>
+
+  @PrePersist
+  void onCreate() {
+<span class="pc bpc" id="L103" title="1 of 2 branches missed.">    if (id == null) id = UuidV7Generator.generate();</span>
+<span class="fc" id="L104">    Instant now = Instant.now();</span>
+<span class="fc" id="L105">    createdAt = now;</span>
+<span class="fc" id="L106">    updatedAt = now;</span>
+<span class="fc" id="L107">  }</span>
+
+  @PreUpdate
+  void onUpdate() {
+<span class="fc" id="L111">    updatedAt = Instant.now();</span>
+<span class="fc" id="L112">  }</span>
+
+  public UUID getId() {
+<span class="fc" id="L115">    return id;</span>
+  }
+
+  public String getEmail() {
+<span class="fc" id="L119">    return email;</span>
+  }
+
+  public void setEmail(String email) {
+<span class="nc" id="L123">    this.email = email;</span>
+<span class="nc" id="L124">  }</span>
+
+  public String getPasswordHash() {
+<span class="fc" id="L127">    return passwordHash;</span>
+  }
+
+  public boolean isVerified() {
+<span class="fc" id="L131">    return verified;</span>
+  }
+
+  public boolean isActivated() {
+<span class="fc" id="L135">    return activated;</span>
+  }
+
+  public boolean isActive() {
+<span class="fc" id="L139">    return active;</span>
+  }
+
+  public boolean isTwoFactorEnabled() {
+<span class="fc" id="L143">    return twoFactorEnabled;</span>
+  }
+
+  public int getTokenVersion() {
+<span class="fc" id="L147">    return tokenVersion;</span>
+  }
+
+  public Role getRole() {
+<span class="fc" id="L151">    return role;</span>
+  }
+
+  public String getNombreCompleto() {
+<span class="fc" id="L155">    return nombreCompleto;</span>
+  }
+
+  public String getNombreUsuario() {
+<span class="fc" id="L159">    return nombreUsuario;</span>
+  }
+
+  public void actualizarPerfil(String nombreCompleto, String nombreUsuario) {
+<span class="fc" id="L163">    this.nombreCompleto = nombreCompleto;</span>
+<span class="fc" id="L164">    this.nombreUsuario = nombreUsuario;</span>
+<span class="fc" id="L165">  }</span>
+
+  public Instant getLockedUntil() {
+<span class="nc" id="L168">    return lockedUntil;</span>
+  }
+
+  public void verify() {
+<span class="fc" id="L172">    verified = true;</span>
+<span class="fc" id="L173">  }</span>
+
+  public void activate() {
+<span class="fc" id="L176">    activated = true;</span>
+<span class="fc" id="L177">    active = true;</span>
+<span class="fc" id="L178">  }</span>
+
+  public void deactivate() {
+<span class="fc" id="L181">    active = false;</span>
+<span class="fc" id="L182">  }</span>
+
+  /**
+   * Baja lógica (RN-USR-08): la cuenta se conserva para que sus registros sigan atribuidos.
+   * Invalida los tokens de acceso emitidos.
+   */
+  public void desactivar(UUID administradorId, String motivo, Instant ahora) {
+<span class="fc" id="L189">    active = false;</span>
+<span class="fc" id="L190">    desactivadoEn = ahora;</span>
+<span class="fc" id="L191">    desactivadoPorId = administradorId;</span>
+<span class="fc" id="L192">    motivoDesactivacion = motivo;</span>
+<span class="fc" id="L193">    tokenVersion++;</span>
+<span class="fc" id="L194">  }</span>
+
+  /** Recupera el acceso con el mismo rol que tenía antes de la baja. */
+  public void reactivar() {
+<span class="fc" id="L198">    active = true;</span>
+<span class="fc" id="L199">    desactivadoEn = null;</span>
+<span class="fc" id="L200">    desactivadoPorId = null;</span>
+<span class="fc" id="L201">    motivoDesactivacion = null;</span>
+<span class="fc" id="L202">  }</span>
+
+  public Instant getDesactivadoEn() {
+<span class="fc" id="L205">    return desactivadoEn;</span>
+  }
+
+  public UUID getDesactivadoPorId() {
+<span class="nc" id="L209">    return desactivadoPorId;</span>
+  }
+
+  public String getMotivoDesactivacion() {
+<span class="fc" id="L213">    return motivoDesactivacion;</span>
+  }
+
+  public Instant getCreatedAt() {
+<span class="fc" id="L217">    return createdAt;</span>
+  }
+
+  public void setPasswordHash(String passwordHash) {
+<span class="fc" id="L221">    this.passwordHash = passwordHash;</span>
+<span class="fc" id="L222">  }</span>
+
+  public void setTwoFactorEnabled(boolean value) {
+<span class="nc" id="L225">    twoFactorEnabled = value;</span>
+<span class="nc" id="L226">  }</span>
+
+  public void incrementTokenVersion() {
+<span class="fc" id="L229">    tokenVersion++;</span>
+<span class="fc" id="L230">  }</span>
+
+  public void setRole(Role role) {
+<span class="fc" id="L233">    this.role = role;</span>
+<span class="fc" id="L234">  }</span>
+
+  public boolean isLocked(Instant now) {
+<span class="pc bpc" id="L237" title="3 of 4 branches missed.">    return lockedUntil != null &amp;&amp; lockedUntil.isAfter(now);</span>
+  }
+
+  public void registerFailedLogin(Instant now) {
+<span class="pc bpc" id="L241" title="1 of 2 branches missed.">    if (failedLoginWindowStartedAt == null</span>
+<span class="nc bnc" id="L242" title="All 2 branches missed.">        || failedLoginWindowStartedAt.plus(LOGIN_WINDOW).isBefore(now)) {</span>
+<span class="fc" id="L243">      failedLoginWindowStartedAt = now;</span>
+<span class="fc" id="L244">      failedLoginAttempts = 1;</span>
+    } else {
+<span class="nc" id="L246">      failedLoginAttempts++;</span>
+    }
+<span class="pc bpc" id="L248" title="1 of 2 branches missed.">    if (failedLoginAttempts &gt;= MAX_FAILED_LOGIN_ATTEMPTS) {</span>
+<span class="nc" id="L249">      lockedUntil = now.plus(LOCK_DURATION);</span>
+    }
+<span class="fc" id="L251">  }</span>
+
+  public void clearFailedLogins() {
+<span class="fc" id="L254">    failedLoginAttempts = 0;</span>
+<span class="fc" id="L255">    failedLoginWindowStartedAt = null;</span>
+<span class="fc" id="L256">    lockedUntil = null;</span>
+<span class="fc" id="L257">  }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

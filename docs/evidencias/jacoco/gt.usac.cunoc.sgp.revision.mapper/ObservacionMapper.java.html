@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ObservacionMapper.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">sgp-api</a> &gt; <a href="index.source.html" class="el_package">gt.usac.cunoc.sgp.revision.mapper</a> &gt; <span class="el_source">ObservacionMapper.java</span></div><h1>ObservacionMapper.java</h1><pre class="source lang-java linenums">package gt.usac.cunoc.sgp.revision.mapper;
+
+import gt.usac.cunoc.sgp.revision.dto.DestinoObservacion;
+import gt.usac.cunoc.sgp.revision.dto.ObservacionResponse;
+import gt.usac.cunoc.sgp.revision.entity.ObservacionRevision;
+import gt.usac.cunoc.sgp.revision.model.TipoDestinoObservacion;
+import org.mapstruct.Mapper;
+import org.mapstruct.Mapping;
+import org.mapstruct.ReportingPolicy;
+
+@Mapper(componentModel = &quot;spring&quot;, unmappedTargetPolicy = ReportingPolicy.ERROR)
+public interface ObservacionMapper {
+  @Mapping(target = &quot;revisionId&quot;, source = &quot;revision.id&quot;)
+  @Mapping(target = &quot;texto&quot;, source = &quot;contenido&quot;)
+  @Mapping(target = &quot;destino&quot;, expression = &quot;java(destino(observacion))&quot;)
+  ObservacionResponse toResponse(ObservacionRevision observacion);
+
+  default DestinoObservacion destino(ObservacionRevision observacion) {
+<span class="fc bfc" id="L19" title="All 2 branches covered.">    if (observacion.getCategoriaFotografica() != null) {</span>
+<span class="fc" id="L20">      return new DestinoObservacion(</span>
+          TipoDestinoObservacion.CATEGORIA_FOTOGRAFICA,
+          null,
+          null,
+<span class="fc" id="L24">          observacion.getCategoriaFotografica());</span>
+    }
+    // V9 permitía filas sin destino: se conservan como legado, sin inventar un ancla ni una
+    // general.
+<span class="pc bpc" id="L28" title="1 of 2 branches missed.">    if (observacion.getElementoRef() == null) return null;</span>
+<span class="fc" id="L29">    return new DestinoObservacion(</span>
+        TipoDestinoObservacion.ELEMENTO,
+<span class="fc" id="L31">        observacion.getElementoRef(),</span>
+<span class="fc" id="L32">        observacion.getInstanciaElementoId(),</span>
+        null);
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

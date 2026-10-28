@@ -1,0 +1,146 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>InvitacionUsuario.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">sgp-api</a> &gt; <a href="index.source.html" class="el_package">gt.usac.cunoc.sgp.usuario.entity</a> &gt; <span class="el_source">InvitacionUsuario.java</span></div><h1>InvitacionUsuario.java</h1><pre class="source lang-java linenums">package gt.usac.cunoc.sgp.usuario.entity;
+
+import gt.usac.cunoc.sgp.usuario.model.EstadoInvitacion;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Table;
+import jakarta.persistence.Version;
+import java.time.Instant;
+import java.util.UUID;
+
+/** Invitación de un solo uso para crear cuentas que no pueden autorregistrarse (RN-USR-03). */
+@Entity
+@Table(name = &quot;invitacion_usuario&quot;)
+public class InvitacionUsuario {
+
+  @Id private UUID id;
+
+  @Column(nullable = false, length = 320, updatable = false)
+  private String email;
+
+  @ManyToOne(fetch = FetchType.LAZY, optional = false)
+  @JoinColumn(name = &quot;rol_id&quot;, nullable = false, updatable = false)
+  private Role rol;
+
+  /** Solo se guarda el hash SHA-256 del token; el token en claro viaja únicamente en el correo. */
+  @Column(name = &quot;token_hash&quot;, nullable = false, unique = true, length = 64, updatable = false)
+  private String tokenHash;
+
+  @Column(name = &quot;invitado_por_id&quot;, nullable = false, updatable = false)
+  private UUID invitadoPorId;
+
+  @Column(name = &quot;expira_en&quot;, nullable = false, updatable = false)
+  private Instant expiraEn;
+
+  @Column(name = &quot;aceptado_en&quot;)
+  private Instant aceptadoEn;
+
+  @Column(name = &quot;cancelado_en&quot;)
+  private Instant canceladoEn;
+
+  @Column(name = &quot;usuario_creado_id&quot;, updatable = false)
+  private UUID usuarioCreadoId;
+
+  @Column(name = &quot;creado_en&quot;, nullable = false, updatable = false)
+  private Instant creadoEn;
+
+  @Column(name = &quot;actualizado_en&quot;, nullable = false)
+  private Instant actualizadoEn;
+
+  @Version
+  @Column(nullable = false)
+  private long version;
+
+<span class="fc" id="L58">  protected InvitacionUsuario() {}</span>
+
+  public InvitacionUsuario(
+      UUID id,
+      String email,
+      Role rol,
+      String tokenHash,
+      UUID invitadoPorId,
+      UUID usuarioCreadoId,
+      Instant creadoEn,
+<span class="fc" id="L68">      Instant expiraEn) {</span>
+<span class="fc" id="L69">    this.id = id;</span>
+<span class="fc" id="L70">    this.email = email;</span>
+<span class="fc" id="L71">    this.rol = rol;</span>
+<span class="fc" id="L72">    this.tokenHash = tokenHash;</span>
+<span class="fc" id="L73">    this.invitadoPorId = invitadoPorId;</span>
+<span class="fc" id="L74">    this.usuarioCreadoId = usuarioCreadoId;</span>
+<span class="fc" id="L75">    this.creadoEn = creadoEn;</span>
+<span class="fc" id="L76">    this.actualizadoEn = creadoEn;</span>
+<span class="fc" id="L77">    this.expiraEn = expiraEn;</span>
+<span class="fc" id="L78">  }</span>
+
+  public EstadoInvitacion estado(Instant ahora) {
+<span class="fc bfc" id="L81" title="All 2 branches covered.">    if (aceptadoEn != null) return EstadoInvitacion.ACEPTADA;</span>
+<span class="fc bfc" id="L82" title="All 2 branches covered.">    if (canceladoEn != null) return EstadoInvitacion.CANCELADA;</span>
+<span class="fc bfc" id="L83" title="All 2 branches covered.">    return expiraEn.isAfter(ahora) ? EstadoInvitacion.PENDIENTE : EstadoInvitacion.VENCIDA;</span>
+  }
+
+  public void aceptar(Instant ahora) {
+<span class="fc bfc" id="L87" title="All 2 branches covered.">    if (estado(ahora) != EstadoInvitacion.PENDIENTE) {</span>
+<span class="fc" id="L88">      throw new IllegalStateException(&quot;Solo una invitacion pendiente puede aceptarse&quot;);</span>
+    }
+<span class="fc" id="L90">    this.aceptadoEn = ahora;</span>
+<span class="fc" id="L91">    this.actualizadoEn = ahora;</span>
+<span class="fc" id="L92">  }</span>
+
+  public void cancelar(Instant ahora) {
+<span class="pc bpc" id="L95" title="1 of 4 branches missed.">    if (aceptadoEn != null || canceladoEn != null) {</span>
+<span class="fc" id="L96">      throw new IllegalStateException(&quot;La invitacion ya fue aceptada o cancelada&quot;);</span>
+    }
+<span class="fc" id="L98">    this.canceladoEn = ahora;</span>
+<span class="fc" id="L99">    this.actualizadoEn = ahora;</span>
+<span class="fc" id="L100">  }</span>
+
+  public UUID getId() {
+<span class="fc" id="L103">    return id;</span>
+  }
+
+  public String getEmail() {
+<span class="fc" id="L107">    return email;</span>
+  }
+
+  public Role getRol() {
+<span class="fc" id="L111">    return rol;</span>
+  }
+
+  public UUID getInvitadoPorId() {
+<span class="fc" id="L115">    return invitadoPorId;</span>
+  }
+
+  public Instant getExpiraEn() {
+<span class="fc" id="L119">    return expiraEn;</span>
+  }
+
+  public Instant getAceptadoEn() {
+<span class="fc" id="L123">    return aceptadoEn;</span>
+  }
+
+  public Instant getCanceladoEn() {
+<span class="fc" id="L127">    return canceladoEn;</span>
+  }
+
+  public UUID getUsuarioCreadoId() {
+<span class="fc" id="L131">    return usuarioCreadoId;</span>
+  }
+
+  public Instant getCreadoEn() {
+<span class="fc" id="L135">    return creadoEn;</span>
+  }
+
+  public Instant getActualizadoEn() {
+<span class="nc" id="L139">    return actualizadoEn;</span>
+  }
+
+  public long getVersion() {
+<span class="nc" id="L143">    return version;</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

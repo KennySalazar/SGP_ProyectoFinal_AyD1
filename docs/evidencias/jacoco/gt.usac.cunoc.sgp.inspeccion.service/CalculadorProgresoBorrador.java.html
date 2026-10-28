@@ -1,0 +1,337 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CalculadorProgresoBorrador.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">sgp-api</a> &gt; <a href="index.source.html" class="el_package">gt.usac.cunoc.sgp.inspeccion.service</a> &gt; <span class="el_source">CalculadorProgresoBorrador.java</span></div><h1>CalculadorProgresoBorrador.java</h1><pre class="source lang-java linenums">package gt.usac.cunoc.sgp.inspeccion.service;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import gt.usac.cunoc.sgp.inspeccion.dto.ProgresoBorradorResponse;
+import gt.usac.cunoc.sgp.inspeccion.dto.ProgresoSeccionResponse;
+import gt.usac.cunoc.sgp.inspeccion.entity.Inspeccion;
+import gt.usac.cunoc.sgp.inspeccion.entity.InspeccionDatoTecnico;
+import gt.usac.cunoc.sgp.puente.entity.Puente;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.util.ArrayList;
+import java.util.List;
+import org.springframework.stereotype.Component;
+
+@Component
+<span class="fc" id="L16">public class CalculadorProgresoBorrador {</span>
+
+  public ProgresoBorradorResponse calcularProgreso(Inspeccion inspeccion) {
+<span class="fc bfc" id="L19" title="All 2 branches covered.">    if (inspeccion == null) {</span>
+<span class="fc" id="L20">      return new ProgresoBorradorResponse(0, 0, 0.0, List.of());</span>
+    }
+
+<span class="fc" id="L23">    JsonNode datos = inspeccion.getDatos();</span>
+<span class="fc" id="L24">    JsonNode idCap = inspeccion.getIdentificacionCapturada();</span>
+<span class="fc" id="L25">    Puente puente = inspeccion.getPuente();</span>
+<span class="fc" id="L26">    InspeccionDatoTecnico tecnico = inspeccion.getDatoTecnico();</span>
+
+<span class="fc" id="L28">    List&lt;ProgresoSeccionResponse&gt; secciones = new ArrayList&lt;&gt;(8);</span>
+
+<span class="fc" id="L30">    secciones.add(calcularIdentificacion(inspeccion, datos, idCap, puente, tecnico));</span>
+
+<span class="fc" id="L32">    secciones.add(calcularDatosGenerales(datos, tecnico));</span>
+
+<span class="fc" id="L34">    secciones.add(calcularTramos(datos));</span>
+
+<span class="fc" id="L36">    secciones.add(calcularSubestructura(datos));</span>
+
+<span class="fc" id="L38">    secciones.add(calcularSuperestructura(datos));</span>
+
+<span class="fc" id="L40">    secciones.add(calcularElementosNoEstructurales(datos));</span>
+
+<span class="fc" id="L42">    secciones.add(calcularCauce(datos));</span>
+
+<span class="fc" id="L44">    secciones.add(calcularOtros(datos, tecnico));</span>
+
+<span class="fc" id="L46">    int totalRequeridos = 0;</span>
+<span class="fc" id="L47">    int totalCompletados = 0;</span>
+<span class="fc bfc" id="L48" title="All 2 branches covered.">    for (ProgresoSeccionResponse s : secciones) {</span>
+<span class="fc" id="L49">      totalRequeridos += s.camposRequeridos();</span>
+<span class="fc" id="L50">      totalCompletados += s.camposCompletados();</span>
+<span class="fc" id="L51">    }</span>
+
+    double porcentajeTotal =
+<span class="pc bpc" id="L54" title="1 of 2 branches missed.">        totalRequeridos &gt; 0</span>
+<span class="fc" id="L55">            ? BigDecimal.valueOf((totalCompletados * 100.0) / totalRequeridos)</span>
+<span class="fc" id="L56">                .setScale(2, RoundingMode.HALF_UP)</span>
+<span class="fc" id="L57">                .doubleValue()</span>
+<span class="pc" id="L58">            : 100.0;</span>
+
+<span class="fc" id="L60">    return new ProgresoBorradorResponse(</span>
+        totalRequeridos, totalCompletados, porcentajeTotal, secciones);
+  }
+
+  private ProgresoSeccionResponse calcularIdentificacion(
+      Inspeccion inspeccion,
+      JsonNode datos,
+      JsonNode idCap,
+      Puente puente,
+      InspeccionDatoTecnico tecnico) {
+<span class="fc" id="L70">    int total = 12;</span>
+<span class="fc" id="L71">    int completados = 0;</span>
+
+<span class="pc bpc" id="L73" title="1 of 2 branches missed.">    if (tieneValor(datos, &quot;/identificacion/nombre_puente&quot;)</span>
+<span class="pc bpc" id="L74" title="1 of 4 branches missed.">        || tieneValor(idCap, &quot;/nombre_puente&quot;)</span>
+<span class="pc bpc" id="L75" title="1 of 2 branches missed.">        || (puente != null &amp;&amp; puente.getNombre() != null)) completados++;</span>
+
+<span class="pc bpc" id="L77" title="1 of 2 branches missed.">    if (tieneValor(datos, &quot;/identificacion/codigo&quot;)</span>
+<span class="pc bpc" id="L78" title="1 of 4 branches missed.">        || tieneValor(idCap, &quot;/codigo&quot;)</span>
+<span class="fc bfc" id="L79" title="All 2 branches covered.">        || (puente != null &amp;&amp; puente.getCodigo() != null)) completados++;</span>
+
+<span class="pc bpc" id="L81" title="1 of 2 branches missed.">    if (tieneValor(datos, &quot;/identificacion/ruta&quot;)</span>
+<span class="pc bpc" id="L82" title="1 of 4 branches missed.">        || tieneValor(idCap, &quot;/ruta&quot;)</span>
+<span class="fc bfc" id="L83" title="All 2 branches covered.">        || (puente != null &amp;&amp; puente.getRuta() != null)) completados++;</span>
+
+<span class="pc bpc" id="L85" title="1 of 2 branches missed.">    if (tieneValor(datos, &quot;/identificacion/departamento&quot;)</span>
+<span class="pc bpc" id="L86" title="1 of 4 branches missed.">        || tieneValor(idCap, &quot;/departamento&quot;)</span>
+        || (puente != null
+<span class="fc bfc" id="L88" title="All 2 branches covered.">            &amp;&amp; puente.getMunicipio() != null</span>
+<span class="pc bpc" id="L89" title="1 of 2 branches missed.">            &amp;&amp; puente.getMunicipio().getDepartamento() != null)) completados++;</span>
+
+<span class="pc bpc" id="L91" title="1 of 2 branches missed.">    if (tieneValor(datos, &quot;/identificacion/municipio&quot;)</span>
+<span class="pc bpc" id="L92" title="1 of 4 branches missed.">        || tieneValor(idCap, &quot;/municipio&quot;)</span>
+        || (puente != null
+<span class="fc bfc" id="L94" title="All 2 branches covered.">            &amp;&amp; puente.getMunicipio() != null</span>
+<span class="pc bpc" id="L95" title="1 of 2 branches missed.">            &amp;&amp; puente.getMunicipio().getNombre() != null)) completados++;</span>
+
+<span class="pc bpc" id="L97" title="2 of 4 branches missed.">    if (tieneValor(datos, &quot;/identificacion/ruta_pavimentada&quot;)</span>
+<span class="nc bnc" id="L98" title="All 2 branches missed.">        || (tecnico != null &amp;&amp; tecnico.getRutaPavimentada() != null)) completados++;</span>
+
+<span class="pc bpc" id="L100" title="2 of 4 branches missed.">    if (tieneValor(datos, &quot;/identificacion/alineamiento_horizontal&quot;)</span>
+<span class="nc bnc" id="L101" title="All 2 branches missed.">        || (tecnico != null &amp;&amp; tecnico.getAlineamientoHorizontal() != null)) completados++;</span>
+
+<span class="pc bpc" id="L103" title="2 of 4 branches missed.">    if (tieneValor(datos, &quot;/identificacion/esviaje&quot;)</span>
+<span class="nc bnc" id="L104" title="All 2 branches missed.">        || (tecnico != null &amp;&amp; tecnico.getEsviaje() != null)) completados++;</span>
+
+<span class="pc bpc" id="L106" title="1 of 2 branches missed.">    if (tieneValor(datos, &quot;/identificacion/coordenadas_utm/norte&quot;)</span>
+<span class="pc bpc" id="L107" title="1 of 2 branches missed.">        || tieneValor(idCap, &quot;/coordenadas_utm/norte&quot;)</span>
+<span class="pc bpc" id="L108" title="1 of 2 branches missed.">        || inspeccion.getUbicacionInicio() != null) completados++;</span>
+
+<span class="pc bpc" id="L110" title="1 of 2 branches missed.">    if (tieneValor(datos, &quot;/identificacion/coordenadas_utm/este&quot;)</span>
+<span class="pc bpc" id="L111" title="1 of 2 branches missed.">        || tieneValor(idCap, &quot;/coordenadas_utm/este&quot;)</span>
+<span class="pc bpc" id="L112" title="1 of 2 branches missed.">        || inspeccion.getUbicacionInicio() != null) completados++;</span>
+
+<span class="pc bpc" id="L114" title="1 of 2 branches missed.">    if (tieneValor(datos, &quot;/identificacion/nombre_inspector&quot;)</span>
+<span class="fc bfc" id="L115" title="All 2 branches covered.">        || (inspeccion.getNombreAutorCapturado() != null</span>
+<span class="pc bpc" id="L116" title="1 of 2 branches missed.">            &amp;&amp; !inspeccion.getNombreAutorCapturado().isBlank())) completados++;</span>
+
+<span class="pc bpc" id="L118" title="1 of 2 branches missed.">    if (tieneValor(datos, &quot;/identificacion/fecha_inspeccion&quot;)</span>
+<span class="fc bfc" id="L119" title="All 2 branches covered.">        || inspeccion.getFechaInspeccion() != null) completados++;</span>
+
+<span class="fc" id="L121">    return crearSeccion(&quot;identificacion&quot;, &quot;1. Identificación del puente&quot;, total, completados);</span>
+  }
+
+  private ProgresoSeccionResponse calcularDatosGenerales(
+      JsonNode datos, InspeccionDatoTecnico tecnico) {
+<span class="fc" id="L126">    int total = 11;</span>
+<span class="fc" id="L127">    int completados = 0;</span>
+
+<span class="pc bpc" id="L129" title="1 of 4 branches missed.">    if (tieneValor(datos, &quot;/datos_generales/longitud_m&quot;)</span>
+<span class="pc bnc" id="L130" title="All 2 branches missed.">        || (tecnico != null &amp;&amp; tecnico.getLongitudM() != null)) completados++;</span>
+
+<span class="pc bpc" id="L132" title="2 of 4 branches missed.">    if (tieneValor(datos, &quot;/datos_generales/numero_tramos&quot;)</span>
+<span class="nc bnc" id="L133" title="All 2 branches missed.">        || (tecnico != null &amp;&amp; tecnico.getNumeroTramos() != null)) completados++;</span>
+
+<span class="pc bpc" id="L135" title="2 of 4 branches missed.">    if (tieneValor(datos, &quot;/datos_generales/ancho_rodadura_m&quot;)</span>
+<span class="nc bnc" id="L136" title="All 2 branches missed.">        || (tecnico != null &amp;&amp; tecnico.getAnchoRodaduraM() != null)) completados++;</span>
+
+<span class="pc bpc" id="L138" title="2 of 4 branches missed.">    if (tieneValor(datos, &quot;/datos_generales/ancho_acera_derecha_m&quot;)</span>
+<span class="nc bnc" id="L139" title="All 2 branches missed.">        || (tecnico != null &amp;&amp; tecnico.getAnchoAceraDerechaM() != null)) completados++;</span>
+
+<span class="pc bpc" id="L141" title="2 of 4 branches missed.">    if (tieneValor(datos, &quot;/datos_generales/ancho_acera_izquierda_m&quot;)</span>
+<span class="nc bnc" id="L142" title="All 2 branches missed.">        || (tecnico != null &amp;&amp; tecnico.getAnchoAceraIzquierdaM() != null)) completados++;</span>
+
+<span class="pc bpc" id="L144" title="2 of 4 branches missed.">    if (tieneValor(datos, &quot;/datos_generales/tipologia_puente&quot;)</span>
+<span class="nc bnc" id="L145" title="All 2 branches missed.">        || (tecnico != null &amp;&amp; tecnico.getTipologiaPuente() != null)) completados++;</span>
+
+<span class="pc bpc" id="L147" title="2 of 4 branches missed.">    if (tieneValor(datos, &quot;/datos_generales/altura_libre_sobre_cauce_m&quot;)</span>
+<span class="nc bnc" id="L148" title="All 2 branches missed.">        || (tecnico != null &amp;&amp; tecnico.getAlturaLibreSobreCauceM() != null)) completados++;</span>
+
+<span class="pc bpc" id="L150" title="2 of 4 branches missed.">    if (tieneValor(datos, &quot;/datos_generales/tipo_cruce&quot;)</span>
+<span class="nc bnc" id="L151" title="All 2 branches missed.">        || (tecnico != null &amp;&amp; tecnico.getTipoCruce() != null)) completados++;</span>
+
+<span class="pc bpc" id="L153" title="2 of 4 branches missed.">    if (tieneValor(datos, &quot;/datos_generales/numero_vias_por_sentido&quot;)</span>
+<span class="nc bnc" id="L154" title="All 2 branches missed.">        || (tecnico != null &amp;&amp; tecnico.getNumeroViasPorSentido() != null)) completados++;</span>
+
+<span class="pc bpc" id="L156" title="2 of 4 branches missed.">    if (tieneValor(datos, &quot;/datos_generales/material_superestructura&quot;)</span>
+<span class="nc bnc" id="L157" title="All 2 branches missed.">        || (tecnico != null &amp;&amp; tecnico.getMaterialSuperestructura() != null)) completados++;</span>
+
+<span class="pc bpc" id="L159" title="2 of 4 branches missed.">    if (tieneValor(datos, &quot;/datos_generales/material_subestructura&quot;)</span>
+<span class="nc bnc" id="L160" title="All 2 branches missed.">        || (tecnico != null &amp;&amp; tecnico.getMaterialSubestructura() != null)) completados++;</span>
+
+<span class="fc" id="L162">    return crearSeccion(&quot;datos_generales&quot;, &quot;2. Datos generales&quot;, total, completados);</span>
+  }
+
+  private ProgresoSeccionResponse calcularTramos(JsonNode datos) {
+<span class="fc" id="L166">    int total = 4;</span>
+<span class="fc" id="L167">    int completados = 0;</span>
+
+<span class="fc bfc" id="L169" title="All 2 branches covered.">    JsonNode tramosNode = datos != null ? datos.path(&quot;tramos&quot;) : null;</span>
+<span class="pc bpc" id="L170" title="3 of 6 branches missed.">    if (tramosNode != null &amp;&amp; tramosNode.isArray() &amp;&amp; !tramosNode.isEmpty()) {</span>
+<span class="nc" id="L171">      JsonNode primerTramo = tramosNode.get(0);</span>
+<span class="nc bnc" id="L172" title="All 2 branches missed.">      if (tieneValor(primerTramo, &quot;/instancia_id&quot;)) completados++;</span>
+<span class="nc bnc" id="L173" title="All 2 branches missed.">      if (tieneValor(primerTramo, &quot;/orden&quot;)) completados++;</span>
+<span class="nc bnc" id="L174" title="All 2 branches missed.">      if (tieneValor(primerTramo, &quot;/longitud_m&quot;)) completados++;</span>
+<span class="nc bnc" id="L175" title="All 2 branches missed.">      if (tieneValor(primerTramo, &quot;/tipo_seccion&quot;)) completados++;</span>
+    }
+
+<span class="fc" id="L178">    return crearSeccion(&quot;tramos&quot;, &quot;3. Tramos&quot;, total, completados);</span>
+  }
+
+  private ProgresoSeccionResponse calcularSubestructura(JsonNode datos) {
+<span class="fc" id="L182">    String[] elementosEstribos = {</span>
+      &quot;cortina_superior&quot;,
+      &quot;cortina_inferior&quot;,
+      &quot;viga_apoyo&quot;,
+      &quot;apoyos&quot;,
+      &quot;columnas&quot;,
+      &quot;cuerpo_muro_gravedad&quot;,
+      &quot;aletones/aguas_arriba&quot;,
+      &quot;aletones/aguas_abajo&quot;,
+      &quot;socavacion&quot;
+    };
+<span class="fc" id="L193">    String[] elementosPilas = {</span>
+      &quot;viga_cabezal&quot;, &quot;columnas&quot;, &quot;cuerpo_muro_gravedad&quot;, &quot;apoyos&quot;, &quot;socavacion&quot;
+    };
+
+<span class="fc" id="L197">    int total = elementosEstribos.length * 2 + elementosPilas.length;</span>
+<span class="fc" id="L198">    int completados = 0;</span>
+
+<span class="fc bfc" id="L200" title="All 2 branches covered.">    for (String elem : elementosEstribos) {</span>
+<span class="pc bpc" id="L201" title="1 of 2 branches missed.">      if (tieneElemento(datos, &quot;/subestructura/estribo_entrada/&quot; + elem)) completados++;</span>
+<span class="pc bpc" id="L202" title="1 of 2 branches missed.">      if (tieneElemento(datos, &quot;/subestructura/estribo_salida/&quot; + elem)) completados++;</span>
+    }
+<span class="fc bfc" id="L204" title="All 2 branches covered.">    for (String elem : elementosPilas) {</span>
+<span class="pc bpc" id="L205" title="1 of 2 branches missed.">      if (tieneElementoPilas(datos, elem)) completados++;</span>
+    }
+
+<span class="fc" id="L208">    return crearSeccion(&quot;subestructura&quot;, &quot;4. Sub-estructura&quot;, total, completados);</span>
+  }
+
+  private ProgresoSeccionResponse calcularSuperestructura(JsonNode datos) {
+<span class="fc" id="L212">    String[] elementos = {</span>
+      &quot;losa_rodamiento&quot;,
+      &quot;elemento_portante_concreto&quot;,
+      &quot;elemento_portante_acero&quot;,
+      &quot;diafragmas_concreto&quot;,
+      &quot;diafragmas_acero&quot;,
+      &quot;estructura_tipo_cercha&quot;,
+      &quot;drenaje&quot;
+    };
+
+<span class="fc" id="L222">    int total = elementos.length;</span>
+<span class="fc" id="L223">    int completados = 0;</span>
+
+<span class="fc bfc" id="L225" title="All 2 branches covered.">    for (String elem : elementos) {</span>
+<span class="pc bpc" id="L226" title="1 of 2 branches missed.">      if (tieneElemento(datos, &quot;/superestructura/&quot; + elem)) {</span>
+<span class="nc" id="L227">        completados++;</span>
+      }
+    }
+
+<span class="fc" id="L231">    return crearSeccion(&quot;superestructura&quot;, &quot;5. Super-estructura&quot;, total, completados);</span>
+  }
+
+  private ProgresoSeccionResponse calcularElementosNoEstructurales(JsonNode datos) {
+<span class="fc" id="L235">    String[] elementos = {</span>
+      &quot;pasamanos_barandal&quot;,
+      &quot;postes_barandal&quot;,
+      &quot;barreras&quot;,
+      &quot;junta_entrada&quot;,
+      &quot;junta_salida&quot;,
+      &quot;juntas_intermedias&quot;,
+      &quot;losa_acceso_entrada&quot;,
+      &quot;losa_acceso_salida&quot;,
+      &quot;obras_proteccion&quot;
+    };
+
+<span class="fc" id="L247">    int total = elementos.length;</span>
+<span class="fc" id="L248">    int completados = 0;</span>
+
+<span class="fc bfc" id="L250" title="All 2 branches covered.">    for (String elem : elementos) {</span>
+<span class="pc bpc" id="L251" title="1 of 2 branches missed.">      if (tieneElemento(datos, &quot;/elementos_no_estructurales/&quot; + elem)) {</span>
+<span class="nc" id="L252">        completados++;</span>
+      }
+    }
+
+<span class="fc" id="L256">    return crearSeccion(</span>
+        &quot;elementos_no_estructurales&quot;, &quot;6. Elementos no estructurales&quot;, total, completados);
+  }
+
+  private ProgresoSeccionResponse calcularCauce(JsonNode datos) {
+<span class="fc" id="L261">    int total = 1;</span>
+<span class="pc bpc" id="L262" title="1 of 2 branches missed.">    int completados = tieneValor(datos, &quot;/caracteristicas_cauce/aplica&quot;) ? 1 : 0;</span>
+<span class="fc" id="L263">    return crearSeccion(</span>
+        &quot;caracteristicas_cauce&quot;, &quot;7. Características del cauce&quot;, total, completados);
+  }
+
+  private ProgresoSeccionResponse calcularOtros(JsonNode datos, InspeccionDatoTecnico tecnico) {
+<span class="fc" id="L268">    int total = 4;</span>
+<span class="fc" id="L269">    int completados = 0;</span>
+
+<span class="fc bfc" id="L271" title="All 2 branches covered.">    if (tieneValor(datos, &quot;/otros/senalizacion&quot;)) completados++;</span>
+<span class="pc bpc" id="L272" title="1 of 4 branches missed.">    if (tieneValor(datos, &quot;/otros/alumbrado_artificial_existe&quot;)</span>
+<span class="pc bnc" id="L273" title="All 2 branches missed.">        || (tecnico != null &amp;&amp; tecnico.getAlumbradoExiste() != null)) completados++;</span>
+<span class="pc bpc" id="L274" title="1 of 4 branches missed.">    if (tieneValor(datos, &quot;/otros/drenajes_aledanos&quot;)</span>
+<span class="pc bnc" id="L275" title="All 2 branches missed.">        || (tecnico != null &amp;&amp; tecnico.getDrenajesAledanosExisten() != null)) completados++;</span>
+<span class="fc bfc" id="L276" title="All 4 branches covered.">    if (datos != null &amp;&amp; datos.at(&quot;/otros/recomendaciones&quot;).isObject()) completados++;</span>
+
+<span class="fc" id="L278">    return crearSeccion(&quot;otros&quot;, &quot;8. Otros&quot;, total, completados);</span>
+  }
+
+  private boolean tieneElemento(JsonNode datos, String ruta) {
+<span class="fc bfc" id="L282" title="All 2 branches covered.">    if (datos == null) return false;</span>
+<span class="fc" id="L283">    JsonNode nodo = datos.at(ruta);</span>
+<span class="pc bpc" id="L284" title="3 of 4 branches missed.">    if (nodo.isMissingNode() || nodo.isNull()) return false;</span>
+<span class="nc bnc" id="L285" title="All 2 branches missed.">    if (nodo.hasNonNull(&quot;existencia&quot;)) return true;</span>
+<span class="nc" id="L286">    return tieneValor(nodo);</span>
+  }
+
+  private boolean tieneElementoPilas(JsonNode datos, String elem) {
+<span class="fc bfc" id="L290" title="All 2 branches covered.">    if (datos == null) return false;</span>
+<span class="fc" id="L291">    JsonNode pilas = datos.at(&quot;/subestructura/pilas&quot;);</span>
+<span class="pc bpc" id="L292" title="3 of 4 branches missed.">    if (pilas.isArray() &amp;&amp; !pilas.isEmpty()) {</span>
+<span class="nc bnc" id="L293" title="All 2 branches missed.">      for (JsonNode pila : pilas) {</span>
+<span class="nc bnc" id="L294" title="All 2 branches missed.">        if (tieneElemento(pila, &quot;/&quot; + elem)) return true;</span>
+<span class="nc" id="L295">      }</span>
+<span class="nc" id="L296">      return false;</span>
+    }
+
+<span class="pc bpc" id="L299" title="1 of 2 branches missed.">    if (pilas.isArray()) return true;</span>
+<span class="fc" id="L300">    return false;</span>
+  }
+
+  private boolean tieneValor(JsonNode raiz, String puntero) {
+<span class="fc bfc" id="L304" title="All 2 branches covered.">    if (raiz == null) return false;</span>
+<span class="fc" id="L305">    JsonNode nodo = raiz.at(puntero);</span>
+<span class="fc" id="L306">    return tieneValor(nodo);</span>
+  }
+
+  private boolean tieneValor(JsonNode nodo) {
+<span class="pc bpc" id="L310" title="2 of 6 branches missed.">    if (nodo == null || nodo.isMissingNode() || nodo.isNull()) {</span>
+<span class="fc" id="L311">      return false;</span>
+    }
+<span class="pc bpc" id="L313" title="1 of 2 branches missed.">    if (nodo.isTextual()) {</span>
+<span class="nc bnc" id="L314" title="All 2 branches missed.">      return !nodo.asText().isBlank();</span>
+    }
+<span class="pc bpc" id="L316" title="1 of 2 branches missed.">    if (nodo.isArray()) {</span>
+<span class="nc bnc" id="L317" title="All 2 branches missed.">      return !nodo.isEmpty();</span>
+    }
+<span class="fc bfc" id="L319" title="All 2 branches covered.">    if (nodo.isObject()) {</span>
+<span class="pc bpc" id="L320" title="1 of 2 branches missed.">      return !nodo.isEmpty();</span>
+    }
+<span class="fc" id="L322">    return true;</span>
+  }
+
+  private ProgresoSeccionResponse crearSeccion(
+      String seccion, String titulo, int total, int completados) {
+    double porcentaje =
+<span class="pc bpc" id="L328" title="1 of 2 branches missed.">        total &gt; 0</span>
+<span class="fc" id="L329">            ? BigDecimal.valueOf((completados * 100.0) / total)</span>
+<span class="fc" id="L330">                .setScale(2, RoundingMode.HALF_UP)</span>
+<span class="fc" id="L331">                .doubleValue()</span>
+<span class="pc" id="L332">            : 100.0;</span>
+<span class="fc bfc" id="L333" title="All 2 branches covered.">    return new ProgresoSeccionResponse(</span>
+        seccion, titulo, total, completados, porcentaje, completados &gt;= total);
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

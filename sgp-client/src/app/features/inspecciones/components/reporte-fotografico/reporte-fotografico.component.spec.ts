@@ -1,5 +1,5 @@
 import { SincronizacionService } from '../../../../offline/services/sincronizacion.service';
-import { EMPTY } from 'rxjs';
+import { EMPTY, Subject } from 'rxjs';
 import { TestBed, ComponentFixture } from '@angular/core/testing';
 import { signal } from '@angular/core';
 import { By } from '@angular/platform-browser';
@@ -8,7 +8,10 @@ import { TranslocoTestingModule } from '@jsverse/transloco';
 import { of, throwError } from 'rxjs';
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 import { AuthStore } from '../../../../core/services/auth.store';
-import { FotografiasLocalesService } from '../../../../offline/services/fotografias-locales.service';
+import {
+  FotografiaPendiente,
+  FotografiasLocalesService,
+} from '../../../../offline/services/fotografias-locales.service';
 import { InspeccionApiService } from '../../services/inspeccion-api.service';
 import { ProcesadorFotografiasService } from '../../services/procesador-fotografias.service';
 import { FotografiaResponse } from '../../models/fotografia.models';
@@ -328,5 +331,104 @@ describe('Reporte fotográfico', () => {
     expect(locales.guardarContexto).not.toHaveBeenCalled();
     expect(locales.pendientes).not.toHaveBeenCalled();
     expect(api.contenidoFotografia).toHaveBeenCalledWith('galeria', 'foto-cauce', true);
+  });
+
+  it('la lista de pendientes se actualiza aunque la sincronización renueve la sesión', async () => {
+    // Cada sincronización empieza renovando la sesión: auth.user() cambia de objeto con el mismo
+    // usuario. La confirmación del servidor llega después y debe vaciar la lista sin recargar.
+    const inventario = new Subject<{
+      pendientes: FotografiaPendiente[];
+      confirmadas: FotografiaResponse[];
+    }>();
+    locales.observarInventario.mockReturnValue(inventario);
+    fixture.componentRef.setInput('inspeccion', {
+      id: 'en-vivo',
+      autorId: 'autor',
+      puenteId: 'puente',
+      estado: 'BORRADOR',
+    });
+    fixture.detectChanges();
+    await fixture.whenStable();
+    const pendiente = {
+      id: 'local',
+      inspeccionId: 'en-vivo',
+      metadatos: { id: 'local', categoria: 'ACCESO' },
+    } as FotografiaPendiente;
+    inventario.next({ pendientes: [pendiente], confirmadas: [] });
+    expect(fixture.componentInstance.pendientes()).toEqual([pendiente]);
+
+    auth.user.set({ id: 'autor' });
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    expect(inventario.observed).toBe(true);
+    inventario.next({ pendientes: [], confirmadas: [{ ...foto, id: 'local' }] });
+    expect(fixture.componentInstance.pendientes()).toEqual([]);
+    expect(fixture.componentInstance.confirmadas().map((f) => f.id)).toEqual(['local']);
+  });
+
+  it('al cambiar de inspección deja de escuchar el inventario anterior', async () => {
+    const anterior = new Subject<{
+      pendientes: FotografiaPendiente[];
+      confirmadas: FotografiaResponse[];
+    }>();
+    locales.observarInventario.mockReturnValue(anterior);
+    fixture.componentRef.setInput('inspeccion', {
+      id: 'primera',
+      autorId: 'autor',
+      puenteId: 'puente',
+      estado: 'BORRADOR',
+    });
+    fixture.detectChanges();
+    await fixture.whenStable();
+    expect(anterior.observed).toBe(true);
+
+    locales.observarInventario.mockReturnValue(EMPTY);
+    fixture.componentRef.setInput('inspeccion', {
+      id: 'segunda',
+      autorId: 'autor',
+      puenteId: 'puente',
+      estado: 'BORRADOR',
+    });
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    expect(anterior.observed).toBe(false);
+  });
+
+  it('una foto confirmada por la sincronización muestra su miniatura sin recargar', async () => {
+    const inventario = new Subject<{
+      pendientes: FotografiaPendiente[];
+      confirmadas: FotografiaResponse[];
+    }>();
+    locales.observarInventario.mockReturnValue(inventario);
+    api.contenidoFotografia.mockReturnValue(of(new Blob(['miniatura'], { type: 'image/jpeg' })));
+    fixture.componentRef.setInput('inspeccion', {
+      id: 'en-vivo',
+      autorId: 'autor',
+      puenteId: 'puente',
+      estado: 'BORRADOR',
+    });
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    // La recarga inicial (lista del servidor) termina antes de que confirme la sincronización.
+    await vi.waitFor(() => expect(api.listarFotografias).toHaveBeenCalledWith('en-vivo'));
+    await fixture.whenStable();
+
+    inventario.next({ pendientes: [], confirmadas: [{ ...foto, id: 'nueva' }] });
+
+    await vi.waitFor(() =>
+      expect(fixture.componentInstance.confirmadas()[0]?.miniatura).toBe('blob:prueba'),
+    );
+    expect(api.contenidoFotografia).toHaveBeenCalledWith('en-vivo', 'nueva', true);
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('img')?.getAttribute('src')).toBe('blob:prueba');
+
+    // Otra emisión con la misma foto no la vuelve a descargar.
+    api.contenidoFotografia.mockClear();
+    inventario.next({ pendientes: [], confirmadas: [{ ...foto, id: 'nueva' }] });
+    await fixture.whenStable();
+    expect(api.contenidoFotografia).not.toHaveBeenCalled();
   });
 });

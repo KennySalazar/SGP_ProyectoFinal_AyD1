@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ForoMapper.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">sgp-api</a> &gt; <a href="index.source.html" class="el_package">gt.usac.cunoc.sgp.foro.mapper</a> &gt; <span class="el_source">ForoMapper.java</span></div><h1>ForoMapper.java</h1><pre class="source lang-java linenums">package gt.usac.cunoc.sgp.foro.mapper;
+
+import gt.usac.cunoc.sgp.foro.dto.ComentarioResponse;
+import gt.usac.cunoc.sgp.foro.dto.HiloResponse;
+import gt.usac.cunoc.sgp.foro.dto.InspeccionSinRevisionResponse;
+import gt.usac.cunoc.sgp.foro.entity.ForoComentario;
+import gt.usac.cunoc.sgp.foro.entity.ForoHilo;
+import gt.usac.cunoc.sgp.foro.repository.ForoAutorRepository.Autor;
+import gt.usac.cunoc.sgp.foro.repository.ForoModeracionRepository.InspeccionSinRevision;
+import java.time.Instant;
+import java.time.OffsetDateTime;
+import java.time.ZoneId;
+import org.mapstruct.Mapper;
+import org.mapstruct.Mapping;
+import org.mapstruct.ReportingPolicy;
+
+@Mapper(componentModel = &quot;spring&quot;, unmappedTargetPolicy = ReportingPolicy.ERROR)
+public interface ForoMapper {
+
+  @Mapping(target = &quot;id&quot;, source = &quot;hilo.id&quot;)
+  @Mapping(target = &quot;autorId&quot;, source = &quot;hilo.autorId&quot;)
+  @Mapping(target = &quot;autorUsuario&quot;, source = &quot;autor.usuario&quot;)
+  @Mapping(target = &quot;autorRol&quot;, source = &quot;autor.rol&quot;)
+  @Mapping(target = &quot;cerrado&quot;, expression = &quot;java(hilo.getCerradoEn() != null)&quot;)
+  @Mapping(target = &quot;totalComentarios&quot;, source = &quot;totalComentarios&quot;)
+  HiloResponse toHiloResponse(ForoHilo hilo, Autor autor, long totalComentarios);
+
+  @Mapping(target = &quot;id&quot;, source = &quot;comentario.id&quot;)
+  @Mapping(target = &quot;autorId&quot;, source = &quot;comentario.autorId&quot;)
+  @Mapping(target = &quot;autorUsuario&quot;, source = &quot;autor.usuario&quot;)
+  @Mapping(target = &quot;autorRol&quot;, source = &quot;autor.rol&quot;)
+  @Mapping(target = &quot;contenido&quot;, expression = &quot;java(contenidoVisible(comentario, moderador))&quot;)
+  @Mapping(
+      target = &quot;motivoOcultamiento&quot;,
+      expression = &quot;java(moderador ? comentario.getMotivoOcultamiento() : null)&quot;)
+  ComentarioResponse toComentarioResponse(
+      ForoComentario comentario, Autor autor, boolean moderador);
+
+  InspeccionSinRevisionResponse toInspeccionSinRevisionResponse(InspeccionSinRevision fila);
+
+  /**
+   * Un comentario eliminado no muestra su texto a nadie; uno oculto solo a quien modera el foro
+   * (RN-FOR-05, RN-FOR-08).
+   */
+  default String contenidoVisible(ForoComentario comentario, boolean moderador) {
+<span class="fc bfc" id="L46" title="All 2 branches covered.">    if (comentario.isEliminado()) return null;</span>
+<span class="fc bfc" id="L47" title="All 4 branches covered.">    if (comentario.isOculto() &amp;&amp; !moderador) return null;</span>
+<span class="fc" id="L48">    return comentario.getContenido();</span>
+  }
+
+  default OffsetDateTime aHoraGuatemala(Instant instante) {
+<span class="fc bfc" id="L52" title="All 2 branches covered.">    return instante == null</span>
+<span class="fc" id="L53">        ? null</span>
+<span class="fc" id="L54">        : instante.atZone(ZoneId.of(&quot;America/Guatemala&quot;)).toOffsetDateTime();</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

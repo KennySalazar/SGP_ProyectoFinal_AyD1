@@ -1,0 +1,246 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PuenteController.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">sgp-api</a> &gt; <a href="index.source.html" class="el_package">gt.usac.cunoc.sgp.puente.controller</a> &gt; <span class="el_source">PuenteController.java</span></div><h1>PuenteController.java</h1><pre class="source lang-java linenums">package gt.usac.cunoc.sgp.puente.controller;
+
+import gt.usac.cunoc.sgp.common.exception.ApiException;
+import gt.usac.cunoc.sgp.common.security.JwtData;
+import gt.usac.cunoc.sgp.puente.dto.ActualizarPuenteRequest;
+import gt.usac.cunoc.sgp.puente.dto.CrearPuenteRequest;
+import gt.usac.cunoc.sgp.puente.dto.DarBajaPuenteRequest;
+import gt.usac.cunoc.sgp.puente.dto.PuenteCatalogoResponse;
+import gt.usac.cunoc.sgp.puente.dto.PuenteResponse;
+import gt.usac.cunoc.sgp.puente.service.PuenteService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletResponse;
+import jakarta.validation.Valid;
+import java.util.UUID;
+import org.springframework.data.domain.Page;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.authentication.AnonymousAuthenticationToken;
+import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+@RequestMapping(&quot;/api/v1/puentes&quot;)
+@Tag(name = &quot;Puentes&quot;, description = &quot;Catálogo de puentes&quot;)
+public class PuenteController {
+
+  private final PuenteService puenteService;
+
+<span class="fc" id="L39">  public PuenteController(PuenteService puenteService) {</span>
+<span class="fc" id="L40">    this.puenteService = puenteService;</span>
+<span class="fc" id="L41">  }</span>
+
+  @GetMapping
+  @PreAuthorize(&quot;permitAll()&quot;)
+  @Operation(
+      summary = &quot;Consultar el catálogo público de puentes&quot;,
+      description =
+          &quot;Acceso sin autenticación para puentes activos. Filtros opcionales por departamentoId (UUID), estado &quot;
+              + &quot;(Bueno, Regular, Malo, Sin evaluar) y activo (solo administradores). Página desde 0, tamaño entre 1 y 100. &quot;
+              + &quot;Orden por nombre e ID.&quot;)
+  public Page&lt;PuenteCatalogoResponse&gt; listarCatalogo(
+      @RequestParam(required = false) UUID departamentoId,
+      @RequestParam(required = false) String estado,
+      @RequestParam(required = false) Boolean activo,
+      @RequestParam(required = false, defaultValue = &quot;false&quot;) boolean todos,
+      @RequestParam(required = false) String busqueda,
+      @RequestParam(defaultValue = &quot;0&quot;) int pagina,
+      @RequestParam(defaultValue = &quot;20&quot;) int tamanio,
+      Authentication authentication,
+      HttpServletResponse response) {
+<span class="fc" id="L61">    noCache(response);</span>
+<span class="fc bfc" id="L62" title="All 2 branches covered.">    boolean esAdmin =</span>
+        authentication != null
+<span class="fc" id="L64">            &amp;&amp; authentication.getAuthorities().stream()</span>
+<span class="fc bfc" id="L65" title="All 2 branches covered.">                .anyMatch(a -&gt; &quot;ROLE_ADMINISTRADOR&quot;.equals(a.getAuthority()));</span>
+    Page&lt;PuenteCatalogoResponse&gt; resultado;
+<span class="pc bpc" id="L67" title="3 of 4 branches missed.">    if (busqueda != null &amp;&amp; !busqueda.isBlank()) {</span>
+<span class="nc bnc" id="L68" title="All 6 branches missed.">      if (esAdmin &amp;&amp; (activo != null || todos)) {</span>
+<span class="nc" id="L69">        resultado =</span>
+<span class="nc" id="L70">            puenteService.listarCatalogo(</span>
+<span class="nc bnc" id="L71" title="All 2 branches missed.">                departamentoId, estado, todos ? null : activo, busqueda, pagina, tamanio);</span>
+      } else {
+<span class="nc" id="L73">        resultado =</span>
+<span class="nc" id="L74">            puenteService.listarCatalogo(</span>
+                departamentoId, estado, Boolean.TRUE, busqueda, pagina, tamanio);
+      }
+<span class="pc bpc" id="L77" title="1 of 6 branches missed.">    } else if (esAdmin &amp;&amp; (activo != null || todos)) {</span>
+<span class="fc" id="L78">      resultado =</span>
+<span class="fc" id="L79">          puenteService.listarCatalogo(</span>
+<span class="fc bfc" id="L80" title="All 2 branches covered.">              departamentoId, estado, todos ? null : activo, pagina, tamanio);</span>
+    } else {
+<span class="fc" id="L82">      resultado = puenteService.listarCatalogo(departamentoId, estado, pagina, tamanio);</span>
+    }
+<span class="fc bfc" id="L84" title="All 2 branches covered.">    return esAutenticado(authentication)</span>
+<span class="fc" id="L85">        ? resultado</span>
+<span class="fc" id="L86">        : resultado.map(PuenteController::ocultarCoordenadasSiMalo);</span>
+  }
+
+  @PostMapping
+  @SecurityRequirement(name = &quot;bearerAuth&quot;)
+  @PreAuthorize(&quot;hasRole('ADMINISTRADOR')&quot;)
+  @Operation(
+      summary = &quot;Registrar un puente&quot;,
+      description =
+          &quot;Registra un puente activo con estado Sin evaluar. &quot;
+              + &quot;Si existen puentes a menos de 100 metros, solicita &quot;
+              + &quot;confirmación mediante confirmarCercania.&quot;)
+  public ResponseEntity&lt;PuenteResponse&gt; registrar(
+      @Valid @RequestBody CrearPuenteRequest request, Authentication authentication) {
+
+<span class="pc bpc" id="L101" title="2 of 4 branches missed.">    if (authentication == null || !(authentication.getDetails() instanceof JwtData jwtData)) {</span>
+<span class="nc" id="L102">      throw new ApiException(</span>
+          HttpStatus.UNAUTHORIZED,
+          &quot;authentication_required&quot;,
+          &quot;Autenticación requerida&quot;,
+          &quot;Se requiere una sesión válida para registrar un puente.&quot;);
+    }
+
+<span class="fc" id="L109">    PuenteResponse response = puenteService.registrar(request, jwtData.userId());</span>
+
+<span class="fc" id="L111">    return ResponseEntity.status(HttpStatus.CREATED).body(response);</span>
+  }
+
+  @GetMapping(&quot;/{id}&quot;)
+  @PreAuthorize(&quot;permitAll()&quot;)
+  @Operation(
+      summary = &quot;Obtener un puente por su identificador&quot;,
+      description = &quot;Retorna los datos de la ficha de un puente activo.&quot;)
+  public ResponseEntity&lt;PuenteResponse&gt; obtenerPorId(
+      @PathVariable UUID id, Authentication authentication, HttpServletResponse response) {
+<span class="fc" id="L121">    noCache(response);</span>
+<span class="fc" id="L122">    PuenteResponse puente = puenteService.obtenerPorId(id);</span>
+<span class="fc bfc" id="L123" title="All 2 branches covered.">    if (!esAutenticado(authentication)) puente = ocultarCoordenadasSiMalo(puente);</span>
+<span class="fc" id="L124">    return ResponseEntity.ok(puente);</span>
+  }
+
+  private static boolean esAutenticado(Authentication authentication) {
+<span class="fc bfc" id="L128" title="All 2 branches covered.">    return authentication != null</span>
+<span class="pc bpc" id="L129" title="2 of 4 branches missed.">        &amp;&amp; authentication.isAuthenticated()</span>
+        &amp;&amp; !(authentication instanceof AnonymousAuthenticationToken);
+  }
+
+  private static void noCache(HttpServletResponse response) {
+<span class="fc" id="L134">    response.setHeader(&quot;Cache-Control&quot;, &quot;private, no-store, max-age=0&quot;);</span>
+<span class="fc" id="L135">    response.setHeader(&quot;Vary&quot;, &quot;Authorization&quot;);</span>
+<span class="fc" id="L136">  }</span>
+
+  private static PuenteCatalogoResponse ocultarCoordenadasSiMalo(PuenteCatalogoResponse puente) {
+<span class="fc bfc" id="L139" title="All 2 branches covered.">    if (!&quot;Malo&quot;.equals(puente.estadoActual())) return puente;</span>
+<span class="fc" id="L140">    return new PuenteCatalogoResponse(</span>
+<span class="fc" id="L141">        puente.id(),</span>
+<span class="fc" id="L142">        puente.codigo(),</span>
+<span class="fc" id="L143">        puente.nombre(),</span>
+<span class="fc" id="L144">        puente.departamento(),</span>
+<span class="fc" id="L145">        puente.municipio(),</span>
+        null,
+        null,
+<span class="fc" id="L148">        puente.activo(),</span>
+<span class="fc" id="L149">        puente.estadoActual(),</span>
+<span class="fc" id="L150">        puente.indiceCondicionActual(),</span>
+<span class="fc" id="L151">        puente.fechaUltimaInspeccion());</span>
+  }
+
+  private static PuenteResponse ocultarCoordenadasSiMalo(PuenteResponse puente) {
+<span class="fc bfc" id="L155" title="All 2 branches covered.">    if (!&quot;Malo&quot;.equals(puente.estadoActual())) return puente;</span>
+<span class="fc" id="L156">    return new PuenteResponse(</span>
+<span class="fc" id="L157">        puente.id(),</span>
+<span class="fc" id="L158">        puente.codigo(),</span>
+<span class="fc" id="L159">        puente.nombre(),</span>
+<span class="fc" id="L160">        puente.departamento(),</span>
+<span class="fc" id="L161">        puente.municipio(),</span>
+<span class="fc" id="L162">        puente.ruta(),</span>
+<span class="fc" id="L163">        puente.kilometraje(),</span>
+        null,
+        null,
+        null,
+<span class="fc" id="L167">        puente.activo(),</span>
+<span class="fc" id="L168">        puente.estadoActual(),</span>
+<span class="fc" id="L169">        puente.indiceCondicionActual(),</span>
+<span class="fc" id="L170">        puente.fechaUltimaInspeccion(),</span>
+<span class="fc" id="L171">        puente.creadoEn(),</span>
+<span class="fc" id="L172">        puente.versionFormularioIdIcVigente());</span>
+  }
+
+  @PutMapping(&quot;/{id}&quot;)
+  @SecurityRequirement(name = &quot;bearerAuth&quot;)
+  @PreAuthorize(&quot;hasRole('ADMINISTRADOR')&quot;)
+  @Operation(
+      summary = &quot;Actualizar los datos generales de un puente&quot;,
+      description =
+          &quot;Actualiza nombre, ruta, kilometraje y coordenadas de un puente existente. &quot;
+              + &quot;El código y los datos calculados son inmutables.&quot;)
+  public ResponseEntity&lt;PuenteResponse&gt; actualizar(
+      @PathVariable UUID id,
+      @Valid @RequestBody ActualizarPuenteRequest request,
+      Authentication authentication) {
+
+<span class="pc bpc" id="L188" title="2 of 4 branches missed.">    if (authentication == null || !(authentication.getDetails() instanceof JwtData jwtData)) {</span>
+<span class="nc" id="L189">      throw new ApiException(</span>
+          HttpStatus.UNAUTHORIZED,
+          &quot;authentication_required&quot;,
+          &quot;Autenticación requerida&quot;,
+          &quot;Se requiere una sesión válida para actualizar un puente.&quot;);
+    }
+
+<span class="fc" id="L196">    PuenteResponse response = puenteService.actualizar(id, request, jwtData.userId());</span>
+<span class="fc" id="L197">    return ResponseEntity.ok(response);</span>
+  }
+
+  @PostMapping(&quot;/{id}/baja&quot;)
+  @SecurityRequirement(name = &quot;bearerAuth&quot;)
+  @PreAuthorize(&quot;hasRole('ADMINISTRADOR')&quot;)
+  @Operation(
+      summary = &quot;Dar de baja lógica a un puente&quot;,
+      description = &quot;Marca un puente como inactivo documentando el motivo. Solo administradores.&quot;)
+  public ResponseEntity&lt;PuenteResponse&gt; darDeBaja(
+      @PathVariable UUID id,
+      @Valid @RequestBody DarBajaPuenteRequest request,
+      Authentication authentication) {
+
+<span class="pc bpc" id="L211" title="2 of 4 branches missed.">    if (authentication == null || !(authentication.getDetails() instanceof JwtData jwtData)) {</span>
+<span class="nc" id="L212">      throw new ApiException(</span>
+          HttpStatus.UNAUTHORIZED,
+          &quot;authentication_required&quot;,
+          &quot;Autenticación requerida&quot;,
+          &quot;Se requiere una sesión válida para dar de baja un puente.&quot;);
+    }
+
+<span class="fc" id="L219">    PuenteResponse response = puenteService.darDeBaja(id, request, jwtData.userId());</span>
+
+<span class="fc" id="L221">    return ResponseEntity.ok(response);</span>
+  }
+
+  @PostMapping(&quot;/{id}/reactivar&quot;)
+  @SecurityRequirement(name = &quot;bearerAuth&quot;)
+  @PreAuthorize(&quot;hasRole('ADMINISTRADOR')&quot;)
+  @Operation(
+      summary = &quot;Reactivar un puente&quot;,
+      description = &quot;Reactiva un puente previamente dado de baja lógica. Solo administradores.&quot;)
+  public ResponseEntity&lt;PuenteResponse&gt; reactivar(
+      @PathVariable UUID id, Authentication authentication) {
+
+<span class="pc bpc" id="L233" title="2 of 4 branches missed.">    if (authentication == null || !(authentication.getDetails() instanceof JwtData jwtData)) {</span>
+<span class="nc" id="L234">      throw new ApiException(</span>
+          HttpStatus.UNAUTHORIZED,
+          &quot;authentication_required&quot;,
+          &quot;Autenticación requerida&quot;,
+          &quot;Se requiere una sesión válida para reactivar un puente.&quot;);
+    }
+
+<span class="fc" id="L241">    PuenteResponse response = puenteService.reactivar(id, jwtData.userId());</span>
+
+<span class="fc" id="L243">    return ResponseEntity.ok(response);</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

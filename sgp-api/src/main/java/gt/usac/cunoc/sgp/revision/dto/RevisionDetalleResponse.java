@@ -6,7 +6,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.util.UUID;
 
-/** Datos y referencias capturados; no incorpora datos técnicos vivos del puente o inspección. */
+/** Contenido histórico del envío y nombres de referencia para presentar la revisión. */
 public record RevisionDetalleResponse(
     UUID revisionId,
     UUID inspeccionId,
@@ -25,7 +25,10 @@ public record RevisionDetalleResponse(
     IndiceCondicionPreliminarResponse icPreliminar,
     String fotografiasEndpoint,
     boolean fotografiasCongeladas,
-    String observacionesEndpoint) {
+    String observacionesEndpoint,
+    String autorNombre,
+    String puenteNombre,
+    String puenteCodigo) {
   @com.fasterxml.jackson.annotation.JsonProperty(
       value = "calibracionEndpoint",
       access = com.fasterxml.jackson.annotation.JsonProperty.Access.READ_ONLY)

@@ -1,0 +1,184 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>IdempotenciaHttpFilter.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">sgp-api</a> &gt; <a href="index.source.html" class="el_package">gt.usac.cunoc.sgp.sync.http</a> &gt; <span class="el_source">IdempotenciaHttpFilter.java</span></div><h1>IdempotenciaHttpFilter.java</h1><pre class="source lang-java linenums">package gt.usac.cunoc.sgp.sync.http;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import gt.usac.cunoc.sgp.common.exception.ApiException;
+import gt.usac.cunoc.sgp.common.security.JwtData;
+import gt.usac.cunoc.sgp.sync.service.HuellaSolicitud;
+import gt.usac.cunoc.sgp.sync.service.IdempotenciaHttpService;
+import jakarta.servlet.FilterChain;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import java.io.IOException;
+import java.util.LinkedHashMap;
+import java.util.List;
+import org.springframework.http.HttpStatus;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
+import org.springframework.web.filter.OncePerRequestFilter;
+import org.springframework.web.util.ContentCachingResponseWrapper;
+
+public class IdempotenciaHttpFilter extends OncePerRequestFilter {
+  private final IdempotenciaHttpService operaciones;
+  private final ObjectMapper json;
+  private final TransactionTemplate transaccion;
+
+  public IdempotenciaHttpFilter(
+<span class="fc" id="L28">      IdempotenciaHttpService operaciones, ObjectMapper json, PlatformTransactionManager tm) {</span>
+<span class="fc" id="L29">    this.operaciones = operaciones;</span>
+<span class="fc" id="L30">    this.json = json;</span>
+<span class="fc" id="L31">    this.transaccion = new TransactionTemplate(tm);</span>
+<span class="fc" id="L32">  }</span>
+
+  public static boolean protegida(String metodo, String ruta) {
+<span class="fc bfc" id="L35" title="All 2 branches covered.">    if (&quot;POST&quot;.equals(metodo)) {</span>
+<span class="fc bfc" id="L36" title="All 2 branches covered.">      return ruta.equals(&quot;/api/v1/inspecciones&quot;)</span>
+<span class="fc bfc" id="L37" title="All 2 branches covered.">          || ruta.equals(&quot;/api/v1/inspecciones/iniciar&quot;)</span>
+<span class="fc bfc" id="L38" title="All 2 branches covered.">          || ruta.matches(&quot;/api/v1/inspecciones/[^/]+/(enviar|reenviar|publicar)&quot;)</span>
+<span class="fc bfc" id="L39" title="All 2 branches covered.">          || ruta.equals(&quot;/api/v1/preparaciones-salida&quot;);</span>
+    }
+<span class="pc bpc" id="L41" title="1 of 4 branches missed.">    return &quot;PUT&quot;.equals(metodo) &amp;&amp; ruta.matches(&quot;/api/v1/inspecciones/[^/]+(/(borrador|datos))?&quot;);</span>
+  }
+
+  @Override
+  protected boolean shouldNotFilter(HttpServletRequest request) {
+<span class="pc bpc" id="L46" title="1 of 2 branches missed.">    return !protegida(request.getMethod(), request.getServletPath())</span>
+<span class="fc bfc" id="L47" title="All 2 branches covered.">        || request.getHeader(&quot;Idempotency-Key&quot;) == null;</span>
+  }
+
+  @Override
+  protected void doFilterInternal(
+      HttpServletRequest request, HttpServletResponse response, FilterChain chain)
+      throws ServletException, IOException {
+<span class="fc" id="L54">    var auth = SecurityContextHolder.getContext().getAuthentication();</span>
+<span class="pc bpc" id="L55" title="2 of 6 branches missed.">    if (auth == null || !auth.isAuthenticated() || !(auth.getDetails() instanceof JwtData jwt)) {</span>
+<span class="fc" id="L56">      chain.doFilter(request, response);</span>
+<span class="fc" id="L57">      return;</span>
+    }
+<span class="fc" id="L59">    String clave = request.getHeader(&quot;Idempotency-Key&quot;);</span>
+<span class="fc bfc" id="L60" title="All 2 branches covered.">    if (!clave.matches(&quot;[!-~]{1,100}&quot;)</span>
+<span class="fc bfc" id="L61" title="All 2 branches covered.">        || java.util.Collections.list(request.getHeaders(&quot;Idempotency-Key&quot;)).size() != 1) {</span>
+<span class="fc" id="L62">      problema(</span>
+          request,
+          response,
+          new ApiException(
+              HttpStatus.BAD_REQUEST,
+              &quot;clave_idempotente_invalida&quot;,
+              &quot;Clave invalida&quot;,
+              &quot;Idempotency-Key debe contener entre 1 y 100 caracteres ASCII visibles.&quot;));
+<span class="fc" id="L70">      return;</span>
+    }
+<span class="fc" id="L72">    byte[] cuerpo = request.getInputStream().readAllBytes();</span>
+    String huella;
+    try {
+<span class="fc" id="L75">      var nodo = json.createObjectNode();</span>
+<span class="fc" id="L76">      nodo.put(&quot;consulta&quot;, request.getQueryString());</span>
+<span class="fc" id="L77">      nodo.put(&quot;contentType&quot;, request.getContentType());</span>
+<span class="fc bfc" id="L78" title="All 2 branches covered.">      nodo.set(&quot;cuerpo&quot;, cuerpo.length == 0 ? json.nullNode() : json.readTree(cuerpo));</span>
+<span class="fc" id="L79">      huella = HuellaSolicitud.calcular(nodo);</span>
+<span class="nc" id="L80">    } catch (IOException e) {</span>
+<span class="nc" id="L81">      huella = HuellaSolicitud.calcular(json.getNodeFactory().binaryNode(cuerpo));</span>
+<span class="fc" id="L82">    }</span>
+    ReservaIdempotente reserva;
+    try {
+<span class="fc" id="L85">      reserva =</span>
+<span class="fc" id="L86">          operaciones.reservar(</span>
+<span class="fc" id="L87">              jwt.userId(), clave, request.getMethod(), request.getServletPath(), huella);</span>
+<span class="fc" id="L88">    } catch (ApiException e) {</span>
+<span class="fc" id="L89">      problema(request, response, e);</span>
+<span class="fc" id="L90">      return;</span>
+<span class="fc" id="L91">    }</span>
+<span class="fc" id="L92">    request.setAttribute(&quot;operacionIdempotenteId&quot;, reserva.id());</span>
+<span class="fc bfc" id="L93" title="All 2 branches covered.">    if (reserva.repetida()) {</span>
+<span class="fc" id="L94">      response.setHeader(&quot;Idempotent-Replay&quot;, &quot;true&quot;);</span>
+<span class="fc" id="L95">      escribir(response, reserva.respuesta());</span>
+<span class="fc" id="L96">      return;</span>
+    }
+<span class="fc" id="L98">    var cache = new ContentCachingResponseWrapper(response);</span>
+    try {
+<span class="fc" id="L100">      transaccion.executeWithoutResult(</span>
+          estado -&gt; {
+            try {
+<span class="fc" id="L103">              chain.doFilter(new SolicitudIdempotente(request, cuerpo), cache);</span>
+<span class="fc" id="L104">            } catch (IOException | ServletException e) {</span>
+<span class="fc" id="L105">              throw new IllegalStateException(&quot;No se pudo completar la operacion HTTP&quot;, e);</span>
+<span class="fc" id="L106">            }</span>
+<span class="pc bpc" id="L107" title="1 of 4 branches missed.">            if (cache.getStatus() &gt;= 200 &amp;&amp; cache.getStatus() &lt; 300) {</span>
+<span class="fc" id="L108">              operaciones.completar(reserva.id(), jwt.userId(), clave, capturar(cache));</span>
+            } else {
+<span class="fc" id="L110">              estado.setRollbackOnly();</span>
+            }
+<span class="fc" id="L112">          });</span>
+<span class="fc" id="L113">    } catch (RuntimeException e) {</span>
+<span class="pc bpc" id="L114" title="3 of 4 branches missed.">      if (cache.getStatus() &lt; 400 || cache.getStatus() &gt;= 500) {</span>
+<span class="fc" id="L115">        operaciones.liberar(reserva.id());</span>
+<span class="fc" id="L116">        response.resetBuffer();</span>
+<span class="fc" id="L117">        problema(</span>
+            request,
+            response,
+            new ApiException(
+                HttpStatus.INTERNAL_SERVER_ERROR,
+                &quot;error_interno&quot;,
+                &quot;Error interno&quot;,
+                &quot;No se pudo completar la operacion. Reintente con la misma clave.&quot;));
+<span class="fc" id="L125">        return;</span>
+      }
+<span class="fc" id="L127">    }</span>
+<span class="fc bfc" id="L128" title="All 4 branches covered.">    if (cache.getStatus() &gt;= 400 &amp;&amp; cache.getStatus() &lt; 500) {</span>
+<span class="fc" id="L129">      operaciones.completarError(reserva.id(), jwt.userId(), clave, capturar(cache));</span>
+<span class="pc bpc" id="L130" title="1 of 4 branches missed.">    } else if (cache.getStatus() &lt; 200 || cache.getStatus() &gt;= 300) {</span>
+<span class="fc" id="L131">      operaciones.liberar(reserva.id());</span>
+    }
+<span class="fc" id="L133">    cache.copyBodyToResponse();</span>
+<span class="fc" id="L134">  }</span>
+
+  private RespuestaIdempotente capturar(ContentCachingResponseWrapper response) {
+<span class="fc" id="L137">    var encabezados = new LinkedHashMap&lt;String, String&gt;();</span>
+<span class="fc" id="L138">    String tipoContenido = response.getContentType();</span>
+<span class="fc bfc" id="L139" title="All 2 branches covered.">    if (tipoContenido != null) {</span>
+<span class="fc" id="L140">      encabezados.put(&quot;Content-Type&quot;, tipoContenido);</span>
+    }
+<span class="fc bfc" id="L142" title="All 2 branches covered.">    for (String nombre : List.of(&quot;Location&quot;, &quot;Retry-After&quot;, &quot;ETag&quot;)) {</span>
+<span class="fc" id="L143">      String valor = response.getHeader(nombre);</span>
+<span class="fc bfc" id="L144" title="All 2 branches covered.">      if (valor != null) {</span>
+<span class="fc" id="L145">        encabezados.put(nombre, valor);</span>
+      }
+<span class="fc" id="L147">    }</span>
+<span class="fc" id="L148">    return new RespuestaIdempotente(</span>
+<span class="fc" id="L149">        response.getStatus(), response.getContentAsByteArray(), encabezados);</span>
+  }
+
+  private void escribir(HttpServletResponse response, RespuestaIdempotente resultado)
+      throws IOException {
+<span class="fc" id="L154">    response.setStatus(resultado.codigo());</span>
+<span class="fc" id="L155">    resultado</span>
+<span class="fc" id="L156">        .encabezados()</span>
+<span class="fc" id="L157">        .forEach(</span>
+            (nombre, valor) -&gt; {
+<span class="fc bfc" id="L159" title="All 2 branches covered.">              if (&quot;Content-Type&quot;.equalsIgnoreCase(nombre)) {</span>
+<span class="fc" id="L160">                response.setContentType(valor);</span>
+              } else {
+<span class="fc" id="L162">                response.setHeader(nombre, valor);</span>
+              }
+<span class="fc" id="L164">            });</span>
+<span class="fc" id="L165">    response.getOutputStream().write(resultado.cuerpo());</span>
+<span class="fc" id="L166">  }</span>
+
+  private void problema(HttpServletRequest request, HttpServletResponse response, ApiException e)
+      throws IOException {
+<span class="fc" id="L170">    response.setStatus(e.getStatus().value());</span>
+<span class="fc" id="L171">    response.setContentType(&quot;application/problem+json&quot;);</span>
+<span class="fc bfc" id="L172" title="All 2 branches covered.">    if (&quot;operacion_en_proceso&quot;.equals(e.getCode())) response.setHeader(&quot;Retry-After&quot;, &quot;1&quot;);</span>
+<span class="fc" id="L173">    var problema =</span>
+<span class="fc" id="L174">        json.createObjectNode()</span>
+<span class="fc" id="L175">            .put(&quot;type&quot;, &quot;about:blank&quot;)</span>
+<span class="fc" id="L176">            .put(&quot;status&quot;, e.getStatus().value())</span>
+<span class="fc" id="L177">            .put(&quot;title&quot;, e.getTitle())</span>
+<span class="fc" id="L178">            .put(&quot;detail&quot;, e.getMessage())</span>
+<span class="fc" id="L179">            .put(&quot;code&quot;, e.getCode())</span>
+<span class="fc" id="L180">            .put(&quot;instance&quot;, request.getRequestURI());</span>
+<span class="fc" id="L181">    json.writeValue(response.getOutputStream(), problema);</span>
+<span class="fc" id="L182">  }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

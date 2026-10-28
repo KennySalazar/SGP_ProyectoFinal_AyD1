@@ -1,0 +1,387 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>FotografiaService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">sgp-api</a> &gt; <a href="index.source.html" class="el_package">gt.usac.cunoc.sgp.inspeccion.service</a> &gt; <span class="el_source">FotografiaService.java</span></div><h1>FotografiaService.java</h1><pre class="source lang-java linenums">package gt.usac.cunoc.sgp.inspeccion.service;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import gt.usac.cunoc.sgp.archivo.entity.*;
+import gt.usac.cunoc.sgp.archivo.mapper.FotografiaMapper;
+import gt.usac.cunoc.sgp.archivo.model.*;
+import gt.usac.cunoc.sgp.archivo.repository.*;
+import gt.usac.cunoc.sgp.archivo.service.*;
+import gt.usac.cunoc.sgp.common.exception.ApiException;
+import gt.usac.cunoc.sgp.inspeccion.dto.*;
+import gt.usac.cunoc.sgp.inspeccion.entity.Inspeccion;
+import gt.usac.cunoc.sgp.inspeccion.repository.InspeccionRepository;
+import gt.usac.cunoc.sgp.inspeccion.validation.ValidadorAnclajeFotografico;
+import gt.usac.cunoc.sgp.puente.repository.AsignacionPuenteRepository;
+import gt.usac.cunoc.sgp.revision.repository.RevisionRepository;
+import gt.usac.cunoc.sgp.sync.model.SolicitudOperacion;
+import gt.usac.cunoc.sgp.sync.service.*;
+import gt.usac.cunoc.sgp.usuario.model.RoleName;
+import java.io.*;
+import java.nio.file.*;
+import java.time.*;
+import java.util.*;
+import org.locationtech.jts.geom.*;
+import org.springframework.http.HttpStatus;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
+import org.springframework.web.multipart.MultipartFile;
+
+@Service
+public class FotografiaService {
+  private final InspeccionRepository inspecciones;
+  private final AsignacionPuenteRepository asignaciones;
+  private final RevisionRepository revisiones;
+  private final ArchivoRepository archivos;
+  private final ArchivoInspeccionRepository vinculos;
+  private final RegistroFotografiasInspeccion registroFotografias;
+  private final FotografiaMapper mapper;
+  private final ValidadorAnclajeFotografico anclajes;
+  private final ReglasEvidenciaFotografica reglasEvidencia;
+  private final ProcesadorImagenes procesador;
+  private final CargasImagenService cargas;
+  private final ObjetosImagenService objetos;
+  private final AlmacenamientoArchivos almacenamiento;
+  private final OperacionIdempotenteService operaciones;
+  private final ObjectMapper json;
+  private final Clock clock;
+  private final TransactionTemplate tx;
+
+  public FotografiaService(
+      InspeccionRepository inspecciones,
+      ArchivoRepository archivos,
+      ArchivoInspeccionRepository vinculos,
+      RegistroFotografiasInspeccion registroFotografias,
+      FotografiaMapper mapper,
+      ValidadorAnclajeFotografico anclajes,
+      ReglasEvidenciaFotografica reglasEvidencia,
+      ProcesadorImagenes procesador,
+      CargasImagenService cargas,
+      ObjetosImagenService objetos,
+      AlmacenamientoArchivos almacenamiento,
+      OperacionIdempotenteService operaciones,
+      ObjectMapper json,
+      Clock clock,
+      AsignacionPuenteRepository asignaciones,
+      RevisionRepository revisiones,
+<span class="fc" id="L67">      PlatformTransactionManager tm) {</span>
+<span class="fc" id="L68">    this.inspecciones = inspecciones;</span>
+<span class="fc" id="L69">    this.asignaciones = asignaciones;</span>
+<span class="fc" id="L70">    this.revisiones = revisiones;</span>
+<span class="fc" id="L71">    this.archivos = archivos;</span>
+<span class="fc" id="L72">    this.vinculos = vinculos;</span>
+<span class="fc" id="L73">    this.registroFotografias = registroFotografias;</span>
+<span class="fc" id="L74">    this.mapper = mapper;</span>
+<span class="fc" id="L75">    this.anclajes = anclajes;</span>
+<span class="fc" id="L76">    this.reglasEvidencia = reglasEvidencia;</span>
+<span class="fc" id="L77">    this.procesador = procesador;</span>
+<span class="fc" id="L78">    this.cargas = cargas;</span>
+<span class="fc" id="L79">    this.objetos = objetos;</span>
+<span class="fc" id="L80">    this.almacenamiento = almacenamiento;</span>
+<span class="fc" id="L81">    this.operaciones = operaciones;</span>
+<span class="fc" id="L82">    this.json = json;</span>
+<span class="fc" id="L83">    this.clock = clock;</span>
+<span class="fc" id="L84">    this.tx = new TransactionTemplate(tm);</span>
+<span class="fc" id="L85">  }</span>
+
+  public FotografiaResponse adjuntar(
+      UUID inspeccionId,
+      UUID actor,
+      AdjuntarFotografiaRequest request,
+      MultipartFile fichero,
+      String clave) {
+<span class="fc" id="L93">    tx.executeWithoutResult(t -&gt; autorizar(inspeccionId, actor, false));</span>
+<span class="fc" id="L94">    CategoriaFoto categoria = validar(request, clave);</span>
+<span class="fc bfc" id="L95" title="All 2 branches covered.">    if (fichero.isEmpty())</span>
+<span class="fc" id="L96">      throw error(</span>
+          HttpStatus.UNPROCESSABLE_ENTITY,
+          &quot;contenido_fotografico_invalido&quot;,
+          &quot;La fotografía no puede estar vacía.&quot;);
+<span class="pc bpc" id="L100" title="1 of 2 branches missed.">    if (fichero.getSize() &gt; 20L * 1024 * 1024)</span>
+<span class="nc" id="L101">      throw error(</span>
+          HttpStatus.PAYLOAD_TOO_LARGE,
+          &quot;carga_demasiado_grande&quot;,
+          &quot;El archivo debe contener una imagen de hasta 20 MB.&quot;);
+<span class="fc" id="L105">    Path temporal = null;</span>
+<span class="fc" id="L106">    CargaImagenPreparada preparada = null;</span>
+<span class="fc" id="L107">    boolean confirmada = false;</span>
+    try {
+<span class="fc" id="L109">      temporal = Files.createTempFile(&quot;sgp-fotografia-&quot;, &quot;.tmp&quot;);</span>
+<span class="fc" id="L110">      fichero.transferTo(temporal);</span>
+<span class="fc" id="L111">      byte[] bytes = Files.readAllBytes(temporal);</span>
+<span class="fc" id="L112">      var huella =</span>
+<span class="fc" id="L113">          json.createObjectNode()</span>
+<span class="fc" id="L114">              .put(&quot;inspeccionId&quot;, inspeccionId.toString())</span>
+<span class="fc" id="L115">              .put(&quot;checksum&quot;, ProcesadorImagenes.checksum(bytes));</span>
+<span class="fc" id="L116">      huella.set(&quot;metadatos&quot;, json.valueToTree(request));</span>
+<span class="fc" id="L117">      var solicitud =</span>
+          new SolicitudOperacion(
+              actor,
+              clave,
+              &quot;POST&quot;,
+              &quot;/api/v1/inspecciones/&quot; + inspeccionId + &quot;/fotografias&quot;,
+<span class="fc" id="L123">              HuellaSolicitud.calcular(huella),</span>
+              &quot;archivo&quot;,
+<span class="fc" id="L125">              request.id());</span>
+<span class="fc" id="L126">      var previa = operaciones.buscarCompletada(solicitud);</span>
+<span class="fc bfc" id="L127" title="All 2 branches covered.">      if (previa.isPresent()) return json.convertValue(previa.get(), FotografiaResponse.class);</span>
+<span class="fc" id="L128">      tx.executeWithoutResult(</span>
+          t -&gt; {
+<span class="fc" id="L130">            var i = autorizar(inspeccionId, actor, false);</span>
+<span class="fc" id="L131">            borrador(i);</span>
+<span class="fc" id="L132">            anclajes.validar(i, request.elementoRef(), request.instanciaElementoId());</span>
+<span class="fc" id="L133">            validarCapacidad(inspeccionId);</span>
+<span class="fc" id="L134">          });</span>
+<span class="fc" id="L135">      var imagen = procesador.procesar(temporal);</span>
+<span class="fc" id="L136">      preparada = cargas.preparar(solicitud, imagen);</span>
+<span class="pc bpc" id="L137" title="1 of 2 branches missed.">      if (preparada.reserva().completada())</span>
+<span class="nc" id="L138">        return json.convertValue(preparada.reserva().respuesta(), FotografiaResponse.class);</span>
+<span class="fc" id="L139">      final var carga = preparada;</span>
+<span class="fc" id="L140">      var respuesta =</span>
+<span class="fc" id="L141">          tx.execute(</span>
+              t -&gt; {
+<span class="fc" id="L143">                var inspeccion = autorizar(inspeccionId, actor, true);</span>
+<span class="fc" id="L144">                borrador(inspeccion);</span>
+<span class="fc" id="L145">                anclajes.validar(inspeccion, request.elementoRef(), request.instanciaElementoId());</span>
+<span class="fc" id="L146">                validarCapacidad(inspeccionId);</span>
+<span class="fc" id="L147">                operaciones.bloquearEntidad(&quot;archivo&quot;, request.id());</span>
+<span class="pc bpc" id="L148" title="1 of 2 branches missed.">                if (archivos.existsById(request.id()))</span>
+<span class="nc" id="L149">                  throw error(</span>
+                      HttpStatus.CONFLICT,
+                      &quot;fotografia_identidad_conflictiva&quot;,
+                      &quot;El identificador de fotografía ya está registrado.&quot;);
+<span class="fc" id="L153">                var punto =</span>
+                    new GeometryFactory(new PrecisionModel(), 4326)
+<span class="fc" id="L155">                        .createPoint(new Coordinate(request.longitud(), request.latitud()));</span>
+<span class="fc" id="L156">                var archivo =</span>
+                    new Archivo(
+<span class="fc" id="L158">                        request.id(),</span>
+                        TipoUsoArchivo.FOTO_INSPECCION,
+                        categoria,
+                        null,
+<span class="fc" id="L162">                        carga.claves().original(),</span>
+<span class="fc" id="L163">                        carga.claves().original(),</span>
+<span class="fc" id="L164">                        carga.claves().miniatura(),</span>
+<span class="fc" id="L165">                        imagen.mimeReal(),</span>
+<span class="fc" id="L166">                        imagen.original().length,</span>
+<span class="fc" id="L167">                        imagen.checksumSha256(),</span>
+<span class="fc" id="L168">                        imagen.anchoPx(),</span>
+<span class="fc" id="L169">                        imagen.altoPx(),</span>
+                        punto,
+<span class="fc" id="L171">                        request.capturadoEn(),</span>
+                        actor,
+<span class="fc" id="L173">                        clock.instant());</span>
+<span class="fc" id="L174">                archivos.saveAndFlush(archivo);</span>
+<span class="fc" id="L175">                var vinculo =</span>
+                    new ArchivoInspeccion(
+                        archivo,
+                        inspeccion,
+<span class="fc" id="L179">                        request.elementoRef(),</span>
+<span class="fc" id="L180">                        request.instanciaElementoId(),</span>
+<span class="fc" id="L181">                        clock.instant());</span>
+<span class="fc" id="L182">                vinculos.saveAndFlush(vinculo);</span>
+<span class="fc" id="L183">                var dto = mapper.toResponse(vinculo);</span>
+<span class="fc" id="L184">                operaciones.completar(carga.reserva(), json.valueToTree(dto), 201, request.id());</span>
+<span class="fc" id="L185">                return dto;</span>
+              });
+<span class="fc" id="L187">      confirmada = true;</span>
+<span class="fc" id="L188">      return respuesta;</span>
+<span class="fc" id="L189">    } catch (IOException e) {</span>
+<span class="fc" id="L190">      throw error(</span>
+          HttpStatus.SERVICE_UNAVAILABLE,
+          &quot;almacenamiento_no_disponible&quot;,
+          &quot;No se pudo almacenar la fotografía. Puede reintentar con la misma operación.&quot;);
+    } finally {
+<span class="pc bpc" id="L195" title="1 of 6 branches missed.">      if (preparada != null &amp;&amp; !preparada.reserva().completada() &amp;&amp; !confirmada) {</span>
+        try {
+<span class="fc" id="L197">          final var pendiente = preparada;</span>
+<span class="fc" id="L198">          operaciones.compensar(</span>
+<span class="fc" id="L199">              pendiente.reserva(),</span>
+              () -&gt; {
+                try {
+<span class="fc" id="L202">                  objetos.eliminar(pendiente.claves());</span>
+<span class="nc" id="L203">                } catch (IOException e) {</span>
+<span class="nc" id="L204">                  throw new UncheckedIOException(e);</span>
+<span class="fc" id="L205">                }</span>
+<span class="fc" id="L206">              });</span>
+<span class="nc" id="L207">        } catch (RuntimeException e) {</span>
+          /* El manifiesto duradero permite recuperar este intento tras vencer. */
+<span class="fc" id="L209">        }</span>
+      }
+<span class="pc bpc" id="L211" title="1 of 2 branches missed.">      if (temporal != null)</span>
+        try {
+<span class="fc" id="L213">          Files.deleteIfExists(temporal);</span>
+<span class="nc" id="L214">        } catch (IOException e) {</span>
+<span class="nc" id="L215">          temporal.toFile().deleteOnExit();</span>
+<span class="fc" id="L216">        }</span>
+    }
+  }
+
+  private void validarCapacidad(UUID inspeccionId) {
+<span class="fc" id="L221">    reglasEvidencia.validarCapacidadParaNuevaFotografia(</span>
+<span class="fc" id="L222">        vinculos.countByInspeccionIdAndTipoUsoAndArchivo_Estado(</span>
+            inspeccionId, TipoUsoArchivo.FOTO_INSPECCION, EstadoArchivo.DISPONIBLE));
+<span class="fc" id="L224">  }</span>
+
+  private CategoriaFoto validar(AdjuntarFotografiaRequest r, String clave) {
+<span class="pc bpc" id="L227" title="1 of 2 branches missed.">    if (r == null</span>
+<span class="pc bpc" id="L228" title="1 of 2 branches missed.">        || r.id() == null</span>
+<span class="pc bpc" id="L229" title="1 of 2 branches missed.">        || r.id().version() != 7</span>
+<span class="pc bpc" id="L230" title="2 of 4 branches missed.">        || r.id().variant() != 2</span>
+        || clave == null
+<span class="pc bpc" id="L232" title="1 of 2 branches missed.">        || clave.isBlank()</span>
+<span class="pc bpc" id="L233" title="1 of 2 branches missed.">        || clave.length() &gt; 100)</span>
+<span class="nc" id="L234">      throw error(</span>
+          HttpStatus.UNPROCESSABLE_ENTITY,
+          &quot;fotografia_metadatos_invalidos&quot;,
+          &quot;Se requieren UUID v7 y clave idempotente válidos.&quot;);
+<span class="fc bfc" id="L238" title="All 2 branches covered.">    if (r.latitud() == null</span>
+<span class="pc bpc" id="L239" title="1 of 2 branches missed.">        || r.longitud() == null</span>
+<span class="pc bpc" id="L240" title="1 of 2 branches missed.">        || !Double.isFinite(r.latitud())</span>
+<span class="pc bpc" id="L241" title="1 of 2 branches missed.">        || !Double.isFinite(r.longitud())</span>
+<span class="fc bfc" id="L242" title="All 2 branches covered.">        || Math.abs(r.latitud()) &gt; 90</span>
+<span class="pc bpc" id="L243" title="1 of 2 branches missed.">        || Math.abs(r.longitud()) &gt; 180</span>
+<span class="fc bfc" id="L244" title="All 2 branches covered.">        || r.capturadoEn() == null</span>
+<span class="pc bpc" id="L245" title="1 of 2 branches missed.">        || r.capturadoEn().isAfter(clock.instant().plusSeconds(300)))</span>
+<span class="fc" id="L246">      throw error(</span>
+          HttpStatus.UNPROCESSABLE_ENTITY,
+          &quot;fotografia_metadatos_invalidos&quot;,
+          &quot;La fotografía requiere ubicación y fecha de captura válidas.&quot;);
+    try {
+<span class="fc" id="L251">      return CategoriaFoto.valueOf(r.categoria());</span>
+<span class="fc" id="L252">    } catch (IllegalArgumentException | NullPointerException e) {</span>
+<span class="fc" id="L253">      throw error(</span>
+          HttpStatus.UNPROCESSABLE_ENTITY,
+          &quot;categoria_fotografia_invalida&quot;,
+          &quot;Seleccione una categoría fotográfica válida.&quot;);
+    }
+  }
+
+  private Inspeccion autorizar(UUID id, UUID actor, boolean bloquear) {
+<span class="pc bpc" id="L261" title="1 of 2 branches missed.">    if (actor == null)</span>
+<span class="nc" id="L262">      throw error(</span>
+          HttpStatus.UNAUTHORIZED, &quot;autenticacion_requerida&quot;, &quot;Se requiere una sesión válida.&quot;);
+    var i =
+<span class="fc bfc" id="L265" title="All 2 branches covered.">        (bloquear</span>
+<span class="fc" id="L266">                ? inspecciones.findByIdAndEliminadoEnIsNullForUpdate(id)</span>
+<span class="fc" id="L267">                : inspecciones.findByIdAndEliminadoEnIsNull(id))</span>
+<span class="fc" id="L268">            .orElseThrow(</span>
+                () -&gt;
+<span class="nc" id="L270">                    error(</span>
+                        HttpStatus.NOT_FOUND,
+                        &quot;inspeccion_no_encontrada&quot;,
+                        &quot;Inspección no encontrada.&quot;));
+<span class="fc bfc" id="L274" title="All 2 branches covered.">    if (!i.getAutorId().equals(actor))</span>
+<span class="fc" id="L275">      throw error(HttpStatus.NOT_FOUND, &quot;inspeccion_no_encontrada&quot;, &quot;Inspección no encontrada.&quot;);</span>
+<span class="fc" id="L276">    return i;</span>
+  }
+
+  private void borrador(Inspeccion i) {
+<span class="fc bfc" id="L280" title="All 2 branches covered.">    if (!&quot;BORRADOR&quot;.equals(i.getEstado()))</span>
+<span class="fc" id="L281">      throw error(</span>
+          HttpStatus.CONFLICT,
+          &quot;estado_inspeccion_no_permite_archivos&quot;,
+          &quot;Solo se pueden modificar fotografías de un borrador propio.&quot;);
+<span class="fc" id="L285">  }</span>
+
+  public void retirar(UUID id, UUID fotoId, UUID actor) {
+<span class="fc" id="L288">    tx.executeWithoutResult(</span>
+        t -&gt; {
+<span class="fc" id="L290">          var inspeccion = autorizar(id, actor, true);</span>
+<span class="fc" id="L291">          borrador(inspeccion);</span>
+<span class="fc" id="L292">          registroFotografias.retirar(id, fotoId, clock.instant());</span>
+<span class="fc" id="L293">        });</span>
+<span class="fc" id="L294">  }</span>
+
+  public List&lt;FotografiaResponse&gt; listar(UUID id, UUID actor) {
+<span class="fc" id="L297">    return listar(id, actor, null);</span>
+  }
+
+  public List&lt;FotografiaResponse&gt; listar(UUID id, UUID actor, RoleName rol) {
+<span class="fc" id="L301">    return tx.execute(</span>
+        t -&gt; {
+<span class="fc" id="L303">          autorizarLectura(id, actor, rol);</span>
+<span class="fc" id="L304">          return vinculos</span>
+<span class="fc" id="L305">              .findByInspeccionIdAndTipoUsoOrderByCreadoEnAsc(id, TipoUsoArchivo.FOTO_INSPECCION)</span>
+<span class="fc" id="L306">              .stream()</span>
+<span class="fc bfc" id="L307" title="All 2 branches covered.">              .filter(v -&gt; v.getArchivo().getEstado() == EstadoArchivo.DISPONIBLE)</span>
+<span class="fc" id="L308">              .map(mapper::toResponse)</span>
+<span class="fc" id="L309">              .toList();</span>
+        });
+  }
+
+  public InputStream contenido(UUID id, UUID fotoId, UUID actor, boolean miniatura) {
+<span class="fc" id="L314">    return contenido(id, fotoId, actor, null, miniatura);</span>
+  }
+
+  public InputStream contenido(UUID id, UUID fotoId, UUID actor, RoleName rol, boolean miniatura) {
+<span class="fc" id="L318">    String clave =</span>
+<span class="fc" id="L319">        tx.execute(</span>
+            t -&gt; {
+<span class="fc" id="L321">              autorizarLectura(id, actor, rol);</span>
+<span class="fc" id="L322">              var v =</span>
+                  vinculos
+<span class="fc" id="L324">                      .findByInspeccionIdAndArchivoIdAndTipoUso(</span>
+                          id, fotoId, TipoUsoArchivo.FOTO_INSPECCION)
+<span class="fc bfc" id="L326" title="All 2 branches covered.">                      .filter(x -&gt; x.getArchivo().getEstado() == EstadoArchivo.DISPONIBLE)</span>
+<span class="fc" id="L327">                      .orElseThrow(</span>
+                          () -&gt;
+<span class="fc" id="L329">                              error(</span>
+                                  HttpStatus.NOT_FOUND,
+                                  &quot;fotografia_no_encontrada&quot;,
+                                  &quot;Fotografía no encontrada.&quot;));
+<span class="fc bfc" id="L333" title="All 2 branches covered.">              return miniatura</span>
+<span class="fc" id="L334">                  ? v.getArchivo().getClaveObjetoMiniatura()</span>
+<span class="fc" id="L335">                  : v.getArchivo().getClaveObjetoOriginal();</span>
+            });
+    try {
+<span class="fc" id="L338">      return almacenamiento.abrir(clave);</span>
+<span class="fc" id="L339">    } catch (IOException e) {</span>
+<span class="fc" id="L340">      throw error(</span>
+          HttpStatus.SERVICE_UNAVAILABLE,
+          &quot;almacenamiento_no_disponible&quot;,
+          &quot;No se pudo recuperar la fotografía.&quot;);
+    }
+  }
+
+  private ApiException error(HttpStatus status, String code, String detail) {
+<span class="fc" id="L348">    return new ApiException(status, code, &quot;Fotografía de inspección&quot;, detail);</span>
+  }
+
+  /**
+   * Quién puede consultar los archivos de una inspección (RN-INS-05, RN-USR-10): su autor,
+   * cualquier cuenta si está publicada y el Catedrático asignado mientras no lo esté. También lo
+   * usan los documentos PDF (HU-070).
+   */
+  void autorizarLectura(UUID id, UUID actor, RoleName rol) {
+<span class="fc bfc" id="L357" title="All 2 branches covered.">    if (actor == null)</span>
+<span class="fc" id="L358">      throw error(</span>
+          HttpStatus.UNAUTHORIZED, &quot;autenticacion_requerida&quot;, &quot;Se requiere una sesión válida.&quot;);
+<span class="fc" id="L360">    var i =</span>
+        inspecciones
+<span class="fc" id="L362">            .findByIdAndEliminadoEnIsNull(id)</span>
+<span class="fc" id="L363">            .orElseThrow(</span>
+                () -&gt;
+<span class="nc" id="L365">                    error(</span>
+                        HttpStatus.NOT_FOUND,
+                        &quot;inspeccion_no_encontrada&quot;,
+                        &quot;Inspección no encontrada.&quot;));
+<span class="fc bfc" id="L369" title="All 4 branches covered.">    if (&quot;PUBLICADA&quot;.equals(i.getEstado()) || i.getAutorId().equals(actor)) return;</span>
+<span class="fc bfc" id="L370" title="All 2 branches covered.">    if (&quot;EN_REVISION&quot;.equals(i.getEstado())) {</span>
+<span class="fc bfc" id="L371" title="All 2 branches covered.">      if (rol != RoleName.CATEDRATICO)</span>
+<span class="fc" id="L372">        throw error(</span>
+            HttpStatus.FORBIDDEN,
+            &quot;lectura_revision_no_permitida&quot;,
+            &quot;La lectura de una inspección en revisión requiere ser su autor o su catedrático revisor.&quot;);
+<span class="fc bfc" id="L376" title="All 2 branches covered.">      if (revisiones.existsByInspeccionIdAndRevisorIdAndEstado(id, actor, &quot;EN_CURSO&quot;)) return;</span>
+<span class="fc" id="L377">      throw error(HttpStatus.NOT_FOUND, &quot;inspeccion_no_encontrada&quot;, &quot;Inspección no encontrada.&quot;);</span>
+    }
+<span class="fc bfc" id="L379" title="All 2 branches covered.">    if (rol == RoleName.CATEDRATICO</span>
+<span class="fc bfc" id="L380" title="All 2 branches covered.">        &amp;&amp; Set.of(&quot;BORRADOR&quot;, &quot;ENVIADA&quot;, &quot;EN_REVISION&quot;).contains(i.getEstado())</span>
+<span class="fc bfc" id="L381" title="All 2 branches covered.">        &amp;&amp; i.getAsignacionPuenteId() != null</span>
+<span class="fc bfc" id="L382" title="All 2 branches covered.">        &amp;&amp; asignaciones.existsVigenteParaLecturaFotografica(</span>
+<span class="fc" id="L383">            i.getAsignacionPuenteId(), i.getAutorId(), i.getPuente().getId(), actor)) return;</span>
+<span class="fc" id="L384">    throw error(HttpStatus.NOT_FOUND, &quot;inspeccion_no_encontrada&quot;, &quot;Inspección no encontrada.&quot;);</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

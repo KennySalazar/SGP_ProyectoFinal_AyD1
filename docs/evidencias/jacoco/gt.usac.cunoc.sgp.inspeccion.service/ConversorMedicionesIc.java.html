@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ConversorMedicionesIc.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">sgp-api</a> &gt; <a href="index.source.html" class="el_package">gt.usac.cunoc.sgp.inspeccion.service</a> &gt; <span class="el_source">ConversorMedicionesIc.java</span></div><h1>ConversorMedicionesIc.java</h1><pre class="source lang-java linenums">package gt.usac.cunoc.sgp.inspeccion.service;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import gt.usac.cunoc.sgp.common.exception.ApiException;
+import java.math.BigDecimal;
+import org.springframework.http.HttpStatus;
+import org.springframework.stereotype.Service;
+
+@Service
+public class ConversorMedicionesIc {
+
+  private final ConversorIndicadoresIc conversor;
+
+<span class="fc" id="L14">  public ConversorMedicionesIc(ConversorIndicadoresIc conversor) {</span>
+<span class="fc" id="L15">    this.conversor = conversor;</span>
+<span class="fc" id="L16">  }</span>
+
+  public BigDecimal convertir(
+      JsonNode valor, JsonNode umbrales, JsonNode reglas, String referencia) {
+
+<span class="fc bfc" id="L21" title="All 4 branches covered.">    if (valor == null || !valor.isNumber()) {</span>
+<span class="fc" id="L22">      throw error(&quot;medicion_ic_invalida&quot;, &quot;Falta una medicion numerica en &quot; + referencia);</span>
+    }
+
+<span class="fc" id="L25">    BigDecimal medicion = valor.decimalValue();</span>
+
+<span class="fc bfc" id="L27" title="All 2 branches covered.">    if (medicion.signum() &lt; 0) {</span>
+<span class="fc" id="L28">      throw error(</span>
+          &quot;medicion_ic_invalida&quot;, &quot;La medicion de &quot; + referencia + &quot; no puede ser negativa&quot;);
+    }
+
+<span class="fc bfc" id="L32" title="All 4 branches covered.">    if (umbrales == null || !umbrales.isObject()) {</span>
+<span class="fc" id="L33">      throw error(&quot;configuracion_ic_incompleta&quot;, &quot;Faltan los umbrales numericos de &quot; + referencia);</span>
+    }
+
+<span class="fc" id="L36">    BigDecimal leve = leerUmbral(umbrales, &quot;LEVE&quot;, referencia);</span>
+<span class="fc" id="L37">    BigDecimal moderado = leerUmbral(umbrales, &quot;MODERADO&quot;, referencia);</span>
+<span class="fc" id="L38">    BigDecimal severo = leerUmbral(umbrales, &quot;SEVERO&quot;, referencia);</span>
+
+<span class="fc bfc" id="L40" title="All 6 branches covered.">    if (leve.signum() &lt;= 0 || moderado.compareTo(leve) &lt;= 0 || severo.compareTo(moderado) &lt;= 0) {</span>
+<span class="fc" id="L41">      throw error(</span>
+          &quot;umbrales_ic_invalidos&quot;,
+          &quot;Los umbrales de &quot; + referencia + &quot; deben cumplir 0 &lt; LEVE &lt; MODERADO &lt; SEVERO&quot;);
+    }
+
+<span class="fc bfc" id="L46" title="All 2 branches covered.">    if (medicion.compareTo(severo) &gt; 0) {</span>
+<span class="fc" id="L47">      throw error(</span>
+          &quot;medicion_ic_fuera_de_umbrales&quot;,
+          &quot;La medicion de &quot;
+              + referencia
+              + &quot; supera el maximo configurado: &quot;
+<span class="fc" id="L52">              + severo.toPlainString());</span>
+    }
+
+    String nivel;
+
+<span class="fc bfc" id="L57" title="All 2 branches covered.">    if (medicion.signum() == 0) {</span>
+<span class="fc" id="L58">      nivel = &quot;NO_PRESENTA&quot;;</span>
+<span class="fc bfc" id="L59" title="All 2 branches covered.">    } else if (medicion.compareTo(leve) &lt;= 0) {</span>
+<span class="fc" id="L60">      nivel = &quot;LEVE&quot;;</span>
+<span class="fc bfc" id="L61" title="All 2 branches covered.">    } else if (medicion.compareTo(moderado) &lt;= 0) {</span>
+<span class="fc" id="L62">      nivel = &quot;MODERADO&quot;;</span>
+    } else {
+<span class="fc" id="L64">      nivel = &quot;SEVERO&quot;;</span>
+    }
+
+<span class="fc" id="L67">    return conversor.convertirSeveridad(</span>
+<span class="fc" id="L68">        com.fasterxml.jackson.databind.node.TextNode.valueOf(nivel), reglas, referencia);</span>
+  }
+
+  private BigDecimal leerUmbral(JsonNode umbrales, String nivel, String referencia) {
+
+<span class="fc" id="L73">    JsonNode valor = umbrales.get(nivel);</span>
+
+<span class="fc bfc" id="L75" title="All 4 branches covered.">    if (valor == null || !valor.isNumber()) {</span>
+<span class="fc" id="L76">      throw error(</span>
+          &quot;configuracion_ic_incompleta&quot;,
+          &quot;Falta configurar el umbral &quot; + nivel + &quot; de &quot; + referencia);
+    }
+
+<span class="fc" id="L81">    return valor.decimalValue();</span>
+  }
+
+  private ApiException error(String codigo, String detalle) {
+<span class="fc" id="L85">    return new ApiException(</span>
+        HttpStatus.UNPROCESSABLE_ENTITY,
+        codigo,
+        &quot;Mediciones del indice de condicion invalidas&quot;,
+        detalle);
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

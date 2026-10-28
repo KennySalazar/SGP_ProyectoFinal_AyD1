@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DestinoObservacion.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">sgp-api</a> &gt; <a href="index.source.html" class="el_package">gt.usac.cunoc.sgp.revision.dto</a> &gt; <span class="el_source">DestinoObservacion.java</span></div><h1>DestinoObservacion.java</h1><pre class="source lang-java linenums">package gt.usac.cunoc.sgp.revision.dto;
+
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import gt.usac.cunoc.sgp.archivo.model.CategoriaFoto;
+import gt.usac.cunoc.sgp.revision.model.TipoDestinoObservacion;
+import jakarta.validation.constraints.AssertTrue;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
+import java.util.UUID;
+
+/**
+ * La existencia del elemento y la pertenencia del UUID se validarán contra el snapshot del ciclo.
+ */
+<span class="fc" id="L14">public record DestinoObservacion(</span>
+    @NotNull TipoDestinoObservacion tipo,
+    @Size(max = 300) String elementoRef,
+    UUID instanciaElementoId,
+    CategoriaFoto categoriaFotografica) {
+
+  @JsonIgnore
+  @AssertTrue(
+      message = &quot;Indique un elemento con referencia o una categoría fotográfica, sin mezclarlos&quot;)
+  public boolean isCoherente() {
+<span class="fc bfc" id="L24" title="All 2 branches covered.">    if (tipo == null) return false;</span>
+<span class="fc bfc" id="L25" title="All 2 branches covered.">    return switch (tipo) {</span>
+      case ELEMENTO -&gt;
+<span class="fc bfc" id="L27" title="All 6 branches covered.">          elementoRef != null &amp;&amp; !elementoRef.isBlank() &amp;&amp; categoriaFotografica == null;</span>
+      case CATEGORIA_FOTOGRAFICA -&gt;
+<span class="fc bfc" id="L29" title="All 6 branches covered.">          categoriaFotografica != null &amp;&amp; elementoRef == null &amp;&amp; instanciaElementoId == null;</span>
+    };
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

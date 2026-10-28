@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>VeredictoRevisionController.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">sgp-api</a> &gt; <a href="index.source.html" class="el_package">gt.usac.cunoc.sgp.revision.controller</a> &gt; <span class="el_source">VeredictoRevisionController.java</span></div><h1>VeredictoRevisionController.java</h1><pre class="source lang-java linenums">package gt.usac.cunoc.sgp.revision.controller;
+
+import gt.usac.cunoc.sgp.common.exception.ApiException;
+import gt.usac.cunoc.sgp.common.security.JwtData;
+import gt.usac.cunoc.sgp.inspeccion.dto.ConfirmacionEstadoIcResponse;
+import gt.usac.cunoc.sgp.revision.dto.EmitirVeredictoRequest;
+import gt.usac.cunoc.sgp.revision.dto.RevisionResultadoResponse;
+import gt.usac.cunoc.sgp.revision.service.VeredictoRevisionService;
+import java.util.List;
+import java.util.UUID;
+import org.springframework.http.*;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.*;
+
+@RestController
+@RequestMapping(&quot;/api/v1&quot;)
+@PreAuthorize(&quot;hasAnyRole('CATEDRATICO','ESTUDIANTE')&quot;)
+public class VeredictoRevisionController {
+  private final VeredictoRevisionService servicio;
+
+<span class="fc" id="L22">  public VeredictoRevisionController(VeredictoRevisionService servicio) {</span>
+<span class="fc" id="L23">    this.servicio = servicio;</span>
+<span class="fc" id="L24">  }</span>
+
+  @PostMapping(&quot;/revisiones/{id}/veredicto&quot;)
+  @PreAuthorize(&quot;hasRole('CATEDRATICO')&quot;)
+  public ResponseEntity&lt;RevisionResultadoResponse&gt; emitir(
+      @PathVariable UUID id, @RequestBody EmitirVeredictoRequest request, Authentication auth) {
+<span class="nc" id="L30">    return privada(servicio.emitir(id, actor(auth), request));</span>
+  }
+
+  @GetMapping(&quot;/revisiones/{id}/resultado&quot;)
+  public ResponseEntity&lt;RevisionResultadoResponse&gt; resultado(
+      @PathVariable UUID id, Authentication auth) {
+<span class="fc" id="L36">    return privada(servicio.resultado(id, actor(auth)));</span>
+  }
+
+  @GetMapping(&quot;/revisiones/{id}/estado-puente&quot;)
+  @PreAuthorize(&quot;hasRole('CATEDRATICO')&quot;)
+  public ResponseEntity&lt;ConfirmacionEstadoIcResponse&gt; estado(
+      @PathVariable UUID id, Authentication auth) {
+<span class="nc" id="L43">    return privada(servicio.estadoPuente(id, actor(auth)));</span>
+  }
+
+  @GetMapping(&quot;/inspecciones/{id}/revisiones&quot;)
+  public ResponseEntity&lt;List&lt;RevisionResultadoResponse&gt;&gt; historial(
+      @PathVariable UUID id, Authentication auth) {
+<span class="nc" id="L49">    return privada(servicio.historial(id, actor(auth)));</span>
+  }
+
+  private &lt;T&gt; ResponseEntity&lt;T&gt; privada(T body) {
+<span class="fc" id="L53">    return ResponseEntity.ok().cacheControl(CacheControl.noStore().cachePrivate()).body(body);</span>
+  }
+
+  private UUID actor(Authentication auth) {
+<span class="pc bpc" id="L57" title="1 of 2 branches missed.">    if (auth == null</span>
+<span class="pc bpc" id="L58" title="1 of 2 branches missed.">        || !auth.isAuthenticated()</span>
+<span class="pc bpc" id="L59" title="1 of 2 branches missed.">        || !(auth.getDetails() instanceof JwtData jwt)</span>
+<span class="pc bpc" id="L60" title="1 of 2 branches missed.">        || jwt.userId() == null)</span>
+<span class="nc" id="L61">      throw new ApiException(</span>
+          HttpStatus.UNAUTHORIZED,
+          &quot;autenticacion_requerida&quot;,
+          &quot;Autenticación requerida&quot;,
+          &quot;Se requiere una sesión válida.&quot;);
+<span class="fc" id="L66">    return jwt.userId();</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

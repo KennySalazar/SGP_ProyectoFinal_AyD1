@@ -19,7 +19,7 @@ import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { ButtonModule } from 'primeng/button';
 import { DialogModule } from 'primeng/dialog';
 import { SelectModule } from 'primeng/select';
-import { firstValueFrom } from 'rxjs';
+import { firstValueFrom, Subscription } from 'rxjs';
 import { MarcadorObservacionesComponent } from '../../../formulario/components/observaciones/marcador-observaciones.component';
 import { AuthStore } from '../../../../core/services/auth.store';
 import {
@@ -108,6 +108,14 @@ export class ReporteFotograficoComponent implements OnDestroy {
   private stream: MediaStream | null = null;
   private revision = 0;
   private contextoActual = '';
+  /**
+   * Inventario local en vivo. Se cancela solo al cambiar de contexto: el effect también se
+   * re-ejecuta cuando la sincronización renueva la sesión (auth.user() cambia de objeto), y si se
+   * cancelara ahí la lista de pendientes quedaría congelada hasta recargar.
+   */
+  private inventarioEnVivo?: Subscription;
+  /** Miniaturas que se están descargando, para no pedir dos veces la misma. */
+  private readonly miniaturasEnCurso = new Set<string>();
   private generacionCarga = 0;
   readonly bloqueada = signal(false);
   readonly inventarioCargado = signal(false);
@@ -147,7 +155,7 @@ export class ReporteFotograficoComponent implements OnDestroy {
       .map((conteo) => conteo.categoria),
   );
   constructor() {
-    effect((onCleanup) => {
+    effect(() => {
       const inspeccion = this.contexto();
       const usuario = this.auth.user();
       untracked(() => {
@@ -161,7 +169,7 @@ export class ReporteFotograficoComponent implements OnDestroy {
           inspeccion.estado === 'BORRADOR' &&
           !this.revisionSoloLectura()
         ) {
-          const subscription = this.locales
+          this.inventarioEnVivo = this.locales
             .observarInventario(usuario.id, inspeccion.id)
             .subscribe((inventario) => {
               if (this.auth.user()?.id !== usuario.id || this.contexto().id !== inspeccion.id)
@@ -176,8 +184,9 @@ export class ReporteFotograficoComponent implements OnDestroy {
                   miniatura: anteriores.get(foto.id),
                 })),
               );
+              // Una foto recién confirmada por la sincronización llega sin miniatura.
+              void this.completarMiniaturas(usuario.id, inspeccion.id, this.revision);
             });
-          onCleanup(() => subscription.unsubscribe());
         }
         if (usuario) void this.recargar(usuario.id, inspeccion.id, this.revision);
       });
@@ -493,10 +502,37 @@ export class ReporteFotograficoComponent implements OnDestroy {
   etiqueta(categoria: string) {
     return this.i18n.translate('inspecciones.fotos.categorias.' + categoria);
   }
+  /** Descarga las miniaturas que faltan en las fotos confirmadas, una vez por foto. */
+  private async completarMiniaturas(usuario: string, inspeccion: string, revision: number) {
+    if (!this.connectivity.online()) return;
+    const faltantes = this.confirmadas().filter(
+      (foto) => !foto.miniatura && !this.miniaturasEnCurso.has(foto.id),
+    );
+    for (const foto of faltantes) {
+      this.miniaturasEnCurso.add(foto.id);
+      try {
+        const blob = await firstValueFrom(this.api.contenidoFotografia(inspeccion, foto.id, true));
+        if (!this.vigente(usuario, inspeccion, revision)) return;
+        const actual = this.confirmadas().find((f) => f.id === foto.id);
+        // Si ya no está o la recarga ya trajo su miniatura, no se usa esta.
+        if (!actual || actual.miniatura) continue;
+        const miniatura = URL.createObjectURL(blob);
+        this.confirmadas.update((lista) =>
+          lista.map((f) => (f.id === foto.id ? { ...f, miniatura } : f)),
+        );
+      } catch {
+        if (this.vigente(usuario, inspeccion, revision)) this.error.set('lectura');
+      } finally {
+        this.miniaturasEnCurso.delete(foto.id);
+      }
+    }
+  }
   private revocar(url?: string | null) {
     if (url) URL.revokeObjectURL(url);
   }
   private limpiar() {
+    this.inventarioEnVivo?.unsubscribe();
+    this.inventarioEnVivo = undefined;
     this.fotoLocalARetirar.set(null);
     this.revision++;
     this.cerrarCamara();

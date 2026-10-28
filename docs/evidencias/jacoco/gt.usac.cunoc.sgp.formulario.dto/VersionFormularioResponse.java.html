@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>VersionFormularioResponse.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">sgp-api</a> &gt; <a href="index.source.html" class="el_package">gt.usac.cunoc.sgp.formulario.dto</a> &gt; <span class="el_source">VersionFormularioResponse.java</span></div><h1>VersionFormularioResponse.java</h1><pre class="source lang-java linenums">package gt.usac.cunoc.sgp.formulario.dto;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import gt.usac.cunoc.sgp.formulario.model.EstadoVersionFormulario;
+import java.time.Instant;
+import java.util.List;
+import java.util.UUID;
+
+<span class="fc" id="L9">public record VersionFormularioResponse(</span>
+    UUID id,
+    String codigo,
+    EstadoVersionFormulario estado,
+    boolean activa,
+    JsonNode esquema,
+    JsonNode vinculosAlmacenamiento,
+    JsonNode reglasEvaluacionIc,
+    String hashContenido,
+    String versionAlgoritmoIc,
+    UUID versionAnteriorId,
+    String versionAnteriorCodigo,
+    UUID creadoPorId,
+    UUID publicadoPorId,
+    Instant publicadoEn,
+    UUID calibradoPorId,
+    Instant calibradoEn,
+    Instant creadoEn,
+    Instant actualizadoEn,
+    long version,
+    List&lt;ConfiguracionIcElementoResponse&gt; pesos,
+    List&lt;MapeoCampoResponse&gt; mapeos,
+    AprobacionCalibracionResponse aprobacionCalibracion) {
+
+  public VersionFormularioResponse(
+      UUID id,
+      String codigo,
+      EstadoVersionFormulario estado,
+      boolean activa,
+      JsonNode esquema,
+      JsonNode vinculosAlmacenamiento,
+      JsonNode reglasEvaluacionIc,
+      String hashContenido,
+      String versionAlgoritmoIc,
+      UUID versionAnteriorId,
+      String versionAnteriorCodigo,
+      UUID creadoPorId,
+      UUID publicadoPorId,
+      Instant publicadoEn,
+      UUID calibradoPorId,
+      Instant calibradoEn,
+      Instant creadoEn,
+      Instant actualizadoEn,
+      long version,
+      List&lt;ConfiguracionIcElementoResponse&gt; pesos,
+      List&lt;MapeoCampoResponse&gt; mapeos) {
+<span class="fc" id="L55">    this(</span>
+        id,
+        codigo,
+        estado,
+        activa,
+        esquema,
+        vinculosAlmacenamiento,
+        reglasEvaluacionIc,
+        hashContenido,
+        versionAlgoritmoIc,
+        versionAnteriorId,
+        versionAnteriorCodigo,
+        creadoPorId,
+        publicadoPorId,
+        publicadoEn,
+        calibradoPorId,
+        calibradoEn,
+        creadoEn,
+        actualizadoEn,
+        version,
+        pesos,
+        mapeos,
+        null);
+<span class="fc" id="L78">  }</span>
+
+  public VersionFormularioResponse conAprobacion(AprobacionCalibracionResponse aprobacion) {
+<span class="fc" id="L81">    return new VersionFormularioResponse(</span>
+        id,
+        codigo,
+        estado,
+        activa,
+        esquema,
+        vinculosAlmacenamiento,
+        reglasEvaluacionIc,
+        hashContenido,
+        versionAlgoritmoIc,
+        versionAnteriorId,
+        versionAnteriorCodigo,
+        creadoPorId,
+        publicadoPorId,
+        publicadoEn,
+        calibradoPorId,
+        calibradoEn,
+        creadoEn,
+        actualizadoEn,
+        version,
+        pesos,
+        mapeos,
+        aprobacion);
+  }
+
+  @com.fasterxml.jackson.annotation.JsonProperty(&quot;rotuloCalibracion&quot;)
+  public String rotuloCalibracion() {
+<span class="fc bfc" id="L108" title="All 2 branches covered.">    if (aprobacionCalibracion != null) return aprobacionCalibracion.rotulo();</span>
+<span class="fc" id="L109">    return AprobacionCalibracionResponse.ROTULO_SIN_APROBAR;</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

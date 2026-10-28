@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SolicitudIdempotente.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">sgp-api</a> &gt; <a href="index.source.html" class="el_package">gt.usac.cunoc.sgp.sync.http</a> &gt; <span class="el_source">SolicitudIdempotente.java</span></div><h1>SolicitudIdempotente.java</h1><pre class="source lang-java linenums">package gt.usac.cunoc.sgp.sync.http;
+
+import jakarta.servlet.ReadListener;
+import jakarta.servlet.ServletInputStream;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletRequestWrapper;
+import java.io.BufferedReader;
+import java.io.ByteArrayInputStream;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
+import java.util.Collections;
+import java.util.Enumeration;
+
+public class SolicitudIdempotente extends HttpServletRequestWrapper {
+  private final byte[] cuerpo;
+
+  public SolicitudIdempotente(HttpServletRequest request, byte[] cuerpo) {
+<span class="fc" id="L18">    super(request);</span>
+<span class="fc" id="L19">    this.cuerpo = cuerpo;</span>
+<span class="fc" id="L20">  }</span>
+
+  @Override
+  public String getHeader(String nombre) {
+<span class="pc bpc" id="L24" title="1 of 2 branches missed.">    return &quot;Idempotency-Key&quot;.equalsIgnoreCase(nombre) ? null : super.getHeader(nombre);</span>
+  }
+
+  @Override
+  public Enumeration&lt;String&gt; getHeaders(String nombre) {
+<span class="fc bfc" id="L29" title="All 2 branches covered.">    return &quot;Idempotency-Key&quot;.equalsIgnoreCase(nombre)</span>
+<span class="fc" id="L30">        ? Collections.emptyEnumeration()</span>
+<span class="fc" id="L31">        : super.getHeaders(nombre);</span>
+  }
+
+  @Override
+  public Enumeration&lt;String&gt; getHeaderNames() {
+<span class="fc" id="L36">    return Collections.enumeration(</span>
+<span class="fc" id="L37">        Collections.list(super.getHeaderNames()).stream()</span>
+<span class="fc bfc" id="L38" title="All 2 branches covered.">            .filter(n -&gt; !&quot;Idempotency-Key&quot;.equalsIgnoreCase(n))</span>
+<span class="fc" id="L39">            .toList());</span>
+  }
+
+  @Override
+  public ServletInputStream getInputStream() {
+<span class="fc" id="L44">    var entrada = new ByteArrayInputStream(cuerpo);</span>
+<span class="fc" id="L45">    return new ServletInputStream() {</span>
+      @Override
+      public int read() {
+<span class="fc" id="L48">        return entrada.read();</span>
+      }
+
+      @Override
+      public boolean isFinished() {
+<span class="nc bnc" id="L53" title="All 2 branches missed.">        return entrada.available() == 0;</span>
+      }
+
+      @Override
+      public boolean isReady() {
+<span class="nc" id="L58">        return true;</span>
+      }
+
+      @Override
+      public void setReadListener(ReadListener listener) {
+<span class="nc" id="L63">        throw new UnsupportedOperationException(&quot;Solo se admiten operaciones sincronas&quot;);</span>
+      }
+    };
+  }
+
+  @Override
+  public BufferedReader getReader() {
+<span class="nc" id="L70">    return new BufferedReader(new InputStreamReader(getInputStream(), StandardCharsets.UTF_8));</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

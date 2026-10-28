@@ -91,7 +91,10 @@ public class RevisionDetalleService {
         preliminar,
         "/api/v1/inspecciones/" + inspeccionId + "/fotografias",
         false,
-        "/api/v1/revisiones/" + revisionId + "/observaciones");
+        "/api/v1/revisiones/" + revisionId + "/observaciones",
+        ciclo.getInspeccion().getNombreAutorCapturado(),
+        ciclo.getInspeccion().getPuente().getNombre(),
+        ciclo.getInspeccion().getPuente().getCodigo());
   }
 
   private UUID identificador(JsonNode snapshot, String campo) {

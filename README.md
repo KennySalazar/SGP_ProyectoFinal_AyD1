@@ -117,6 +117,8 @@ Antes de desarrollar una funcionalidad, revisar la documentación correspondient
 - [`docs/deployment/GUIA_IMPLEMENTACION_PRODUCCION.md`](docs/deployment/GUIA_IMPLEMENTACION_PRODUCCION.md) — contratos y decisiones para el responsable de producción.
 - [`docs/deployment/PRODUCCION_AWS.md`](docs/deployment/PRODUCCION_AWS.md) — recursos, despliegue y verificación de producción en AWS.
 - [`docs/deployment/RESPALDO_Y_RESTAURACION.md`](docs/deployment/RESPALDO_Y_RESTAURACION.md) — respaldos diarios y mensuales, prueba de restauración y recuperación.
+- [`docs/db/DICCIONARIO_DATOS.md`](docs/db/DICCIONARIO_DATOS.md) — diccionario de datos: tablas, columnas, tipos, restricciones y significado (también en [PDF](docs/db/DICCIONARIO_DATOS.pdf)).
+- [`docs/api/`](docs/api/) — especificación OpenAPI exportada de la API REST.
 - [`docs/adr/`](docs/adr/) — decisiones de arquitectura relevantes.
 
 ## Reglas principales

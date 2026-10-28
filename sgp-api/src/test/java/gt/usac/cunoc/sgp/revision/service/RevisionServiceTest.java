@@ -33,6 +33,25 @@ class RevisionServiceTest {
       new RevisionService(revisiones, transiciones, mapper, Clock.fixed(AHORA, ZoneOffset.UTC));
 
   @Test
+  void listaResueltasSoloDelRevisorConPaginacion() {
+    UUID revisorId = UUID.randomUUID();
+    var pagina = org.springframework.data.domain.PageRequest.of(2, 10);
+    when(revisiones.buscarResueltas(revisorId, pagina))
+        .thenReturn(org.springframework.data.domain.Page.empty(pagina));
+    assertThat(service.listarResueltas(revisorId, 2, 10).getContent()).isEmpty();
+    verify(revisiones).buscarResueltas(revisorId, pagina);
+  }
+
+  @Test
+  void rechazaPaginacionInvalidaDeResueltas() {
+    for (int[] pagina : new int[][] {{-1, 20}, {0, 0}, {0, 101}}) {
+      assertThatThrownBy(() -> service.listarResueltas(UUID.randomUUID(), pagina[0], pagina[1]))
+          .isInstanceOf(ApiException.class);
+    }
+    org.mockito.Mockito.verifyNoInteractions(revisiones);
+  }
+
+  @Test
   void iniciaCicloPendienteYRegistraLaFecha() {
     UUID revisionId = UUID.randomUUID();
     UUID inspeccionId = UUID.randomUUID();

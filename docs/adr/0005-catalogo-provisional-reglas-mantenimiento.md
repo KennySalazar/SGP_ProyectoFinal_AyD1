@@ -23,7 +23,7 @@ Se requiere definir:
 
 - Al iniciar el sistema sobre una versión activa del formulario de inspección (por ejemplo, `SIECA-v1`) que no posea reglas de mantenimiento, el backend sembrará automáticamente un conjunto de 18 reglas iniciales derivadas de los elementos e indicadores del esquema.
 - Toda regla recién sembrada o creada por el Administrador que no haya sido validada por un docente especialista permanece en estado **«Provisional · sin validar»** (`validado_por_id = null`, `validado_en = null`).
-- Las reglas provisionales están activas y operativas para generar propuestas de mantenimiento, pero se distinguen visual y técnicamente con el rótulo correspondiente para advertir a los inspectores y administradores que son parámetros sugeridos pendientes de ratificación académica.
+- Las reglas provisionales están activas y operativas para generar propuestas de mantenimiento, pero se distinguen visual y técnicamente con el rótulo correspondiente para advertir a los inspectores y administradores que son parámetros sugeridos pendientes de validación por un docente especialista.
 
 ### 2. Construcción de la semilla basada en indicadores del esquema SIECA
 

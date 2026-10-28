@@ -1,0 +1,445 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PuenteService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">sgp-api</a> &gt; <a href="index.source.html" class="el_package">gt.usac.cunoc.sgp.puente.service</a> &gt; <span class="el_source">PuenteService.java</span></div><h1>PuenteService.java</h1><pre class="source lang-java linenums">package gt.usac.cunoc.sgp.puente.service;
+
+import gt.usac.cunoc.sgp.common.audit.aspect.Auditable;
+import gt.usac.cunoc.sgp.common.audit.model.AccionAuditoria;
+import gt.usac.cunoc.sgp.common.exception.ApiException;
+import gt.usac.cunoc.sgp.common.util.UuidV7Generator;
+import gt.usac.cunoc.sgp.mantenimiento.service.PlanMantenimientoService;
+import gt.usac.cunoc.sgp.puente.dto.ActualizarPuenteRequest;
+import gt.usac.cunoc.sgp.puente.dto.CrearPuenteRequest;
+import gt.usac.cunoc.sgp.puente.dto.DarBajaPuenteRequest;
+import gt.usac.cunoc.sgp.puente.dto.PuenteCatalogoResponse;
+import gt.usac.cunoc.sgp.puente.dto.PuenteResponse;
+import gt.usac.cunoc.sgp.puente.entity.Departamento;
+import gt.usac.cunoc.sgp.puente.entity.Municipio;
+import gt.usac.cunoc.sgp.puente.entity.Puente;
+import gt.usac.cunoc.sgp.puente.exception.CercaniaPuenteException;
+import gt.usac.cunoc.sgp.puente.mapper.PuenteMapper;
+import gt.usac.cunoc.sgp.puente.repository.DepartamentoRepository;
+import gt.usac.cunoc.sgp.puente.repository.MunicipioRepository;
+import gt.usac.cunoc.sgp.puente.repository.PuenteRepository;
+import gt.usac.cunoc.sgp.puente.repository.PuenteRepository.PuenteCercanoProjection;
+import jakarta.validation.ConstraintViolationException;
+import jakarta.validation.Validator;
+import java.time.Clock;
+import java.time.Instant;
+import java.util.Locale;
+import java.util.Set;
+import java.util.UUID;
+import org.locationtech.jts.geom.Coordinate;
+import org.locationtech.jts.geom.GeometryFactory;
+import org.locationtech.jts.geom.Point;
+import org.locationtech.jts.geom.PrecisionModel;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
+import org.springframework.http.HttpStatus;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+@Service
+public class PuenteService {
+
+  public static final double DISTANCIA_MINIMA_SUPERPUESTO_METROS = 1.0;
+
+<span class="fc" id="L46">  private static final GeometryFactory GEOMETRY_FACTORY =</span>
+      new GeometryFactory(new PrecisionModel(), 4326);
+
+  private final DepartamentoRepository departamentos;
+  private final MunicipioRepository municipios;
+  private final PuenteRepository puentes;
+  private final PuenteMapper mapper;
+  private final Validator validator;
+  private final Clock clock;
+  private final PlanMantenimientoService planesMantenimiento;
+
+  public PuenteService(
+      DepartamentoRepository departamentos,
+      MunicipioRepository municipios,
+      PuenteRepository puentes,
+      PuenteMapper mapper,
+      Validator validator,
+      Clock clock,
+<span class="fc" id="L64">      PlanMantenimientoService planesMantenimiento) {</span>
+<span class="fc" id="L65">    this.departamentos = departamentos;</span>
+<span class="fc" id="L66">    this.municipios = municipios;</span>
+<span class="fc" id="L67">    this.puentes = puentes;</span>
+<span class="fc" id="L68">    this.mapper = mapper;</span>
+<span class="fc" id="L69">    this.validator = validator;</span>
+<span class="fc" id="L70">    this.clock = clock;</span>
+<span class="fc" id="L71">    this.planesMantenimiento = planesMantenimiento;</span>
+<span class="fc" id="L72">  }</span>
+
+  @Transactional
+  @PreAuthorize(&quot;hasRole('ADMINISTRADOR')&quot;)
+  @Auditable(accion = AccionAuditoria.CREAR, entidad = &quot;puente&quot;)
+  public PuenteResponse registrar(CrearPuenteRequest request, UUID administradorId) {
+<span class="fc" id="L78">    var errores = validator.validate(request);</span>
+<span class="pc bpc" id="L79" title="1 of 2 branches missed.">    if (!errores.isEmpty()) {</span>
+<span class="nc" id="L80">      throw new ConstraintViolationException(errores);</span>
+    }
+
+<span class="fc" id="L83">    double latitud = request.latitud().doubleValue();</span>
+<span class="fc" id="L84">    double longitud = request.longitud().doubleValue();</span>
+
+<span class="fc" id="L86">    validarDentroDeGuatemala(latitud, longitud);</span>
+
+<span class="fc" id="L88">    Departamento departamento =</span>
+        departamentos
+<span class="fc" id="L90">            .findByIdAndActivoTrue(request.departamentoId())</span>
+<span class="fc" id="L91">            .orElseThrow(</span>
+                () -&gt;
+<span class="nc" id="L93">                    validacion(</span>
+                        &quot;departamento_invalido&quot;, &quot;El departamento no existe o esta inactivo&quot;));
+
+<span class="fc" id="L96">    Municipio municipio =</span>
+        municipios
+<span class="fc" id="L98">            .findActivoByIdForUpdate(request.municipioId())</span>
+<span class="fc" id="L99">            .orElseThrow(</span>
+<span class="nc" id="L100">                () -&gt; validacion(&quot;municipio_invalido&quot;, &quot;El municipio no existe o esta inactivo&quot;));</span>
+
+<span class="fc bfc" id="L102" title="All 2 branches covered.">    if (!municipio.getDepartamento().getId().equals(departamento.getId())) {</span>
+<span class="fc" id="L103">      throw validacion(</span>
+          &quot;municipio_departamento_incongruente&quot;,
+          &quot;El municipio no pertenece al departamento seleccionado&quot;);
+    }
+
+<span class="fc" id="L108">    validarUbicacionEnMunicipio(municipio.getId(), latitud, longitud);</span>
+
+<span class="fc" id="L110">    var cercanos = puentes.findCercanos(latitud, longitud, PageRequest.of(0, 100));</span>
+<span class="fc" id="L111">    validarNoSuperpuesto(cercanos);</span>
+<span class="fc bfc" id="L112" title="All 4 branches covered.">    if (cercanos.hasContent() &amp;&amp; !request.confirmarCercania()) {</span>
+<span class="fc" id="L113">      throw new CercaniaPuenteException(cercanos.map(mapper::toPuenteCercanoResponse));</span>
+    }
+
+<span class="fc bfc" id="L116" title="All 2 branches covered.">    if (municipio.getUltimoCorrelativoPuente() &gt;= 9999) {</span>
+<span class="fc" id="L117">      throw new ApiException(</span>
+          HttpStatus.CONFLICT,
+          &quot;correlativo_agotado&quot;,
+          &quot;Correlativo agotado&quot;,
+          &quot;El municipio alcanzo el limite de 9999 puentes&quot;);
+    }
+
+<span class="fc" id="L124">    int correlativo = municipio.getUltimoCorrelativoPuente() + 1;</span>
+<span class="fc" id="L125">    String codigo =</span>
+<span class="fc" id="L126">        String.format(</span>
+            Locale.ROOT,
+            &quot;GT-%s-%s-%04d&quot;,
+<span class="fc" id="L129">            departamento.getCodigoIne(),</span>
+<span class="fc" id="L130">            municipio.getCodigoIne(),</span>
+<span class="fc" id="L131">            correlativo);</span>
+
+<span class="fc" id="L133">    var utm = mapper.toCoordenadaUtmResponse(puentes.calcularUtm(latitud, longitud));</span>
+
+<span class="fc" id="L135">    Instant ahora = clock.instant();</span>
+<span class="fc" id="L136">    municipio.asignarCorrelativoPuente(correlativo, ahora);</span>
+
+<span class="fc" id="L138">    Puente puente =</span>
+        new Puente(
+<span class="fc" id="L140">            UuidV7Generator.generate(),</span>
+            codigo,
+            correlativo,
+            municipio,
+<span class="fc" id="L144">            request.nombre().strip(),</span>
+<span class="fc" id="L145">            request.ruta().strip(),</span>
+<span class="fc" id="L146">            request.kilometraje(),</span>
+<span class="fc" id="L147">            GEOMETRY_FACTORY.createPoint(new Coordinate(longitud, latitud)),</span>
+            administradorId,
+            ahora);
+
+<span class="fc" id="L151">    Puente guardado = puentes.saveAndFlush(puente);</span>
+<span class="fc" id="L152">    planesMantenimiento.crearPorDefecto(guardado, administradorId);</span>
+<span class="fc" id="L153">    return mapper.toAltaResponse(guardado, utm);</span>
+  }
+
+  @Transactional(readOnly = true)
+  public PuenteResponse obtenerPorId(UUID id) {
+<span class="fc" id="L158">    Puente puente =</span>
+        puentes
+<span class="fc" id="L160">            .findPuenteConRelacionesById(id)</span>
+<span class="fc" id="L161">            .filter(Puente::isActivo)</span>
+<span class="fc" id="L162">            .orElseThrow(</span>
+                () -&gt;
+<span class="nc" id="L164">                    new ApiException(</span>
+                        HttpStatus.NOT_FOUND,
+                        &quot;puente_no_encontrado&quot;,
+                        &quot;Puente no encontrado&quot;,
+                        &quot;El puente no existe o esta inactivo&quot;));
+
+<span class="fc" id="L170">    double latitud = puente.getUbicacion().getY();</span>
+<span class="fc" id="L171">    double longitud = puente.getUbicacion().getX();</span>
+<span class="fc" id="L172">    var utm = mapper.toCoordenadaUtmResponse(puentes.calcularUtm(latitud, longitud));</span>
+<span class="fc" id="L173">    return mapper.toAltaResponse(puente, utm);</span>
+  }
+
+  @Transactional
+  @PreAuthorize(&quot;hasRole('ADMINISTRADOR')&quot;)
+  @Auditable(
+      accion = AccionAuditoria.MODIFICAR,
+      entidad = &quot;puente&quot;,
+      tipo = Puente.class,
+      idArg = &quot;id&quot;)
+  public PuenteResponse actualizar(UUID id, ActualizarPuenteRequest request, UUID administradorId) {
+<span class="fc" id="L184">    var errores = validator.validate(request);</span>
+<span class="pc bpc" id="L185" title="1 of 2 branches missed.">    if (!errores.isEmpty()) {</span>
+<span class="nc" id="L186">      throw new ConstraintViolationException(errores);</span>
+    }
+
+<span class="fc" id="L189">    Puente puente =</span>
+        puentes
+<span class="fc" id="L191">            .findPuenteConRelacionesById(id)</span>
+<span class="fc" id="L192">            .filter(Puente::isActivo)</span>
+<span class="fc" id="L193">            .orElseThrow(</span>
+                () -&gt;
+<span class="nc" id="L195">                    new ApiException(</span>
+                        HttpStatus.NOT_FOUND,
+                        &quot;puente_no_encontrado&quot;,
+                        &quot;Puente no encontrado&quot;,
+                        &quot;El puente no existe o esta inactivo&quot;));
+
+<span class="fc bfc" id="L201" title="All 2 branches covered.">    if (request.codigo() != null</span>
+<span class="pc bpc" id="L202" title="1 of 2 branches missed.">        &amp;&amp; !request.codigo().isBlank()</span>
+<span class="fc bfc" id="L203" title="All 2 branches covered.">        &amp;&amp; !request.codigo().trim().equals(puente.getCodigo())) {</span>
+<span class="fc" id="L204">      throw validacion(</span>
+          &quot;codigo_inmutable&quot;, &quot;El codigo del puente es inmutable y no puede modificarse&quot;);
+    }
+
+<span class="fc" id="L208">    double latitud = request.latitud().doubleValue();</span>
+<span class="fc" id="L209">    double longitud = request.longitud().doubleValue();</span>
+
+<span class="fc" id="L211">    validarDentroDeGuatemala(latitud, longitud);</span>
+
+<span class="fc" id="L213">    Departamento departamento =</span>
+        departamentos
+<span class="fc" id="L215">            .findByIdAndActivoTrue(request.departamentoId())</span>
+<span class="fc" id="L216">            .orElseThrow(</span>
+                () -&gt;
+<span class="nc" id="L218">                    validacion(</span>
+                        &quot;departamento_invalido&quot;, &quot;El departamento no existe o esta inactivo&quot;));
+
+<span class="fc" id="L221">    Municipio municipio =</span>
+        municipios
+<span class="fc" id="L223">            .findActivoByIdForUpdate(request.municipioId())</span>
+<span class="fc" id="L224">            .orElseThrow(</span>
+<span class="nc" id="L225">                () -&gt; validacion(&quot;municipio_invalido&quot;, &quot;El municipio no existe o esta inactivo&quot;));</span>
+
+<span class="fc bfc" id="L227" title="All 2 branches covered.">    if (!municipio.getDepartamento().getId().equals(departamento.getId())) {</span>
+<span class="fc" id="L228">      throw validacion(</span>
+          &quot;municipio_departamento_incongruente&quot;,
+          &quot;El municipio no pertenece al departamento seleccionado&quot;);
+    }
+
+<span class="fc" id="L233">    validarUbicacionEnMunicipio(municipio.getId(), latitud, longitud);</span>
+
+<span class="fc" id="L235">    var cercanos =</span>
+<span class="fc" id="L236">        puentes.findCercanosExcluyendoPuente(latitud, longitud, id, PageRequest.of(0, 100));</span>
+<span class="fc" id="L237">    validarNoSuperpuesto(cercanos);</span>
+<span class="fc bfc" id="L238" title="All 4 branches covered.">    if (cercanos.hasContent() &amp;&amp; !request.confirmarCercania()) {</span>
+<span class="fc" id="L239">      throw new CercaniaPuenteException(cercanos.map(mapper::toPuenteCercanoResponse));</span>
+    }
+
+<span class="fc" id="L242">    Instant ahora = clock.instant();</span>
+<span class="fc" id="L243">    Point nuevaUbicacion = GEOMETRY_FACTORY.createPoint(new Coordinate(longitud, latitud));</span>
+
+<span class="fc" id="L245">    puente.actualizarDatosGenerales(</span>
+<span class="fc" id="L246">        request.nombre().strip(),</span>
+<span class="fc" id="L247">        request.ruta().strip(),</span>
+<span class="fc" id="L248">        request.kilometraje(),</span>
+        municipio,
+        nuevaUbicacion,
+        ahora);
+
+<span class="fc" id="L253">    Puente guardado = puentes.saveAndFlush(puente);</span>
+
+<span class="fc" id="L255">    var utm = mapper.toCoordenadaUtmResponse(puentes.calcularUtm(latitud, longitud));</span>
+<span class="fc" id="L256">    return mapper.toAltaResponse(guardado, utm);</span>
+  }
+
+  @Transactional
+  @PreAuthorize(&quot;hasRole('ADMINISTRADOR')&quot;)
+  public PuenteResponse darDeBaja(UUID id, DarBajaPuenteRequest request, UUID administradorId) {
+<span class="fc" id="L262">    var errores = validator.validate(request);</span>
+<span class="pc bpc" id="L263" title="1 of 2 branches missed.">    if (!errores.isEmpty()) {</span>
+<span class="nc" id="L264">      throw new ConstraintViolationException(errores);</span>
+    }
+
+<span class="fc" id="L267">    Puente puente =</span>
+        puentes
+<span class="fc" id="L269">            .findPuenteConRelacionesById(id)</span>
+<span class="fc" id="L270">            .orElseThrow(</span>
+                () -&gt;
+<span class="fc" id="L272">                    new ApiException(</span>
+                        HttpStatus.NOT_FOUND,
+                        &quot;puente_no_encontrado&quot;,
+                        &quot;Puente no encontrado&quot;,
+                        &quot;No existe un puente con el identificador proporcionado.&quot;));
+
+<span class="fc bfc" id="L278" title="All 2 branches covered.">    if (!puente.isActivo()) {</span>
+<span class="fc" id="L279">      throw new ApiException(</span>
+          HttpStatus.CONFLICT,
+          &quot;puente_ya_inactivo&quot;,
+          &quot;Puente ya inactivo&quot;,
+          &quot;El puente ya se encuentra dado de baja.&quot;);
+    }
+
+<span class="fc" id="L286">    Instant ahora = clock.instant();</span>
+<span class="fc" id="L287">    puente.darDeBaja(request.motivo().strip(), administradorId, ahora);</span>
+<span class="fc" id="L288">    Puente guardado = puentes.saveAndFlush(puente);</span>
+
+<span class="fc" id="L290">    var utm =</span>
+<span class="fc" id="L291">        mapper.toCoordenadaUtmResponse(</span>
+<span class="fc" id="L292">            puentes.calcularUtm(guardado.getUbicacion().getY(), guardado.getUbicacion().getX()));</span>
+<span class="fc" id="L293">    return mapper.toAltaResponse(guardado, utm);</span>
+  }
+
+  @Transactional
+  @PreAuthorize(&quot;hasRole('ADMINISTRADOR')&quot;)
+  public PuenteResponse reactivar(UUID id, UUID administradorId) {
+<span class="fc" id="L299">    Puente puente =</span>
+        puentes
+<span class="fc" id="L301">            .findPuenteConRelacionesById(id)</span>
+<span class="fc" id="L302">            .orElseThrow(</span>
+                () -&gt;
+<span class="nc" id="L304">                    new ApiException(</span>
+                        HttpStatus.NOT_FOUND,
+                        &quot;puente_no_encontrado&quot;,
+                        &quot;Puente no encontrado&quot;,
+                        &quot;No existe un puente con el identificador proporcionado.&quot;));
+
+<span class="fc bfc" id="L310" title="All 2 branches covered.">    if (puente.isActivo()) {</span>
+<span class="fc" id="L311">      throw new ApiException(</span>
+          HttpStatus.CONFLICT,
+          &quot;puente_ya_activo&quot;,
+          &quot;Puente ya activo&quot;,
+          &quot;El puente ya se encuentra activo.&quot;);
+    }
+
+<span class="fc" id="L318">    Instant ahora = clock.instant();</span>
+<span class="fc" id="L319">    puente.reactivar(ahora);</span>
+<span class="fc" id="L320">    Puente guardado = puentes.saveAndFlush(puente);</span>
+<span class="fc" id="L321">    planesMantenimiento.crearPorDefecto(guardado, administradorId);</span>
+
+<span class="fc" id="L323">    var utm =</span>
+<span class="fc" id="L324">        mapper.toCoordenadaUtmResponse(</span>
+<span class="fc" id="L325">            puentes.calcularUtm(guardado.getUbicacion().getY(), guardado.getUbicacion().getX()));</span>
+<span class="fc" id="L326">    return mapper.toAltaResponse(guardado, utm);</span>
+  }
+
+  @Transactional(readOnly = true)
+  public void validarDentroDeGuatemala(double latitud, double longitud) {
+<span class="fc" id="L331">    Boolean dentroDeGuatemala = puentes.estaDentroDeGuatemala(latitud, longitud);</span>
+
+<span class="pc bpc" id="L333" title="1 of 2 branches missed.">    if (dentroDeGuatemala == null) {</span>
+<span class="nc" id="L334">      throw new ApiException(</span>
+          HttpStatus.SERVICE_UNAVAILABLE,
+          &quot;limite_territorial_no_disponible&quot;,
+          &quot;Validación territorial no disponible&quot;,
+          &quot;No está cargado el límite territorial de Guatemala.&quot;);
+    }
+
+<span class="fc bfc" id="L341" title="All 2 branches covered.">    if (!dentroDeGuatemala) {</span>
+<span class="fc" id="L342">      throw validacion(</span>
+          &quot;ubicacion_fuera_de_guatemala&quot;,
+          &quot;Las coordenadas deben estar dentro del territorio de Guatemala.&quot;);
+    }
+<span class="fc" id="L346">  }</span>
+
+  @Transactional(readOnly = true)
+  public void validarUbicacionEnMunicipio(UUID municipioId, double latitud, double longitud) {
+<span class="fc" id="L350">    Boolean perteneceAlMunicipio =</span>
+<span class="fc" id="L351">        municipios.ubicacionPerteneceAlMunicipio(municipioId, latitud, longitud);</span>
+
+<span class="pc bpc" id="L353" title="1 of 2 branches missed.">    if (perteneceAlMunicipio == null) {</span>
+<span class="nc" id="L354">      throw new ApiException(</span>
+          HttpStatus.SERVICE_UNAVAILABLE,
+          &quot;limite_municipal_no_disponible&quot;,
+          &quot;Validación municipal no disponible&quot;,
+          &quot;No está cargado el límite geográfico del municipio seleccionado.&quot;);
+    }
+
+<span class="fc bfc" id="L361" title="All 2 branches covered.">    if (!perteneceAlMunicipio) {</span>
+<span class="fc" id="L362">      throw validacion(</span>
+          &quot;ubicacion_municipio_incongruente&quot;,
+          &quot;Las coordenadas no corresponden al municipio seleccionado.&quot;);
+    }
+<span class="fc" id="L366">  }</span>
+
+  @Transactional(readOnly = true)
+  public Page&lt;PuenteCatalogoResponse&gt; listarCatalogo(
+      UUID departamentoId, String estado, int pagina, int tamanio) {
+<span class="fc" id="L371">    return listarCatalogo(departamentoId, estado, Boolean.TRUE, null, pagina, tamanio);</span>
+  }
+
+  @Transactional(readOnly = true)
+  public Page&lt;PuenteCatalogoResponse&gt; listarCatalogo(
+      UUID departamentoId, String estado, Boolean activo, int pagina, int tamanio) {
+<span class="fc" id="L377">    return listarCatalogo(departamentoId, estado, activo, null, pagina, tamanio);</span>
+  }
+
+  @Transactional(readOnly = true)
+  public Page&lt;PuenteCatalogoResponse&gt; listarCatalogo(
+      UUID departamentoId,
+      String estado,
+      Boolean activo,
+      String busqueda,
+      int pagina,
+      int tamanio) {
+<span class="fc bfc" id="L388" title="All 6 branches covered.">    if (pagina &lt; 0 || tamanio &lt; 1 || tamanio &gt; 100) {</span>
+<span class="fc" id="L389">      throw validacion(</span>
+          &quot;paginacion_invalida&quot;,
+          &quot;La página debe ser mayor o igual a 0 y el tamaño debe estar entre 1 y 100.&quot;);
+    }
+<span class="fc bfc" id="L393" title="All 4 branches covered.">    if (estado != null &amp;&amp; !Set.of(&quot;Bueno&quot;, &quot;Regular&quot;, &quot;Malo&quot;, &quot;Sin evaluar&quot;).contains(estado)) {</span>
+<span class="fc" id="L394">      throw validacion(&quot;estado_invalido&quot;, &quot;El estado debe ser Bueno, Regular, Malo o Sin evaluar.&quot;);</span>
+    }
+
+<span class="pc bpc" id="L397" title="3 of 4 branches missed.">    String busquedaLimpia = (busqueda != null &amp;&amp; !busqueda.isBlank()) ? busqueda.trim() : null;</span>
+
+<span class="fc" id="L399">    var pageable =</span>
+<span class="fc" id="L400">        PageRequest.of(pagina, tamanio, Sort.by(Sort.Order.asc(&quot;nombre&quot;), Sort.Order.asc(&quot;id&quot;)));</span>
+
+    Page&lt;Puente&gt; resultado =
+<span class="fc bfc" id="L403" title="All 2 branches covered.">        estado == null</span>
+<span class="pc bpc" id="L404" title="1 of 2 branches missed.">            ? busquedaLimpia == null</span>
+<span class="fc" id="L405">                ? puentes.findCatalogo(departamentoId, activo, pageable)</span>
+<span class="nc" id="L406">                : puentes.findCatalogoConBusqueda(departamentoId, activo, busquedaLimpia, pageable)</span>
+<span class="pc bpc" id="L407" title="1 of 2 branches missed.">            : busquedaLimpia == null</span>
+<span class="fc" id="L408">                ? puentes.findCatalogoPorEstado(departamentoId, activo, estado, pageable)</span>
+<span class="pc" id="L409">                : puentes.findCatalogoPorEstadoConBusqueda(</span>
+                    departamentoId, activo, estado, busquedaLimpia, pageable);
+<span class="fc" id="L411">    return resultado.map(mapper::toCatalogoResponse);</span>
+  }
+
+  void validarNoSuperpuesto(Page&lt;PuenteCercanoProjection&gt; cercanos) {
+<span class="pc bpc" id="L415" title="1 of 4 branches missed.">    if (cercanos == null || !cercanos.hasContent()) {</span>
+<span class="fc" id="L416">      return;</span>
+    }
+<span class="fc" id="L418">    cercanos.getContent().stream()</span>
+<span class="fc" id="L419">        .filter(</span>
+            c -&gt;
+<span class="pc bpc" id="L421" title="1 of 2 branches missed.">                c.getDistanciaMetros() != null</span>
+<span class="fc bfc" id="L422" title="All 2 branches covered.">                    &amp;&amp; c.getDistanciaMetros() &lt; DISTANCIA_MINIMA_SUPERPUESTO_METROS)</span>
+<span class="fc" id="L423">        .findFirst()</span>
+<span class="fc" id="L424">        .ifPresent(</span>
+            c -&gt; {
+<span class="fc bfc" id="L426" title="All 2 branches covered.">              String estado = c.getActivo() ? &quot;activo&quot; : &quot;inactivo&quot;;</span>
+<span class="fc" id="L427">              throw new ApiException(</span>
+                  HttpStatus.CONFLICT,
+                  &quot;puente_superpuesto&quot;,
+                  &quot;Ubicacion ocupada&quot;,
+<span class="fc" id="L431">                  String.format(</span>
+                      Locale.ROOT,
+                      &quot;Ya existe un puente %s registrado en esta misma ubicacion (%s — %s). No se puede posicionar un puente sobre otro.&quot;,
+                      estado,
+<span class="fc" id="L435">                      c.getCodigo(),</span>
+<span class="fc" id="L436">                      c.getNombre()));</span>
+            });
+<span class="fc" id="L438">  }</span>
+
+  private ApiException validacion(String codigo, String detalle) {
+<span class="fc" id="L441">    return new ApiException(</span>
+        HttpStatus.UNPROCESSABLE_ENTITY, codigo, &quot;Datos de puente invalidos&quot;, detalle);
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

@@ -1,0 +1,142 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ValidadorCalibracionIc.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">sgp-api</a> &gt; <a href="index.source.html" class="el_package">gt.usac.cunoc.sgp.formulario.validation</a> &gt; <span class="el_source">ValidadorCalibracionIc.java</span></div><h1>ValidadorCalibracionIc.java</h1><pre class="source lang-java linenums">package gt.usac.cunoc.sgp.formulario.validation;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import gt.usac.cunoc.sgp.common.exception.ApiException;
+import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import org.springframework.http.HttpStatus;
+
+public final class ValidadorCalibracionIc {
+  private ValidadorCalibracionIc() {}
+
+  public static void validar(JsonNode catalogo) {
+<span class="fc" id="L16">    var errores = new ArrayList&lt;Map&lt;String, String&gt;&gt;();</span>
+<span class="fc bfc" id="L17" title="All 2 branches covered.">    if (!catalogo.isObject()) {</span>
+<span class="fc" id="L18">      agregar(errores, &quot;reglasEvaluacionIc&quot;, &quot;Debe ser un objeto.&quot;);</span>
+<span class="fc bfc" id="L19" title="All 2 branches covered.">    } else if (catalogo.has(&quot;reglas_evaluacion_ic&quot;)) {</span>
+<span class="fc" id="L20">      var reglas = catalogo.path(&quot;reglas_evaluacion_ic&quot;);</span>
+<span class="fc bfc" id="L21" title="All 2 branches covered.">      if (!reglas.isObject()) {</span>
+<span class="fc" id="L22">        agregar(errores, &quot;reglasEvaluacionIc.reglas_evaluacion_ic&quot;, &quot;Debe ser un objeto.&quot;);</span>
+      } else {
+<span class="fc" id="L24">        var escala = reglas.path(&quot;escala_severidad&quot;);</span>
+<span class="fc bfc" id="L25" title="All 2 branches covered.">        if (!escala.isMissingNode()) {</span>
+<span class="fc bfc" id="L26" title="All 2 branches covered.">          for (String nivel : List.of(&quot;NO_PRESENTA&quot;, &quot;LEVE&quot;, &quot;MODERADO&quot;, &quot;SEVERO&quot;)) {</span>
+<span class="fc" id="L27">            calificacion(escala.path(nivel), &quot;escala_severidad.&quot; + nivel, errores);</span>
+<span class="fc" id="L28">          }</span>
+<span class="pc bpc" id="L29" title="1 of 2 branches missed.">          if (escala.path(&quot;NO_PRESENTA&quot;).isNumber()</span>
+<span class="pc bpc" id="L30" title="1 of 2 branches missed.">              &amp;&amp; escala.path(&quot;NO_PRESENTA&quot;).decimalValue().signum() != 0) {</span>
+<span class="nc" id="L31">            agregar(errores, &quot;escala_severidad.NO_PRESENTA&quot;, &quot;Debe ser cero.&quot;);</span>
+          }
+        }
+<span class="fc" id="L34">        var rangos = reglas.path(&quot;rangos_estado&quot;);</span>
+<span class="fc bfc" id="L35" title="All 2 branches covered.">        if (!rangos.isMissingNode()) {</span>
+<span class="pc bpc" id="L36" title="1 of 2 branches missed.">          if (!rangos.path(&quot;MALO&quot;).isNumber()</span>
+<span class="pc bpc" id="L37" title="1 of 2 branches missed.">              || !rangos.path(&quot;REGULAR&quot;).isNumber()</span>
+<span class="pc bpc" id="L38" title="1 of 2 branches missed.">              || !rangos.path(&quot;BUENO&quot;).isNumber()</span>
+<span class="fc bfc" id="L39" title="All 2 branches covered.">              || rangos.path(&quot;MALO&quot;).decimalValue().signum() != 0</span>
+<span class="pc bpc" id="L40" title="1 of 2 branches missed.">              || rangos.path(&quot;REGULAR&quot;).decimalValue().signum() &lt;= 0</span>
+              || rangos
+<span class="fc" id="L42">                      .path(&quot;BUENO&quot;)</span>
+<span class="fc" id="L43">                      .decimalValue()</span>
+<span class="fc bfc" id="L44" title="All 2 branches covered.">                      .compareTo(rangos.path(&quot;REGULAR&quot;).decimalValue())</span>
+                  &lt;= 0
+<span class="fc bfc" id="L46" title="All 2 branches covered.">              || rangos.path(&quot;BUENO&quot;).decimalValue().compareTo(BigDecimal.valueOf(100)) &gt; 0) {</span>
+<span class="fc" id="L47">            agregar(errores, &quot;rangos_estado&quot;, &quot;Debe cumplir MALO = 0 &lt; REGULAR &lt; BUENO &lt;= 100.&quot;);</span>
+          }
+        }
+<span class="fc" id="L50">        var agregacion = reglas.path(&quot;agregacion&quot;);</span>
+<span class="fc bfc" id="L51" title="All 2 branches covered.">        for (String campo : List.of(&quot;indicadores_de_un_elemento&quot;, &quot;instancias_repetibles&quot;)) {</span>
+<span class="fc bfc" id="L52" title="All 2 branches covered.">          if (agregacion.has(campo)</span>
+<span class="pc bpc" id="L53" title="1 of 2 branches missed.">              &amp;&amp; (!agregacion.path(campo).isTextual()</span>
+<span class="fc bfc" id="L54" title="All 2 branches covered.">                  || !Set.of(&quot;MAXIMO&quot;, &quot;PROMEDIO&quot;).contains(agregacion.path(campo).asText()))) {</span>
+<span class="fc" id="L55">            agregar(errores, &quot;agregacion.&quot; + campo, &quot;Debe ser MAXIMO o PROMEDIO.&quot;);</span>
+          }
+<span class="fc" id="L57">        }</span>
+        for (String campo :
+<span class="fc bfc" id="L59" title="All 2 branches covered.">            List.of(&quot;elementos_ausentes_portantes&quot;, &quot;elementos_ausentes_no_portantes&quot;)) {</span>
+<span class="fc bfc" id="L60" title="All 2 branches covered.">          if (agregacion.has(campo))</span>
+<span class="fc" id="L61">            calificacion(agregacion.path(campo), &quot;agregacion.&quot; + campo, errores);</span>
+<span class="fc" id="L62">        }</span>
+<span class="fc" id="L63">        var conversiones = reglas.path(&quot;conversion_indicadores&quot;);</span>
+<span class="fc" id="L64">        conversiones</span>
+<span class="fc" id="L65">            .path(&quot;booleanos&quot;)</span>
+<span class="fc" id="L66">            .fields()</span>
+<span class="fc" id="L67">            .forEachRemaining(</span>
+                e -&gt;
+<span class="fc" id="L69">                    calificacion(</span>
+<span class="fc" id="L70">                        e.getValue(), &quot;conversion_indicadores.booleanos.&quot; + e.getKey(), errores));</span>
+<span class="fc" id="L71">        conversiones</span>
+<span class="fc" id="L72">            .path(&quot;enumerados&quot;)</span>
+<span class="fc" id="L73">            .fields()</span>
+<span class="fc" id="L74">            .forEachRemaining(</span>
+                familia -&gt;
+                    familia
+<span class="fc" id="L77">                        .getValue()</span>
+<span class="fc" id="L78">                        .fields()</span>
+<span class="fc" id="L79">                        .forEachRemaining(</span>
+                            e -&gt;
+<span class="fc" id="L81">                                calificacion(</span>
+<span class="fc" id="L82">                                    e.getValue(),</span>
+                                    &quot;conversion_indicadores.enumerados.&quot;
+<span class="fc" id="L84">                                        + familia.getKey()</span>
+                                        + &quot;.&quot;
+<span class="fc" id="L86">                                        + e.getKey(),</span>
+                                    errores)));
+<span class="fc" id="L88">        conversiones</span>
+<span class="fc" id="L89">            .path(&quot;numericos&quot;)</span>
+<span class="fc" id="L90">            .fields()</span>
+<span class="fc" id="L91">            .forEachRemaining(</span>
+                e -&gt; {
+<span class="fc bfc" id="L93" title="All 2 branches covered.">                  String campo = e.getValue().has(&quot;umbrales_m&quot;) ? &quot;umbrales_m&quot; : &quot;umbrales&quot;;</span>
+<span class="fc" id="L94">                  JsonNode valores = e.getValue().path(campo);</span>
+<span class="fc" id="L95">                  var leve = valores.path(&quot;LEVE&quot;);</span>
+<span class="fc" id="L96">                  var moderado = valores.path(&quot;MODERADO&quot;);</span>
+<span class="fc" id="L97">                  var severo = valores.path(&quot;SEVERO&quot;);</span>
+<span class="pc bpc" id="L98" title="1 of 2 branches missed.">                  if (!leve.isNumber()</span>
+<span class="pc bpc" id="L99" title="1 of 2 branches missed.">                      || !moderado.isNumber()</span>
+<span class="pc bpc" id="L100" title="1 of 2 branches missed.">                      || !severo.isNumber()</span>
+<span class="pc bpc" id="L101" title="1 of 2 branches missed.">                      || leve.decimalValue().signum() &lt;= 0</span>
+<span class="fc bfc" id="L102" title="All 2 branches covered.">                      || moderado.decimalValue().compareTo(leve.decimalValue()) &lt;= 0</span>
+<span class="pc bpc" id="L103" title="1 of 2 branches missed.">                      || severo.decimalValue().compareTo(moderado.decimalValue()) &lt;= 0) {</span>
+<span class="fc" id="L104">                    agregar(</span>
+                        errores,
+<span class="fc" id="L106">                        &quot;conversion_indicadores.numericos.&quot; + e.getKey() + &quot;.&quot; + campo,</span>
+                        &quot;Debe cumplir 0 &lt; LEVE &lt; MODERADO &lt; SEVERO.&quot;);
+                  }
+<span class="fc" id="L109">                });</span>
+<span class="fc bfc" id="L110" title="All 2 branches covered.">        if (reglas.has(&quot;reglas_anulacion&quot;)) {</span>
+          try {
+<span class="fc" id="L112">            ValidadorReglasCriticasIc.validarCatalogo(reglas, catalogo);</span>
+<span class="nc" id="L113">          } catch (ApiException e) {</span>
+<span class="nc" id="L114">            agregar(errores, &quot;reglas_anulacion&quot;, e.getMessage());</span>
+<span class="fc" id="L115">          }</span>
+        }
+      }
+    }
+<span class="fc bfc" id="L119" title="All 2 branches covered.">    if (!errores.isEmpty()) {</span>
+<span class="fc" id="L120">      throw new ApiException(</span>
+          HttpStatus.UNPROCESSABLE_ENTITY,
+          &quot;calibracion_ic_invalida&quot;,
+          &quot;Calibracion invalida&quot;,
+          &quot;Revise los valores de la calibracion.&quot;,
+          errores);
+    }
+<span class="fc" id="L127">  }</span>
+
+  private static void calificacion(
+      JsonNode valor, String campo, List&lt;Map&lt;String, String&gt;&gt; errores) {
+<span class="pc bpc" id="L131" title="1 of 2 branches missed.">    if (!valor.isNumber()</span>
+<span class="pc bpc" id="L132" title="1 of 2 branches missed.">        || valor.decimalValue().signum() &lt; 0</span>
+<span class="pc bpc" id="L133" title="1 of 2 branches missed.">        || valor.decimalValue().compareTo(BigDecimal.valueOf(4)) &gt; 0) {</span>
+<span class="nc" id="L134">      agregar(errores, campo, &quot;Requiere un numero entre 0 y 4.&quot;);</span>
+    }
+<span class="fc" id="L136">  }</span>
+
+  private static void agregar(List&lt;Map&lt;String, String&gt;&gt; errores, String campo, String mensaje) {
+<span class="fc" id="L139">    errores.add(Map.of(&quot;campo&quot;, campo, &quot;mensaje&quot;, mensaje));</span>
+<span class="fc" id="L140">  }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

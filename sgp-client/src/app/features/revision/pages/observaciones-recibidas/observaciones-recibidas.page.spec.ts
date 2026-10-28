@@ -31,6 +31,9 @@ describe('Observaciones recibidas del autor', () => {
         {
           revisionId: 'c1',
           inspeccionId: 'i1',
+          fechaInspeccion: '2026-10-17',
+          puenteNombre: 'Puente Central',
+          puenteCodigo: 'P-001',
           numeroCiclo: 1,
           estadoRevision: 'RESUELTA',
           enviadaEn: '2026-10-19T12:00:00Z',
@@ -38,6 +41,9 @@ describe('Observaciones recibidas del autor', () => {
         {
           revisionId: 'c2',
           inspeccionId: 'i1',
+          fechaInspeccion: '2026-10-17',
+          puenteNombre: 'Puente Central',
+          puenteCodigo: 'P-001',
           numeroCiclo: 2,
           estadoRevision: 'EN_CURSO',
           enviadaEn: '2026-10-19T13:00:00Z',
@@ -54,7 +60,12 @@ describe('Observaciones recibidas del autor', () => {
     expect(
       Array.from(html.querySelectorAll('article a')).map((a) => a.getAttribute('href')),
     ).toEqual(['/observaciones/c1', '/observaciones/c2']);
-    expect(html.textContent).toContain('RESUELTA');
+    expect(html.textContent).toContain('Resuelta');
+    expect(html.textContent).toContain('Puente Central');
+    expect(html.textContent).toContain('P-001');
+    expect(html.textContent).toContain('17/10/2026');
+    expect(html.textContent).not.toContain('i1');
+    expect(html.textContent).not.toContain('RESUELTA');
     expect(html.querySelector('app-editor-observaciones')).toBeNull();
     fixture.componentInstance.cambiarPagina({ page: 1 });
     expect(fixture.componentInstance.pagina()).toBeNull();

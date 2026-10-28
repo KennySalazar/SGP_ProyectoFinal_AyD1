@@ -45,6 +45,14 @@ describe('RevisionApiService', () => {
     request.flush({ content: [] });
   });
 
+  it('consulta revisadas paginadas sin permitir seleccionar otro catedratico', () => {
+    service.listarRevisadas(1, 10).subscribe();
+    const request = http.expectOne('/api/v1/revisiones/revisadas?pagina=1&tamanio=10');
+    expect(request.request.method).toBe('GET');
+    expect(request.request.params.has('revisorId')).toBe(false);
+    request.flush({ content: [] });
+  });
+
   it('consulta los borradores de estudiantes por separado', () => {
     service.listarBorradores(1, 50).subscribe();
 

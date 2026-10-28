@@ -136,12 +136,18 @@ class RevisionDetalleControllerSecurityTest {
                 null,
                 "/fotografias",
                 false,
-                "/observaciones"));
+                "/observaciones",
+                "Ana López",
+                "Puente del Río",
+                "P-001"));
     mvc.perform(get(ruta).with(authentication(sesion(RoleName.CATEDRATICO))))
         .andExpect(status().isOk())
         .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
         .andExpect(jsonPath("$.icPreliminar").value(org.hamcrest.Matchers.nullValue()))
         .andExpect(jsonPath("$.datos.campo").value("enviado"))
+        .andExpect(jsonPath("$.autorNombre").value("Ana López"))
+        .andExpect(jsonPath("$.puenteNombre").value("Puente del Río"))
+        .andExpect(jsonPath("$.puenteCodigo").value("P-001"))
         .andExpect(jsonPath("$.fotografiasEndpoint").value("/fotografias"))
         .andExpect(jsonPath("$.observacionesEndpoint").value("/observaciones"))
         .andExpect(jsonPath("$.code").doesNotExist())

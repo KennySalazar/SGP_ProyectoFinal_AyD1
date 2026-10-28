@@ -5,6 +5,8 @@ import {
   VinculoVisual,
 } from '../models/formulario.models';
 
+const LONGITUD_MULTILINEA = 200;
+
 export function resolverVinculoParaCampo(
   secClave: string,
   pregClave: string,
@@ -173,7 +175,7 @@ export function esquemaASeccionesVisuales(
         tipo = 'boolean';
       } else if (
         Boolean(p['x-sgp-multiline']) ||
-        (typeof p['maxLength'] === 'number' && (p['maxLength'] as number) > 200)
+        (typeof p['maxLength'] === 'number' && (p['maxLength'] as number) > LONGITUD_MULTILINEA)
       ) {
         tipo = 'multiline';
       } else {
@@ -274,7 +276,11 @@ export function seccionesVisualesAEsquema(
     const propsObj: Record<string, unknown> = { ...propiedadesNoEditables };
     const ordenPreguntas =
       sec.preguntas.length > 0
-        ? sec.preguntas.map((pregunta) => pregunta.clave)
+        ? ordenConNoEditables(
+            sec.preguntas.map((pregunta) => pregunta.clave),
+            esquemaBasePreguntas['x-sgp-orden'],
+            Object.keys(propiedadesNoEditables),
+          )
         : esquemaBasePreguntas['x-sgp-orden'];
     const requeridosBase = new Set(
       Array.isArray(esquemaBasePreguntas['required']) ? esquemaBasePreguntas['required'] : [],
@@ -287,6 +293,7 @@ export function seccionesVisualesAEsquema(
       const pBase: Record<string, unknown> = (propsBase[p.clave] as Record<string, unknown>)
         ? { ...(propsBase[p.clave] as Record<string, unknown>) }
         : {};
+      const tipoBase = pBase['type'];
 
       pBase['title'] = p.titulo;
       if (p.descripcion && p.descripcion.trim().length > 0) {
@@ -303,7 +310,7 @@ export function seccionesVisualesAEsquema(
 
       switch (p.tipo) {
         case 'select':
-          pBase['type'] = 'string';
+          pBase['type'] = tipoJson(tipoBase, 'string');
           pBase['enum'] =
             p.opciones && p.opciones.length > 0 ? p.opciones.map((op) => op.trim()) : ['OPCION_1'];
           delete pBase['format'];
@@ -317,7 +324,7 @@ export function seccionesVisualesAEsquema(
           break;
 
         case 'date':
-          pBase['type'] = 'string';
+          pBase['type'] = tipoJson(tipoBase, 'string');
           pBase['format'] = 'date';
           delete pBase['enum'];
           delete pBase['minimum'];
@@ -328,8 +335,10 @@ export function seccionesVisualesAEsquema(
           break;
 
         case 'multiline':
-          pBase['type'] = 'string';
-          pBase['x-sgp-multiline'] = true;
+          pBase['type'] = tipoJson(tipoBase, 'string');
+          if (!(typeof p.longitudMaxima === 'number' && p.longitudMaxima > LONGITUD_MULTILINEA)) {
+            pBase['x-sgp-multiline'] = true;
+          }
           delete pBase['enum'];
           delete pBase['format'];
           delete pBase['minimum'];
@@ -343,33 +352,27 @@ export function seccionesVisualesAEsquema(
           break;
 
         case 'integer':
-          pBase['type'] = 'integer';
+          pBase['type'] = tipoJson(tipoBase, 'integer');
           delete pBase['enum'];
           delete pBase['format'];
           delete pBase['minLength'];
           delete pBase['maxLength'];
           delete pBase['x-sgp-multiline'];
-          if (p.valorMinimo != null) pBase['minimum'] = p.valorMinimo;
-          else delete pBase['minimum'];
-          if (p.valorMaximo != null) pBase['maximum'] = p.valorMaximo;
-          else delete pBase['maximum'];
+          aplicarLimites(pBase, p);
           break;
 
         case 'number':
-          pBase['type'] = 'number';
+          pBase['type'] = tipoJson(tipoBase, 'number');
           delete pBase['enum'];
           delete pBase['format'];
           delete pBase['minLength'];
           delete pBase['maxLength'];
           delete pBase['x-sgp-multiline'];
-          if (p.valorMinimo != null) pBase['minimum'] = p.valorMinimo;
-          else delete pBase['minimum'];
-          if (p.valorMaximo != null) pBase['maximum'] = p.valorMaximo;
-          else delete pBase['maximum'];
+          aplicarLimites(pBase, p);
           break;
 
         case 'boolean':
-          pBase['type'] = 'boolean';
+          pBase['type'] = tipoJson(tipoBase, 'boolean');
           delete pBase['enum'];
           delete pBase['format'];
           delete pBase['minLength'];
@@ -383,7 +386,7 @@ export function seccionesVisualesAEsquema(
 
         case 'string':
         default:
-          pBase['type'] = 'string';
+          pBase['type'] = tipoJson(tipoBase, 'string');
           delete pBase['enum'];
           delete pBase['format'];
           delete pBase['minimum'];
@@ -419,6 +422,7 @@ export function seccionesVisualesAEsquema(
         ...(sec.descripcion ? { description: sec.descripcion } : {}),
         type: 'array',
         items: {
+          ...esquemaBasePreguntas,
           type: 'object',
           additionalProperties: false,
           required: reqList,
@@ -445,6 +449,37 @@ export function seccionesVisualesAEsquema(
   esquema['x-sgp-orden'] = secciones.map((s) => s.clave);
 
   return { esquema, vinculos };
+}
+
+// Conserva la nulabilidad declarada (["number", "null"]) para no estrechar el campo al guardar.
+function tipoJson(tipoBase: unknown, tipo: string): string | unknown[] {
+  if (!Array.isArray(tipoBase) || !tipoBase.includes('null')) return tipo;
+  return tipoBase.includes(tipo) ? tipoBase : [tipo, 'null'];
+}
+
+// valorMinimo/valorMaximo también se leen de exclusiveMinimum/exclusiveMaximum; si el límite ya
+// está declarado como exclusivo no se duplica como inclusivo.
+function aplicarLimites(pBase: Record<string, unknown>, p: PreguntaVisual): void {
+  if (p.valorMinimo == null) delete pBase['minimum'];
+  else if (pBase['exclusiveMinimum'] !== p.valorMinimo) pBase['minimum'] = p.valorMinimo;
+  if (p.valorMaximo == null) delete pBase['maximum'];
+  else if (pBase['exclusiveMaximum'] !== p.valorMaximo) pBase['maximum'] = p.valorMaximo;
+}
+
+// Los campos que el editor visual no maneja (objetos, listas, $ref) mantienen su posición.
+function ordenConNoEditables(
+  editables: string[],
+  ordenBase: unknown,
+  noEditables: string[],
+): string[] {
+  const orden = [...editables];
+  if (!Array.isArray(ordenBase)) return orden;
+  ordenBase.forEach((clave, indice) => {
+    if (typeof clave === 'string' && noEditables.includes(clave)) {
+      orden.splice(Math.min(indice, orden.length), 0, clave);
+    }
+  });
+  return orden;
 }
 
 function esCampoVisualEditable(esquema: Record<string, unknown>): boolean {

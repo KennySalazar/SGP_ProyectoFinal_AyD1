@@ -1,0 +1,360 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>JsonSchemaValidatorService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">sgp-api</a> &gt; <a href="index.source.html" class="el_package">gt.usac.cunoc.sgp.formulario.validation</a> &gt; <span class="el_source">JsonSchemaValidatorService.java</span></div><h1>JsonSchemaValidatorService.java</h1><pre class="source lang-java linenums">package gt.usac.cunoc.sgp.formulario.validation;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.networknt.schema.JsonSchema;
+import com.networknt.schema.JsonSchemaFactory;
+import com.networknt.schema.SchemaLocation;
+import com.networknt.schema.SpecVersion;
+import com.networknt.schema.ValidationMessage;
+import gt.usac.cunoc.sgp.common.exception.ApiException;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.Comparator;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+import org.springframework.http.HttpStatus;
+import org.springframework.stereotype.Component;
+
+@Component
+<span class="fc" id="L26">public class JsonSchemaValidatorService {</span>
+
+<span class="fc" id="L28">  private final ConcurrentMap&lt;String, JsonSchema&gt; schemaCache = new ConcurrentHashMap&lt;&gt;();</span>
+
+  public void validarEsquema(JsonNode esquema) {
+<span class="pc bpc" id="L31" title="1 of 6 branches missed.">    if (esquema == null || !esquema.isObject() || esquema.isEmpty()) {</span>
+<span class="fc" id="L32">      throw new ApiException(</span>
+          HttpStatus.UNPROCESSABLE_ENTITY,
+          &quot;esquema_invalido&quot;,
+          &quot;Esquema inválido&quot;,
+          &quot;El esquema debe ser un objeto JSON válido y no puede estar vacío&quot;);
+    }
+
+    String dialecto =
+<span class="fc bfc" id="L40" title="All 2 branches covered.">        esquema.hasNonNull(&quot;$schema&quot;)</span>
+<span class="fc" id="L41">            ? esquema.get(&quot;$schema&quot;).asText()</span>
+<span class="fc" id="L42">            : &quot;https://json-schema.org/draft/2020-12/schema&quot;;</span>
+
+    SpecVersion.VersionFlag versionFlag =
+<span class="pc bpc" id="L45" title="1 of 2 branches missed.">        dialecto.contains(&quot;draft-07&quot;)</span>
+<span class="nc" id="L46">            ? SpecVersion.VersionFlag.V7</span>
+<span class="fc" id="L47">            : SpecVersion.VersionFlag.V202012;</span>
+
+    try {
+<span class="fc" id="L50">      JsonSchemaFactory factory = JsonSchemaFactory.getInstance(versionFlag);</span>
+<span class="fc" id="L51">      JsonSchema metaSchema = factory.getSchema(SchemaLocation.of(dialecto));</span>
+<span class="fc" id="L52">      Set&lt;ValidationMessage&gt; errores = metaSchema.validate(esquema);</span>
+
+<span class="fc bfc" id="L54" title="All 2 branches covered.">      if (!errores.isEmpty()) {</span>
+<span class="fc" id="L55">        ValidationMessage primerError = errores.iterator().next();</span>
+<span class="fc" id="L56">        String ruta = primerError.getInstanceLocation().toString();</span>
+<span class="pc bpc" id="L57" title="1 of 2 branches missed.">        if (ruta.isBlank()) {</span>
+<span class="nc" id="L58">          ruta = primerError.getEvaluationPath().toString();</span>
+        }
+<span class="pc bpc" id="L60" title="1 of 2 branches missed.">        if (ruta.isBlank()) {</span>
+<span class="nc" id="L61">          ruta = &quot;/&quot;;</span>
+        }
+<span class="fc" id="L63">        String motivo = primerError.getMessage();</span>
+<span class="fc" id="L64">        throw new ApiException(</span>
+            HttpStatus.UNPROCESSABLE_ENTITY,
+            &quot;esquema_invalido&quot;,
+            &quot;Esquema inválido&quot;,
+            &quot;Error en la ruta '&quot; + ruta + &quot;': &quot; + motivo);
+      }
+
+<span class="fc" id="L71">      validarConsistenciaEstructural(esquema, &quot;$&quot;);</span>
+
+      // Probar compilación del esquema
+<span class="fc" id="L74">      factory.getSchema(esquema);</span>
+<span class="fc" id="L75">    } catch (ApiException e) {</span>
+<span class="fc" id="L76">      throw e;</span>
+<span class="nc" id="L77">    } catch (Exception e) {</span>
+<span class="nc" id="L78">      throw new ApiException(</span>
+          HttpStatus.UNPROCESSABLE_ENTITY,
+          &quot;esquema_invalido&quot;,
+          &quot;Esquema inválido&quot;,
+<span class="nc" id="L82">          &quot;Error de estructura JSON Schema: &quot; + e.getMessage());</span>
+<span class="fc" id="L83">    }</span>
+<span class="fc" id="L84">  }</span>
+
+  private void validarConsistenciaEstructural(JsonNode esquema, String ruta) {
+    // Boolean schemas are valid JSON Schema subschemas and have no structural keywords.
+<span class="pc bpc" id="L88" title="1 of 4 branches missed.">    if (esquema == null || !esquema.isObject()) return;</span>
+
+<span class="fc" id="L90">    JsonNode tipo = esquema.get(&quot;type&quot;);</span>
+<span class="fc bfc" id="L91" title="All 4 branches covered.">    if (esquema.has(&quot;properties&quot;) &amp;&amp; !declaraTipo(tipo, &quot;object&quot;)) {</span>
+<span class="fc" id="L92">      throw esquemaInvalido(</span>
+          &quot;El nodo '&quot; + ruta + &quot;' define properties, por lo que su tipo debe incluir 'object'.&quot;);
+    }
+<span class="fc bfc" id="L95" title="All 4 branches covered.">    if (esquema.has(&quot;items&quot;) &amp;&amp; !declaraTipo(tipo, &quot;array&quot;)) {</span>
+<span class="fc" id="L96">      throw esquemaInvalido(</span>
+          &quot;El nodo '&quot; + ruta + &quot;' define items, por lo que su tipo debe incluir 'array'.&quot;);
+    }
+
+    for (String keyword :
+<span class="fc bfc" id="L101" title="All 2 branches covered.">        List.of(</span>
+            &quot;$defs&quot;,
+            &quot;definitions&quot;,
+            &quot;properties&quot;,
+            &quot;patternProperties&quot;,
+            &quot;dependentSchemas&quot;,
+            &quot;dependencies&quot;)) {
+<span class="fc" id="L108">      JsonNode subschemas = esquema.get(keyword);</span>
+<span class="pc bpc" id="L109" title="1 of 4 branches missed.">      if (subschemas != null &amp;&amp; subschemas.isObject()) {</span>
+<span class="fc" id="L110">        Iterator&lt;Map.Entry&lt;String, JsonNode&gt;&gt; campos = subschemas.fields();</span>
+<span class="fc bfc" id="L111" title="All 2 branches covered.">        while (campos.hasNext()) {</span>
+<span class="fc" id="L112">          var campo = campos.next();</span>
+<span class="fc" id="L113">          validarConsistenciaEstructural(</span>
+<span class="fc" id="L114">              campo.getValue(), ruta + &quot;/&quot; + keyword + &quot;/&quot; + escaparPuntero(campo.getKey()));</span>
+<span class="fc" id="L115">        }</span>
+      }
+<span class="fc" id="L117">    }</span>
+
+    for (String keyword :
+<span class="fc bfc" id="L120" title="All 2 branches covered.">        List.of(</span>
+            &quot;items&quot;,
+            &quot;additionalItems&quot;,
+            &quot;additionalProperties&quot;,
+            &quot;unevaluatedProperties&quot;,
+            &quot;unevaluatedItems&quot;,
+            &quot;contains&quot;,
+            &quot;not&quot;,
+            &quot;if&quot;,
+            &quot;then&quot;,
+            &quot;else&quot;,
+            &quot;propertyNames&quot;,
+            &quot;contentSchema&quot;)) {
+<span class="fc" id="L133">      JsonNode subschema = esquema.get(keyword);</span>
+<span class="fc bfc" id="L134" title="All 4 branches covered.">      if (subschema != null &amp;&amp; subschema.isObject()) {</span>
+<span class="fc" id="L135">        validarConsistenciaEstructural(subschema, ruta + &quot;/&quot; + keyword);</span>
+<span class="pc bpc" id="L136" title="1 of 4 branches missed.">      } else if (subschema != null &amp;&amp; subschema.isArray()) {</span>
+<span class="nc bnc" id="L137" title="All 2 branches missed.">        for (int indice = 0; indice &lt; subschema.size(); indice++) {</span>
+<span class="nc" id="L138">          validarConsistenciaEstructural(</span>
+<span class="nc" id="L139">              subschema.get(indice), ruta + &quot;/&quot; + keyword + &quot;/&quot; + indice);</span>
+        }
+      }
+<span class="fc" id="L142">    }</span>
+
+<span class="fc bfc" id="L144" title="All 2 branches covered.">    for (String keyword : List.of(&quot;allOf&quot;, &quot;anyOf&quot;, &quot;oneOf&quot;, &quot;prefixItems&quot;)) {</span>
+<span class="fc" id="L145">      JsonNode subschemas = esquema.get(keyword);</span>
+<span class="pc bpc" id="L146" title="1 of 4 branches missed.">      if (subschemas != null &amp;&amp; subschemas.isArray()) {</span>
+<span class="fc bfc" id="L147" title="All 2 branches covered.">        for (int indice = 0; indice &lt; subschemas.size(); indice++) {</span>
+<span class="fc" id="L148">          validarConsistenciaEstructural(</span>
+<span class="fc" id="L149">              subschemas.get(indice), ruta + &quot;/&quot; + keyword + &quot;/&quot; + indice);</span>
+        }
+      }
+<span class="fc" id="L152">    }</span>
+<span class="fc" id="L153">  }</span>
+
+  private boolean declaraTipo(JsonNode tipo, String esperado) {
+<span class="pc bpc" id="L156" title="1 of 4 branches missed.">    if (tipo == null || tipo.isNull()) return true;</span>
+<span class="pc bpc" id="L157" title="1 of 2 branches missed.">    if (tipo.isTextual()) return esperado.equals(tipo.asText());</span>
+<span class="nc bnc" id="L158" title="All 2 branches missed.">    if (tipo.isArray()) {</span>
+<span class="nc bnc" id="L159" title="All 2 branches missed.">      for (JsonNode alternativa : tipo) {</span>
+<span class="nc bnc" id="L160" title="All 4 branches missed.">        if (alternativa.isTextual() &amp;&amp; esperado.equals(alternativa.asText())) return true;</span>
+<span class="nc" id="L161">      }</span>
+    }
+<span class="nc" id="L163">    return false;</span>
+  }
+
+  private ApiException esquemaInvalido(String mensaje) {
+<span class="fc" id="L167">    return new ApiException(</span>
+        HttpStatus.UNPROCESSABLE_ENTITY, &quot;esquema_invalido&quot;, &quot;Esquema inválido&quot;, mensaje);
+  }
+
+  private String escaparPuntero(String segmento) {
+<span class="fc" id="L172">    return segmento.replace(&quot;~&quot;, &quot;~0&quot;).replace(&quot;/&quot;, &quot;~1&quot;);</span>
+  }
+
+  public List&lt;ErrorValidacionCampo&gt; obtenerErroresValidacion(
+      JsonNode esquema, JsonNode datos, boolean esBorrador) {
+<span class="pc bpc" id="L177" title="2 of 4 branches missed.">    if (datos == null || !datos.isObject()) {</span>
+<span class="nc" id="L178">      return List.of(</span>
+          new ErrorValidacionCampo(
+              &quot;datos&quot;, &quot;Los datos de la inspección deben ser un objeto JSON válido&quot;));
+    }
+
+<span class="fc" id="L183">    JsonSchema validador = compilarEsquema(esquema, esBorrador);</span>
+<span class="fc" id="L184">    Set&lt;ValidationMessage&gt; mensajes = validador.validate(datos);</span>
+<span class="fc bfc" id="L185" title="All 2 branches covered.">    if (mensajes.isEmpty()) {</span>
+<span class="fc" id="L186">      return List.of();</span>
+    }
+
+<span class="fc" id="L189">    return mensajes.stream()</span>
+<span class="fc" id="L190">        .map(this::convertirAErrorValidacion)</span>
+<span class="fc" id="L191">        .distinct()</span>
+<span class="fc" id="L192">        .sorted(</span>
+<span class="fc" id="L193">            Comparator.comparing(ErrorValidacionCampo::campo)</span>
+<span class="fc" id="L194">                .thenComparing(ErrorValidacionCampo::mensaje))</span>
+<span class="fc" id="L195">        .toList();</span>
+  }
+
+  public void validarRespuestas(JsonNode esquema, JsonNode datos, boolean esBorrador) {
+<span class="fc" id="L199">    List&lt;ErrorValidacionCampo&gt; errores = obtenerErroresValidacion(esquema, datos, esBorrador);</span>
+<span class="fc bfc" id="L200" title="All 2 branches covered.">    if (!errores.isEmpty()) {</span>
+<span class="fc" id="L201">      List&lt;Map&lt;String, String&gt;&gt; erroresMap =</span>
+<span class="fc" id="L202">          errores.stream().map(e -&gt; Map.of(&quot;campo&quot;, e.campo(), &quot;mensaje&quot;, e.mensaje())).toList();</span>
+<span class="fc" id="L203">      throw new ApiException(</span>
+          HttpStatus.UNPROCESSABLE_ENTITY,
+          &quot;datos_formulario_invalidos&quot;,
+          &quot;Respuestas de inspección inválidas&quot;,
+          &quot;Los datos de la inspección no cumplen con el esquema de la versión del formulario&quot;,
+          erroresMap);
+    }
+<span class="fc" id="L210">  }</span>
+
+  public JsonSchema compilarEsquema(JsonNode esquema, boolean esBorrador) {
+<span class="pc bpc" id="L213" title="2 of 4 branches missed.">    if (esquema == null || !esquema.isObject()) {</span>
+<span class="nc" id="L214">      throw new ApiException(</span>
+          HttpStatus.UNPROCESSABLE_ENTITY,
+          &quot;esquema_invalido&quot;,
+          &quot;Esquema inválido&quot;,
+          &quot;El esquema debe ser un objeto JSON válido&quot;);
+    }
+
+    String dialecto =
+<span class="fc bfc" id="L222" title="All 2 branches covered.">        esquema.hasNonNull(&quot;$schema&quot;)</span>
+<span class="fc" id="L223">            ? esquema.get(&quot;$schema&quot;).asText()</span>
+<span class="fc" id="L224">            : &quot;https://json-schema.org/draft/2020-12/schema&quot;;</span>
+
+    SpecVersion.VersionFlag versionFlag =
+<span class="pc bpc" id="L227" title="1 of 2 branches missed.">        dialecto.contains(&quot;draft-07&quot;)</span>
+<span class="nc" id="L228">            ? SpecVersion.VersionFlag.V7</span>
+<span class="fc" id="L229">            : SpecVersion.VersionFlag.V202012;</span>
+
+<span class="fc bfc" id="L231" title="All 2 branches covered.">    JsonNode esquemaEfectivo = esBorrador ? crearEsquemaBorrador(esquema) : esquema;</span>
+<span class="fc bfc" id="L232" title="All 2 branches covered.">    String cacheKey = calcularHash(esquemaEfectivo) + &quot;:&quot; + (esBorrador ? &quot;draft&quot; : &quot;strict&quot;);</span>
+
+<span class="fc" id="L234">    return schemaCache.computeIfAbsent(</span>
+        cacheKey,
+        k -&gt; {
+<span class="fc" id="L237">          JsonSchemaFactory factory = JsonSchemaFactory.getInstance(versionFlag);</span>
+<span class="fc" id="L238">          return factory.getSchema(esquemaEfectivo);</span>
+        });
+  }
+
+  public JsonNode crearEsquemaBorrador(JsonNode esquema) {
+<span class="pc bpc" id="L243" title="2 of 4 branches missed.">    if (esquema == null || !esquema.isObject()) {</span>
+<span class="nc" id="L244">      return esquema;</span>
+    }
+<span class="fc" id="L246">    JsonNode copia = esquema.deepCopy();</span>
+<span class="fc" id="L247">    removerRestriccionesObligatorias(copia);</span>
+<span class="fc" id="L248">    return copia;</span>
+  }
+
+  private void removerRestriccionesObligatorias(JsonNode nodo) {
+<span class="pc bpc" id="L252" title="1 of 4 branches missed.">    if (nodo == null || !nodo.isContainerNode()) {</span>
+<span class="fc" id="L253">      return;</span>
+    }
+<span class="fc bfc" id="L255" title="All 2 branches covered.">    if (nodo.isObject()) {</span>
+<span class="fc" id="L256">      ObjectNode obj = (ObjectNode) nodo;</span>
+<span class="fc" id="L257">      obj.remove(&quot;required&quot;);</span>
+<span class="fc" id="L258">      obj.remove(&quot;minItems&quot;);</span>
+<span class="fc" id="L259">      Iterator&lt;JsonNode&gt; elementos = obj.elements();</span>
+<span class="fc bfc" id="L260" title="All 2 branches covered.">      while (elementos.hasNext()) {</span>
+<span class="fc" id="L261">        removerRestriccionesObligatorias(elementos.next());</span>
+      }
+<span class="pc bpc" id="L263" title="1 of 2 branches missed.">    } else if (nodo.isArray()) {</span>
+<span class="fc" id="L264">      ArrayNode arr = (ArrayNode) nodo;</span>
+<span class="fc bfc" id="L265" title="All 2 branches covered.">      for (JsonNode item : arr) {</span>
+<span class="fc" id="L266">        removerRestriccionesObligatorias(item);</span>
+<span class="fc" id="L267">      }</span>
+    }
+<span class="fc" id="L269">  }</span>
+
+  private ErrorValidacionCampo convertirAErrorValidacion(ValidationMessage msg) {
+<span class="fc" id="L272">    String tipo = msg.getType();</span>
+<span class="fc" id="L273">    Object[] args = msg.getArguments();</span>
+<span class="fc" id="L274">    String campo = formatearRuta(msg.getInstanceLocation().toString(), tipo, args);</span>
+<span class="fc" id="L275">    String mensaje = construirMensajeError(tipo, campo, msg, args);</span>
+<span class="fc" id="L276">    return new ErrorValidacionCampo(campo, mensaje);</span>
+  }
+
+  private String formatearRuta(String instanceLocation, String tipo, Object[] args) {
+<span class="pc bpc" id="L280" title="1 of 2 branches missed.">    String ruta = instanceLocation == null ? &quot;&quot; : instanceLocation.trim();</span>
+<span class="fc bfc" id="L281" title="All 2 branches covered.">    if (ruta.startsWith(&quot;$.&quot;)) {</span>
+<span class="fc" id="L282">      ruta = ruta.substring(2);</span>
+<span class="pc bpc" id="L283" title="1 of 2 branches missed.">    } else if (ruta.startsWith(&quot;$&quot;)) {</span>
+<span class="fc" id="L284">      ruta = ruta.substring(1);</span>
+    }
+<span class="pc bpc" id="L286" title="1 of 2 branches missed.">    if (ruta.startsWith(&quot;/&quot;)) {</span>
+<span class="nc" id="L287">      ruta = ruta.substring(1);</span>
+    }
+<span class="fc" id="L289">    ruta = ruta.replace('/', '.');</span>
+<span class="fc" id="L290">    ruta = ruta.replaceAll(&quot;\\.(\\d+)&quot;, &quot;[$1]&quot;);</span>
+<span class="pc bpc" id="L291" title="1 of 2 branches missed.">    if (ruta.matches(&quot;^\\d+.*&quot;)) {</span>
+<span class="nc" id="L292">      ruta = ruta.replaceFirst(&quot;^(\\d+)&quot;, &quot;[$1]&quot;);</span>
+    }
+
+<span class="pc bpc" id="L295" title="2 of 6 branches missed.">    if (&quot;required&quot;.equalsIgnoreCase(tipo) &amp;&amp; args != null &amp;&amp; args.length &gt; 0) {</span>
+<span class="fc" id="L296">      String prop = String.valueOf(args[0]);</span>
+<span class="pc bpc" id="L297" title="1 of 4 branches missed.">      ruta = ruta.isEmpty() ? prop : (ruta.endsWith(&quot;]&quot;) ? ruta + &quot;.&quot; + prop : ruta + &quot;.&quot; + prop);</span>
+<span class="pc bpc" id="L298" title="2 of 6 branches missed.">    } else if (&quot;additionalProperties&quot;.equalsIgnoreCase(tipo) &amp;&amp; args != null &amp;&amp; args.length &gt; 0) {</span>
+<span class="fc" id="L299">      String prop = String.valueOf(args[0]);</span>
+<span class="pc bpc" id="L300" title="1 of 2 branches missed.">      if (!ruta.endsWith(prop)) {</span>
+<span class="pc bpc" id="L301" title="2 of 4 branches missed.">        ruta = ruta.isEmpty() ? prop : (ruta.endsWith(&quot;]&quot;) ? ruta + &quot;.&quot; + prop : ruta + &quot;.&quot; + prop);</span>
+      }
+    }
+
+<span class="pc bpc" id="L305" title="1 of 2 branches missed.">    return ruta.isEmpty() ? &quot;raiz&quot; : ruta;</span>
+  }
+
+  private String construirMensajeError(
+      String tipo, String campo, ValidationMessage msg, Object[] args) {
+<span class="pc bpc" id="L310" title="9 of 14 branches missed.">    return switch (tipo == null ? &quot;&quot; : tipo.toLowerCase()) {</span>
+<span class="fc" id="L311">      case &quot;required&quot; -&gt; &quot;El campo '&quot; + campo + &quot;' es obligatorio&quot;;</span>
+      case &quot;type&quot; -&gt; {
+<span class="nc bnc" id="L313" title="All 4 branches missed.">        if (args != null &amp;&amp; args.length &gt;= 2) {</span>
+<span class="nc" id="L314">          yield &quot;Tipo de dato inválido para '&quot;</span>
+              + campo
+              + &quot;': se esperaba &quot;
+              + args[0]
+              + &quot;, pero se recibió &quot;
+              + args[1];
+        }
+<span class="nc" id="L321">        yield &quot;Tipo de dato inválido para '&quot; + campo + &quot;'&quot;;</span>
+      }
+      case &quot;enum&quot; -&gt; {
+<span class="pc bpc" id="L324" title="2 of 4 branches missed.">        if (args != null &amp;&amp; args.length &gt;= 1) {</span>
+<span class="fc" id="L325">          yield &quot;Valor no permitido para el campo '&quot; + campo + &quot;'. Valores válidos: &quot; + args[0];</span>
+        }
+<span class="nc" id="L327">        yield &quot;Valor no permitido para el campo '&quot; + campo + &quot;'&quot;;</span>
+      }
+<span class="fc" id="L329">      case &quot;additionalproperties&quot; -&gt; &quot;El campo '&quot; + campo + &quot;' no está permitido en el esquema&quot;;</span>
+<span class="fc" id="L330">      case &quot;minimum&quot; -&gt; &quot;El valor del campo '&quot; + campo + &quot;' es menor que el mínimo permitido&quot;;</span>
+<span class="nc" id="L331">      case &quot;maximum&quot; -&gt; &quot;El valor del campo '&quot; + campo + &quot;' es mayor que el máximo permitido&quot;;</span>
+<span class="nc" id="L332">      case &quot;minlength&quot; -&gt; &quot;La longitud del campo '&quot; + campo + &quot;' es menor que la mínima requerida&quot;;</span>
+<span class="nc" id="L333">      case &quot;maxlength&quot; -&gt; &quot;La longitud del campo '&quot; + campo + &quot;' es mayor que la máxima permitida&quot;;</span>
+<span class="nc" id="L334">      case &quot;minitems&quot; -&gt; &quot;La lista '&quot; + campo + &quot;' contiene menos elementos de los requeridos&quot;;</span>
+<span class="nc" id="L335">      case &quot;maxitems&quot; -&gt; &quot;La lista '&quot; + campo + &quot;' contiene más elementos de los permitidos&quot;;</span>
+<span class="nc" id="L336">      case &quot;pattern&quot;, &quot;format&quot; -&gt; &quot;El formato del campo '&quot; + campo + &quot;' no es válido&quot;;</span>
+      default -&gt; {
+<span class="nc" id="L338">        String original = msg.getMessage();</span>
+<span class="nc bnc" id="L339" title="All 4 branches missed.">        yield original != null &amp;&amp; !original.isBlank()</span>
+<span class="nc" id="L340">            ? original</span>
+<span class="nc" id="L341">            : &quot;El valor del campo '&quot; + campo + &quot;' no es válido&quot;;</span>
+      }
+    };
+  }
+
+  private String calcularHash(JsonNode nodo) {
+    try {
+<span class="fc" id="L348">      MessageDigest digest = MessageDigest.getInstance(&quot;SHA-256&quot;);</span>
+<span class="fc" id="L349">      byte[] hash = digest.digest(nodo.toString().getBytes(StandardCharsets.UTF_8));</span>
+<span class="fc" id="L350">      StringBuilder hex = new StringBuilder();</span>
+<span class="fc bfc" id="L351" title="All 2 branches covered.">      for (byte b : hash) {</span>
+<span class="fc" id="L352">        hex.append(String.format(&quot;%02x&quot;, b));</span>
+      }
+<span class="fc" id="L354">      return hex.toString();</span>
+<span class="nc" id="L355">    } catch (NoSuchAlgorithmException e) {</span>
+<span class="nc" id="L356">      return String.valueOf(nodo.hashCode());</span>
+    }
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

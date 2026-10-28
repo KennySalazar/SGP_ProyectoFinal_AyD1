@@ -1,0 +1,226 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RecalculoIcService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">sgp-api</a> &gt; <a href="index.source.html" class="el_package">gt.usac.cunoc.sgp.inspeccion.service</a> &gt; <span class="el_source">RecalculoIcService.java</span></div><h1>RecalculoIcService.java</h1><pre class="source lang-java linenums">package gt.usac.cunoc.sgp.inspeccion.service;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import gt.usac.cunoc.sgp.common.audit.model.AccionAuditoria;
+import gt.usac.cunoc.sgp.common.audit.service.AuditoriaWriter;
+import gt.usac.cunoc.sgp.common.exception.ApiException;
+import gt.usac.cunoc.sgp.common.util.UuidV7Generator;
+import gt.usac.cunoc.sgp.formulario.entity.VersionFormulario;
+import gt.usac.cunoc.sgp.formulario.model.EstadoVersionFormulario;
+import gt.usac.cunoc.sgp.formulario.repository.VersionFormularioRepository;
+import gt.usac.cunoc.sgp.inspeccion.dto.ComparacionIcResponse;
+import gt.usac.cunoc.sgp.inspeccion.dto.ResultadoIcHistorialResponse;
+import gt.usac.cunoc.sgp.inspeccion.entity.Inspeccion;
+import gt.usac.cunoc.sgp.inspeccion.entity.ResultadoIc;
+import gt.usac.cunoc.sgp.inspeccion.repository.InspeccionRepository;
+import gt.usac.cunoc.sgp.inspeccion.repository.ResultadoIcRepository;
+import gt.usac.cunoc.sgp.usuario.entity.UserAccount;
+import gt.usac.cunoc.sgp.usuario.repository.UserAccountRepository;
+import java.time.Clock;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+import org.springframework.http.HttpStatus;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+@Service
+public class RecalculoIcService {
+  private final InspeccionRepository inspecciones;
+  private final ResultadoIcRepository resultados;
+  private final VersionFormularioRepository versiones;
+  private final UserAccountRepository usuarios;
+  private final PreparadorEntradaIcService preparador;
+  private final CalculoIndiceCondicionService calculador;
+  private final AuditoriaWriter auditoria;
+  private final ObjectMapper json;
+  private final Clock clock;
+
+  public RecalculoIcService(
+      InspeccionRepository inspecciones,
+      ResultadoIcRepository resultados,
+      VersionFormularioRepository versiones,
+      UserAccountRepository usuarios,
+      PreparadorEntradaIcService preparador,
+      CalculoIndiceCondicionService calculador,
+      AuditoriaWriter auditoria,
+      ObjectMapper json,
+<span class="fc" id="L51">      Clock clock) {</span>
+<span class="fc" id="L52">    this.inspecciones = inspecciones;</span>
+<span class="fc" id="L53">    this.resultados = resultados;</span>
+<span class="fc" id="L54">    this.versiones = versiones;</span>
+<span class="fc" id="L55">    this.usuarios = usuarios;</span>
+<span class="fc" id="L56">    this.preparador = preparador;</span>
+<span class="fc" id="L57">    this.calculador = calculador;</span>
+<span class="fc" id="L58">    this.auditoria = auditoria;</span>
+<span class="fc" id="L59">    this.json = json;</span>
+<span class="fc" id="L60">    this.clock = clock;</span>
+<span class="fc" id="L61">  }</span>
+
+  @Transactional
+  @PreAuthorize(&quot;hasAnyRole('ADMINISTRADOR', 'CATEDRATICO')&quot;)
+  public ResultadoIcHistorialResponse recalcular(UUID inspeccionId, UUID usuarioId) {
+<span class="pc bpc" id="L66" title="1 of 2 branches missed.">    if (usuarioId == null)</span>
+<span class="nc" id="L67">      throw error(</span>
+          HttpStatus.UNAUTHORIZED, &quot;authentication_required&quot;, &quot;Se requiere una sesion valida.&quot;);
+<span class="fc" id="L69">    Inspeccion inspeccion =</span>
+        inspecciones
+<span class="fc" id="L71">            .findByIdAndEliminadoEnIsNullForUpdate(inspeccionId)</span>
+<span class="fc" id="L72">            .orElseThrow(() -&gt; noEncontrada());</span>
+<span class="fc" id="L73">    validarPublicada(inspeccion);</span>
+<span class="fc" id="L74">    resultados.findPublicacionByInspeccionId(inspeccionId).orElseThrow(() -&gt; sinOriginal());</span>
+<span class="fc" id="L75">    VersionFormulario vigente =</span>
+        versiones
+<span class="fc" id="L77">            .findByActivaTrue()</span>
+<span class="fc" id="L78">            .orElseThrow(</span>
+                () -&gt;
+<span class="fc" id="L80">                    error(</span>
+                        HttpStatus.UNPROCESSABLE_ENTITY,
+                        &quot;configuracion_ic_no_vigente&quot;,
+                        &quot;No hay una version activa de configuracion del IC.&quot;));
+<span class="fc bfc" id="L84" title="All 2 branches covered.">    if (vigente.getEstado() != EstadoVersionFormulario.PUBLICADA)</span>
+<span class="fc" id="L85">      throw error(</span>
+          HttpStatus.UNPROCESSABLE_ENTITY,
+          &quot;configuracion_ic_no_publicada&quot;,
+          &quot;La configuracion activa debe estar publicada.&quot;);
+<span class="fc" id="L89">    var entrada = preparador.preparar(vigente.getId(), inspeccion.getDatos());</span>
+<span class="fc" id="L90">    var calculo = calculador.calcular(entrada);</span>
+<span class="fc" id="L91">    var existente =</span>
+<span class="fc" id="L92">        resultados.findRecalculo(</span>
+<span class="fc" id="L93">            inspeccionId, vigente.getId(), calculo.hashEntrada(), calculo.versionAlgoritmo());</span>
+<span class="fc bfc" id="L94" title="All 2 branches covered.">    if (existente.isPresent()) return respuesta(existente.get());</span>
+    ResultadoIc resultado =
+<span class="fc" id="L96">        ResultadoIc.recalculo(</span>
+<span class="fc" id="L97">            UuidV7Generator.generate(),</span>
+            inspeccionId,
+<span class="fc" id="L99">            vigente.getId(),</span>
+<span class="fc" id="L100">            calculo.indiceCalculado(),</span>
+<span class="fc" id="L101">            calculo.estadoPorRango(),</span>
+<span class="fc" id="L102">            calculo.estadoCalculado(),</span>
+<span class="fc" id="L103">            json.valueToTree(calculo.condicionesAnulacion()),</span>
+<span class="fc" id="L104">            json.valueToTree(calculo),</span>
+<span class="fc" id="L105">            calculo.hashEntrada(),</span>
+<span class="fc" id="L106">            calculo.versionAlgoritmo(),</span>
+            usuarioId,
+<span class="fc" id="L108">            clock.instant());</span>
+<span class="fc" id="L109">    resultados.saveAndFlush(resultado);</span>
+<span class="fc" id="L110">    var datosAuditoria = json.createObjectNode();</span>
+<span class="fc" id="L111">    datosAuditoria.put(&quot;resultadoIcId&quot;, resultado.getId().toString());</span>
+<span class="fc" id="L112">    datosAuditoria.put(&quot;inspeccionId&quot;, inspeccionId.toString());</span>
+<span class="fc" id="L113">    datosAuditoria.put(&quot;versionConfiguracionId&quot;, vigente.getId().toString());</span>
+<span class="fc" id="L114">    datosAuditoria.put(&quot;tipo&quot;, resultado.getTipo());</span>
+<span class="fc" id="L115">    datosAuditoria.put(&quot;indiceCalculado&quot;, resultado.getIndiceCalculado());</span>
+<span class="fc" id="L116">    datosAuditoria.put(&quot;hashEntrada&quot;, resultado.getHashEntrada());</span>
+<span class="fc" id="L117">    auditoria.registrarEnTransaccion(</span>
+        usuarioId,
+        AccionAuditoria.CREAR,
+        &quot;resultado_ic&quot;,
+<span class="fc" id="L121">        resultado.getId(),</span>
+        null,
+        datosAuditoria,
+        null);
+<span class="fc" id="L125">    return respuesta(resultado);</span>
+  }
+
+  @Transactional(readOnly = true)
+  @PreAuthorize(&quot;isAuthenticated()&quot;)
+  public ComparacionIcResponse historial(UUID inspeccionId) {
+<span class="fc" id="L131">    Inspeccion inspeccion =</span>
+<span class="pc" id="L132">        inspecciones.findByIdAndEliminadoEnIsNull(inspeccionId).orElseThrow(() -&gt; noEncontrada());</span>
+<span class="fc" id="L133">    validarPublicada(inspeccion);</span>
+<span class="fc" id="L134">    List&lt;ResultadoIc&gt; lista =</span>
+<span class="fc" id="L135">        resultados.findAllByInspeccionIdOrderByCalculadoEnDescIdDesc(inspeccionId);</span>
+<span class="fc" id="L136">    ResultadoIc original =</span>
+<span class="fc" id="L137">        lista.stream()</span>
+<span class="fc" id="L138">            .filter(r -&gt; &quot;PUBLICACION&quot;.equals(r.getTipo()))</span>
+<span class="fc" id="L139">            .findFirst()</span>
+<span class="pc" id="L140">            .orElseThrow(() -&gt; sinOriginal());</span>
+<span class="fc" id="L141">    Map&lt;UUID, VersionFormulario&gt; versionesPorId =</span>
+        versiones
+<span class="fc" id="L143">            .findAllById(</span>
+<span class="fc" id="L144">                lista.stream().map(ResultadoIc::getVersionConfiguracionId).distinct().toList())</span>
+<span class="fc" id="L145">            .stream()</span>
+<span class="fc" id="L146">            .collect(Collectors.toMap(VersionFormulario::getId, Function.identity()));</span>
+<span class="fc" id="L147">    Map&lt;UUID, UserAccount&gt; usuariosPorId =</span>
+        usuarios
+<span class="fc" id="L149">            .findAllById(</span>
+<span class="fc" id="L150">                lista.stream()</span>
+<span class="fc" id="L151">                    .map(ResultadoIc::getSolicitadoPorId)</span>
+<span class="fc" id="L152">                    .filter(java.util.Objects::nonNull)</span>
+<span class="fc" id="L153">                    .distinct()</span>
+<span class="fc" id="L154">                    .toList())</span>
+<span class="fc" id="L155">            .stream()</span>
+<span class="fc" id="L156">            .collect(Collectors.toMap(UserAccount::getId, Function.identity()));</span>
+<span class="fc" id="L157">    Function&lt;ResultadoIc, ResultadoIcHistorialResponse&gt; convertir =</span>
+        r -&gt;
+<span class="fc" id="L159">            respuesta(</span>
+                r,
+<span class="fc" id="L161">                versionesPorId.get(r.getVersionConfiguracionId()),</span>
+<span class="fc" id="L162">                usuariosPorId.get(r.getSolicitadoPorId()));</span>
+<span class="fc" id="L163">    return new ComparacionIcResponse(</span>
+        inspeccionId,
+<span class="fc" id="L165">        convertir.apply(original),</span>
+<span class="fc" id="L166">        lista.stream().filter(r -&gt; &quot;RECALCULO&quot;.equals(r.getTipo())).map(convertir).toList());</span>
+  }
+
+  private ResultadoIcHistorialResponse respuesta(ResultadoIc r) {
+<span class="fc" id="L170">    return respuesta(</span>
+        r,
+<span class="fc" id="L172">        versiones.findById(r.getVersionConfiguracionId()).orElse(null),</span>
+<span class="pc bpc" id="L173" title="1 of 2 branches missed.">        r.getSolicitadoPorId() == null</span>
+<span class="nc" id="L174">            ? null</span>
+<span class="fc" id="L175">            : usuarios.findById(r.getSolicitadoPorId()).orElse(null));</span>
+  }
+
+  private ResultadoIcHistorialResponse respuesta(
+      ResultadoIc r, VersionFormulario version, UserAccount usuario) {
+<span class="fc bfc" id="L180" title="All 2 branches covered.">    String nombre = usuario == null ? null : usuario.getNombreCompleto();</span>
+<span class="pc bpc" id="L181" title="2 of 6 branches missed.">    if (usuario != null &amp;&amp; (nombre == null || nombre.isBlank())) nombre = usuario.getEmail();</span>
+<span class="fc" id="L182">    return new ResultadoIcHistorialResponse(</span>
+<span class="fc" id="L183">        r.getId(),</span>
+<span class="fc" id="L184">        r.getInspeccionId(),</span>
+<span class="fc" id="L185">        r.getTipo(),</span>
+<span class="fc" id="L186">        r.getVersionConfiguracionId(),</span>
+<span class="pc bpc" id="L187" title="1 of 2 branches missed.">        version == null ? null : version.getCodigo(),</span>
+<span class="fc" id="L188">        r.getIndiceCalculado(),</span>
+<span class="fc" id="L189">        r.getEstadoPorRango(),</span>
+<span class="fc" id="L190">        r.getEstadoCalculado(),</span>
+<span class="fc" id="L191">        r.getEstadoConfirmado(),</span>
+<span class="fc" id="L192">        r.getJustificacionAjuste(),</span>
+<span class="fc" id="L193">        r.getCondicionesAnulacion(),</span>
+<span class="fc" id="L194">        r.getDesglose(),</span>
+<span class="fc" id="L195">        r.getHashEntrada(),</span>
+<span class="fc" id="L196">        r.getVersionAlgoritmo(),</span>
+<span class="fc" id="L197">        r.getSolicitadoPorId(),</span>
+        nombre,
+<span class="fc" id="L199">        r.getCalculadoEn());</span>
+  }
+
+  private void validarPublicada(Inspeccion inspeccion) {
+<span class="fc bfc" id="L203" title="All 4 branches covered.">    if (!&quot;PUBLICADA&quot;.equals(inspeccion.getEstado()) || inspeccion.getPublicadoEn() == null)</span>
+<span class="fc" id="L204">      throw error(</span>
+          HttpStatus.CONFLICT,
+          &quot;inspeccion_no_publicada&quot;,
+          &quot;El recalculo requiere una inspeccion publicada.&quot;);
+<span class="fc" id="L208">  }</span>
+
+  private ApiException noEncontrada() {
+<span class="fc" id="L211">    return error(</span>
+        HttpStatus.NOT_FOUND, &quot;inspeccion_no_encontrada&quot;, &quot;No existe la inspeccion solicitada.&quot;);
+  }
+
+  private ApiException sinOriginal() {
+<span class="fc" id="L216">    return error(</span>
+        HttpStatus.CONFLICT,
+        &quot;ic_original_no_disponible&quot;,
+        &quot;La inspeccion publicada no tiene un IC original registrado.&quot;);
+  }
+
+  private ApiException error(HttpStatus estado, String codigo, String detalle) {
+<span class="fc" id="L223">    return new ApiException(estado, codigo, &quot;Recalculo del indice de condicion&quot;, detalle);</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

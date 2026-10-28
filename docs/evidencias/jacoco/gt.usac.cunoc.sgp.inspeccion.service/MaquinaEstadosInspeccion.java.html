@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>MaquinaEstadosInspeccion.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">sgp-api</a> &gt; <a href="index.source.html" class="el_package">gt.usac.cunoc.sgp.inspeccion.service</a> &gt; <span class="el_source">MaquinaEstadosInspeccion.java</span></div><h1>MaquinaEstadosInspeccion.java</h1><pre class="source lang-java linenums">package gt.usac.cunoc.sgp.inspeccion.service;
+
+import gt.usac.cunoc.sgp.common.exception.ApiException;
+import gt.usac.cunoc.sgp.inspeccion.model.EstadoInspeccion;
+import gt.usac.cunoc.sgp.inspeccion.model.EventoInspeccion;
+import org.springframework.http.HttpStatus;
+
+/**
+ * Reglas de transición de la inspección (RN-INS-04, DT-BE-07). Solo decide si una transición es
+ * válida; quien la aplica es {@link TransicionInspeccionService}.
+ */
+public final class MaquinaEstadosInspeccion {
+
+  private MaquinaEstadosInspeccion() {}
+
+  /**
+   * Devuelve el estado destino del evento o responde 409 si no es válido desde el estado actual.
+   * Los estados terminales (PUBLICADA, RECHAZADA) rechazan cualquier evento.
+   */
+  public static EstadoInspeccion destino(EstadoInspeccion actual, EventoInspeccion evento) {
+<span class="fc bfc" id="L21" title="All 4 branches covered.">    if (actual == null || evento == null) {</span>
+<span class="fc" id="L22">      throw new IllegalArgumentException(&quot;El estado y el evento son obligatorios&quot;);</span>
+    }
+<span class="fc bfc" id="L24" title="All 2 branches covered.">    if (actual.esTerminal()) {</span>
+<span class="fc" id="L25">      throw new ApiException(</span>
+          HttpStatus.CONFLICT,
+          &quot;estado_terminal&quot;,
+          &quot;Transicion no permitida&quot;,
+          &quot;La inspeccion esta &quot;
+<span class="fc" id="L30">              + actual.name()</span>
+              + &quot; y no admite cambios de estado (accion &quot;
+<span class="fc" id="L32">              + evento.name()</span>
+              + &quot;).&quot;);
+    }
+<span class="fc bfc" id="L35" title="All 2 branches covered.">    if (evento.origen() != actual) {</span>
+<span class="fc" id="L36">      throw new ApiException(</span>
+          HttpStatus.CONFLICT,
+          &quot;transicion_invalida&quot;,
+          &quot;Transicion no permitida&quot;,
+          &quot;La accion &quot;
+<span class="fc" id="L41">              + evento.name()</span>
+              + &quot; no se puede aplicar a una inspeccion en estado &quot;
+<span class="fc" id="L43">              + actual.name()</span>
+              + &quot;.&quot;);
+    }
+<span class="fc" id="L46">    return evento.destino();</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

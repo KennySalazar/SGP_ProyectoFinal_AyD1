@@ -1,0 +1,194 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>VeredictoRevisionService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">sgp-api</a> &gt; <a href="index.source.html" class="el_package">gt.usac.cunoc.sgp.revision.service</a> &gt; <span class="el_source">VeredictoRevisionService.java</span></div><h1>VeredictoRevisionService.java</h1><pre class="source lang-java linenums">package gt.usac.cunoc.sgp.revision.service;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import gt.usac.cunoc.sgp.common.audit.model.AccionAuditoria;
+import gt.usac.cunoc.sgp.common.audit.service.AuditoriaWriter;
+import gt.usac.cunoc.sgp.common.exception.ApiException;
+import gt.usac.cunoc.sgp.inspeccion.dto.ConfirmacionEstadoIcResponse;
+import gt.usac.cunoc.sgp.inspeccion.dto.ConfirmarEstadoIcRequest;
+import gt.usac.cunoc.sgp.inspeccion.repository.InspeccionRepository;
+import gt.usac.cunoc.sgp.inspeccion.service.ConfirmacionEstadoIcService;
+import gt.usac.cunoc.sgp.inspeccion.service.TransicionInspeccionService;
+import gt.usac.cunoc.sgp.notificacion.service.NotificacionService;
+import gt.usac.cunoc.sgp.puente.repository.PuenteRepository;
+import gt.usac.cunoc.sgp.revision.dto.EmitirVeredictoRequest;
+import gt.usac.cunoc.sgp.revision.dto.RevisionResultadoResponse;
+import gt.usac.cunoc.sgp.revision.entity.Revision;
+import gt.usac.cunoc.sgp.revision.mapper.RevisionResultadoMapper;
+import gt.usac.cunoc.sgp.revision.model.EstadoObservacion;
+import gt.usac.cunoc.sgp.revision.model.VeredictoRevision;
+import gt.usac.cunoc.sgp.revision.repository.ObservacionRevisionRepository;
+import gt.usac.cunoc.sgp.revision.repository.RevisionRepository;
+import jakarta.validation.Validator;
+import java.time.Clock;
+import java.util.List;
+import java.util.UUID;
+import org.springframework.dao.PessimisticLockingFailureException;
+import org.springframework.http.HttpStatus;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+@Service
+@PreAuthorize(&quot;hasRole('CATEDRATICO')&quot;)
+public class VeredictoRevisionService {
+  private final RevisionRepository revisiones;
+  private final ObservacionRevisionRepository observaciones;
+  private final InspeccionRepository inspecciones;
+  private final PuenteRepository puentes;
+  private final TransicionInspeccionService transiciones;
+  private final ConfirmacionEstadoIcService confirmaciones;
+  private final RevisionResultadoMapper mapper;
+  private final AuditoriaWriter auditoria;
+  private final NotificacionService notificaciones;
+  private final Validator validator;
+  private final ObjectMapper json;
+  private final Clock clock;
+
+  public VeredictoRevisionService(
+      RevisionRepository revisiones,
+      ObservacionRevisionRepository observaciones,
+      InspeccionRepository inspecciones,
+      PuenteRepository puentes,
+      TransicionInspeccionService transiciones,
+      ConfirmacionEstadoIcService confirmaciones,
+      RevisionResultadoMapper mapper,
+      AuditoriaWriter auditoria,
+      NotificacionService notificaciones,
+      Validator validator,
+      ObjectMapper json,
+<span class="fc" id="L60">      Clock clock) {</span>
+<span class="fc" id="L61">    this.revisiones = revisiones;</span>
+<span class="fc" id="L62">    this.observaciones = observaciones;</span>
+<span class="fc" id="L63">    this.inspecciones = inspecciones;</span>
+<span class="fc" id="L64">    this.puentes = puentes;</span>
+<span class="fc" id="L65">    this.transiciones = transiciones;</span>
+<span class="fc" id="L66">    this.confirmaciones = confirmaciones;</span>
+<span class="fc" id="L67">    this.mapper = mapper;</span>
+<span class="fc" id="L68">    this.auditoria = auditoria;</span>
+<span class="fc" id="L69">    this.notificaciones = notificaciones;</span>
+<span class="fc" id="L70">    this.validator = validator;</span>
+<span class="fc" id="L71">    this.json = json;</span>
+<span class="fc" id="L72">    this.clock = clock;</span>
+<span class="fc" id="L73">  }</span>
+
+  @Transactional
+  public RevisionResultadoResponse emitir(UUID id, UUID actor, EmitirVeredictoRequest request) {
+<span class="fc bfc" id="L77" title="All 2 branches covered.">    if (!observaciones.existeCicloDelRevisor(id, actor)) throw noEncontrada();</span>
+<span class="pc bpc" id="L78" title="1 of 4 branches missed.">    if (request == null || !validator.validate(request).isEmpty())</span>
+<span class="fc" id="L79">      throw error(</span>
+          HttpStatus.UNPROCESSABLE_ENTITY,
+          &quot;veredicto_invalido&quot;,
+          &quot;Indique un veredicto y una calificación entre 0 y 100 con hasta dos decimales.&quot;);
+    // Antes de tomar ciclo/inspección, la aprobación bloquea el puente como toda publicación.
+<span class="fc bfc" id="L84" title="All 2 branches covered.">    if (request.veredicto() == VeredictoRevision.APROBADA) {</span>
+<span class="fc" id="L85">      var puenteId = revisiones.findPuenteId(id).orElseThrow(this::noEncontrada);</span>
+<span class="fc" id="L86">      puentes.findByIdForUpdate(puenteId).orElseThrow(this::noEncontrada);</span>
+    }
+    Revision ciclo;
+    try {
+<span class="fc" id="L90">      ciclo = revisiones.findByIdForUpdate(id).orElseThrow(this::noEncontrada);</span>
+<span class="fc" id="L91">      var inspeccion =</span>
+          inspecciones
+<span class="fc" id="L93">              .findByIdAndEliminadoEnIsNullForUpdate(ciclo.getInspeccion().getId())</span>
+<span class="fc" id="L94">              .orElseThrow(this::noEncontrada);</span>
+<span class="pc bpc" id="L95" title="1 of 2 branches missed.">      if (!ciclo.getRevisorId().equals(actor)) throw noEncontrada();</span>
+<span class="pc bpc" id="L96" title="1 of 4 branches missed.">      if (!&quot;EN_CURSO&quot;.equals(ciclo.getEstado()) || !&quot;EN_REVISION&quot;.equals(inspeccion.getEstado()))</span>
+<span class="fc" id="L97">        throw error(</span>
+            HttpStatus.CONFLICT,
+            &quot;revision_ya_resuelta&quot;,
+            &quot;El veredicto requiere un ciclo EN_CURSO y una inspección EN_REVISION.&quot;);
+<span class="fc" id="L101">    } catch (PessimisticLockingFailureException e) {</span>
+<span class="fc" id="L102">      throw error(</span>
+          HttpStatus.CONFLICT,
+          &quot;revision_en_proceso&quot;,
+          &quot;Otra operación está modificando el ciclo. Reintente.&quot;);
+<span class="fc" id="L106">    }</span>
+    String general =
+<span class="fc bfc" id="L108" title="All 2 branches covered.">        request.observacionGeneral() == null</span>
+<span class="fc" id="L109">            ? ciclo.getObservacionGeneral()</span>
+<span class="fc" id="L110">            : request.observacionGeneral().strip();</span>
+<span class="fc bfc" id="L111" title="All 4 branches covered.">    if (general != null &amp;&amp; general.isBlank()) general = null;</span>
+<span class="fc bfc" id="L112" title="All 4 branches covered.">    if (request.veredicto() != VeredictoRevision.APROBADA &amp;&amp; general == null)</span>
+<span class="fc" id="L113">      throw error(</span>
+          HttpStatus.UNPROCESSABLE_ENTITY,
+          &quot;observacion_general_obligatoria&quot;,
+          &quot;Solicitar cambios o rechazar requiere observación general.&quot;);
+<span class="fc" id="L117">    UUID inspeccionId = ciclo.getInspeccion().getId();</span>
+<span class="fc" id="L118">    String motivo = &quot;Veredicto del ciclo &quot; + ciclo.getNumeroCiclo();</span>
+<span class="pc bpc" id="L119" title="1 of 4 branches missed.">    switch (request.veredicto()) {</span>
+      case APROBADA -&gt; {
+<span class="fc bfc" id="L121" title="All 2 branches covered.">        if (observaciones.countByRevisionIdAndEstado(id, EstadoObservacion.PENDIENTE) &gt; 0)</span>
+<span class="fc" id="L122">          throw error(</span>
+              HttpStatus.UNPROCESSABLE_ENTITY,
+              &quot;observaciones_pendientes&quot;,
+              &quot;No puede aprobar un ciclo con observaciones pendientes.&quot;);
+<span class="fc" id="L126">        ConfirmarEstadoIcRequest decision = request.confirmacionEstado();</span>
+<span class="fc bfc" id="L127" title="All 2 branches covered.">        if (decision == null) {</span>
+<span class="fc" id="L128">          var calculo = confirmaciones.consultarRevision(id).calculo();</span>
+<span class="fc" id="L129">          decision =</span>
+<span class="fc" id="L130">              new ConfirmarEstadoIcRequest(calculo.estadoCalculado(), calculo.hashEntrada(), null);</span>
+        }
+<span class="fc" id="L132">        confirmaciones.confirmarRevision(id, decision);</span>
+<span class="fc" id="L133">        transiciones.aprobar(inspeccionId, actor, id);</span>
+<span class="fc" id="L134">      }</span>
+<span class="fc" id="L135">      case CAMBIOS_SOLICITADOS -&gt; transiciones.solicitarCambios(inspeccionId, actor, motivo, id);</span>
+<span class="fc" id="L136">      case RECHAZADA -&gt; transiciones.rechazar(inspeccionId, actor, motivo, id);</span>
+    }
+<span class="fc" id="L138">    ciclo.resolver(request.veredicto().name(), general, request.calificacion(), clock.instant());</span>
+<span class="fc" id="L139">    revisiones.saveAndFlush(ciclo);</span>
+    // La nota y el texto privado nunca se copian a bitácoras, avisos o respuestas públicas.
+<span class="fc" id="L141">    auditoria.registrarEnTransaccion(</span>
+        actor,
+        AccionAuditoria.CAMBIAR_ESTADO,
+        &quot;revision&quot;,
+        id,
+<span class="fc" id="L146">        json.createObjectNode().put(&quot;estado&quot;, &quot;EN_CURSO&quot;),</span>
+<span class="fc" id="L147">        json.createObjectNode()</span>
+<span class="fc" id="L148">            .put(&quot;estado&quot;, &quot;RESUELTA&quot;)</span>
+<span class="fc" id="L149">            .put(&quot;veredicto&quot;, request.veredicto().name()),</span>
+        &quot;HU-038&quot;);
+<span class="fc" id="L151">    notificaciones.registrar(</span>
+<span class="fc" id="L152">        ciclo.getInspeccion().getAutorId(),</span>
+        &quot;REVISION_RESUELTA&quot;,
+        &quot;Revisión resuelta&quot;,
+        &quot;Tu revisión tiene un resultado. Consulta el detalle privado.&quot;,
+        &quot;revision&quot;,
+        id,
+        &quot;revision-resuelta:&quot; + id);
+<span class="fc" id="L159">    return mapper.toResponse(ciclo);</span>
+  }
+
+  @Transactional
+  public ConfirmacionEstadoIcResponse estadoPuente(UUID id, UUID actor) {
+<span class="pc bpc" id="L164" title="1 of 2 branches missed.">    if (!observaciones.existeCicloDelRevisor(id, actor)) throw noEncontrada();</span>
+<span class="fc" id="L165">    return confirmaciones.consultarRevision(id);</span>
+  }
+
+  @Transactional(readOnly = true)
+  @PreAuthorize(&quot;hasAnyRole('CATEDRATICO','ESTUDIANTE')&quot;)
+  public RevisionResultadoResponse resultado(UUID id, UUID actor) {
+<span class="fc bfc" id="L171" title="All 2 branches covered.">    if (!observaciones.existeCicloLegible(id, actor)) throw noEncontrada();</span>
+<span class="fc" id="L172">    return mapper.toResponse(revisiones.findById(id).orElseThrow(this::noEncontrada));</span>
+  }
+
+  @Transactional(readOnly = true)
+  @PreAuthorize(&quot;hasAnyRole('CATEDRATICO','ESTUDIANTE')&quot;)
+  public List&lt;RevisionResultadoResponse&gt; historial(UUID inspeccionId, UUID actor) {
+<span class="fc" id="L178">    var ciclos = revisiones.historialPrivado(inspeccionId, actor);</span>
+<span class="pc bpc" id="L179" title="1 of 2 branches missed.">    if (ciclos.isEmpty()) throw noEncontrada();</span>
+<span class="fc" id="L180">    return ciclos.stream().map(mapper::toResponse).toList();</span>
+  }
+
+  private ApiException noEncontrada() {
+<span class="fc" id="L184">    return error(</span>
+        HttpStatus.NOT_FOUND,
+        &quot;revision_no_encontrada&quot;,
+        &quot;La revisión no está disponible para este usuario.&quot;);
+  }
+
+  private ApiException error(HttpStatus status, String codigo, String detalle) {
+<span class="fc" id="L191">    return new ApiException(status, codigo, &quot;Revisión académica&quot;, detalle);</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

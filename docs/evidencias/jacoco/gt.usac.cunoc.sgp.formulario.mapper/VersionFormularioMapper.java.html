@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>VersionFormularioMapper.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">sgp-api</a> &gt; <a href="index.source.html" class="el_package">gt.usac.cunoc.sgp.formulario.mapper</a> &gt; <span class="el_source">VersionFormularioMapper.java</span></div><h1>VersionFormularioMapper.java</h1><pre class="source lang-java linenums">package gt.usac.cunoc.sgp.formulario.mapper;
+
+import gt.usac.cunoc.sgp.formulario.dto.ConfiguracionIcElementoResponse;
+import gt.usac.cunoc.sgp.formulario.dto.FormularioActivoResponse;
+import gt.usac.cunoc.sgp.formulario.dto.MapeoCampoResponse;
+import gt.usac.cunoc.sgp.formulario.dto.VersionFormularioResponse;
+import gt.usac.cunoc.sgp.formulario.dto.VersionFormularioResumenResponse;
+import gt.usac.cunoc.sgp.formulario.entity.ConfiguracionIcElemento;
+import gt.usac.cunoc.sgp.formulario.entity.MapeoCampoFormulario;
+import gt.usac.cunoc.sgp.formulario.entity.VersionFormulario;
+import java.util.List;
+import org.mapstruct.Mapper;
+import org.mapstruct.Mapping;
+import org.mapstruct.ReportingPolicy;
+
+@Mapper(componentModel = &quot;spring&quot;, unmappedTargetPolicy = ReportingPolicy.IGNORE)
+public interface VersionFormularioMapper {
+
+  @Mapping(target = &quot;versionAnteriorId&quot;, source = &quot;versionAnterior.id&quot;)
+  @Mapping(target = &quot;versionAnteriorCodigo&quot;, source = &quot;versionAnterior.codigo&quot;)
+  VersionFormularioResumenResponse toResumenResponse(VersionFormulario version);
+
+  @Mapping(target = &quot;versionAnteriorId&quot;, source = &quot;version.versionAnterior.id&quot;)
+  @Mapping(target = &quot;versionAnteriorCodigo&quot;, source = &quot;version.versionAnterior.codigo&quot;)
+  @Mapping(target = &quot;id&quot;, source = &quot;version.id&quot;)
+  @Mapping(target = &quot;codigo&quot;, source = &quot;version.codigo&quot;)
+  @Mapping(target = &quot;estado&quot;, source = &quot;version.estado&quot;)
+  @Mapping(target = &quot;activa&quot;, source = &quot;version.activa&quot;)
+  @Mapping(target = &quot;esquema&quot;, source = &quot;version.esquema&quot;)
+  @Mapping(target = &quot;vinculosAlmacenamiento&quot;, source = &quot;version.vinculosAlmacenamiento&quot;)
+  @Mapping(target = &quot;reglasEvaluacionIc&quot;, source = &quot;version.reglasEvaluacionIc&quot;)
+  @Mapping(target = &quot;hashContenido&quot;, source = &quot;version.hashContenido&quot;)
+  @Mapping(target = &quot;versionAlgoritmoIc&quot;, source = &quot;version.versionAlgoritmoIc&quot;)
+  @Mapping(target = &quot;creadoPorId&quot;, source = &quot;version.creadoPorId&quot;)
+  @Mapping(target = &quot;publicadoPorId&quot;, source = &quot;version.publicadoPorId&quot;)
+  @Mapping(target = &quot;publicadoEn&quot;, source = &quot;version.publicadoEn&quot;)
+  @Mapping(target = &quot;calibradoPorId&quot;, source = &quot;version.calibradoPorId&quot;)
+  @Mapping(target = &quot;calibradoEn&quot;, source = &quot;version.calibradoEn&quot;)
+  @Mapping(target = &quot;creadoEn&quot;, source = &quot;version.creadoEn&quot;)
+  @Mapping(target = &quot;actualizadoEn&quot;, source = &quot;version.actualizadoEn&quot;)
+  @Mapping(target = &quot;version&quot;, source = &quot;version.version&quot;)
+  @Mapping(target = &quot;pesos&quot;, source = &quot;pesos&quot;)
+  @Mapping(target = &quot;mapeos&quot;, source = &quot;mapeos&quot;)
+  @Mapping(target = &quot;aprobacionCalibracion&quot;, ignore = true)
+  VersionFormularioResponse toResponse(
+      VersionFormulario version,
+      List&lt;ConfiguracionIcElementoResponse&gt; pesos,
+      List&lt;MapeoCampoResponse&gt; mapeos);
+
+  default VersionFormularioResponse toResponse(
+      VersionFormulario version,
+      List&lt;ConfiguracionIcElementoResponse&gt; pesos,
+      List&lt;MapeoCampoResponse&gt; mapeos,
+      gt.usac.cunoc.sgp.formulario.dto.AprobacionCalibracionResponse aprobacion) {
+<span class="fc" id="L55">    return toResponse(version, pesos, mapeos).conAprobacion(aprobacion);</span>
+  }
+
+  FormularioActivoResponse toActivoResponse(VersionFormulario version);
+
+  @Mapping(target = &quot;versionOrigenId&quot;, source = &quot;versionOrigen.id&quot;)
+  @Mapping(target = &quot;versionDestinoId&quot;, source = &quot;versionDestino.id&quot;)
+  MapeoCampoResponse toMapeoResponse(MapeoCampoFormulario mapeo);
+
+  ConfiguracionIcElementoResponse toIcElementoResponse(ConfiguracionIcElemento elemento);
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

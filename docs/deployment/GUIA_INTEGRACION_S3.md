@@ -2,80 +2,66 @@
 
 ## 1. Propósito y alcance
 
-Este documento transfiere el contexto técnico para una futura historia de
-usuario de almacenamiento de archivos del Sistema de Gestión de Puentes. La
-infraestructura básica de S3 de staging ya existe, pero la aplicación todavía no
-almacena ni recupera objetos. Esta guía no autoriza cambios en AWS ni define
-reglas de negocio nuevas.
+Esta guía transfiere el estado de la infraestructura y de la integración de
+archivos para quienes continúen su desarrollo. No autoriza cambios en AWS ni
+establece reglas de negocio nuevas. Contrastar los requisitos vigentes y las
+historias correspondientes con el código antes de ampliar cualquier flujo.
 
-La futura implementación debe conservar una separación clara:
+Los binarios se guardan en almacenamiento de objetos y PostgreSQL conserva
+metadatos y asociaciones. MinIO se usa en desarrollo local y S3 en AWS; cada
+ambiente debe tener bucket, rol, datos y configuración independientes.
 
-- el binario vive en almacenamiento de objetos;
-- PostgreSQL conserva metadatos, estado y asociaciones de negocio;
-- el dominio depende de una abstracción, no del SDK de AWS;
-- MinIO sirve para desarrollo local y Amazon S3 para AWS;
-- cada ambiente usa bucket, rol IAM, datos y configuración independientes.
+## 2. Infraestructura y pruebas de staging
 
-Los criterios propuestos aquí deben contrastarse con la HU vigente y el
-enunciado antes de comenzar. Si existe una diferencia, debe resolverse con el
-equipo y documentarse; no se debe asumir una regla nueva.
+El bucket privado `sgp-staging-archivos-ayd1-2026-gt01` existe en `us-east-1`.
+En la revisión inicial tenía bloqueo de acceso público, Bucket owner enforced,
+ACL deshabilitadas, SSE-S3, etiquetas `Project=SGP` y `Environment=staging`,
+sin versionado, Object Lock, política de bucket personalizada ni CORS. Fue
+creado vacío y después recibió cargas; no se ha inventariado su contenido actual.
 
-## 2. Infraestructura existente
+La EC2 usa `sgp-staging-ec2-role`, con `AmazonSSMManagedInstanceCore` y, desde
+el 27 de octubre de 2026, `sgp-staging-s3-objects-policy`, que permite
+`PutObject`, `GetObject` y `DeleteObject` sobre los objetos de ese bucket. La
+instancia exige IMDSv2 y tiene hop limit `2`. El SDK usa su cadena de
+credenciales predeterminada, incluido el rol de instancia; no crear access keys
+para AWS ni registrar tokens. El rol OIDC de despliegue es una identidad distinta.
 
-Último estado documentado, no verificado nuevamente durante la creación de esta
-guía:
+Ese día Session Manager confirmó la identidad del rol y se verificaron subida,
+lectura comparada con el original y eliminación de un objeto de diagnóstico;
+la carga indicó SSE-S3 `AES256`. En el navegador se confirmaron fotos de
+`ACCESO` y `SUPERESTRUCTURA`, y el usuario confirmó carga de PDF. La evidencia,
+el alcance y la incidencia están en [staging](STAGING_AWS.md). La prueba de
+eliminación solo afectó al objeto de diagnóstico y no acredita una eliminación
+funcional desde la interfaz.
 
-| Propiedad | Estado conocido |
-|---|---|
-| Proveedor | Amazon S3. |
-| Región | `us-east-1`. |
-| Bucket | `sgp-staging-archivos-ayd1-2026-gt01`. |
-| Ambiente | Staging. |
-| Acceso público | Bloqueado en todas sus opciones. |
-| Propiedad | Bucket owner enforced; ACL deshabilitadas. |
-| Cifrado predeterminado | SSE-S3. |
-| Etiquetas | `Project=SGP`, `Environment=staging`. |
-| Versionado | Deshabilitado. |
-| Object Lock | Deshabilitado. |
-| Bucket policy | Sin política personalizada. |
-| CORS | Sin configuración específica. |
-| Contenido | Creado inicialmente vacío; no se ha aportado una verificación posterior. |
-| Integración backend | No implementada ni validada. |
+La política IAM corrigió el permiso `DeleteObject` que causaba un 403 durante
+el rollback de un PDF. El usuario confirmó que la corrección también resolvió
+los errores 409 observados anteriormente.
 
-La EC2 de staging usa el rol `sgp-staging-ec2-role`. Su permiso confirmado es
-`AmazonSSMManagedInstanceCore`; no se ha asignado una política S3. La instancia
-exige IMDSv2 y usa hop limit `2`, condición necesaria para que un SDK dentro de
-Docker pueda consultar las credenciales temporales del rol.
+## 3. Implementación existente en el repositorio
 
-No deben crearse access keys para la aplicación ni variables
-`AWS_ACCESS_KEY_ID` o `AWS_SECRET_ACCESS_KEY` en `.env`. En AWS, el SDK debe usar
-la cadena de credenciales predeterminada y el rol de instancia.
-
-## 3. Estado del repositorio
-
-### Preparado
-
-- `docker-compose.yml` contiene MinIO para desarrollo local, publicado solo en
-  loopback (`19000` API y `19001` consola) y con volumen `minio_data`.
-- `docs/DEVELOPMENT.md` aclara que MinIO es infraestructura preparada, no una
-  dependencia funcional actual del backend.
-- `sgp-api/src/main/resources/db/migration/V10__mantenimiento_y_archivos.sql`
-  ya creó el modelo de metadatos. La migración aplicada no debe modificarse.
-- `docs/ARCHITECTURE.md` reserva el dominio backend `archivo/` y establece que
-  las capacidades frontend se integran en las features que gestionan adjuntos.
-- El frontend conserva marcadores explícitos de HU-028 para el reporte
-  fotográfico pendiente y la persistencia offline debe pasar por `offline/`.
-
-### No implementado
-
-- No existe el contrato `AlmacenamientoArchivos` ni una implementación S3 o
-  MinIO en el backend.
-- No existe dependencia ni configuración del AWS SDK en `sgp-api`.
-- No hay endpoints funcionales de carga, descarga, confirmación o eliminación.
-- No hay variables de bucket consumidas por Spring Boot.
-- No hay política IAM S3 asociada al rol de EC2.
-- No se han probado cargas, descargas, autorizaciones, purga ni recuperación de
-  objetos en staging.
+- [`AlmacenamientoArchivos`](../../sgp-api/src/main/java/gt/usac/cunoc/sgp/archivo/service/AlmacenamientoArchivos.java)
+  define guardar, abrir, consultar existencia y eliminar; las claves son opacas.
+- [`AlmacenamientoS3`](../../sgp-api/src/main/java/gt/usac/cunoc/sgp/archivo/service/AlmacenamientoS3.java)
+  usa el SDK de AWS para S3 y también para MinIO compatible; la carga evita
+  sobrescribir mediante `If-None-Match`. Existe además
+  [`AlmacenamientoLocal`](../../sgp-api/src/main/java/gt/usac/cunoc/sgp/archivo/service/AlmacenamientoLocal.java).
+- [`AlmacenamientoConfiguration`](../../sgp-api/src/main/java/gt/usac/cunoc/sgp/archivo/config/AlmacenamientoConfiguration.java)
+  selecciona el proveedor; con endpoint explícito admite credenciales para MinIO
+  y path-style. Sin endpoint usa la cadena del SDK; rechaza credenciales
+  explícitas sin endpoint.
+- [`FotografiaController`](../../sgp-api/src/main/java/gt/usac/cunoc/sgp/inspeccion/controller/FotografiaController.java)
+  implementa carga multipart, listado, retiro y lectura de contenido y miniatura
+  bajo `/api/v1/inspecciones/{id}/fotografias`.
+  [`DocumentoInspeccionController`](../../sgp-api/src/main/java/gt/usac/cunoc/sgp/inspeccion/controller/DocumentoInspeccionController.java)
+  implementa carga, listado, lectura de contenido y retiro bajo la ruta equivalente
+  `/documentos`. Su existencia no acredita que todos los flujos se hayan probado
+  en staging.
+- [`RecuperacionCargasService`](../../sgp-api/src/main/java/gt/usac/cunoc/sgp/archivo/service/RecuperacionCargasService.java)
+  gestiona recuperación de cargas.
+- `docker-compose.yml` prepara MinIO local. La migración
+  `sgp-api/src/main/resources/db/migration/V10__mantenimiento_y_archivos.sql`
+  creó metadatos y no debe modificarse retroactivamente.
 
 ## 4. Modelo persistente disponible
 
@@ -101,9 +87,9 @@ compatible con S3. No se debe editar la migración para cambiar ese comentario.
 Si la implementación necesita columnas o restricciones nuevas, deberá crear la
 siguiente migración disponible después de revisar todas las existentes.
 
-## 5. Requisitos identificados en el enunciado
+## 5. Requisitos de almacenamiento
 
-La futura HU debe confirmar al menos los siguientes requisitos explícitos:
+La implementación debe contrastarse con estos requisitos:
 
 - Toda fotografía pertenece a una inspección y puede quedar anclada mediante
   `elemento_ref` (RN-ARC-01).
@@ -133,71 +119,37 @@ La futura HU debe confirmar al menos los siguientes requisitos explícitos:
 - Los objetos deben incorporarse a la política de respaldos y restauración con
   la misma prioridad que PostgreSQL (DT-ALM-05 y DT-DEP-07/08).
 
-El enunciado define MinIO compatible con S3 para el servidor universitario. El
-ADR-0002 adapta esa decisión a AWS: MinIO permanece local y S3 es el proveedor
-de staging/producción. La portabilidad se conserva mediante
-`AlmacenamientoArchivos`.
+La arquitectura de referencia contempla MinIO compatible con S3. El ADR-0002
+adapta el despliegue a AWS: MinIO permanece local y S3 es el proveedor de
+staging/producción. La portabilidad se conserva mediante `AlmacenamientoArchivos`.
 
-## 6. Diseño que debe completar la futura HU
+## 6. Configuración y evolución
 
-### Contrato y adaptadores
+Las propiedades actuales en `sgp-api/src/main/resources/application.properties`
+son `app.archivos.proveedor` (`ARCHIVOS_PROVEEDOR`, por defecto `local`),
+`app.archivos.local.directorio` (`ARCHIVOS_DIRECTORIO`),
+`app.archivos.s3.region` (`AWS_REGION`, por defecto `us-east-1`),
+`app.archivos.s3.bucket` (`ARCHIVOS_BUCKET`), `app.archivos.s3.endpoint`
+(`ARCHIVOS_ENDPOINT`) y las credenciales locales `MINIO_ACCESS_KEY` y
+`MINIO_SECRET_KEY`. Para AWS se selecciona `s3`, se configura región y bucket
+y se usa el rol EC2 sin credenciales estáticas. Para MinIO se configura el
+endpoint local y sus credenciales locales. Producción necesita recursos propios.
 
-Definir el contrato en el dominio `archivo/` con las operaciones mínimas que
-exija la HU, por ejemplo almacenar, leer y retirar. Los DTO del dominio no deben
-exponer clases del SDK ni nombres de bucket. Las implementaciones concretas de
-S3 y MinIO pertenecen a infraestructura.
+Al extender los flujos, revisar autorización, claves generadas por servidor,
+miniaturas, compensación entre PostgreSQL y objetos, idempotencia y cola offline.
+La existencia del código no prueba por sí sola todos los requisitos ni sus
+comportamientos en AWS.
 
-Antes de fijar una API, decidir con el equipo:
+## 7. IAM de mínimo privilegio
 
-- si el backend transmite siempre los bytes o emite URLs firmadas cortas;
-- cómo se confirma una carga y se recuperan objetos huérfanos ante un fallo de
-  la transacción de PostgreSQL;
-- qué operaciones son idempotentes y cómo se relacionan con la cola offline;
-- estructura de claves y prefijos por ambiente y contexto;
-- comportamiento exacto de retiro, purga y conservación de metadatos;
-- dónde se genera la miniatura de 300 px;
-- cómo se valida autorización para cada tipo de asociación.
-
-Los nombres originales nunca deben formar por sí solos la clave. La clave debe
-ser generada por el servidor, no revelar datos personales y evitar colisiones.
-
-### Configuración por ambiente
-
-- Desarrollo: MinIO local y credenciales exclusivamente locales; definir
-  endpoint y path-style solo en el adaptador de desarrollo.
-- Staging: S3 en `us-east-1`, bucket confirmado y credenciales temporales del
-  rol EC2.
-- Producción: bucket y rol propios, aún no creados ni nombrados en esta guía.
-
-Los nombres exactos de propiedades de Spring Boot todavía no existen. Deben
-definirse junto con la implementación, documentarse en `.env.example` sin
-secretos y validarse al arranque. La región y el nombre de bucket no son
-secretos; las credenciales sí y no deben configurarse manualmente en AWS.
-
-## 7. IAM de mínimo privilegio pendiente
-
-Primero deben definirse los flujos y prefijos. Después se creará una política
-limitada al bucket de staging. Según las operaciones realmente implementadas,
-podría requerir:
-
-- `s3:ListBucket`, restringido al prefijo aprobado;
-- `s3:GetObject` para descarga o generación de URL firmada;
-- `s3:PutObject` para carga;
-- `s3:DeleteObject` solo si retiro/purga ejecuta borrado físico.
-
-No conceder `s3:*`, acceso a `arn:aws:s3:::*`, administración del bucket ni
-permisos sobre otros ambientes. Si la aplicación no lista objetos, omitir
-`ListBucket`; si solo marca objetos como retirados, no conceder `DeleteObject`
-hasta implementar la purga autorizada.
-
-La política deberá separar el recurso bucket de los recursos objeto y, cuando
-se acuerde una estructura, restringir `s3:prefix`. Debe asociarse a
-`sgp-staging-ec2-role`, no al rol OIDC de GitHub Actions. El workflow despliega;
-la aplicación en EC2 es quien accede a S3.
-
-Después de asociarla, verificar desde el contenedor que el SDK obtiene
-credenciales temporales. No imprimir tokens de sesión ni respuestas de IMDS en
-logs. La rotación corresponde a AWS mediante el rol.
+La política de staging concede `s3:PutObject`, `s3:GetObject` y
+`s3:DeleteObject` únicamente sobre
+`arn:aws:s3:::sgp-staging-archivos-ayd1-2026-gt01/*`; no concede `s3:*`,
+`AmazonS3FullAccess`, administración de buckets ni permisos sobre otros ambientes.
+El adaptador también usa `HeadObject` para consultar existencia. Si se agregan
+operaciones o prefijos, revisar sus permisos efectivos; `s3:ListBucket` solo se
+concede si se necesita, en el recurso bucket y restringido según corresponda.
+Producción debe tener su propio rol y política adaptada a su propio bucket.
 
 ## 8. CORS, versionado, ciclo de vida y recuperación
 
@@ -214,7 +166,7 @@ evaluar:
 - costo de versiones y cargas incompletas;
 - transición o expiración de objetos retirados/purgados;
 - retención de borradores y protección de inspecciones publicadas;
-- respaldos mensuales y prueba de restauración exigidos por el enunciado.
+- respaldos mensuales y prueba de restauración requeridos.
 
 Una regla de ciclo de vida genérica no debe eliminar objetos sin considerar el
 estado y la asociación almacenados en PostgreSQL. La aplicación y la política de
@@ -250,57 +202,35 @@ recuperación deben acordar cuál es la fuente de verdad.
 Las pruebas locales no prueban IAM y una llamada aislada a S3 no demuestra las
 reglas funcionales. Ambas evidencias son necesarias.
 
-## 10. Orden sugerido de implementación
+Los registros confirmaron un 403 de `s3:DeleteObject` durante rollback de PDF;
+el usuario confirmó que los 409 anteriores se resolvieron con la corrección IAM.
+No se han declarado verificadas la recuperación de inspecciones antiguas ni las
+operaciones funcionales de eliminación o restauración.
 
-1. Revisar la HU, el enunciado, V10 y las features consumidoras.
-2. Aprobar contrato, flujos de autorización, claves, consistencia y purga.
-3. Crear pruebas del contrato y el adaptador MinIO local.
-4. Implementar servicio de aplicación, DTO y endpoints bajo `/api/v1`.
-5. Integrar frontend/offline respetando compresión, UUID v7 e idempotencia.
-6. Definir propiedades externas y adaptar S3 sin credenciales estáticas.
-7. Diseñar y revisar la política IAM de mínimo privilegio.
-8. Aplicar la política en AWS mediante una actividad autorizada.
-9. Desplegar por CI/CD y ejecutar las pruebas reales de staging.
-10. Documentar operación, observabilidad, respaldo y restauración.
+## 10. Criterios de seguimiento
 
-## 11. Criterios de aceptación propuestos
+El contrato, el adaptador y los endpoints existen; se deben comprobar sus
+resultados frente a los requisitos vigentes, incluyendo autorización, límites,
+consistencia, miniaturas, retención y recuperación. Las pruebas automatizadas
+existentes no sustituyen pruebas reales de AWS ni prueban por sí solas el estado
+del entorno desplegado.
 
-Sujetos a la HU y aprobación del equipo:
+## 11. Riesgos, dependencias y pendientes
 
-1. Existe `AlmacenamientoArchivos` con adaptadores intercambiables para MinIO y
-   S3 sin dependencias AWS en el dominio.
-2. Los binarios están fuera de PostgreSQL y los metadatos usan el modelo
-   existente o una migración nueva compatible.
-3. Carga, descarga, retiro y purga respetan autenticación, autorización, estado
-   y límites del enunciado.
-4. Fotos se comprimen en cliente, conservan geolocalización/fecha y almacenan
-   original más miniatura.
-5. Desarrollo funciona con MinIO y staging con el rol EC2, sin access keys.
-6. La política IAM se limita al bucket y operaciones/prefijos necesarios.
-7. El bucket continúa privado y los accesos son autorizados o firmados y breves.
-8. Pruebas automatizadas y reales de staging cubren éxito, rechazo y fallos
-   parciales.
-9. Existe una política de respaldo/restauración probada o la excepción queda
-   explícitamente aceptada; no se declara DT-ALM-05 completo sin evidencia.
-10. La documentación y plantillas enumeran configuración sin secretos.
-
-## 12. Riesgos, dependencias y pendientes
-
-- La HU funcional de archivos y sus prioridades deben confirmarse; HU-028 se
-  menciona en el frontend, pero esta guía no inventa su definición formal.
-- La consistencia entre S3 y PostgreSQL no es transaccional y necesita un diseño
-  de idempotencia, compensación y limpieza de huérfanos.
+- Confirmar las prioridades del trabajo funcional de archivos y el alcance de
+  HU-028, mencionada en el frontend.
+- La consistencia entre S3 y PostgreSQL no es transaccional; revisar el
+  comportamiento implementado de idempotencia, compensación y recuperación.
 - La EC2 `t4g.micro` tiene recursos limitados; procesamiento de imágenes debe
   medirse para evitar presión de memoria y CPU.
 - El bucket no tiene versionado ni política de recuperación aplicada.
-- La retención y restauración de objetos siguen fuera de la HU de staging ya
-  implementada, pero son requisitos globales pendientes.
+- La retención y restauración de objetos siguen fuera del alcance implementado
+  para staging y son requisitos globales pendientes.
 - El SMTP ficticio afecta notificaciones de borradores si esa función usa correo.
 - La integración de actas depende también del trabajo pendiente documentado en
   `docs/pendientes/HU-019-acta-calibracion.md`.
-- Producción requiere bucket, rol, política, datos y pruebas independientes.
 
-## 13. Evidencia y referencias del repositorio
+## 12. Evidencia y referencias del repositorio
 
 - `docs/ARCHITECTURE.md`: límites de los dominios `archivo/` y `offline/`.
 - `docs/DEVELOPMENT.md`: operación actual de MinIO local.

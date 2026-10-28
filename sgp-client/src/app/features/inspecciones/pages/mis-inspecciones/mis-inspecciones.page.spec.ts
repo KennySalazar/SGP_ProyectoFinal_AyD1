@@ -7,6 +7,7 @@ import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { Router, provideRouter } from '@angular/router';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { ConnectivityService } from '../../../../offline/services/connectivity.service';
 import { UserSession } from '../../../../core/models/auth.models';
 import { AuthStore } from '../../../../core/services/auth.store';
 import { PuenteResponse } from '../../../puentes/models/puente.models';
@@ -60,14 +61,29 @@ describe('MisInspeccionesPage', () => {
 
   const authStoreMock = { user: signal<UserSession | null>(null) };
 
+  const online = signal(true);
+  const locales = {
+    listarPorUsuario: vi.fn(),
+    esBorradorSoloLocal: vi.fn(),
+    eliminarInspeccionLocal: vi.fn(),
+    confirmarEliminacionRemota: vi.fn(),
+  };
+
   beforeEach(async () => {
+    online.set(true);
+    authStoreMock.user.set({ id: 'usuario-1', role: 'ESTUDIANTE' } as UserSession);
+    locales.listarPorUsuario.mockReset().mockResolvedValue([]);
+    locales.esBorradorSoloLocal.mockReset().mockResolvedValue(false);
+    locales.eliminarInspeccionLocal.mockReset().mockResolvedValue(undefined);
+    locales.confirmarEliminacionRemota.mockReset().mockResolvedValue(undefined);
     await TestBed.configureTestingModule({
       imports: [MisInspeccionesPage],
       providers: [
         {
           provide: InspeccionesLocalesService,
-          useValue: { listarPorUsuario: vi.fn().mockResolvedValue([]) },
+          useValue: locales,
         },
+        { provide: ConnectivityService, useValue: { online } },
         provideHttpClient(),
         provideHttpClientTesting(),
         provideRouter([]),
@@ -186,6 +202,7 @@ describe('MisInspeccionesPage', () => {
     expect(page.inspeccionCorregir()).toBe(publicada);
     expect(page.corrigiendo()).toBe(false);
   });
+
   it('conserva el estado del servidor frente a una copia local ya sincronizada', async () => {
     cargarListado([]);
     authStoreMock.user.set({ id: 'usuario-1', role: 'ESTUDIANTE' } as UserSession);
@@ -212,5 +229,104 @@ describe('MisInspeccionesPage', () => {
     const texto = (fixture.nativeElement as HTMLElement).textContent;
     expect(texto).toContain('inspecciones.mis.viewReview');
     expect(texto).not.toContain('inspecciones.mis.delete');
+  });
+
+
+  async function iniciarEliminacion(estado: string = 'BORRADOR'): Promise<void> {
+    cargarListado([inspeccion({ estado: estado as InspeccionResumenResponse['estado'] })]);
+    page.confirmarEliminar(inspeccion({ estado: estado as InspeccionResumenResponse['estado'] }));
+    page.eliminarBorrador();
+    await Promise.resolve();
+  }
+
+  it('espera la limpieza local tras el DELETE antes de recargar y no vuelve a listar el borrador', async () => {
+    let completar!: () => void;
+    locales.confirmarEliminacionRemota.mockReturnValue(
+      new Promise<void>((resolve) => (completar = resolve)),
+    );
+    await iniciarEliminacion();
+    expect(locales.confirmarEliminacionRemota).not.toHaveBeenCalled();
+    http.expectOne('/api/v1/inspecciones/inspeccion-1').flush(null);
+    expect(locales.confirmarEliminacionRemota).toHaveBeenCalledWith('inspeccion-1', 'usuario-1');
+    expect(page.eliminando()).toBe(true);
+    http.expectNone(LISTADO);
+    completar();
+    await fixture.whenStable();
+    cargarListado([]);
+    expect(page.pagina()?.content).toEqual([]);
+    expect(page.inspeccionEliminar()).toBeNull();
+  });
+
+  it('también elimina en el servidor un borrador remoto con cambios pendientes', async () => {
+    await iniciarEliminacion('PENDIENTE_SYNC');
+    http.expectOne('/api/v1/inspecciones/inspeccion-1').flush(null);
+    await fixture.whenStable();
+    cargarListado([]);
+    expect(locales.eliminarInspeccionLocal).not.toHaveBeenCalled();
+  });
+
+  it('conserva la copia local si el servidor rechaza la eliminación', async () => {
+    await iniciarEliminacion();
+    http
+      .expectOne('/api/v1/inspecciones/inspeccion-1')
+      .flush({}, { status: 409, statusText: 'Conflict' });
+    await fixture.whenStable();
+    expect(locales.confirmarEliminacionRemota).not.toHaveBeenCalled();
+    expect(page.errorEliminar()).toBe('delete');
+    expect(page.inspeccionEliminar()).not.toBeNull();
+  });
+
+  it('limpia la copia huérfana si el servidor ya no encuentra el borrador', async () => {
+    await iniciarEliminacion();
+    http
+      .expectOne('/api/v1/inspecciones/inspeccion-1')
+      .flush({}, { status: 404, statusText: 'Not Found' });
+    await fixture.whenStable();
+    cargarListado([]);
+    expect(locales.confirmarEliminacionRemota).toHaveBeenCalled();
+  });
+
+  it('mantiene el diálogo para reintentar si falla la limpieza del navegador', async () => {
+    locales.confirmarEliminacionRemota.mockRejectedValue(new Error('IndexedDB'));
+    await iniciarEliminacion();
+    http.expectOne('/api/v1/inspecciones/inspeccion-1').flush(null);
+    await fixture.whenStable();
+    expect(page.errorEliminar()).toBe('delete');
+    expect(page.inspeccionEliminar()).not.toBeNull();
+    http.expectNone(LISTADO);
+  });
+
+  it('descarta una creación exclusivamente local sin llamar al servidor', async () => {
+    locales.esBorradorSoloLocal.mockResolvedValue(true);
+    await iniciarEliminacion('PENDIENTE_SYNC');
+    await fixture.whenStable();
+    cargarListado([]);
+    expect(locales.eliminarInspeccionLocal).toHaveBeenCalledWith('inspeccion-1', true);
+    http.expectNone('/api/v1/inspecciones/inspeccion-1');
+  });
+
+  it('muestra el bloqueo de creación sin enviar DELETE ni limpiar datos', async () => {
+    locales.esBorradorSoloLocal.mockRejectedValue(new Error('creacionPendiente'));
+    await iniciarEliminacion('PENDIENTE_SYNC');
+    await fixture.whenStable();
+    expect(page.errorEliminar()).toBe('creationPending');
+    expect(textoDe('[role="alert"]')).toContain('inspecciones.mis.deleteCreationPending');
+    expect(page.inspeccionEliminar()).not.toBeNull();
+    expect(page.eliminando()).toBe(false);
+    expect(locales.confirmarEliminacionRemota).not.toHaveBeenCalled();
+    expect(locales.eliminarInspeccionLocal).not.toHaveBeenCalled();
+    http.expectNone('/api/v1/inspecciones/inspeccion-1');
+  });
+
+  it('no borra únicamente la copia local de un borrador remoto cuando no hay red', async () => {
+    cargarListado([]);
+    online.set(false);
+    page.confirmarEliminar(inspeccion({ estado: 'BORRADOR' }));
+    page.eliminarBorrador();
+    await fixture.whenStable();
+    expect(page.errorEliminar()).toBe('delete');
+    expect(locales.eliminarInspeccionLocal).not.toHaveBeenCalled();
+    expect(locales.confirmarEliminacionRemota).not.toHaveBeenCalled();
+    http.expectNone('/api/v1/inspecciones/inspeccion-1');
   });
 });

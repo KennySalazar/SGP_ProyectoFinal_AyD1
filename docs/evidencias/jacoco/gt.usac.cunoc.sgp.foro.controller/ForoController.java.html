@@ -1,0 +1,206 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ForoController.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">sgp-api</a> &gt; <a href="index.source.html" class="el_package">gt.usac.cunoc.sgp.foro.controller</a> &gt; <span class="el_source">ForoController.java</span></div><h1>ForoController.java</h1><pre class="source lang-java linenums">package gt.usac.cunoc.sgp.foro.controller;
+
+import gt.usac.cunoc.sgp.common.exception.ApiException;
+import gt.usac.cunoc.sgp.common.security.JwtData;
+import gt.usac.cunoc.sgp.foro.dto.ComentarioResponse;
+import gt.usac.cunoc.sgp.foro.dto.CrearComentarioRequest;
+import gt.usac.cunoc.sgp.foro.dto.CrearHiloRequest;
+import gt.usac.cunoc.sgp.foro.dto.HiloInspeccionResponse;
+import gt.usac.cunoc.sgp.foro.dto.HiloResponse;
+import gt.usac.cunoc.sgp.foro.service.FiltroComentarios;
+import gt.usac.cunoc.sgp.foro.service.ForoInspeccionService;
+import gt.usac.cunoc.sgp.foro.service.ForoInspeccionService.Apertura;
+import gt.usac.cunoc.sgp.foro.service.ForoService;
+import gt.usac.cunoc.sgp.usuario.model.RoleName;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import java.util.UUID;
+import org.springframework.data.domain.Page;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+/**
+ * Foro por puente (HU-063) y por inspección publicada (HU-064). Leer es público (RN-FOR-09); crear
+ * hilos y comentar exige una sesión activa de cualquier rol.
+ */
+@RestController
+@RequestMapping(&quot;/api/v1&quot;)
+@Tag(name = &quot;Foro&quot;, description = &quot;Hilos por puente y por inspección, y sus comentarios&quot;)
+public class ForoController {
+
+  private final ForoService foro;
+  private final ForoInspeccionService foroInspeccion;
+
+<span class="fc" id="L44">  public ForoController(ForoService foro, ForoInspeccionService foroInspeccion) {</span>
+<span class="fc" id="L45">    this.foro = foro;</span>
+<span class="fc" id="L46">    this.foroInspeccion = foroInspeccion;</span>
+<span class="fc" id="L47">  }</span>
+
+  @GetMapping(&quot;/puentes/{puenteId}/hilos&quot;)
+  @PreAuthorize(&quot;permitAll()&quot;)
+  @Operation(
+      summary = &quot;Listar los hilos de un puente&quot;,
+      description =
+          &quot;Público. Solo los hilos propios del puente, del de actividad más reciente al más &quot;
+              + &quot;antiguo, con su total de comentarios. Página desde 0, tamaño entre 1 y 100 &quot;
+              + &quot;(20 por defecto). 404 si el puente no existe o está inactivo.&quot;)
+  public Page&lt;HiloResponse&gt; listarHilos(
+      @PathVariable UUID puenteId,
+      @RequestParam(defaultValue = &quot;0&quot;) int pagina,
+      @RequestParam(defaultValue = &quot;20&quot;) int tamanio) {
+<span class="fc" id="L61">    return foro.listarHilosDePuente(puenteId, pagina, tamanio);</span>
+  }
+
+  @PostMapping(&quot;/puentes/{puenteId}/hilos&quot;)
+  @PreAuthorize(&quot;isAuthenticated()&quot;)
+  @SecurityRequirement(name = &quot;bearerAuth&quot;)
+  @Operation(
+      summary = &quot;Abrir un hilo en un puente&quot;,
+      description =
+          &quot;Cualquier usuario autenticado y activo. Exige título (hasta 120 caracteres), categoría &quot;
+              + &quot;(DISCUSION_TECNICA, PROPUESTA_INTERVENCION, CONSULTA, REFERENCIA_DOCUMENTAL o &quot;
+              + &quot;ALERTA) y primer comentario (hasta 2000 caracteres); 422 con el detalle de lo &quot;
+              + &quot;que falte o exceda, sin crear nada. Cada usuario abre hasta 3 hilos y publica &quot;
+              + &quot;hasta 10 comentarios por minuto; si lo supera, 429 con Retry-After. Las menciones &quot;
+              + &quot;@usuario avisan al mencionado y una Alerta sobre un puente en estado Malo avisa &quot;
+              + &quot;a Catedráticos y Administradores.&quot;)
+  public ResponseEntity&lt;HiloResponse&gt; crearHilo(
+      @PathVariable UUID puenteId,
+      @RequestBody CrearHiloRequest request,
+      Authentication authentication) {
+<span class="fc" id="L81">    return ResponseEntity.status(HttpStatus.CREATED)</span>
+<span class="fc" id="L82">        .body(foro.crearHilo(puenteId, request, usuarioId(authentication)));</span>
+  }
+
+  @GetMapping(&quot;/comentarios/{comentarioId}&quot;)
+  @PreAuthorize(&quot;isAuthenticated()&quot;)
+  @SecurityRequirement(name = &quot;bearerAuth&quot;)
+  @Operation(
+      summary = &quot;Consultar un comentario&quot;,
+      description =
+          &quot;Con sesión. Lleva al hilo de un comentario, por ejemplo desde el aviso de una mención. &quot;
+              + &quot;Se ve como en la lista de comentarios: sin texto si se eliminó, y si está oculto &quot;
+              + &quot;solo el Catedrático y el Administrador ven el texto y el motivo. 404 si no existe.&quot;)
+  public ComentarioResponse obtenerComentario(
+      @PathVariable UUID comentarioId, Authentication authentication) {
+<span class="fc" id="L96">    return foro.obtenerComentario(comentarioId, rolLector(authentication));</span>
+  }
+
+  @GetMapping(&quot;/hilos/{hiloId}&quot;)
+  @PreAuthorize(&quot;permitAll()&quot;)
+  @Operation(summary = &quot;Consultar un hilo&quot;, description = &quot;Público. 404 si no existe.&quot;)
+  public HiloResponse obtenerHilo(@PathVariable UUID hiloId) {
+<span class="fc" id="L103">    return foro.obtenerHilo(hiloId);</span>
+  }
+
+  @GetMapping(&quot;/inspecciones/{inspeccionId}/hilo&quot;)
+  @PreAuthorize(&quot;permitAll()&quot;)
+  @Operation(
+      summary = &quot;Consultar el hilo de una inspección publicada&quot;,
+      description =
+          &quot;Público. Devuelve el hilo y cuántos comentarios tiene cada campo o elemento anclado. &quot;
+              + &quot;404 si la inspección no existe, no está publicada o aún no tiene hilo; esta &quot;
+              + &quot;consulta nunca lo crea.&quot;)
+  public HiloInspeccionResponse obtenerHiloDeInspeccion(@PathVariable UUID inspeccionId) {
+<span class="fc" id="L115">    return foroInspeccion.obtener(inspeccionId);</span>
+  }
+
+  @PostMapping(&quot;/inspecciones/{inspeccionId}/hilo&quot;)
+  @PreAuthorize(&quot;isAuthenticated()&quot;)
+  @SecurityRequirement(name = &quot;bearerAuth&quot;)
+  @Operation(
+      summary = &quot;Abrir el hilo de una inspección publicada&quot;,
+      description =
+          &quot;Cualquier usuario autenticado y activo. Es idempotente: crea el hilo si aún no existe &quot;
+              + &quot;(201), por ejemplo en una inspección publicada antes de esta función, y si ya &quot;
+              + &quot;existe lo devuelve (200). 404 si la inspección no existe o no está publicada.&quot;)
+  public ResponseEntity&lt;HiloInspeccionResponse&gt; abrirHiloDeInspeccion(
+      @PathVariable UUID inspeccionId, Authentication authentication) {
+<span class="fc" id="L129">    Apertura apertura = foroInspeccion.abrir(inspeccionId, usuarioId(authentication));</span>
+<span class="fc bfc" id="L130" title="All 2 branches covered.">    return ResponseEntity.status(apertura.creado() ? HttpStatus.CREATED : HttpStatus.OK)</span>
+<span class="fc" id="L131">        .body(apertura.hilo());</span>
+  }
+
+  @GetMapping(&quot;/hilos/{hiloId}/comentarios&quot;)
+  @PreAuthorize(&quot;permitAll()&quot;)
+  @Operation(
+      summary = &quot;Listar los comentarios de un hilo&quot;,
+      description =
+          &quot;Público. Comentarios y respuestas en una sola lista, de los más antiguos a los más &quot;
+              + &quot;nuevos; una respuesta lleva el padreId de su comentario principal y llega siempre &quot;
+              + &quot;después de él. Se puede filtrar por un campo o elemento (elementoRef, y sin &quot;
+              + &quot;instanciaElementoId los del elemento sin instancia), por una sección entera &quot;
+              + &quot;(seccion, su clave sin barras, con todo lo que contiene) o por los generales &quot;
+              + &quot;(soloGenerales, los que no están anclados); dos filtros a la vez dan 422. Página &quot;
+              + &quot;desde 0, tamaño entre 1 y 100 (20 por defecto). Un comentario eliminado llega &quot;
+              + &quot;sin texto con eliminado=true; uno oculto llega sin texto con oculto=true, salvo &quot;
+              + &quot;para el Catedrático y el Administrador, que ven el texto y el motivo.&quot;)
+  public Page&lt;ComentarioResponse&gt; listarComentarios(
+      @PathVariable UUID hiloId,
+      @RequestParam(defaultValue = &quot;0&quot;) int pagina,
+      @RequestParam(defaultValue = &quot;20&quot;) int tamanio,
+      @RequestParam(required = false) String elementoRef,
+      @RequestParam(required = false) UUID instanciaElementoId,
+      @RequestParam(required = false) String seccion,
+      @RequestParam(defaultValue = &quot;false&quot;) boolean soloGenerales,
+      Authentication authentication) {
+<span class="fc" id="L157">    return foro.listarComentariosPara(</span>
+        hiloId,
+        pagina,
+        tamanio,
+        new FiltroComentarios(elementoRef, instanciaElementoId, seccion, soloGenerales),
+<span class="fc" id="L162">        rolLector(authentication));</span>
+  }
+
+  @PostMapping(&quot;/hilos/{hiloId}/comentarios&quot;)
+  @PreAuthorize(&quot;isAuthenticated()&quot;)
+  @SecurityRequirement(name = &quot;bearerAuth&quot;)
+  @Operation(
+      summary = &quot;Comentar un hilo o responder a un comentario&quot;,
+      description =
+          &quot;Cualquier usuario autenticado y activo. El contenido es obligatorio (hasta 2000 &quot;
+              + &quot;caracteres). Con padreId responde a un comentario principal del mismo hilo; no &quot;
+              + &quot;se puede responder a una respuesta (422). En el hilo de una inspección, &quot;
+              + &quot;elementoRef (y instanciaElementoId si el elemento es repetible) ancla el &quot;
+              + &quot;comentario a un campo o elemento que debe existir en el formulario con que se &quot;
+              + &quot;levantó la inspección (422 si no); una respuesta toma el ancla de su comentario. &quot;
+              + &quot;Un hilo cerrado responde 409. Hasta 10 comentarios por minuto por usuario; si lo &quot;
+              + &quot;supera, 429 con Retry-After. Las menciones @usuario avisan una sola vez a cada &quot;
+              + &quot;mencionado activo, salvo a uno mismo.&quot;)
+  public ResponseEntity&lt;ComentarioResponse&gt; crearComentario(
+      @PathVariable UUID hiloId,
+      @RequestBody CrearComentarioRequest request,
+      Authentication authentication) {
+<span class="fc" id="L184">    return ResponseEntity.status(HttpStatus.CREATED)</span>
+<span class="fc" id="L185">        .body(foro.crearComentario(hiloId, request, usuarioId(authentication)));</span>
+  }
+
+  /** El rol de quien lee, o nulo si es un visitante sin sesión. */
+  private RoleName rolLector(Authentication authentication) {
+<span class="pc bpc" id="L190" title="1 of 4 branches missed.">    return authentication != null &amp;&amp; authentication.getDetails() instanceof JwtData jwtData</span>
+<span class="fc" id="L191">        ? jwtData.role()</span>
+<span class="fc" id="L192">        : null;</span>
+  }
+
+  private UUID usuarioId(Authentication authentication) {
+<span class="pc bpc" id="L196" title="2 of 4 branches missed.">    if (authentication == null || !(authentication.getDetails() instanceof JwtData jwtData)) {</span>
+<span class="nc" id="L197">      throw new ApiException(</span>
+          HttpStatus.UNAUTHORIZED,
+          &quot;autenticacion_requerida&quot;,
+          &quot;Autenticación requerida&quot;,
+          &quot;Se requiere una sesión válida para participar en el foro.&quot;);
+    }
+<span class="fc" id="L203">    return jwtData.userId();</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

@@ -32,8 +32,12 @@ export function completarEquivalencias(
   destino: Record<string, unknown>,
 ): DeclaracionMapeoRequest[] {
   const resultado = [...actuales];
-  const usadosOrigen = new Set(actuales.map((m) => m.elementoRefOrigen));
-  const usadosDestino = new Set(actuales.map((m) => m.elementoRefDestino));
+  const usadosOrigen = new Set(
+    actuales.map((m) => m.elementoRefOrigen).filter((r): r is string => !!r),
+  );
+  const usadosDestino = new Set(
+    actuales.map((m) => m.elementoRefDestino).filter((r): r is string => !!r),
+  );
   const destinos = new Set(analisis.camposDestino);
   const esquemaIdentico =
     JSON.stringify(normalizar(origen)) === JSON.stringify(normalizar(destino));
@@ -57,5 +61,68 @@ export function completarEquivalencias(
     usadosOrigen.add(ruta);
     usadosDestino.add(ruta);
   }
+  return resultado;
+}
+
+export function completarMapeosAutomaticos(
+  analisis: AnalisisMapeo,
+  actuales: DeclaracionMapeoRequest[],
+  origen: Record<string, unknown>,
+  destino: Record<string, unknown>,
+): DeclaracionMapeoRequest[] {
+  const resultado = completarEquivalencias(analisis, actuales, origen, destino);
+  const usadosOrigen = new Set(
+    resultado.map((m) => m.elementoRefOrigen).filter((r): r is string => !!r),
+  );
+  const usadosDestino = new Set(
+    resultado.map((m) => m.elementoRefDestino).filter((r): r is string => !!r),
+  );
+
+  for (const rutaDestino of analisis.camposDestino) {
+    if (usadosDestino.has(rutaDestino)) continue;
+    const claveDestino = rutaDestino.split('/').filter(Boolean).pop();
+    if (!claveDestino) continue;
+    const matchOrigen = analisis.camposOrigen.find(
+      (rutaOrigen) =>
+        !usadosOrigen.has(rutaOrigen) &&
+        rutaOrigen !== rutaDestino &&
+        rutaOrigen.split('/').filter(Boolean).pop() === claveDestino,
+    );
+    if (matchOrigen) {
+      resultado.push({
+        elementoRefOrigen: matchOrigen,
+        elementoRefDestino: rutaDestino,
+        tipo: 'RENOMBRADO',
+        observacion: 'Campo reubicado entre secciones',
+      });
+      usadosOrigen.add(matchOrigen);
+      usadosDestino.add(rutaDestino);
+    }
+  }
+
+  for (const ruta of analisis.camposDestino) {
+    if (!usadosDestino.has(ruta)) {
+      resultado.push({
+        elementoRefOrigen: null,
+        elementoRefDestino: ruta,
+        tipo: 'NUEVO',
+        observacion: 'Campo nuevo agregado en esta versión',
+      });
+      usadosDestino.add(ruta);
+    }
+  }
+
+  for (const ruta of analisis.camposOrigen) {
+    if (!usadosOrigen.has(ruta)) {
+      resultado.push({
+        elementoRefOrigen: ruta,
+        elementoRefDestino: null,
+        tipo: 'ELIMINADO',
+        observacion: 'Campo no presente en esta versión',
+      });
+      usadosOrigen.add(ruta);
+    }
+  }
+
   return resultado;
 }

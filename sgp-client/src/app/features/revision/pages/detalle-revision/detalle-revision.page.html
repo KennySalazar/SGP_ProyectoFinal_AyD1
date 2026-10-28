@@ -1,7 +1,10 @@
 <header class="page-heading">
   <p class="page-kicker">{{ 'revision.detalle.kicker' | transloco }}</p>
   <h1 class="page-title">{{ 'revision.detalle.titulo' | transloco }}</h1>
-  <a pButton [routerLink]="consultaAutor() ? '/observaciones' : '/revisiones'"
+  <a
+    pButton
+    [routerLink]="consultaAutor() ? '/observaciones' : '/revisiones'"
+    [queryParams]="!consultaAutor() && detalle()?.estadoRevision === 'RESUELTA' ? {vista:'revisadas'} : null"
     ><i class="pi pi-arrow-left" aria-hidden="true"></i>{{ (consultaAutor() ?
     'revision.autor.volver' : 'revision.detalle.volver') | transloco }}</a
   >
@@ -13,20 +16,24 @@
 } @if (detalle(); as d) {
 <section class="surface-card resumen" aria-labelledby="contexto-revision">
   <h2 id="contexto-revision">
-    {{ 'revision.detalle.ciclo' | transloco }} {{ d.numeroCiclo }} · {{ d.estadoRevision }}
+    {{ 'revision.detalle.ciclo' | transloco }} {{ d.numeroCiclo }} · {{ ('revision.detalle.estados.'
+    + d.estadoRevision) | transloco }}
   </h2>
   <dl>
     <div>
       <dt>{{ 'revision.detalle.puente' | transloco }}</dt>
-      <dd>{{ d.puenteId }}</dd>
+      <dd>
+        {{ nombrePuente() || ('revision.detalle.sinDato' | transloco) }}@if (codigoPuente(); as
+        codigo) { · {{ codigo }} }
+      </dd>
     </div>
     <div>
       <dt>{{ 'revision.detalle.inspeccion' | transloco }}</dt>
-      <dd>{{ d.inspeccionId }}</dd>
+      <dd>{{ d.fechaInspeccion | date:'dd/MM/yyyy' }}</dd>
     </div>
     <div>
       <dt>{{ 'revision.detalle.autor' | transloco }}</dt>
-      <dd>{{ d.autorId }}</dd>
+      <dd>{{ d.autorNombre || ('revision.detalle.sinDato' | transloco) }}</dd>
     </div>
     <div>
       <dt>{{ 'revision.detalle.enviada' | transloco }}</dt>
@@ -44,13 +51,13 @@
     }
   </p>
   <app-aprobacion-calibracion [versionId]="d.versionFormularioId" />
-  @if (d.identificacionCapturada; as identificacion) {
+  @if (identificacionPresentacion().length) {
   <h3>{{ 'revision.detalle.identificacion' | transloco }}</h3>
   <dl>
-    @for (dato of identificacion | keyvalue; track dato.key) {
+    @for (dato of identificacionPresentacion(); track dato.etiqueta) {
     <div>
-      <dt>{{ dato.key }}</dt>
-      <dd>{{ dato.value | json }}</dd>
+      <dt>{{ dato.etiqueta }}</dt>
+      <dd>{{ dato.valor }}</dd>
     </div>
     }
   </dl>
@@ -70,6 +77,7 @@
 <app-resultado-revision
   [inspeccionId]="d.inspeccionId"
   [revisionId]="d.revisionId"
+  [soloLectura]="!consultaAutor() && d.estadoRevision === 'RESUELTA'"
   (actualizado)="actualizarRevision()"
 />
 <div class="revision" [class.con-panel]="panelAbierto()">

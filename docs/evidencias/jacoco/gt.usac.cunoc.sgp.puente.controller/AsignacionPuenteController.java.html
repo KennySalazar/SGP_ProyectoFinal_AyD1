@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AsignacionPuenteController.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">sgp-api</a> &gt; <a href="index.source.html" class="el_package">gt.usac.cunoc.sgp.puente.controller</a> &gt; <span class="el_source">AsignacionPuenteController.java</span></div><h1>AsignacionPuenteController.java</h1><pre class="source lang-java linenums">package gt.usac.cunoc.sgp.puente.controller;
+
+import gt.usac.cunoc.sgp.puente.dto.AsignacionPuenteResponse;
+import gt.usac.cunoc.sgp.puente.dto.AsignarPuenteRequest;
+import gt.usac.cunoc.sgp.puente.dto.EstudianteAsignableResponse;
+import gt.usac.cunoc.sgp.puente.dto.PuenteAsignableResponse;
+import gt.usac.cunoc.sgp.puente.dto.RevocarAsignacionPuenteRequest;
+import gt.usac.cunoc.sgp.puente.service.AsignacionPuenteService;
+import gt.usac.cunoc.sgp.usuario.dto.MessageResponse;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import java.util.List;
+import java.util.UUID;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+@RequestMapping(&quot;/api/v1/asignaciones-puentes&quot;)
+@SecurityRequirement(name = &quot;bearerAuth&quot;)
+@Tag(name = &quot;Asignaciones de puentes&quot;)
+public class AsignacionPuenteController {
+
+  private final AsignacionPuenteService asignaciones;
+
+<span class="fc" id="L36">  public AsignacionPuenteController(AsignacionPuenteService asignaciones) {</span>
+<span class="fc" id="L37">    this.asignaciones = asignaciones;</span>
+<span class="fc" id="L38">  }</span>
+
+  @GetMapping(&quot;/estudiantes&quot;)
+  @PreAuthorize(&quot;hasRole('CATEDRATICO')&quot;)
+  @Operation(summary = &quot;Listar estudiantes activos vinculados a cursos vigentes propios&quot;)
+  public List&lt;EstudianteAsignableResponse&gt; listarEstudiantes(Authentication authentication) {
+<span class="nc" id="L44">    return asignaciones.listarEstudiantesAsignables(authentication.getName());</span>
+  }
+
+  @GetMapping(&quot;/puentes&quot;)
+  @PreAuthorize(&quot;hasRole('CATEDRATICO')&quot;)
+  @Operation(summary = &quot;Listar puentes activos asignables&quot;)
+  public List&lt;PuenteAsignableResponse&gt; listarPuentes(Authentication authentication) {
+<span class="nc" id="L51">    return asignaciones.listarPuentesAsignables(authentication.getName());</span>
+  }
+
+  @GetMapping
+  @PreAuthorize(&quot;hasRole('CATEDRATICO')&quot;)
+  @Operation(summary = &quot;Listar asignaciones activas de los cursos propios&quot;)
+  public List&lt;AsignacionPuenteResponse&gt; listar(Authentication authentication) {
+<span class="nc" id="L58">    return asignaciones.listarAsignaciones(authentication.getName());</span>
+  }
+
+  @PostMapping
+  @PreAuthorize(&quot;hasRole('CATEDRATICO')&quot;)
+  @Operation(summary = &quot;Asignar un puente activo a un estudiante vinculado&quot;)
+  public ResponseEntity&lt;MessageResponse&gt; asignar(
+      Authentication authentication, @Valid @RequestBody AsignarPuenteRequest request) {
+<span class="fc" id="L66">    return ResponseEntity.status(HttpStatus.CREATED)</span>
+<span class="fc" id="L67">        .body(asignaciones.asignar(authentication.getName(), request));</span>
+  }
+
+  @PatchMapping(&quot;/{asignacionId}/revocar&quot;)
+  @PreAuthorize(&quot;hasRole('CATEDRATICO')&quot;)
+  @Operation(summary = &quot;Revocar una asignación activa de puente&quot;)
+  public MessageResponse revocar(
+      Authentication authentication,
+      @PathVariable UUID asignacionId,
+      @Valid @RequestBody RevocarAsignacionPuenteRequest request) {
+<span class="nc" id="L77">    return asignaciones.revocar(authentication.getName(), asignacionId, request);</span>
+  }
+
+  @GetMapping(&quot;/mis-puentes&quot;)
+  @PreAuthorize(&quot;hasRole('ESTUDIANTE')&quot;)
+  @Operation(summary = &quot;Listar los puentes activos asignados al estudiante actual&quot;)
+  public List&lt;AsignacionPuenteResponse&gt; listarMisPuentes(Authentication authentication) {
+<span class="fc" id="L84">    return asignaciones.listarMisPuentes(authentication.getName());</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

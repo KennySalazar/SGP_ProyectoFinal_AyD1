@@ -1,0 +1,166 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ForoInspeccionService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">sgp-api</a> &gt; <a href="index.source.html" class="el_package">gt.usac.cunoc.sgp.foro.service</a> &gt; <span class="el_source">ForoInspeccionService.java</span></div><h1>ForoInspeccionService.java</h1><pre class="source lang-java linenums">package gt.usac.cunoc.sgp.foro.service;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import gt.usac.cunoc.sgp.common.audit.model.AccionAuditoria;
+import gt.usac.cunoc.sgp.common.audit.service.AuditoriaWriter;
+import gt.usac.cunoc.sgp.common.exception.ApiException;
+import gt.usac.cunoc.sgp.common.util.UuidV7Generator;
+import gt.usac.cunoc.sgp.foro.dto.AnclaResponse;
+import gt.usac.cunoc.sgp.foro.dto.HiloInspeccionResponse;
+import gt.usac.cunoc.sgp.foro.entity.ForoHilo;
+import gt.usac.cunoc.sgp.foro.model.CategoriaHilo;
+import gt.usac.cunoc.sgp.foro.repository.ForoComentarioRepository;
+import gt.usac.cunoc.sgp.foro.repository.ForoHiloRepository;
+import gt.usac.cunoc.sgp.inspeccion.entity.Inspeccion;
+import gt.usac.cunoc.sgp.inspeccion.model.EstadoInspeccion;
+import gt.usac.cunoc.sgp.inspeccion.repository.InspeccionRepository;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.format.DateTimeFormatter;
+import java.util.List;
+import java.util.UUID;
+import org.springframework.http.HttpStatus;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
+
+/**
+ * Hilo de una inspección publicada (HU-064). Solo una inspección PUBLICADA tiene hilo (RN-FOR-03,
+ * RN-INS-05). Se abre al publicarse, después de confirmarse la transacción, y también la primera
+ * vez que un usuario autenticado abre el foro de una inspección publicada antes de esta función.
+ * Leerlo es público y nunca lo crea.
+ *
+ * &lt;p&gt;El hilo nace sin comentarios, con el autor de la inspección y la categoría Discusión técnica.
+ * El índice único por inspección y la inserción que ignora el conflicto hacen que el evento y la
+ * creación perezosa puedan coincidir, o que el evento llegue dos veces, sin duplicar el hilo.
+ */
+@Service
+public class ForoInspeccionService {
+
+  /** Marca la apertura automática en la bitácora (RN-USR-09). */
+  static final String PROCESO = &quot;abrir-hilo-inspeccion&quot;;
+
+<span class="fc" id="L44">  private static final DateTimeFormatter FECHA = DateTimeFormatter.ofPattern(&quot;dd/MM/yyyy&quot;);</span>
+
+  /** El hilo y si esta llamada fue la que lo creó. */
+<span class="fc" id="L47">  public record Apertura(HiloInspeccionResponse hilo, boolean creado) {}</span>
+
+  private final ForoHiloRepository hilos;
+  private final ForoComentarioRepository comentarios;
+  private final InspeccionRepository inspecciones;
+  private final ForoService foro;
+  private final AuditoriaWriter auditoria;
+  private final ObjectMapper json;
+  private final Clock clock;
+
+  public ForoInspeccionService(
+      ForoHiloRepository hilos,
+      ForoComentarioRepository comentarios,
+      InspeccionRepository inspecciones,
+      ForoService foro,
+      AuditoriaWriter auditoria,
+      ObjectMapper json,
+<span class="fc" id="L64">      Clock clock) {</span>
+<span class="fc" id="L65">    this.hilos = hilos;</span>
+<span class="fc" id="L66">    this.comentarios = comentarios;</span>
+<span class="fc" id="L67">    this.inspecciones = inspecciones;</span>
+<span class="fc" id="L68">    this.foro = foro;</span>
+<span class="fc" id="L69">    this.auditoria = auditoria;</span>
+<span class="fc" id="L70">    this.json = json;</span>
+<span class="fc" id="L71">    this.clock = clock;</span>
+<span class="fc" id="L72">  }</span>
+
+  /**
+   * El hilo de una inspección publicada con el resumen de sus comentarios anclados. 404 si la
+   * inspección no existe, no está publicada o todavía no tiene hilo; nunca lo crea.
+   */
+  @Transactional(readOnly = true)
+  public HiloInspeccionResponse obtener(UUID inspeccionId) {
+<span class="fc" id="L80">    publicada(inspeccionId);</span>
+<span class="fc" id="L81">    ForoHilo hilo =</span>
+        hilos
+<span class="fc" id="L83">            .findByInspeccionId(inspeccionId)</span>
+<span class="fc" id="L84">            .orElseThrow(</span>
+                () -&gt;
+<span class="fc" id="L86">                    new ApiException(</span>
+                        HttpStatus.NOT_FOUND,
+                        &quot;hilo_no_encontrado&quot;,
+                        &quot;Hilo no encontrado&quot;,
+                        &quot;La inspección todavía no tiene hilo.&quot;));
+<span class="fc" id="L91">    return respuesta(hilo);</span>
+  }
+
+  /**
+   * Devuelve el hilo de una inspección publicada y lo crea si aún no existe. Es idempotente:
+   * llamarlo de nuevo, o a la vez, devuelve el mismo hilo.
+   */
+  @Transactional
+  public Apertura abrir(UUID inspeccionId, UUID usuarioId) {
+<span class="fc" id="L100">    Inspeccion inspeccion = publicada(inspeccionId);</span>
+<span class="fc" id="L101">    boolean creado = asegurarHilo(inspeccion, usuarioId, null);</span>
+<span class="fc" id="L102">    ForoHilo hilo = hilos.findByInspeccionId(inspeccionId).orElseThrow();</span>
+<span class="fc" id="L103">    return new Apertura(respuesta(hilo), creado);</span>
+  }
+
+  /**
+   * Abre el hilo cuando la publicación ya se confirmó. Corre en su propia transacción: un fallo
+   * aquí nunca revierte la publicación (el oyente lo atrapa y lo registra).
+   */
+  @Transactional(propagation = Propagation.REQUIRES_NEW)
+  public void abrirTrasPublicacion(UUID inspeccionId) {
+<span class="fc" id="L112">    asegurarHilo(publicada(inspeccionId), null, PROCESO);</span>
+<span class="fc" id="L113">  }</span>
+
+  private boolean asegurarHilo(Inspeccion inspeccion, UUID actor, String proceso) {
+<span class="fc" id="L116">    UUID inspeccionId = inspeccion.getId();</span>
+<span class="fc bfc" id="L117" title="All 2 branches covered.">    if (hilos.findByInspeccionId(inspeccionId).isPresent()) return false;</span>
+<span class="fc" id="L118">    UUID id = UuidV7Generator.generate();</span>
+<span class="fc" id="L119">    String titulo = &quot;Inspección del &quot; + FECHA.format(inspeccion.getFechaInspeccion());</span>
+<span class="fc" id="L120">    Instant ahora = clock.instant();</span>
+<span class="fc" id="L121">    int insertadas =</span>
+<span class="fc" id="L122">        hilos.abrirHiloDeInspeccion(</span>
+            id,
+<span class="fc" id="L124">            inspeccion.getPuente().getId(),</span>
+            inspeccionId,
+<span class="fc" id="L126">            inspeccion.getAutorId(),</span>
+<span class="fc" id="L127">            CategoriaHilo.DISCUSION_TECNICA.name(),</span>
+            titulo,
+            ahora);
+<span class="pc bpc" id="L130" title="1 of 2 branches missed.">    if (insertadas == 0) return false;</span>
+<span class="fc" id="L131">    ObjectNode despues = json.createObjectNode();</span>
+<span class="fc" id="L132">    despues.put(&quot;puenteId&quot;, inspeccion.getPuente().getId().toString());</span>
+<span class="fc" id="L133">    despues.put(&quot;inspeccionId&quot;, inspeccionId.toString());</span>
+<span class="fc" id="L134">    despues.put(&quot;categoria&quot;, CategoriaHilo.DISCUSION_TECNICA.name());</span>
+<span class="fc" id="L135">    despues.put(&quot;titulo&quot;, titulo);</span>
+<span class="fc" id="L136">    auditoria.registrarEnTransaccion(</span>
+        actor, AccionAuditoria.CREAR, &quot;foro_hilo&quot;, id, null, despues, proceso);
+<span class="fc" id="L138">    return true;</span>
+  }
+
+  private HiloInspeccionResponse respuesta(ForoHilo hilo) {
+<span class="fc" id="L142">    List&lt;AnclaResponse&gt; anclas =</span>
+<span class="fc" id="L143">        comentarios.contarPorAncla(hilo.getId()).stream()</span>
+<span class="fc" id="L144">            .map(</span>
+                a -&gt;
+<span class="fc" id="L146">                    new AnclaResponse(a.getElementoRef(), a.getInstanciaElementoId(), a.getTotal()))</span>
+<span class="fc" id="L147">            .toList();</span>
+<span class="fc" id="L148">    return new HiloInspeccionResponse(foro.obtenerHilo(hilo.getId()), anclas);</span>
+  }
+
+  /** La inspección publicada de un puente activo; cualquier otra cosa es un 404. */
+  private Inspeccion publicada(UUID inspeccionId) {
+<span class="fc" id="L153">    return inspecciones</span>
+<span class="fc" id="L154">        .findByIdAndEliminadoEnIsNull(inspeccionId)</span>
+<span class="fc" id="L155">        .filter(i -&gt; EstadoInspeccion.PUBLICADA.name().equals(i.getEstado()))</span>
+<span class="fc" id="L156">        .filter(i -&gt; i.getPuente().isActivo())</span>
+<span class="fc" id="L157">        .orElseThrow(</span>
+            () -&gt;
+<span class="fc" id="L159">                new ApiException(</span>
+                    HttpStatus.NOT_FOUND,
+                    &quot;inspeccion_no_encontrada&quot;,
+                    &quot;Inspección no encontrada&quot;,
+                    &quot;La inspección no existe o no está publicada.&quot;));
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

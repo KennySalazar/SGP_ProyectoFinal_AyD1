@@ -1,0 +1,168 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ObservacionRevision.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">sgp-api</a> &gt; <a href="index.source.html" class="el_package">gt.usac.cunoc.sgp.revision.entity</a> &gt; <span class="el_source">ObservacionRevision.java</span></div><h1>ObservacionRevision.java</h1><pre class="source lang-java linenums">package gt.usac.cunoc.sgp.revision.entity;
+
+import gt.usac.cunoc.sgp.archivo.model.CategoriaFoto;
+import gt.usac.cunoc.sgp.revision.model.EstadoObservacion;
+import jakarta.persistence.*;
+import java.time.Instant;
+import java.util.Objects;
+import java.util.UUID;
+
+/** Observación puntual de V9; no duplica al autor de inspección ni al revisor del ciclo. */
+@Entity
+@Table(name = &quot;observacion_revision&quot;)
+public class ObservacionRevision {
+  @Id private UUID id;
+
+  @ManyToOne(fetch = FetchType.LAZY, optional = false)
+  @JoinColumn(name = &quot;revision_id&quot;, nullable = false, updatable = false)
+  private Revision revision;
+
+  @Column(name = &quot;elemento_ref&quot;, length = 300, updatable = false)
+  private String elementoRef;
+
+  @Column(name = &quot;instancia_elemento_id&quot;, updatable = false)
+  private UUID instanciaElementoId;
+
+  @Enumerated(EnumType.STRING)
+  @Column(name = &quot;categoria_fotografica&quot;, length = 30, updatable = false)
+  private CategoriaFoto categoriaFotografica;
+
+  @Column(nullable = false, columnDefinition = &quot;text&quot;)
+  private String contenido;
+
+  @Enumerated(EnumType.STRING)
+  @Column(nullable = false, length = 20)
+  private EstadoObservacion estado;
+
+  @Column(name = &quot;creado_por_id&quot;, nullable = false, updatable = false)
+  private UUID creadoPorId;
+
+  @Column(name = &quot;creado_en&quot;, nullable = false, updatable = false)
+  private Instant creadoEn;
+
+  @Column(name = &quot;resuelto_por_id&quot;)
+  private UUID resueltoPorId;
+
+  @Column(name = &quot;resuelto_en&quot;)
+  private Instant resueltoEn;
+
+  @Column(name = &quot;respuesta_autor&quot;, columnDefinition = &quot;text&quot;)
+  private String respuestaAutor;
+
+<span class="fc" id="L52">  protected ObservacionRevision() {}</span>
+
+  private ObservacionRevision(
+<span class="fc" id="L55">      UUID id, Revision revision, String contenido, UUID creadoPorId, Instant creadoEn) {</span>
+<span class="fc" id="L56">    this.id = Objects.requireNonNull(id);</span>
+<span class="fc" id="L57">    this.revision = Objects.requireNonNull(revision);</span>
+<span class="fc bfc" id="L58" title="All 6 branches covered.">    if (contenido == null || contenido.isBlank() || contenido.length() &gt; 2000) {</span>
+<span class="fc" id="L59">      throw new IllegalArgumentException(&quot;La observación requiere texto de hasta 2000 caracteres&quot;);</span>
+    }
+<span class="fc" id="L61">    this.contenido = contenido;</span>
+<span class="fc" id="L62">    this.creadoPorId = Objects.requireNonNull(creadoPorId);</span>
+<span class="fc" id="L63">    this.creadoEn = Objects.requireNonNull(creadoEn);</span>
+<span class="fc" id="L64">    this.estado = EstadoObservacion.PENDIENTE;</span>
+<span class="fc" id="L65">  }</span>
+
+  /**
+   * El servicio deberá validar el anclaje contra el esquema y datos congelados antes de persistir.
+   */
+  public static ObservacionRevision paraElemento(
+      UUID id,
+      Revision revision,
+      String elementoRef,
+      UUID instanciaElementoId,
+      String texto,
+      UUID creadoPorId,
+      Instant creadoEn) {
+<span class="pc bpc" id="L78" title="2 of 6 branches missed.">    if (elementoRef == null || elementoRef.isBlank() || elementoRef.length() &gt; 300) {</span>
+<span class="fc" id="L79">      throw new IllegalArgumentException(&quot;Se requiere una referencia de hasta 300 caracteres&quot;);</span>
+    }
+<span class="fc" id="L81">    var observacion = new ObservacionRevision(id, revision, texto, creadoPorId, creadoEn);</span>
+<span class="fc" id="L82">    observacion.elementoRef = elementoRef;</span>
+<span class="fc" id="L83">    observacion.instanciaElementoId = instanciaElementoId;</span>
+<span class="fc" id="L84">    return observacion;</span>
+  }
+
+  public static ObservacionRevision paraCategoriaFotografica(
+      UUID id,
+      Revision revision,
+      CategoriaFoto categoria,
+      String texto,
+      UUID creadoPorId,
+      Instant creadoEn) {
+<span class="fc" id="L94">    var observacion = new ObservacionRevision(id, revision, texto, creadoPorId, creadoEn);</span>
+<span class="fc" id="L95">    observacion.categoriaFotografica = Objects.requireNonNull(categoria);</span>
+<span class="fc" id="L96">    return observacion;</span>
+  }
+
+  public UUID getId() {
+<span class="fc" id="L100">    return id;</span>
+  }
+
+  /**
+   * El servicio aplica autorización, bloqueo de ciclo y auditoría antes de confirmar la edición.
+   */
+  public void editarTexto(String texto) {
+<span class="pc bpc" id="L107" title="3 of 6 branches missed.">    if (texto == null || texto.isBlank() || texto.length() &gt; 2000) {</span>
+<span class="nc" id="L108">      throw new IllegalArgumentException(&quot;La observación requiere texto de hasta 2000 caracteres&quot;);</span>
+    }
+<span class="fc" id="L110">    contenido = texto;</span>
+<span class="fc" id="L111">  }</span>
+
+  public void resolver(UUID actor, String respuesta, Instant ahora) {
+<span class="pc bpc" id="L114" title="1 of 2 branches missed.">    if (estado != EstadoObservacion.PENDIENTE)</span>
+<span class="nc" id="L115">      throw new IllegalStateException(&quot;La observación ya fue resuelta&quot;);</span>
+<span class="pc bpc" id="L116" title="1 of 4 branches missed.">    if (respuesta != null &amp;&amp; respuesta.length() &gt; 2000)</span>
+<span class="nc" id="L117">      throw new IllegalArgumentException(&quot;Respuesta demasiado larga&quot;);</span>
+<span class="fc" id="L118">    estado = EstadoObservacion.RESUELTA;</span>
+<span class="fc" id="L119">    resueltoPorId = Objects.requireNonNull(actor);</span>
+<span class="fc" id="L120">    resueltoEn = Objects.requireNonNull(ahora);</span>
+<span class="fc" id="L121">    respuestaAutor = respuesta;</span>
+<span class="fc" id="L122">  }</span>
+
+  public Revision getRevision() {
+<span class="fc" id="L125">    return revision;</span>
+  }
+
+  public String getElementoRef() {
+<span class="fc" id="L129">    return elementoRef;</span>
+  }
+
+  public UUID getInstanciaElementoId() {
+<span class="fc" id="L133">    return instanciaElementoId;</span>
+  }
+
+  public CategoriaFoto getCategoriaFotografica() {
+<span class="fc" id="L137">    return categoriaFotografica;</span>
+  }
+
+  public String getContenido() {
+<span class="fc" id="L141">    return contenido;</span>
+  }
+
+  public EstadoObservacion getEstado() {
+<span class="fc" id="L145">    return estado;</span>
+  }
+
+  public UUID getCreadoPorId() {
+<span class="fc" id="L149">    return creadoPorId;</span>
+  }
+
+  public Instant getCreadoEn() {
+<span class="fc" id="L153">    return creadoEn;</span>
+  }
+
+  public UUID getResueltoPorId() {
+<span class="fc" id="L157">    return resueltoPorId;</span>
+  }
+
+  public Instant getResueltoEn() {
+<span class="fc" id="L161">    return resueltoEn;</span>
+  }
+
+  public String getRespuestaAutor() {
+<span class="fc" id="L165">    return respuestaAutor;</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

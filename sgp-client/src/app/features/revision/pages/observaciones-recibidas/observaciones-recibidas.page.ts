@@ -37,9 +37,19 @@ import { RevisionApiService } from '../../services/revision-api.service';
         <article class="surface-card ciclo">
           <h2>
             {{ 'revision.detalle.ciclo' | transloco }} {{ ciclo.numeroCiclo }} ·
-            {{ ciclo.estadoRevision }}
+            {{ 'revision.detalle.estados.' + ciclo.estadoRevision | transloco }}
           </h2>
-          <p>{{ 'revision.detalle.inspeccion' | transloco }}: {{ ciclo.inspeccionId }}</p>
+          <p>
+            <strong>{{ ciclo.puenteNombre }}</strong> · {{ ciclo.puenteCodigo }}
+          </p>
+          <p>
+            {{ 'revision.detalle.inspeccion' | transloco }}:
+            {{
+              ciclo.fechaInspeccion
+                ? (ciclo.fechaInspeccion | date: 'dd/MM/yyyy')
+                : ('revision.detalle.sinDato' | transloco)
+            }}
+          </p>
           <p>
             {{ 'revision.detalle.enviada' | transloco }}:
             {{ ciclo.enviadaEn | date: 'dd/MM/yyyy HH:mm' }}

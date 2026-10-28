@@ -191,7 +191,10 @@
     inspeccionEliminar()?.nombrePuente } }}
   </p>
   @if (errorEliminar()) {
-  <p class="mensaje error" role="alert">{{ 'inspecciones.mis.deleteError' | transloco }}</p>
+  <p class="mensaje error" role="alert">
+    {{ (errorEliminar() === 'creationPending' ? 'inspecciones.mis.deleteCreationPending' :
+    'inspecciones.mis.deleteError') | transloco }}
+  </p>
   }
   <div class="dialog-acciones">
     <button

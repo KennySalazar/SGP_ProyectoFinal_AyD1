@@ -14,6 +14,7 @@ import {
   ObservacionGeneralResponse,
   PaginaBorradoresEstudiante,
   PaginaRevisiones,
+  PaginaRevisionesResueltas,
   ResultadoInicioRevision,
 } from '../models/revision.models';
 
@@ -35,6 +36,12 @@ export class RevisionApiService {
     if (filtros.fechaDesde) params['fechaDesde'] = filtros.fechaDesde;
     if (filtros.fechaHasta) params['fechaHasta'] = filtros.fechaHasta;
     return this.http.get<PaginaRevisiones>('/api/v1/revisiones/bandeja', { params });
+  }
+
+  listarRevisadas(pagina = 0, tamanio = 20): Observable<PaginaRevisionesResueltas> {
+    return this.http.get<PaginaRevisionesResueltas>('/api/v1/revisiones/revisadas', {
+      params: { pagina, tamanio },
+    });
   }
 
   cargarContador(): Observable<{ pendientes: number }> {

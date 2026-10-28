@@ -1,5 +1,6 @@
 package gt.usac.cunoc.sgp.revision.repository;
 
+import gt.usac.cunoc.sgp.revision.dto.RevisionResueltaResponse;
 import gt.usac.cunoc.sgp.revision.entity.Revision;
 import jakarta.persistence.LockModeType;
 import jakarta.persistence.QueryHint;
@@ -16,6 +17,25 @@ import org.springframework.data.jpa.repository.QueryHints;
 import org.springframework.data.repository.query.Param;
 
 public interface RevisionRepository extends JpaRepository<Revision, UUID> {
+
+  @Query(
+      value =
+          """
+          select new gt.usac.cunoc.sgp.revision.dto.RevisionResueltaResponse(
+            r.id, i.id, p.codigo, p.nombre, i.nombreAutorCapturado,
+            r.numeroCiclo, r.enviadaEn, r.resueltaEn, r.veredicto)
+          from Revision r join r.inspeccion i join i.puente p
+          where r.revisorId = :revisorId and r.estado = 'RESUELTA' and i.eliminadoEn is null
+          order by r.resueltaEn desc, r.id desc
+          """,
+      countQuery =
+          """
+          select count(r) from Revision r
+          where r.revisorId = :revisorId and r.estado = 'RESUELTA'
+            and r.inspeccion.eliminadoEn is null
+          """)
+  Page<RevisionResueltaResponse> buscarResueltas(
+      @Param("revisorId") UUID revisorId, Pageable pageable);
 
   @Query("select r.inspeccion.puente.id from Revision r where r.id = :id")
   Optional<UUID> findPuenteId(@Param("id") UUID id);

@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AuditoriaMapperImpl.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">sgp-api</a> &gt; <a href="index.source.html" class="el_package">gt.usac.cunoc.sgp.common.audit.mapper</a> &gt; <span class="el_source">AuditoriaMapperImpl.java</span></div><h1>AuditoriaMapperImpl.java</h1><pre class="source lang-java linenums">package gt.usac.cunoc.sgp.common.audit.mapper;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import gt.usac.cunoc.sgp.common.audit.dto.AuditoriaResponse;
+import gt.usac.cunoc.sgp.common.audit.entity.Auditoria;
+import gt.usac.cunoc.sgp.common.audit.model.AccionAuditoria;
+import java.time.OffsetDateTime;
+import java.util.UUID;
+import javax.annotation.processing.Generated;
+import org.springframework.stereotype.Component;
+
+@Generated(
+    value = &quot;org.mapstruct.ap.MappingProcessor&quot;,
+    date = &quot;2026-10-27T23:39:18-0600&quot;,
+    comments = &quot;version: 1.6.3, compiler: javac, environment: Java 25.0.4.1 (Debian)&quot;
+)
+@Component
+<span class="fc" id="L18">public class AuditoriaMapperImpl implements AuditoriaMapper {</span>
+
+    @Override
+    public AuditoriaResponse toResponse(Auditoria auditoria, String usuarioEmail) {
+<span class="pc bpc" id="L22" title="3 of 4 branches missed.">        if ( auditoria == null &amp;&amp; usuarioEmail == null ) {</span>
+<span class="nc" id="L23">            return null;</span>
+        }
+
+<span class="fc" id="L26">        UUID id = null;</span>
+<span class="fc" id="L27">        UUID usuarioId = null;</span>
+<span class="fc" id="L28">        AccionAuditoria accion = null;</span>
+<span class="fc" id="L29">        String entidad = null;</span>
+<span class="fc" id="L30">        UUID entidadId = null;</span>
+<span class="fc" id="L31">        JsonNode valoresAnteriores = null;</span>
+<span class="fc" id="L32">        JsonNode valoresPosteriores = null;</span>
+<span class="fc" id="L33">        String procesoAutomatico = null;</span>
+<span class="pc bpc" id="L34" title="1 of 2 branches missed.">        if ( auditoria != null ) {</span>
+<span class="fc" id="L35">            id = auditoria.getId();</span>
+<span class="fc" id="L36">            usuarioId = auditoria.getUsuarioId();</span>
+<span class="fc" id="L37">            accion = auditoria.getAccion();</span>
+<span class="fc" id="L38">            entidad = auditoria.getEntidad();</span>
+<span class="fc" id="L39">            entidadId = auditoria.getEntidadId();</span>
+<span class="fc" id="L40">            valoresAnteriores = auditoria.getValoresAnteriores();</span>
+<span class="fc" id="L41">            valoresPosteriores = auditoria.getValoresPosteriores();</span>
+<span class="fc" id="L42">            procesoAutomatico = auditoria.getProcesoAutomatico();</span>
+        }
+<span class="fc" id="L44">        String usuarioEmail1 = null;</span>
+<span class="fc" id="L45">        usuarioEmail1 = usuarioEmail;</span>
+
+<span class="fc" id="L47">        OffsetDateTime creadoEn = auditoria.getCreadoEn().atZone(java.time.ZoneId.of(&quot;America/Guatemala&quot;)).toOffsetDateTime();</span>
+
+<span class="fc" id="L49">        AuditoriaResponse auditoriaResponse = new AuditoriaResponse( id, usuarioId, accion, entidad, entidadId, valoresAnteriores, valoresPosteriores, procesoAutomatico, creadoEn, usuarioEmail1 );</span>
+
+<span class="fc" id="L51">        return auditoriaResponse;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

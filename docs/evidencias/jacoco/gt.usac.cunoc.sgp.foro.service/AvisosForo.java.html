@@ -1,0 +1,140 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AvisosForo.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">sgp-api</a> &gt; <a href="index.source.html" class="el_package">gt.usac.cunoc.sgp.foro.service</a> &gt; <span class="el_source">AvisosForo.java</span></div><h1>AvisosForo.java</h1><pre class="source lang-java linenums">package gt.usac.cunoc.sgp.foro.service;
+
+import gt.usac.cunoc.sgp.common.util.UuidV7Generator;
+import gt.usac.cunoc.sgp.foro.entity.ForoComentario;
+import gt.usac.cunoc.sgp.foro.entity.ForoHilo;
+import gt.usac.cunoc.sgp.foro.model.CategoriaHilo;
+import gt.usac.cunoc.sgp.foro.repository.ForoAutorRepository;
+import gt.usac.cunoc.sgp.foro.repository.ForoComentarioRepository;
+import gt.usac.cunoc.sgp.notificacion.service.NotificacionService;
+import gt.usac.cunoc.sgp.puente.entity.Puente;
+import gt.usac.cunoc.sgp.puente.repository.PuenteRepository;
+import gt.usac.cunoc.sgp.usuario.entity.UserAccount;
+import gt.usac.cunoc.sgp.usuario.model.RoleName;
+import gt.usac.cunoc.sgp.usuario.repository.UserAccountRepository;
+import java.time.Clock;
+import java.time.Instant;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Locale;
+import java.util.Set;
+import java.util.UUID;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import org.springframework.stereotype.Component;
+
+/**
+ * Avisos que genera el foro (HU-066) mediante el servicio transversal de avisos (HU-040): las
+ * menciones con {@code @usuario} (RN-FOR-10) y las alertas sobre un puente en estado Malo
+ * (RN-FOR-07).
+ *
+ * &lt;p&gt;Los avisos se registran en la misma transacción que el comentario o el hilo y nunca incluyen
+ * su texto ni lo que escribió un usuario: solo datos del sistema, como el código del puente
+ * (DT-SEC-12).
+ */
+@Component
+public class AvisosForo {
+
+  static final String TIPO_MENCION = &quot;FORO_MENCION&quot;;
+  static final String TIPO_ALERTA_PUENTE_MALO = &quot;FORO_ALERTA_PUENTE_MALO&quot;;
+
+  /**
+   * Un {@code @usuario} con la forma de un nombre de usuario (ReglasPerfil): de 3 a 30 caracteres,
+   * que empieza y termina en letra o dígito. No cuenta si va pegado a otra palabra, como en un
+   * correo.
+   */
+<span class="fc" id="L46">  private static final Pattern MENCION =</span>
+<span class="fc" id="L47">      Pattern.compile(&quot;(?&lt;![A-Za-z0-9._@-])@([A-Za-z0-9][A-Za-z0-9._-]{1,28}[A-Za-z0-9])&quot;);</span>
+
+  private final ForoComentarioRepository comentarios;
+  private final ForoAutorRepository autores;
+  private final PuenteRepository puentes;
+  private final UserAccountRepository usuarios;
+  private final NotificacionService notificaciones;
+  private final Clock clock;
+
+  AvisosForo(
+      ForoComentarioRepository comentarios,
+      ForoAutorRepository autores,
+      PuenteRepository puentes,
+      UserAccountRepository usuarios,
+      NotificacionService notificaciones,
+<span class="fc" id="L62">      Clock clock) {</span>
+<span class="fc" id="L63">    this.comentarios = comentarios;</span>
+<span class="fc" id="L64">    this.autores = autores;</span>
+<span class="fc" id="L65">    this.puentes = puentes;</span>
+<span class="fc" id="L66">    this.usuarios = usuarios;</span>
+<span class="fc" id="L67">    this.notificaciones = notificaciones;</span>
+<span class="fc" id="L68">    this.clock = clock;</span>
+<span class="fc" id="L69">  }</span>
+
+  /** Los nombres mencionados en un texto, en minúsculas y sin repetir. */
+  static Set&lt;String&gt; mencionados(String texto) {
+<span class="fc" id="L73">    Set&lt;String&gt; nombres = new LinkedHashSet&lt;&gt;();</span>
+<span class="pc bpc" id="L74" title="1 of 2 branches missed.">    if (texto == null) return nombres;</span>
+<span class="fc" id="L75">    Matcher matcher = MENCION.matcher(texto);</span>
+<span class="fc bfc" id="L76" title="All 2 branches covered.">    while (matcher.find()) nombres.add(matcher.group(1).toLowerCase(Locale.ROOT));</span>
+<span class="fc" id="L77">    return nombres;</span>
+  }
+
+  /**
+   * Registra las menciones de un comentario y avisa a cada mencionado nuevo, una sola vez por
+   * comentario: al editarlo solo se avisa a quien no estaba mencionado antes. Un nombre que no
+   * existe o de una cuenta desactivada se ignora sin error, y nadie se avisa a sí mismo.
+   */
+  void avisarMenciones(ForoHilo hilo, ForoComentario comentario) {
+<span class="fc" id="L86">    Set&lt;String&gt; nombres = mencionados(comentario.getContenido());</span>
+<span class="fc bfc" id="L87" title="All 2 branches covered.">    if (nombres.isEmpty()) return;</span>
+<span class="fc" id="L88">    Instant ahora = clock.instant();</span>
+<span class="fc" id="L89">    String puente = null;</span>
+<span class="fc bfc" id="L90" title="All 2 branches covered.">    for (UUID mencionado : autores.buscarMencionables(nombres)) {</span>
+<span class="fc bfc" id="L91" title="All 2 branches covered.">      if (mencionado.equals(comentario.getAutorId())) continue;</span>
+<span class="fc bfc" id="L92" title="All 2 branches covered.">      if (comentarios.registrarMencion(</span>
+<span class="fc" id="L93">              UuidV7Generator.generate(), comentario.getId(), mencionado, ahora)</span>
+<span class="fc" id="L94">          == 0) continue;</span>
+<span class="pc bpc" id="L95" title="1 of 2 branches missed.">      if (puente == null) puente = codigoDe(hilo.getPuenteId());</span>
+<span class="fc" id="L96">      notificaciones.notificar(</span>
+          mencionado,
+          TIPO_MENCION,
+          &quot;Te mencionaron en el foro&quot;,
+          &quot;Te mencionaron en un comentario del foro del puente &quot; + puente + &quot;.&quot;,
+          &quot;foro_comentario&quot;,
+<span class="fc" id="L102">          comentario.getId(),</span>
+<span class="fc" id="L103">          &quot;foro-mencion:&quot; + comentario.getId());</span>
+<span class="fc" id="L104">    }</span>
+<span class="fc" id="L105">  }</span>
+
+  /**
+   * Un hilo de categoría Alerta sobre un puente en estado Malo avisa a los Catedráticos y
+   * Administradores activos, salvo a quien lo abrió (RN-FOR-07).
+   */
+  void avisarAlerta(ForoHilo hilo, Puente puente) {
+<span class="fc bfc" id="L112" title="All 4 branches covered.">    if (hilo.getCategoria() != CategoriaHilo.ALERTA || !&quot;Malo&quot;.equals(puente.getEstadoActual())) {</span>
+<span class="fc" id="L113">      return;</span>
+    }
+<span class="fc" id="L115">    Set&lt;UUID&gt; destinatarios = new LinkedHashSet&lt;&gt;();</span>
+<span class="fc bfc" id="L116" title="All 2 branches covered.">    for (RoleName rol : List.of(RoleName.CATEDRATICO, RoleName.ADMINISTRADOR)) {</span>
+<span class="fc" id="L117">      usuarios.findByRole_NameAndActiveTrueOrderByEmailAsc(rol).stream()</span>
+<span class="fc" id="L118">          .map(UserAccount::getId)</span>
+<span class="fc" id="L119">          .forEach(destinatarios::add);</span>
+<span class="fc" id="L120">    }</span>
+<span class="fc" id="L121">    destinatarios.remove(hilo.getAutorId());</span>
+<span class="fc bfc" id="L122" title="All 2 branches covered.">    for (UUID destinatario : destinatarios) {</span>
+<span class="fc" id="L123">      notificaciones.notificar(</span>
+          destinatario,
+          TIPO_ALERTA_PUENTE_MALO,
+          &quot;Alerta sobre un puente en mal estado&quot;,
+          &quot;Se abrió una alerta en el foro del puente &quot;
+<span class="fc" id="L128">              + puente.getCodigo()</span>
+              + &quot;, que está en estado Malo.&quot;,
+          &quot;foro_hilo&quot;,
+<span class="fc" id="L131">          hilo.getId(),</span>
+<span class="fc" id="L132">          &quot;foro-alerta-puente-malo:&quot; + hilo.getId());</span>
+<span class="fc" id="L133">    }</span>
+<span class="fc" id="L134">  }</span>
+
+  private String codigoDe(UUID puenteId) {
+<span class="fc" id="L137">    return puentes.findById(puenteId).map(Puente::getCodigo).orElse(&quot;&quot;);</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

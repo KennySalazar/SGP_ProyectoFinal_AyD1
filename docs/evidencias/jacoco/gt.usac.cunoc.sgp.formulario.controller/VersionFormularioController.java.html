@@ -1,0 +1,253 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>VersionFormularioController.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">sgp-api</a> &gt; <a href="index.source.html" class="el_package">gt.usac.cunoc.sgp.formulario.controller</a> &gt; <span class="el_source">VersionFormularioController.java</span></div><h1>VersionFormularioController.java</h1><pre class="source lang-java linenums">package gt.usac.cunoc.sgp.formulario.controller;
+
+import gt.usac.cunoc.sgp.common.exception.ApiException;
+import gt.usac.cunoc.sgp.common.security.JwtData;
+import gt.usac.cunoc.sgp.formulario.dto.ActualizarBorradorRequest;
+import gt.usac.cunoc.sgp.formulario.dto.AnalisisMapeoResponse;
+import gt.usac.cunoc.sgp.formulario.dto.ConfiguracionIcElementoRequest;
+import gt.usac.cunoc.sgp.formulario.dto.ConfiguracionIcElementoResponse;
+import gt.usac.cunoc.sgp.formulario.dto.CrearVersionRequest;
+import gt.usac.cunoc.sgp.formulario.dto.DeclaracionMapeoRequest;
+import gt.usac.cunoc.sgp.formulario.dto.FormularioActivoResponse;
+import gt.usac.cunoc.sgp.formulario.dto.MapeoCampoResponse;
+import gt.usac.cunoc.sgp.formulario.dto.PublicarVersionRequest;
+import gt.usac.cunoc.sgp.formulario.dto.VersionFormularioResponse;
+import gt.usac.cunoc.sgp.formulario.dto.VersionFormularioResumenResponse;
+import gt.usac.cunoc.sgp.formulario.service.VersionFormularioService;
+import gt.usac.cunoc.sgp.formulario.validation.VersionCalibracionHttp;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import java.util.List;
+import java.util.UUID;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+@RequestMapping(&quot;/api/v1/formularios&quot;)
+@SecurityRequirement(name = &quot;bearerAuth&quot;)
+@Tag(
+    name = &quot;Formularios&quot;,
+    description = &quot;Gestión de versiones del formulario SIECA y cálculo de IC&quot;)
+public class VersionFormularioController {
+
+  private final VersionFormularioService service;
+
+<span class="fc" id="L48">  public VersionFormularioController(VersionFormularioService service) {</span>
+<span class="fc" id="L49">    this.service = service;</span>
+<span class="fc" id="L50">  }</span>
+
+  @GetMapping
+  @PreAuthorize(&quot;hasAnyRole('ADMINISTRADOR', 'CATEDRATICO')&quot;)
+  @Operation(
+      summary = &quot;Listar todas las versiones de formulario&quot;,
+      description = &quot;Lista resumida de versiones creadas en el sistema ordenadas cronológicamente.&quot;)
+  public ResponseEntity&lt;List&lt;VersionFormularioResumenResponse&gt;&gt; listarVersiones() {
+<span class="fc" id="L58">    return ResponseEntity.ok(service.listarVersiones());</span>
+  }
+
+  @GetMapping(&quot;/activo&quot;)
+  @PreAuthorize(&quot;isAuthenticated()&quot;)
+  @Operation(
+      summary = &quot;Consultar la versión de formulario activa&quot;,
+      description =
+          &quot;Retorna el esquema, vínculos de almacenamiento y versión del formulario activo para captura de inspecciones.&quot;)
+  public ResponseEntity&lt;FormularioActivoResponse&gt; obtenerActiva() {
+<span class="fc" id="L68">    return ResponseEntity.ok(service.obtenerActiva());</span>
+  }
+
+  @GetMapping(&quot;/{id}/esquema&quot;)
+  @PreAuthorize(&quot;isAuthenticated()&quot;)
+  @Operation(
+      summary = &quot;Consultar el esquema de una versión publicada&quot;,
+      description =
+          &quot;Retorna el esquema de una versión publicada, activa o anterior, para mostrar una &quot;
+              + &quot;inspección con la estructura de su versión original. Los borradores responden 404.&quot;)
+  public ResponseEntity&lt;FormularioActivoResponse&gt; obtenerEsquemaPublicado(@PathVariable UUID id) {
+<span class="fc" id="L79">    return ResponseEntity.ok(service.obtenerPublicadaPorId(id));</span>
+  }
+
+  @GetMapping(&quot;/{id}&quot;)
+  @PreAuthorize(&quot;hasAnyRole('ADMINISTRADOR', 'CATEDRATICO')&quot;)
+  @Operation(
+      summary = &quot;Consultar el detalle de una versión de formulario&quot;,
+      description = &quot;Retorna el esquema completo, pesos configurados y mapeos declarados.&quot;)
+  public ResponseEntity&lt;VersionFormularioResponse&gt; obtenerPorId(@PathVariable UUID id) {
+<span class="fc" id="L88">    return ResponseEntity.ok(service.obtenerPorId(id));</span>
+  }
+
+  @PostMapping
+  @PreAuthorize(&quot;hasAnyRole('ADMINISTRADOR', 'CATEDRATICO')&quot;)
+  @Operation(
+      summary = &quot;Crear una nueva versión de formulario&quot;,
+      description =
+          &quot;Crea una versión en estado BORRADOR a partir de una plantilla, versión base o esquema inicial.&quot;)
+  public ResponseEntity&lt;VersionFormularioResponse&gt; crear(
+      @Valid @RequestBody CrearVersionRequest request, Authentication authentication) {
+<span class="fc" id="L99">    VersionFormularioResponse response = service.crear(request, usuarioId(authentication));</span>
+<span class="fc" id="L100">    return ResponseEntity.status(HttpStatus.CREATED).body(response);</span>
+  }
+
+  @PostMapping(&quot;/plantilla-sieca&quot;)
+  @PreAuthorize(&quot;hasRole('ADMINISTRADOR')&quot;)
+  @Operation(
+      summary = &quot;Cargar versión inicial desde plantilla SIECA&quot;,
+      description =
+          &quot;Carga SIECA en borrador con 45 pesos e IC completo provisional, notas de decisiones pendientes y mapeos iniciales respecto a la version activa. Publicar es una segunda accion del Administrador.&quot;)
+  public ResponseEntity&lt;VersionFormularioResponse&gt; cargarPlantillaSieca(
+      @RequestParam(required = false, defaultValue = &quot;SIECA-v1&quot;) String codigo,
+      Authentication authentication) {
+<span class="fc" id="L112">    VersionFormularioResponse response =</span>
+<span class="fc" id="L113">        service.cargarPlantillaSiecaInicial(codigo, usuarioId(authentication));</span>
+<span class="fc" id="L114">    return ResponseEntity.status(HttpStatus.CREATED).body(response);</span>
+  }
+
+  @PutMapping(&quot;/{id}&quot;)
+  @PreAuthorize(&quot;hasAnyRole('ADMINISTRADOR', 'CATEDRATICO')&quot;)
+  @Operation(
+      summary = &quot;Actualizar borrador de una versión de formulario&quot;,
+      description =
+          &quot;Permite modificar el esquema, vínculos de almacenamiento y reglas de evaluación mientras siga en estado BORRADOR.&quot;)
+  public ResponseEntity&lt;VersionFormularioResponse&gt; actualizarBorrador(
+      @PathVariable UUID id,
+      @Valid @RequestBody ActualizarBorradorRequest request,
+      @RequestHeader(value = &quot;If-Match&quot;, required = false) String versionEsperada,
+      Authentication authentication) {
+<span class="fc" id="L128">    VersionFormularioResponse response =</span>
+<span class="fc" id="L129">        service.actualizarBorrador(</span>
+            id,
+<span class="fc" id="L131">            request.esquema(),</span>
+<span class="fc" id="L132">            request.vinculosAlmacenamiento(),</span>
+<span class="fc" id="L133">            request.reglasEvaluacionIc(),</span>
+<span class="fc" id="L134">            request.codigo(),</span>
+<span class="fc" id="L135">            usuarioId(authentication),</span>
+<span class="fc" id="L136">            VersionCalibracionHttp.exigir(versionEsperada));</span>
+<span class="fc" id="L137">    return ResponseEntity.ok(response);</span>
+  }
+
+  @PutMapping(&quot;/{id}/pesos&quot;)
+  @PreAuthorize(&quot;hasAnyRole('ADMINISTRADOR', 'CATEDRATICO')&quot;)
+  @Operation(
+      summary = &quot;Calibrar pesos de los elementos evaluables&quot;,
+      description = &quot;Reemplaza los pesos configurados para los elementos de cálculo de IC.&quot;)
+  public ResponseEntity&lt;List&lt;ConfiguracionIcElementoResponse&gt;&gt; calibrarPesos(
+      @PathVariable UUID id,
+      @RequestBody List&lt;ConfiguracionIcElementoRequest&gt; request,
+      @RequestHeader(value = &quot;If-Match&quot;, required = false) String versionEsperada,
+      Authentication authentication) {
+<span class="fc" id="L150">    List&lt;ConfiguracionIcElementoResponse&gt; response =</span>
+<span class="fc" id="L151">        service.calibrarPesos(</span>
+<span class="fc" id="L152">            id, request, usuarioId(authentication), VersionCalibracionHttp.exigir(versionEsperada));</span>
+<span class="fc" id="L153">    return ResponseEntity.ok(response);</span>
+  }
+
+  @GetMapping(&quot;/{id}/mapeos/analisis&quot;)
+  @PreAuthorize(&quot;hasAnyRole('ADMINISTRADOR', 'CATEDRATICO')&quot;)
+  @Operation(
+      summary = &quot;Analizar diferencias y mapeos con la versión anterior&quot;,
+      description =
+          &quot;Compara los campos del esquema respecto a la versión anterior e identifica campos pendientes de declarar.&quot;)
+  public ResponseEntity&lt;AnalisisMapeoResponse&gt; analizarMapeo(@PathVariable UUID id) {
+<span class="fc" id="L163">    return ResponseEntity.ok(service.analizarMapeo(id));</span>
+  }
+
+  @PutMapping(&quot;/{id}/mapeos&quot;)
+  @PreAuthorize(&quot;hasRole('ADMINISTRADOR')&quot;)
+  @Operation(
+      summary = &quot;Declarar o actualizar mapeos con la versión anterior&quot;,
+      description = &quot;Declara las equivalencias, cambios de nombre, adiciones o eliminaciones.&quot;)
+  public ResponseEntity&lt;List&lt;MapeoCampoResponse&gt;&gt; guardarMapeos(
+      @PathVariable UUID id,
+      @Valid @RequestBody List&lt;DeclaracionMapeoRequest&gt; request,
+      Authentication authentication) {
+<span class="fc" id="L175">    List&lt;MapeoCampoResponse&gt; response =</span>
+<span class="fc" id="L176">        service.guardarMapeos(id, request, usuarioId(authentication));</span>
+<span class="fc" id="L177">    return ResponseEntity.ok(response);</span>
+  }
+
+  @PostMapping(&quot;/{id}/publicar&quot;)
+  @PreAuthorize(&quot;hasRole('ADMINISTRADOR')&quot;)
+  @Operation(
+      summary = &quot;Publicar y activar una versión de formulario&quot;,
+      description =
+          &quot;Valida esquema, mapeos obligatorios y pesos completos. Desactiva la versión activa previa y publica la actual.&quot;)
+  public ResponseEntity&lt;VersionFormularioResponse&gt; publicar(
+      @PathVariable UUID id,
+      @RequestBody(required = false) PublicarVersionRequest request,
+      Authentication authentication) {
+<span class="fc" id="L190">    VersionFormularioResponse response = service.publicar(id, request, usuarioId(authentication));</span>
+<span class="fc" id="L191">    return ResponseEntity.ok(response);</span>
+  }
+
+  private UUID usuarioId(Authentication authentication) {
+<span class="pc bpc" id="L195" title="2 of 4 branches missed.">    if (authentication == null || !(authentication.getDetails() instanceof JwtData jwtData)) {</span>
+<span class="nc" id="L196">      throw new ApiException(</span>
+          HttpStatus.UNAUTHORIZED,
+          &quot;authentication_required&quot;,
+          &quot;Autenticación requerida&quot;,
+          &quot;Se requiere una sesión válida para gestionar versiones del formulario.&quot;);
+    }
+<span class="fc" id="L202">    return jwtData.userId();</span>
+  }
+
+  @PutMapping(&quot;/{id}/escala&quot;)
+  @PreAuthorize(&quot;hasAnyRole('ADMINISTRADOR', 'CATEDRATICO')&quot;)
+  @Operation(
+      summary = &quot;Configurar escala de severidad del IC&quot;,
+      description = &quot;Configura los valores de severidad de una version en BORRADOR.&quot;)
+  public ResponseEntity&lt;VersionFormularioResponse&gt; configurarEscala(
+      @PathVariable UUID id,
+      @Valid @RequestBody gt.usac.cunoc.sgp.formulario.dto.ConfigurarEscalaIcRequest request,
+      @RequestHeader(value = &quot;If-Match&quot;, required = false) String versionEsperada,
+      Authentication authentication) {
+<span class="fc" id="L215">    return ResponseEntity.ok(</span>
+<span class="fc" id="L216">        service.configurarEscala(</span>
+            id,
+            request,
+<span class="fc" id="L219">            usuarioId(authentication),</span>
+<span class="fc" id="L220">            VersionCalibracionHttp.exigir(versionEsperada)));</span>
+  }
+
+  @PutMapping(&quot;/{id}/reglas-criticas&quot;)
+  @PreAuthorize(&quot;hasAnyRole('ADMINISTRADOR', 'CATEDRATICO')&quot;)
+  public ResponseEntity&lt;VersionFormularioResponse&gt; configurarReglasCriticas(
+      @PathVariable UUID id,
+      @Valid @RequestBody
+          gt.usac.cunoc.sgp.formulario.dto.ConfigurarReglasCriticasIcRequest request,
+      @RequestHeader(value = &quot;If-Match&quot;, required = false) String versionEsperada,
+      Authentication authentication) {
+<span class="fc" id="L231">    return ResponseEntity.ok(</span>
+<span class="fc" id="L232">        service.configurarReglasCriticas(</span>
+            id,
+            request,
+<span class="fc" id="L235">            usuarioId(authentication),</span>
+<span class="fc" id="L236">            VersionCalibracionHttp.exigir(versionEsperada)));</span>
+  }
+
+  @PostMapping(&quot;/{id}/validar-respuestas&quot;)
+  @PreAuthorize(&quot;isAuthenticated()&quot;)
+  @Operation(
+      summary = &quot;Validar respuestas contra el esquema de una versión&quot;,
+      description =
+          &quot;Valida un payload de respuestas contra el esquema de la versión de formulario.&quot;)
+  public ResponseEntity&lt;java.util.Map&lt;String, Object&gt;&gt; validarRespuestas(
+      @PathVariable UUID id,
+      @Valid @RequestBody gt.usac.cunoc.sgp.inspeccion.dto.ValidarRespuestasRequest request) {
+<span class="nc" id="L248">    service.validarRespuestas(id, request.datos(), request.esBorrador());</span>
+<span class="nc" id="L249">    return ResponseEntity.ok(</span>
+<span class="nc" id="L250">        java.util.Map.of(&quot;valido&quot;, true, &quot;mensaje&quot;, &quot;Las respuestas son válidas&quot;));</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

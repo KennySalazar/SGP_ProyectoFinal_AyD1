@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AprobacionCalibracionController.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">sgp-api</a> &gt; <a href="index.source.html" class="el_package">gt.usac.cunoc.sgp.formulario.controller</a> &gt; <span class="el_source">AprobacionCalibracionController.java</span></div><h1>AprobacionCalibracionController.java</h1><pre class="source lang-java linenums">package gt.usac.cunoc.sgp.formulario.controller;
+
+import gt.usac.cunoc.sgp.common.exception.ApiException;
+import gt.usac.cunoc.sgp.common.security.JwtData;
+import gt.usac.cunoc.sgp.formulario.dto.*;
+import gt.usac.cunoc.sgp.formulario.service.AprobacionCalibracionService;
+import jakarta.validation.Valid;
+import java.util.UUID;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.*;
+
+@RestController
+@RequestMapping(&quot;/api/v1/formularios/{id}&quot;)
+public class AprobacionCalibracionController {
+  private final AprobacionCalibracionService servicio;
+
+<span class="fc" id="L20">  public AprobacionCalibracionController(AprobacionCalibracionService servicio) {</span>
+<span class="fc" id="L21">    this.servicio = servicio;</span>
+<span class="fc" id="L22">  }</span>
+
+  @PostMapping(&quot;/aprobacion-calibracion&quot;)
+  @PreAuthorize(&quot;hasRole('CATEDRATICO')&quot;)
+  public ResponseEntity&lt;AprobacionCalibracionResponse&gt; aprobar(
+      @PathVariable UUID id,
+      @Valid @RequestBody(required = false) AprobarCalibracionRequest solicitud,
+      Authentication autenticacion) {
+<span class="pc bpc" id="L30" title="2 of 4 branches missed.">    if (autenticacion == null || !(autenticacion.getDetails() instanceof JwtData datos)) {</span>
+<span class="nc" id="L31">      throw new ApiException(</span>
+          HttpStatus.UNAUTHORIZED,
+          &quot;authentication_required&quot;,
+          &quot;Autenticacion requerida&quot;,
+          &quot;Se requiere una sesion valida.&quot;);
+    }
+<span class="fc" id="L37">    return ResponseEntity.status(HttpStatus.CREATED)</span>
+<span class="fc" id="L38">        .body(</span>
+<span class="fc" id="L39">            servicio.aprobar(</span>
+<span class="fc bfc" id="L40" title="All 2 branches covered.">                id, datos.userId(), solicitud == null ? null : solicitud.observaciones()));</span>
+  }
+
+  @GetMapping(&quot;/aprobacion-calibracion&quot;)
+  @PreAuthorize(&quot;hasAnyRole('ADMINISTRADOR', 'CATEDRATICO')&quot;)
+  public ResponseEntity&lt;AprobacionCalibracionResponse&gt; consultar(@PathVariable UUID id) {
+<span class="fc" id="L46">    return ResponseEntity.ok()</span>
+<span class="fc" id="L47">        .cacheControl(org.springframework.http.CacheControl.noStore())</span>
+<span class="fc" id="L48">        .body(servicio.consultar(id));</span>
+  }
+
+  @GetMapping(&quot;/estado-calibracion&quot;)
+  @PreAuthorize(&quot;isAuthenticated()&quot;)
+  public ResponseEntity&lt;EstadoCalibracionResponse&gt; estado(@PathVariable UUID id) {
+<span class="fc" id="L54">    return ResponseEntity.ok()</span>
+<span class="fc" id="L55">        .cacheControl(org.springframework.http.CacheControl.noStore())</span>
+<span class="fc" id="L56">        .body(servicio.estado(id));</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

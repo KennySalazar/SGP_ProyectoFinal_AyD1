@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ObservacionMapperImpl.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">sgp-api</a> &gt; <a href="index.source.html" class="el_package">gt.usac.cunoc.sgp.revision.mapper</a> &gt; <span class="el_source">ObservacionMapperImpl.java</span></div><h1>ObservacionMapperImpl.java</h1><pre class="source lang-java linenums">package gt.usac.cunoc.sgp.revision.mapper;
+
+import gt.usac.cunoc.sgp.revision.dto.DestinoObservacion;
+import gt.usac.cunoc.sgp.revision.dto.ObservacionResponse;
+import gt.usac.cunoc.sgp.revision.entity.ObservacionRevision;
+import gt.usac.cunoc.sgp.revision.entity.Revision;
+import gt.usac.cunoc.sgp.revision.model.EstadoObservacion;
+import java.time.Instant;
+import java.util.UUID;
+import javax.annotation.processing.Generated;
+import org.springframework.stereotype.Component;
+
+@Generated(
+    value = &quot;org.mapstruct.ap.MappingProcessor&quot;,
+    date = &quot;2026-10-27T23:39:18-0600&quot;,
+    comments = &quot;version: 1.6.3, compiler: javac, environment: Java 25.0.4.1 (Debian)&quot;
+)
+@Component
+<span class="fc" id="L19">public class ObservacionMapperImpl implements ObservacionMapper {</span>
+
+    @Override
+    public ObservacionResponse toResponse(ObservacionRevision observacion) {
+<span class="pc bpc" id="L23" title="1 of 2 branches missed.">        if ( observacion == null ) {</span>
+<span class="nc" id="L24">            return null;</span>
+        }
+
+<span class="fc" id="L27">        UUID revisionId = null;</span>
+<span class="fc" id="L28">        String texto = null;</span>
+<span class="fc" id="L29">        UUID id = null;</span>
+<span class="fc" id="L30">        EstadoObservacion estado = null;</span>
+<span class="fc" id="L31">        UUID creadoPorId = null;</span>
+<span class="fc" id="L32">        Instant creadoEn = null;</span>
+<span class="fc" id="L33">        UUID resueltoPorId = null;</span>
+<span class="fc" id="L34">        Instant resueltoEn = null;</span>
+<span class="fc" id="L35">        String respuestaAutor = null;</span>
+
+<span class="fc" id="L37">        revisionId = observacionRevisionId( observacion );</span>
+<span class="fc" id="L38">        texto = observacion.getContenido();</span>
+<span class="fc" id="L39">        id = observacion.getId();</span>
+<span class="fc" id="L40">        estado = observacion.getEstado();</span>
+<span class="fc" id="L41">        creadoPorId = observacion.getCreadoPorId();</span>
+<span class="fc" id="L42">        creadoEn = observacion.getCreadoEn();</span>
+<span class="fc" id="L43">        resueltoPorId = observacion.getResueltoPorId();</span>
+<span class="fc" id="L44">        resueltoEn = observacion.getResueltoEn();</span>
+<span class="fc" id="L45">        respuestaAutor = observacion.getRespuestaAutor();</span>
+
+<span class="fc" id="L47">        DestinoObservacion destino = destino(observacion);</span>
+
+<span class="fc" id="L49">        ObservacionResponse observacionResponse = new ObservacionResponse( id, revisionId, destino, texto, estado, creadoPorId, creadoEn, resueltoPorId, resueltoEn, respuestaAutor );</span>
+
+<span class="fc" id="L51">        return observacionResponse;</span>
+    }
+
+    private UUID observacionRevisionId(ObservacionRevision observacionRevision) {
+<span class="fc" id="L55">        Revision revision = observacionRevision.getRevision();</span>
+<span class="pc bpc" id="L56" title="1 of 2 branches missed.">        if ( revision == null ) {</span>
+<span class="nc" id="L57">            return null;</span>
+        }
+<span class="fc" id="L59">        return revision.getId();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

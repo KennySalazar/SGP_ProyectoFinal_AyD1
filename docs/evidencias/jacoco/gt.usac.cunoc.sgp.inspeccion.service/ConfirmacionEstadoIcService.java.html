@@ -1,0 +1,353 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ConfirmacionEstadoIcService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">sgp-api</a> &gt; <a href="index.source.html" class="el_package">gt.usac.cunoc.sgp.inspeccion.service</a> &gt; <span class="el_source">ConfirmacionEstadoIcService.java</span></div><h1>ConfirmacionEstadoIcService.java</h1><pre class="source lang-java linenums">package gt.usac.cunoc.sgp.inspeccion.service;
+
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import gt.usac.cunoc.sgp.common.audit.model.AccionAuditoria;
+import gt.usac.cunoc.sgp.common.audit.service.AuditoriaWriter;
+import gt.usac.cunoc.sgp.common.exception.ApiException;
+import gt.usac.cunoc.sgp.common.security.JwtData;
+import gt.usac.cunoc.sgp.inspeccion.dto.ConfirmacionEstadoIcResponse;
+import gt.usac.cunoc.sgp.inspeccion.dto.ConfirmarEstadoIcRequest;
+import gt.usac.cunoc.sgp.inspeccion.model.EstadoCondicion;
+import gt.usac.cunoc.sgp.inspeccion.model.ResultadoCalculoIc;
+import jakarta.validation.ConstraintViolationException;
+import jakarta.validation.Validator;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
+import java.util.UUID;
+import org.springframework.http.HttpStatus;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+@Service
+public class ConfirmacionEstadoIcService {
+
+  private final JdbcTemplate jdbc;
+  private final PreparadorEntradaIcService preparador;
+  private final CalculoIndiceCondicionService calculador;
+  private final AuditoriaWriter auditoria;
+  private final ObjectMapper json;
+  private final Validator validator;
+  private final Clock clock;
+
+  public ConfirmacionEstadoIcService(
+      JdbcTemplate jdbc,
+      PreparadorEntradaIcService preparador,
+      CalculoIndiceCondicionService calculador,
+      AuditoriaWriter auditoria,
+      ObjectMapper json,
+      Validator validator,
+<span class="fc" id="L47">      Clock clock) {</span>
+<span class="fc" id="L48">    this.jdbc = jdbc;</span>
+<span class="fc" id="L49">    this.preparador = preparador;</span>
+<span class="fc" id="L50">    this.calculador = calculador;</span>
+<span class="fc" id="L51">    this.auditoria = auditoria;</span>
+<span class="fc" id="L52">    this.json = json;</span>
+<span class="fc" id="L53">    this.validator = validator;</span>
+<span class="fc" id="L54">    this.clock = clock;</span>
+<span class="fc" id="L55">  }</span>
+
+  @Transactional
+  @PreAuthorize(&quot;isAuthenticated()&quot;)
+  public ConfirmacionEstadoIcResponse consultar(UUID inspeccionId) {
+<span class="fc" id="L60">    return consultarInterno(inspeccionId, usuarioActual(), null);</span>
+  }
+
+  @Transactional
+  @PreAuthorize(&quot;hasRole('CATEDRATICO')&quot;)
+  public ConfirmacionEstadoIcResponse consultarRevision(UUID revisionId) {
+<span class="fc" id="L66">    UUID actor = usuarioActual();</span>
+<span class="fc" id="L67">    return consultarInterno(inspeccionDeRevision(revisionId, actor), actor, revisionId);</span>
+  }
+
+  private ConfirmacionEstadoIcResponse consultarInterno(
+      UUID inspeccionId, UUID usuarioId, UUID revisionId) {
+<span class="fc" id="L72">    Inspeccion inspeccion = cargarYAutorizar(inspeccionId, usuarioId, revisionId);</span>
+<span class="fc" id="L73">    ResultadoCalculoIc calculo = calcular(inspeccion);</span>
+<span class="fc" id="L74">    JsonNode guardada = cargarConfirmacion(inspeccionId);</span>
+<span class="fc bfc" id="L75" title="All 2 branches covered.">    boolean vigente =</span>
+        guardada != null
+<span class="pc bpc" id="L77" title="1 of 2 branches missed.">            &amp;&amp; usuarioId.toString().equals(guardada.path(&quot;realizadoPorId&quot;).asText())</span>
+<span class="fc bfc" id="L78" title="All 2 branches covered.">            &amp;&amp; jsonEquivalente(json.valueToTree(calculo), guardada.get(&quot;calculo&quot;));</span>
+<span class="fc" id="L79">    return new ConfirmacionEstadoIcResponse(</span>
+        inspeccionId,
+        calculo,
+<span class="fc bfc" id="L82" title="All 2 branches covered.">        vigente ? EstadoCondicion.valueOf(guardada.path(&quot;estadoConfirmado&quot;).asText()) : null,</span>
+<span class="fc bfc" id="L83" title="All 2 branches covered.">        vigente ? textoOpcional(guardada.get(&quot;justificacion&quot;)) : null,</span>
+<span class="fc bfc" id="L84" title="All 2 branches covered.">        vigente ? usuarioId : null,</span>
+<span class="fc bfc" id="L85" title="All 2 branches covered.">        vigente ? Instant.parse(guardada.path(&quot;realizadoEn&quot;).asText()) : null,</span>
+        vigente);
+  }
+
+  @Transactional
+  @PreAuthorize(&quot;isAuthenticated()&quot;)
+  public ConfirmacionEstadoIcResponse confirmar(
+      UUID inspeccionId, ConfirmarEstadoIcRequest request) {
+<span class="fc" id="L93">    return confirmarInterno(inspeccionId, usuarioActual(), null, request);</span>
+  }
+
+  @Transactional
+  @PreAuthorize(&quot;hasRole('CATEDRATICO')&quot;)
+  public ConfirmacionEstadoIcResponse confirmarRevision(
+      UUID revisionId, ConfirmarEstadoIcRequest request) {
+<span class="fc" id="L100">    UUID actor = usuarioActual();</span>
+<span class="fc" id="L101">    return confirmarInterno(inspeccionDeRevision(revisionId, actor), actor, revisionId, request);</span>
+  }
+
+  private ConfirmacionEstadoIcResponse confirmarInterno(
+      UUID inspeccionId, UUID usuarioId, UUID revisionId, ConfirmarEstadoIcRequest request) {
+<span class="fc" id="L106">    Inspeccion inspeccion = cargarYAutorizar(inspeccionId, usuarioId, revisionId);</span>
+<span class="pc bpc" id="L107" title="1 of 2 branches missed.">    if (request == null) {</span>
+<span class="nc" id="L108">      throw error(</span>
+          HttpStatus.UNPROCESSABLE_ENTITY,
+          &quot;confirmacion_ic_invalida&quot;,
+          &quot;La solicitud de confirmacion es obligatoria.&quot;);
+    }
+<span class="fc" id="L113">    var errores = validator.validate(request);</span>
+<span class="pc bpc" id="L114" title="1 of 2 branches missed.">    if (!errores.isEmpty()) {</span>
+<span class="nc" id="L115">      throw new ConstraintViolationException(errores);</span>
+    }
+<span class="fc" id="L117">    ResultadoCalculoIc calculo = calcular(inspeccion);</span>
+<span class="fc bfc" id="L118" title="All 2 branches covered.">    if (!calculo.hashEntrada().equals(request.hashEntrada())) {</span>
+<span class="fc" id="L119">      throw error(</span>
+          HttpStatus.CONFLICT,
+          &quot;calculo_ic_desactualizado&quot;,
+          &quot;Los datos del calculo cambiaron. Consulta el calculo actual y confirma nuevamente.&quot;);
+    }
+<span class="fc bfc" id="L124" title="All 2 branches covered.">    boolean ajuste = request.estadoConfirmado() != calculo.estadoCalculado();</span>
+<span class="fc bfc" id="L125" title="All 2 branches covered.">    String justificacion = request.justificacion() == null ? null : request.justificacion().strip();</span>
+<span class="fc bfc" id="L126" title="All 6 branches covered.">    if (ajuste &amp;&amp; (justificacion == null || justificacion.isBlank())) {</span>
+<span class="fc" id="L127">      throw error(</span>
+          HttpStatus.UNPROCESSABLE_ENTITY,
+          &quot;justificacion_ajuste_obligatoria&quot;,
+          &quot;Cambiar el estado calculado requiere una justificacion escrita.&quot;);
+    }
+<span class="fc bfc" id="L132" title="All 2 branches covered.">    if (!ajuste) {</span>
+<span class="fc" id="L133">      justificacion = null;</span>
+    }
+<span class="fc" id="L135">    JsonNode anteriores = cargarConfirmacion(inspeccionId);</span>
+<span class="fc" id="L136">    Instant ahora = clock.instant();</span>
+<span class="fc" id="L137">    JsonNode calculoJson = json.valueToTree(calculo);</span>
+<span class="fc" id="L138">    jdbc.update(</span>
+        &quot;&quot;&quot;
+            INSERT INTO confirmacion_estado_inspeccion (
+              inspeccion_id, version_formulario_id, hash_entrada, version_algoritmo,
+              indice_calculado, estado_calculado, estado_confirmado, justificacion_ajuste,
+              realizado_por_id, realizado_en, calculo
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CAST(? AS jsonb))
+            ON CONFLICT (inspeccion_id) DO UPDATE SET
+              version_formulario_id = EXCLUDED.version_formulario_id,
+              hash_entrada = EXCLUDED.hash_entrada,
+              version_algoritmo = EXCLUDED.version_algoritmo,
+              indice_calculado = EXCLUDED.indice_calculado,
+              estado_calculado = EXCLUDED.estado_calculado,
+              estado_confirmado = EXCLUDED.estado_confirmado,
+              justificacion_ajuste = EXCLUDED.justificacion_ajuste,
+              realizado_por_id = EXCLUDED.realizado_por_id,
+              realizado_en = EXCLUDED.realizado_en,
+              calculo = EXCLUDED.calculo
+            &quot;&quot;&quot;,
+        inspeccionId,
+<span class="fc" id="L158">        calculo.versionFormularioId(),</span>
+<span class="fc" id="L159">        calculo.hashEntrada(),</span>
+<span class="fc" id="L160">        calculo.versionAlgoritmo(),</span>
+<span class="fc" id="L161">        calculo.indiceCalculado(),</span>
+<span class="fc" id="L162">        calculo.estadoCalculado().name(),</span>
+<span class="fc" id="L163">        request.estadoConfirmado().name(),</span>
+        justificacion,
+        usuarioId,
+<span class="fc" id="L166">        OffsetDateTime.ofInstant(ahora, ZoneOffset.UTC),</span>
+<span class="fc" id="L167">        calculoJson.toString());</span>
+<span class="fc" id="L168">    JsonNode posteriores = cargarConfirmacion(inspeccionId);</span>
+<span class="fc" id="L169">    auditoria.registrarEnTransaccion(</span>
+        usuarioId,
+<span class="fc bfc" id="L171" title="All 2 branches covered.">        anteriores == null ? AccionAuditoria.CREAR : AccionAuditoria.MODIFICAR,</span>
+        &quot;confirmacion_estado_inspeccion&quot;,
+        inspeccionId,
+        anteriores,
+        posteriores,
+        null);
+<span class="fc" id="L177">    return new ConfirmacionEstadoIcResponse(</span>
+<span class="fc" id="L178">        inspeccionId, calculo, request.estadoConfirmado(), justificacion, usuarioId, ahora, true);</span>
+  }
+
+  private ResultadoCalculoIc calcular(Inspeccion inspeccion) {
+<span class="fc" id="L182">    return calculador.calcular(</span>
+<span class="fc" id="L183">        preparador.preparar(inspeccion.versionFormularioId(), inspeccion.datos()));</span>
+  }
+
+  private UUID inspeccionDeRevision(UUID revisionId, UUID actor) {
+<span class="fc" id="L187">    var ids =</span>
+<span class="fc" id="L188">        jdbc.query(</span>
+            &quot;select r.inspeccion_id from revision r join inspeccion i on i.id=r.inspeccion_id &quot;
+                + &quot;where r.id=? and r.revisor_id=? and i.eliminado_en is null&quot;,
+<span class="fc" id="L191">            (rs, n) -&gt; rs.getObject(1, UUID.class),</span>
+            revisionId,
+            actor);
+<span class="pc bpc" id="L194" title="1 of 2 branches missed.">    if (ids.isEmpty())</span>
+<span class="nc" id="L195">      throw error(</span>
+          HttpStatus.NOT_FOUND, &quot;revision_no_encontrada&quot;, &quot;La revisión no está disponible.&quot;);
+<span class="fc" id="L197">    return ids.get(0);</span>
+  }
+
+  private Inspeccion cargarYAutorizar(UUID id, UUID usuarioId, UUID revisionId) {
+<span class="pc bpc" id="L201" title="1 of 2 branches missed.">    if (id == null) {</span>
+<span class="nc" id="L202">      throw error(</span>
+          HttpStatus.UNPROCESSABLE_ENTITY,
+          &quot;inspeccion_id_obligatorio&quot;,
+          &quot;La inspeccion es obligatoria.&quot;);
+    }
+<span class="fc" id="L207">    var encontrados =</span>
+<span class="fc" id="L208">        jdbc.query(</span>
+            &quot;&quot;&quot;
+            SELECT autor_id, version_formulario_id, estado, datos, eliminado_en
+            FROM inspeccion WHERE id = ? FOR UPDATE
+            &quot;&quot;&quot;,
+            (rs, numero) -&gt;
+<span class="fc" id="L214">                new Inspeccion(</span>
+<span class="fc" id="L215">                    rs.getObject(&quot;autor_id&quot;, UUID.class),</span>
+<span class="fc" id="L216">                    rs.getObject(&quot;version_formulario_id&quot;, UUID.class),</span>
+<span class="fc" id="L217">                    rs.getString(&quot;estado&quot;),</span>
+<span class="fc" id="L218">                    leerJson(rs.getString(&quot;datos&quot;)),</span>
+<span class="pc bpc" id="L219" title="1 of 2 branches missed.">                    rs.getObject(&quot;eliminado_en&quot;) != null),</span>
+            id);
+<span class="pc bpc" id="L221" title="1 of 2 branches missed.">    if (encontrados.isEmpty()) {</span>
+<span class="nc" id="L222">      throw error(HttpStatus.NOT_FOUND, &quot;inspeccion_no_encontrada&quot;, &quot;No existe la inspeccion.&quot;);</span>
+    }
+<span class="fc" id="L224">    Inspeccion inspeccion = encontrados.get(0);</span>
+<span class="fc bfc" id="L225" title="All 4 branches covered.">    if (revisionId == null &amp;&amp; !usuarioId.equals(inspeccion.autorId())) {</span>
+<span class="fc" id="L226">      throw error(</span>
+          HttpStatus.FORBIDDEN,
+          &quot;evaluador_no_responsable&quot;,
+          &quot;Solo el autor responsable puede confirmar o ajustar el estado.&quot;);
+    }
+<span class="fc bfc" id="L231" title="All 2 branches covered.">    if (revisionId != null</span>
+<span class="pc bpc" id="L232" title="1 of 2 branches missed.">        &amp;&amp; (!&quot;EN_REVISION&quot;.equals(inspeccion.estado())</span>
+<span class="pc bpc" id="L233" title="1 of 2 branches missed.">            || !Boolean.TRUE.equals(</span>
+<span class="fc" id="L234">                jdbc.queryForObject(</span>
+                    &quot;select exists(select 1 from revision where id=? and inspeccion_id=? and revisor_id=? and estado='EN_CURSO')&quot;,
+                    Boolean.class,
+                    revisionId,
+                    id,
+                    usuarioId)))) {
+<span class="nc" id="L240">      throw error(</span>
+          HttpStatus.CONFLICT,
+          &quot;revision_no_editable&quot;,
+          &quot;La confirmación requiere el ciclo EN_CURSO de esta inspección EN_REVISION.&quot;);
+    }
+<span class="pc bpc" id="L245" title="1 of 2 branches missed.">    if (inspeccion.eliminada()) {</span>
+<span class="nc" id="L246">      throw error(</span>
+          HttpStatus.CONFLICT,
+          &quot;inspeccion_eliminada&quot;,
+          &quot;No se puede confirmar una inspeccion eliminada.&quot;);
+    }
+<span class="fc bfc" id="L251" title="All 2 branches covered.">    if (&quot;PUBLICADA&quot;.equals(inspeccion.estado())) {</span>
+<span class="fc" id="L252">      throw error(</span>
+          HttpStatus.CONFLICT,
+          &quot;inspeccion_publicada_inmutable&quot;,
+          &quot;Una inspeccion publicada requiere una nueva inspeccion de correccion.&quot;);
+    }
+<span class="pc bpc" id="L257" title="1 of 2 branches missed.">    if (&quot;RECHAZADA&quot;.equals(inspeccion.estado())) {</span>
+<span class="nc" id="L258">      throw error(</span>
+          HttpStatus.CONFLICT,
+          &quot;inspeccion_no_confirmable&quot;,
+          &quot;No se puede confirmar una inspeccion rechazada.&quot;);
+    }
+<span class="fc" id="L263">    return inspeccion;</span>
+  }
+
+  private JsonNode cargarConfirmacion(UUID id) {
+<span class="fc" id="L267">    var filas =</span>
+<span class="fc" id="L268">        jdbc.query(</span>
+            &quot;&quot;&quot;
+            SELECT estado_confirmado, justificacion_ajuste, realizado_por_id, realizado_en, calculo
+            FROM confirmacion_estado_inspeccion WHERE inspeccion_id = ?
+            &quot;&quot;&quot;,
+            (rs, numero) -&gt; {
+<span class="fc" id="L274">              ObjectNode valor = json.createObjectNode();</span>
+<span class="fc" id="L275">              valor.put(&quot;inspeccionId&quot;, id.toString());</span>
+<span class="fc" id="L276">              valor.put(&quot;estadoConfirmado&quot;, rs.getString(&quot;estado_confirmado&quot;));</span>
+<span class="fc" id="L277">              valor.put(&quot;justificacion&quot;, rs.getString(&quot;justificacion_ajuste&quot;));</span>
+<span class="fc" id="L278">              valor.put(&quot;realizadoPorId&quot;, rs.getObject(&quot;realizado_por_id&quot;, UUID.class).toString());</span>
+<span class="fc" id="L279">              valor.put(</span>
+                  &quot;realizadoEn&quot;,
+<span class="fc" id="L281">                  rs.getObject(&quot;realizado_en&quot;, OffsetDateTime.class).toInstant().toString());</span>
+<span class="fc" id="L282">              valor.set(&quot;calculo&quot;, leerJson(rs.getString(&quot;calculo&quot;)));</span>
+<span class="fc" id="L283">              return valor;</span>
+            },
+            id);
+<span class="fc bfc" id="L286" title="All 2 branches covered.">    return filas.isEmpty() ? null : filas.get(0);</span>
+  }
+
+  private UUID usuarioActual() {
+<span class="fc" id="L290">    var autenticacion = SecurityContextHolder.getContext().getAuthentication();</span>
+<span class="fc bfc" id="L291" title="All 2 branches covered.">    if (autenticacion == null</span>
+<span class="pc bpc" id="L292" title="1 of 2 branches missed.">        || !autenticacion.isAuthenticated()</span>
+<span class="pc bpc" id="L293" title="1 of 2 branches missed.">        || !(autenticacion.getDetails() instanceof JwtData jwt)) {</span>
+<span class="fc" id="L294">      throw error(</span>
+          HttpStatus.UNAUTHORIZED, &quot;authentication_required&quot;, &quot;Se requiere una sesion valida.&quot;);
+    }
+<span class="fc" id="L297">    return jwt.userId();</span>
+  }
+
+  private boolean jsonEquivalente(JsonNode esperado, JsonNode guardado) {
+<span class="pc bpc" id="L301" title="2 of 4 branches missed.">    if (esperado == null || guardado == null) {</span>
+<span class="nc bnc" id="L302" title="All 2 branches missed.">      return esperado == guardado;</span>
+    }
+<span class="pc bpc" id="L304" title="1 of 4 branches missed.">    if (esperado.isNumber() &amp;&amp; guardado.isNumber()) {</span>
+<span class="fc bfc" id="L305" title="All 2 branches covered.">      return esperado.decimalValue().compareTo(guardado.decimalValue()) == 0;</span>
+    }
+<span class="pc bpc" id="L307" title="1 of 4 branches missed.">    if (esperado.isObject() &amp;&amp; guardado.isObject()) {</span>
+<span class="pc bpc" id="L308" title="1 of 2 branches missed.">      if (esperado.size() != guardado.size()) {</span>
+<span class="nc" id="L309">        return false;</span>
+      }
+<span class="fc" id="L311">      var campos = esperado.fields();</span>
+<span class="fc bfc" id="L312" title="All 2 branches covered.">      while (campos.hasNext()) {</span>
+<span class="fc" id="L313">        var campo = campos.next();</span>
+<span class="fc bfc" id="L314" title="All 2 branches covered.">        if (!jsonEquivalente(campo.getValue(), guardado.get(campo.getKey()))) {</span>
+<span class="fc" id="L315">          return false;</span>
+        }
+<span class="fc" id="L317">      }</span>
+<span class="fc" id="L318">      return true;</span>
+    }
+<span class="pc bpc" id="L320" title="1 of 4 branches missed.">    if (esperado.isArray() &amp;&amp; guardado.isArray()) {</span>
+<span class="pc bpc" id="L321" title="1 of 2 branches missed.">      if (esperado.size() != guardado.size()) {</span>
+<span class="nc" id="L322">        return false;</span>
+      }
+<span class="fc bfc" id="L324" title="All 2 branches covered.">      for (int indice = 0; indice &lt; esperado.size(); indice++) {</span>
+<span class="pc bpc" id="L325" title="1 of 2 branches missed.">        if (!jsonEquivalente(esperado.get(indice), guardado.get(indice))) {</span>
+<span class="nc" id="L326">          return false;</span>
+        }
+      }
+<span class="fc" id="L329">      return true;</span>
+    }
+<span class="fc" id="L331">    return esperado.equals(guardado);</span>
+  }
+
+  private JsonNode leerJson(String contenido) {
+    try {
+<span class="fc" id="L336">      return json.readTree(contenido);</span>
+<span class="nc" id="L337">    } catch (JsonProcessingException excepcion) {</span>
+<span class="nc" id="L338">      throw new IllegalStateException(&quot;Los datos almacenados no contienen JSON valido.&quot;, excepcion);</span>
+    }
+  }
+
+  private String textoOpcional(JsonNode valor) {
+<span class="pc bpc" id="L343" title="1 of 4 branches missed.">    return valor == null || valor.isNull() ? null : valor.asText();</span>
+  }
+
+  private ApiException error(HttpStatus estado, String codigo, String detalle) {
+<span class="fc" id="L347">    return new ApiException(estado, codigo, &quot;Confirmacion del estado de la inspeccion&quot;, detalle);</span>
+  }
+
+<span class="fc" id="L350">  private record Inspeccion(</span>
+      UUID autorId, UUID versionFormularioId, String estado, JsonNode datos, boolean eliminada) {}
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

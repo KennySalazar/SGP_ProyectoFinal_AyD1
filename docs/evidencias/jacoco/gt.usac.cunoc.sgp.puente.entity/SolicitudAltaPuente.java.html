@@ -1,0 +1,174 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SolicitudAltaPuente.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">sgp-api</a> &gt; <a href="index.source.html" class="el_package">gt.usac.cunoc.sgp.puente.entity</a> &gt; <span class="el_source">SolicitudAltaPuente.java</span></div><h1>SolicitudAltaPuente.java</h1><pre class="source lang-java linenums">package gt.usac.cunoc.sgp.puente.entity;
+
+import gt.usac.cunoc.sgp.puente.model.EstadoSolicitudAltaPuente;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Table;
+import jakarta.persistence.Version;
+import java.math.BigDecimal;
+import java.time.Instant;
+import java.util.UUID;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
+import org.locationtech.jts.geom.Point;
+
+@Entity
+@Table(name = &quot;solicitud_alta_puente&quot;)
+public class SolicitudAltaPuente {
+
+  @Id private UUID id;
+
+  @Column(name = &quot;solicitado_por_id&quot;, nullable = false, updatable = false)
+  private UUID solicitadoPorId;
+
+  @Column(name = &quot;nombre_propuesto&quot;, nullable = false, length = 200)
+  private String nombrePropuesto;
+
+  @ManyToOne(fetch = FetchType.LAZY, optional = false)
+  @JoinColumn(name = &quot;municipio_id&quot;, nullable = false)
+  private Municipio municipio;
+
+  @Column(nullable = false, length = 100)
+  private String ruta;
+
+  @Column(precision = 10, scale = 3)
+  private BigDecimal kilometraje;
+
+  @JdbcTypeCode(SqlTypes.GEOGRAPHY)
+  @Column(nullable = false, columnDefinition = &quot;geography(Point,4326)&quot;)
+  private Point ubicacion;
+
+  @Column(columnDefinition = &quot;text&quot;)
+  private String justificacion;
+
+  @Enumerated(EnumType.STRING)
+  @Column(nullable = false, length = 20)
+  private EstadoSolicitudAltaPuente estado;
+
+  @Column(name = &quot;revisado_por_id&quot;)
+  private UUID revisadoPorId;
+
+  @Column(name = &quot;revisado_en&quot;)
+  private Instant revisadoEn;
+
+  @Column(name = &quot;motivo_decision&quot;, columnDefinition = &quot;text&quot;)
+  private String motivoDecision;
+
+  @ManyToOne(fetch = FetchType.LAZY)
+  @JoinColumn(name = &quot;puente_creado_id&quot;)
+  private Puente puenteCreado;
+
+  @Column(name = &quot;creado_en&quot;, nullable = false, updatable = false)
+  private Instant creadoEn;
+
+  @Column(name = &quot;actualizado_en&quot;, nullable = false)
+  private Instant actualizadoEn;
+
+  @Version
+  @Column(nullable = false)
+  private long version;
+
+<span class="fc" id="L77">  protected SolicitudAltaPuente() {}</span>
+
+  public SolicitudAltaPuente(
+      UUID id,
+      UUID solicitadoPorId,
+      String nombrePropuesto,
+      Municipio municipio,
+      String ruta,
+      BigDecimal kilometraje,
+      Point ubicacion,
+      String justificacion,
+<span class="fc" id="L88">      Instant creadoEn) {</span>
+<span class="fc" id="L89">    this.id = id;</span>
+<span class="fc" id="L90">    this.solicitadoPorId = solicitadoPorId;</span>
+<span class="fc" id="L91">    this.nombrePropuesto = nombrePropuesto;</span>
+<span class="fc" id="L92">    this.municipio = municipio;</span>
+<span class="fc" id="L93">    this.ruta = ruta;</span>
+<span class="fc" id="L94">    this.kilometraje = kilometraje;</span>
+<span class="fc" id="L95">    this.ubicacion = ubicacion;</span>
+<span class="fc" id="L96">    this.justificacion = justificacion;</span>
+<span class="fc" id="L97">    this.estado = EstadoSolicitudAltaPuente.PENDIENTE;</span>
+<span class="fc" id="L98">    this.creadoEn = creadoEn;</span>
+<span class="fc" id="L99">    this.actualizadoEn = creadoEn;</span>
+<span class="fc" id="L100">  }</span>
+
+  public void aprobar(UUID administradorId, Puente puente, Instant ahora) {
+<span class="fc" id="L103">    this.estado = EstadoSolicitudAltaPuente.APROBADA;</span>
+<span class="fc" id="L104">    this.revisadoPorId = administradorId;</span>
+<span class="fc" id="L105">    this.revisadoEn = ahora;</span>
+<span class="fc" id="L106">    this.puenteCreado = puente;</span>
+<span class="fc" id="L107">    this.actualizadoEn = ahora;</span>
+<span class="fc" id="L108">  }</span>
+
+  public void rechazar(UUID administradorId, String motivo, Instant ahora) {
+<span class="fc" id="L111">    this.estado = EstadoSolicitudAltaPuente.RECHAZADA;</span>
+<span class="fc" id="L112">    this.revisadoPorId = administradorId;</span>
+<span class="fc" id="L113">    this.revisadoEn = ahora;</span>
+<span class="fc" id="L114">    this.motivoDecision = motivo;</span>
+<span class="fc" id="L115">    this.actualizadoEn = ahora;</span>
+<span class="fc" id="L116">  }</span>
+
+  public UUID getId() {
+<span class="fc" id="L119">    return id;</span>
+  }
+
+  public UUID getSolicitadoPorId() {
+<span class="fc" id="L123">    return solicitadoPorId;</span>
+  }
+
+  public String getNombrePropuesto() {
+<span class="fc" id="L127">    return nombrePropuesto;</span>
+  }
+
+  public Municipio getMunicipio() {
+<span class="fc" id="L131">    return municipio;</span>
+  }
+
+  public String getRuta() {
+<span class="fc" id="L135">    return ruta;</span>
+  }
+
+  public BigDecimal getKilometraje() {
+<span class="fc" id="L139">    return kilometraje;</span>
+  }
+
+  public Point getUbicacion() {
+<span class="fc" id="L143">    return ubicacion;</span>
+  }
+
+  public String getJustificacion() {
+<span class="fc" id="L147">    return justificacion;</span>
+  }
+
+  public EstadoSolicitudAltaPuente getEstado() {
+<span class="fc" id="L151">    return estado;</span>
+  }
+
+  public UUID getRevisadoPorId() {
+<span class="fc" id="L155">    return revisadoPorId;</span>
+  }
+
+  public Puente getPuenteCreado() {
+<span class="fc" id="L159">    return puenteCreado;</span>
+  }
+
+  public Instant getRevisadoEn() {
+<span class="fc" id="L163">    return revisadoEn;</span>
+  }
+
+  public String getMotivoDecision() {
+<span class="fc" id="L167">    return motivoDecision;</span>
+  }
+
+  public Instant getCreadoEn() {
+<span class="fc" id="L171">    return creadoEn;</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

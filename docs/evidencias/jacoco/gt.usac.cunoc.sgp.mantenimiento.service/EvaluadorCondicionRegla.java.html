@@ -1,0 +1,124 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>EvaluadorCondicionRegla.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">sgp-api</a> &gt; <a href="index.source.html" class="el_package">gt.usac.cunoc.sgp.mantenimiento.service</a> &gt; <span class="el_source">EvaluadorCondicionRegla.java</span></div><h1>EvaluadorCondicionRegla.java</h1><pre class="source lang-java linenums">package gt.usac.cunoc.sgp.mantenimiento.service;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import java.util.List;
+import java.util.Optional;
+import java.util.function.Predicate;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Component;
+
+/**
+ * Evalúa la {@code condicion} de una regla de mantenimiento contra un elemento de la inspección
+ * (HU-046, RN-MTO-02). La condición es un dato, no código: {@code {&quot;indicador&quot;, &quot;operador&quot;,
+ * &quot;umbral&quot;}}, con los operadores {@code IGUAL}, {@code DISTINTO}, {@code MAYOR_O_IGUAL}, {@code
+ * MENOR_O_IGUAL} y {@code CONTIENE}.
+ *
+ * &lt;p&gt;Una condición que no se puede evaluar —indicador sin responder, tipos incompatibles u operador
+ * desconocido— se trata como «no se cumple», nunca como error: una regla defectuosa no debe impedir
+ * que se evalúen las demás.
+ */
+@Component
+<span class="fc" id="L22">public class EvaluadorCondicionRegla {</span>
+
+<span class="fc" id="L24">  private static final Logger log = LoggerFactory.getLogger(EvaluadorCondicionRegla.class);</span>
+
+  /** Escala de severidad del esquema SIECA, de menor a mayor gravedad. */
+<span class="fc" id="L27">  static final List&lt;String&gt; ESCALA_SEVERIDAD = List.of(&quot;NO_PRESENTA&quot;, &quot;LEVE&quot;, &quot;MODERADO&quot;, &quot;SEVERO&quot;);</span>
+
+  /**
+   * @param condicion la condición de la regla
+   * @param elemento el elemento de la inspección donde se busca el indicador
+   * @return el valor encontrado si la condición se cumple; vacío si no se cumple o no se puede
+   *     evaluar
+   */
+  public Optional&lt;JsonNode&gt; evaluar(JsonNode condicion, JsonNode elemento) {
+<span class="fc bfc" id="L36" title="All 8 branches covered.">    if (condicion == null || !condicion.isObject() || elemento == null || !elemento.isObject()) {</span>
+<span class="fc" id="L37">      return Optional.empty();</span>
+    }
+<span class="fc" id="L39">    String indicador = condicion.path(&quot;indicador&quot;).asText(&quot;&quot;);</span>
+<span class="fc" id="L40">    String operador = condicion.path(&quot;operador&quot;).asText(&quot;&quot;);</span>
+<span class="fc" id="L41">    JsonNode umbral = condicion.get(&quot;umbral&quot;);</span>
+<span class="fc bfc" id="L42" title="All 6 branches covered.">    if (indicador.isBlank() || umbral == null || umbral.isNull()) {</span>
+<span class="fc" id="L43">      log.warn(&quot;Condición de regla incompleta: {}&quot;, condicion);</span>
+<span class="fc" id="L44">      return Optional.empty();</span>
+    }
+
+<span class="fc" id="L47">    JsonNode valor = elemento.get(indicador);</span>
+<span class="fc bfc" id="L48" title="All 4 branches covered.">    if (valor == null || valor.isNull()) {</span>
+      // Sin responder no es lo mismo que false ni que cero: no dispara la regla.
+<span class="fc" id="L50">      return Optional.empty();</span>
+    }
+
+    Boolean cumple =
+<span class="fc bfc" id="L54" title="All 6 branches covered.">        switch (operador) {</span>
+<span class="fc" id="L55">          case &quot;IGUAL&quot; -&gt; esIgual(valor, umbral);</span>
+<span class="fc bfc" id="L56" title="All 2 branches covered.">          case &quot;DISTINTO&quot; -&gt; aplicar(esIgual(valor, umbral), igual -&gt; !igual);</span>
+<span class="fc bfc" id="L57" title="All 2 branches covered.">          case &quot;MAYOR_O_IGUAL&quot; -&gt; aplicar(comparar(valor, umbral), orden -&gt; orden &gt;= 0);</span>
+<span class="fc bfc" id="L58" title="All 2 branches covered.">          case &quot;MENOR_O_IGUAL&quot; -&gt; aplicar(comparar(valor, umbral), orden -&gt; orden &lt;= 0);</span>
+<span class="fc" id="L59">          case &quot;CONTIENE&quot; -&gt; contiene(valor, umbral);</span>
+          default -&gt; {
+<span class="fc" id="L61">            log.warn(&quot;Operador de regla desconocido '{}' en {}&quot;, operador, condicion);</span>
+<span class="fc" id="L62">            yield null;</span>
+          }
+        };
+<span class="fc bfc" id="L65" title="All 2 branches covered.">    if (cumple == null) {</span>
+<span class="fc" id="L66">      log.warn(</span>
+          &quot;La condición {} no es comparable con el valor {} del indicador '{}'&quot;,
+          condicion,
+          valor,
+          indicador);
+<span class="fc" id="L71">      return Optional.empty();</span>
+    }
+<span class="fc bfc" id="L73" title="All 2 branches covered.">    return cumple ? Optional.of(valor) : Optional.empty();</span>
+  }
+
+  private static Boolean esIgual(JsonNode valor, JsonNode umbral) {
+<span class="fc bfc" id="L77" title="All 4 branches covered.">    if (valor.isBoolean() &amp;&amp; umbral.isBoolean()) {</span>
+<span class="fc bfc" id="L78" title="All 2 branches covered.">      return valor.booleanValue() == umbral.booleanValue();</span>
+    }
+<span class="fc bfc" id="L80" title="All 4 branches covered.">    if (valor.isNumber() &amp;&amp; umbral.isNumber()) {</span>
+<span class="fc bfc" id="L81" title="All 2 branches covered.">      return valor.decimalValue().compareTo(umbral.decimalValue()) == 0;</span>
+    }
+<span class="pc bpc" id="L83" title="1 of 4 branches missed.">    if (valor.isTextual() &amp;&amp; umbral.isTextual()) {</span>
+<span class="fc" id="L84">      return valor.textValue().equals(umbral.textValue());</span>
+    }
+<span class="fc" id="L86">    return null;</span>
+  }
+
+  /** Orden del valor respecto al umbral: números, o textos de la escala de severidad. */
+  private static Integer comparar(JsonNode valor, JsonNode umbral) {
+<span class="fc bfc" id="L91" title="All 4 branches covered.">    if (valor.isNumber() &amp;&amp; umbral.isNumber()) {</span>
+<span class="fc" id="L92">      return valor.decimalValue().compareTo(umbral.decimalValue());</span>
+    }
+<span class="pc bpc" id="L94" title="1 of 4 branches missed.">    if (valor.isTextual() &amp;&amp; umbral.isTextual()) {</span>
+<span class="fc" id="L95">      int posicionValor = ESCALA_SEVERIDAD.indexOf(valor.textValue());</span>
+<span class="fc" id="L96">      int posicionUmbral = ESCALA_SEVERIDAD.indexOf(umbral.textValue());</span>
+<span class="pc bpc" id="L97" title="1 of 4 branches missed.">      if (posicionValor &gt;= 0 &amp;&amp; posicionUmbral &gt;= 0) {</span>
+<span class="fc" id="L98">        return Integer.compare(posicionValor, posicionUmbral);</span>
+      }
+    }
+<span class="fc" id="L101">    return null;</span>
+  }
+
+  /** Aplica la prueba al resultado, conservando «no comparable» como nulo. */
+  private static &lt;T&gt; Boolean aplicar(T resultado, Predicate&lt;T&gt; prueba) {
+<span class="fc bfc" id="L106" title="All 2 branches covered.">    return resultado == null ? null : prueba.test(resultado);</span>
+  }
+
+  private static Boolean contiene(JsonNode valor, JsonNode umbral) {
+<span class="fc bfc" id="L110" title="All 2 branches covered.">    if (!umbral.isTextual()) {</span>
+<span class="fc" id="L111">      return null;</span>
+    }
+<span class="fc bfc" id="L113" title="All 2 branches covered.">    if (valor.isArray()) {</span>
+<span class="fc bfc" id="L114" title="All 2 branches covered.">      for (JsonNode elemento : valor) {</span>
+<span class="pc bpc" id="L115" title="1 of 4 branches missed.">        if (elemento.isTextual() &amp;&amp; elemento.textValue().equals(umbral.textValue())) {</span>
+<span class="fc" id="L116">          return true;</span>
+        }
+<span class="fc" id="L118">      }</span>
+<span class="fc" id="L119">      return false;</span>
+    }
+<span class="fc" id="L121">    return null;</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

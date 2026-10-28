@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ConversorIndicadoresIc.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">sgp-api</a> &gt; <a href="index.source.html" class="el_package">gt.usac.cunoc.sgp.inspeccion.service</a> &gt; <span class="el_source">ConversorIndicadoresIc.java</span></div><h1>ConversorIndicadoresIc.java</h1><pre class="source lang-java linenums">package gt.usac.cunoc.sgp.inspeccion.service;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import gt.usac.cunoc.sgp.common.exception.ApiException;
+import java.math.BigDecimal;
+import org.springframework.http.HttpStatus;
+import org.springframework.stereotype.Service;
+
+@Service
+public class ConversorIndicadoresIc {
+
+  private final AgregadorCalificacionesIc agregador;
+
+<span class="fc" id="L14">  public ConversorIndicadoresIc(AgregadorCalificacionesIc agregador) {</span>
+<span class="fc" id="L15">    this.agregador = agregador;</span>
+<span class="fc" id="L16">  }</span>
+
+  public BigDecimal convertirSeveridad(JsonNode valor, JsonNode reglas, String referencia) {
+
+<span class="fc bfc" id="L20" title="All 4 branches covered.">    if (reglas == null || !reglas.isObject()) {</span>
+<span class="fc" id="L21">      throw error(</span>
+          &quot;configuracion_ic_incompleta&quot;, &quot;Faltan las reglas de evaluacion de &quot; + referencia);
+    }
+
+<span class="fc" id="L25">    return convertirCategoria(valor, reglas.get(&quot;escala_severidad&quot;), referencia);</span>
+  }
+
+  public BigDecimal convertirCategoria(JsonNode valor, JsonNode equivalencias, String referencia) {
+
+<span class="fc bfc" id="L30" title="All 6 branches covered.">    if (valor == null || valor.isNull() || valor.isMissingNode()) {</span>
+<span class="fc" id="L31">      throw error(&quot;datos_ic_incompletos&quot;, &quot;Falta el valor del indicador &quot; + referencia);</span>
+    }
+
+<span class="fc bfc" id="L34" title="All 4 branches covered.">    if (!valor.isTextual() &amp;&amp; !valor.isBoolean()) {</span>
+<span class="fc" id="L35">      throw error(</span>
+          &quot;indicador_ic_invalido&quot;,
+          &quot;El indicador &quot; + referencia + &quot; debe contener una categoria o un booleano&quot;);
+    }
+
+<span class="fc" id="L40">    String categoria = valor.asText();</span>
+
+<span class="fc bfc" id="L42" title="All 4 branches covered.">    if (equivalencias == null || !equivalencias.isObject()) {</span>
+<span class="fc" id="L43">      throw error(</span>
+          &quot;configuracion_ic_incompleta&quot;, &quot;Faltan las equivalencias del indicador &quot; + referencia);
+    }
+
+<span class="fc" id="L47">    return leerCalificacion(equivalencias.get(categoria), referencia + &quot; [&quot; + categoria + &quot;]&quot;);</span>
+  }
+
+  public BigDecimal leerCalificacion(JsonNode configuracion, String referencia) {
+
+<span class="fc bfc" id="L52" title="All 6 branches covered.">    if (configuracion == null || configuracion.isNull() || configuracion.isMissingNode()) {</span>
+<span class="fc" id="L53">      throw error(</span>
+          &quot;configuracion_ic_incompleta&quot;, &quot;Falta configurar la calificacion de &quot; + referencia);
+    }
+
+<span class="fc bfc" id="L57" title="All 2 branches covered.">    if (!configuracion.isNumber()) {</span>
+<span class="fc" id="L58">      throw error(</span>
+          &quot;configuracion_ic_invalida&quot;,
+          &quot;La calificacion configurada de &quot; + referencia + &quot; debe ser numerica&quot;);
+    }
+
+<span class="fc" id="L63">    BigDecimal calificacion = configuracion.decimalValue();</span>
+<span class="fc" id="L64">    agregador.validarCalificacion(calificacion, referencia);</span>
+
+<span class="fc" id="L66">    return calificacion;</span>
+  }
+
+  private ApiException error(String codigo, String detalle) {
+<span class="fc" id="L70">    return new ApiException(</span>
+        HttpStatus.UNPROCESSABLE_ENTITY,
+        codigo,
+        &quot;Indicadores del indice de condicion invalidos&quot;,
+        detalle);
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>
