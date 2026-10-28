@@ -2119,6 +2119,7 @@
       "noActions": "Sin acciones disponibles",
       "deleteTitle": "Eliminar borrador",
       "deleteConfirmation": "Eliminarás de forma lógica el borrador de {{puente}}. Esta acción no se puede deshacer desde la aplicación.",
+      "deleteCreationPending": "La creación de esta inspección aún no está confirmada. Espera a que termine la sincronización y vuelve a intentar eliminarla.",
       "deleteError": "No fue posible eliminar el borrador. Es posible que ya no esté disponible.",
       "estados": {
         "BORRADOR": "Borrador",
