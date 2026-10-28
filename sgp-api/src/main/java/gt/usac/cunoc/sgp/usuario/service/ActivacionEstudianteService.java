@@ -15,6 +15,8 @@ import gt.usac.cunoc.sgp.usuario.model.RoleName;
 import gt.usac.cunoc.sgp.usuario.repository.UserAccountRepository;
 import java.time.Clock;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -104,6 +106,7 @@ public class ActivacionEstudianteService {
           "Curso finalizado",
           "No es posible vincular estudiantes a un curso finalizado");
     }
+    exigirFechasVigentes(curso);
     if (inscripciones.existsByCurso_IdAndEstudiante_Id(curso.getId(), estudiante.getId())) {
       throw new ApiException(
           HttpStatus.CONFLICT,
@@ -134,6 +137,7 @@ public class ActivacionEstudianteService {
   public List<CursoDisponibleResponse> listarCursosVigentes(String emailCatedratico) {
     UserAccount catedratico = buscarCatedratico(emailCatedratico);
     return cursos.findByCatedratico_IdAndActivoTrueOrderByPeriodoDesc(catedratico.getId()).stream()
+        .filter(curso -> fechasVigentes(curso))
         .map(
             curso ->
                 new CursoDisponibleResponse(
@@ -154,6 +158,7 @@ public class ActivacionEstudianteService {
           "Curso finalizado",
           "No es posible vincular estudiantes a un curso finalizado");
     }
+    exigirFechasVigentes(curso);
     if (inscripciones.existsByEstudiante_IdAndEstado(estudiante.getId(), "ACTIVO")) {
       throw new ApiException(
           HttpStatus.CONFLICT,
@@ -185,6 +190,21 @@ public class ActivacionEstudianteService {
             "seccion", request.seccion().trim()),
         ahora);
     return new MessageResponse("Estudiante activado y vinculado al curso correctamente");
+  }
+
+  private boolean fechasVigentes(Curso curso) {
+    LocalDate hoy = LocalDate.now(clock.withZone(ZoneId.of("America/Guatemala")));
+    return !hoy.isBefore(curso.getFechaInicio()) && !hoy.isAfter(curso.getFechaFin());
+  }
+
+  private void exigirFechasVigentes(Curso curso) {
+    if (!fechasVigentes(curso)) {
+      throw new ApiException(
+          HttpStatus.UNPROCESSABLE_ENTITY,
+          "curso_fuera_de_fechas",
+          "Curso fuera de fechas",
+          "Seleccione un curso cuyas fechas incluyan el día actual.");
+    }
   }
 
   private UserAccount buscarCatedratico(String email) {
