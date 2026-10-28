@@ -1,0 +1,119 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Curso.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">sgp-api</a> &gt; <a href="index.source.html" class="el_package">gt.usac.cunoc.sgp.curso.entity</a> &gt; <span class="el_source">Curso.java</span></div><h1>Curso.java</h1><pre class="source lang-java linenums">package gt.usac.cunoc.sgp.curso.entity;
+
+import gt.usac.cunoc.sgp.common.util.UuidV7Generator;
+import gt.usac.cunoc.sgp.usuario.entity.UserAccount;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Table;
+import jakarta.persistence.Version;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.util.UUID;
+
+@Entity
+@Table(name = &quot;curso&quot;)
+public class Curso {
+
+  @Id private UUID id;
+
+  @ManyToOne(fetch = FetchType.LAZY, optional = false)
+  @JoinColumn(name = &quot;asignatura_id&quot;, nullable = false)
+  private Asignatura asignatura;
+
+  @Column(nullable = false, length = 50)
+  private String periodo;
+
+  @ManyToOne(fetch = FetchType.LAZY, optional = false)
+  @JoinColumn(name = &quot;catedratico_id&quot;, nullable = false)
+  private UserAccount catedratico;
+
+  @Column(name = &quot;fecha_inicio&quot;, nullable = false)
+  private LocalDate fechaInicio;
+
+  @Column(name = &quot;fecha_fin&quot;, nullable = false)
+  private LocalDate fechaFin;
+
+  @Column(nullable = false)
+  private boolean activo;
+
+  @Column(name = &quot;creado_en&quot;, nullable = false, updatable = false)
+  private Instant creadoEn;
+
+  @Column(name = &quot;actualizado_en&quot;, nullable = false)
+  private Instant actualizadoEn;
+
+  @Version private long version;
+
+<span class="nc" id="L51">  protected Curso() {}</span>
+
+  public Curso(
+      Asignatura asignatura,
+      String periodo,
+      UserAccount catedratico,
+      LocalDate fechaInicio,
+      LocalDate fechaFin,
+<span class="fc" id="L59">      Instant ahora) {</span>
+<span class="fc" id="L60">    this.id = UuidV7Generator.generate();</span>
+<span class="fc" id="L61">    this.asignatura = asignatura;</span>
+<span class="fc" id="L62">    this.periodo = periodo;</span>
+<span class="fc" id="L63">    this.catedratico = catedratico;</span>
+<span class="fc" id="L64">    this.fechaInicio = fechaInicio;</span>
+<span class="fc" id="L65">    this.fechaFin = fechaFin;</span>
+<span class="fc" id="L66">    this.activo = true;</span>
+<span class="fc" id="L67">    this.creadoEn = ahora;</span>
+<span class="fc" id="L68">    this.actualizadoEn = ahora;</span>
+<span class="fc" id="L69">  }</span>
+
+  public void finalizar(Instant ahora) {
+<span class="fc" id="L72">    this.activo = false;</span>
+<span class="fc" id="L73">    this.actualizadoEn = ahora;</span>
+<span class="fc" id="L74">  }</span>
+
+  public void actualizar(
+      Asignatura asignatura,
+      String periodo,
+      UserAccount catedratico,
+      LocalDate fechaInicio,
+      LocalDate fechaFin,
+      Instant ahora) {
+<span class="fc" id="L83">    this.asignatura = asignatura;</span>
+<span class="fc" id="L84">    this.periodo = periodo;</span>
+<span class="fc" id="L85">    this.catedratico = catedratico;</span>
+<span class="fc" id="L86">    this.fechaInicio = fechaInicio;</span>
+<span class="fc" id="L87">    this.fechaFin = fechaFin;</span>
+<span class="fc" id="L88">    this.actualizadoEn = ahora;</span>
+<span class="fc" id="L89">  }</span>
+
+  public UUID getId() {
+<span class="fc" id="L92">    return id;</span>
+  }
+
+  public Asignatura getAsignatura() {
+<span class="fc" id="L96">    return asignatura;</span>
+  }
+
+  public String getPeriodo() {
+<span class="fc" id="L100">    return periodo;</span>
+  }
+
+  public UserAccount getCatedratico() {
+<span class="fc" id="L104">    return catedratico;</span>
+  }
+
+  public LocalDate getFechaInicio() {
+<span class="nc" id="L108">    return fechaInicio;</span>
+  }
+
+  public LocalDate getFechaFin() {
+<span class="nc" id="L112">    return fechaFin;</span>
+  }
+
+  public boolean isActivo() {
+<span class="fc" id="L116">    return activo;</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

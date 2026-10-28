@@ -1,0 +1,129 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>OtpService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">sgp-api</a> &gt; <a href="index.source.html" class="el_package">gt.usac.cunoc.sgp.usuario.service</a> &gt; <span class="el_source">OtpService.java</span></div><h1>OtpService.java</h1><pre class="source lang-java linenums">package gt.usac.cunoc.sgp.usuario.service;
+
+import gt.usac.cunoc.sgp.common.config.OtpProperties;
+import gt.usac.cunoc.sgp.common.exception.ApiException;
+import gt.usac.cunoc.sgp.usuario.entity.OtpChallenge;
+import gt.usac.cunoc.sgp.usuario.entity.UserAccount;
+import gt.usac.cunoc.sgp.usuario.exception.OtpRateLimitException;
+import gt.usac.cunoc.sgp.usuario.model.OtpPurpose;
+import gt.usac.cunoc.sgp.usuario.repository.OtpChallengeRepository;
+import java.security.SecureRandom;
+import java.time.Clock;
+import java.time.Instant;
+import java.util.Locale;
+import java.util.UUID;
+import org.springframework.http.HttpStatus;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+@Service
+public class OtpService {
+
+  private final OtpChallengeRepository challenges;
+  private final PasswordEncoder passwordEncoder;
+  private final OtpEmailService otpEmailService;
+  private final OtpProperties properties;
+  private final Clock clock;
+<span class="fc" id="L28">  private final SecureRandom random = new SecureRandom();</span>
+
+  public OtpService(
+      OtpChallengeRepository challenges,
+      PasswordEncoder passwordEncoder,
+      OtpEmailService otpEmailService,
+      OtpProperties properties,
+<span class="fc" id="L35">      Clock clock) {</span>
+<span class="fc" id="L36">    this.challenges = challenges;</span>
+<span class="fc" id="L37">    this.passwordEncoder = passwordEncoder;</span>
+<span class="fc" id="L38">    this.otpEmailService = otpEmailService;</span>
+<span class="fc" id="L39">    this.properties = properties;</span>
+<span class="fc" id="L40">    this.clock = clock;</span>
+<span class="fc" id="L41">  }</span>
+
+  @Transactional(noRollbackFor = OtpRateLimitException.class)
+  public OtpChallenge issue(UserAccount user, OtpPurpose purpose) {
+<span class="nc" id="L45">    Instant now = clock.instant();</span>
+<span class="nc" id="L46">    OtpChallenge latest =</span>
+        challenges
+<span class="nc" id="L48">            .findTopByUserAndPurposeAndConsumedAtIsNullOrderByCreatedAtDesc(user, purpose)</span>
+<span class="nc" id="L49">            .orElse(null);</span>
+<span class="nc bnc" id="L50" title="All 2 branches missed.">    if (latest != null</span>
+<span class="nc bnc" id="L51" title="All 2 branches missed.">        &amp;&amp; !latest.isExpired(now)</span>
+<span class="nc bnc" id="L52" title="All 2 branches missed.">        &amp;&amp; latest.getCreatedAt().plusSeconds(properties.getResendCooldownSeconds()).isAfter(now)) {</span>
+<span class="nc" id="L53">      throw new OtpRateLimitException();</span>
+    }
+<span class="nc" id="L55">    challenges.invalidateActive(user, purpose, now);</span>
+<span class="nc" id="L56">    String code = generateCode();</span>
+<span class="nc" id="L57">    OtpChallenge challenge =</span>
+<span class="nc" id="L58">        challenges.save(</span>
+            new OtpChallenge(
+                user,
+                purpose,
+<span class="nc" id="L62">                passwordEncoder.encode(code),</span>
+<span class="nc" id="L63">                now.plusSeconds(properties.getExpirationMinutes() * 60L),</span>
+<span class="nc" id="L64">                properties.getMaxAttempts(),</span>
+                now));
+<span class="nc" id="L66">    otpEmailService.sendOtp(user.getEmail(), purpose, code, challenge.getExpiresAt());</span>
+<span class="nc" id="L67">    return challenge;</span>
+  }
+
+  @Transactional(noRollbackFor = ApiException.class)
+  public UserAccount verify(
+      UUID challengeId, UserAccount expectedUser, OtpPurpose purpose, String code) {
+<span class="nc" id="L73">    OtpChallenge challenge = challenges.findForUpdate(challengeId).orElse(null);</span>
+<span class="nc bnc" id="L74" title="All 2 branches missed.">    if (challenge == null</span>
+<span class="nc bnc" id="L75" title="All 2 branches missed.">        || challenge.getPurpose() != purpose</span>
+<span class="nc bnc" id="L76" title="All 2 branches missed.">        || !challenge.getUser().getId().equals(expectedUser.getId())) throw invalidOtp();</span>
+<span class="nc" id="L77">    verifyCode(challenge, code);</span>
+<span class="nc" id="L78">    challenge.consume(clock.instant());</span>
+<span class="nc" id="L79">    return challenge.getUser();</span>
+  }
+
+  @Transactional(noRollbackFor = ApiException.class)
+  public UserAccount verify(UUID challengeId, OtpPurpose purpose, String code) {
+<span class="nc" id="L84">    OtpChallenge challenge = challenges.findForUpdate(challengeId).orElse(null);</span>
+<span class="nc bnc" id="L85" title="All 4 branches missed.">    if (challenge == null || challenge.getPurpose() != purpose) throw invalidOtp();</span>
+<span class="nc" id="L86">    verifyCode(challenge, code);</span>
+<span class="nc" id="L87">    challenge.consume(clock.instant());</span>
+<span class="nc" id="L88">    return challenge.getUser();</span>
+  }
+
+  @Transactional(noRollbackFor = ApiException.class)
+  public UserAccount verifyLatest(UserAccount user, OtpPurpose purpose, String code) {
+<span class="fc" id="L93">    OtpChallenge challenge =</span>
+        challenges
+<span class="fc" id="L95">            .findTopByUserAndPurposeAndConsumedAtIsNullOrderByCreatedAtDesc(user, purpose)</span>
+<span class="fc" id="L96">            .orElse(null);</span>
+<span class="pc bpc" id="L97" title="1 of 2 branches missed.">    if (challenge == null) throw invalidOtp();</span>
+<span class="fc" id="L98">    verifyCode(challenge, code);</span>
+<span class="fc" id="L99">    challenge.consume(clock.instant());</span>
+<span class="fc" id="L100">    return challenge.getUser();</span>
+  }
+
+  private void verifyCode(OtpChallenge challenge, String code) {
+<span class="fc" id="L104">    Instant now = clock.instant();</span>
+<span class="pc bpc" id="L105" title="1 of 2 branches missed.">    if (code == null</span>
+<span class="pc bpc" id="L106" title="1 of 2 branches missed.">        || challenge.isConsumed()</span>
+<span class="pc bpc" id="L107" title="1 of 2 branches missed.">        || challenge.isExpired(now)</span>
+<span class="pc bpc" id="L108" title="1 of 2 branches missed.">        || !challenge.hasAttemptsRemaining()) throw invalidOtp();</span>
+<span class="pc bpc" id="L109" title="1 of 2 branches missed.">    if (!passwordEncoder.matches(code, challenge.getCodeHash())) {</span>
+<span class="nc" id="L110">      challenge.registerFailedAttempt(now);</span>
+<span class="nc" id="L111">      throw invalidOtp();</span>
+    }
+<span class="fc" id="L113">  }</span>
+
+  private String generateCode() {
+<span class="nc" id="L116">    int length = properties.getLength();</span>
+<span class="nc" id="L117">    int bound = (int) Math.pow(10, length);</span>
+<span class="nc" id="L118">    return String.format(Locale.ROOT, &quot;%0&quot; + length + &quot;d&quot;, random.nextInt(bound));</span>
+  }
+
+  private ApiException invalidOtp() {
+<span class="nc" id="L122">    return new ApiException(</span>
+        HttpStatus.BAD_REQUEST,
+        &quot;invalid_otp&quot;,
+        &quot;Codigo OTP invalido&quot;,
+        &quot;Codigo OTP invalido o expirado&quot;);
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

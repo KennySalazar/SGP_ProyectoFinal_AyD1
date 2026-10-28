@@ -1,0 +1,116 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PrioridadSugeridaIc.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">sgp-api</a> &gt; <a href="index.source.html" class="el_package">gt.usac.cunoc.sgp.mantenimiento.service</a> &gt; <span class="el_source">PrioridadSugeridaIc.java</span></div><h1>PrioridadSugeridaIc.java</h1><pre class="source lang-java linenums">package gt.usac.cunoc.sgp.mantenimiento.service;
+
+import gt.usac.cunoc.sgp.formulario.entity.ConfiguracionIcElemento;
+import gt.usac.cunoc.sgp.inspeccion.entity.ResultadoIc;
+import gt.usac.cunoc.sgp.mantenimiento.model.PrioridadOrden;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
+import java.util.UUID;
+
+/** HU-067 deterministic priority calculation for newly generated proposals. */
+final class PrioridadSugeridaIc {
+
+<span class="fc" id="L16">  private static final BigDecimal CIEN = BigDecimal.valueOf(100);</span>
+
+  private PrioridadSugeridaIc() {}
+
+  static Calculo calcular(
+      PrioridadOrden base,
+      ResultadoIc resultado,
+      UUID versionFormularioId,
+      String elementoRef,
+      List&lt;ConfiguracionIcElemento&gt; configuraciones) {
+<span class="fc" id="L26">    List&lt;String&gt; motivos = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L27" title="All 2 branches covered.">    BigDecimal ic = resultado == null ? null : resultado.getIndiceCalculado();</span>
+<span class="fc bfc" id="L28" title="All 2 branches covered.">    if (resultado == null) {</span>
+<span class="fc" id="L29">      motivos.add(&quot;No hay un IC publicado disponible.&quot;);</span>
+    } else {
+<span class="pc bpc" id="L31" title="1 of 2 branches missed.">      if (ic == null) motivos.add(&quot;No hay un IC publicado disponible.&quot;);</span>
+<span class="fc bfc" id="L32" title="All 2 branches covered.">      if (!Objects.equals(resultado.getVersionConfiguracionId(), versionFormularioId)) {</span>
+<span class="fc" id="L33">        motivos.add(&quot;La versión del resultado IC no coincide con la inspección.&quot;);</span>
+      }
+<span class="pc bpc" id="L35" title="2 of 6 branches missed.">      if (ic != null &amp;&amp; (ic.compareTo(BigDecimal.ZERO) &lt; 0 || ic.compareTo(CIEN) &gt; 0)) {</span>
+<span class="fc" id="L36">        motivos.add(&quot;El IC publicado está fuera del rango de 0 a 100.&quot;);</span>
+      }
+    }
+
+<span class="pc bpc" id="L40" title="1 of 2 branches missed.">    List&lt;ConfiguracionIcElemento&gt; pesos = configuraciones == null ? List.of() : configuraciones;</span>
+<span class="fc" id="L41">    List&lt;ConfiguracionIcElemento&gt; coincidentes =</span>
+<span class="fc" id="L42">        pesos.stream().filter(c -&gt; Objects.equals(c.getElementoRef(), elementoRef)).toList();</span>
+<span class="fc" id="L43">    BigDecimal pesoElemento = null;</span>
+<span class="fc bfc" id="L44" title="All 2 branches covered.">    if (coincidentes.isEmpty()) {</span>
+<span class="fc" id="L45">      motivos.add(&quot;No hay un peso configurado para el elemento afectado.&quot;);</span>
+<span class="pc bpc" id="L46" title="1 of 2 branches missed.">    } else if (coincidentes.size() != 1) {</span>
+<span class="nc" id="L47">      motivos.add(&quot;Hay más de un peso configurado para el elemento en esa versión.&quot;);</span>
+    } else {
+<span class="fc" id="L49">      pesoElemento = coincidentes.getFirst().getPeso();</span>
+<span class="pc bpc" id="L50" title="1 of 4 branches missed.">      if (pesoElemento == null || pesoElemento.signum() &lt;= 0) {</span>
+<span class="fc" id="L51">        motivos.add(&quot;El peso configurado para el elemento no es positivo.&quot;);</span>
+      }
+    }
+
+<span class="fc" id="L55">    BigDecimal pesoMaximo =</span>
+<span class="fc" id="L56">        pesos.stream()</span>
+<span class="fc" id="L57">            .map(ConfiguracionIcElemento::getPeso)</span>
+<span class="fc" id="L58">            .filter(Objects::nonNull)</span>
+<span class="fc bfc" id="L59" title="All 2 branches covered.">            .filter(p -&gt; p.signum() &gt; 0)</span>
+<span class="fc" id="L60">            .max(BigDecimal::compareTo)</span>
+<span class="fc" id="L61">            .orElse(null);</span>
+<span class="fc bfc" id="L62" title="All 2 branches covered.">    if (pesoMaximo == null) motivos.add(&quot;La versión no tiene un peso máximo positivo disponible.&quot;);</span>
+
+<span class="fc" id="L64">    BigDecimal relativo = null;</span>
+<span class="pc bpc" id="L65" title="1 of 6 branches missed.">    if (pesoElemento != null &amp;&amp; pesoElemento.signum() &gt; 0 &amp;&amp; pesoMaximo != null) {</span>
+<span class="fc" id="L66">      relativo = pesoElemento.divide(pesoMaximo, 16, RoundingMode.HALF_UP);</span>
+<span class="pc bpc" id="L67" title="1 of 2 branches missed.">      if (pesoElemento.compareTo(pesoMaximo) &gt; 0</span>
+<span class="pc bpc" id="L68" title="1 of 2 branches missed.">          || relativo.compareTo(BigDecimal.ZERO) &lt; 0</span>
+<span class="pc bpc" id="L69" title="1 of 2 branches missed.">          || relativo.compareTo(BigDecimal.ONE) &gt; 0) {</span>
+<span class="nc" id="L70">        motivos.add(&quot;El peso relativo no está dentro del rango de 0 a 1.&quot;);</span>
+      }
+    }
+
+<span class="fc bfc" id="L74" title="All 2 branches covered.">    if (!motivos.isEmpty()) {</span>
+<span class="fc" id="L75">      return new Calculo(base, ic, pesoElemento, pesoMaximo, relativo, String.join(&quot;;&quot;, motivos));</span>
+    }
+
+<span class="fc" id="L78">    int baseIndex = indice(base);</span>
+<span class="fc" id="L79">    BigDecimal incremento =</span>
+<span class="fc" id="L80">        BigDecimal.valueOf(3L - baseIndex)</span>
+<span class="fc" id="L81">            .multiply(CIEN.subtract(ic))</span>
+<span class="fc" id="L82">            .multiply(pesoElemento)</span>
+<span class="fc" id="L83">            .divide(CIEN.multiply(pesoMaximo), 0, RoundingMode.HALF_UP);</span>
+<span class="fc" id="L84">    int sugerida = baseIndex + incremento.intValueExact();</span>
+<span class="fc" id="L85">    return new Calculo(prioridad(sugerida), ic, pesoElemento, pesoMaximo, relativo, null);</span>
+  }
+
+  private static int indice(PrioridadOrden prioridad) {
+<span class="fc bfc" id="L89" title="All 4 branches covered.">    return switch (prioridad) {</span>
+<span class="fc" id="L90">      case BAJA -&gt; 0;</span>
+<span class="fc" id="L91">      case MEDIA -&gt; 1;</span>
+<span class="fc" id="L92">      case ALTA -&gt; 2;</span>
+<span class="fc" id="L93">      case CRITICA -&gt; 3;</span>
+    };
+  }
+
+  private static PrioridadOrden prioridad(int indice) {
+<span class="pc bpc" id="L98" title="1 of 5 branches missed.">    return switch (indice) {</span>
+<span class="fc" id="L99">      case 0 -&gt; PrioridadOrden.BAJA;</span>
+<span class="fc" id="L100">      case 1 -&gt; PrioridadOrden.MEDIA;</span>
+<span class="fc" id="L101">      case 2 -&gt; PrioridadOrden.ALTA;</span>
+<span class="fc" id="L102">      case 3 -&gt; PrioridadOrden.CRITICA;</span>
+      default -&gt;
+<span class="nc" id="L104">          throw new IllegalArgumentException(&quot;Indice de prioridad fuera de rango: &quot; + indice);</span>
+    };
+  }
+
+<span class="fc" id="L108">  record Calculo(</span>
+      PrioridadOrden prioridad,
+      BigDecimal ic,
+      BigDecimal pesoElemento,
+      BigDecimal pesoMaximo,
+      BigDecimal pesoRelativo,
+      String motivoFallback) {}
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

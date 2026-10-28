@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ArchivoInspeccion.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">sgp-api</a> &gt; <a href="index.source.html" class="el_package">gt.usac.cunoc.sgp.archivo.entity</a> &gt; <span class="el_source">ArchivoInspeccion.java</span></div><h1>ArchivoInspeccion.java</h1><pre class="source lang-java linenums">package gt.usac.cunoc.sgp.archivo.entity;
+
+import gt.usac.cunoc.sgp.archivo.model.TipoUsoArchivo;
+import gt.usac.cunoc.sgp.inspeccion.entity.Inspeccion;
+import jakarta.persistence.*;
+import java.time.Instant;
+import java.util.UUID;
+
+@Entity
+@Table(name = &quot;archivo_inspeccion&quot;)
+public class ArchivoInspeccion implements org.springframework.data.domain.Persistable&lt;UUID&gt; {
+<span class="fc" id="L12">  @Transient private boolean nuevo = true;</span>
+
+  @PostLoad
+  @PostPersist
+  void persistido() {
+<span class="fc" id="L17">    nuevo = false;</span>
+<span class="fc" id="L18">  }</span>
+
+  public boolean isNew() {
+<span class="fc" id="L21">    return nuevo;</span>
+  }
+
+  @Id
+  @Column(name = &quot;archivo_id&quot;)
+  private UUID archivoId;
+
+  @OneToOne(fetch = FetchType.LAZY, optional = false)
+  @JoinColumn(name = &quot;archivo_id&quot;, insertable = false, updatable = false)
+  private Archivo archivo;
+
+  @Enumerated(EnumType.STRING)
+  @Column(name = &quot;tipo_uso&quot;, nullable = false, length = 30)
+  private TipoUsoArchivo tipoUso;
+
+  @ManyToOne(fetch = FetchType.LAZY, optional = false)
+  @JoinColumn(name = &quot;inspeccion_id&quot;)
+  private Inspeccion inspeccion;
+
+  @Column(name = &quot;elemento_ref&quot;, length = 300)
+  private String elementoRef;
+
+  @Column(name = &quot;instancia_elemento_id&quot;)
+  private UUID instanciaElementoId;
+
+  @Column(name = &quot;creado_en&quot;, nullable = false)
+  private Instant creadoEn;
+
+  public UUID getId() {
+<span class="nc" id="L50">    return archivoId;</span>
+  }
+
+<span class="fc" id="L53">  protected ArchivoInspeccion() {}</span>
+
+  public ArchivoInspeccion(
+      Archivo archivo,
+      Inspeccion inspeccion,
+      String elementoRef,
+      UUID instanciaElementoId,
+<span class="fc" id="L60">      Instant creadoEn) {</span>
+<span class="fc" id="L61">    this.archivo = archivo;</span>
+<span class="fc" id="L62">    this.archivoId = archivo.getId();</span>
+<span class="fc" id="L63">    this.tipoUso = archivo.getTipoUso();</span>
+<span class="fc" id="L64">    this.inspeccion = inspeccion;</span>
+<span class="fc" id="L65">    this.elementoRef = elementoRef;</span>
+<span class="fc" id="L66">    this.instanciaElementoId = instanciaElementoId;</span>
+<span class="fc" id="L67">    this.creadoEn = creadoEn;</span>
+<span class="fc" id="L68">  }</span>
+
+  public UUID getArchivoId() {
+<span class="fc" id="L71">    return archivoId;</span>
+  }
+
+  public Archivo getArchivo() {
+<span class="fc" id="L75">    return archivo;</span>
+  }
+
+  public TipoUsoArchivo getTipoUso() {
+<span class="nc" id="L79">    return tipoUso;</span>
+  }
+
+  public Inspeccion getInspeccion() {
+<span class="fc" id="L83">    return inspeccion;</span>
+  }
+
+  public String getElementoRef() {
+<span class="fc" id="L87">    return elementoRef;</span>
+  }
+
+  public UUID getInstanciaElementoId() {
+<span class="fc" id="L91">    return instanciaElementoId;</span>
+  }
+
+  public Instant getCreadoEn() {
+<span class="nc" id="L95">    return creadoEn;</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

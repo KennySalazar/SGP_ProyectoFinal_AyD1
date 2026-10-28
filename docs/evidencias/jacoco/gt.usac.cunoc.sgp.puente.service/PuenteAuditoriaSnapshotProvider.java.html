@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PuenteAuditoriaSnapshotProvider.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">sgp-api</a> &gt; <a href="index.source.html" class="el_package">gt.usac.cunoc.sgp.puente.service</a> &gt; <span class="el_source">PuenteAuditoriaSnapshotProvider.java</span></div><h1>PuenteAuditoriaSnapshotProvider.java</h1><pre class="source lang-java linenums">package gt.usac.cunoc.sgp.puente.service;
+
+import gt.usac.cunoc.sgp.common.audit.service.AuditoriaSnapshotProvider;
+import gt.usac.cunoc.sgp.puente.entity.Puente;
+import gt.usac.cunoc.sgp.puente.repository.PuenteRepository;
+import java.util.UUID;
+import org.springframework.stereotype.Component;
+
+@Component
+public class PuenteAuditoriaSnapshotProvider implements AuditoriaSnapshotProvider {
+  private final PuenteRepository puentes;
+
+<span class="fc" id="L13">  public PuenteAuditoriaSnapshotProvider(PuenteRepository puentes) {</span>
+<span class="fc" id="L14">    this.puentes = puentes;</span>
+<span class="fc" id="L15">  }</span>
+
+  @Override
+  public Class&lt;?&gt; tipo() {
+<span class="fc" id="L19">    return Puente.class;</span>
+  }
+
+  @Override
+  public Object cargar(UUID id) {
+<span class="fc" id="L24">    return puentes.findById(id).map(this::proyectar).orElse(null);</span>
+  }
+
+  private PuenteSnapshot proyectar(Puente puente) {
+<span class="fc" id="L28">    return new PuenteSnapshot(</span>
+<span class="fc" id="L29">        puente.getId(),</span>
+<span class="fc" id="L30">        puente.getCodigo(),</span>
+<span class="fc" id="L31">        puente.getNombre(),</span>
+<span class="fc" id="L32">        puente.getRuta(),</span>
+<span class="fc" id="L33">        puente.getUbicacion().getY(),</span>
+<span class="fc" id="L34">        puente.getUbicacion().getX(),</span>
+<span class="fc" id="L35">        puente.isActivo());</span>
+  }
+
+<span class="fc" id="L38">  public record PuenteSnapshot(</span>
+      UUID id,
+      String codigo,
+      String nombre,
+      String ruta,
+      double latitud,
+      double longitud,
+      boolean activo) {}
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

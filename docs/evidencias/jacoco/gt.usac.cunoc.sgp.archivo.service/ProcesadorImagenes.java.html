@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ProcesadorImagenes.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">sgp-api</a> &gt; <a href="index.source.html" class="el_package">gt.usac.cunoc.sgp.archivo.service</a> &gt; <span class="el_source">ProcesadorImagenes.java</span></div><h1>ProcesadorImagenes.java</h1><pre class="source lang-java linenums">package gt.usac.cunoc.sgp.archivo.service;
+
+import gt.usac.cunoc.sgp.archivo.model.ImagenProcesada;
+import java.awt.*;
+import java.awt.image.BufferedImage;
+import java.io.*;
+import java.nio.file.Path;
+import java.security.*;
+import java.util.HexFormat;
+import javax.imageio.*;
+import org.springframework.stereotype.Service;
+
+@Service
+public class ProcesadorImagenes {
+  private final InspectorImagenesImageIo inspector;
+
+<span class="fc" id="L17">  public ProcesadorImagenes(InspectorImagenesImageIo inspector) {</span>
+<span class="fc" id="L18">    this.inspector = inspector;</span>
+<span class="fc" id="L19">  }</span>
+
+  /** Normaliza JPEG y WebP a JPEG RGB sin EXIF; el llamador conserva GPS/fecha por separado. */
+  public ImagenProcesada procesar(Path archivo) throws IOException {
+<span class="fc" id="L23">    var decodificada = inspector.decodificar(archivo);</span>
+<span class="fc" id="L24">    BufferedImage original = escalar(decodificada.imagen(), 1600);</span>
+<span class="fc" id="L25">    byte[] bytes = jpeg(original, 0.82f);</span>
+<span class="fc" id="L26">    byte[] miniatura = jpeg(escalar(original, 300), 0.8f);</span>
+<span class="fc" id="L27">    return new ImagenProcesada(</span>
+<span class="fc" id="L28">        bytes, miniatura, &quot;image/jpeg&quot;, original.getWidth(), original.getHeight(), checksum(bytes));</span>
+  }
+
+  static BufferedImage escalar(BufferedImage fuente, int maximo) {
+<span class="fc" id="L32">    double factor =</span>
+<span class="fc" id="L33">        Math.min(1.0, (double) maximo / Math.max(fuente.getWidth(), fuente.getHeight()));</span>
+<span class="fc" id="L34">    int ancho = Math.max(1, (int) Math.round(fuente.getWidth() * factor)),</span>
+<span class="fc" id="L35">        alto = Math.max(1, (int) Math.round(fuente.getHeight() * factor));</span>
+<span class="fc" id="L36">    BufferedImage destino = new BufferedImage(ancho, alto, BufferedImage.TYPE_INT_RGB);</span>
+<span class="fc" id="L37">    Graphics2D g = destino.createGraphics();</span>
+    try {
+<span class="fc" id="L39">      g.setColor(Color.WHITE);</span>
+<span class="fc" id="L40">      g.fillRect(0, 0, ancho, alto);</span>
+<span class="fc" id="L41">      g.setRenderingHint(</span>
+          RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BICUBIC);
+<span class="fc" id="L43">      g.drawImage(fuente, 0, 0, ancho, alto, null);</span>
+    } finally {
+<span class="fc" id="L45">      g.dispose();</span>
+    }
+<span class="fc" id="L47">    return destino;</span>
+  }
+
+  private byte[] jpeg(BufferedImage imagen, float calidad) throws IOException {
+<span class="fc" id="L51">    var escritor = ImageIO.getImageWritersByFormatName(&quot;jpeg&quot;).next();</span>
+<span class="fc" id="L52">    try (var bytes = new ByteArrayOutputStream();</span>
+<span class="fc" id="L53">        var salida = ImageIO.createImageOutputStream(bytes)) {</span>
+<span class="fc" id="L54">      escritor.setOutput(salida);</span>
+<span class="fc" id="L55">      var parametros = escritor.getDefaultWriteParam();</span>
+<span class="fc" id="L56">      parametros.setCompressionMode(ImageWriteParam.MODE_EXPLICIT);</span>
+<span class="fc" id="L57">      parametros.setCompressionQuality(calidad);</span>
+<span class="fc" id="L58">      escritor.write(null, new IIOImage(imagen, null, null), parametros);</span>
+<span class="fc" id="L59">      salida.flush();</span>
+<span class="fc" id="L60">      return bytes.toByteArray();</span>
+    } finally {
+<span class="fc" id="L62">      escritor.dispose();</span>
+    }
+  }
+
+  public static String checksum(byte[] bytes) {
+    try {
+<span class="fc" id="L68">      return HexFormat.of().formatHex(MessageDigest.getInstance(&quot;SHA-256&quot;).digest(bytes));</span>
+<span class="nc" id="L69">    } catch (NoSuchAlgorithmException e) {</span>
+<span class="nc" id="L70">      throw new IllegalStateException(e);</span>
+    }
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

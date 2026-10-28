@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>OrdenesDeInspeccionService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">sgp-api</a> &gt; <a href="index.source.html" class="el_package">gt.usac.cunoc.sgp.mantenimiento.service</a> &gt; <span class="el_source">OrdenesDeInspeccionService.java</span></div><h1>OrdenesDeInspeccionService.java</h1><pre class="source lang-java linenums">package gt.usac.cunoc.sgp.mantenimiento.service;
+
+import gt.usac.cunoc.sgp.common.exception.ApiException;
+import gt.usac.cunoc.sgp.inspeccion.entity.Inspeccion;
+import gt.usac.cunoc.sgp.inspeccion.model.EstadoInspeccion;
+import gt.usac.cunoc.sgp.inspeccion.repository.InspeccionRepository;
+import gt.usac.cunoc.sgp.mantenimiento.dto.OrdenMantenimientoResponse;
+import gt.usac.cunoc.sgp.mantenimiento.mapper.OrdenMantenimientoMapper;
+import gt.usac.cunoc.sgp.mantenimiento.repository.OrdenMantenimientoRepository;
+import java.util.List;
+import java.util.UUID;
+import org.springframework.http.HttpStatus;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+/**
+ * Consulta las órdenes que originó una inspección publicada, para mostrarlas junto a ella (HU-046).
+ * Un borrador o una inspección en revisión no es visible para nadie más que su autor y su revisor
+ * (RN-INS-05), así que aquí responde 404 como si no existiera.
+ */
+@Service
+public class OrdenesDeInspeccionService {
+
+  private final InspeccionRepository inspecciones;
+  private final OrdenMantenimientoRepository ordenes;
+  private final OrdenMantenimientoMapper mapper;
+
+  public OrdenesDeInspeccionService(
+      InspeccionRepository inspecciones,
+      OrdenMantenimientoRepository ordenes,
+<span class="fc" id="L31">      OrdenMantenimientoMapper mapper) {</span>
+<span class="fc" id="L32">    this.inspecciones = inspecciones;</span>
+<span class="fc" id="L33">    this.ordenes = ordenes;</span>
+<span class="fc" id="L34">    this.mapper = mapper;</span>
+<span class="fc" id="L35">  }</span>
+
+  @Transactional(readOnly = true)
+  public List&lt;OrdenMantenimientoResponse&gt; listar(UUID inspeccionId) {
+<span class="fc" id="L39">    Inspeccion inspeccion =</span>
+        inspecciones
+<span class="fc" id="L41">            .findByIdAndEliminadoEnIsNull(inspeccionId)</span>
+<span class="fc bfc" id="L42" title="All 2 branches covered.">            .filter(i -&gt; i.estadoActual() == EstadoInspeccion.PUBLICADA)</span>
+<span class="fc" id="L43">            .orElseThrow(</span>
+                () -&gt;
+<span class="fc" id="L45">                    new ApiException(</span>
+                        HttpStatus.NOT_FOUND,
+                        &quot;inspeccion_no_encontrada&quot;,
+                        &quot;Inspección no encontrada&quot;,
+                        &quot;No existe la inspección publicada solicitada.&quot;));
+<span class="fc" id="L50">    return ordenes.findByInspeccionOrigenIdOrderByCreadoEnAscIdAsc(inspeccion.getId()).stream()</span>
+<span class="fc" id="L51">        .map(mapper::toResponse)</span>
+<span class="fc" id="L52">        .toList();</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

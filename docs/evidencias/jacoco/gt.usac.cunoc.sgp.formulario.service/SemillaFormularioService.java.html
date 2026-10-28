@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SemillaFormularioService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">sgp-api</a> &gt; <a href="index.source.html" class="el_package">gt.usac.cunoc.sgp.formulario.service</a> &gt; <span class="el_source">SemillaFormularioService.java</span></div><h1>SemillaFormularioService.java</h1><pre class="source lang-java linenums">package gt.usac.cunoc.sgp.formulario.service;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import gt.usac.cunoc.sgp.common.audit.model.AccionAuditoria;
+import gt.usac.cunoc.sgp.common.audit.service.AuditoriaWriter;
+import gt.usac.cunoc.sgp.common.config.BootstrapProperties;
+import gt.usac.cunoc.sgp.common.util.EmailNormalizer;
+import gt.usac.cunoc.sgp.formulario.repository.VersionFormularioRepository;
+import gt.usac.cunoc.sgp.mantenimiento.service.ReglaMantenimientoService;
+import gt.usac.cunoc.sgp.usuario.model.RoleName;
+import gt.usac.cunoc.sgp.usuario.repository.UserAccountRepository;
+import java.util.Optional;
+import java.util.UUID;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Isolation;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
+
+@Service
+public class SemillaFormularioService {
+  private final JdbcTemplate jdbc;
+  private final VersionFormularioRepository versiones;
+  private final VersionFormularioService formularios;
+  private final ReglaMantenimientoService mantenimiento;
+  private final UserAccountRepository usuarios;
+  private final BootstrapProperties bootstrap;
+  private final AuditoriaWriter auditoria;
+  private final ObjectMapper json;
+
+  public SemillaFormularioService(
+      JdbcTemplate jdbc,
+      VersionFormularioRepository versiones,
+      VersionFormularioService formularios,
+      ReglaMantenimientoService mantenimiento,
+      UserAccountRepository usuarios,
+      BootstrapProperties bootstrap,
+      AuditoriaWriter auditoria,
+<span class="fc" id="L39">      ObjectMapper json) {</span>
+<span class="fc" id="L40">    this.jdbc = jdbc;</span>
+<span class="fc" id="L41">    this.versiones = versiones;</span>
+<span class="fc" id="L42">    this.formularios = formularios;</span>
+<span class="fc" id="L43">    this.mantenimiento = mantenimiento;</span>
+<span class="fc" id="L44">    this.usuarios = usuarios;</span>
+<span class="fc" id="L45">    this.bootstrap = bootstrap;</span>
+<span class="fc" id="L46">    this.auditoria = auditoria;</span>
+<span class="fc" id="L47">    this.json = json;</span>
+<span class="fc" id="L48">  }</span>
+
+  @Transactional(
+      propagation = Propagation.REQUIRES_NEW,
+      isolation = Isolation.READ_COMMITTED,
+      timeout = 60)
+  public Optional&lt;UUID&gt; sembrarSiNoExisteActiva() {
+<span class="fc" id="L55">    jdbc.execute(&quot;SET LOCAL lock_timeout = '15s'&quot;);</span>
+<span class="fc" id="L56">    jdbc.execute(&quot;LOCK TABLE version_formulario IN SHARE ROW EXCLUSIVE MODE&quot;);</span>
+<span class="fc bfc" id="L57" title="All 2 branches covered.">    if (versiones.findByActivaTrue().isPresent()) return Optional.empty();</span>
+<span class="fc" id="L58">    var administrador =</span>
+        usuarios
+<span class="fc" id="L60">            .findByEmail(EmailNormalizer.normalize(bootstrap.getEmail()))</span>
+<span class="fc" id="L61">            .filter(</span>
+                usuario -&gt;
+<span class="pc bpc" id="L63" title="2 of 4 branches missed.">                    usuario.isActive() &amp;&amp; usuario.getRole().getName() == RoleName.ADMINISTRADOR)</span>
+<span class="fc" id="L64">            .orElseThrow(</span>
+                () -&gt;
+<span class="fc" id="L66">                    new IllegalStateException(</span>
+                        &quot;No esta disponible el administrador inicial para sembrar el formulario&quot;));
+<span class="fc" id="L68">    int numero = 1;</span>
+<span class="fc bfc" id="L69" title="All 2 branches covered.">    while (versiones.existsByCodigo(&quot;SIECA-v&quot; + numero)) numero++;</span>
+<span class="fc" id="L70">    var publicada = formularios.sembrarPlantillaInicial(&quot;SIECA-v&quot; + numero, administrador.getId());</span>
+<span class="fc" id="L71">    int reglas =</span>
+<span class="fc" id="L72">        mantenimiento.sembrarCatalogoProvisionalSiNoExiste(publicada.id(), administrador.getId());</span>
+<span class="fc" id="L73">    auditoria.registrarEnTransaccion(</span>
+        null,
+        AccionAuditoria.CREAR,
+        &quot;version_formulario&quot;,
+<span class="fc" id="L77">        publicada.id(),</span>
+        null,
+<span class="fc" id="L79">        json.createObjectNode()</span>
+<span class="fc" id="L80">            .put(&quot;codigo&quot;, publicada.codigo())</span>
+<span class="fc" id="L81">            .put(&quot;activa&quot;, true)</span>
+<span class="fc" id="L82">            .put(&quot;calibracionProvisional&quot;, true)</span>
+<span class="fc" id="L83">            .put(&quot;reglasMantenimiento&quot;, reglas),</span>
+        &quot;HU-051-siembra-formulario&quot;);
+<span class="fc" id="L85">    return Optional.of(publicada.id());</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

@@ -1,0 +1,206 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AuditoriaAspect.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">sgp-api</a> &gt; <a href="index.source.html" class="el_package">gt.usac.cunoc.sgp.common.audit.aspect</a> &gt; <span class="el_source">AuditoriaAspect.java</span></div><h1>AuditoriaAspect.java</h1><pre class="source lang-java linenums">package gt.usac.cunoc.sgp.common.audit.aspect;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import gt.usac.cunoc.sgp.common.audit.model.AccionAuditoria;
+import gt.usac.cunoc.sgp.common.audit.service.AuditoriaSnapshotService;
+import gt.usac.cunoc.sgp.common.audit.service.AuditoriaWriter;
+import gt.usac.cunoc.sgp.common.security.JwtData;
+import java.lang.reflect.Method;
+import java.util.Objects;
+import java.util.UUID;
+import org.aspectj.lang.ProceedingJoinPoint;
+import org.aspectj.lang.annotation.Around;
+import org.aspectj.lang.annotation.Aspect;
+import org.aspectj.lang.reflect.MethodSignature;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.core.annotation.Order;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.stereotype.Component;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
+
+/**
+ * Aspecto {@code @Around} que registra las acciones anotadas con {@link Auditable} (HU-006,
+ * DT-BD-12).
+ */
+@Aspect
+@Component
+@Order(0)
+public class AuditoriaAspect {
+
+<span class="fc" id="L33">  private static final Logger LOGGER = LoggerFactory.getLogger(AuditoriaAspect.class);</span>
+
+  private final AuditoriaWriter escritor;
+  private final AuditoriaSnapshotService snapshots;
+
+<span class="fc" id="L38">  public AuditoriaAspect(AuditoriaWriter escritor, AuditoriaSnapshotService snapshots) {</span>
+<span class="fc" id="L39">    this.escritor = escritor;</span>
+<span class="fc" id="L40">    this.snapshots = snapshots;</span>
+<span class="fc" id="L41">  }</span>
+
+  @Around(&quot;@annotation(auditable)&quot;)
+  public Object auditar(ProceedingJoinPoint punto, Auditable auditable) throws Throwable {
+<span class="fc" id="L45">    UUID entidadId = null;</span>
+<span class="fc" id="L46">    String email = null;</span>
+<span class="fc" id="L47">    JsonNode anteriores = null;</span>
+    try {
+<span class="fc" id="L49">      entidadId = entidadId(punto, auditable);</span>
+<span class="fc" id="L50">      email = email(punto, auditable);</span>
+      anteriores =
+<span class="fc bfc" id="L52" title="All 2 branches covered.">          email == null</span>
+<span class="fc" id="L53">              ? snapshots.cargar(auditable.tipo(), entidadId)</span>
+<span class="fc" id="L54">              : snapshots.cargarPorEmail(auditable.tipo(), email);</span>
+<span class="nc" id="L55">    } catch (RuntimeException | StackOverflowError excepcion) {</span>
+<span class="nc" id="L56">      LOGGER.error(&quot;Auditoria: captura previa fallida para {}&quot;, auditable.entidad(), excepcion);</span>
+<span class="fc" id="L57">    }</span>
+
+<span class="fc" id="L59">    Object resultado = punto.proceed();</span>
+
+<span class="fc" id="L61">    registrar(auditable, entidadId, email, anteriores, resultado);</span>
+<span class="fc" id="L62">    return resultado;</span>
+  }
+
+  private void registrar(
+      Auditable auditable, UUID entidadId, String email, JsonNode anteriores, Object resultado) {
+    try {
+      JsonNode posteriores;
+
+<span class="fc bfc" id="L70" title="All 2 branches covered.">      if (email != null) {</span>
+<span class="fc" id="L71">        posteriores = snapshots.cargarPorEmail(auditable.tipo(), email);</span>
+<span class="pc bpc" id="L72" title="3 of 4 branches missed.">        if (posteriores == null &amp;&amp; anteriores != null) {</span>
+<span class="nc" id="L73">          UUID idAnterior = idDesde(anteriores);</span>
+<span class="nc bnc" id="L74" title="All 2 branches missed.">          if (idAnterior != null) {</span>
+<span class="nc" id="L75">            posteriores = snapshots.cargar(auditable.tipo(), idAnterior);</span>
+          }
+<span class="nc" id="L77">        }</span>
+<span class="fc bfc" id="L78" title="All 2 branches covered.">      } else if (auditable.recargarPosteriores()) {</span>
+<span class="pc bpc" id="L79" title="1 of 2 branches missed.">        if (entidadId == null) {</span>
+<span class="nc" id="L80">          throw new IllegalStateException(</span>
+              &quot;La auditoria requiere el identificador para recargar el estado posterior.&quot;);
+        }
+<span class="fc" id="L83">        posteriores = snapshots.cargar(auditable.tipo(), entidadId);</span>
+      } else {
+<span class="fc" id="L85">        posteriores = snapshots.serializar(resultado);</span>
+      }
+<span class="fc bfc" id="L87" title="All 4 branches covered.">      if (posteriores == null &amp;&amp; entidadId != null) {</span>
+<span class="fc" id="L88">        posteriores = snapshots.cargar(auditable.tipo(), entidadId);</span>
+      }
+<span class="fc" id="L90">      UUID entidadIdFinal = entidadId;</span>
+<span class="fc bfc" id="L91" title="All 2 branches covered.">      if (entidadIdFinal == null) {</span>
+<span class="fc" id="L92">        entidadIdFinal = idDesde(posteriores);</span>
+      }
+<span class="fc bfc" id="L94" title="All 4 branches covered.">      if (Objects.equals(anteriores, posteriores) &amp;&amp; anteriores != null) return;</span>
+      AccionAuditoria accion =
+<span class="fc bfc" id="L96" title="All 4 branches covered.">          auditable.accion() == AccionAuditoria.CREAR &amp;&amp; anteriores != null</span>
+<span class="fc" id="L97">              ? AccionAuditoria.MODIFICAR</span>
+<span class="fc" id="L98">              : auditable.accion();</span>
+<span class="fc bfc" id="L99" title="All 2 branches covered.">      UUID usuarioId = auditable.proceso().isBlank() ? usuarioActual() : null;</span>
+<span class="fc bfc" id="L100" title="All 4 branches covered.">      if (usuarioId == null &amp;&amp; auditable.actorEsEntidad()) usuarioId = entidadIdFinal;</span>
+<span class="fc" id="L101">      UUID actorFinal = usuarioId;</span>
+<span class="fc" id="L102">      UUID idFinal = entidadIdFinal;</span>
+<span class="fc" id="L103">      JsonNode antesFinal = anteriores;</span>
+<span class="fc" id="L104">      JsonNode despuesFinal = posteriores;</span>
+<span class="fc" id="L105">      Runnable escritura =</span>
+<span class="fc" id="L106">          () -&gt; escribir(actorFinal, accion, auditable, idFinal, antesFinal, despuesFinal);</span>
+<span class="fc bfc" id="L107" title="All 2 branches covered.">      if (TransactionSynchronizationManager.isActualTransactionActive()) {</span>
+<span class="fc" id="L108">        TransactionSynchronizationManager.registerSynchronization(</span>
+<span class="fc" id="L109">            new TransactionSynchronization() {</span>
+              @Override
+              public void afterCommit() {
+<span class="fc" id="L112">                escritura.run();</span>
+<span class="fc" id="L113">              }</span>
+            });
+      } else {
+<span class="fc" id="L116">        escritura.run();</span>
+      }
+<span class="nc" id="L118">    } catch (RuntimeException | StackOverflowError excepcion) {</span>
+<span class="nc" id="L119">      LOGGER.error(</span>
+          &quot;Auditoria no registrada para {}.{}: {}&quot;,
+<span class="nc" id="L121">          auditable.entidad(),</span>
+<span class="nc" id="L122">          auditable.accion(),</span>
+<span class="nc" id="L123">          excepcion.getMessage(),</span>
+          excepcion);
+<span class="fc" id="L125">    }</span>
+<span class="fc" id="L126">  }</span>
+
+  private void escribir(
+      UUID usuarioId,
+      AccionAuditoria accion,
+      Auditable auditable,
+      UUID entidadId,
+      JsonNode anteriores,
+      JsonNode posteriores) {
+    try {
+<span class="fc" id="L136">      escritor.registrar(</span>
+          usuarioId,
+          accion,
+<span class="fc" id="L139">          auditable.entidad(),</span>
+          entidadId,
+          anteriores,
+          posteriores,
+<span class="fc" id="L143">          auditable.proceso());</span>
+<span class="fc" id="L144">    } catch (RuntimeException | StackOverflowError excepcion) {</span>
+<span class="fc" id="L145">      LOGGER.error(&quot;Auditoria no registrada para {}.{}&quot;, auditable.entidad(), accion, excepcion);</span>
+<span class="fc" id="L146">    }</span>
+<span class="fc" id="L147">  }</span>
+
+  private UUID entidadId(ProceedingJoinPoint punto, Auditable auditable) {
+<span class="fc bfc" id="L150" title="All 2 branches covered.">    if (auditable.idArg().isBlank()) {</span>
+<span class="fc" id="L151">      return null;</span>
+    }
+<span class="fc" id="L153">    String[] nombres = ((MethodSignature) punto.getSignature()).getParameterNames();</span>
+<span class="fc" id="L154">    Object[] argumentos = punto.getArgs();</span>
+<span class="pc bpc" id="L155" title="2 of 4 branches missed.">    if (nombres == null || argumentos == null) return null;</span>
+<span class="pc bpc" id="L156" title="1 of 2 branches missed.">    for (int indice = 0; indice &lt; Math.min(nombres.length, argumentos.length); indice++) {</span>
+<span class="pc bpc" id="L157" title="2 of 4 branches missed.">      if (nombres[indice].equals(auditable.idArg()) &amp;&amp; argumentos[indice] instanceof UUID id) {</span>
+<span class="fc" id="L158">        return id;</span>
+      }
+    }
+<span class="nc" id="L161">    LOGGER.warn(</span>
+        &quot;Auditoria: parametro {} de {} no encontrado&quot;,
+<span class="nc" id="L163">        auditable.idArg(),</span>
+<span class="nc" id="L164">        punto.getSignature().getName());</span>
+<span class="nc" id="L165">    return null;</span>
+  }
+
+  private String email(ProceedingJoinPoint punto, Auditable auditable) {
+<span class="fc" id="L169">    int indice = auditable.emailArgIndex();</span>
+<span class="pc bpc" id="L170" title="2 of 6 branches missed.">    if (indice &lt; 0 || punto.getArgs() == null || indice &gt;= punto.getArgs().length) return null;</span>
+<span class="fc" id="L171">    Object argumento = punto.getArgs()[indice];</span>
+<span class="fc bfc" id="L172" title="All 2 branches covered.">    if (argumento instanceof String correo) return correo;</span>
+<span class="pc bpc" id="L173" title="1 of 2 branches missed.">    if (argumento == null) return null;</span>
+    try {
+<span class="fc" id="L175">      Method metodo = argumento.getClass().getMethod(&quot;email&quot;);</span>
+<span class="fc" id="L176">      Object valor = metodo.invoke(argumento);</span>
+<span class="pc bpc" id="L177" title="1 of 2 branches missed.">      return valor instanceof String correo ? correo : null;</span>
+<span class="nc" id="L178">    } catch (ReflectiveOperationException excepcion) {</span>
+<span class="nc" id="L179">      LOGGER.warn(&quot;Auditoria: argumento de correo no valido para {}&quot;, auditable.entidad());</span>
+<span class="nc" id="L180">      return null;</span>
+    }
+  }
+
+  private UUID idDesde(JsonNode posteriores) {
+<span class="fc bfc" id="L185" title="All 4 branches covered.">    if (posteriores == null || !posteriores.hasNonNull(&quot;id&quot;)) {</span>
+<span class="fc" id="L186">      return null;</span>
+    }
+    try {
+<span class="fc" id="L189">      return UUID.fromString(posteriores.get(&quot;id&quot;).asText());</span>
+<span class="nc" id="L190">    } catch (IllegalArgumentException excepcion) {</span>
+<span class="nc" id="L191">      return null;</span>
+    }
+  }
+
+  private UUID usuarioActual() {
+<span class="fc" id="L196">    Authentication autenticacion = SecurityContextHolder.getContext().getAuthentication();</span>
+<span class="fc bfc" id="L197" title="All 2 branches covered.">    if (autenticacion == null) {</span>
+<span class="fc" id="L198">      return null;</span>
+    }
+<span class="pc bpc" id="L200" title="1 of 2 branches missed.">    if (autenticacion.getDetails() instanceof JwtData jwt) {</span>
+<span class="fc" id="L201">      return jwt.userId();</span>
+    }
+<span class="nc" id="L203">    return null;</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

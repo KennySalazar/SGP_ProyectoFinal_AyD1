@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>UbicacionTerritorialService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">sgp-api</a> &gt; <a href="index.source.html" class="el_package">gt.usac.cunoc.sgp.puente.service</a> &gt; <span class="el_source">UbicacionTerritorialService.java</span></div><h1>UbicacionTerritorialService.java</h1><pre class="source lang-java linenums">package gt.usac.cunoc.sgp.puente.service;
+
+import gt.usac.cunoc.sgp.common.exception.ApiException;
+import gt.usac.cunoc.sgp.puente.dto.CandidatoTerritorialResponse;
+import gt.usac.cunoc.sgp.puente.dto.DepartamentoResponse;
+import gt.usac.cunoc.sgp.puente.dto.MunicipioResponse;
+import gt.usac.cunoc.sgp.puente.dto.UbicacionTerritorialResponse;
+import gt.usac.cunoc.sgp.puente.repository.MunicipioRepository;
+import gt.usac.cunoc.sgp.puente.repository.PuenteRepository;
+import org.springframework.http.HttpStatus;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+@Service
+@Transactional(readOnly = true)
+@PreAuthorize(&quot;hasAnyRole('ADMINISTRADOR', 'CATEDRATICO')&quot;)
+public class UbicacionTerritorialService {
+
+  private final MunicipioRepository municipios;
+  private final PuenteRepository puentes;
+
+<span class="fc" id="L23">  public UbicacionTerritorialService(MunicipioRepository municipios, PuenteRepository puentes) {</span>
+<span class="fc" id="L24">    this.municipios = municipios;</span>
+<span class="fc" id="L25">    this.puentes = puentes;</span>
+<span class="fc" id="L26">  }</span>
+
+  public UbicacionTerritorialResponse resolver(double latitud, double longitud) {
+<span class="fc bfc" id="L29" title="All 2 branches covered.">    if (!Double.isFinite(latitud)</span>
+<span class="fc bfc" id="L30" title="All 10 branches covered.">        || !Double.isFinite(longitud)</span>
+        || latitud &lt; -90
+        || latitud &gt; 90
+        || longitud &lt; -180
+        || longitud &gt; 180) {
+<span class="fc" id="L35">      throw validacion(</span>
+          &quot;coordenadas_invalidas&quot;,
+          &quot;La latitud debe estar entre -90 y 90 y la longitud entre -180 y 180.&quot;);
+    }
+
+<span class="fc" id="L40">    Boolean dentroDeGuatemala = puentes.estaDentroDeGuatemala(latitud, longitud);</span>
+
+<span class="pc bpc" id="L42" title="1 of 2 branches missed.">    if (dentroDeGuatemala == null) {</span>
+<span class="nc" id="L43">      throw new ApiException(</span>
+          HttpStatus.SERVICE_UNAVAILABLE,
+          &quot;limite_territorial_no_disponible&quot;,
+          &quot;Validación territorial no disponible&quot;,
+          &quot;No está cargado el límite territorial de Guatemala.&quot;);
+    }
+
+<span class="fc bfc" id="L50" title="All 2 branches covered.">    if (!dentroDeGuatemala) {</span>
+<span class="fc" id="L51">      throw validacion(</span>
+          &quot;ubicacion_fuera_de_guatemala&quot;,
+          &quot;Las coordenadas deben estar dentro del territorio de Guatemala.&quot;);
+    }
+
+<span class="fc" id="L56">    var candidatos =</span>
+<span class="fc" id="L57">        municipios.findMunicipiosPorUbicacion(latitud, longitud).stream()</span>
+<span class="fc" id="L58">            .map(</span>
+                candidato -&gt;
+<span class="fc" id="L60">                    new CandidatoTerritorialResponse(</span>
+                        new DepartamentoResponse(
+<span class="fc" id="L62">                            candidato.getDepartamentoId(),</span>
+<span class="fc" id="L63">                            candidato.getDepartamentoCodigoIne(),</span>
+<span class="fc" id="L64">                            candidato.getDepartamentoNombre()),</span>
+                        new MunicipioResponse(
+<span class="fc" id="L66">                            candidato.getMunicipioId(),</span>
+<span class="fc" id="L67">                            candidato.getDepartamentoId(),</span>
+<span class="fc" id="L68">                            candidato.getMunicipioCodigoIne(),</span>
+<span class="fc" id="L69">                            candidato.getMunicipioNombre())))</span>
+<span class="fc" id="L70">            .toList();</span>
+
+<span class="fc bfc" id="L72" title="All 2 branches covered.">    if (candidatos.isEmpty()) {</span>
+<span class="fc" id="L73">      throw validacion(</span>
+          &quot;ubicacion_sin_municipio_activo&quot;,
+          &quot;No se encontró un municipio activo que cubra las coordenadas &quot;
+              + &quot;en los límites municipales cargados.&quot;);
+    }
+
+<span class="fc" id="L79">    return new UbicacionTerritorialResponse(</span>
+<span class="fc bfc" id="L80" title="All 4 branches covered.">        latitud, longitud, longitud &lt; -90 ? &quot;15N&quot; : &quot;16N&quot;, candidatos.size() &gt; 1, candidatos);</span>
+  }
+
+  private ApiException validacion(String codigo, String detalle) {
+<span class="fc" id="L84">    return new ApiException(</span>
+        HttpStatus.UNPROCESSABLE_ENTITY, codigo, &quot;Ubicación territorial inválida&quot;, detalle);
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RevisionDetalleController.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">sgp-api</a> &gt; <a href="index.source.html" class="el_package">gt.usac.cunoc.sgp.revision.controller</a> &gt; <span class="el_source">RevisionDetalleController.java</span></div><h1>RevisionDetalleController.java</h1><pre class="source lang-java linenums">package gt.usac.cunoc.sgp.revision.controller;
+
+import gt.usac.cunoc.sgp.common.exception.ApiException;
+import gt.usac.cunoc.sgp.common.security.JwtData;
+import gt.usac.cunoc.sgp.revision.dto.RevisionDetalleResponse;
+import gt.usac.cunoc.sgp.revision.service.RevisionDetalleService;
+import java.util.UUID;
+import org.springframework.http.*;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.*;
+
+@RestController
+@RequestMapping(&quot;/api/v1/revisiones&quot;)
+@PreAuthorize(&quot;hasAnyRole('CATEDRATICO', 'ESTUDIANTE')&quot;)
+public class RevisionDetalleController {
+  private final RevisionDetalleService detalle;
+
+<span class="fc" id="L19">  public RevisionDetalleController(RevisionDetalleService detalle) {</span>
+<span class="fc" id="L20">    this.detalle = detalle;</span>
+<span class="fc" id="L21">  }</span>
+
+  @GetMapping(&quot;/{revisionId}&quot;)
+  public ResponseEntity&lt;RevisionDetalleResponse&gt; obtener(
+      @PathVariable UUID revisionId, Authentication auth) {
+<span class="pc bpc" id="L26" title="1 of 2 branches missed.">    if (auth == null</span>
+<span class="pc bpc" id="L27" title="1 of 2 branches missed.">        || !auth.isAuthenticated()</span>
+<span class="fc bfc" id="L28" title="All 2 branches covered.">        || !(auth.getDetails() instanceof JwtData jwt)</span>
+<span class="pc bpc" id="L29" title="1 of 2 branches missed.">        || jwt.userId() == null)</span>
+<span class="fc" id="L30">      throw new ApiException(</span>
+          HttpStatus.UNAUTHORIZED,
+          &quot;autenticacion_requerida&quot;,
+          &quot;Autenticación requerida&quot;,
+          &quot;Se requiere una sesión válida.&quot;);
+<span class="fc" id="L35">    return ResponseEntity.ok()</span>
+<span class="fc" id="L36">        .cacheControl(CacheControl.noStore().cachePrivate())</span>
+<span class="fc" id="L37">        .body(detalle.obtener(revisionId, jwt.userId()));</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

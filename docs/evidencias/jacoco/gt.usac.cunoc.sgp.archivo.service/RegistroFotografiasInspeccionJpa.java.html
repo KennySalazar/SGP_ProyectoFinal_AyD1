@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RegistroFotografiasInspeccionJpa.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">sgp-api</a> &gt; <a href="index.source.html" class="el_package">gt.usac.cunoc.sgp.archivo.service</a> &gt; <span class="el_source">RegistroFotografiasInspeccionJpa.java</span></div><h1>RegistroFotografiasInspeccionJpa.java</h1><pre class="source lang-java linenums">package gt.usac.cunoc.sgp.archivo.service;
+
+import gt.usac.cunoc.sgp.archivo.mapper.FotografiaMapper;
+import gt.usac.cunoc.sgp.archivo.model.*;
+import gt.usac.cunoc.sgp.archivo.repository.ArchivoInspeccionRepository;
+import gt.usac.cunoc.sgp.common.exception.ApiException;
+import java.time.Instant;
+import java.util.*;
+import org.springframework.http.HttpStatus;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.*;
+
+@Service
+@Transactional(readOnly = true)
+public class RegistroFotografiasInspeccionJpa implements RegistroFotografiasInspeccion {
+  private final ArchivoInspeccionRepository repositorio;
+  private final FotografiaMapper mapper;
+
+  public RegistroFotografiasInspeccionJpa(
+<span class="fc" id="L20">      ArchivoInspeccionRepository repositorio, FotografiaMapper mapper) {</span>
+<span class="fc" id="L21">    this.repositorio = repositorio;</span>
+<span class="fc" id="L22">    this.mapper = mapper;</span>
+<span class="fc" id="L23">  }</span>
+
+  public List&lt;FotografiaRegistrada&gt; consultar(UUID inspeccionId) {
+<span class="fc" id="L26">    return repositorio</span>
+<span class="fc" id="L27">        .findByInspeccionIdAndTipoUsoOrderByCreadoEnAsc(</span>
+            inspeccionId, TipoUsoArchivo.FOTO_INSPECCION)
+<span class="fc" id="L29">        .stream()</span>
+<span class="fc" id="L30">        .map(mapper::toRegistrada)</span>
+<span class="fc" id="L31">        .toList();</span>
+  }
+
+  public Optional&lt;FotografiaRegistrada&gt; buscar(UUID inspeccionId, UUID fotografiaId) {
+<span class="fc" id="L35">    return repositorio</span>
+<span class="fc" id="L36">        .findByInspeccionIdAndArchivoIdAndTipoUso(</span>
+            inspeccionId, fotografiaId, TipoUsoArchivo.FOTO_INSPECCION)
+<span class="fc" id="L38">        .map(mapper::toRegistrada);</span>
+  }
+
+  @Transactional(propagation = Propagation.MANDATORY)
+  public void retirar(UUID inspeccionId, UUID fotografiaId, Instant retiradoEn) {
+<span class="fc" id="L43">    var vinculo =</span>
+        repositorio
+<span class="fc" id="L45">            .findByInspeccionIdAndArchivoIdAndTipoUso(</span>
+                inspeccionId, fotografiaId, TipoUsoArchivo.FOTO_INSPECCION)
+<span class="fc" id="L47">            .orElseThrow(this::noEncontrada);</span>
+<span class="fc bfc" id="L48" title="All 2 branches covered.">    if (vinculo.getArchivo().getEstado() == EstadoArchivo.PURGADO) throw noEncontrada();</span>
+<span class="fc" id="L49">    vinculo.getArchivo().retirar(Objects.requireNonNull(retiradoEn));</span>
+<span class="fc" id="L50">  }</span>
+
+  private ApiException noEncontrada() {
+<span class="fc" id="L53">    return new ApiException(</span>
+        HttpStatus.NOT_FOUND,
+        &quot;fotografia_no_encontrada&quot;,
+        &quot;Fotografía no encontrada&quot;,
+        &quot;No existe la fotografía solicitada.&quot;);
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

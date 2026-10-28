@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ProcesosProgramados.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">sgp-api</a> &gt; <a href="index.source.html" class="el_package">gt.usac.cunoc.sgp.common.config</a> &gt; <span class="el_source">ProcesosProgramados.java</span></div><h1>ProcesosProgramados.java</h1><pre class="source lang-java linenums">package gt.usac.cunoc.sgp.common.config;
+
+/**
+ * Convención de los procesos programados (HU-069, DT-BE-14). Cada proceso se anota con
+ * {@code @Scheduled(cron = CRON_DIARIO, zone = ZONA)} y {@code @SchedulerLock} con su nombre y
+ * estas duraciones, para que dos réplicas del servidor no lo ejecuten a la vez. Su nombre también
+ * identifica al proceso automático en la bitácora.
+ */
+public final class ProcesosProgramados {
+
+  /** Una vez al día; configurable con PROCESOS_CRON_DIARIO. */
+  public static final String CRON_DIARIO = &quot;${app.procesos.cron-diario:0 0 2 * * *}&quot;;
+
+  public static final String ZONA = &quot;America/Guatemala&quot;;
+
+  /** Libera el bloqueo aunque la réplica que lo tomó se caiga a mitad del proceso. */
+  public static final String BLOQUEO_MAXIMO = &quot;PT30M&quot;;
+
+  /** Evita que otra réplica con el reloj desfasado vuelva a ejecutarlo enseguida. */
+  public static final String BLOQUEO_MINIMO = &quot;PT5M&quot;;
+
+  public static final String ALERTA_REVISIONES_SIN_REVISAR = &quot;alerta-revisiones-sin-revisar&quot;;
+  public static final String ALERTA_PUENTES_SIN_INSPECCION = &quot;alerta-puentes-sin-inspeccion&quot;;
+  public static final String ALERTA_ORDENES_PROGRAMADAS = &quot;alerta-ordenes-programadas&quot;;
+  public static final String ALERTA_BORRADORES_INACTIVOS = &quot;alerta-borradores-inactivos&quot;;
+  public static final String PURGA_ARCHIVOS_BORRADORES = &quot;purga-archivos-borradores&quot;;
+  public static final String LIMPIEZA_IDEMPOTENCIA = &quot;limpieza-claves-idempotencia&quot;;
+
+  /** Entidad de la bitácora para el resumen de cada ejecución. */
+  public static final String ENTIDAD_AUDITORIA = &quot;proceso_programado&quot;;
+
+  /** Las consultas nativas devuelven las fechas con distinto tipo según el controlador JDBC. */
+  public static java.time.Instant instante(Object valor) {
+<span class="pc bpc" id="L34" title="1 of 2 branches missed.">    if (valor instanceof java.time.Instant instante) {</span>
+<span class="fc" id="L35">      return instante;</span>
+    }
+<span class="nc bnc" id="L37" title="All 2 branches missed.">    if (valor instanceof java.time.OffsetDateTime fecha) {</span>
+<span class="nc" id="L38">      return fecha.toInstant();</span>
+    }
+<span class="nc bnc" id="L40" title="All 2 branches missed.">    if (valor instanceof java.sql.Timestamp marca) {</span>
+<span class="nc" id="L41">      return marca.toInstant();</span>
+    }
+<span class="nc" id="L43">    throw new IllegalArgumentException(&quot;Fecha no reconocida: &quot; + valor);</span>
+  }
+
+  private ProcesosProgramados() {}
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CursoEstudiante.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">sgp-api</a> &gt; <a href="index.source.html" class="el_package">gt.usac.cunoc.sgp.curso.entity</a> &gt; <span class="el_source">CursoEstudiante.java</span></div><h1>CursoEstudiante.java</h1><pre class="source lang-java linenums">package gt.usac.cunoc.sgp.curso.entity;
+
+import gt.usac.cunoc.sgp.common.util.UuidV7Generator;
+import gt.usac.cunoc.sgp.usuario.entity.UserAccount;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Table;
+import jakarta.persistence.Version;
+import java.time.Instant;
+import java.util.UUID;
+
+@Entity
+@Table(name = &quot;curso_estudiante&quot;)
+public class CursoEstudiante {
+
+  @Id private UUID id;
+
+  @ManyToOne(fetch = FetchType.LAZY, optional = false)
+  @JoinColumn(name = &quot;curso_id&quot;, nullable = false)
+  private Curso curso;
+
+  @ManyToOne(fetch = FetchType.LAZY, optional = false)
+  @JoinColumn(name = &quot;estudiante_id&quot;, nullable = false)
+  private UserAccount estudiante;
+
+  @Column(nullable = false, length = 20)
+  private String estado;
+
+  @Column(nullable = false, length = 30)
+  private String seccion;
+
+  @Column(name = &quot;inscrito_en&quot;, nullable = false)
+  private Instant inscritoEn;
+
+  @ManyToOne(fetch = FetchType.LAZY, optional = false)
+  @JoinColumn(name = &quot;inscrito_por_id&quot;, nullable = false)
+  private UserAccount inscritoPor;
+
+  @Column(name = &quot;creado_en&quot;, nullable = false, updatable = false)
+  private Instant creadoEn;
+
+  @Column(name = &quot;actualizado_en&quot;, nullable = false)
+  private Instant actualizadoEn;
+
+  @Version private long version;
+
+<span class="nc" id="L51">  protected CursoEstudiante() {}</span>
+
+  public CursoEstudiante(
+<span class="fc" id="L54">      Curso curso, UserAccount estudiante, String seccion, UserAccount inscritoPor, Instant ahora) {</span>
+<span class="fc" id="L55">    this.id = UuidV7Generator.generate();</span>
+<span class="fc" id="L56">    this.curso = curso;</span>
+<span class="fc" id="L57">    this.estudiante = estudiante;</span>
+<span class="fc" id="L58">    this.estado = &quot;ACTIVO&quot;;</span>
+<span class="fc" id="L59">    this.seccion = seccion;</span>
+<span class="fc" id="L60">    this.inscritoEn = ahora;</span>
+<span class="fc" id="L61">    this.inscritoPor = inscritoPor;</span>
+<span class="fc" id="L62">    this.creadoEn = ahora;</span>
+<span class="fc" id="L63">    this.actualizadoEn = ahora;</span>
+<span class="fc" id="L64">  }</span>
+
+  public UUID getId() {
+<span class="fc" id="L67">    return id;</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

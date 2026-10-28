@@ -1,0 +1,132 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PreparadorEntradaIcService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">sgp-api</a> &gt; <a href="index.source.html" class="el_package">gt.usac.cunoc.sgp.inspeccion.service</a> &gt; <span class="el_source">PreparadorEntradaIcService.java</span></div><h1>PreparadorEntradaIcService.java</h1><pre class="source lang-java linenums">package gt.usac.cunoc.sgp.inspeccion.service;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import gt.usac.cunoc.sgp.common.exception.ApiException;
+import gt.usac.cunoc.sgp.formulario.model.EstadoVersionFormulario;
+import gt.usac.cunoc.sgp.formulario.repository.ConfiguracionIcElementoRepository;
+import gt.usac.cunoc.sgp.formulario.repository.VersionFormularioRepository;
+import gt.usac.cunoc.sgp.inspeccion.model.EntradaCalculoIc;
+import java.math.BigDecimal;
+import java.util.Map;
+import java.util.TreeMap;
+import java.util.UUID;
+import org.springframework.http.HttpStatus;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+@Service
+public class PreparadorEntradaIcService {
+
+  private final VersionFormularioRepository versiones;
+  private final ConfiguracionIcElementoRepository configuraciones;
+
+  public PreparadorEntradaIcService(
+<span class="fc" id="L24">      VersionFormularioRepository versiones, ConfiguracionIcElementoRepository configuraciones) {</span>
+<span class="fc" id="L25">    this.versiones = versiones;</span>
+<span class="fc" id="L26">    this.configuraciones = configuraciones;</span>
+<span class="fc" id="L27">  }</span>
+
+  @Transactional(readOnly = true)
+  public EntradaCalculoIc preparar(UUID versionFormularioId, JsonNode datos) {
+<span class="fc bfc" id="L31" title="All 6 branches covered.">    if (versionFormularioId == null || datos == null || !datos.isObject()) {</span>
+<span class="fc" id="L32">      throw error(</span>
+          &quot;entrada_ic_invalida&quot;,
+          &quot;Se requieren la version del formulario y los datos de la inspeccion.&quot;);
+    }
+
+<span class="fc" id="L37">    var version =</span>
+        versiones
+<span class="fc" id="L39">            .findById(versionFormularioId)</span>
+<span class="fc" id="L40">            .orElseThrow(</span>
+                () -&gt;
+<span class="fc" id="L42">                    new ApiException(</span>
+                        HttpStatus.NOT_FOUND,
+                        &quot;version_no_encontrada&quot;,
+                        &quot;Version no encontrada&quot;,
+                        &quot;No existe la version &quot; + versionFormularioId));
+
+<span class="fc bfc" id="L48" title="All 2 branches covered.">    if (version.getEstado() != EstadoVersionFormulario.PUBLICADA) {</span>
+<span class="fc" id="L49">      throw error(</span>
+          &quot;version_ic_no_publicada&quot;, &quot;El calculo requiere una version de formulario publicada.&quot;);
+    }
+
+<span class="fc" id="L53">    JsonNode catalogo = version.getReglasEvaluacionIc();</span>
+
+<span class="pc bpc" id="L55" title="2 of 4 branches missed.">    if (catalogo == null || !catalogo.isObject()) {</span>
+<span class="nc" id="L56">      throw error(&quot;configuracion_ic_incompleta&quot;, &quot;Falta el catalogo de la version.&quot;);</span>
+    }
+
+<span class="fc" id="L59">    JsonNode elementos = catalogo.get(&quot;elementos&quot;);</span>
+<span class="fc" id="L60">    JsonNode reglas = catalogo.get(&quot;reglas_evaluacion_ic&quot;);</span>
+
+<span class="pc bpc" id="L62" title="2 of 6 branches missed.">    if (elementos == null || !elementos.isArray() || elementos.isEmpty()) {</span>
+<span class="fc" id="L63">      throw error(&quot;configuracion_ic_incompleta&quot;, &quot;Faltan los elementos del catalogo.&quot;);</span>
+    }
+
+<span class="pc bpc" id="L66" title="2 of 4 branches missed.">    if (reglas == null || !reglas.isObject()) {</span>
+<span class="nc" id="L67">      throw error(&quot;configuracion_ic_incompleta&quot;, &quot;Faltan las reglas de evaluacion.&quot;);</span>
+    }
+
+<span class="fc" id="L70">    String formulario = texto(catalogo.get(&quot;formulario&quot;), &quot;catalogo.formulario&quot;);</span>
+<span class="fc" id="L71">    String algoritmo = texto(reglas.get(&quot;version_algoritmo&quot;), &quot;version_algoritmo&quot;);</span>
+
+<span class="fc bfc" id="L73" title="All 2 branches covered.">    if (!algoritmo.equals(version.getVersionAlgoritmoIc())) {</span>
+<span class="fc" id="L74">      throw error(</span>
+          &quot;version_ic_incongruente&quot;,
+          &quot;El algoritmo registrado en la version no coincide con sus reglas de evaluacion.&quot;);
+    }
+
+<span class="fc" id="L79">    JsonNode esquema = version.getEsquema();</span>
+
+<span class="pc bpc" id="L81" title="2 of 4 branches missed.">    if (esquema == null || !esquema.isObject()) {</span>
+<span class="nc" id="L82">      throw error(&quot;configuracion_ic_incompleta&quot;, &quot;Falta el esquema del formulario.&quot;);</span>
+    }
+
+<span class="fc" id="L85">    Map&lt;String, BigDecimal&gt; pesos = new TreeMap&lt;&gt;();</span>
+
+<span class="fc bfc" id="L87" title="All 2 branches covered.">    for (var configuracion : configuraciones.findAllByVersionFormularioId(versionFormularioId)) {</span>
+<span class="fc" id="L88">      String referencia = configuracion.getElementoRef();</span>
+<span class="fc" id="L89">      BigDecimal peso = configuracion.getPeso();</span>
+
+<span class="pc bpc" id="L91" title="3 of 8 branches missed.">      if (referencia == null || referencia.isBlank() || peso == null || peso.signum() &lt;= 0) {</span>
+<span class="fc" id="L92">        throw error(</span>
+            &quot;configuracion_ic_incompleta&quot;,
+            &quot;Falta una referencia o un peso positivo en la configuracion de &quot; + referencia);
+      }
+
+<span class="fc bfc" id="L97" title="All 2 branches covered.">      if (pesos.putIfAbsent(referencia, peso) != null) {</span>
+<span class="fc" id="L98">        throw error(&quot;configuracion_ic_invalida&quot;, &quot;Peso duplicado para &quot; + referencia);</span>
+      }
+<span class="fc" id="L100">    }</span>
+
+<span class="fc bfc" id="L102" title="All 2 branches covered.">    if (pesos.isEmpty()) {</span>
+<span class="fc" id="L103">      throw error(&quot;configuracion_ic_incompleta&quot;, &quot;La version no tiene pesos configurados.&quot;);</span>
+    }
+
+<span class="fc" id="L106">    return new EntradaCalculoIc(</span>
+        versionFormularioId,
+        formulario,
+        algoritmo,
+<span class="fc" id="L110">        datos.deepCopy(),</span>
+<span class="fc" id="L111">        esquema.deepCopy(),</span>
+<span class="fc" id="L112">        catalogo.deepCopy(),</span>
+<span class="fc" id="L113">        reglas.deepCopy(),</span>
+<span class="fc" id="L114">        Map.copyOf(pesos));</span>
+  }
+
+  private String texto(JsonNode valor, String campo) {
+<span class="pc bpc" id="L118" title="3 of 6 branches missed.">    if (valor == null || !valor.isTextual() || valor.asText().isBlank()) {</span>
+<span class="nc" id="L119">      throw error(&quot;configuracion_ic_incompleta&quot;, &quot;Falta configurar &quot; + campo);</span>
+    }
+<span class="fc" id="L121">    return valor.asText();</span>
+  }
+
+  private ApiException error(String codigo, String detalle) {
+<span class="fc" id="L125">    return new ApiException(</span>
+        HttpStatus.UNPROCESSABLE_ENTITY,
+        codigo,
+        &quot;Configuracion del indice de condicion invalida&quot;,
+        detalle);
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

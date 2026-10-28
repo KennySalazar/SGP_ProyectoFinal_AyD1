@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ValidadorAnclajeFotografico.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">sgp-api</a> &gt; <a href="index.source.html" class="el_package">gt.usac.cunoc.sgp.inspeccion.validation</a> &gt; <span class="el_source">ValidadorAnclajeFotografico.java</span></div><h1>ValidadorAnclajeFotografico.java</h1><pre class="source lang-java linenums">package gt.usac.cunoc.sgp.inspeccion.validation;
+
+import gt.usac.cunoc.sgp.common.exception.ApiException;
+import gt.usac.cunoc.sgp.formulario.validation.AnclajeInvalidoException;
+import gt.usac.cunoc.sgp.formulario.validation.ValidadorAnclajeFormulario;
+import gt.usac.cunoc.sgp.inspeccion.entity.Inspeccion;
+import java.util.UUID;
+import org.springframework.http.HttpStatus;
+import org.springframework.stereotype.Component;
+
+@Component
+<span class="fc" id="L12">public class ValidadorAnclajeFotografico {</span>
+<span class="fc" id="L13">  private final ValidadorAnclajeFormulario validador = new ValidadorAnclajeFormulario();</span>
+
+  public void validar(Inspeccion inspeccion, String ref, UUID instancia) {
+<span class="fc bfc" id="L16" title="All 2 branches covered.">    if (ref == null) {</span>
+<span class="fc bfc" id="L17" title="All 2 branches covered.">      if (instancia != null) throw invalido();</span>
+<span class="fc" id="L18">      return;</span>
+    }
+    try {
+<span class="fc" id="L21">      validador.validarFotografiaHu028(</span>
+<span class="fc" id="L22">          inspeccion.getVersionFormulario().getEsquema(), inspeccion.getDatos(), ref, instancia);</span>
+<span class="fc" id="L23">    } catch (AnclajeInvalidoException e) {</span>
+<span class="fc" id="L24">      throw invalido();</span>
+<span class="fc" id="L25">    }</span>
+<span class="fc" id="L26">  }</span>
+
+  private ApiException invalido() {
+<span class="fc" id="L29">    return new ApiException(</span>
+        HttpStatus.UNPROCESSABLE_ENTITY,
+        &quot;anclaje_fotografico_invalido&quot;,
+        &quot;Referencia inválida&quot;,
+        &quot;El elemento o la instancia no pertenecen a la versión y datos de esta inspección.&quot;);
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

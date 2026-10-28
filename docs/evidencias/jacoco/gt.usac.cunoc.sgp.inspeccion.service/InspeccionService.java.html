@@ -1,0 +1,1751 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>InspeccionService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">sgp-api</a> &gt; <a href="index.source.html" class="el_package">gt.usac.cunoc.sgp.inspeccion.service</a> &gt; <span class="el_source">InspeccionService.java</span></div><h1>InspeccionService.java</h1><pre class="source lang-java linenums">package gt.usac.cunoc.sgp.inspeccion.service;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import gt.usac.cunoc.sgp.archivo.model.TipoUsoArchivo;
+import gt.usac.cunoc.sgp.archivo.repository.ArchivoInspeccionRepository;
+import gt.usac.cunoc.sgp.common.audit.model.AccionAuditoria;
+import gt.usac.cunoc.sgp.common.audit.service.AuditoriaWriter;
+import gt.usac.cunoc.sgp.common.exception.ApiException;
+import gt.usac.cunoc.sgp.common.util.UuidV7Generator;
+import gt.usac.cunoc.sgp.formulario.dto.MapeoCampoResponse;
+import gt.usac.cunoc.sgp.formulario.entity.MapeoCampoFormulario;
+import gt.usac.cunoc.sgp.formulario.entity.VersionFormulario;
+import gt.usac.cunoc.sgp.formulario.model.EstadoVersionFormulario;
+import gt.usac.cunoc.sgp.formulario.model.TipoMapeoCampo;
+import gt.usac.cunoc.sgp.formulario.repository.MapeoCampoFormularioRepository;
+import gt.usac.cunoc.sgp.formulario.repository.VersionFormularioRepository;
+import gt.usac.cunoc.sgp.formulario.validation.JsonSchemaValidatorService;
+import gt.usac.cunoc.sgp.inspeccion.dto.AcompananteRequest;
+import gt.usac.cunoc.sgp.inspeccion.dto.AcompananteResponse;
+import gt.usac.cunoc.sgp.inspeccion.dto.ConflictoSincronizacionResponse;
+import gt.usac.cunoc.sgp.inspeccion.dto.DatosPermanentesResponse;
+import gt.usac.cunoc.sgp.inspeccion.dto.ExportacionInspeccionResponse;
+import gt.usac.cunoc.sgp.inspeccion.dto.GuardarBorradorRequest;
+import gt.usac.cunoc.sgp.inspeccion.dto.GuardarRespuestasRequest;
+import gt.usac.cunoc.sgp.inspeccion.dto.IndiceCondicionPreliminarResponse;
+import gt.usac.cunoc.sgp.inspeccion.dto.IniciarInspeccionRequest;
+import gt.usac.cunoc.sgp.inspeccion.dto.IniciarInspeccionResponse;
+import gt.usac.cunoc.sgp.inspeccion.dto.IniciarInspeccionVersionadaRequest;
+import gt.usac.cunoc.sgp.inspeccion.dto.IniciarInspeccionVersionadaResponse;
+import gt.usac.cunoc.sgp.inspeccion.dto.InspeccionBorradorResponse;
+import gt.usac.cunoc.sgp.inspeccion.dto.InspeccionPublicadaDetalleResponse;
+import gt.usac.cunoc.sgp.inspeccion.dto.InspeccionPublicadaResumenResponse;
+import gt.usac.cunoc.sgp.inspeccion.dto.InspeccionResumenResponse;
+import gt.usac.cunoc.sgp.inspeccion.dto.ProgresoBorradorResponse;
+import gt.usac.cunoc.sgp.inspeccion.dto.RelacionVersionActivaResponse;
+import gt.usac.cunoc.sgp.inspeccion.dto.ResultadoIcPublicadoResponse;
+import gt.usac.cunoc.sgp.inspeccion.entity.Inspeccion;
+import gt.usac.cunoc.sgp.inspeccion.entity.InspeccionAcompanante;
+import gt.usac.cunoc.sgp.inspeccion.entity.InspeccionDatoTecnico;
+import gt.usac.cunoc.sgp.inspeccion.mapper.InspeccionMapper;
+import gt.usac.cunoc.sgp.inspeccion.model.EntradaCalculoIc;
+import gt.usac.cunoc.sgp.inspeccion.model.ResultadoCalculoIc;
+import gt.usac.cunoc.sgp.inspeccion.repository.InspeccionDatoTecnicoRepository;
+import gt.usac.cunoc.sgp.inspeccion.repository.InspeccionRepository;
+import gt.usac.cunoc.sgp.inspeccion.repository.ResultadoIcRepository;
+import gt.usac.cunoc.sgp.mantenimiento.repository.OrdenMantenimientoRepository;
+import gt.usac.cunoc.sgp.puente.entity.Puente;
+import gt.usac.cunoc.sgp.puente.repository.AsignacionPuenteRepository;
+import gt.usac.cunoc.sgp.puente.repository.PuenteRepository;
+import gt.usac.cunoc.sgp.sync.entity.ConflictoSincronizacion;
+import gt.usac.cunoc.sgp.sync.model.SolicitudOperacion;
+import gt.usac.cunoc.sgp.sync.repository.ConflictoSincronizacionRepository;
+import gt.usac.cunoc.sgp.sync.service.HuellaSolicitud;
+import gt.usac.cunoc.sgp.sync.service.OperacionIdempotenteService;
+import gt.usac.cunoc.sgp.usuario.entity.UserAccount;
+import gt.usac.cunoc.sgp.usuario.model.RoleName;
+import gt.usac.cunoc.sgp.usuario.repository.UserAccountRepository;
+import gt.usac.cunoc.sgp.usuario.repository.UsuarioProfesionalRepository;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HexFormat;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
+import org.locationtech.jts.geom.Coordinate;
+import org.locationtech.jts.geom.GeometryFactory;
+import org.locationtech.jts.geom.Point;
+import org.locationtech.jts.geom.PrecisionModel;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.http.HttpStatus;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+@Service
+public class InspeccionService {
+
+<span class="fc" id="L96">  private static final GeometryFactory GEOMETRY_FACTORY =</span>
+      new GeometryFactory(new PrecisionModel(), 4326);
+<span class="fc" id="L98">  private static final ZoneId ZONA_GUATEMALA = ZoneId.of(&quot;America/Guatemala&quot;);</span>
+<span class="fc" id="L99">  private static final Set&lt;String&gt; ESTADOS_VALIDOS =</span>
+<span class="fc" id="L100">      Set.of(&quot;BORRADOR&quot;, &quot;ENVIADA&quot;, &quot;EN_REVISION&quot;, &quot;CAMBIOS_SOLICITADOS&quot;, &quot;PUBLICADA&quot;, &quot;RECHAZADA&quot;);</span>
+
+  private final InspeccionRepository inspeccionRepository;
+  private final InspeccionDatoTecnicoRepository datoTecnicoRepository;
+  private final PuenteRepository puenteRepository;
+  private final VersionFormularioRepository versionFormularioRepository;
+  private final UserAccountRepository userAccountRepository;
+  private final UsuarioProfesionalRepository profesionalRepository;
+  private final OperacionIdempotenteService operaciones;
+  private final AuditoriaWriter auditoriaWriter;
+  private final ObjectMapper objectMapper;
+  private final Clock clock;
+  private final CalculadorProgresoBorrador calculadorProgreso;
+  private final PreparadorEntradaIcService preparadorEntradaIcService;
+  private final CalculoIndiceCondicionService calculoIndiceCondicionService;
+  private final JsonSchemaValidatorService jsonSchemaValidatorService;
+  private final InspeccionMapper inspeccionMapper;
+  private AsignacionPuenteRepository asignaciones;
+  private final ResultadoIcRepository resultadoIcRepository;
+  private MapeoCampoFormularioRepository mapeoCampoFormularioRepository;
+  private ArchivoInspeccionRepository archivoInspeccionRepository;
+  private OrdenMantenimientoRepository ordenMantenimientoRepository;
+
+  @Autowired(required = false)
+  private ConflictoSincronizacionRepository conflictosSincronizacion;
+
+  public InspeccionService(
+      InspeccionRepository inspeccionRepository,
+      VersionFormularioRepository versionFormularioRepository,
+      PuenteRepository puenteRepository,
+      JsonSchemaValidatorService jsonSchemaValidatorService,
+      InspeccionMapper inspeccionMapper,
+      ObjectMapper objectMapper,
+      AsignacionPuenteRepository asignaciones) {
+<span class="fc" id="L134">    this(</span>
+        inspeccionRepository,
+        null,
+        puenteRepository,
+        versionFormularioRepository,
+        null,
+        null,
+        null,
+        null,
+        objectMapper,
+<span class="fc" id="L144">        Clock.systemUTC(),</span>
+        null,
+        null,
+        null,
+        jsonSchemaValidatorService,
+        inspeccionMapper,
+        asignaciones);
+<span class="fc" id="L151">  }</span>
+
+  public InspeccionService(
+      InspeccionRepository inspeccionRepository,
+      InspeccionDatoTecnicoRepository datoTecnicoRepository,
+      PuenteRepository puenteRepository,
+      VersionFormularioRepository versionFormularioRepository,
+      UserAccountRepository userAccountRepository,
+      UsuarioProfesionalRepository profesionalRepository,
+      OperacionIdempotenteService operaciones,
+      AuditoriaWriter auditoriaWriter,
+      ObjectMapper objectMapper,
+      Clock clock) {
+<span class="fc" id="L164">    this(</span>
+        inspeccionRepository,
+        datoTecnicoRepository,
+        puenteRepository,
+        versionFormularioRepository,
+        userAccountRepository,
+        profesionalRepository,
+        operaciones,
+        auditoriaWriter,
+        objectMapper,
+        clock,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null);
+<span class="fc" id="L181">  }</span>
+
+  public InspeccionService(
+      InspeccionRepository inspeccionRepository,
+      InspeccionDatoTecnicoRepository datoTecnicoRepository,
+      PuenteRepository puenteRepository,
+      VersionFormularioRepository versionFormularioRepository,
+      UserAccountRepository userAccountRepository,
+      UsuarioProfesionalRepository profesionalRepository,
+      OperacionIdempotenteService operaciones,
+      AuditoriaWriter auditoriaWriter,
+      ObjectMapper objectMapper,
+      Clock clock,
+      CalculadorProgresoBorrador calculadorProgreso,
+      PreparadorEntradaIcService preparadorEntradaIcService,
+      CalculoIndiceCondicionService calculoIndiceCondicionService) {
+<span class="fc" id="L197">    this(</span>
+        inspeccionRepository,
+        datoTecnicoRepository,
+        puenteRepository,
+        versionFormularioRepository,
+        userAccountRepository,
+        profesionalRepository,
+        operaciones,
+        auditoriaWriter,
+        objectMapper,
+        clock,
+        calculadorProgreso,
+        preparadorEntradaIcService,
+        calculoIndiceCondicionService,
+        null,
+        null,
+        null);
+<span class="fc" id="L214">  }</span>
+
+  public InspeccionService(
+      InspeccionRepository inspeccionRepository,
+      InspeccionDatoTecnicoRepository datoTecnicoRepository,
+      PuenteRepository puenteRepository,
+      VersionFormularioRepository versionFormularioRepository,
+      UserAccountRepository userAccountRepository,
+      UsuarioProfesionalRepository profesionalRepository,
+      OperacionIdempotenteService operaciones,
+      AuditoriaWriter auditoriaWriter,
+      ObjectMapper objectMapper,
+      Clock clock,
+      CalculadorProgresoBorrador calculadorProgreso,
+      PreparadorEntradaIcService preparadorEntradaIcService,
+      CalculoIndiceCondicionService calculoIndiceCondicionService,
+      JsonSchemaValidatorService jsonSchemaValidatorService,
+      InspeccionMapper inspeccionMapper,
+      AsignacionPuenteRepository asignaciones) {
+<span class="fc" id="L233">    this(</span>
+        inspeccionRepository,
+        datoTecnicoRepository,
+        puenteRepository,
+        versionFormularioRepository,
+        userAccountRepository,
+        profesionalRepository,
+        operaciones,
+        auditoriaWriter,
+        objectMapper,
+        clock,
+        calculadorProgreso,
+        preparadorEntradaIcService,
+        calculoIndiceCondicionService,
+        jsonSchemaValidatorService,
+        inspeccionMapper,
+        asignaciones,
+        null);
+<span class="fc" id="L251">  }</span>
+
+  @Autowired
+  public InspeccionService(
+      InspeccionRepository inspeccionRepository,
+      InspeccionDatoTecnicoRepository datoTecnicoRepository,
+      PuenteRepository puenteRepository,
+      VersionFormularioRepository versionFormularioRepository,
+      UserAccountRepository userAccountRepository,
+      UsuarioProfesionalRepository profesionalRepository,
+      OperacionIdempotenteService operaciones,
+      AuditoriaWriter auditoriaWriter,
+      ObjectMapper objectMapper,
+      Clock clock,
+      CalculadorProgresoBorrador calculadorProgreso,
+      PreparadorEntradaIcService preparadorEntradaIcService,
+      CalculoIndiceCondicionService calculoIndiceCondicionService,
+      JsonSchemaValidatorService jsonSchemaValidatorService,
+      InspeccionMapper inspeccionMapper,
+      AsignacionPuenteRepository asignaciones,
+<span class="fc" id="L271">      ResultadoIcRepository resultadoIcRepository) {</span>
+<span class="fc" id="L272">    this.inspeccionRepository = inspeccionRepository;</span>
+<span class="fc" id="L273">    this.datoTecnicoRepository = datoTecnicoRepository;</span>
+<span class="fc" id="L274">    this.puenteRepository = puenteRepository;</span>
+<span class="fc" id="L275">    this.versionFormularioRepository = versionFormularioRepository;</span>
+<span class="fc" id="L276">    this.userAccountRepository = userAccountRepository;</span>
+<span class="fc" id="L277">    this.profesionalRepository = profesionalRepository;</span>
+<span class="fc" id="L278">    this.operaciones = operaciones;</span>
+<span class="fc" id="L279">    this.auditoriaWriter = auditoriaWriter;</span>
+<span class="fc" id="L280">    this.objectMapper = objectMapper;</span>
+<span class="fc" id="L281">    this.clock = clock;</span>
+<span class="fc" id="L282">    this.calculadorProgreso =</span>
+<span class="fc bfc" id="L283" title="All 2 branches covered.">        calculadorProgreso != null ? calculadorProgreso : new CalculadorProgresoBorrador();</span>
+<span class="fc" id="L284">    this.preparadorEntradaIcService = preparadorEntradaIcService;</span>
+<span class="fc" id="L285">    this.calculoIndiceCondicionService = calculoIndiceCondicionService;</span>
+<span class="fc" id="L286">    this.jsonSchemaValidatorService = jsonSchemaValidatorService;</span>
+<span class="fc" id="L287">    this.inspeccionMapper = inspeccionMapper;</span>
+<span class="fc" id="L288">    this.asignaciones = asignaciones;</span>
+<span class="fc" id="L289">    this.resultadoIcRepository = resultadoIcRepository;</span>
+<span class="fc" id="L290">  }</span>
+
+  @Autowired(required = false)
+  void setAsignacionPuenteRepository(AsignacionPuenteRepository asignaciones) {
+<span class="fc" id="L294">    this.asignaciones = asignaciones;</span>
+<span class="fc" id="L295">  }</span>
+
+  @Autowired(required = false)
+  public void setMapeoCampoFormularioRepository(
+      MapeoCampoFormularioRepository mapeoCampoFormularioRepository) {
+<span class="fc" id="L300">    this.mapeoCampoFormularioRepository = mapeoCampoFormularioRepository;</span>
+<span class="fc" id="L301">  }</span>
+
+  @Autowired(required = false)
+  public void setArchivoInspeccionRepository(
+      ArchivoInspeccionRepository archivoInspeccionRepository) {
+<span class="fc" id="L306">    this.archivoInspeccionRepository = archivoInspeccionRepository;</span>
+<span class="fc" id="L307">  }</span>
+
+  @Autowired(required = false)
+  public void setOrdenMantenimientoRepository(
+      OrdenMantenimientoRepository ordenMantenimientoRepository) {
+<span class="fc" id="L312">    this.ordenMantenimientoRepository = ordenMantenimientoRepository;</span>
+<span class="fc" id="L313">  }</span>
+
+  /** Conserva el contrato de HU-024 utilizado por los consumidores de HU-028. */
+  @Transactional
+  public IniciarInspeccionResponse iniciarInspeccion(
+      IniciarInspeccionRequest request, UUID usuarioId, String idempotencyKey) {
+<span class="fc" id="L319">    return iniciarInspeccionHu024(request, usuarioId, idempotencyKey);</span>
+  }
+
+  @Transactional
+  public IniciarInspeccionResponse iniciarInspeccionHu024(
+      IniciarInspeccionRequest request, UUID usuarioId, String idempotencyKey) {
+    // 1. Autorización de rol y verificación
+<span class="fc" id="L326">    UserAccount user = validarInspector(usuarioId);</span>
+
+<span class="pc bpc" id="L328" title="1 of 4 branches missed.">    if (idempotencyKey != null &amp;&amp; !idempotencyKey.isBlank()) {</span>
+<span class="fc" id="L329">      var solicitud =</span>
+          new SolicitudOperacion(
+              usuarioId,
+              idempotencyKey,
+              &quot;POST&quot;,
+              &quot;/api/v1/inspecciones&quot;,
+<span class="fc" id="L335">              calcularHash(request.toString()),</span>
+              &quot;inspeccion&quot;,
+<span class="fc" id="L337">              request.id());</span>
+<span class="fc" id="L338">      return operaciones.ejecutar(</span>
+          solicitud,
+          201,
+<span class="fc" id="L341">          () -&gt; crearORecuperar(request, user),</span>
+          IniciarInspeccionResponse::id,
+          nodo -&gt; {
+<span class="fc bfc" id="L344" title="All 2 branches covered.">            if (nodo.has(&quot;rolAutor&quot;))</span>
+<span class="fc" id="L345">              return objectMapper.convertValue(nodo, IniciarInspeccionResponse.class);</span>
+            // Compatibilidad con snapshots de HU-024 guardados antes del coordinador común.
+<span class="fc" id="L347">            UUID id = UUID.fromString(nodo.path(&quot;id&quot;).asText());</span>
+<span class="fc" id="L348">            return inspeccionRepository</span>
+<span class="fc" id="L349">                .findConDetallesById(id)</span>
+<span class="pc bpc" id="L350" title="2 of 4 branches missed.">                .filter(i -&gt; i.getAutorId().equals(usuarioId) &amp;&amp; i.getEliminadoEn() == null)</span>
+<span class="fc" id="L351">                .map(this::aResponse)</span>
+<span class="pc" id="L352">                .orElseThrow(() -&gt; conflictoIdentidad());</span>
+          });
+    }
+<span class="fc" id="L355">    return crearORecuperar(request, user);</span>
+  }
+
+  private IniciarInspeccionResponse crearORecuperar(
+      IniciarInspeccionRequest request, UserAccount user) {
+<span class="fc bfc" id="L360" title="All 2 branches covered.">    if (request.id() != null) {</span>
+<span class="fc" id="L361">      operaciones.bloquearEntidad(&quot;inspeccion&quot;, request.id());</span>
+<span class="fc" id="L362">      var existente = inspeccionRepository.findConDetallesById(request.id());</span>
+<span class="fc bfc" id="L363" title="All 2 branches covered.">      if (existente.isPresent()) {</span>
+<span class="fc" id="L364">        var i = existente.get();</span>
+<span class="pc bpc" id="L365" title="1 of 2 branches missed.">        if ((i.getHuellaSolicitudInicio() != null</span>
+<span class="fc" id="L366">                &amp;&amp; !i.getHuellaSolicitudInicio()</span>
+<span class="fc bfc" id="L367" title="All 2 branches covered.">                    .equals(HuellaSolicitud.calcular(objectMapper.valueToTree(request))))</span>
+<span class="fc bfc" id="L368" title="All 2 branches covered.">            || !i.getAutorId().equals(user.getId())</span>
+<span class="pc bpc" id="L369" title="1 of 2 branches missed.">            || i.getEliminadoEn() != null</span>
+<span class="pc bpc" id="L370" title="1 of 2 branches missed.">            || !i.getPuente().getId().equals(request.puenteId())</span>
+<span class="pc bpc" id="L371" title="1 of 2 branches missed.">            || !i.getFechaInspeccion().equals(request.fechaInspeccion())</span>
+<span class="pc bpc" id="L372" title="1 of 2 branches missed.">            || !i.getDispositivoId().equals(request.dispositivoId())) throw conflictoIdentidad();</span>
+<span class="fc" id="L373">        return aResponse(i);</span>
+      }
+    }
+<span class="fc" id="L376">    return crearNuevaInspeccion(request, user);</span>
+  }
+
+  private ApiException conflictoIdentidad() {
+<span class="fc" id="L380">    return new ApiException(</span>
+        HttpStatus.CONFLICT,
+        &quot;inspeccion_identidad_conflictiva&quot;,
+        &quot;Conflicto de inspección&quot;,
+        &quot;El identificador de inspección ya corresponde a otra solicitud o no está disponible.&quot;);
+  }
+
+  @Transactional
+  public IniciarInspeccionVersionadaResponse iniciarInspeccion(
+      IniciarInspeccionVersionadaRequest request, UUID usuarioId, String rolUsuario) {
+<span class="pc bpc" id="L390" title="2 of 6 branches missed.">    if (request == null || request.puenteId() == null || request.versionFormularioId() == null) {</span>
+<span class="fc" id="L391">      throw new ApiException(</span>
+          HttpStatus.UNPROCESSABLE_ENTITY,
+          &quot;solicitud_invalida&quot;,
+          &quot;Solicitud inválida&quot;,
+          &quot;El puente y la versión del formulario son obligatorios.&quot;);
+    }
+
+<span class="fc" id="L398">    Puente puente =</span>
+        puenteRepository
+<span class="fc" id="L400">            .findById(request.puenteId())</span>
+<span class="fc" id="L401">            .orElseThrow(</span>
+                () -&gt;
+<span class="nc" id="L403">                    new ApiException(</span>
+                        HttpStatus.NOT_FOUND,
+                        &quot;puente_no_encontrado&quot;,
+                        &quot;Puente no encontrado&quot;,
+                        &quot;El puente especificado no existe&quot;));
+<span class="pc bpc" id="L408" title="1 of 2 branches missed.">    if (!puente.isActivo()) {</span>
+<span class="nc" id="L409">      throw new ApiException(</span>
+          HttpStatus.UNPROCESSABLE_ENTITY,
+          &quot;puente_inactivo&quot;,
+          &quot;Puente inactivo&quot;,
+          &quot;No se puede iniciar una inspección en un puente inactivo&quot;);
+    }
+
+<span class="fc" id="L416">    VersionFormulario version =</span>
+        versionFormularioRepository
+<span class="fc" id="L418">            .findById(request.versionFormularioId())</span>
+<span class="fc bfc" id="L419" title="All 2 branches covered.">            .filter(candidata -&gt; candidata.getEstado() == EstadoVersionFormulario.PUBLICADA)</span>
+<span class="fc" id="L420">            .orElseThrow(</span>
+                () -&gt;
+<span class="fc" id="L422">                    new ApiException(</span>
+                        HttpStatus.UNPROCESSABLE_ENTITY,
+                        &quot;version_no_utilizable&quot;,
+                        &quot;Versión de formulario no utilizable&quot;,
+                        &quot;Solo se pueden iniciar inspecciones con versiones de formulario&quot;
+                            + &quot; publicadas&quot;));
+
+<span class="fc" id="L429">    JsonNode datos = request.datos();</span>
+<span class="pc bpc" id="L430" title="5 of 6 branches missed.">    if (datos == null || datos.isNull() || datos.isEmpty()) {</span>
+<span class="fc" id="L431">      datos = objectMapper.createObjectNode();</span>
+    }
+<span class="pc bpc" id="L433" title="1 of 2 branches missed.">    if (jsonSchemaValidatorService != null) {</span>
+<span class="fc" id="L434">      jsonSchemaValidatorService.validarRespuestas(version.getEsquema(), datos, true);</span>
+    }
+
+    LocalDate fecha =
+<span class="pc bpc" id="L438" title="1 of 2 branches missed.">        request.fechaInspeccion() != null</span>
+<span class="fc" id="L439">            ? request.fechaInspeccion()</span>
+<span class="pc" id="L440">            : LocalDate.now(clock.withZone(ZONA_GUATEMALA));</span>
+    String dispositivo =
+<span class="pc bpc" id="L442" title="2 of 4 branches missed.">        request.dispositivoId() != null &amp;&amp; !request.dispositivoId().isBlank()</span>
+<span class="fc" id="L443">            ? request.dispositivoId()</span>
+<span class="pc" id="L444">            : &quot;web&quot;;</span>
+    String nombre =
+<span class="pc bpc" id="L446" title="2 of 4 branches missed.">        request.nombreAutorCapturado() != null &amp;&amp; !request.nombreAutorCapturado().isBlank()</span>
+<span class="fc" id="L447">            ? request.nombreAutorCapturado()</span>
+<span class="pc" id="L448">            : &quot;Inspector&quot;;</span>
+
+<span class="fc bfc" id="L450" title="All 4 branches covered.">    if (RoleName.ESTUDIANTE.name().equals(rolUsuario) &amp;&amp; request.asignacionPuenteId() != null) {</span>
+<span class="pc bpc" id="L451" title="1 of 2 branches missed.">      if (asignaciones == null</span>
+<span class="fc bfc" id="L452" title="All 2 branches covered.">          || !asignaciones.existsVigenteParaInspeccion(</span>
+<span class="fc" id="L453">              request.asignacionPuenteId(), usuarioId, puente.getId())) {</span>
+<span class="fc" id="L454">        throw new ApiException(</span>
+            HttpStatus.NOT_FOUND,
+            &quot;asignacion_no_encontrada&quot;,
+            &quot;Asignación no encontrada&quot;,
+            &quot;No existe una asignación vigente del estudiante para este puente.&quot;);
+      }
+    }
+
+<span class="fc" id="L462">    Inspeccion inspeccion =</span>
+        new Inspeccion(puente, version, usuarioId, rolUsuario, nombre, fecha, dispositivo, datos);
+<span class="fc bfc" id="L464" title="All 2 branches covered.">    if (request.asignacionPuenteId() != null) {</span>
+<span class="pc bpc" id="L465" title="1 of 2 branches missed.">      if (!RoleName.ESTUDIANTE.name().equals(rolUsuario)</span>
+<span class="nc bnc" id="L466" title="All 2 branches missed.">          &amp;&amp; !asignaciones.existsVigenteParaInspeccion(</span>
+<span class="nc" id="L467">              request.asignacionPuenteId(), usuarioId, puente.getId())) {</span>
+<span class="nc" id="L468">        throw new ApiException(</span>
+            HttpStatus.NOT_FOUND,
+            &quot;asignacion_no_encontrada&quot;,
+            &quot;Asignación no encontrada&quot;,
+            &quot;No existe una asignación vigente del autor para este puente.&quot;);
+      }
+<span class="fc" id="L474">      inspeccion.setAsignacionPuenteId(request.asignacionPuenteId());</span>
+    }
+<span class="fc" id="L476">    InspeccionResumenResponse response =</span>
+<span class="fc" id="L477">        inspeccionMapper.toResumenResponse(inspeccionRepository.save(inspeccion));</span>
+<span class="fc" id="L478">    return new IniciarInspeccionVersionadaResponse(</span>
+<span class="fc" id="L479">        response.id(),</span>
+<span class="fc" id="L480">        response.puenteId(),</span>
+<span class="fc" id="L481">        response.puenteNombre(),</span>
+<span class="fc" id="L482">        response.versionFormularioId(),</span>
+<span class="fc" id="L483">        response.versionFormularioCodigo(),</span>
+<span class="fc" id="L484">        response.autorId(),</span>
+<span class="fc" id="L485">        response.rolAutorCreacion(),</span>
+<span class="fc" id="L486">        response.nombreAutorCapturado(),</span>
+<span class="fc" id="L487">        response.tipo(),</span>
+<span class="fc" id="L488">        response.estado(),</span>
+<span class="fc" id="L489">        response.fechaInspeccion(),</span>
+<span class="fc" id="L490">        response.dispositivoId(),</span>
+<span class="fc" id="L491">        response.datos(),</span>
+<span class="fc" id="L492">        response.creadoEn(),</span>
+<span class="fc" id="L493">        response.actualizadoEn());</span>
+  }
+
+  @Transactional(readOnly = true)
+  public Optional&lt;DatosPermanentesResponse&gt; obtenerDatosPermanentesVigentes(UUID puenteId) {
+<span class="nc" id="L498">    Puente puente =</span>
+        puenteRepository
+<span class="nc" id="L500">            .findById(puenteId)</span>
+<span class="nc" id="L501">            .orElseThrow(</span>
+                () -&gt;
+<span class="nc" id="L503">                    new ApiException(</span>
+                        HttpStatus.NOT_FOUND,
+                        &quot;puente_no_encontrado&quot;,
+                        &quot;Puente no encontrado&quot;,
+                        &quot;No se encontró el puente especificado.&quot;));
+
+<span class="nc bnc" id="L509" title="All 2 branches missed.">    if (puente.getInspeccionVigenteId() == null) {</span>
+<span class="nc" id="L510">      return Optional.empty();</span>
+    }
+
+<span class="nc" id="L513">    return datoTecnicoRepository</span>
+<span class="nc" id="L514">        .findByInspeccionId(puente.getInspeccionVigenteId())</span>
+<span class="nc" id="L515">        .map(this::aDatosPermanentesResponse);</span>
+  }
+
+  @Transactional
+  public InspeccionBorradorResponse guardarBorrador(
+      UUID id, GuardarBorradorRequest request, UUID usuarioId) {
+<span class="fc" id="L521">    return guardarBorrador(id, request, usuarioId, false, null);</span>
+  }
+
+  @Transactional
+  public InspeccionBorradorResponse guardarBorrador(
+      UUID id,
+      GuardarBorradorRequest request,
+      UUID usuarioId,
+      boolean clientePrevalece,
+      UUID operacionIdempotenteId) {
+<span class="fc" id="L531">    Inspeccion inspeccion =</span>
+        inspeccionRepository
+<span class="fc" id="L533">            .findConDetallesById(id)</span>
+<span class="fc" id="L534">            .orElseThrow(</span>
+                () -&gt;
+<span class="nc" id="L536">                    new ApiException(</span>
+                        HttpStatus.NOT_FOUND,
+                        &quot;inspeccion_no_encontrada&quot;,
+                        &quot;Inspección no encontrada&quot;,
+                        &quot;No se encontró la inspección especificada.&quot;));
+
+<span class="pc bpc" id="L542" title="1 of 2 branches missed.">    if (inspeccion.getEliminadoEn() != null) {</span>
+<span class="nc" id="L543">      throw new ApiException(</span>
+          HttpStatus.NOT_FOUND,
+          &quot;inspeccion_no_encontrada&quot;,
+          &quot;Inspección no encontrada&quot;,
+          &quot;No se encontró la inspección especificada.&quot;);
+    }
+
+    // 7. Solo el autor puede editar
+<span class="fc bfc" id="L551" title="All 2 branches covered.">    if (!inspeccion.getAutorId().equals(usuarioId)) {</span>
+<span class="fc" id="L552">      throw new ApiException(</span>
+          HttpStatus.NOT_FOUND,
+          &quot;inspeccion_no_encontrada&quot;,
+          &quot;Inspección no encontrada&quot;,
+          &quot;No se encontró la inspección especificada o no tiene acceso a ella.&quot;);
+    }
+
+    // 6. Solo BORRADOR puede editarse
+<span class="fc bfc" id="L560" title="All 2 branches covered.">    if (!&quot;BORRADOR&quot;.equals(inspeccion.getEstado())) {</span>
+<span class="fc" id="L561">      throw new ApiException(</span>
+          HttpStatus.CONFLICT,
+          &quot;inspeccion_no_editable&quot;,
+          &quot;Inspección no editable&quot;,
+          &quot;Solo las inspecciones en estado BORRADOR pueden ser modificadas.&quot;);
+    }
+
+    // 8. Ediciones obsoletas / concurrencia optimista
+<span class="pc bpc" id="L569" title="1 of 2 branches missed.">    if (request != null</span>
+<span class="pc bpc" id="L570" title="1 of 2 branches missed.">        &amp;&amp; request.version() != null</span>
+<span class="fc bfc" id="L571" title="All 2 branches covered.">        &amp;&amp; !Objects.equals(request.version(), inspeccion.getVersion())) {</span>
+<span class="pc bpc" id="L572" title="5 of 6 branches missed.">      if (!clientePrevalece || operacionIdempotenteId == null || conflictosSincronizacion == null) {</span>
+<span class="fc" id="L573">        throw new ApiException(</span>
+            HttpStatus.CONFLICT,
+            &quot;concurrencia_conflicto&quot;,
+            &quot;Conflicto de concurrencia&quot;,
+            &quot;La inspección fue modificada concurrentemente por otra sesión o dispositivo.&quot;);
+      }
+<span class="nc" id="L579">      var copiaServidor = objectMapper.valueToTree(aBorradorResponse(inspeccion));</span>
+<span class="nc" id="L580">      var conflicto =</span>
+          new ConflictoSincronizacion(
+<span class="nc" id="L582">              UuidV7Generator.generate(),</span>
+<span class="nc" id="L583">              inspeccion.getId(),</span>
+              operacionIdempotenteId,
+<span class="nc" id="L585">              inspeccion.getVersion(),</span>
+<span class="nc" id="L586">              request.version(),</span>
+              copiaServidor,
+<span class="nc" id="L588">              calcularHash(objectMapper.valueToTree(request).toString()),</span>
+<span class="nc" id="L589">              clock.instant());</span>
+<span class="nc" id="L590">      conflictosSincronizacion.save(conflicto);</span>
+<span class="nc bnc" id="L591" title="All 2 branches missed.">      if (auditoriaWriter != null) {</span>
+<span class="nc" id="L592">        auditoriaWriter.registrarEnTransaccion(</span>
+            usuarioId,
+            AccionAuditoria.MODIFICAR,
+            &quot;conflicto_sincronizacion&quot;,
+<span class="nc" id="L596">            conflicto.getId(),</span>
+            copiaServidor,
+<span class="nc" id="L598">            objectMapper.valueToTree(request),</span>
+            &quot;HU-059&quot;);
+      }
+    }
+
+    // 9. Fechas futuras o anteriores a la construcción
+<span class="pc bpc" id="L604" title="2 of 4 branches missed.">    if (request != null &amp;&amp; request.fechaInspeccion() != null) {</span>
+<span class="fc" id="L605">      LocalDate hoy = LocalDate.now(clock);</span>
+<span class="fc bfc" id="L606" title="All 2 branches covered.">      if (request.fechaInspeccion().isAfter(hoy)) {</span>
+<span class="fc" id="L607">        throw new ApiException(</span>
+            HttpStatus.UNPROCESSABLE_ENTITY,
+            &quot;fecha_futura&quot;,
+            &quot;Fecha de inspección inválida&quot;,
+            &quot;La fecha de inspección no puede ser posterior a la fecha actual.&quot;);
+      }
+
+<span class="fc" id="L614">      Short anioConstruccion = null;</span>
+<span class="fc bfc" id="L615" title="All 2 branches covered.">      if (inspeccion.getDatoTecnico() != null</span>
+<span class="pc bpc" id="L616" title="1 of 2 branches missed.">          &amp;&amp; inspeccion.getDatoTecnico().getAnioConstruccion() != null) {</span>
+<span class="fc" id="L617">        anioConstruccion = inspeccion.getDatoTecnico().getAnioConstruccion();</span>
+<span class="pc bpc" id="L618" title="1 of 2 branches missed.">      } else if (inspeccion.getPuente().getInspeccionVigenteId() != null) {</span>
+<span class="nc" id="L619">        var tv =</span>
+            datoTecnicoRepository
+<span class="nc" id="L621">                .findByInspeccionId(inspeccion.getPuente().getInspeccionVigenteId())</span>
+<span class="nc" id="L622">                .orElse(null);</span>
+<span class="nc bnc" id="L623" title="All 2 branches missed.">        if (tv != null) {</span>
+<span class="nc" id="L624">          anioConstruccion = tv.getAnioConstruccion();</span>
+        }
+      }
+
+<span class="pc bpc" id="L628" title="1 of 4 branches missed.">      if (anioConstruccion != null &amp;&amp; request.fechaInspeccion().getYear() &lt; anioConstruccion) {</span>
+<span class="fc" id="L629">        throw new ApiException(</span>
+            HttpStatus.UNPROCESSABLE_ENTITY,
+            &quot;fecha_anterior_construccion&quot;,
+            &quot;Fecha de inspección inválida&quot;,
+            &quot;La fecha de inspección (&quot;
+<span class="fc" id="L634">                + request.fechaInspeccion()</span>
+                + &quot;) no puede ser anterior al año de construcción registrado (&quot;
+                + anioConstruccion
+                + &quot;).&quot;);
+      }
+    }
+
+<span class="fc" id="L641">    Instant ahora = clock.instant();</span>
+
+<span class="pc bpc" id="L643" title="1 of 2 branches missed.">    if (request != null) {</span>
+<span class="fc" id="L644">      inspeccion.actualizarBorrador(</span>
+<span class="fc" id="L645">          request.datos(), request.identificacionCapturada(), request.fechaInspeccion(), ahora);</span>
+
+<span class="fc bfc" id="L647" title="All 2 branches covered.">      if (request.acompanantes() != null) {</span>
+<span class="fc" id="L648">        List&lt;InspeccionAcompanante&gt; nuevos = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L649" title="All 2 branches covered.">        for (AcompananteRequest a : request.acompanantes()) {</span>
+<span class="fc" id="L650">          nuevos.add(</span>
+              new InspeccionAcompanante(
+<span class="fc" id="L652">                  UuidV7Generator.generate(),</span>
+                  inspeccion,
+<span class="fc" id="L654">                  a.usuarioId(),</span>
+<span class="fc" id="L655">                  a.nombre().trim(),</span>
+<span class="pc bpc" id="L656" title="1 of 2 branches missed.">                  a.numeroColegiado() != null ? a.numeroColegiado().trim() : null,</span>
+                  ahora));
+<span class="fc" id="L658">        }</span>
+<span class="fc" id="L659">        inspeccion.reemplazarAcompanantes(nuevos);</span>
+<span class="fc" id="L660">      }</span>
+    } else {
+<span class="nc" id="L662">      inspeccion.actualizarBorrador(null, null, null, ahora);</span>
+    }
+
+<span class="fc" id="L665">    inspeccionRepository.saveAndFlush(inspeccion);</span>
+
+<span class="fc" id="L667">    return aBorradorResponse(inspeccion);</span>
+  }
+
+  @Transactional(readOnly = true)
+  public List&lt;ConflictoSincronizacionResponse&gt; listarConflictosSincronizacion(
+      UUID inspeccionId, UUID usuarioId) {
+<span class="nc" id="L673">    var inspeccion =</span>
+        inspeccionRepository
+<span class="nc" id="L675">            .findActiveById(inspeccionId)</span>
+<span class="nc" id="L676">            .orElseThrow(</span>
+                () -&gt;
+<span class="nc" id="L678">                    new ApiException(</span>
+                        HttpStatus.NOT_FOUND,
+                        &quot;inspeccion_no_encontrada&quot;,
+                        &quot;Inspección no encontrada&quot;,
+                        &quot;No existe la inspección solicitada.&quot;));
+<span class="nc bnc" id="L683" title="All 2 branches missed.">    if (!inspeccion.getAutorId().equals(usuarioId))</span>
+<span class="nc" id="L684">      throw new ApiException(</span>
+          HttpStatus.NOT_FOUND,
+          &quot;inspeccion_no_encontrada&quot;,
+          &quot;Inspección no encontrada&quot;,
+          &quot;No existe la inspección solicitada.&quot;);
+<span class="nc bnc" id="L689" title="All 2 branches missed.">    if (conflictosSincronizacion == null) return List.of();</span>
+<span class="nc" id="L690">    return conflictosSincronizacion.findByInspeccionIdOrderByDetectadoEnDesc(inspeccionId).stream()</span>
+<span class="nc" id="L691">        .map(</span>
+            c -&gt;
+<span class="nc" id="L693">                new ConflictoSincronizacionResponse(</span>
+<span class="nc" id="L694">                    c.getId(),</span>
+<span class="nc" id="L695">                    c.getVersionServidor(),</span>
+<span class="nc" id="L696">                    c.getVersionCliente(),</span>
+<span class="nc" id="L697">                    c.getCopiaServidor(),</span>
+<span class="nc" id="L698">                    c.getDetectadoEn()))</span>
+<span class="nc" id="L699">        .toList();</span>
+  }
+
+  @Transactional(readOnly = true)
+  public InspeccionBorradorResponse obtenerBorrador(UUID id, UUID usuarioId) {
+<span class="fc" id="L704">    Inspeccion inspeccion =</span>
+        inspeccionRepository
+<span class="fc" id="L706">            .findConDetallesById(id)</span>
+<span class="fc" id="L707">            .orElseThrow(</span>
+                () -&gt;
+<span class="nc" id="L709">                    new ApiException(</span>
+                        HttpStatus.NOT_FOUND,
+                        &quot;inspeccion_no_encontrada&quot;,
+                        &quot;Inspección no encontrada&quot;,
+                        &quot;No se encontró la inspección especificada o no tiene acceso a ella.&quot;));
+
+<span class="fc" id="L715">    boolean autor = inspeccion.getAutorId().equals(usuarioId);</span>
+<span class="fc" id="L716">    boolean catedraticoAsignado = esCatedraticoAsignado(inspeccion, usuarioId);</span>
+    // El autor solo puede editar su borrador. El catedrático asignado puede consultar la
+    // inspección del estudiante durante el ciclo de revisión, siempre en solo lectura.
+<span class="fc" id="L719">    boolean inspeccionDisponibleParaRevision =</span>
+<span class="fc" id="L720">        Set.of(&quot;BORRADOR&quot;, &quot;ENVIADA&quot;, &quot;EN_REVISION&quot;).contains(inspeccion.getEstado());</span>
+<span class="pc bpc" id="L721" title="1 of 4 branches missed.">    if (inspeccion.getEliminadoEn() != null</span>
+<span class="pc bpc" id="L722" title="1 of 6 branches missed.">        || !(autor &amp;&amp; &quot;BORRADOR&quot;.equals(inspeccion.getEstado()))</span>
+            &amp;&amp; !(catedraticoAsignado &amp;&amp; inspeccionDisponibleParaRevision)) {
+<span class="fc" id="L724">      throw new ApiException(</span>
+          HttpStatus.NOT_FOUND,
+          &quot;inspeccion_no_encontrada&quot;,
+          &quot;Inspección no encontrada&quot;,
+          &quot;No se encontró la inspección especificada o no tiene acceso a ella.&quot;);
+    }
+
+<span class="fc" id="L731">    return aBorradorResponse(inspeccion);</span>
+  }
+
+  @Transactional(readOnly = true)
+  public Page&lt;InspeccionResumenResponse&gt; listarMisInspecciones(
+      UUID usuarioId, String estado, int pagina, int tamanio) {
+<span class="fc" id="L737">    validarInspector(usuarioId);</span>
+
+<span class="pc bpc" id="L739" title="3 of 6 branches missed.">    if (pagina &lt; 0 || tamanio &lt; 1 || tamanio &gt; 100) {</span>
+<span class="nc" id="L740">      throw new ApiException(</span>
+          HttpStatus.UNPROCESSABLE_ENTITY,
+          &quot;paginacion_invalida&quot;,
+          &quot;Paginación inválida&quot;,
+          &quot;La página debe ser mayor o igual a 0 y el tamaño debe estar entre 1 y 100.&quot;);
+    }
+
+<span class="fc" id="L747">    String estadoFiltro = null;</span>
+<span class="pc bpc" id="L748" title="2 of 4 branches missed.">    if (estado != null &amp;&amp; !estado.isBlank()) {</span>
+<span class="fc" id="L749">      estadoFiltro = estado.trim();</span>
+<span class="pc bpc" id="L750" title="1 of 2 branches missed.">      if (!ESTADOS_VALIDOS.contains(estadoFiltro)) {</span>
+<span class="nc" id="L751">        throw new ApiException(</span>
+            HttpStatus.UNPROCESSABLE_ENTITY,
+            &quot;estado_invalido&quot;,
+            &quot;Estado inválido&quot;,
+            &quot;El estado debe ser uno de: &quot; + ESTADOS_VALIDOS);
+      }
+    }
+
+<span class="fc" id="L759">    Pageable pageable =</span>
+<span class="fc" id="L760">        PageRequest.of(</span>
+            pagina,
+            tamanio,
+<span class="fc" id="L763">            Sort.by(Sort.Order.desc(&quot;ultimaActividadEn&quot;), Sort.Order.desc(&quot;creadoEn&quot;)));</span>
+
+<span class="fc" id="L765">    Page&lt;Inspeccion&gt; resultado =</span>
+<span class="fc" id="L766">        inspeccionRepository.findMisInspecciones(usuarioId, estadoFiltro, pageable);</span>
+<span class="fc" id="L767">    Map&lt;UUID, UUID&gt; superadas = correccionesPublicadasDe(resultado.getContent());</span>
+<span class="fc" id="L768">    return resultado.map(</span>
+        i -&gt; {
+<span class="fc" id="L770">          InspeccionResumenResponse resumen = aResumenResponse(i);</span>
+<span class="fc" id="L771">          UUID correccion = superadas.get(i.getId());</span>
+<span class="fc bfc" id="L772" title="All 2 branches covered.">          return correccion == null ? resumen : resumen.conSuperadaPor(correccion);</span>
+        });
+  }
+
+  /** Correcciones publicadas que superan a las inspecciones indicadas, en una sola consulta. */
+  private Map&lt;UUID, UUID&gt; correccionesPublicadasDe(List&lt;Inspeccion&gt; inspecciones) {
+<span class="fc" id="L778">    List&lt;UUID&gt; publicadas =</span>
+<span class="fc" id="L779">        inspecciones.stream()</span>
+<span class="fc" id="L780">            .filter(i -&gt; &quot;PUBLICADA&quot;.equals(i.getEstado()))</span>
+<span class="fc" id="L781">            .map(Inspeccion::getId)</span>
+<span class="fc" id="L782">            .toList();</span>
+<span class="fc" id="L783">    Map&lt;UUID, UUID&gt; superadas = new HashMap&lt;&gt;();</span>
+<span class="pc bpc" id="L784" title="1 of 2 branches missed.">    if (!publicadas.isEmpty()) {</span>
+<span class="fc bfc" id="L785" title="All 2 branches covered.">      for (Object[] fila : inspeccionRepository.findCorreccionesPublicadas(publicadas)) {</span>
+<span class="fc" id="L786">        superadas.put((UUID) fila[0], (UUID) fila[1]);</span>
+<span class="fc" id="L787">      }</span>
+    }
+<span class="fc" id="L789">    return superadas;</span>
+  }
+
+  @Transactional
+  public void eliminarBorrador(UUID id, UUID usuarioId) {
+<span class="fc" id="L794">    Inspeccion inspeccion =</span>
+        inspeccionRepository
+<span class="fc" id="L796">            .findConDetallesById(id)</span>
+<span class="fc" id="L797">            .orElseThrow(</span>
+                () -&gt;
+<span class="nc" id="L799">                    new ApiException(</span>
+                        HttpStatus.NOT_FOUND,
+                        &quot;inspeccion_no_encontrada&quot;,
+                        &quot;Inspección no encontrada&quot;,
+                        &quot;No se encontró la inspección especificada o no tiene acceso a ella.&quot;));
+
+<span class="pc bpc" id="L805" title="2 of 4 branches missed.">    if (inspeccion.getEliminadoEn() != null || !inspeccion.getAutorId().equals(usuarioId)) {</span>
+<span class="nc" id="L806">      throw new ApiException(</span>
+          HttpStatus.NOT_FOUND,
+          &quot;inspeccion_no_encontrada&quot;,
+          &quot;Inspección no encontrada&quot;,
+          &quot;No se encontró la inspección especificada o no tiene acceso a ella.&quot;);
+    }
+
+<span class="fc" id="L813">    validarInspector(usuarioId);</span>
+
+<span class="fc bfc" id="L815" title="All 2 branches covered.">    if (&quot;PUBLICADA&quot;.equals(inspeccion.getEstado())) {</span>
+<span class="fc" id="L816">      throw new ApiException(</span>
+          HttpStatus.CONFLICT,
+          &quot;inspeccion_publicada&quot;,
+          &quot;Inspección publicada&quot;,
+          &quot;No se puede eliminar una inspección publicada.&quot;);
+    }
+
+<span class="pc bpc" id="L823" title="1 of 2 branches missed.">    if (!&quot;BORRADOR&quot;.equals(inspeccion.getEstado())) {</span>
+<span class="nc" id="L824">      throw new ApiException(</span>
+          HttpStatus.CONFLICT,
+          &quot;inspeccion_no_eliminable&quot;,
+          &quot;Inspección no eliminable&quot;,
+          &quot;Solo las inspecciones en estado BORRADOR pueden ser eliminadas.&quot;);
+    }
+
+<span class="fc" id="L831">    Instant ahora = clock.instant();</span>
+<span class="fc" id="L832">    inspeccion.marcarEliminado(usuarioId, ahora);</span>
+<span class="fc" id="L833">    inspeccionRepository.save(inspeccion);</span>
+
+<span class="fc" id="L835">    ObjectNode snapshotAnterior = objectMapper.createObjectNode();</span>
+<span class="fc" id="L836">    snapshotAnterior.put(&quot;id&quot;, inspeccion.getId().toString());</span>
+<span class="fc" id="L837">    snapshotAnterior.put(&quot;puenteId&quot;, inspeccion.getPuente().getId().toString());</span>
+<span class="fc" id="L838">    snapshotAnterior.put(&quot;codigoPuente&quot;, inspeccion.getPuente().getCodigo());</span>
+<span class="fc" id="L839">    snapshotAnterior.put(&quot;estado&quot;, inspeccion.getEstado());</span>
+<span class="fc" id="L840">    snapshotAnterior.put(&quot;autorId&quot;, inspeccion.getAutorId().toString());</span>
+
+<span class="fc" id="L842">    ObjectNode snapshotNuevo = objectMapper.createObjectNode();</span>
+<span class="fc" id="L843">    snapshotNuevo.put(&quot;eliminadoEn&quot;, ahora.toString());</span>
+<span class="fc" id="L844">    snapshotNuevo.put(&quot;eliminadoPorId&quot;, usuarioId.toString());</span>
+
+<span class="fc" id="L846">    auditoriaWriter.registrarEnTransaccion(</span>
+        usuarioId,
+        AccionAuditoria.CAMBIAR_ESTADO,
+        &quot;inspeccion&quot;,
+<span class="fc" id="L850">        inspeccion.getId(),</span>
+        snapshotAnterior,
+        snapshotNuevo,
+        &quot;HU-031&quot;);
+<span class="fc" id="L854">  }</span>
+
+  private InspeccionResumenResponse aResumenResponse(Inspeccion i) {
+<span class="fc" id="L857">    String depto = null;</span>
+<span class="fc" id="L858">    String muni = null;</span>
+<span class="pc bpc" id="L859" title="2 of 4 branches missed.">    if (i.getPuente() != null &amp;&amp; i.getPuente().getMunicipio() != null) {</span>
+<span class="fc" id="L860">      muni = i.getPuente().getMunicipio().getNombre();</span>
+<span class="pc bpc" id="L861" title="1 of 2 branches missed.">      if (i.getPuente().getMunicipio().getDepartamento() != null) {</span>
+<span class="fc" id="L862">        depto = i.getPuente().getMunicipio().getDepartamento().getNombre();</span>
+      }
+    }
+
+<span class="fc" id="L866">    Double avance = null;</span>
+<span class="pc bpc" id="L867" title="1 of 2 branches missed.">    if (&quot;BORRADOR&quot;.equals(i.getEstado())) {</span>
+<span class="nc" id="L868">      ProgresoBorradorResponse progreso = calculadorProgreso.calcularProgreso(i);</span>
+<span class="nc bnc" id="L869" title="All 2 branches missed.">      avance = progreso != null ? progreso.porcentajeTotal() : 0.0;</span>
+<span class="pc bpc" id="L870" title="1 of 2 branches missed.">    } else if (&quot;PUBLICADA&quot;.equals(i.getEstado())) {</span>
+<span class="fc" id="L871">      avance = 100.0;</span>
+    }
+
+<span class="fc" id="L874">    return new InspeccionResumenResponse(</span>
+<span class="fc" id="L875">        i.getId(),</span>
+<span class="fc" id="L876">        i.getPuente().getId(),</span>
+<span class="fc" id="L877">        i.getPuente().getCodigo(),</span>
+<span class="fc" id="L878">        i.getPuente().getNombre(),</span>
+        depto,
+        muni,
+<span class="fc" id="L881">        i.getVersionFormulario().getId(),</span>
+<span class="fc" id="L882">        i.getVersionFormulario().getCodigo(),</span>
+<span class="fc" id="L883">        i.getAutorId(),</span>
+<span class="fc" id="L884">        i.getRolAutorCreacion(),</span>
+<span class="fc" id="L885">        i.getNombreAutorCapturado(),</span>
+<span class="fc" id="L886">        i.getEstado(),</span>
+<span class="fc" id="L887">        i.getTipo(),</span>
+<span class="fc" id="L888">        i.getFechaInspeccion(),</span>
+        avance,
+<span class="fc" id="L890">        i.getUltimaActividadEn(),</span>
+<span class="fc" id="L891">        i.getCreadoEn(),</span>
+<span class="fc" id="L892">        i.getActualizadoEn());</span>
+  }
+
+  private IniciarInspeccionResponse crearNuevaInspeccion(
+      IniciarInspeccionRequest request, UserAccount user) {
+    // 3. Validar puente
+<span class="fc" id="L898">    Puente puente =</span>
+        puenteRepository
+<span class="fc" id="L900">            .findById(request.puenteId())</span>
+<span class="fc" id="L901">            .orElseThrow(</span>
+                () -&gt;
+<span class="nc" id="L903">                    new ApiException(</span>
+                        HttpStatus.NOT_FOUND,
+                        &quot;puente_no_encontrado&quot;,
+                        &quot;Puente no encontrado&quot;,
+                        &quot;El puente especificado no existe.&quot;));
+
+<span class="fc bfc" id="L909" title="All 2 branches covered.">    if (!puente.isActivo()) {</span>
+<span class="fc" id="L910">      throw new ApiException(</span>
+          HttpStatus.CONFLICT,
+          &quot;puente_inactivo&quot;,
+          &quot;Puente inactivo&quot;,
+          &quot;El puente está inactivo y no admite nuevas inspecciones.&quot;);
+    }
+
+<span class="fc" id="L917">    LocalDate hoyGuatemala = LocalDate.now(clock.withZone(ZONA_GUATEMALA));</span>
+<span class="fc" id="L918">    UUID asignacionPuenteId = null;</span>
+<span class="fc bfc" id="L919" title="All 2 branches covered.">    if (user.getRole().getName() == RoleName.ESTUDIANTE) {</span>
+<span class="pc bpc" id="L920" title="1 of 2 branches missed.">      if (asignaciones == null) {</span>
+<span class="nc" id="L921">        throw new ApiException(</span>
+            HttpStatus.FORBIDDEN,
+            &quot;puente_no_asignado&quot;,
+            &quot;Puente no asignado&quot;,
+            &quot;El estudiante no tiene una asignación vigente para este puente.&quot;);
+      }
+<span class="fc" id="L927">      asignacionPuenteId =</span>
+          asignaciones
+<span class="fc" id="L929">              .findVigenteParaInspeccion(user.getId(), puente.getId(), hoyGuatemala)</span>
+<span class="fc" id="L930">              .map(AsignacionPuenteRepository.AsignacionInspeccionProjection::getId)</span>
+<span class="fc" id="L931">              .orElseThrow(</span>
+                  () -&gt;
+<span class="fc" id="L933">                      new ApiException(</span>
+                          HttpStatus.FORBIDDEN,
+                          &quot;puente_no_asignado&quot;,
+                          &quot;Puente no asignado&quot;,
+                          &quot;El estudiante no tiene una asignación vigente para este puente.&quot;));
+    }
+
+    // Una captura preparada conserva su versión aunque cambie la activa.
+    VersionFormulario versionActiva =
+<span class="fc bfc" id="L942" title="All 2 branches covered.">        (request.versionFormularioId() == null</span>
+<span class="fc" id="L943">                ? versionFormularioRepository.findByActivaTrue()</span>
+<span class="fc" id="L944">                : versionFormularioRepository.findById(request.versionFormularioId()))</span>
+<span class="fc" id="L945">            .orElseThrow(</span>
+                () -&gt;
+<span class="nc" id="L947">                    new ApiException(</span>
+                        HttpStatus.CONFLICT,
+                        &quot;sin_formulario_activo&quot;,
+                        &quot;Formulario no disponible&quot;,
+                        &quot;No existe la versión de formulario solicitada para iniciar inspecciones.&quot;));
+<span class="pc bpc" id="L952" title="1 of 2 branches missed.">    if (versionActiva.getEstado() != EstadoVersionFormulario.PUBLICADA) {</span>
+<span class="nc" id="L953">      throw new ApiException(</span>
+          HttpStatus.UNPROCESSABLE_ENTITY,
+          &quot;version_no_utilizable&quot;,
+          &quot;Versión de formulario no utilizable&quot;,
+          &quot;Solo se pueden iniciar inspecciones con versiones de formulario publicadas&quot;);
+    }
+
+<span class="fc" id="L960">    JsonNode datosIniciales = objectMapper.createObjectNode();</span>
+<span class="fc bfc" id="L961" title="All 2 branches covered.">    if (jsonSchemaValidatorService != null) {</span>
+<span class="fc" id="L962">      jsonSchemaValidatorService.validarRespuestas(</span>
+<span class="fc" id="L963">          versionActiva.getEsquema(), datosIniciales, true);</span>
+    }
+
+    // 5. Validar fechas de inspección
+    LocalDate fechaInspeccion =
+<span class="pc bpc" id="L968" title="1 of 2 branches missed.">        request.fechaInspeccion() != null ? request.fechaInspeccion() : hoyGuatemala;</span>
+<span class="fc bfc" id="L969" title="All 2 branches covered.">    if (fechaInspeccion.isAfter(hoyGuatemala)) {</span>
+<span class="fc" id="L970">      throw new ApiException(</span>
+          HttpStatus.UNPROCESSABLE_ENTITY,
+          &quot;fecha_inspeccion_futura&quot;,
+          &quot;Fecha de inspección inválida&quot;,
+          &quot;La fecha de inspección no puede ser posterior a la fecha actual.&quot;);
+    }
+
+    // Comprobar año de construcción del puente si existe inspección previa
+<span class="fc" id="L978">    InspeccionDatoTecnico tecnicoVigente = null;</span>
+<span class="fc bfc" id="L979" title="All 2 branches covered.">    if (puente.getInspeccionVigenteId() != null) {</span>
+<span class="fc" id="L980">      tecnicoVigente =</span>
+<span class="fc" id="L981">          datoTecnicoRepository.findByInspeccionId(puente.getInspeccionVigenteId()).orElse(null);</span>
+<span class="pc bpc" id="L982" title="1 of 2 branches missed.">      if (tecnicoVigente != null</span>
+<span class="pc bpc" id="L983" title="1 of 2 branches missed.">          &amp;&amp; tecnicoVigente.getAnioConstruccion() != null</span>
+<span class="fc bfc" id="L984" title="All 2 branches covered.">          &amp;&amp; fechaInspeccion.getYear() &lt; tecnicoVigente.getAnioConstruccion()) {</span>
+<span class="fc" id="L985">        throw new ApiException(</span>
+            HttpStatus.UNPROCESSABLE_ENTITY,
+            &quot;fecha_anterior_construccion&quot;,
+            &quot;Fecha de inspección inválida&quot;,
+            &quot;La fecha de inspección (&quot;
+                + fechaInspeccion
+                + &quot;) no puede ser anterior al año de construcción registrado (&quot;
+<span class="fc" id="L992">                + tecnicoVigente.getAnioConstruccion()</span>
+                + &quot;).&quot;);
+      }
+    }
+
+    // 6. Validación y cálculo GPS
+<span class="fc" id="L998">    Point ubicacionInicio = null;</span>
+<span class="fc" id="L999">    BigDecimal precisionGps = null;</span>
+<span class="fc" id="L1000">    BigDecimal distanciaAlPuente = null;</span>
+<span class="fc" id="L1001">    boolean advertenciaGps = false;</span>
+<span class="fc" id="L1002">    String mensajeAdvertencia = null;</span>
+
+<span class="pc bpc" id="L1004" title="1 of 4 branches missed.">    if (request.latitud() != null &amp;&amp; request.longitud() != null) {</span>
+<span class="fc" id="L1005">      ubicacionInicio =</span>
+<span class="fc" id="L1006">          GEOMETRY_FACTORY.createPoint(new Coordinate(request.longitud(), request.latitud()));</span>
+<span class="fc" id="L1007">      precisionGps = request.precisionGpsM();</span>
+
+<span class="fc" id="L1009">      double distancia =</span>
+<span class="fc" id="L1010">          calcularDistanciaMetros(</span>
+<span class="fc" id="L1011">              puente.getUbicacion().getY(),</span>
+<span class="fc" id="L1012">              puente.getUbicacion().getX(),</span>
+<span class="fc" id="L1013">              request.latitud(),</span>
+<span class="fc" id="L1014">              request.longitud());</span>
+<span class="fc" id="L1015">      distanciaAlPuente = BigDecimal.valueOf(distancia).setScale(2, RoundingMode.HALF_UP);</span>
+
+<span class="fc bfc" id="L1017" title="All 2 branches covered.">      if (distancia &gt; 500.0) {</span>
+<span class="fc" id="L1018">        advertenciaGps = true;</span>
+<span class="fc" id="L1019">        mensajeAdvertencia =</span>
+            &quot;El dispositivo se encuentra a más de 500 metros del puente (&quot;
+<span class="fc" id="L1021">                + Math.round(distancia)</span>
+                + &quot; m).&quot;;
+      }
+    }
+
+    // 7. Precarga de datos permanentes con confirmación explícita (nunca daños)
+<span class="fc" id="L1027">    Instant ahora = clock.instant();</span>
+<span class="fc" id="L1028">    Instant datosPermanentesConfirmadosEn = null;</span>
+<span class="fc" id="L1029">    InspeccionDatoTecnico datoTecnico = null;</span>
+
+<span class="pc bpc" id="L1031" title="1 of 4 branches missed.">    if (request.confirmarDatosPermanentes() &amp;&amp; tecnicoVigente != null) {</span>
+<span class="fc" id="L1032">      datosPermanentesConfirmadosEn = ahora;</span>
+    }
+
+    // 8. Crear agregada Inspeccion en BORRADOR
+<span class="fc bfc" id="L1036" title="All 2 branches covered.">    UUID inspeccionId = request.id() != null ? request.id() : UuidV7Generator.generate();</span>
+    String nombreAutorCapturado =
+<span class="pc bpc" id="L1038" title="1 of 4 branches missed.">        request.nombreAutor() != null &amp;&amp; !request.nombreAutor().isBlank()</span>
+<span class="fc" id="L1039">            ? request.nombreAutor().trim()</span>
+<span class="fc" id="L1040">            : user.getEmail();</span>
+    String dispositivoId =
+<span class="pc bpc" id="L1042" title="2 of 4 branches missed.">        request.dispositivoId() != null &amp;&amp; !request.dispositivoId().isBlank()</span>
+<span class="fc" id="L1043">            ? request.dispositivoId()</span>
+<span class="pc" id="L1044">            : &quot;web&quot;;</span>
+
+<span class="fc" id="L1046">    Inspeccion inspeccion =</span>
+        new Inspeccion(
+            inspeccionId,
+            puente,
+            versionActiva,
+<span class="fc" id="L1051">            user.getId(),</span>
+<span class="fc" id="L1052">            user.getRole().getName().name(),</span>
+            nombreAutorCapturado,
+            fechaInspeccion,
+            dispositivoId,
+            ubicacionInicio,
+            precisionGps,
+            distanciaAlPuente,
+            datosPermanentesConfirmadosEn,
+            datosIniciales,
+            ahora);
+<span class="fc" id="L1062">    inspeccion.setHuellaSolicitudInicio(</span>
+<span class="fc" id="L1063">        HuellaSolicitud.calcular(objectMapper.valueToTree(request)));</span>
+<span class="fc" id="L1064">    inspeccion.setAsignacionPuenteId(asignacionPuenteId);</span>
+
+<span class="pc bpc" id="L1066" title="1 of 4 branches missed.">    if (request.confirmarDatosPermanentes() &amp;&amp; tecnicoVigente != null) {</span>
+<span class="fc" id="L1067">      datoTecnico = new InspeccionDatoTecnico(inspeccion, ahora);</span>
+<span class="fc" id="L1068">      datoTecnico.copiarDatosPermanentesDe(tecnicoVigente);</span>
+<span class="fc" id="L1069">      inspeccion.setDatoTecnico(datoTecnico);</span>
+    }
+
+    // Acompañantes
+<span class="fc bfc" id="L1073" title="All 2 branches covered.">    if (request.acompanantes() != null) {</span>
+<span class="fc bfc" id="L1074" title="All 2 branches covered.">      for (AcompananteRequest a : request.acompanantes()) {</span>
+<span class="fc" id="L1075">        InspeccionAcompanante acompanante =</span>
+            new InspeccionAcompanante(
+<span class="fc" id="L1077">                UuidV7Generator.generate(),</span>
+                inspeccion,
+<span class="fc" id="L1079">                a.usuarioId(),</span>
+<span class="fc" id="L1080">                a.nombre().trim(),</span>
+<span class="pc bpc" id="L1081" title="1 of 2 branches missed.">                a.numeroColegiado() != null ? a.numeroColegiado().trim() : null,</span>
+                ahora);
+<span class="fc" id="L1083">        inspeccion.agregarAcompanante(acompanante);</span>
+<span class="fc" id="L1084">      }</span>
+    }
+
+<span class="fc" id="L1087">    inspeccionRepository.save(inspeccion);</span>
+
+    // 9. Registro de auditoría
+<span class="fc" id="L1090">    ObjectNode snapshot = objectMapper.createObjectNode();</span>
+<span class="fc" id="L1091">    snapshot.put(&quot;id&quot;, inspeccion.getId().toString());</span>
+<span class="fc" id="L1092">    snapshot.put(&quot;puenteId&quot;, puente.getId().toString());</span>
+<span class="fc" id="L1093">    snapshot.put(&quot;codigoPuente&quot;, puente.getCodigo());</span>
+<span class="fc" id="L1094">    snapshot.put(&quot;versionFormularioId&quot;, versionActiva.getId().toString());</span>
+<span class="fc" id="L1095">    snapshot.put(&quot;autorId&quot;, user.getId().toString());</span>
+<span class="fc" id="L1096">    snapshot.put(&quot;rolAutorCreacion&quot;, user.getRole().getName().name());</span>
+<span class="fc" id="L1097">    snapshot.put(&quot;nombreAutorCapturado&quot;, nombreAutorCapturado);</span>
+<span class="fc" id="L1098">    snapshot.put(&quot;estado&quot;, &quot;BORRADOR&quot;);</span>
+<span class="fc" id="L1099">    snapshot.put(&quot;fechaInspeccion&quot;, fechaInspeccion.toString());</span>
+<span class="fc" id="L1100">    snapshot.put(&quot;dispositivoId&quot;, dispositivoId);</span>
+<span class="fc bfc" id="L1101" title="All 2 branches covered.">    snapshot.put(&quot;datosPermanentesConfirmados&quot;, datosPermanentesConfirmadosEn != null);</span>
+<span class="fc bfc" id="L1102" title="All 2 branches covered.">    if (distanciaAlPuente != null) {</span>
+<span class="fc" id="L1103">      snapshot.put(&quot;distanciaAlPuenteM&quot;, distanciaAlPuente);</span>
+    }
+
+<span class="fc" id="L1106">    auditoriaWriter.registrarEnTransaccion(</span>
+<span class="fc" id="L1107">        user.getId(),</span>
+        AccionAuditoria.CREAR,
+        &quot;inspeccion&quot;,
+<span class="fc" id="L1110">        inspeccion.getId(),</span>
+        null,
+        snapshot,
+<span class="fc bfc" id="L1113" title="All 2 branches covered.">        user.getRole().getName() == RoleName.ESTUDIANTE ? &quot;HU-035&quot; : &quot;HU-024&quot;);</span>
+
+<span class="fc" id="L1115">    IniciarInspeccionResponse response = aResponse(inspeccion);</span>
+<span class="fc bfc" id="L1116" title="All 2 branches covered.">    if (advertenciaGps) {</span>
+<span class="fc" id="L1117">      return new IniciarInspeccionResponse(</span>
+<span class="fc" id="L1118">          response.id(),</span>
+<span class="fc" id="L1119">          response.puenteId(),</span>
+<span class="fc" id="L1120">          response.codigoPuente(),</span>
+<span class="fc" id="L1121">          response.nombrePuente(),</span>
+<span class="fc" id="L1122">          response.versionFormularioId(),</span>
+<span class="fc" id="L1123">          response.codigoVersionFormulario(),</span>
+<span class="fc" id="L1124">          response.autorId(),</span>
+<span class="fc" id="L1125">          response.rolAutor(),</span>
+<span class="fc" id="L1126">          response.nombreAutor(),</span>
+<span class="fc" id="L1127">          response.estado(),</span>
+<span class="fc" id="L1128">          response.fechaInspeccion(),</span>
+<span class="fc" id="L1129">          response.dispositivoId(),</span>
+<span class="fc" id="L1130">          response.latitudInicio(),</span>
+<span class="fc" id="L1131">          response.longitudInicio(),</span>
+<span class="fc" id="L1132">          response.precisionGpsM(),</span>
+<span class="fc" id="L1133">          response.distanciaAlPuenteM(),</span>
+          true,
+          mensajeAdvertencia,
+<span class="fc" id="L1136">          response.datosPermanentesConfirmados(),</span>
+<span class="fc" id="L1137">          response.datosPermanentes(),</span>
+<span class="fc" id="L1138">          response.acompanantes(),</span>
+<span class="fc" id="L1139">          response.creadoEn());</span>
+    }
+<span class="fc" id="L1141">    return response;</span>
+  }
+
+  private UserAccount validarInspector(UUID usuarioId) {
+<span class="fc bfc" id="L1145" title="All 2 branches covered.">    if (usuarioId == null) {</span>
+<span class="fc" id="L1146">      throw new ApiException(</span>
+          HttpStatus.UNAUTHORIZED,
+          &quot;autenticacion_requerida&quot;,
+          &quot;Autenticación requerida&quot;,
+          &quot;Se requiere una sesión válida para iniciar una inspección.&quot;);
+    }
+
+<span class="fc" id="L1153">    UserAccount user =</span>
+        userAccountRepository
+<span class="fc" id="L1155">            .findWithRoleById(usuarioId)</span>
+<span class="fc" id="L1156">            .orElseThrow(</span>
+                () -&gt;
+<span class="nc" id="L1158">                    new ApiException(</span>
+                        HttpStatus.UNAUTHORIZED,
+                        &quot;usuario_no_encontrado&quot;,
+                        &quot;Usuario no encontrado&quot;,
+                        &quot;No se encontró el usuario autenticado.&quot;));
+
+<span class="pc bpc" id="L1164" title="3 of 6 branches missed.">    if (!user.isActive() || !user.isActivated() || !user.isVerified()) {</span>
+<span class="nc" id="L1165">      throw new ApiException(</span>
+          HttpStatus.FORBIDDEN,
+          &quot;cuenta_inactiva&quot;,
+          &quot;Cuenta no disponible&quot;,
+          &quot;La cuenta del usuario se encuentra inactiva o no verificada.&quot;);
+    }
+
+<span class="fc" id="L1172">    RoleName role = user.getRole().getName();</span>
+<span class="fc bfc" id="L1173" title="All 2 branches covered.">    if (role == RoleName.PROFESIONAL_EXTERNO) {</span>
+<span class="fc" id="L1174">      boolean verificado =</span>
+          profesionalRepository
+<span class="fc" id="L1176">              .findById(user.getId())</span>
+<span class="fc" id="L1177">              .map(p -&gt; p.isColegiadoVerificado())</span>
+<span class="fc" id="L1178">              .orElse(false);</span>
+<span class="fc bfc" id="L1179" title="All 2 branches covered.">      if (!verificado) {</span>
+<span class="fc" id="L1180">        throw new ApiException(</span>
+            HttpStatus.FORBIDDEN,
+            &quot;profesional_no_verificado&quot;,
+            &quot;Colegiado no verificado&quot;,
+            &quot;Tu número de colegiado aún no ha sido verificado por el Administrador.&quot;);
+      }
+<span class="pc bpc" id="L1186" title="1 of 4 branches missed.">    } else if (role != RoleName.CATEDRATICO &amp;&amp; role != RoleName.ESTUDIANTE) {</span>
+<span class="nc" id="L1187">      throw new ApiException(</span>
+          HttpStatus.FORBIDDEN,
+          &quot;rol_no_autorizado&quot;,
+          &quot;Acceso denegado&quot;,
+          &quot;Solo Estudiantes asignados, Catedráticos y Profesionales externos verificados pueden&quot;
+              + &quot; iniciar inspecciones.&quot;);
+    }
+
+<span class="fc" id="L1195">    return user;</span>
+  }
+
+  private IniciarInspeccionResponse aResponse(Inspeccion i) {
+<span class="fc" id="L1199">    List&lt;AcompananteResponse&gt; acs =</span>
+<span class="fc" id="L1200">        i.getAcompanantes().stream()</span>
+<span class="fc" id="L1201">            .map(</span>
+                a -&gt;
+<span class="fc" id="L1203">                    new AcompananteResponse(</span>
+<span class="fc" id="L1204">                        a.getId(), a.getUsuarioId(), a.getNombre(), a.getNumeroColegiado()))</span>
+<span class="fc" id="L1205">            .toList();</span>
+
+    DatosPermanentesResponse dp =
+<span class="fc bfc" id="L1208" title="All 2 branches covered.">        i.getDatoTecnico() != null ? aDatosPermanentesResponse(i.getDatoTecnico()) : null;</span>
+
+<span class="fc bfc" id="L1210" title="All 2 branches covered.">    Double lat = i.getUbicacionInicio() != null ? i.getUbicacionInicio().getY() : null;</span>
+<span class="fc bfc" id="L1211" title="All 2 branches covered.">    Double lon = i.getUbicacionInicio() != null ? i.getUbicacionInicio().getX() : null;</span>
+
+<span class="fc" id="L1213">    boolean advertencia =</span>
+<span class="fc bfc" id="L1214" title="All 2 branches covered.">        i.getDistanciaAlPuenteM() != null</span>
+<span class="fc bfc" id="L1215" title="All 2 branches covered.">            &amp;&amp; i.getDistanciaAlPuenteM().compareTo(BigDecimal.valueOf(500.0)) &gt; 0;</span>
+    String msjAdvertencia =
+<span class="fc bfc" id="L1217" title="All 2 branches covered.">        advertencia</span>
+            ? &quot;El dispositivo se encuentra a más de 500 metros del puente (&quot;
+<span class="fc" id="L1219">                + i.getDistanciaAlPuenteM()</span>
+<span class="fc" id="L1220">                + &quot; m).&quot;</span>
+<span class="fc" id="L1221">            : null;</span>
+
+<span class="fc" id="L1223">    return new IniciarInspeccionResponse(</span>
+<span class="fc" id="L1224">        i.getId(),</span>
+<span class="fc" id="L1225">        i.getPuente().getId(),</span>
+<span class="fc" id="L1226">        i.getPuente().getCodigo(),</span>
+<span class="fc" id="L1227">        i.getPuente().getNombre(),</span>
+<span class="fc" id="L1228">        i.getVersionFormulario().getId(),</span>
+<span class="fc" id="L1229">        i.getVersionFormulario().getCodigo(),</span>
+<span class="fc" id="L1230">        i.getAutorId(),</span>
+<span class="fc" id="L1231">        i.getRolAutorCreacion(),</span>
+<span class="fc" id="L1232">        i.getNombreAutorCapturado(),</span>
+<span class="fc" id="L1233">        i.getEstado(),</span>
+<span class="fc" id="L1234">        i.getFechaInspeccion(),</span>
+<span class="fc" id="L1235">        i.getDispositivoId(),</span>
+        lat,
+        lon,
+<span class="fc" id="L1238">        i.getPrecisionGpsM(),</span>
+<span class="fc" id="L1239">        i.getDistanciaAlPuenteM(),</span>
+        advertencia,
+        msjAdvertencia,
+<span class="fc bfc" id="L1242" title="All 2 branches covered.">        i.getDatosPermanentesConfirmadosEn() != null,</span>
+        dp,
+        acs,
+<span class="fc" id="L1245">        i.getCreadoEn());</span>
+  }
+
+  private InspeccionBorradorResponse aBorradorResponse(Inspeccion inspeccion) {
+<span class="fc" id="L1249">    List&lt;AcompananteResponse&gt; acompanantes =</span>
+<span class="fc" id="L1250">        inspeccion.getAcompanantes().stream()</span>
+<span class="fc" id="L1251">            .map(</span>
+                a -&gt;
+<span class="fc" id="L1253">                    new AcompananteResponse(</span>
+<span class="fc" id="L1254">                        a.getId(), a.getUsuarioId(), a.getNombre(), a.getNumeroColegiado()))</span>
+<span class="fc" id="L1255">            .toList();</span>
+
+    DatosPermanentesResponse dp =
+<span class="pc bpc" id="L1258" title="1 of 2 branches missed.">        inspeccion.getDatoTecnico() != null</span>
+<span class="nc" id="L1259">            ? aDatosPermanentesResponse(inspeccion.getDatoTecnico())</span>
+<span class="fc" id="L1260">            : null;</span>
+
+    Double latitud =
+<span class="pc bpc" id="L1263" title="1 of 2 branches missed.">        inspeccion.getUbicacionInicio() != null ? inspeccion.getUbicacionInicio().getY() : null;</span>
+    Double longitud =
+<span class="pc bpc" id="L1265" title="1 of 2 branches missed.">        inspeccion.getUbicacionInicio() != null ? inspeccion.getUbicacionInicio().getX() : null;</span>
+
+<span class="fc" id="L1267">    ProgresoBorradorResponse progreso = calculadorProgreso.calcularProgreso(inspeccion);</span>
+<span class="fc" id="L1268">    IndiceCondicionPreliminarResponse icPreliminar = calcularIcPreliminar(inspeccion);</span>
+
+<span class="fc" id="L1270">    return new InspeccionBorradorResponse(</span>
+<span class="fc" id="L1271">        inspeccion.getId(),</span>
+<span class="fc" id="L1272">        inspeccion.getPuente().getId(),</span>
+<span class="fc" id="L1273">        inspeccion.getPuente().getCodigo(),</span>
+<span class="fc" id="L1274">        inspeccion.getPuente().getNombre(),</span>
+<span class="fc" id="L1275">        inspeccion.getVersionFormulario().getId(),</span>
+<span class="fc" id="L1276">        inspeccion.getVersionFormulario().getCodigo(),</span>
+<span class="fc" id="L1277">        inspeccion.getAutorId(),</span>
+<span class="fc" id="L1278">        inspeccion.getRolAutorCreacion(),</span>
+<span class="fc" id="L1279">        inspeccion.getNombreAutorCapturado(),</span>
+<span class="fc" id="L1280">        inspeccion.getEstado(),</span>
+<span class="fc" id="L1281">        inspeccion.getFechaInspeccion(),</span>
+<span class="fc" id="L1282">        inspeccion.getDispositivoId(),</span>
+        latitud,
+        longitud,
+<span class="fc" id="L1285">        inspeccion.getPrecisionGpsM(),</span>
+<span class="fc" id="L1286">        inspeccion.getDistanciaAlPuenteM(),</span>
+        false,
+        null,
+<span class="pc bpc" id="L1289" title="1 of 2 branches missed.">        inspeccion.getDatosPermanentesConfirmadosEn() != null,</span>
+        dp,
+<span class="fc" id="L1291">        inspeccion.getIdentificacionCapturada(),</span>
+<span class="fc" id="L1292">        inspeccion.getDatos(),</span>
+        acompanantes,
+<span class="fc" id="L1294">        inspeccion.getVersion(),</span>
+<span class="fc" id="L1295">        inspeccion.getUltimaActividadEn(),</span>
+<span class="fc" id="L1296">        inspeccion.getCreadoEn(),</span>
+<span class="fc" id="L1297">        inspeccion.getActualizadoEn(),</span>
+        progreso,
+        icPreliminar);
+  }
+
+  private IndiceCondicionPreliminarResponse calcularIcPreliminar(Inspeccion inspeccion) {
+<span class="pc bpc" id="L1303" title="1 of 4 branches missed.">    if (preparadorEntradaIcService == null || calculoIndiceCondicionService == null) {</span>
+<span class="fc" id="L1304">      return null;</span>
+    }
+    try {
+<span class="pc bpc" id="L1307" title="1 of 2 branches missed.">      if (inspeccion.getVersionFormulario() == null</span>
+<span class="pc bpc" id="L1308" title="1 of 2 branches missed.">          || inspeccion.getDatos() == null</span>
+<span class="pc bpc" id="L1309" title="1 of 2 branches missed.">          || !inspeccion.getDatos().isObject()</span>
+<span class="fc bfc" id="L1310" title="All 2 branches covered.">          || inspeccion.getDatos().isEmpty()) {</span>
+<span class="fc" id="L1311">        return null;</span>
+      }
+<span class="fc" id="L1313">      EntradaCalculoIc entrada =</span>
+<span class="fc" id="L1314">          preparadorEntradaIcService.preparar(</span>
+<span class="fc" id="L1315">              inspeccion.getVersionFormulario().getId(), inspeccion.getDatos());</span>
+<span class="fc" id="L1316">      ResultadoCalculoIc resultado = calculoIndiceCondicionService.calcular(entrada);</span>
+<span class="pc bpc" id="L1317" title="1 of 4 branches missed.">      if (resultado != null &amp;&amp; resultado.indiceCalculado() != null) {</span>
+        String estado =
+<span class="pc bpc" id="L1319" title="1 of 2 branches missed.">            resultado.estadoCalculado() != null ? resultado.estadoCalculado().name() : null;</span>
+<span class="fc" id="L1320">        return new IndiceCondicionPreliminarResponse(</span>
+<span class="fc" id="L1321">            resultado.indiceCalculado(), estado, &quot;Preliminar&quot;);</span>
+      }
+<span class="nc" id="L1323">    } catch (Exception ignored) {</span>
+      // Incomplete data for IC calculation is expected during partial draft saves
+<span class="fc" id="L1325">    }</span>
+<span class="fc" id="L1326">    return null;</span>
+  }
+
+  private DatosPermanentesResponse aDatosPermanentesResponse(InspeccionDatoTecnico d) {
+<span class="fc" id="L1330">    return new DatosPermanentesResponse(</span>
+<span class="fc" id="L1331">        d.getLongitudM(),</span>
+<span class="fc" id="L1332">        d.getNumeroTramos(),</span>
+<span class="fc" id="L1333">        d.getAnchoRodaduraM(),</span>
+<span class="fc" id="L1334">        d.getAnchoAceraDerechaM(),</span>
+<span class="fc" id="L1335">        d.getAnchoAceraIzquierdaM(),</span>
+<span class="fc" id="L1336">        d.getAlturaLibreSuperiorM(),</span>
+<span class="fc" id="L1337">        d.getAlturaLibreSobreCauceM(),</span>
+<span class="fc" id="L1338">        d.getTipologiaPuente(),</span>
+<span class="fc" id="L1339">        d.getTipoCruce(),</span>
+<span class="fc" id="L1340">        d.getNumeroViasPorSentido(),</span>
+<span class="fc" id="L1341">        d.getMaterialSuperestructura(),</span>
+<span class="fc" id="L1342">        d.getMaterialSubestructura(),</span>
+<span class="fc" id="L1343">        d.getCargaDiseno(),</span>
+<span class="fc bfc" id="L1344" title="All 2 branches covered.">        d.getAnioConstruccion() != null ? d.getAnioConstruccion().intValue() : null,</span>
+<span class="fc" id="L1345">        d.getRutaPavimentada(),</span>
+<span class="fc" id="L1346">        d.getAlineamientoHorizontal(),</span>
+<span class="fc" id="L1347">        d.getEsviaje(),</span>
+<span class="fc" id="L1348">        d.getTipoCuerpoAgua(),</span>
+<span class="fc" id="L1349">        d.getNombreRio(),</span>
+<span class="fc" id="L1350">        d.getEncauzamiento(),</span>
+<span class="fc" id="L1351">        d.getAlumbradoExiste(),</span>
+<span class="fc" id="L1352">        d.getDrenajesAledanosExisten());</span>
+  }
+
+  public static double calcularDistanciaMetros(double lat1, double lon1, double lat2, double lon2) {
+<span class="fc" id="L1356">    final double R = 6371000.0;</span>
+<span class="fc" id="L1357">    double dLat = Math.toRadians(lat2 - lat1);</span>
+<span class="fc" id="L1358">    double dLon = Math.toRadians(lon2 - lon1);</span>
+<span class="fc" id="L1359">    double a =</span>
+<span class="fc" id="L1360">        Math.sin(dLat / 2) * Math.sin(dLat / 2)</span>
+<span class="fc" id="L1361">            + Math.cos(Math.toRadians(lat1))</span>
+<span class="fc" id="L1362">                * Math.cos(Math.toRadians(lat2))</span>
+<span class="fc" id="L1363">                * Math.sin(dLon / 2)</span>
+<span class="fc" id="L1364">                * Math.sin(dLon / 2);</span>
+<span class="fc" id="L1365">    double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));</span>
+<span class="fc" id="L1366">    return R * c;</span>
+  }
+
+  private String calcularHash(String contenido) {
+    try {
+<span class="fc" id="L1371">      MessageDigest digest = MessageDigest.getInstance(&quot;SHA-256&quot;);</span>
+<span class="fc" id="L1372">      byte[] hash = digest.digest(contenido.getBytes(StandardCharsets.UTF_8));</span>
+<span class="fc" id="L1373">      return HexFormat.of().formatHex(hash);</span>
+<span class="nc" id="L1374">    } catch (NoSuchAlgorithmException e) {</span>
+<span class="nc" id="L1375">      throw new IllegalStateException(&quot;Error al calcular hash SHA-256&quot;, e);</span>
+    }
+  }
+
+  @Transactional
+  public InspeccionResumenResponse guardarRespuestas(
+      UUID inspeccionId, GuardarRespuestasRequest request, UUID usuarioId) {
+<span class="pc bpc" id="L1382" title="2 of 4 branches missed.">    if (request == null || request.datos() == null) {</span>
+<span class="nc" id="L1383">      throw new ApiException(</span>
+          HttpStatus.UNPROCESSABLE_ENTITY,
+          &quot;datos_obligatorios&quot;,
+          &quot;Datos obligatorios&quot;,
+          &quot;Los datos de la inspección son obligatorios&quot;);
+    }
+
+<span class="fc" id="L1390">    Inspeccion inspeccion = obtenerInspeccionActiva(inspeccionId);</span>
+
+<span class="pc bpc" id="L1392" title="1 of 2 branches missed.">    if (!inspeccion.getAutorId().equals(usuarioId)) {</span>
+<span class="nc" id="L1393">      throw new ApiException(</span>
+          HttpStatus.NOT_FOUND,
+          &quot;inspeccion_no_encontrada&quot;,
+          &quot;Inspección no encontrada&quot;,
+          &quot;No existe la inspección solicitada.&quot;);
+    }
+<span class="fc bfc" id="L1399" title="All 2 branches covered.">    if (!&quot;BORRADOR&quot;.equalsIgnoreCase(inspeccion.getEstado())) {</span>
+<span class="fc" id="L1400">      throw new ApiException(</span>
+          HttpStatus.CONFLICT,
+          &quot;inspeccion_no_editable&quot;,
+          &quot;Inspección no editable&quot;,
+          &quot;Solo las inspecciones en estado BORRADOR pueden modificarse.&quot;);
+    }
+
+<span class="pc bpc" id="L1407" title="3 of 4 branches missed.">    if (request.version() != null &amp;&amp; !Objects.equals(request.version(), inspeccion.getVersion())) {</span>
+<span class="nc" id="L1408">      throw new ApiException(</span>
+          HttpStatus.CONFLICT,
+          &quot;concurrencia_conflicto&quot;,
+          &quot;Conflicto de concurrencia&quot;,
+          &quot;La inspección fue modificada concurrentemente por otra sesión o dispositivo.&quot;);
+    }
+
+    // Se valida contra la versión de la inspección, NO contra la activa (RN-FRM-02)
+<span class="fc" id="L1416">    VersionFormulario version = inspeccion.getVersionFormulario();</span>
+<span class="pc bpc" id="L1417" title="1 of 2 branches missed.">    if (jsonSchemaValidatorService != null) {</span>
+<span class="fc" id="L1418">      jsonSchemaValidatorService.validarRespuestas(version.getEsquema(), request.datos(), true);</span>
+    }
+<span class="fc" id="L1420">    inspeccion.setDatos(request.datos());</span>
+<span class="fc" id="L1421">    Instant ahora = clock.instant();</span>
+<span class="fc" id="L1422">    inspeccion.setActualizadoEn(ahora);</span>
+<span class="fc" id="L1423">    inspeccion.setUltimaActividadEn(ahora);</span>
+
+<span class="fc" id="L1425">    inspeccion = inspeccionRepository.saveAndFlush(inspeccion);</span>
+<span class="fc" id="L1426">    return inspeccionMapper.toResumenResponse(inspeccion);</span>
+  }
+
+  @Transactional(readOnly = true)
+  public Page&lt;InspeccionPublicadaResumenResponse&gt; listarPublicadasPorPuente(
+      UUID puenteId, int pagina, int tamanio) {
+<span class="fc bfc" id="L1432" title="All 6 branches covered.">    if (pagina &lt; 0 || tamanio &lt; 1 || tamanio &gt; 100) {</span>
+<span class="fc" id="L1433">      throw new ApiException(</span>
+          HttpStatus.UNPROCESSABLE_ENTITY,
+          &quot;paginacion_invalida&quot;,
+          &quot;Paginación inválida&quot;,
+          &quot;La página debe ser mayor o igual a 0 y el tamaño debe estar entre 1 y 100.&quot;);
+    }
+<span class="fc" id="L1439">    return inspeccionRepository.findPublicadasByPuenteId(</span>
+        puenteId,
+<span class="fc" id="L1441">        PageRequest.of(</span>
+<span class="fc" id="L1442">            pagina, tamanio, Sort.by(Sort.Order.desc(&quot;publicadoEn&quot;), Sort.Order.desc(&quot;id&quot;))));</span>
+  }
+
+  @Transactional(readOnly = true)
+  public InspeccionPublicadaDetalleResponse consultarPublicada(UUID id) {
+<span class="fc" id="L1447">    Inspeccion inspeccion =</span>
+        inspeccionRepository
+<span class="fc" id="L1449">            .findPublicadaConDetallesById(id)</span>
+<span class="fc" id="L1450">            .orElseThrow(</span>
+                () -&gt;
+<span class="fc" id="L1452">                    new ApiException(</span>
+                        HttpStatus.NOT_FOUND,
+                        &quot;inspeccion_no_encontrada&quot;,
+                        &quot;Inspección no encontrada&quot;,
+                        &quot;No existe la inspección publicada solicitada.&quot;));
+    // Leer el resultado de ESTA publicación, nunca el vigente del puente ni un cálculo nuevo.
+    var resultado =
+<span class="pc bpc" id="L1459" title="1 of 2 branches missed.">        resultadoIcRepository != null</span>
+<span class="fc" id="L1460">            ? resultadoIcRepository.findPublicacionByInspeccionId(id).orElse(null)</span>
+<span class="pc" id="L1461">            : null;</span>
+<span class="fc" id="L1462">    UUID correccionId = inspeccionRepository.findCorreccionPublicadaId(id).orElse(null);</span>
+    DatosPermanentesResponse permanentes =
+<span class="fc bfc" id="L1464" title="All 2 branches covered.">        inspeccion.getDatoTecnico() == null</span>
+<span class="fc" id="L1465">            ? null</span>
+<span class="fc" id="L1466">            : aDatosPermanentesResponse(inspeccion.getDatoTecnico());</span>
+<span class="fc" id="L1467">    RelacionVersionActivaResponse relacionVersionActiva =</span>
+<span class="fc" id="L1468">        determinarRelacionVersionActiva(inspeccion.getVersionFormulario());</span>
+<span class="fc" id="L1469">    return inspeccionMapper.toPublicadaDetalle(</span>
+        inspeccion, resultado, permanentes, correccionId, relacionVersionActiva);
+  }
+
+  public RelacionVersionActivaResponse determinarRelacionVersionActiva(
+      VersionFormulario versionInspeccion) {
+<span class="fc bfc" id="L1475" title="All 2 branches covered.">    if (versionInspeccion == null) {</span>
+<span class="fc" id="L1476">      return null;</span>
+    }
+<span class="fc bfc" id="L1478" title="All 2 branches covered.">    if (versionFormularioRepository == null) {</span>
+<span class="fc" id="L1479">      return new RelacionVersionActivaResponse(</span>
+<span class="fc" id="L1480">          versionInspeccion.isActiva(),</span>
+<span class="fc" id="L1481">          versionInspeccion.getCodigo(),</span>
+          null,
+          null,
+          false,
+          0,
+          0,
+          0,
+<span class="fc" id="L1488">          Collections.emptyList());</span>
+    }
+<span class="fc" id="L1490">    Optional&lt;VersionFormulario&gt; activaOpt = versionFormularioRepository.findByActivaTrue();</span>
+<span class="pc bpc" id="L1491" title="1 of 2 branches missed.">    if (activaOpt.isEmpty()) {</span>
+<span class="nc" id="L1492">      return new RelacionVersionActivaResponse(</span>
+<span class="nc" id="L1493">          versionInspeccion.isActiva(),</span>
+<span class="nc" id="L1494">          versionInspeccion.getCodigo(),</span>
+          null,
+          null,
+          false,
+          0,
+          0,
+          0,
+<span class="nc" id="L1501">          Collections.emptyList());</span>
+    }
+
+<span class="fc" id="L1504">    VersionFormulario activa = activaOpt.get();</span>
+<span class="fc" id="L1505">    boolean esActiva = activa.getId().equals(versionInspeccion.getId());</span>
+<span class="fc bfc" id="L1506" title="All 2 branches covered.">    if (esActiva) {</span>
+<span class="fc" id="L1507">      return new RelacionVersionActivaResponse(</span>
+          true,
+<span class="fc" id="L1509">          versionInspeccion.getCodigo(),</span>
+<span class="fc" id="L1510">          activa.getCodigo(),</span>
+<span class="fc" id="L1511">          activa.getId(),</span>
+          false,
+          0,
+          0,
+          0,
+<span class="fc" id="L1516">          Collections.emptyList());</span>
+    }
+
+    List&lt;MapeoCampoFormulario&gt; mapeos =
+<span class="pc bpc" id="L1520" title="1 of 2 branches missed.">        mapeoCampoFormularioRepository != null</span>
+<span class="fc" id="L1521">            ? mapeoCampoFormularioRepository.findAllByVersionOrigenIdAndVersionDestinoId(</span>
+<span class="fc" id="L1522">                versionInspeccion.getId(), activa.getId())</span>
+<span class="pc" id="L1523">            : Collections.emptyList();</span>
+
+<span class="fc" id="L1525">    List&lt;MapeoCampoResponse&gt; mapeosDto =</span>
+<span class="fc" id="L1526">        mapeos.stream()</span>
+<span class="fc" id="L1527">            .map(</span>
+                m -&gt;
+<span class="fc" id="L1529">                    new MapeoCampoResponse(</span>
+<span class="fc" id="L1530">                        m.getId(),</span>
+<span class="fc" id="L1531">                        m.getVersionOrigen().getId(),</span>
+<span class="fc" id="L1532">                        m.getVersionDestino().getId(),</span>
+<span class="fc" id="L1533">                        m.getElementoRefOrigen(),</span>
+<span class="fc" id="L1534">                        m.getElementoRefDestino(),</span>
+<span class="fc" id="L1535">                        m.getTipo(),</span>
+<span class="fc" id="L1536">                        m.getObservacion()))</span>
+<span class="fc" id="L1537">            .toList();</span>
+
+<span class="fc" id="L1539">    int equivalentes =</span>
+<span class="fc bfc" id="L1540" title="All 2 branches covered.">        (int) mapeosDto.stream().filter(m -&gt; m.tipo() == TipoMapeoCampo.EQUIVALENTE).count();</span>
+<span class="fc bfc" id="L1541" title="All 2 branches covered.">    int nuevos = (int) mapeosDto.stream().filter(m -&gt; m.tipo() == TipoMapeoCampo.NUEVO).count();</span>
+<span class="fc" id="L1542">    int eliminados =</span>
+<span class="pc bpc" id="L1543" title="1 of 2 branches missed.">        (int) mapeosDto.stream().filter(m -&gt; m.tipo() == TipoMapeoCampo.ELIMINADO).count();</span>
+
+<span class="fc" id="L1545">    return new RelacionVersionActivaResponse(</span>
+        false,
+<span class="fc" id="L1547">        versionInspeccion.getCodigo(),</span>
+<span class="fc" id="L1548">        activa.getCodigo(),</span>
+<span class="fc" id="L1549">        activa.getId(),</span>
+<span class="fc bfc" id="L1550" title="All 2 branches covered.">        !mapeosDto.isEmpty(),</span>
+        equivalentes,
+        nuevos,
+        eliminados,
+        mapeosDto);
+  }
+
+  @Transactional(readOnly = true)
+  public ExportacionInspeccionResponse exportarInspeccion(UUID id) {
+<span class="fc" id="L1559">    Inspeccion inspeccion =</span>
+        inspeccionRepository
+<span class="fc" id="L1561">            .findPublicadaConDetallesById(id)</span>
+<span class="fc" id="L1562">            .orElseThrow(</span>
+                () -&gt;
+<span class="fc" id="L1564">                    new ApiException(</span>
+                        HttpStatus.NOT_FOUND,
+                        &quot;inspeccion_no_encontrada&quot;,
+                        &quot;Inspección no encontrada&quot;,
+                        &quot;No existe la inspección publicada solicitada.&quot;));
+
+    var resultado =
+<span class="pc bpc" id="L1571" title="1 of 2 branches missed.">        resultadoIcRepository != null</span>
+<span class="nc" id="L1572">            ? resultadoIcRepository.findPublicacionByInspeccionId(id).orElse(null)</span>
+<span class="fc" id="L1573">            : null;</span>
+    ResultadoIcPublicadoResponse icDto =
+<span class="pc bpc" id="L1575" title="3 of 4 branches missed.">        resultado == null || inspeccionMapper == null</span>
+<span class="fc" id="L1576">            ? null</span>
+<span class="pc" id="L1577">            : inspeccionMapper.toResultadoPublicado(resultado);</span>
+
+    DatosPermanentesResponse permanentes =
+<span class="pc bpc" id="L1580" title="1 of 2 branches missed.">        inspeccion.getDatoTecnico() == null</span>
+<span class="fc" id="L1581">            ? null</span>
+<span class="pc" id="L1582">            : aDatosPermanentesResponse(inspeccion.getDatoTecnico());</span>
+
+<span class="fc" id="L1584">    RelacionVersionActivaResponse relacion =</span>
+<span class="fc" id="L1585">        determinarRelacionVersionActiva(inspeccion.getVersionFormulario());</span>
+
+<span class="fc" id="L1587">    Puente puente = inspeccion.getPuente();</span>
+<span class="fc" id="L1588">    ExportacionInspeccionResponse.PuenteResumenExportacion puenteDto =</span>
+        new ExportacionInspeccionResponse.PuenteResumenExportacion(
+<span class="fc" id="L1590">            puente.getId(),</span>
+<span class="fc" id="L1591">            puente.getCodigo(),</span>
+<span class="fc" id="L1592">            puente.getNombre(),</span>
+<span class="pc bpc" id="L1593" title="3 of 4 branches missed.">            puente.getMunicipio() != null &amp;&amp; puente.getMunicipio().getDepartamento() != null</span>
+<span class="nc" id="L1594">                ? puente.getMunicipio().getDepartamento().getNombre()</span>
+<span class="fc" id="L1595">                : null,</span>
+<span class="pc bpc" id="L1596" title="1 of 2 branches missed.">            puente.getMunicipio() != null ? puente.getMunicipio().getNombre() : null);</span>
+
+<span class="fc" id="L1598">    VersionFormulario vf = inspeccion.getVersionFormulario();</span>
+<span class="fc" id="L1599">    ExportacionInspeccionResponse.VersionFormularioExportacion versionDto =</span>
+        new ExportacionInspeccionResponse.VersionFormularioExportacion(
+<span class="fc" id="L1601">            vf.getId(), vf.getCodigo(), vf.getEsquema());</span>
+
+    List&lt;ExportacionInspeccionResponse.FotografiaExportacionResponse&gt; fotosDto =
+<span class="pc bpc" id="L1604" title="1 of 2 branches missed.">        archivoInspeccionRepository != null</span>
+            ? archivoInspeccionRepository
+<span class="fc" id="L1606">                .findByInspeccionIdAndTipoUsoOrderByCreadoEnAsc(</span>
+<span class="fc" id="L1607">                    inspeccion.getId(), TipoUsoArchivo.FOTO_INSPECCION)</span>
+<span class="fc" id="L1608">                .stream()</span>
+<span class="fc" id="L1609">                .map(</span>
+                    ai -&gt;
+<span class="nc" id="L1611">                        new ExportacionInspeccionResponse.FotografiaExportacionResponse(</span>
+<span class="nc" id="L1612">                            ai.getArchivo().getId(),</span>
+<span class="nc bnc" id="L1613" title="All 2 branches missed.">                            ai.getArchivo().getCategoriaFoto() != null</span>
+<span class="nc" id="L1614">                                ? ai.getArchivo().getCategoriaFoto().name()</span>
+<span class="nc" id="L1615">                                : null,</span>
+<span class="nc" id="L1616">                            ai.getElementoRef(),</span>
+<span class="nc" id="L1617">                            ai.getArchivo().getCapturadoEn()))</span>
+<span class="fc" id="L1618">                .toList()</span>
+<span class="pc" id="L1619">            : Collections.emptyList();</span>
+
+    List&lt;ExportacionInspeccionResponse.PropuestaMantenimientoExportacionResponse&gt; propuestasDto =
+<span class="pc bpc" id="L1622" title="1 of 2 branches missed.">        ordenMantenimientoRepository != null</span>
+            ? ordenMantenimientoRepository
+<span class="fc" id="L1624">                .findByInspeccionOrigenIdOrderByCreadoEnAscIdAsc(inspeccion.getId())</span>
+<span class="fc" id="L1625">                .stream()</span>
+<span class="fc" id="L1626">                .map(</span>
+                    o -&gt;
+<span class="nc" id="L1628">                        new ExportacionInspeccionResponse.PropuestaMantenimientoExportacionResponse(</span>
+<span class="nc" id="L1629">                            o.getId(),</span>
+<span class="nc" id="L1630">                            o.getTipo().name(),</span>
+<span class="nc" id="L1631">                            o.getEstado().name(),</span>
+<span class="nc" id="L1632">                            o.getDescripcion(),</span>
+<span class="nc bnc" id="L1633" title="All 2 branches missed.">                            o.getPrioridadSugerida() != null</span>
+<span class="nc" id="L1634">                                ? o.getPrioridadSugerida().name()</span>
+<span class="nc" id="L1635">                                : null))</span>
+<span class="fc" id="L1636">                .toList()</span>
+<span class="pc" id="L1637">            : Collections.emptyList();</span>
+
+<span class="fc" id="L1639">    UUID correccionId = inspeccionRepository.findCorreccionPublicadaId(id).orElse(null);</span>
+<span class="pc bpc" id="L1640" title="1 of 2 branches missed.">    String vigencia = correccionId == null ? &quot;VIGENTE&quot; : &quot;SUPERADA&quot;;</span>
+
+<span class="fc" id="L1642">    return new ExportacionInspeccionResponse(</span>
+<span class="fc" id="L1643">        inspeccion.getId(),</span>
+<span class="fc" id="L1644">        inspeccion.getFechaInspeccion(),</span>
+        puenteDto,
+        versionDto,
+        relacion,
+<span class="fc" id="L1648">        inspeccion.getEstado(),</span>
+        vigencia,
+<span class="fc" id="L1650">        inspeccion.getIdentificacionCapturada(),</span>
+<span class="fc" id="L1651">        inspeccion.getDatos(),</span>
+        permanentes,
+        icDto,
+        fotosDto,
+        propuestasDto,
+<span class="fc" id="L1656">        clock.instant());</span>
+  }
+
+  @Transactional(readOnly = true)
+  public InspeccionResumenResponse consultarPorId(UUID inspeccionId, UUID usuarioId) {
+<span class="fc" id="L1661">    Inspeccion inspeccion = obtenerInspeccionActiva(inspeccionId);</span>
+<span class="fc" id="L1662">    boolean academica = RoleName.ESTUDIANTE.name().equals(inspeccion.getRolAutorCreacion());</span>
+<span class="fc" id="L1663">    boolean autorizado =</span>
+<span class="pc bpc" id="L1664" title="1 of 4 branches missed.">        inspeccion.getAutorId().equals(usuarioId) || esCatedraticoAsignado(inspeccion, usuarioId);</span>
+<span class="pc bpc" id="L1665" title="1 of 2 branches missed.">    boolean borradorPrivadoNoAcademico =</span>
+        !academica
+<span class="fc bfc" id="L1667" title="All 2 branches covered.">            &amp;&amp; &quot;BORRADOR&quot;.equalsIgnoreCase(inspeccion.getEstado())</span>
+<span class="fc bfc" id="L1668" title="All 2 branches covered.">            &amp;&amp; !inspeccion.getAutorId().equals(usuarioId);</span>
+<span class="pc bpc" id="L1669" title="1 of 2 branches missed.">    boolean inspeccionAcademicaPrivada =</span>
+<span class="pc bnc" id="L1670" title="All 4 branches missed.">        academica &amp;&amp; !&quot;PUBLICADA&quot;.equalsIgnoreCase(inspeccion.getEstado()) &amp;&amp; !autorizado;</span>
+<span class="pc bpc" id="L1671" title="1 of 4 branches missed.">    if (borradorPrivadoNoAcademico || inspeccionAcademicaPrivada) {</span>
+<span class="fc" id="L1672">      throw new ApiException(</span>
+          HttpStatus.NOT_FOUND,
+          &quot;inspeccion_no_encontrada&quot;,
+          &quot;Inspección no encontrada&quot;,
+          &quot;No existe la inspección solicitada.&quot;);
+    }
+<span class="fc" id="L1678">    InspeccionResumenResponse resumen = inspeccionMapper.toResumenResponse(inspeccion);</span>
+    // Una inspección publicada superada por una corrección enlaza hacia ella (RN-INS-08).
+<span class="fc bfc" id="L1680" title="All 2 branches covered.">    return &quot;PUBLICADA&quot;.equals(inspeccion.getEstado())</span>
+        ? inspeccionRepository
+<span class="fc" id="L1682">            .findCorreccionPublicadaId(inspeccion.getId())</span>
+<span class="fc" id="L1683">            .map(resumen::conSuperadaPor)</span>
+<span class="fc" id="L1684">            .orElse(resumen)</span>
+<span class="fc" id="L1685">        : resumen;</span>
+  }
+
+  private boolean esCatedraticoAsignado(Inspeccion inspeccion, UUID usuarioId) {
+<span class="pc bpc" id="L1689" title="1 of 4 branches missed.">    return inspeccion.getAsignacionPuenteId() != null</span>
+        &amp;&amp; asignaciones != null
+<span class="pc bpc" id="L1691" title="1 of 2 branches missed.">        &amp;&amp; asignaciones.perteneceACatedratico(inspeccion.getAsignacionPuenteId(), usuarioId);</span>
+  }
+
+  @Transactional(readOnly = true)
+  public void validarRespuestasInspeccion(
+      UUID inspeccionId, JsonNode datos, Boolean esBorrador, UUID usuarioId) {
+<span class="nc" id="L1697">    Inspeccion inspeccion = obtenerInspeccionActiva(inspeccionId);</span>
+<span class="nc bnc" id="L1698" title="All 2 branches missed.">    if (&quot;BORRADOR&quot;.equalsIgnoreCase(inspeccion.getEstado())</span>
+<span class="nc bnc" id="L1699" title="All 2 branches missed.">        &amp;&amp; !inspeccion.getAutorId().equals(usuarioId)) {</span>
+<span class="nc" id="L1700">      throw new ApiException(</span>
+          HttpStatus.NOT_FOUND,
+          &quot;inspeccion_no_encontrada&quot;,
+          &quot;Inspección no encontrada&quot;,
+          &quot;No existe la inspección solicitada.&quot;);
+    }
+<span class="nc bnc" id="L1706" title="All 4 branches missed.">    boolean modoBorrador = esBorrador == null || esBorrador;</span>
+<span class="nc bnc" id="L1707" title="All 2 branches missed.">    if (jsonSchemaValidatorService != null) {</span>
+<span class="nc" id="L1708">      jsonSchemaValidatorService.validarRespuestas(</span>
+<span class="nc" id="L1709">          inspeccion.getVersionFormulario().getEsquema(), datos, modoBorrador);</span>
+    }
+<span class="nc" id="L1711">  }</span>
+
+  @Transactional(readOnly = true)
+  public void validarRespuestasVersion(UUID versionId, JsonNode datos, Boolean esBorrador) {
+<span class="nc" id="L1715">    VersionFormulario version =</span>
+        versionFormularioRepository
+<span class="nc" id="L1717">            .findById(versionId)</span>
+<span class="nc" id="L1718">            .orElseThrow(</span>
+                () -&gt;
+<span class="nc" id="L1720">                    new ApiException(</span>
+                        HttpStatus.NOT_FOUND,
+                        &quot;version_no_encontrada&quot;,
+                        &quot;Versión no encontrada&quot;,
+                        &quot;La versión de formulario especificada no existe&quot;));
+
+<span class="nc bnc" id="L1726" title="All 4 branches missed.">    boolean modoBorrador = esBorrador == null || esBorrador;</span>
+<span class="nc bnc" id="L1727" title="All 2 branches missed.">    if (jsonSchemaValidatorService != null) {</span>
+<span class="nc" id="L1728">      jsonSchemaValidatorService.validarRespuestas(version.getEsquema(), datos, modoBorrador);</span>
+    }
+<span class="nc" id="L1730">  }</span>
+
+  private Inspeccion obtenerInspeccionActiva(UUID id) {
+<span class="pc bpc" id="L1733" title="1 of 2 branches missed.">    if (id == null) {</span>
+<span class="nc" id="L1734">      throw new ApiException(</span>
+          HttpStatus.UNPROCESSABLE_ENTITY,
+          &quot;id_obligatorio&quot;,
+          &quot;ID obligatorio&quot;,
+          &quot;El identificador de la inspección es obligatorio&quot;);
+    }
+<span class="fc" id="L1740">    return inspeccionRepository</span>
+<span class="fc" id="L1741">        .findActiveById(id)</span>
+<span class="fc" id="L1742">        .orElseThrow(</span>
+            () -&gt;
+<span class="nc" id="L1744">                new ApiException(</span>
+                    HttpStatus.NOT_FOUND,
+                    &quot;inspeccion_no_encontrada&quot;,
+                    &quot;Inspección no encontrada&quot;,
+                    &quot;No existe la inspección solicitada&quot;));
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

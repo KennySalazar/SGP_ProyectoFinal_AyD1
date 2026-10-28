@@ -1,0 +1,141 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PlanMantenimientoRutinario.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">sgp-api</a> &gt; <a href="index.source.html" class="el_package">gt.usac.cunoc.sgp.mantenimiento.entity</a> &gt; <span class="el_source">PlanMantenimientoRutinario.java</span></div><h1>PlanMantenimientoRutinario.java</h1><pre class="source lang-java linenums">package gt.usac.cunoc.sgp.mantenimiento.entity;
+
+import gt.usac.cunoc.sgp.common.util.UuidV7Generator;
+import gt.usac.cunoc.sgp.puente.entity.Puente;
+import jakarta.persistence.CascadeType;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OneToMany;
+import jakarta.persistence.OrderBy;
+import jakarta.persistence.Table;
+import jakarta.persistence.Version;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.UUID;
+
+@Entity
+@Table(name = &quot;plan_mantenimiento_rutinario&quot;)
+public class PlanMantenimientoRutinario {
+
+  @Id private UUID id;
+
+  @ManyToOne(fetch = FetchType.LAZY, optional = false)
+  @JoinColumn(name = &quot;puente_id&quot;, nullable = false, unique = true)
+  private Puente puente;
+
+  @Column(name = &quot;periodicidad_meses&quot;, nullable = false)
+  private short periodicidadMeses;
+
+  @Column(name = &quot;fecha_inicio&quot;, nullable = false)
+  private LocalDate fechaInicio;
+
+  @Column(name = &quot;responsable_usuario_id&quot;)
+  private UUID responsableUsuarioId;
+
+  @Column(nullable = false)
+  private boolean activo;
+
+  @Column(name = &quot;aprobado_por_id&quot;)
+  private UUID aprobadoPorId;
+
+  @Column(name = &quot;aprobado_en&quot;)
+  private Instant aprobadoEn;
+
+  @Column(name = &quot;inactivado_en&quot;)
+  private Instant inactivadoEn;
+
+  @Column(name = &quot;motivo_inactivacion&quot;, columnDefinition = &quot;text&quot;)
+  private String motivoInactivacion;
+
+  @Column(name = &quot;creado_en&quot;, nullable = false, updatable = false)
+  private Instant creadoEn;
+
+  @Column(name = &quot;actualizado_en&quot;, nullable = false)
+  private Instant actualizadoEn;
+
+  @Version
+  @Column(nullable = false)
+  private long version;
+
+<span class="pc" id="L66">  @OneToMany(mappedBy = &quot;plan&quot;, cascade = CascadeType.ALL, orphanRemoval = true)</span>
+  @OrderBy(&quot;posicion ASC&quot;)
+  private List&lt;PlanMantenimientoRutinarioActividad&gt; actividades = new ArrayList&lt;&gt;();
+
+<span class="nc" id="L70">  protected PlanMantenimientoRutinario() {}</span>
+
+<span class="fc" id="L72">  public PlanMantenimientoRutinario(UUID id, Puente puente, LocalDate fechaInicio, Instant ahora) {</span>
+<span class="fc" id="L73">    this.id = id;</span>
+<span class="fc" id="L74">    this.puente = puente;</span>
+<span class="fc" id="L75">    this.periodicidadMeses = 12;</span>
+<span class="fc" id="L76">    this.fechaInicio = fechaInicio;</span>
+<span class="fc" id="L77">    this.activo = true;</span>
+<span class="fc" id="L78">    this.creadoEn = ahora;</span>
+<span class="fc" id="L79">    this.actualizadoEn = ahora;</span>
+<span class="fc" id="L80">  }</span>
+
+  public void actualizar(short periodicidadMeses, List&lt;String&gt; descripciones, Instant ahora) {
+<span class="nc" id="L83">    this.periodicidadMeses = periodicidadMeses;</span>
+<span class="nc" id="L84">    this.actualizadoEn = ahora;</span>
+<span class="nc" id="L85">    this.actividades.clear();</span>
+<span class="nc bnc" id="L86" title="All 2 branches missed.">    for (int i = 0; i &lt; descripciones.size(); i++) {</span>
+<span class="nc" id="L87">      this.actividades.add(</span>
+          new PlanMantenimientoRutinarioActividad(
+<span class="nc" id="L89">              UuidV7Generator.generate(), this, i + 1, descripciones.get(i).strip()));</span>
+    }
+<span class="nc" id="L91">  }</span>
+
+  public UUID getId() {
+<span class="fc" id="L94">    return id;</span>
+  }
+
+  public Puente getPuente() {
+<span class="fc" id="L98">    return puente;</span>
+  }
+
+  public short getPeriodicidadMeses() {
+<span class="fc" id="L102">    return periodicidadMeses;</span>
+  }
+
+  public LocalDate getFechaInicio() {
+<span class="fc" id="L106">    return fechaInicio;</span>
+  }
+
+  public UUID getResponsableUsuarioId() {
+<span class="nc" id="L110">    return responsableUsuarioId;</span>
+  }
+
+  public boolean isActivo() {
+<span class="nc" id="L114">    return activo;</span>
+  }
+
+  public UUID getAprobadoPorId() {
+<span class="nc" id="L118">    return aprobadoPorId;</span>
+  }
+
+  public Instant getAprobadoEn() {
+<span class="nc" id="L122">    return aprobadoEn;</span>
+  }
+
+  public Instant getCreadoEn() {
+<span class="nc" id="L126">    return creadoEn;</span>
+  }
+
+  public Instant getActualizadoEn() {
+<span class="nc" id="L130">    return actualizadoEn;</span>
+  }
+
+  public long getVersion() {
+<span class="nc" id="L134">    return version;</span>
+  }
+
+  public List&lt;PlanMantenimientoRutinarioActividad&gt; getActividades() {
+<span class="fc" id="L138">    return actividades;</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

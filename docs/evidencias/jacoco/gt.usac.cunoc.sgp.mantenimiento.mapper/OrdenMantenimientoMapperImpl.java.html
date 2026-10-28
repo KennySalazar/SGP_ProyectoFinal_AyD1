@@ -1,0 +1,213 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>OrdenMantenimientoMapperImpl.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">sgp-api</a> &gt; <a href="index.source.html" class="el_package">gt.usac.cunoc.sgp.mantenimiento.mapper</a> &gt; <span class="el_source">OrdenMantenimientoMapperImpl.java</span></div><h1>OrdenMantenimientoMapperImpl.java</h1><pre class="source lang-java linenums">package gt.usac.cunoc.sgp.mantenimiento.mapper;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import gt.usac.cunoc.sgp.archivo.entity.Archivo;
+import gt.usac.cunoc.sgp.archivo.entity.ArchivoEvidenciaMantenimiento;
+import gt.usac.cunoc.sgp.mantenimiento.dto.EjecucionOrdenResponse;
+import gt.usac.cunoc.sgp.mantenimiento.dto.EvidenciaMantenimientoResponse;
+import gt.usac.cunoc.sgp.mantenimiento.dto.HistorialEstadoOrdenResponse;
+import gt.usac.cunoc.sgp.mantenimiento.dto.OrdenMantenimientoResponse;
+import gt.usac.cunoc.sgp.mantenimiento.entity.HistorialEstadoOrden;
+import gt.usac.cunoc.sgp.mantenimiento.entity.OrdenMantenimiento;
+import gt.usac.cunoc.sgp.mantenimiento.entity.OrdenMantenimientoEjecucion;
+import gt.usac.cunoc.sgp.mantenimiento.model.EstadoOrden;
+import gt.usac.cunoc.sgp.mantenimiento.model.PrioridadOrden;
+import gt.usac.cunoc.sgp.mantenimiento.model.TipoOrden;
+import java.time.LocalDate;
+import java.time.OffsetDateTime;
+import java.util.UUID;
+import javax.annotation.processing.Generated;
+import org.springframework.stereotype.Component;
+
+@Generated(
+    value = &quot;org.mapstruct.ap.MappingProcessor&quot;,
+    date = &quot;2026-10-27T23:39:18-0600&quot;,
+    comments = &quot;version: 1.6.3, compiler: javac, environment: Java 25.0.4.1 (Debian)&quot;
+)
+@Component
+<span class="fc" id="L28">public class OrdenMantenimientoMapperImpl implements OrdenMantenimientoMapper {</span>
+
+    @Override
+    public OrdenMantenimientoResponse toResponse(OrdenMantenimiento orden) {
+<span class="pc bpc" id="L32" title="1 of 2 branches missed.">        if ( orden == null ) {</span>
+<span class="nc" id="L33">            return null;</span>
+        }
+
+<span class="fc" id="L36">        UUID id = null;</span>
+<span class="fc" id="L37">        UUID puenteId = null;</span>
+<span class="fc" id="L38">        UUID inspeccionOrigenId = null;</span>
+<span class="fc" id="L39">        UUID reglaOrigenId = null;</span>
+<span class="fc" id="L40">        UUID resultadoIcOrigenId = null;</span>
+<span class="fc" id="L41">        String elementoRef = null;</span>
+<span class="fc" id="L42">        UUID instanciaElementoId = null;</span>
+<span class="fc" id="L43">        TipoOrden tipo = null;</span>
+<span class="fc" id="L44">        EstadoOrden estado = null;</span>
+<span class="fc" id="L45">        String descripcion = null;</span>
+<span class="fc" id="L46">        PrioridadOrden prioridadSugerida = null;</span>
+<span class="fc" id="L47">        PrioridadOrden prioridadConfirmada = null;</span>
+<span class="fc" id="L48">        String justificacionPrioridad = null;</span>
+<span class="fc" id="L49">        JsonNode fundamentoGeneracion = null;</span>
+<span class="fc" id="L50">        UUID creadoPorId = null;</span>
+<span class="fc" id="L51">        UUID aceptadoPorId = null;</span>
+<span class="fc" id="L52">        OffsetDateTime aceptadoEn = null;</span>
+<span class="fc" id="L53">        LocalDate fechaProgramada = null;</span>
+<span class="fc" id="L54">        String motivoCierreSinEjecucion = null;</span>
+<span class="fc" id="L55">        OffsetDateTime creadoEn = null;</span>
+<span class="fc" id="L56">        OffsetDateTime actualizadoEn = null;</span>
+<span class="fc" id="L57">        Long version = null;</span>
+<span class="fc" id="L58">        Boolean reglaProvisional = null;</span>
+
+<span class="fc" id="L60">        id = orden.getId();</span>
+<span class="fc" id="L61">        puenteId = orden.getPuenteId();</span>
+<span class="fc" id="L62">        inspeccionOrigenId = orden.getInspeccionOrigenId();</span>
+<span class="fc" id="L63">        reglaOrigenId = orden.getReglaOrigenId();</span>
+<span class="fc" id="L64">        resultadoIcOrigenId = orden.getResultadoIcOrigenId();</span>
+<span class="fc" id="L65">        elementoRef = orden.getElementoRef();</span>
+<span class="fc" id="L66">        instanciaElementoId = orden.getInstanciaElementoId();</span>
+<span class="fc" id="L67">        tipo = orden.getTipo();</span>
+<span class="fc" id="L68">        estado = orden.getEstado();</span>
+<span class="fc" id="L69">        descripcion = orden.getDescripcion();</span>
+<span class="fc" id="L70">        prioridadSugerida = orden.getPrioridadSugerida();</span>
+<span class="fc" id="L71">        prioridadConfirmada = orden.getPrioridadConfirmada();</span>
+<span class="fc" id="L72">        justificacionPrioridad = orden.getJustificacionPrioridad();</span>
+<span class="fc" id="L73">        fundamentoGeneracion = orden.getFundamentoGeneracion();</span>
+<span class="fc" id="L74">        creadoPorId = orden.getCreadoPorId();</span>
+<span class="fc" id="L75">        aceptadoPorId = orden.getAceptadoPorId();</span>
+<span class="fc" id="L76">        aceptadoEn = aHoraGuatemala( orden.getAceptadoEn() );</span>
+<span class="fc" id="L77">        fechaProgramada = orden.getFechaProgramada();</span>
+<span class="fc" id="L78">        motivoCierreSinEjecucion = orden.getMotivoCierreSinEjecucion();</span>
+<span class="fc" id="L79">        creadoEn = aHoraGuatemala( orden.getCreadoEn() );</span>
+<span class="fc" id="L80">        actualizadoEn = aHoraGuatemala( orden.getActualizadoEn() );</span>
+<span class="fc" id="L81">        version = orden.getVersion();</span>
+<span class="fc" id="L82">        reglaProvisional = orden.getReglaProvisional();</span>
+
+<span class="fc" id="L84">        OrdenMantenimientoResponse ordenMantenimientoResponse = new OrdenMantenimientoResponse( id, puenteId, inspeccionOrigenId, reglaOrigenId, resultadoIcOrigenId, elementoRef, instanciaElementoId, tipo, estado, descripcion, prioridadSugerida, prioridadConfirmada, justificacionPrioridad, fundamentoGeneracion, creadoPorId, aceptadoPorId, aceptadoEn, fechaProgramada, motivoCierreSinEjecucion, creadoEn, actualizadoEn, version, reglaProvisional );</span>
+
+<span class="fc" id="L86">        return ordenMantenimientoResponse;</span>
+    }
+
+    @Override
+    public HistorialEstadoOrdenResponse toHistorialResponse(HistorialEstadoOrden historial) {
+<span class="pc bpc" id="L91" title="1 of 2 branches missed.">        if ( historial == null ) {</span>
+<span class="nc" id="L92">            return null;</span>
+        }
+
+<span class="fc" id="L95">        int secuencia = 0;</span>
+<span class="fc" id="L96">        String estadoAnterior = null;</span>
+<span class="fc" id="L97">        String estadoNuevo = null;</span>
+<span class="fc" id="L98">        UUID realizadoPorId = null;</span>
+<span class="fc" id="L99">        String motivo = null;</span>
+<span class="fc" id="L100">        OffsetDateTime creadoEn = null;</span>
+
+<span class="fc" id="L102">        secuencia = historial.getSecuencia();</span>
+<span class="fc" id="L103">        estadoAnterior = historial.getEstadoAnterior();</span>
+<span class="fc" id="L104">        estadoNuevo = historial.getEstadoNuevo();</span>
+<span class="fc" id="L105">        realizadoPorId = historial.getRealizadoPorId();</span>
+<span class="fc" id="L106">        motivo = historial.getMotivo();</span>
+<span class="fc" id="L107">        creadoEn = aHoraGuatemala( historial.getCreadoEn() );</span>
+
+<span class="fc" id="L109">        HistorialEstadoOrdenResponse historialEstadoOrdenResponse = new HistorialEstadoOrdenResponse( secuencia, estadoAnterior, estadoNuevo, realizadoPorId, motivo, creadoEn );</span>
+
+<span class="fc" id="L111">        return historialEstadoOrdenResponse;</span>
+    }
+
+    @Override
+    public EjecucionOrdenResponse toEjecucionResponse(OrdenMantenimientoEjecucion ejecucion, String responsableUsuarioEmail) {
+<span class="pc bpc" id="L116" title="3 of 4 branches missed.">        if ( ejecucion == null &amp;&amp; responsableUsuarioEmail == null ) {</span>
+<span class="nc" id="L117">            return null;</span>
+        }
+
+<span class="fc" id="L120">        UUID ordenId = null;</span>
+<span class="fc" id="L121">        OffsetDateTime iniciadoEn = null;</span>
+<span class="fc" id="L122">        LocalDate fechaEjecucion = null;</span>
+<span class="fc" id="L123">        UUID responsableUsuarioId = null;</span>
+<span class="fc" id="L124">        String responsableNombre = null;</span>
+<span class="fc" id="L125">        OffsetDateTime actualizadoEn = null;</span>
+<span class="pc bpc" id="L126" title="1 of 2 branches missed.">        if ( ejecucion != null ) {</span>
+<span class="fc" id="L127">            ordenId = ejecucion.getOrdenMantenimientoId();</span>
+<span class="fc" id="L128">            iniciadoEn = aHoraGuatemala( ejecucion.getIniciadoEn() );</span>
+<span class="fc" id="L129">            fechaEjecucion = ejecucion.getFechaEjecucion();</span>
+<span class="fc" id="L130">            responsableUsuarioId = ejecucion.getResponsableUsuarioId();</span>
+<span class="fc" id="L131">            responsableNombre = ejecucion.getResponsableNombre();</span>
+<span class="fc" id="L132">            actualizadoEn = aHoraGuatemala( ejecucion.getActualizadoEn() );</span>
+        }
+<span class="fc" id="L134">        String responsableUsuarioEmail1 = null;</span>
+<span class="fc" id="L135">        responsableUsuarioEmail1 = responsableUsuarioEmail;</span>
+
+<span class="fc" id="L137">        EjecucionOrdenResponse ejecucionOrdenResponse = new EjecucionOrdenResponse( ordenId, iniciadoEn, fechaEjecucion, responsableUsuarioId, responsableUsuarioEmail1, responsableNombre, actualizadoEn );</span>
+
+<span class="fc" id="L139">        return ejecucionOrdenResponse;</span>
+    }
+
+    @Override
+    public EvidenciaMantenimientoResponse toEvidenciaResponse(ArchivoEvidenciaMantenimiento evidencia) {
+<span class="pc bpc" id="L144" title="1 of 2 branches missed.">        if ( evidencia == null ) {</span>
+<span class="nc" id="L145">            return null;</span>
+        }
+
+<span class="fc" id="L148">        UUID id = null;</span>
+<span class="fc" id="L149">        UUID ordenId = null;</span>
+<span class="fc" id="L150">        String mimeReal = null;</span>
+<span class="fc" id="L151">        long tamanoBytes = 0L;</span>
+<span class="fc" id="L152">        Integer anchoPx = null;</span>
+<span class="fc" id="L153">        Integer altoPx = null;</span>
+<span class="fc" id="L154">        UUID subidoPorId = null;</span>
+<span class="fc" id="L155">        OffsetDateTime subidoEn = null;</span>
+<span class="fc" id="L156">        String elementoRef = null;</span>
+
+<span class="fc" id="L158">        id = evidencia.getArchivoId();</span>
+<span class="fc" id="L159">        ordenId = evidencia.getOrdenMantenimientoId();</span>
+<span class="fc" id="L160">        mimeReal = evidenciaArchivoMimeReal( evidencia );</span>
+<span class="fc" id="L161">        tamanoBytes = evidenciaArchivoTamanoBytes( evidencia );</span>
+<span class="fc" id="L162">        anchoPx = evidenciaArchivoAnchoPx( evidencia );</span>
+<span class="fc" id="L163">        altoPx = evidenciaArchivoAltoPx( evidencia );</span>
+<span class="fc" id="L164">        subidoPorId = evidenciaArchivoSubidoPorId( evidencia );</span>
+<span class="fc" id="L165">        subidoEn = aHoraGuatemala( evidencia.getCreadoEn() );</span>
+<span class="fc" id="L166">        elementoRef = evidencia.getElementoRef();</span>
+
+<span class="fc" id="L168">        EvidenciaMantenimientoResponse evidenciaMantenimientoResponse = new EvidenciaMantenimientoResponse( id, ordenId, elementoRef, mimeReal, tamanoBytes, anchoPx, altoPx, subidoPorId, subidoEn );</span>
+
+<span class="fc" id="L170">        return evidenciaMantenimientoResponse;</span>
+    }
+
+    private String evidenciaArchivoMimeReal(ArchivoEvidenciaMantenimiento archivoEvidenciaMantenimiento) {
+<span class="fc" id="L174">        Archivo archivo = archivoEvidenciaMantenimiento.getArchivo();</span>
+<span class="pc bpc" id="L175" title="1 of 2 branches missed.">        if ( archivo == null ) {</span>
+<span class="nc" id="L176">            return null;</span>
+        }
+<span class="fc" id="L178">        return archivo.getMimeReal();</span>
+    }
+
+    private long evidenciaArchivoTamanoBytes(ArchivoEvidenciaMantenimiento archivoEvidenciaMantenimiento) {
+<span class="fc" id="L182">        Archivo archivo = archivoEvidenciaMantenimiento.getArchivo();</span>
+<span class="pc bpc" id="L183" title="1 of 2 branches missed.">        if ( archivo == null ) {</span>
+<span class="nc" id="L184">            return 0L;</span>
+        }
+<span class="fc" id="L186">        return archivo.getTamanoBytes();</span>
+    }
+
+    private Integer evidenciaArchivoAnchoPx(ArchivoEvidenciaMantenimiento archivoEvidenciaMantenimiento) {
+<span class="fc" id="L190">        Archivo archivo = archivoEvidenciaMantenimiento.getArchivo();</span>
+<span class="pc bpc" id="L191" title="1 of 2 branches missed.">        if ( archivo == null ) {</span>
+<span class="nc" id="L192">            return null;</span>
+        }
+<span class="fc" id="L194">        return archivo.getAnchoPx();</span>
+    }
+
+    private Integer evidenciaArchivoAltoPx(ArchivoEvidenciaMantenimiento archivoEvidenciaMantenimiento) {
+<span class="fc" id="L198">        Archivo archivo = archivoEvidenciaMantenimiento.getArchivo();</span>
+<span class="pc bpc" id="L199" title="1 of 2 branches missed.">        if ( archivo == null ) {</span>
+<span class="nc" id="L200">            return null;</span>
+        }
+<span class="fc" id="L202">        return archivo.getAltoPx();</span>
+    }
+
+    private UUID evidenciaArchivoSubidoPorId(ArchivoEvidenciaMantenimiento archivoEvidenciaMantenimiento) {
+<span class="fc" id="L206">        Archivo archivo = archivoEvidenciaMantenimiento.getArchivo();</span>
+<span class="pc bpc" id="L207" title="1 of 2 branches missed.">        if ( archivo == null ) {</span>
+<span class="nc" id="L208">            return null;</span>
+        }
+<span class="fc" id="L210">        return archivo.getSubidoPorId();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

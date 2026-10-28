@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CrearComentarioRequest.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">sgp-api</a> &gt; <a href="index.source.html" class="el_package">gt.usac.cunoc.sgp.foro.dto</a> &gt; <span class="el_source">CrearComentarioRequest.java</span></div><h1>CrearComentarioRequest.java</h1><pre class="source lang-java linenums">package gt.usac.cunoc.sgp.foro.dto;
+
+import java.util.UUID;
+
+/**
+ * Comentario nuevo. {@code padreId} lo convierte en respuesta a un comentario principal. {@code
+ * elementoRef} (y, si el elemento es repetible, {@code instanciaElementoId}) lo ancla a un campo o
+ * elemento de una inspección publicada; solo vale en el hilo de una inspección y en un comentario
+ * principal.
+ */
+<span class="fc" id="L11">public record CrearComentarioRequest(</span>
+    String contenido, UUID padreId, String elementoRef, UUID instanciaElementoId) {
+
+  /** Comentario o respuesta sin ancla. */
+  public CrearComentarioRequest(String contenido, UUID padreId) {
+<span class="fc" id="L16">    this(contenido, padreId, null, null);</span>
+<span class="fc" id="L17">  }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

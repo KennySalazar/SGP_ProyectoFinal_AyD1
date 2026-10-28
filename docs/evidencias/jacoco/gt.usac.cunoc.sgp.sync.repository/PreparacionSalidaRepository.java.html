@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PreparacionSalidaRepository.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">sgp-api</a> &gt; <a href="index.source.html" class="el_package">gt.usac.cunoc.sgp.sync.repository</a> &gt; <span class="el_source">PreparacionSalidaRepository.java</span></div><h1>PreparacionSalidaRepository.java</h1><pre class="source lang-java linenums">package gt.usac.cunoc.sgp.sync.repository;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import gt.usac.cunoc.sgp.sync.dto.UltimaPreparacionResponse;
+import java.time.Instant;
+import java.util.Optional;
+import java.util.UUID;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.stereotype.Repository;
+
+@Repository
+public class PreparacionSalidaRepository {
+  private final JdbcTemplate jdbc;
+  private final ObjectMapper json;
+
+<span class="fc" id="L17">  public PreparacionSalidaRepository(JdbcTemplate jdbc, ObjectMapper json) {</span>
+<span class="fc" id="L18">    this.jdbc = jdbc;</span>
+<span class="fc" id="L19">    this.json = json;</span>
+<span class="fc" id="L20">  }</span>
+
+  public void registrar(
+      UUID id, UUID usuario, String dispositivo, UUID version, JsonNode contexto, Instant ahora) {
+<span class="fc" id="L24">    jdbc.update(</span>
+        &quot;&quot;&quot;
+                INSERT INTO preparacion_salida
+                  (id, usuario_id, dispositivo_id, version_formulario_id, contexto_autorizado,
+                   preparado_en, creado_en)
+                VALUES (?, ?, ?, ?, CAST(? AS jsonb), ?, ?)
+                &quot;&quot;&quot;,
+        id,
+        usuario,
+        dispositivo,
+        version,
+<span class="fc" id="L35">        contexto.toString(),</span>
+<span class="fc" id="L36">        java.sql.Timestamp.from(ahora),</span>
+<span class="fc" id="L37">        java.sql.Timestamp.from(ahora));</span>
+<span class="fc" id="L38">  }</span>
+
+  public Optional&lt;UltimaPreparacionResponse&gt; ultima(UUID usuario, String dispositivo) {
+<span class="fc" id="L41">    return jdbc</span>
+<span class="fc" id="L42">        .query(</span>
+            &quot;&quot;&quot;
+                    SELECT id, dispositivo_id, version_formulario_id, preparado_en, contexto_autorizado
+                    FROM preparacion_salida WHERE usuario_id = ? AND dispositivo_id = ?
+                    ORDER BY preparado_en DESC, id DESC LIMIT 1
+                    &quot;&quot;&quot;,
+            (rs, fila) -&gt; {
+              try {
+<span class="fc" id="L50">                return new UltimaPreparacionResponse(</span>
+<span class="fc" id="L51">                    rs.getObject(&quot;id&quot;, UUID.class),</span>
+<span class="fc" id="L52">                    rs.getString(&quot;dispositivo_id&quot;),</span>
+<span class="fc" id="L53">                    rs.getObject(&quot;version_formulario_id&quot;, UUID.class),</span>
+<span class="fc" id="L54">                    rs.getTimestamp(&quot;preparado_en&quot;).toInstant(),</span>
+<span class="fc" id="L55">                    json.readTree(rs.getString(&quot;contexto_autorizado&quot;)));</span>
+<span class="nc" id="L56">              } catch (java.io.IOException e) {</span>
+<span class="nc" id="L57">                throw new IllegalStateException(&quot;No se pudo leer la preparacion&quot;, e);</span>
+              }
+            },
+            usuario,
+            dispositivo)
+<span class="fc" id="L62">        .stream()</span>
+<span class="fc" id="L63">        .findFirst();</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

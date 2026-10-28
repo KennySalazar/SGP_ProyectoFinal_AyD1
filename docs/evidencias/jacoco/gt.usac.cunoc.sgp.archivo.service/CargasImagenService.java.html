@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CargasImagenService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">sgp-api</a> &gt; <a href="index.source.html" class="el_package">gt.usac.cunoc.sgp.archivo.service</a> &gt; <span class="el_source">CargasImagenService.java</span></div><h1>CargasImagenService.java</h1><pre class="source lang-java linenums">package gt.usac.cunoc.sgp.archivo.service;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import gt.usac.cunoc.sgp.archivo.model.*;
+import gt.usac.cunoc.sgp.sync.model.SolicitudOperacion;
+import gt.usac.cunoc.sgp.sync.service.OperacionIdempotenteService;
+import java.io.IOException;
+import org.springframework.stereotype.Service;
+
+@Service
+public class CargasImagenService {
+  private final OperacionIdempotenteService operaciones;
+  private final ObjetosImagenService objetos;
+  private final ObjectMapper json;
+
+  public CargasImagenService(
+<span class="fc" id="L17">      OperacionIdempotenteService operaciones, ObjetosImagenService objetos, ObjectMapper json) {</span>
+<span class="fc" id="L18">    this.operaciones = operaciones;</span>
+<span class="fc" id="L19">    this.objetos = objetos;</span>
+<span class="fc" id="L20">    this.json = json;</span>
+<span class="fc" id="L21">  }</span>
+
+  /**
+   * La huella incluye destino, metadatos y checksum. Autorizar antes de preparar. Después, el
+   * dominio confirma Archivo/asociación y operaciones.completar en la misma transacción.
+   */
+  public CargaImagenPreparada preparar(SolicitudOperacion solicitud, ImagenProcesada imagen)
+      throws IOException {
+<span class="fc" id="L29">    var claves = objetos.nuevasClaves();</span>
+<span class="fc" id="L30">    var recursos =</span>
+<span class="fc" id="L31">        json.createObjectNode()</span>
+<span class="fc" id="L32">            .put(&quot;tipo&quot;, &quot;imagen&quot;)</span>
+<span class="fc" id="L33">            .put(&quot;original&quot;, claves.original())</span>
+<span class="fc" id="L34">            .put(&quot;miniatura&quot;, claves.miniatura());</span>
+<span class="fc" id="L35">    var reserva = operaciones.reservar(solicitud, recursos);</span>
+<span class="fc bfc" id="L36" title="All 2 branches covered.">    if (reserva.completada()) return new CargaImagenPreparada(reserva, null);</span>
+    try {
+<span class="fc" id="L38">      objetos.guardar(claves, imagen);</span>
+<span class="fc" id="L39">    } catch (IOException | RuntimeException e) {</span>
+      try {
+<span class="fc" id="L41">        operaciones.compensar(</span>
+            reserva,
+            () -&gt; {
+              try {
+<span class="fc" id="L45">                objetos.eliminar(claves);</span>
+<span class="nc" id="L46">              } catch (IOException fallo) {</span>
+<span class="nc" id="L47">                throw new java.io.UncheckedIOException(fallo);</span>
+<span class="fc" id="L48">              }</span>
+<span class="fc" id="L49">            });</span>
+<span class="nc" id="L50">      } catch (RuntimeException limpieza) {</span>
+<span class="nc" id="L51">        e.addSuppressed(limpieza);</span>
+<span class="fc" id="L52">      }</span>
+<span class="fc" id="L53">      throw e;</span>
+<span class="fc" id="L54">    }</span>
+<span class="fc" id="L55">    return new CargaImagenPreparada(reserva, claves);</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

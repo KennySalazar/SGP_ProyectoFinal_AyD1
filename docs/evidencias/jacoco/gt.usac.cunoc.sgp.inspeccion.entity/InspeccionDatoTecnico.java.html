@@ -1,0 +1,418 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>InspeccionDatoTecnico.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">sgp-api</a> &gt; <a href="index.source.html" class="el_package">gt.usac.cunoc.sgp.inspeccion.entity</a> &gt; <span class="el_source">InspeccionDatoTecnico.java</span></div><h1>InspeccionDatoTecnico.java</h1><pre class="source lang-java linenums">package gt.usac.cunoc.sgp.inspeccion.entity;
+
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.MapsId;
+import jakarta.persistence.OneToOne;
+import jakarta.persistence.Table;
+import jakarta.persistence.Version;
+import java.math.BigDecimal;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.util.UUID;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
+
+@Entity
+@Table(name = &quot;inspeccion_dato_tecnico&quot;)
+public class InspeccionDatoTecnico {
+
+  @Id
+  @Column(name = &quot;inspeccion_id&quot;)
+  private UUID inspeccionId;
+
+  @MapsId
+  @OneToOne(fetch = FetchType.LAZY, optional = false)
+  @JoinColumn(name = &quot;inspeccion_id&quot;)
+  private Inspeccion inspeccion;
+
+  @Column(name = &quot;longitud_m&quot;, precision = 10, scale = 2)
+  private BigDecimal longitudM;
+
+  @Column(name = &quot;numero_tramos&quot;)
+  private Integer numeroTramos;
+
+  @Column(name = &quot;ancho_rodadura_m&quot;, precision = 10, scale = 2)
+  private BigDecimal anchoRodaduraM;
+
+  @Column(name = &quot;ancho_acera_derecha_m&quot;, precision = 10, scale = 2)
+  private BigDecimal anchoAceraDerechaM;
+
+  @Column(name = &quot;ancho_acera_izquierda_m&quot;, precision = 10, scale = 2)
+  private BigDecimal anchoAceraIzquierdaM;
+
+  @Column(name = &quot;altura_libre_superior_m&quot;, precision = 10, scale = 2)
+  private BigDecimal alturaLibreSuperiorM;
+
+  @Column(name = &quot;altura_libre_sobre_cauce_m&quot;, precision = 10, scale = 2)
+  private BigDecimal alturaLibreSobreCauceM;
+
+  @Column(name = &quot;tipologia_puente&quot;, length = 100)
+  private String tipologiaPuente;
+
+  @Column(name = &quot;tipo_cruce&quot;, length = 100)
+  private String tipoCruce;
+
+  @Column(name = &quot;numero_vias_por_sentido&quot;)
+  private Integer numeroViasPorSentido;
+
+  @Column(name = &quot;material_superestructura&quot;, length = 100)
+  private String materialSuperestructura;
+
+  @Column(name = &quot;material_subestructura&quot;, length = 100)
+  private String materialSubestructura;
+
+  @Column(name = &quot;carga_diseno&quot;, length = 100)
+  private String cargaDiseno;
+
+  @JdbcTypeCode(SqlTypes.SMALLINT)
+  @Column(name = &quot;anio_construccion&quot;)
+  private Short anioConstruccion;
+
+  @Column(name = &quot;trafico_vehiculos_dia&quot;)
+  private Integer traficoVehiculosDia;
+
+  @Column(name = &quot;porcentaje_camiones_buses&quot;, precision = 5, scale = 2)
+  private BigDecimal porcentajeCamionesBuses;
+
+  @Column(name = &quot;ruta_pavimentada&quot;, length = 10)
+  private String rutaPavimentada;
+
+  @Column(name = &quot;alineamiento_horizontal&quot;, length = 15)
+  private String alineamientoHorizontal;
+
+  @Column(name = &quot;esviaje&quot;)
+  private Boolean esviaje;
+
+  @Column(name = &quot;poblacion_antes&quot;, length = 200)
+  private String poblacionAntes;
+
+  @Column(name = &quot;poblacion_despues&quot;, length = 200)
+  private String poblacionDespues;
+
+  @Column(name = &quot;tipo_cuerpo_agua&quot;, length = 50)
+  private String tipoCuerpoAgua;
+
+  @Column(name = &quot;nombre_rio&quot;, length = 200)
+  private String nombreRio;
+
+  @Column(name = &quot;encauzamiento&quot;, length = 20)
+  private String encauzamiento;
+
+  @Column(name = &quot;antecedente_desbordamiento&quot;)
+  private Boolean antecedenteDesbordamiento;
+
+  @Column(name = &quot;frecuencia_desbordamiento_anios&quot;, precision = 8, scale = 2)
+  private BigDecimal frecuenciaDesbordamientoAnios;
+
+  @Column(name = &quot;fecha_ultimo_desbordamiento&quot;)
+  private LocalDate fechaUltimoDesbordamiento;
+
+  @Column(name = &quot;alumbrado_existe&quot;)
+  private Boolean alumbradoExiste;
+
+  @Column(name = &quot;drenajes_aledanos_existen&quot;)
+  private Boolean drenajesAledanosExisten;
+
+  @Column(name = &quot;creado_en&quot;, nullable = false, updatable = false)
+  private Instant creadoEn;
+
+  @Column(name = &quot;actualizado_en&quot;, nullable = false)
+  private Instant actualizadoEn;
+
+  @Version
+  @Column(nullable = false)
+  private long version;
+
+<span class="fc" id="L130">  public InspeccionDatoTecnico() {}</span>
+
+<span class="fc" id="L132">  public InspeccionDatoTecnico(Inspeccion inspeccion, Instant ahora) {</span>
+<span class="fc" id="L133">    this.inspeccion = inspeccion;</span>
+<span class="fc" id="L134">    this.creadoEn = ahora;</span>
+<span class="fc" id="L135">    this.actualizadoEn = ahora;</span>
+<span class="fc" id="L136">  }</span>
+
+  public UUID getInspeccionId() {
+<span class="nc" id="L139">    return inspeccionId;</span>
+  }
+
+  public Inspeccion getInspeccion() {
+<span class="nc" id="L143">    return inspeccion;</span>
+  }
+
+  public BigDecimal getLongitudM() {
+<span class="fc" id="L147">    return longitudM;</span>
+  }
+
+  public void setLongitudM(BigDecimal longitudM) {
+<span class="fc" id="L151">    this.longitudM = longitudM;</span>
+<span class="fc" id="L152">  }</span>
+
+  public Integer getNumeroTramos() {
+<span class="fc" id="L155">    return numeroTramos;</span>
+  }
+
+  public void setNumeroTramos(Integer numeroTramos) {
+<span class="fc" id="L159">    this.numeroTramos = numeroTramos;</span>
+<span class="fc" id="L160">  }</span>
+
+  public BigDecimal getAnchoRodaduraM() {
+<span class="fc" id="L163">    return anchoRodaduraM;</span>
+  }
+
+  public void setAnchoRodaduraM(BigDecimal anchoRodaduraM) {
+<span class="nc" id="L167">    this.anchoRodaduraM = anchoRodaduraM;</span>
+<span class="nc" id="L168">  }</span>
+
+  public BigDecimal getAnchoAceraDerechaM() {
+<span class="fc" id="L171">    return anchoAceraDerechaM;</span>
+  }
+
+  public void setAnchoAceraDerechaM(BigDecimal anchoAceraDerechaM) {
+<span class="nc" id="L175">    this.anchoAceraDerechaM = anchoAceraDerechaM;</span>
+<span class="nc" id="L176">  }</span>
+
+  public BigDecimal getAnchoAceraIzquierdaM() {
+<span class="fc" id="L179">    return anchoAceraIzquierdaM;</span>
+  }
+
+  public void setAnchoAceraIzquierdaM(BigDecimal anchoAceraIzquierdaM) {
+<span class="nc" id="L183">    this.anchoAceraIzquierdaM = anchoAceraIzquierdaM;</span>
+<span class="nc" id="L184">  }</span>
+
+  public BigDecimal getAlturaLibreSuperiorM() {
+<span class="fc" id="L187">    return alturaLibreSuperiorM;</span>
+  }
+
+  public void setAlturaLibreSuperiorM(BigDecimal alturaLibreSuperiorM) {
+<span class="nc" id="L191">    this.alturaLibreSuperiorM = alturaLibreSuperiorM;</span>
+<span class="nc" id="L192">  }</span>
+
+  public BigDecimal getAlturaLibreSobreCauceM() {
+<span class="fc" id="L195">    return alturaLibreSobreCauceM;</span>
+  }
+
+  public void setAlturaLibreSobreCauceM(BigDecimal alturaLibreSobreCauceM) {
+<span class="nc" id="L199">    this.alturaLibreSobreCauceM = alturaLibreSobreCauceM;</span>
+<span class="nc" id="L200">  }</span>
+
+  public String getTipologiaPuente() {
+<span class="fc" id="L203">    return tipologiaPuente;</span>
+  }
+
+  public void setTipologiaPuente(String tipologiaPuente) {
+<span class="fc" id="L207">    this.tipologiaPuente = tipologiaPuente;</span>
+<span class="fc" id="L208">  }</span>
+
+  public String getTipoCruce() {
+<span class="fc" id="L211">    return tipoCruce;</span>
+  }
+
+  public void setTipoCruce(String tipoCruce) {
+<span class="nc" id="L215">    this.tipoCruce = tipoCruce;</span>
+<span class="nc" id="L216">  }</span>
+
+  public Integer getNumeroViasPorSentido() {
+<span class="fc" id="L219">    return numeroViasPorSentido;</span>
+  }
+
+  public void setNumeroViasPorSentido(Integer numeroViasPorSentido) {
+<span class="nc" id="L223">    this.numeroViasPorSentido = numeroViasPorSentido;</span>
+<span class="nc" id="L224">  }</span>
+
+  public String getMaterialSuperestructura() {
+<span class="fc" id="L227">    return materialSuperestructura;</span>
+  }
+
+  public void setMaterialSuperestructura(String materialSuperestructura) {
+<span class="fc" id="L231">    this.materialSuperestructura = materialSuperestructura;</span>
+<span class="fc" id="L232">  }</span>
+
+  public String getMaterialSubestructura() {
+<span class="fc" id="L235">    return materialSubestructura;</span>
+  }
+
+  public void setMaterialSubestructura(String materialSubestructura) {
+<span class="nc" id="L239">    this.materialSubestructura = materialSubestructura;</span>
+<span class="nc" id="L240">  }</span>
+
+  public String getCargaDiseno() {
+<span class="fc" id="L243">    return cargaDiseno;</span>
+  }
+
+  public void setCargaDiseno(String cargaDiseno) {
+<span class="nc" id="L247">    this.cargaDiseno = cargaDiseno;</span>
+<span class="nc" id="L248">  }</span>
+
+  public Short getAnioConstruccion() {
+<span class="fc" id="L251">    return anioConstruccion;</span>
+  }
+
+  public void setAnioConstruccion(Short anioConstruccion) {
+<span class="fc" id="L255">    this.anioConstruccion = anioConstruccion;</span>
+<span class="fc" id="L256">  }</span>
+
+  public Integer getTraficoVehiculosDia() {
+<span class="nc" id="L259">    return traficoVehiculosDia;</span>
+  }
+
+  public void setTraficoVehiculosDia(Integer traficoVehiculosDia) {
+<span class="nc" id="L263">    this.traficoVehiculosDia = traficoVehiculosDia;</span>
+<span class="nc" id="L264">  }</span>
+
+  public BigDecimal getPorcentajeCamionesBuses() {
+<span class="nc" id="L267">    return porcentajeCamionesBuses;</span>
+  }
+
+  public void setPorcentajeCamionesBuses(BigDecimal porcentajeCamionesBuses) {
+<span class="nc" id="L271">    this.porcentajeCamionesBuses = porcentajeCamionesBuses;</span>
+<span class="nc" id="L272">  }</span>
+
+  public String getRutaPavimentada() {
+<span class="fc" id="L275">    return rutaPavimentada;</span>
+  }
+
+  public void setRutaPavimentada(String rutaPavimentada) {
+<span class="nc" id="L279">    this.rutaPavimentada = rutaPavimentada;</span>
+<span class="nc" id="L280">  }</span>
+
+  public String getAlineamientoHorizontal() {
+<span class="fc" id="L283">    return alineamientoHorizontal;</span>
+  }
+
+  public void setAlineamientoHorizontal(String alineamientoHorizontal) {
+<span class="nc" id="L287">    this.alineamientoHorizontal = alineamientoHorizontal;</span>
+<span class="nc" id="L288">  }</span>
+
+  public Boolean getEsviaje() {
+<span class="fc" id="L291">    return esviaje;</span>
+  }
+
+  public void setEsviaje(Boolean esviaje) {
+<span class="nc" id="L295">    this.esviaje = esviaje;</span>
+<span class="nc" id="L296">  }</span>
+
+  public String getPoblacionAntes() {
+<span class="nc" id="L299">    return poblacionAntes;</span>
+  }
+
+  public void setPoblacionAntes(String poblacionAntes) {
+<span class="nc" id="L303">    this.poblacionAntes = poblacionAntes;</span>
+<span class="nc" id="L304">  }</span>
+
+  public String getPoblacionDespues() {
+<span class="nc" id="L307">    return poblacionDespues;</span>
+  }
+
+  public void setPoblacionDespues(String poblacionDespues) {
+<span class="nc" id="L311">    this.poblacionDespues = poblacionDespues;</span>
+<span class="nc" id="L312">  }</span>
+
+  public String getTipoCuerpoAgua() {
+<span class="fc" id="L315">    return tipoCuerpoAgua;</span>
+  }
+
+  public void setTipoCuerpoAgua(String tipoCuerpoAgua) {
+<span class="nc" id="L319">    this.tipoCuerpoAgua = tipoCuerpoAgua;</span>
+<span class="nc" id="L320">  }</span>
+
+  public String getNombreRio() {
+<span class="fc" id="L323">    return nombreRio;</span>
+  }
+
+  public void setNombreRio(String nombreRio) {
+<span class="nc" id="L327">    this.nombreRio = nombreRio;</span>
+<span class="nc" id="L328">  }</span>
+
+  public String getEncauzamiento() {
+<span class="fc" id="L331">    return encauzamiento;</span>
+  }
+
+  public void setEncauzamiento(String encauzamiento) {
+<span class="nc" id="L335">    this.encauzamiento = encauzamiento;</span>
+<span class="nc" id="L336">  }</span>
+
+  public Boolean getAntecedenteDesbordamiento() {
+<span class="nc" id="L339">    return antecedenteDesbordamiento;</span>
+  }
+
+  public void setAntecedenteDesbordamiento(Boolean antecedenteDesbordamiento) {
+<span class="nc" id="L343">    this.antecedenteDesbordamiento = antecedenteDesbordamiento;</span>
+<span class="nc" id="L344">  }</span>
+
+  public BigDecimal getFrecuenciaDesbordamientoAnios() {
+<span class="nc" id="L347">    return frecuenciaDesbordamientoAnios;</span>
+  }
+
+  public void setFrecuenciaDesbordamientoAnios(BigDecimal frecuenciaDesbordamientoAnios) {
+<span class="nc" id="L351">    this.frecuenciaDesbordamientoAnios = frecuenciaDesbordamientoAnios;</span>
+<span class="nc" id="L352">  }</span>
+
+  public LocalDate getFechaUltimoDesbordamiento() {
+<span class="nc" id="L355">    return fechaUltimoDesbordamiento;</span>
+  }
+
+  public void setFechaUltimoDesbordamiento(LocalDate fechaUltimoDesbordamiento) {
+<span class="nc" id="L359">    this.fechaUltimoDesbordamiento = fechaUltimoDesbordamiento;</span>
+<span class="nc" id="L360">  }</span>
+
+  public Boolean getAlumbradoExiste() {
+<span class="fc" id="L363">    return alumbradoExiste;</span>
+  }
+
+  public void setAlumbradoExiste(Boolean alumbradoExiste) {
+<span class="nc" id="L367">    this.alumbradoExiste = alumbradoExiste;</span>
+<span class="nc" id="L368">  }</span>
+
+  public Boolean getDrenajesAledanosExisten() {
+<span class="fc" id="L371">    return drenajesAledanosExisten;</span>
+  }
+
+  public void setDrenajesAledanosExisten(Boolean drenajesAledanosExisten) {
+<span class="nc" id="L375">    this.drenajesAledanosExisten = drenajesAledanosExisten;</span>
+<span class="nc" id="L376">  }</span>
+
+  public Instant getCreadoEn() {
+<span class="nc" id="L379">    return creadoEn;</span>
+  }
+
+  public Instant getActualizadoEn() {
+<span class="nc" id="L383">    return actualizadoEn;</span>
+  }
+
+  public long getVersion() {
+<span class="nc" id="L387">    return version;</span>
+  }
+
+  public void copiarDatosPermanentesDe(InspeccionDatoTecnico fuente) {
+<span class="pc bpc" id="L391" title="1 of 2 branches missed.">    if (fuente == null) return;</span>
+<span class="fc" id="L392">    this.longitudM = fuente.longitudM;</span>
+<span class="fc" id="L393">    this.numeroTramos = fuente.numeroTramos;</span>
+<span class="fc" id="L394">    this.anchoRodaduraM = fuente.anchoRodaduraM;</span>
+<span class="fc" id="L395">    this.anchoAceraDerechaM = fuente.anchoAceraDerechaM;</span>
+<span class="fc" id="L396">    this.anchoAceraIzquierdaM = fuente.anchoAceraIzquierdaM;</span>
+<span class="fc" id="L397">    this.alturaLibreSuperiorM = fuente.alturaLibreSuperiorM;</span>
+<span class="fc" id="L398">    this.alturaLibreSobreCauceM = fuente.alturaLibreSobreCauceM;</span>
+<span class="fc" id="L399">    this.tipologiaPuente = fuente.tipologiaPuente;</span>
+<span class="fc" id="L400">    this.tipoCruce = fuente.tipoCruce;</span>
+<span class="fc" id="L401">    this.numeroViasPorSentido = fuente.numeroViasPorSentido;</span>
+<span class="fc" id="L402">    this.materialSuperestructura = fuente.materialSuperestructura;</span>
+<span class="fc" id="L403">    this.materialSubestructura = fuente.materialSubestructura;</span>
+<span class="fc" id="L404">    this.cargaDiseno = fuente.cargaDiseno;</span>
+<span class="fc" id="L405">    this.anioConstruccion = fuente.anioConstruccion;</span>
+<span class="fc" id="L406">    this.rutaPavimentada = fuente.rutaPavimentada;</span>
+<span class="fc" id="L407">    this.alineamientoHorizontal = fuente.alineamientoHorizontal;</span>
+<span class="fc" id="L408">    this.esviaje = fuente.esviaje;</span>
+<span class="fc" id="L409">    this.poblacionAntes = fuente.poblacionAntes;</span>
+<span class="fc" id="L410">    this.poblacionDespues = fuente.poblacionDespues;</span>
+<span class="fc" id="L411">    this.tipoCuerpoAgua = fuente.tipoCuerpoAgua;</span>
+<span class="fc" id="L412">    this.nombreRio = fuente.nombreRio;</span>
+<span class="fc" id="L413">    this.encauzamiento = fuente.encauzamiento;</span>
+<span class="fc" id="L414">    this.alumbradoExiste = fuente.alumbradoExiste;</span>
+<span class="fc" id="L415">    this.drenajesAledanosExisten = fuente.drenajesAledanosExisten;</span>
+<span class="fc" id="L416">  }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

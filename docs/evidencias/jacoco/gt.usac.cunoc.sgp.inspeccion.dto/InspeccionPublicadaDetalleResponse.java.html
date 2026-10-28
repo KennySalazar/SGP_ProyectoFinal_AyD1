@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>InspeccionPublicadaDetalleResponse.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">sgp-api</a> &gt; <a href="index.source.html" class="el_package">gt.usac.cunoc.sgp.inspeccion.dto</a> &gt; <span class="el_source">InspeccionPublicadaDetalleResponse.java</span></div><h1>InspeccionPublicadaDetalleResponse.java</h1><pre class="source lang-java linenums">package gt.usac.cunoc.sgp.inspeccion.dto;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.util.List;
+import java.util.UUID;
+
+<span class="fc" id="L9">public record InspeccionPublicadaDetalleResponse(</span>
+    UUID id,
+    UUID puenteId,
+    String puenteNombre,
+    UUID versionFormularioId,
+    String versionFormularioCodigo,
+    JsonNode esquemaFormulario,
+    UUID autorId,
+    String nombreAutor,
+    String rolAutor,
+    List&lt;AcompananteResponse&gt; acompanantes,
+    String estado,
+    LocalDate fechaInspeccion,
+    String dispositivoId,
+    JsonNode identificacionCapturada,
+    JsonNode datos,
+    DatosPermanentesResponse datosPermanentes,
+    Instant creadoEn,
+    Instant enviadoEn,
+    Instant publicadoEn,
+    ResultadoIcPublicadoResponse ic,
+    UUID supersedeAId,
+    String motivoCorreccion,
+    UUID superadaPorId,
+    String vigencia,
+    RelacionVersionActivaResponse relacionVersionActiva) {
+  @com.fasterxml.jackson.annotation.JsonProperty(
+      value = &quot;resultadosIcEndpoint&quot;,
+      access = com.fasterxml.jackson.annotation.JsonProperty.Access.READ_ONLY)
+  public String resultadosIcEndpoint() {
+<span class="fc" id="L39">    return &quot;/api/v1/inspecciones/&quot; + id + &quot;/resultados-ic&quot;;</span>
+  }
+
+  @com.fasterxml.jackson.annotation.JsonProperty(
+      value = &quot;calibracionEndpoint&quot;,
+      access = com.fasterxml.jackson.annotation.JsonProperty.Access.READ_ONLY)
+  public String calibracionEndpoint() {
+<span class="fc" id="L46">    return &quot;/api/v1/formularios/&quot; + versionFormularioId + &quot;/estado-calibracion&quot;;</span>
+  }
+
+  public InspeccionPublicadaDetalleResponse(
+      UUID id,
+      UUID puenteId,
+      String puenteNombre,
+      UUID versionFormularioId,
+      String versionFormularioCodigo,
+      JsonNode esquemaFormulario,
+      UUID autorId,
+      String nombreAutor,
+      String rolAutor,
+      List&lt;AcompananteResponse&gt; acompanantes,
+      String estado,
+      LocalDate fechaInspeccion,
+      String dispositivoId,
+      JsonNode identificacionCapturada,
+      JsonNode datos,
+      DatosPermanentesResponse datosPermanentes,
+      Instant creadoEn,
+      Instant enviadoEn,
+      Instant publicadoEn,
+      ResultadoIcPublicadoResponse ic,
+      UUID supersedeAId,
+      String motivoCorreccion,
+      UUID superadaPorId,
+      String vigencia) {
+<span class="nc" id="L74">    this(</span>
+        id,
+        puenteId,
+        puenteNombre,
+        versionFormularioId,
+        versionFormularioCodigo,
+        esquemaFormulario,
+        autorId,
+        nombreAutor,
+        rolAutor,
+        acompanantes,
+        estado,
+        fechaInspeccion,
+        dispositivoId,
+        identificacionCapturada,
+        datos,
+        datosPermanentes,
+        creadoEn,
+        enviadoEn,
+        publicadoEn,
+        ic,
+        supersedeAId,
+        motivoCorreccion,
+        superadaPorId,
+        vigencia,
+        null);
+<span class="nc" id="L100">  }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

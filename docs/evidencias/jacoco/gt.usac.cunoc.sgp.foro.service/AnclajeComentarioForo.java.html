@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AnclajeComentarioForo.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">sgp-api</a> &gt; <a href="index.source.html" class="el_package">gt.usac.cunoc.sgp.foro.service</a> &gt; <span class="el_source">AnclajeComentarioForo.java</span></div><h1>AnclajeComentarioForo.java</h1><pre class="source lang-java linenums">package gt.usac.cunoc.sgp.foro.service;
+
+import gt.usac.cunoc.sgp.formulario.validation.AnclajeInvalidoException;
+import gt.usac.cunoc.sgp.formulario.validation.ValidadorAnclajeFormulario;
+import gt.usac.cunoc.sgp.inspeccion.entity.Inspeccion;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+import org.springframework.stereotype.Component;
+
+/**
+ * Comprueba que el campo o elemento al que se ancla un comentario existe en el esquema de la
+ * versión del formulario con que se levantó la inspección y, si es repetible, que la instancia está
+ * en sus datos (RN-FOR-02). Usa el mismo validador que las observaciones de revisión.
+ */
+@Component
+public class AnclajeComentarioForo {
+
+  private final ValidadorAnclajeFormulario validador;
+
+<span class="fc" id="L21">  public AnclajeComentarioForo(ValidadorAnclajeFormulario validador) {</span>
+<span class="fc" id="L22">    this.validador = validador;</span>
+<span class="fc" id="L23">  }</span>
+
+  /** Agrega a {@code errores} el motivo por el que el ancla no es válida, si no lo es. */
+  public void validar(
+      Inspeccion inspeccion,
+      String elementoRef,
+      UUID instancia,
+      List&lt;Map&lt;String, String&gt;&gt; errores) {
+    try {
+<span class="fc" id="L32">      validador.validar(</span>
+<span class="fc" id="L33">          inspeccion.getVersionFormulario().getEsquema(),</span>
+<span class="fc" id="L34">          inspeccion.getDatos(),</span>
+          elementoRef,
+          instancia);
+<span class="fc" id="L37">    } catch (AnclajeInvalidoException e) {</span>
+<span class="fc" id="L38">      errores.add(</span>
+<span class="pc bpc" id="L39" title="3 of 8 branches missed.">          switch (e.getMotivo()) {</span>
+            case INSTANCIA_REQUERIDA -&gt;
+<span class="fc" id="L41">                ContenidoForo.error(</span>
+                    &quot;instanciaElementoId&quot;, &quot;El elemento es repetible: indica cuál instancia.&quot;);
+            case INSTANCIA_NO_ENCONTRADA -&gt;
+<span class="fc" id="L44">                ContenidoForo.error(</span>
+                    &quot;instanciaElementoId&quot;, &quot;La instancia no existe en esta inspección.&quot;);
+            case INSTANCIA_DUPLICADA -&gt;
+<span class="nc" id="L47">                ContenidoForo.error(</span>
+                    &quot;instanciaElementoId&quot;,
+                    &quot;La instancia aparece repetida en los datos de la inspección.&quot;);
+            case INSTANCIA_NO_PERMITIDA -&gt;
+<span class="fc" id="L51">                ContenidoForo.error(</span>
+                    &quot;instanciaElementoId&quot;, &quot;El elemento no es repetible: no lleva instancia.&quot;);
+            case DATOS_REPETIBLE_INVALIDOS -&gt;
+<span class="nc" id="L54">                ContenidoForo.error(</span>
+                    &quot;instanciaElementoId&quot;,
+                    &quot;Los datos de la inspección no permiten ubicar la instancia.&quot;);
+            case ELEMENTO_INEXISTENTE -&gt;
+<span class="fc" id="L58">                ContenidoForo.error(</span>
+                    &quot;elementoRef&quot;,
+                    &quot;El elemento no existe en el formulario con que se levantó la inspección.&quot;);
+            case REPETIBLE_ANIDADO_NO_SOPORTADO -&gt;
+<span class="nc" id="L62">                ContenidoForo.error(</span>
+                    &quot;elementoRef&quot;, &quot;No se admiten elementos repetibles dentro de otros.&quot;);
+            case RUTA_INVALIDA, REFERENCIA_ESQUEMA_INVALIDA, CATEGORIA_FOTOGRAFICA_INVALIDA -&gt;
+<span class="fc" id="L65">                ContenidoForo.error(</span>
+                    &quot;elementoRef&quot;, &quot;La referencia al elemento no tiene un formato válido.&quot;);
+          });
+<span class="fc" id="L68">    }</span>
+<span class="fc" id="L69">  }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

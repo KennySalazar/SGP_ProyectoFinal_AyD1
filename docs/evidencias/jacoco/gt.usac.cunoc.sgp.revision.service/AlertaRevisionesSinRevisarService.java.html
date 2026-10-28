@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AlertaRevisionesSinRevisarService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">sgp-api</a> &gt; <a href="index.source.html" class="el_package">gt.usac.cunoc.sgp.revision.service</a> &gt; <span class="el_source">AlertaRevisionesSinRevisarService.java</span></div><h1>AlertaRevisionesSinRevisarService.java</h1><pre class="source lang-java linenums">package gt.usac.cunoc.sgp.revision.service;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import gt.usac.cunoc.sgp.common.audit.service.AuditoriaWriter;
+import gt.usac.cunoc.sgp.common.config.ProcesosProgramados;
+import gt.usac.cunoc.sgp.notificacion.service.NotificacionService;
+import gt.usac.cunoc.sgp.revision.repository.RevisionRepository;
+import gt.usac.cunoc.sgp.usuario.repository.UserAccountRepository;
+import java.time.Clock;
+import java.time.Duration;
+import java.util.List;
+import java.util.UUID;
+import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.stereotype.Service;
+
+/**
+ * Avisa al Catedrático asignado cuando una inspección enviada lleva 15 días naturales sin revisarse
+ * (RN-REV-08, HU-069). Cada revisión se avisa una sola vez.
+ */
+@Service
+public class AlertaRevisionesSinRevisarService {
+
+  static final String TIPO = &quot;REVISION_SIN_REVISAR_15_DIAS&quot;;
+<span class="fc" id="L28">  static final Duration PLAZO = Duration.ofDays(15);</span>
+
+<span class="fc" id="L30">  private static final Logger LOG =</span>
+<span class="fc" id="L31">      LoggerFactory.getLogger(AlertaRevisionesSinRevisarService.class);</span>
+
+  private final RevisionRepository revisiones;
+  private final UserAccountRepository usuarios;
+  private final NotificacionService notificaciones;
+  private final AuditoriaWriter auditoria;
+  private final ObjectMapper json;
+  private final Clock clock;
+
+  public AlertaRevisionesSinRevisarService(
+      RevisionRepository revisiones,
+      UserAccountRepository usuarios,
+      NotificacionService notificaciones,
+      AuditoriaWriter auditoria,
+      ObjectMapper json,
+<span class="fc" id="L46">      Clock clock) {</span>
+<span class="fc" id="L47">    this.revisiones = revisiones;</span>
+<span class="fc" id="L48">    this.usuarios = usuarios;</span>
+<span class="fc" id="L49">    this.notificaciones = notificaciones;</span>
+<span class="fc" id="L50">    this.auditoria = auditoria;</span>
+<span class="fc" id="L51">    this.json = json;</span>
+<span class="fc" id="L52">    this.clock = clock;</span>
+<span class="fc" id="L53">  }</span>
+
+  @Scheduled(cron = ProcesosProgramados.CRON_DIARIO, zone = ProcesosProgramados.ZONA)
+  @SchedulerLock(
+      name = ProcesosProgramados.ALERTA_REVISIONES_SIN_REVISAR,
+      lockAtMostFor = ProcesosProgramados.BLOQUEO_MAXIMO,
+      lockAtLeastFor = ProcesosProgramados.BLOQUEO_MINIMO)
+  public void ejecutar() {
+<span class="fc" id="L61">    int destinatarios = 0;</span>
+<span class="fc" id="L62">    int fallos = 0;</span>
+<span class="fc" id="L63">    List&lt;Object[]&gt; pendientes = revisiones.findSinRevisarDesde(clock.instant().minus(PLAZO));</span>
+<span class="fc bfc" id="L64" title="All 2 branches covered.">    for (Object[] fila : pendientes) {</span>
+<span class="fc" id="L65">      UUID revisionId = (UUID) fila[0];</span>
+<span class="fc" id="L66">      UUID revisorId = (UUID) fila[2];</span>
+      try {
+<span class="fc bfc" id="L68" title="All 2 branches covered.">        if (usuarios.filtrarActivos(List.of(revisorId)).isEmpty()) {</span>
+<span class="fc" id="L69">          continue;</span>
+        }
+<span class="fc" id="L71">        notificaciones.notificar(</span>
+            revisorId,
+            TIPO,
+            &quot;Inspección sin revisar&quot;,
+            &quot;La inspección del puente &quot; + fila[3] + &quot; lleva más de 15 días enviada sin revisarse.&quot;,
+            &quot;revision&quot;,
+            revisionId,
+            &quot;revision-sin-revisar-15-dias:&quot; + revisionId);
+<span class="fc" id="L79">        destinatarios++;</span>
+<span class="nc" id="L80">      } catch (DataIntegrityViolationException e) {</span>
+        // Una ejecución simultánea ya registró el mismo aviso; la clave de evento lo impide.
+<span class="nc" id="L82">        LOG.debug(&quot;Aviso ya registrado para la revisión {}&quot;, revisionId);</span>
+<span class="nc" id="L83">      } catch (RuntimeException e) {</span>
+<span class="nc" id="L84">        fallos++;</span>
+<span class="nc" id="L85">        LOG.warn(&quot;No se pudo avisar la revisión sin revisar {}&quot;, revisionId, e);</span>
+<span class="pc" id="L86">      }</span>
+<span class="fc" id="L87">    }</span>
+<span class="fc" id="L88">    auditoria.registrarProceso(</span>
+        ProcesosProgramados.ALERTA_REVISIONES_SIN_REVISAR,
+<span class="fc" id="L90">        json.createObjectNode()</span>
+<span class="fc" id="L91">            .put(&quot;pendientes&quot;, pendientes.size())</span>
+<span class="fc" id="L92">            .put(&quot;destinatarios&quot;, destinatarios)</span>
+<span class="fc" id="L93">            .put(&quot;fallos&quot;, fallos));</span>
+<span class="fc" id="L94">  }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

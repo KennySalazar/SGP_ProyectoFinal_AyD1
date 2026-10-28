@@ -1,0 +1,241 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Archivo.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">sgp-api</a> &gt; <a href="index.source.html" class="el_package">gt.usac.cunoc.sgp.archivo.entity</a> &gt; <span class="el_source">Archivo.java</span></div><h1>Archivo.java</h1><pre class="source lang-java linenums">package gt.usac.cunoc.sgp.archivo.entity;
+
+import gt.usac.cunoc.sgp.archivo.model.*;
+import jakarta.persistence.*;
+import java.time.Instant;
+import java.util.UUID;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
+import org.locationtech.jts.geom.Point;
+
+@Entity
+@Table(name = &quot;archivo&quot;)
+public class Archivo implements org.springframework.data.domain.Persistable&lt;UUID&gt; {
+<span class="fc" id="L14">  @Transient private boolean nuevo = true;</span>
+
+  @PostLoad
+  @PostPersist
+  void persistido() {
+<span class="fc" id="L19">    nuevo = false;</span>
+<span class="fc" id="L20">  }</span>
+
+  public boolean isNew() {
+<span class="fc" id="L23">    return nuevo;</span>
+  }
+
+  @Id private UUID id;
+
+  @Enumerated(EnumType.STRING)
+  @Column(name = &quot;tipo_uso&quot;, nullable = false, length = 30)
+  private TipoUsoArchivo tipoUso;
+
+  @Enumerated(EnumType.STRING)
+  @Column(name = &quot;categoria_foto&quot;, length = 30)
+  private CategoriaFoto categoriaFoto;
+
+  @Column(name = &quot;nombre_original&quot;, length = 255)
+  private String nombreOriginal;
+
+  @Column(name = &quot;nombre_almacenado&quot;, nullable = false, length = 255)
+  private String nombreAlmacenado;
+
+  @Column(name = &quot;clave_objeto_original&quot;, nullable = false, length = 500)
+  private String claveObjetoOriginal;
+
+  @Column(name = &quot;clave_objeto_miniatura&quot;, length = 500)
+  private String claveObjetoMiniatura;
+
+  @Column(name = &quot;mime_real&quot;, nullable = false, length = 100)
+  private String mimeReal;
+
+  @Column(name = &quot;tamano_bytes&quot;, nullable = false)
+  private long tamanoBytes;
+
+  @Column(name = &quot;checksum_sha256&quot;, nullable = false, length = 64)
+  private String checksumSha256;
+
+  @Column(name = &quot;ancho_px&quot;)
+  private Integer anchoPx;
+
+  @Column(name = &quot;alto_px&quot;)
+  private Integer altoPx;
+
+  @JdbcTypeCode(SqlTypes.GEOGRAPHY)
+  @Column(name = &quot;ubicacion_captura&quot;, columnDefinition = &quot;geography(Point,4326)&quot;)
+  private Point ubicacionCaptura;
+
+  @Column(name = &quot;capturado_en&quot;)
+  private Instant capturadoEn;
+
+  @Column(name = &quot;subido_por_id&quot;, nullable = false)
+  private UUID subidoPorId;
+
+  @Column(name = &quot;confirmado_en&quot;, nullable = false)
+  private Instant confirmadoEn;
+
+  @Enumerated(EnumType.STRING)
+  @Column(nullable = false, length = 20)
+  private EstadoArchivo estado;
+
+  @Column(name = &quot;retirado_en&quot;)
+  private Instant retiradoEn;
+
+  @Column(name = &quot;purgado_en&quot;)
+  private Instant purgadoEn;
+
+  @Column(name = &quot;motivo_retiro&quot;)
+  private String motivoRetiro;
+
+  @Column(name = &quot;creado_en&quot;, nullable = false)
+  private Instant creadoEn;
+
+<span class="fc" id="L92">  protected Archivo() {}</span>
+
+  public Archivo(
+      UUID id,
+      TipoUsoArchivo tipoUso,
+      CategoriaFoto categoriaFoto,
+      String nombreOriginal,
+      String nombreAlmacenado,
+      String claveObjetoOriginal,
+      String claveObjetoMiniatura,
+      String mimeReal,
+      long tamanoBytes,
+      String checksumSha256,
+      Integer anchoPx,
+      Integer altoPx,
+      Point ubicacionCaptura,
+      Instant capturadoEn,
+      UUID subidoPorId,
+<span class="fc" id="L110">      Instant confirmadoEn) {</span>
+<span class="fc" id="L111">    this.id = id;</span>
+<span class="fc" id="L112">    this.tipoUso = tipoUso;</span>
+<span class="fc" id="L113">    this.categoriaFoto = categoriaFoto;</span>
+<span class="fc" id="L114">    this.nombreOriginal = nombreOriginal;</span>
+<span class="fc" id="L115">    this.nombreAlmacenado = nombreAlmacenado;</span>
+<span class="fc" id="L116">    this.claveObjetoOriginal = claveObjetoOriginal;</span>
+<span class="fc" id="L117">    this.claveObjetoMiniatura = claveObjetoMiniatura;</span>
+<span class="fc" id="L118">    this.mimeReal = mimeReal;</span>
+<span class="fc" id="L119">    this.tamanoBytes = tamanoBytes;</span>
+<span class="fc" id="L120">    this.checksumSha256 = checksumSha256;</span>
+<span class="fc" id="L121">    this.anchoPx = anchoPx;</span>
+<span class="fc" id="L122">    this.altoPx = altoPx;</span>
+<span class="fc" id="L123">    this.ubicacionCaptura = ubicacionCaptura;</span>
+<span class="fc" id="L124">    this.capturadoEn = capturadoEn;</span>
+<span class="fc" id="L125">    this.subidoPorId = subidoPorId;</span>
+<span class="fc" id="L126">    this.confirmadoEn = confirmadoEn;</span>
+<span class="fc" id="L127">    this.estado = EstadoArchivo.DISPONIBLE;</span>
+<span class="fc" id="L128">    this.creadoEn = confirmadoEn;</span>
+<span class="fc" id="L129">  }</span>
+
+  /**
+   * Marca el archivo como purgado tras eliminar sus objetos del almacenamiento (RN-ARC-06). El
+   * registro se conserva; solo deja de existir el contenido.
+   */
+  public void purgar(Instant ahora) {
+<span class="pc bpc" id="L136" title="1 of 2 branches missed.">    if (estado != EstadoArchivo.PURGADO) {</span>
+<span class="fc" id="L137">      estado = EstadoArchivo.PURGADO;</span>
+<span class="fc" id="L138">      purgadoEn = ahora;</span>
+    }
+<span class="fc" id="L140">  }</span>
+
+  public void retirar(Instant ahora) {
+<span class="fc bfc" id="L143" title="All 2 branches covered.">    if (estado == EstadoArchivo.DISPONIBLE) {</span>
+<span class="fc" id="L144">      estado = EstadoArchivo.RETIRADO;</span>
+<span class="fc" id="L145">      retiradoEn = ahora;</span>
+    }
+<span class="fc" id="L147">  }</span>
+
+  /** Retira el archivo documentando por qué deja de contar como evidencia (HU-048). */
+  public void retirar(Instant ahora, String motivo) {
+<span class="pc bpc" id="L151" title="1 of 2 branches missed.">    if (estado == EstadoArchivo.DISPONIBLE) {</span>
+<span class="fc" id="L152">      retirar(ahora);</span>
+<span class="fc" id="L153">      motivoRetiro = motivo;</span>
+    }
+<span class="fc" id="L155">  }</span>
+
+  public UUID getId() {
+<span class="fc" id="L158">    return id;</span>
+  }
+
+  public TipoUsoArchivo getTipoUso() {
+<span class="fc" id="L162">    return tipoUso;</span>
+  }
+
+  public CategoriaFoto getCategoriaFoto() {
+<span class="fc" id="L166">    return categoriaFoto;</span>
+  }
+
+  public String getNombreOriginal() {
+<span class="fc" id="L170">    return nombreOriginal;</span>
+  }
+
+  public String getNombreAlmacenado() {
+<span class="nc" id="L174">    return nombreAlmacenado;</span>
+  }
+
+  public String getClaveObjetoOriginal() {
+<span class="fc" id="L178">    return claveObjetoOriginal;</span>
+  }
+
+  public String getClaveObjetoMiniatura() {
+<span class="fc" id="L182">    return claveObjetoMiniatura;</span>
+  }
+
+  public String getMimeReal() {
+<span class="fc" id="L186">    return mimeReal;</span>
+  }
+
+  public long getTamanoBytes() {
+<span class="fc" id="L190">    return tamanoBytes;</span>
+  }
+
+  public String getChecksumSha256() {
+<span class="fc" id="L194">    return checksumSha256;</span>
+  }
+
+  public Integer getAnchoPx() {
+<span class="fc" id="L198">    return anchoPx;</span>
+  }
+
+  public Integer getAltoPx() {
+<span class="fc" id="L202">    return altoPx;</span>
+  }
+
+  public Point getUbicacionCaptura() {
+<span class="fc" id="L206">    return ubicacionCaptura;</span>
+  }
+
+  public Instant getCapturadoEn() {
+<span class="fc" id="L210">    return capturadoEn;</span>
+  }
+
+  public UUID getSubidoPorId() {
+<span class="fc" id="L214">    return subidoPorId;</span>
+  }
+
+  public Instant getConfirmadoEn() {
+<span class="fc" id="L218">    return confirmadoEn;</span>
+  }
+
+  public EstadoArchivo getEstado() {
+<span class="fc" id="L222">    return estado;</span>
+  }
+
+  public Instant getRetiradoEn() {
+<span class="fc" id="L226">    return retiradoEn;</span>
+  }
+
+  public Instant getPurgadoEn() {
+<span class="nc" id="L230">    return purgadoEn;</span>
+  }
+
+  public String getMotivoRetiro() {
+<span class="nc" id="L234">    return motivoRetiro;</span>
+  }
+
+  public Instant getCreadoEn() {
+<span class="nc" id="L238">    return creadoEn;</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

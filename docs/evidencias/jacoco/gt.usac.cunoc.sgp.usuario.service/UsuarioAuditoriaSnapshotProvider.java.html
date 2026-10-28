@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>UsuarioAuditoriaSnapshotProvider.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">sgp-api</a> &gt; <a href="index.source.html" class="el_package">gt.usac.cunoc.sgp.usuario.service</a> &gt; <span class="el_source">UsuarioAuditoriaSnapshotProvider.java</span></div><h1>UsuarioAuditoriaSnapshotProvider.java</h1><pre class="source lang-java linenums">package gt.usac.cunoc.sgp.usuario.service;
+
+import gt.usac.cunoc.sgp.common.audit.service.AuditoriaSnapshotProvider;
+import gt.usac.cunoc.sgp.common.util.EmailNormalizer;
+import gt.usac.cunoc.sgp.usuario.entity.UserAccount;
+import gt.usac.cunoc.sgp.usuario.repository.UserAccountRepository;
+import java.util.UUID;
+import org.springframework.stereotype.Component;
+
+/** Campos de usuario permitidos en auditoria aca nunca incluye credenciales ni tokens jsjs */
+@Component
+public class UsuarioAuditoriaSnapshotProvider implements AuditoriaSnapshotProvider {
+  private final UserAccountRepository usuarios;
+
+<span class="fc" id="L15">  public UsuarioAuditoriaSnapshotProvider(UserAccountRepository usuarios) {</span>
+<span class="fc" id="L16">    this.usuarios = usuarios;</span>
+<span class="fc" id="L17">  }</span>
+
+  @Override
+  public Class&lt;?&gt; tipo() {
+<span class="fc" id="L21">    return UserAccount.class;</span>
+  }
+
+  @Override
+  public Object cargar(UUID id) {
+<span class="fc" id="L26">    return usuarios.findById(id).map(this::proyectar).orElse(null);</span>
+  }
+
+  @Override
+  public Object cargarPorEmail(String email) {
+<span class="fc" id="L31">    return usuarios.findByEmail(EmailNormalizer.normalize(email)).map(this::proyectar).orElse(null);</span>
+  }
+
+  private UsuarioSnapshot proyectar(UserAccount usuario) {
+<span class="fc" id="L35">    return new UsuarioSnapshot(</span>
+<span class="fc" id="L36">        usuario.getId(),</span>
+<span class="fc" id="L37">        usuario.getEmail(),</span>
+<span class="fc" id="L38">        usuario.getNombreCompleto(),</span>
+<span class="fc" id="L39">        usuario.getNombreUsuario(),</span>
+<span class="fc" id="L40">        usuario.getRole().getName().name(),</span>
+<span class="fc" id="L41">        usuario.isVerified(),</span>
+<span class="fc" id="L42">        usuario.isActivated(),</span>
+<span class="fc" id="L43">        usuario.isActive(),</span>
+<span class="fc" id="L44">        usuario.isTwoFactorEnabled(),</span>
+<span class="fc" id="L45">        usuario.getTokenVersion(),</span>
+<span class="fc" id="L46">        usuario.getMotivoDesactivacion());</span>
+  }
+
+<span class="fc" id="L49">  public record UsuarioSnapshot(</span>
+      UUID id,
+      String email,
+      String nombreCompleto,
+      String nombreUsuario,
+      String rol,
+      boolean verificado,
+      boolean activado,
+      boolean activo,
+      boolean dosFactoresHabilitado,
+      int versionToken,
+      String motivoDesactivacion) {}
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

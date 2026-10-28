@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>UsuarioMapperImpl.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">sgp-api</a> &gt; <a href="index.source.html" class="el_package">gt.usac.cunoc.sgp.usuario.mapper</a> &gt; <span class="el_source">UsuarioMapperImpl.java</span></div><h1>UsuarioMapperImpl.java</h1><pre class="source lang-java linenums">package gt.usac.cunoc.sgp.usuario.mapper;
+
+import gt.usac.cunoc.sgp.usuario.dto.UsuarioResponse;
+import gt.usac.cunoc.sgp.usuario.entity.Role;
+import gt.usac.cunoc.sgp.usuario.entity.UserAccount;
+import gt.usac.cunoc.sgp.usuario.entity.UsuarioProfesional;
+import gt.usac.cunoc.sgp.usuario.model.EstadoUsuario;
+import gt.usac.cunoc.sgp.usuario.model.RoleName;
+import java.time.OffsetDateTime;
+import java.util.UUID;
+import javax.annotation.processing.Generated;
+import org.springframework.stereotype.Component;
+
+@Generated(
+    value = &quot;org.mapstruct.ap.MappingProcessor&quot;,
+    date = &quot;2026-10-27T23:39:18-0600&quot;,
+    comments = &quot;version: 1.6.3, compiler: javac, environment: Java 25.0.4.1 (Debian)&quot;
+)
+@Component
+<span class="fc" id="L20">public class UsuarioMapperImpl implements UsuarioMapper {</span>
+
+    @Override
+    public UsuarioResponse toResponse(UserAccount usuario, EstadoUsuario estado, UsuarioProfesional profesional) {
+<span class="pc bpc" id="L24" title="5 of 6 branches missed.">        if ( usuario == null &amp;&amp; estado == null &amp;&amp; profesional == null ) {</span>
+<span class="nc" id="L25">            return null;</span>
+        }
+
+<span class="fc" id="L28">        UUID id = null;</span>
+<span class="fc" id="L29">        String email = null;</span>
+<span class="fc" id="L30">        String nombreCompleto = null;</span>
+<span class="fc" id="L31">        String nombreUsuario = null;</span>
+<span class="fc" id="L32">        RoleName rol = null;</span>
+<span class="fc" id="L33">        boolean verificado = false;</span>
+<span class="fc" id="L34">        boolean activado = false;</span>
+<span class="fc" id="L35">        boolean activo = false;</span>
+<span class="fc" id="L36">        OffsetDateTime desactivadoEn = null;</span>
+<span class="fc" id="L37">        String motivoDesactivacion = null;</span>
+<span class="fc" id="L38">        OffsetDateTime creadoEn = null;</span>
+<span class="pc bpc" id="L39" title="1 of 2 branches missed.">        if ( usuario != null ) {</span>
+<span class="fc" id="L40">            id = usuario.getId();</span>
+<span class="fc" id="L41">            email = usuario.getEmail();</span>
+<span class="fc" id="L42">            nombreCompleto = usuario.getNombreCompleto();</span>
+<span class="fc" id="L43">            nombreUsuario = usuario.getNombreUsuario();</span>
+<span class="fc" id="L44">            rol = usuarioRoleName( usuario );</span>
+<span class="fc" id="L45">            verificado = usuario.isVerified();</span>
+<span class="fc" id="L46">            activado = usuario.isActivated();</span>
+<span class="fc" id="L47">            activo = usuario.isActive();</span>
+<span class="fc" id="L48">            desactivadoEn = aHoraGuatemala( usuario.getDesactivadoEn() );</span>
+<span class="fc" id="L49">            motivoDesactivacion = usuario.getMotivoDesactivacion();</span>
+<span class="fc" id="L50">            creadoEn = aHoraGuatemala( usuario.getCreatedAt() );</span>
+        }
+<span class="fc" id="L52">        String numeroColegiado = null;</span>
+<span class="fc bfc" id="L53" title="All 2 branches covered.">        if ( profesional != null ) {</span>
+<span class="fc" id="L54">            numeroColegiado = profesional.getNumeroColegiado();</span>
+        }
+<span class="fc" id="L56">        EstadoUsuario estado1 = null;</span>
+<span class="fc" id="L57">        estado1 = estado;</span>
+
+<span class="fc bfc" id="L59" title="All 2 branches covered.">        Boolean colegiadoVerificado = profesional == null ? null : profesional.isColegiadoVerificado();</span>
+
+<span class="fc" id="L61">        UsuarioResponse usuarioResponse = new UsuarioResponse( id, email, nombreCompleto, nombreUsuario, rol, estado1, verificado, activado, activo, numeroColegiado, colegiadoVerificado, desactivadoEn, motivoDesactivacion, creadoEn );</span>
+
+<span class="fc" id="L63">        return usuarioResponse;</span>
+    }
+
+    private RoleName usuarioRoleName(UserAccount userAccount) {
+<span class="fc" id="L67">        Role role = userAccount.getRole();</span>
+<span class="pc bpc" id="L68" title="1 of 2 branches missed.">        if ( role == null ) {</span>
+<span class="nc" id="L69">            return null;</span>
+        }
+<span class="fc" id="L71">        return role.getName();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

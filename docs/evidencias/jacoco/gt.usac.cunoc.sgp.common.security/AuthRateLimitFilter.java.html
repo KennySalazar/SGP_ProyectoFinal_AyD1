@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AuthRateLimitFilter.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">sgp-api</a> &gt; <a href="index.source.html" class="el_package">gt.usac.cunoc.sgp.common.security</a> &gt; <span class="el_source">AuthRateLimitFilter.java</span></div><h1>AuthRateLimitFilter.java</h1><pre class="source lang-java linenums">package gt.usac.cunoc.sgp.common.security;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import gt.usac.cunoc.sgp.common.exception.ProblemDetails;
+import jakarta.servlet.FilterChain;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import java.io.IOException;
+import java.time.Clock;
+import java.time.Instant;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import org.springframework.http.MediaType;
+import org.springframework.http.ProblemDetail;
+import org.springframework.stereotype.Component;
+import org.springframework.web.filter.OncePerRequestFilter;
+
+@Component
+public class AuthRateLimitFilter extends OncePerRequestFilter {
+
+  private static final int MAX_REQUESTS = 20;
+  private static final long WINDOW_SECONDS = 60;
+<span class="fc" id="L24">  private final Map&lt;String, WindowCounter&gt; counters = new ConcurrentHashMap&lt;&gt;();</span>
+  private final Clock clock;
+  private final ObjectMapper objectMapper;
+
+<span class="fc" id="L28">  public AuthRateLimitFilter(Clock clock, ObjectMapper objectMapper) {</span>
+<span class="fc" id="L29">    this.clock = clock;</span>
+<span class="fc" id="L30">    this.objectMapper = objectMapper;</span>
+<span class="fc" id="L31">  }</span>
+
+  @Override
+  protected boolean shouldNotFilter(HttpServletRequest request) {
+<span class="fc bfc" id="L35" title="All 2 branches covered.">    if (!&quot;POST&quot;.equalsIgnoreCase(request.getMethod())) return true;</span>
+<span class="fc" id="L36">    String uri = request.getRequestURI();</span>
+<span class="pc bpc" id="L37" title="1 of 2 branches missed.">    return !(uri.equals(&quot;/api/v1/auth/login&quot;)</span>
+<span class="pc bpc" id="L38" title="1 of 2 branches missed.">        || uri.equals(&quot;/api/v1/auth/register&quot;)</span>
+<span class="pc bpc" id="L39" title="1 of 2 branches missed.">        || uri.equals(&quot;/api/v1/auth/password-recovery&quot;)</span>
+<span class="pc bpc" id="L40" title="1 of 2 branches missed.">        || uri.equals(&quot;/api/v1/auth/refresh&quot;)</span>
+<span class="pc bpc" id="L41" title="1 of 2 branches missed.">        || uri.equals(&quot;/api/v1/invitaciones/validacion&quot;)</span>
+<span class="pc bpc" id="L42" title="1 of 2 branches missed.">        || uri.equals(&quot;/api/v1/invitaciones/aceptacion&quot;));</span>
+  }
+
+  @Override
+  protected void doFilterInternal(
+      HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
+      throws ServletException, IOException {
+<span class="nc" id="L49">    Instant now = clock.instant();</span>
+<span class="nc" id="L50">    String key = request.getRemoteAddr() + '|' + request.getRequestURI();</span>
+<span class="nc" id="L51">    WindowCounter counter =</span>
+<span class="nc" id="L52">        counters.compute(</span>
+            key,
+            (ignored, existing) -&gt; {
+<span class="nc bnc" id="L55" title="All 4 branches missed.">              if (existing == null || existing.startedAt.plusSeconds(WINDOW_SECONDS).isBefore(now))</span>
+<span class="nc" id="L56">                return new WindowCounter(now, 1);</span>
+<span class="nc" id="L57">              return new WindowCounter(existing.startedAt, existing.count + 1);</span>
+            });
+<span class="nc bnc" id="L59" title="All 2 branches missed.">    if (counter.count &gt; MAX_REQUESTS) {</span>
+<span class="nc" id="L60">      ProblemDetail problem =</span>
+<span class="nc" id="L61">          ProblemDetails.create(</span>
+              429,
+              &quot;Demasiadas solicitudes&quot;,
+              &quot;Espere antes de volver a intentarlo&quot;,
+              &quot;rate_limited&quot;,
+              request);
+<span class="nc" id="L67">      response.setStatus(429);</span>
+<span class="nc" id="L68">      response.setContentType(MediaType.APPLICATION_PROBLEM_JSON_VALUE);</span>
+<span class="nc" id="L69">      objectMapper.writeValue(response.getOutputStream(), problem);</span>
+<span class="nc" id="L70">      return;</span>
+    }
+<span class="nc" id="L72">    filterChain.doFilter(request, response);</span>
+<span class="nc" id="L73">  }</span>
+
+<span class="nc" id="L75">  private record WindowCounter(Instant startedAt, int count) {}</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

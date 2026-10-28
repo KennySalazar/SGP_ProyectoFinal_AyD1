@@ -1,0 +1,379 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TransicionOrdenService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">sgp-api</a> &gt; <a href="index.source.html" class="el_package">gt.usac.cunoc.sgp.mantenimiento.service</a> &gt; <span class="el_source">TransicionOrdenService.java</span></div><h1>TransicionOrdenService.java</h1><pre class="source lang-java linenums">package gt.usac.cunoc.sgp.mantenimiento.service;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import gt.usac.cunoc.sgp.archivo.entity.ArchivoEvidenciaMantenimiento;
+import gt.usac.cunoc.sgp.archivo.model.EstadoArchivo;
+import gt.usac.cunoc.sgp.archivo.repository.ArchivoEvidenciaMantenimientoRepository;
+import gt.usac.cunoc.sgp.archivo.service.AlmacenamientoArchivos;
+import gt.usac.cunoc.sgp.common.audit.model.AccionAuditoria;
+import gt.usac.cunoc.sgp.common.audit.service.AuditoriaWriter;
+import gt.usac.cunoc.sgp.common.exception.ApiException;
+import gt.usac.cunoc.sgp.common.util.UuidV7Generator;
+import gt.usac.cunoc.sgp.mantenimiento.dto.CerrarComoEjecutadaRequest;
+import gt.usac.cunoc.sgp.mantenimiento.dto.CerrarSinEjecucionRequest;
+import gt.usac.cunoc.sgp.mantenimiento.dto.IniciarEjecucionRequest;
+import gt.usac.cunoc.sgp.mantenimiento.dto.OrdenMantenimientoResponse;
+import gt.usac.cunoc.sgp.mantenimiento.dto.ProgramarOrdenRequest;
+import gt.usac.cunoc.sgp.mantenimiento.entity.HistorialEstadoOrden;
+import gt.usac.cunoc.sgp.mantenimiento.entity.OrdenMantenimiento;
+import gt.usac.cunoc.sgp.mantenimiento.entity.OrdenMantenimientoEjecucion;
+import gt.usac.cunoc.sgp.mantenimiento.mapper.OrdenMantenimientoMapper;
+import gt.usac.cunoc.sgp.mantenimiento.model.EstadoOrden;
+import gt.usac.cunoc.sgp.mantenimiento.model.EventoOrden;
+import gt.usac.cunoc.sgp.mantenimiento.repository.HistorialEstadoOrdenRepository;
+import gt.usac.cunoc.sgp.mantenimiento.repository.OrdenMantenimientoEjecucionRepository;
+import gt.usac.cunoc.sgp.mantenimiento.repository.OrdenMantenimientoRepository;
+import gt.usac.cunoc.sgp.notificacion.service.NotificacionService;
+import java.io.IOException;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.UUID;
+import java.util.stream.Collectors;
+import org.springframework.http.HttpStatus;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+/**
+ * Única puerta de entrada para cambiar el estado de una orden de mantenimiento (DT-BE-07). Valida
+ * la transición con {@link MaquinaEstadosOrden}, controla la versión optimista, registra el
+ * historial y la auditoría, y avisa a quien creó la orden (RN-MTO-04, RN-MTO-09, RN-USR-09).
+ */
+@Service
+public class TransicionOrdenService {
+
+<span class="fc" id="L53">  static final ZoneId ZONA_GUATEMALA = ZoneId.of(&quot;America/Guatemala&quot;);</span>
+  static final int LONGITUD_MAXIMA_MOTIVO = 2000;
+  static final String TIPO_AVISO = &quot;ORDEN_MANTENIMIENTO&quot;;
+  static final String ENTIDAD = &quot;orden_mantenimiento&quot;;
+
+<span class="fc" id="L58">  private static final DateTimeFormatter FORMATO_FECHA = DateTimeFormatter.ofPattern(&quot;dd/MM/yyyy&quot;);</span>
+
+  private final OrdenMantenimientoRepository ordenes;
+  private final HistorialEstadoOrdenRepository historial;
+  private final OrdenMantenimientoEjecucionRepository ejecuciones;
+  private final ArchivoEvidenciaMantenimientoRepository evidencias;
+  private final AlmacenamientoArchivos almacenamiento;
+  private final AuditoriaWriter auditoria;
+  private final NotificacionService notificaciones;
+  private final OrdenMantenimientoMapper mapper;
+  private final ObjectMapper json;
+  private final Clock clock;
+
+  public TransicionOrdenService(
+      OrdenMantenimientoRepository ordenes,
+      HistorialEstadoOrdenRepository historial,
+      OrdenMantenimientoEjecucionRepository ejecuciones,
+      ArchivoEvidenciaMantenimientoRepository evidencias,
+      AlmacenamientoArchivos almacenamiento,
+      AuditoriaWriter auditoria,
+      NotificacionService notificaciones,
+      OrdenMantenimientoMapper mapper,
+      ObjectMapper json,
+<span class="fc" id="L81">      Clock clock) {</span>
+<span class="fc" id="L82">    this.ordenes = ordenes;</span>
+<span class="fc" id="L83">    this.historial = historial;</span>
+<span class="fc" id="L84">    this.ejecuciones = ejecuciones;</span>
+<span class="fc" id="L85">    this.evidencias = evidencias;</span>
+<span class="fc" id="L86">    this.almacenamiento = almacenamiento;</span>
+<span class="fc" id="L87">    this.auditoria = auditoria;</span>
+<span class="fc" id="L88">    this.notificaciones = notificaciones;</span>
+<span class="fc" id="L89">    this.mapper = mapper;</span>
+<span class="fc" id="L90">    this.json = json;</span>
+<span class="fc" id="L91">    this.clock = clock;</span>
+<span class="fc" id="L92">  }</span>
+
+  /** PROPUESTA a PROGRAMADA: fecha no pasada; se guardan quién aceptó y cuándo. */
+  @Transactional
+  public OrdenMantenimientoResponse aceptarYProgramar(
+      UUID ordenId, ProgramarOrdenRequest request, UUID usuarioId) {
+<span class="fc" id="L98">    Long version = exigirVersion(request.version());</span>
+<span class="fc" id="L99">    LocalDate fecha = request.fechaProgramada();</span>
+<span class="fc bfc" id="L100" title="All 2 branches covered.">    if (fecha == null) {</span>
+<span class="fc" id="L101">      throw invalida(&quot;fechaProgramada&quot;, &quot;La fecha programada es obligatoria.&quot;);</span>
+    }
+<span class="fc bfc" id="L103" title="All 2 branches covered.">    if (fecha.isBefore(LocalDate.now(clock.withZone(ZONA_GUATEMALA)))) {</span>
+<span class="fc" id="L104">      throw invalida(&quot;fechaProgramada&quot;, &quot;La fecha programada no puede ser anterior a hoy.&quot;);</span>
+    }
+
+<span class="fc" id="L107">    OrdenMantenimiento orden = buscarConVersion(ordenId, version);</span>
+<span class="fc" id="L108">    EstadoOrden anterior = orden.getEstado();</span>
+<span class="fc" id="L109">    EstadoOrden destino = MaquinaEstadosOrden.destino(anterior, EventoOrden.ACEPTAR_Y_PROGRAMAR);</span>
+<span class="fc" id="L110">    Instant ahora = clock.instant();</span>
+
+<span class="fc" id="L112">    orden.registrarAceptacion(usuarioId, ahora, fecha);</span>
+<span class="fc" id="L113">    ObjectNode extra = json.createObjectNode().put(&quot;fechaProgramada&quot;, fecha.toString());</span>
+<span class="fc" id="L114">    registrarCambio(</span>
+        orden, anterior, destino, EventoOrden.ACEPTAR_Y_PROGRAMAR, usuarioId, null, ahora, extra);
+<span class="fc" id="L116">    avisarAlCreador(</span>
+        orden,
+        destino,
+        &quot;Orden de mantenimiento programada&quot;,
+        &quot;La orden de mantenimiento que creaste fue programada para el &quot;
+<span class="fc" id="L121">            + FORMATO_FECHA.format(fecha)</span>
+            + &quot;.&quot;);
+<span class="fc" id="L123">    return mapper.toResponse(ordenes.saveAndFlush(orden));</span>
+  }
+
+  /** PROPUESTA a DESCARTADA con motivo obligatorio (RN-MTO-09). */
+  @Transactional
+  public OrdenMantenimientoResponse descartar(
+      UUID ordenId, CerrarSinEjecucionRequest request, UUID usuarioId) {
+<span class="fc" id="L130">    return cerrarSinEjecucion(</span>
+        ordenId,
+        request,
+        usuarioId,
+        EventoOrden.DESCARTAR,
+        &quot;Orden de mantenimiento descartada&quot;,
+        &quot;La orden de mantenimiento que creaste fue descartada. Motivo: &quot;);
+  }
+
+  /** PROGRAMADA a CANCELADA con motivo obligatorio (RN-MTO-09). */
+  @Transactional
+  public OrdenMantenimientoResponse cancelar(
+      UUID ordenId, CerrarSinEjecucionRequest request, UUID usuarioId) {
+<span class="fc" id="L143">    return cerrarSinEjecucion(</span>
+        ordenId,
+        request,
+        usuarioId,
+        EventoOrden.CANCELAR,
+        &quot;Orden de mantenimiento cancelada&quot;,
+        &quot;La orden de mantenimiento que creaste fue cancelada. Motivo: &quot;);
+  }
+
+  /** PROGRAMADA a EN_EJECUCION: crea el registro de ejecución con la fecha de inicio. */
+  @Transactional
+  public OrdenMantenimientoResponse iniciarEjecucion(
+      UUID ordenId, IniciarEjecucionRequest request, UUID usuarioId) {
+<span class="fc" id="L156">    Long version = exigirVersion(request.version());</span>
+<span class="fc" id="L157">    OrdenMantenimiento orden = buscarConVersion(ordenId, version);</span>
+<span class="fc" id="L158">    EstadoOrden anterior = orden.getEstado();</span>
+<span class="fc" id="L159">    EstadoOrden destino = MaquinaEstadosOrden.destino(anterior, EventoOrden.INICIAR_EJECUCION);</span>
+<span class="fc" id="L160">    Instant ahora = clock.instant();</span>
+
+<span class="fc" id="L162">    ejecuciones.save(new OrdenMantenimientoEjecucion(orden.getId(), ahora, usuarioId));</span>
+<span class="fc" id="L163">    registrarCambio(</span>
+        orden, anterior, destino, EventoOrden.INICIAR_EJECUCION, usuarioId, null, ahora, null);
+<span class="fc" id="L165">    return mapper.toResponse(ordenes.saveAndFlush(orden));</span>
+  }
+
+  /**
+   * EN_EJECUCION a EJECUTADA (RN-MTO-05). Exige fecha de ejecución, responsable y al menos una
+   * fotografía de evidencia disponible en el almacenamiento; si falta algo responde 422 con el
+   * detalle y la orden no cambia. El estado, el historial y la auditoría se guardan juntos.
+   */
+  @Transactional
+  public OrdenMantenimientoResponse cerrarComoEjecutada(
+      UUID ordenId, CerrarComoEjecutadaRequest request, UUID usuarioId) {
+<span class="fc bfc" id="L176" title="All 2 branches covered.">    Long version = exigirVersion(request == null ? null : request.version());</span>
+<span class="fc" id="L177">    OrdenMantenimiento orden = conVersion(ordenes.findByIdForUpdate(ordenId), ordenId, version);</span>
+<span class="fc" id="L178">    EstadoOrden anterior = orden.getEstado();</span>
+<span class="fc" id="L179">    EstadoOrden destino = MaquinaEstadosOrden.destino(anterior, EventoOrden.CERRAR_COMO_EJECUTADA);</span>
+
+<span class="fc" id="L181">    Optional&lt;OrdenMantenimientoEjecucion&gt; ejecucion = ejecuciones.findById(ordenId);</span>
+<span class="fc" id="L182">    LocalDate fecha = ejecucion.map(OrdenMantenimientoEjecucion::getFechaEjecucion).orElse(null);</span>
+<span class="fc" id="L183">    UUID responsableId =</span>
+<span class="fc" id="L184">        ejecucion.map(OrdenMantenimientoEjecucion::getResponsableUsuarioId).orElse(null);</span>
+<span class="fc" id="L185">    String responsableNombre =</span>
+<span class="fc" id="L186">        ejecucion.map(OrdenMantenimientoEjecucion::getResponsableNombre).orElse(null);</span>
+<span class="fc" id="L187">    long fotografias = evidenciasAlmacenadas(ordenId);</span>
+
+<span class="fc" id="L189">    List&lt;Map&lt;String, String&gt;&gt; faltantes = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L190" title="All 2 branches covered.">    if (fecha == null) {</span>
+<span class="fc" id="L191">      faltantes.add(faltante(&quot;fechaEjecucion&quot;, &quot;Falta la fecha de ejecución.&quot;));</span>
+    }
+<span class="fc bfc" id="L193" title="All 6 branches covered.">    if (responsableId == null &amp;&amp; (responsableNombre == null || responsableNombre.isBlank())) {</span>
+<span class="fc" id="L194">      faltantes.add(faltante(&quot;responsable&quot;, &quot;Falta el responsable de la intervención.&quot;));</span>
+    }
+<span class="fc bfc" id="L196" title="All 2 branches covered.">    if (fotografias == 0) {</span>
+<span class="fc" id="L197">      faltantes.add(faltante(&quot;evidencias&quot;, &quot;Falta al menos una fotografía de evidencia.&quot;));</span>
+    }
+<span class="fc bfc" id="L199" title="All 2 branches covered.">    if (!faltantes.isEmpty()) {</span>
+<span class="fc" id="L200">      throw new ApiException(</span>
+          HttpStatus.UNPROCESSABLE_ENTITY,
+          &quot;cierre_incompleto&quot;,
+          &quot;Cierre incompleto&quot;,
+<span class="fc" id="L204">          faltantes.stream()</span>
+<span class="fc" id="L205">              .map(f -&gt; f.get(&quot;mensaje&quot;))</span>
+<span class="fc" id="L206">              .collect(Collectors.joining(&quot; &quot;, &quot;No se puede cerrar la orden como ejecutada. &quot;, &quot;&quot;)),</span>
+          faltantes);
+    }
+
+<span class="fc" id="L210">    Instant ahora = clock.instant();</span>
+<span class="fc" id="L211">    ObjectNode extra =</span>
+<span class="fc" id="L212">        json.createObjectNode()</span>
+<span class="fc" id="L213">            .put(&quot;fechaEjecucion&quot;, fecha.toString())</span>
+<span class="fc bfc" id="L214" title="All 2 branches covered.">            .put(&quot;responsableUsuarioId&quot;, responsableId == null ? null : responsableId.toString())</span>
+<span class="fc" id="L215">            .put(&quot;responsableNombre&quot;, responsableNombre)</span>
+<span class="fc" id="L216">            .put(&quot;evidencias&quot;, fotografias);</span>
+<span class="fc" id="L217">    registrarCambio(</span>
+        orden, anterior, destino, EventoOrden.CERRAR_COMO_EJECUTADA, usuarioId, null, ahora, extra);
+<span class="fc" id="L219">    avisarAlCreador(</span>
+        orden,
+        destino,
+        &quot;Orden de mantenimiento ejecutada&quot;,
+<span class="fc" id="L223">        &quot;La orden de mantenimiento que creaste se ejecutó el &quot; + FORMATO_FECHA.format(fecha) + &quot;.&quot;);</span>
+<span class="fc" id="L224">    return mapper.toResponse(ordenes.saveAndFlush(orden));</span>
+  }
+
+  /** Evidencias disponibles cuyo objeto sigue en el almacenamiento; 503 si este no responde. */
+  private long evidenciasAlmacenadas(UUID ordenId) {
+<span class="fc" id="L229">    long disponibles = 0;</span>
+    for (ArchivoEvidenciaMantenimiento evidencia :
+<span class="fc bfc" id="L231" title="All 2 branches covered.">        evidencias.findByOrdenMantenimientoIdAndArchivo_EstadoOrderByCreadoEnAsc(</span>
+            ordenId, EstadoArchivo.DISPONIBLE)) {
+      try {
+<span class="fc bfc" id="L234" title="All 2 branches covered.">        if (almacenamiento.existe(evidencia.getArchivo().getClaveObjetoOriginal())) {</span>
+<span class="fc" id="L235">          disponibles++;</span>
+        }
+<span class="fc" id="L237">      } catch (IOException e) {</span>
+<span class="fc" id="L238">        throw new ApiException(</span>
+            HttpStatus.SERVICE_UNAVAILABLE,
+            &quot;almacenamiento_no_disponible&quot;,
+            &quot;Almacenamiento no disponible&quot;,
+            &quot;No se pudo verificar la evidencia fotográfica. La orden sigue EN_EJECUCION; intente&quot;
+                + &quot; de nuevo más tarde.&quot;);
+<span class="fc" id="L244">      }</span>
+<span class="fc" id="L245">    }</span>
+<span class="fc" id="L246">    return disponibles;</span>
+  }
+
+  private static Map&lt;String, String&gt; faltante(String campo, String mensaje) {
+<span class="fc" id="L250">    return Map.of(&quot;campo&quot;, campo, &quot;mensaje&quot;, mensaje);</span>
+  }
+
+  private OrdenMantenimientoResponse cerrarSinEjecucion(
+      UUID ordenId,
+      CerrarSinEjecucionRequest request,
+      UUID usuarioId,
+      EventoOrden evento,
+      String tituloAviso,
+      String mensajeAviso) {
+<span class="fc" id="L260">    Long version = exigirVersion(request.version());</span>
+<span class="fc" id="L261">    String motivo = exigirMotivo(request.motivo());</span>
+<span class="fc" id="L262">    OrdenMantenimiento orden = buscarConVersion(ordenId, version);</span>
+<span class="fc" id="L263">    EstadoOrden anterior = orden.getEstado();</span>
+<span class="fc" id="L264">    EstadoOrden destino = MaquinaEstadosOrden.destino(anterior, evento);</span>
+<span class="fc" id="L265">    Instant ahora = clock.instant();</span>
+
+<span class="fc" id="L267">    orden.registrarMotivoCierre(motivo);</span>
+<span class="fc" id="L268">    registrarCambio(orden, anterior, destino, evento, usuarioId, motivo, ahora, null);</span>
+<span class="fc" id="L269">    avisarAlCreador(orden, destino, tituloAviso, mensajeAviso + motivo);</span>
+<span class="fc" id="L270">    return mapper.toResponse(ordenes.saveAndFlush(orden));</span>
+  }
+
+  /** Aplica el estado validado, agrega la fila de historial y registra la auditoría. */
+  private void registrarCambio(
+      OrdenMantenimiento orden,
+      EstadoOrden anterior,
+      EstadoOrden destino,
+      EventoOrden evento,
+      UUID usuarioId,
+      String motivo,
+      Instant ahora,
+      ObjectNode extra) {
+<span class="fc" id="L283">    orden.aplicarTransicion(destino, ahora);</span>
+<span class="fc" id="L284">    historial.save(</span>
+        new HistorialEstadoOrden(
+<span class="fc" id="L286">            UuidV7Generator.generate(),</span>
+<span class="fc" id="L287">            orden.getId(),</span>
+<span class="fc" id="L288">            historial.ultimaSecuencia(orden.getId()) + 1,</span>
+<span class="fc" id="L289">            anterior.name(),</span>
+<span class="fc" id="L290">            destino.name(),</span>
+            usuarioId,
+            motivo,
+            ahora));
+
+<span class="fc" id="L295">    ObjectNode antes = json.createObjectNode().put(&quot;estado&quot;, anterior.name());</span>
+<span class="fc" id="L296">    ObjectNode despues =</span>
+<span class="fc" id="L297">        json.createObjectNode().put(&quot;estado&quot;, destino.name()).put(&quot;evento&quot;, evento.name());</span>
+<span class="fc bfc" id="L298" title="All 2 branches covered.">    if (motivo != null) {</span>
+<span class="fc" id="L299">      despues.put(&quot;motivo&quot;, motivo);</span>
+    }
+<span class="fc bfc" id="L301" title="All 2 branches covered.">    if (extra != null) {</span>
+<span class="fc" id="L302">      despues.setAll(extra);</span>
+    }
+<span class="fc" id="L304">    auditoria.registrarEnTransaccion(</span>
+<span class="fc" id="L305">        usuarioId, AccionAuditoria.CAMBIAR_ESTADO, ENTIDAD, orden.getId(), antes, despues, null);</span>
+<span class="fc" id="L306">  }</span>
+
+  /**
+   * Avisa a quien creó la orden manualmente (HU-040). Las propuestas generadas por el sistema no
+   * tienen creador y su aviso inicial lo emite HU-046.
+   */
+  private void avisarAlCreador(
+      OrdenMantenimiento orden, EstadoOrden destino, String titulo, String mensaje) {
+<span class="fc bfc" id="L314" title="All 2 branches covered.">    if (orden.getCreadoPorId() == null) {</span>
+<span class="fc" id="L315">      return;</span>
+    }
+<span class="fc" id="L317">    notificaciones.notificar(</span>
+<span class="fc" id="L318">        orden.getCreadoPorId(),</span>
+        TIPO_AVISO,
+        titulo,
+        mensaje,
+        ENTIDAD,
+<span class="fc" id="L323">        orden.getId(),</span>
+<span class="fc" id="L324">        &quot;orden-mantenimiento:&quot; + orden.getId() + &quot;:&quot; + destino.name());</span>
+<span class="fc" id="L325">  }</span>
+
+  private OrdenMantenimiento buscarConVersion(UUID ordenId, Long version) {
+<span class="fc" id="L328">    return conVersion(ordenes.findById(ordenId), ordenId, version);</span>
+  }
+
+  private OrdenMantenimiento conVersion(
+      Optional&lt;OrdenMantenimiento&gt; encontrada, UUID ordenId, Long version) {
+<span class="fc" id="L333">    OrdenMantenimiento orden =</span>
+<span class="fc" id="L334">        encontrada.orElseThrow(</span>
+            () -&gt;
+<span class="fc" id="L336">                new ApiException(</span>
+                    HttpStatus.NOT_FOUND,
+                    &quot;orden_no_encontrada&quot;,
+                    &quot;Orden no encontrada&quot;,
+                    &quot;No existe la orden de mantenimiento &quot; + ordenId));
+<span class="fc bfc" id="L341" title="All 2 branches covered.">    if (!Objects.equals(orden.getVersion(), version)) {</span>
+<span class="fc" id="L342">      throw new ApiException(</span>
+          HttpStatus.CONFLICT,
+          &quot;version_desactualizada&quot;,
+          &quot;La orden cambio&quot;,
+          &quot;Otro usuario modifico la orden. Vuelva a consultarla antes de reintentar.&quot;);
+    }
+<span class="fc" id="L348">    return orden;</span>
+  }
+
+  private Long exigirVersion(Long version) {
+<span class="fc bfc" id="L352" title="All 2 branches covered.">    if (version == null) {</span>
+<span class="fc" id="L353">      throw invalida(&quot;version&quot;, &quot;La version de la orden es obligatoria.&quot;);</span>
+    }
+<span class="fc" id="L355">    return version;</span>
+  }
+
+  private String exigirMotivo(String motivo) {
+<span class="fc bfc" id="L359" title="All 4 branches covered.">    if (motivo == null || motivo.isBlank()) {</span>
+<span class="fc" id="L360">      throw invalida(&quot;motivo&quot;, &quot;El motivo es obligatorio.&quot;);</span>
+    }
+<span class="fc" id="L362">    String limpio = motivo.strip();</span>
+<span class="fc bfc" id="L363" title="All 2 branches covered.">    if (limpio.length() &gt; LONGITUD_MAXIMA_MOTIVO) {</span>
+<span class="fc" id="L364">      throw invalida(</span>
+          &quot;motivo&quot;, &quot;El motivo no puede exceder &quot; + LONGITUD_MAXIMA_MOTIVO + &quot; caracteres.&quot;);
+    }
+<span class="fc" id="L367">    return limpio;</span>
+  }
+
+  private static ApiException invalida(String campo, String mensaje) {
+<span class="fc" id="L371">    return new ApiException(</span>
+        HttpStatus.UNPROCESSABLE_ENTITY,
+        &quot;solicitud_invalida&quot;,
+        &quot;Solicitud invalida&quot;,
+        mensaje,
+<span class="fc" id="L376">        List.of(Map.of(&quot;campo&quot;, campo, &quot;mensaje&quot;, mensaje)));</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

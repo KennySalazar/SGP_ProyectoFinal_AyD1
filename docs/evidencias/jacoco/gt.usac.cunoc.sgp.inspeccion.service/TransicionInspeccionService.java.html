@@ -1,0 +1,501 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TransicionInspeccionService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">sgp-api</a> &gt; <a href="index.source.html" class="el_package">gt.usac.cunoc.sgp.inspeccion.service</a> &gt; <span class="el_source">TransicionInspeccionService.java</span></div><h1>TransicionInspeccionService.java</h1><pre class="source lang-java linenums">package gt.usac.cunoc.sgp.inspeccion.service;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import gt.usac.cunoc.sgp.common.audit.model.AccionAuditoria;
+import gt.usac.cunoc.sgp.common.audit.service.AuditoriaWriter;
+import gt.usac.cunoc.sgp.common.exception.ApiException;
+import gt.usac.cunoc.sgp.common.util.UuidV7Generator;
+import gt.usac.cunoc.sgp.formulario.validation.JsonSchemaValidatorService;
+import gt.usac.cunoc.sgp.inspeccion.dto.InspeccionResumenResponse;
+import gt.usac.cunoc.sgp.inspeccion.entity.HistorialEstadoInspeccion;
+import gt.usac.cunoc.sgp.inspeccion.entity.Inspeccion;
+import gt.usac.cunoc.sgp.inspeccion.mapper.InspeccionMapper;
+import gt.usac.cunoc.sgp.inspeccion.model.EstadoInspeccion;
+import gt.usac.cunoc.sgp.inspeccion.model.EventoInspeccion;
+import gt.usac.cunoc.sgp.inspeccion.model.InspeccionPublicadaEvent;
+import gt.usac.cunoc.sgp.inspeccion.repository.HistorialEstadoInspeccionRepository;
+import gt.usac.cunoc.sgp.inspeccion.repository.InspeccionRepository;
+import gt.usac.cunoc.sgp.puente.repository.PuenteRepository;
+import gt.usac.cunoc.sgp.revision.entity.Revision;
+import gt.usac.cunoc.sgp.revision.service.CicloRevisionService;
+import gt.usac.cunoc.sgp.sync.model.SolicitudOperacion;
+import gt.usac.cunoc.sgp.sync.service.OperacionIdempotenteService;
+import gt.usac.cunoc.sgp.usuario.entity.UsuarioProfesional;
+import gt.usac.cunoc.sgp.usuario.model.RoleName;
+import gt.usac.cunoc.sgp.usuario.repository.UsuarioProfesionalRepository;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.time.Clock;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.HexFormat;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
+import java.util.stream.Collectors;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.http.HttpStatus;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+/**
+ * Única puerta de entrada para cambiar el estado de una inspección (DT-BE-07). Valida la transición
+ * con {@link MaquinaEstadosInspeccion}, registra el historial y la auditoría, y publica de forma
+ * atómica junto con el Índice de Condición (RN-INS-04, RN-INS-06, RN-INS-13, RN-REV-02).
+ */
+@Service
+public class TransicionInspeccionService {
+
+  /** Roles cuyas inspecciones se publican sin revisión previa (RN-REV-02). */
+<span class="fc" id="L55">  private static final Set&lt;String&gt; ROLES_PUBLICACION_DIRECTA =</span>
+<span class="fc" id="L56">      Set.of(RoleName.CATEDRATICO.name(), RoleName.PROFESIONAL_EXTERNO.name());</span>
+
+  private final InspeccionRepository inspecciones;
+  private final HistorialEstadoInspeccionRepository historial;
+  private final PuenteRepository puentes;
+  private final UsuarioProfesionalRepository profesionales;
+  private final JsonSchemaValidatorService validadorEsquema;
+  private final ReglasEvidenciaFotografica reglasEvidencia;
+  private final PublicacionIndiceCondicionService publicacionIc;
+  private final AuditoriaWriter auditoria;
+  private final InspeccionMapper mapper;
+  private final ObjectMapper json;
+  private final Clock clock;
+  private CicloRevisionService ciclosRevision;
+  private OperacionIdempotenteService operaciones;
+  private ApplicationEventPublisher eventos;
+
+  public TransicionInspeccionService(
+      InspeccionRepository inspecciones,
+      HistorialEstadoInspeccionRepository historial,
+      PuenteRepository puentes,
+      UsuarioProfesionalRepository profesionales,
+      JsonSchemaValidatorService validadorEsquema,
+      ReglasEvidenciaFotografica reglasEvidencia,
+      PublicacionIndiceCondicionService publicacionIc,
+      AuditoriaWriter auditoria,
+      InspeccionMapper mapper,
+      ObjectMapper json,
+<span class="fc" id="L84">      Clock clock) {</span>
+<span class="fc" id="L85">    this.inspecciones = inspecciones;</span>
+<span class="fc" id="L86">    this.historial = historial;</span>
+<span class="fc" id="L87">    this.puentes = puentes;</span>
+<span class="fc" id="L88">    this.profesionales = profesionales;</span>
+<span class="fc" id="L89">    this.validadorEsquema = validadorEsquema;</span>
+<span class="fc" id="L90">    this.reglasEvidencia = reglasEvidencia;</span>
+<span class="fc" id="L91">    this.publicacionIc = publicacionIc;</span>
+<span class="fc" id="L92">    this.auditoria = auditoria;</span>
+<span class="fc" id="L93">    this.mapper = mapper;</span>
+<span class="fc" id="L94">    this.json = json;</span>
+<span class="fc" id="L95">    this.clock = clock;</span>
+<span class="fc" id="L96">  }</span>
+
+  @Autowired(required = false)
+  void setCiclosRevision(CicloRevisionService ciclosRevision) {
+<span class="fc" id="L100">    this.ciclosRevision = ciclosRevision;</span>
+<span class="fc" id="L101">  }</span>
+
+  @Autowired(required = false)
+  void setOperaciones(OperacionIdempotenteService operaciones) {
+<span class="fc" id="L105">    this.operaciones = operaciones;</span>
+<span class="fc" id="L106">  }</span>
+
+  /**
+   * Publicador de eventos internos (HU-046). Opcional, como las demás dependencias añadidas después
+   * del constructor: sin él la publicación funciona igual, sin avisar al mantenimiento.
+   */
+  @Autowired(required = false)
+  void setEventos(ApplicationEventPublisher eventos) {
+<span class="fc" id="L114">    this.eventos = eventos;</span>
+<span class="fc" id="L115">  }</span>
+
+  /** El Estudiante envía su inspección completa a revisión (RN-INS-06, RN-REV-01). */
+  @Transactional
+  public InspeccionResumenResponse enviar(UUID inspeccionId, UUID usuarioId) {
+<span class="fc" id="L120">    return enviarInterno(inspeccionId, usuarioId);</span>
+  }
+
+  @Transactional
+  public InspeccionResumenResponse enviar(
+      UUID inspeccionId, UUID usuarioId, String idempotencyKey) {
+<span class="pc bpc" id="L126" title="3 of 6 branches missed.">    if (idempotencyKey == null || idempotencyKey.isBlank() || operaciones == null) {</span>
+<span class="nc" id="L127">      return enviarInterno(inspeccionId, usuarioId);</span>
+    }
+<span class="fc" id="L129">    SolicitudOperacion solicitud =</span>
+        new SolicitudOperacion(
+            usuarioId,
+            idempotencyKey,
+            &quot;POST&quot;,
+            &quot;/api/v1/inspecciones/&quot; + inspeccionId + &quot;/enviar&quot;,
+<span class="fc" id="L135">            hash(inspeccionId.toString()),</span>
+            &quot;revision&quot;,
+            inspeccionId);
+<span class="fc" id="L138">    return operaciones.ejecutar(</span>
+        solicitud,
+        InspeccionResumenResponse.class,
+        200,
+<span class="fc" id="L142">        () -&gt; enviarInterno(inspeccionId, usuarioId),</span>
+        InspeccionResumenResponse::id);
+  }
+
+  private InspeccionResumenResponse enviarInterno(UUID inspeccionId, UUID usuarioId) {
+<span class="fc" id="L147">    Inspeccion inspeccion = bloquear(inspeccionId);</span>
+<span class="fc" id="L148">    exigirAutor(inspeccion, usuarioId);</span>
+<span class="pc bpc" id="L149" title="1 of 2 branches missed.">    if (publicaSinRevision(inspeccion)) {</span>
+<span class="nc" id="L150">      throw new ApiException(</span>
+          HttpStatus.CONFLICT,
+          &quot;publicacion_directa&quot;,
+          &quot;Accion no aplicable&quot;,
+          &quot;Las inspecciones de Catedraticos y Profesionales externos se publican directamente.&quot;);
+    }
+<span class="fc" id="L156">    MaquinaEstadosInspeccion.destino(inspeccion.estadoActual(), EventoInspeccion.ENVIAR);</span>
+<span class="fc" id="L157">    exigirCompleta(inspeccion);</span>
+
+<span class="fc bfc" id="L159" title="All 2 branches covered.">    Revision revision = ciclosRevision != null ? ciclosRevision.crearParaEnvio(inspeccion) : null;</span>
+<span class="fc" id="L160">    aplicar(</span>
+        inspeccion,
+        EventoInspeccion.ENVIAR,
+        usuarioId,
+        null,
+<span class="fc bfc" id="L165" title="All 2 branches covered.">        revision != null ? revision.getId() : null);</span>
+<span class="fc" id="L166">    return mapper.toResumenResponse(inspecciones.saveAndFlush(inspeccion));</span>
+  }
+
+  /**
+   * El Catedrático o Profesional externo verificado publica sin revisión: la inspección pasa por
+   * ENVIADA y queda PUBLICADA en la misma transacción, junto con su IC definitivo y el estado
+   * vigente del puente. Cualquier fallo revierte toda la operación (RN-REV-02, RN-INS-04).
+   */
+  @Transactional
+  public InspeccionResumenResponse publicar(UUID inspeccionId, UUID usuarioId) {
+<span class="fc" id="L176">    Inspeccion inspeccion = bloquearParaPublicar(inspeccionId);</span>
+<span class="fc" id="L177">    exigirAutor(inspeccion, usuarioId);</span>
+<span class="fc bfc" id="L178" title="All 2 branches covered.">    if (!publicaSinRevision(inspeccion)) {</span>
+<span class="fc" id="L179">      throw new ApiException(</span>
+          HttpStatus.FORBIDDEN,
+          &quot;publicacion_requiere_revision&quot;,
+          &quot;Publicacion no permitida&quot;,
+          &quot;Las inspecciones de Estudiantes deben enviarse a revision de un Catedratico.&quot;);
+    }
+<span class="fc" id="L185">    exigirColegiadoVerificado(inspeccion);</span>
+<span class="fc" id="L186">    MaquinaEstadosInspeccion.destino(inspeccion.estadoActual(), EventoInspeccion.ENVIAR);</span>
+<span class="fc" id="L187">    exigirSinCorreccionPublicada(inspeccion);</span>
+<span class="fc" id="L188">    exigirCompleta(inspeccion);</span>
+
+<span class="fc" id="L190">    aplicar(inspeccion, EventoInspeccion.ENVIAR, usuarioId, null);</span>
+<span class="fc" id="L191">    aplicar(inspeccion, EventoInspeccion.PUBLICAR_SIN_REVISION, usuarioId, null);</span>
+<span class="fc" id="L192">    return publicarConIndice(inspeccion, usuarioId);</span>
+  }
+
+  /** Un Catedrático toma una inspección enviada para revisarla. */
+  @Transactional
+  @PreAuthorize(&quot;hasRole('CATEDRATICO')&quot;)
+  public InspeccionResumenResponse iniciarRevision(UUID inspeccionId, UUID revisorId) {
+<span class="fc" id="L199">    return iniciarRevision(inspeccionId, revisorId, null);</span>
+  }
+
+  @Transactional
+  @PreAuthorize(&quot;hasRole('CATEDRATICO')&quot;)
+  public InspeccionResumenResponse iniciarRevision(
+      UUID inspeccionId, UUID revisorId, UUID revisionId) {
+<span class="fc" id="L206">    Inspeccion inspeccion = bloquear(inspeccionId);</span>
+<span class="fc" id="L207">    exigirRevisorDistintoDelAutor(inspeccion, revisorId);</span>
+<span class="fc" id="L208">    aplicar(inspeccion, EventoInspeccion.INICIAR_REVISION, revisorId, null, revisionId);</span>
+<span class="fc" id="L209">    return mapper.toResumenResponse(inspecciones.saveAndFlush(inspeccion));</span>
+  }
+
+  /** Aprobar publica la inspección con su IC definitivo en la misma transacción. */
+  @Transactional
+  @PreAuthorize(&quot;hasRole('CATEDRATICO')&quot;)
+  public InspeccionResumenResponse aprobar(UUID inspeccionId, UUID revisorId) {
+<span class="fc" id="L216">    return aprobar(inspeccionId, revisorId, null);</span>
+  }
+
+  @Transactional
+  @PreAuthorize(&quot;hasRole('CATEDRATICO')&quot;)
+  public InspeccionResumenResponse aprobar(UUID inspeccionId, UUID revisorId, UUID revisionId) {
+<span class="fc" id="L222">    Inspeccion inspeccion = bloquearParaPublicar(inspeccionId);</span>
+<span class="fc" id="L223">    exigirRevisorDistintoDelAutor(inspeccion, revisorId);</span>
+<span class="fc" id="L224">    MaquinaEstadosInspeccion.destino(inspeccion.estadoActual(), EventoInspeccion.APROBAR);</span>
+<span class="fc" id="L225">    exigirSinCorreccionPublicada(inspeccion);</span>
+<span class="fc" id="L226">    exigirEvidenciaCompleta(inspeccion, List.of());</span>
+<span class="fc" id="L227">    aplicar(inspeccion, EventoInspeccion.APROBAR, revisorId, null, revisionId);</span>
+<span class="fc" id="L228">    return publicarConIndice(inspeccion, revisorId);</span>
+  }
+
+  @Transactional
+  @PreAuthorize(&quot;hasRole('CATEDRATICO')&quot;)
+  public InspeccionResumenResponse solicitarCambios(
+      UUID inspeccionId, UUID revisorId, String motivo) {
+<span class="fc" id="L235">    return solicitarCambios(inspeccionId, revisorId, motivo, null);</span>
+  }
+
+  @Transactional
+  @PreAuthorize(&quot;hasRole('CATEDRATICO')&quot;)
+  public InspeccionResumenResponse solicitarCambios(
+      UUID inspeccionId, UUID revisorId, String motivo, UUID revisionId) {
+<span class="fc" id="L242">    return resolverConMotivo(</span>
+        inspeccionId, revisorId, motivo, EventoInspeccion.SOLICITAR_CAMBIOS, revisionId);
+  }
+
+  @Transactional
+  @PreAuthorize(&quot;hasRole('CATEDRATICO')&quot;)
+  public InspeccionResumenResponse rechazar(UUID inspeccionId, UUID revisorId, String motivo) {
+<span class="fc" id="L249">    return rechazar(inspeccionId, revisorId, motivo, null);</span>
+  }
+
+  @Transactional
+  @PreAuthorize(&quot;hasRole('CATEDRATICO')&quot;)
+  public InspeccionResumenResponse rechazar(
+      UUID inspeccionId, UUID revisorId, String motivo, UUID revisionId) {
+<span class="fc" id="L256">    return resolverConMotivo(</span>
+        inspeccionId, revisorId, motivo, EventoInspeccion.RECHAZAR, revisionId);
+  }
+
+  /** Con cambios solicitados, la inspección vuelve al autor como borrador editable (RN-REV-06). */
+  @Transactional
+  public InspeccionResumenResponse devolverABorrador(UUID inspeccionId, UUID usuarioId) {
+<span class="fc" id="L263">    return devolverABorrador(inspeccionId, usuarioId, null);</span>
+  }
+
+  @Transactional
+  public InspeccionResumenResponse devolverABorrador(
+      UUID inspeccionId, UUID usuarioId, UUID revisionId) {
+<span class="fc" id="L269">    Inspeccion inspeccion = bloquear(inspeccionId);</span>
+<span class="fc" id="L270">    exigirAutor(inspeccion, usuarioId);</span>
+<span class="fc" id="L271">    aplicar(inspeccion, EventoInspeccion.DEVOLVER_A_BORRADOR, usuarioId, null, revisionId);</span>
+<span class="fc" id="L272">    return mapper.toResumenResponse(inspecciones.saveAndFlush(inspeccion));</span>
+  }
+
+  private InspeccionResumenResponse resolverConMotivo(
+      UUID inspeccionId, UUID revisorId, String motivo, EventoInspeccion evento, UUID revisionId) {
+<span class="pc bpc" id="L277" title="1 of 4 branches missed.">    if (motivo == null || motivo.isBlank()) {</span>
+<span class="fc" id="L278">      throw new ApiException(</span>
+          HttpStatus.UNPROCESSABLE_ENTITY,
+          &quot;motivo_requerido&quot;,
+          &quot;Motivo requerido&quot;,
+          &quot;Solicitar cambios o rechazar exige una observacion escrita (RN-REV-04).&quot;);
+    }
+<span class="fc" id="L284">    Inspeccion inspeccion = bloquear(inspeccionId);</span>
+<span class="fc" id="L285">    exigirRevisorDistintoDelAutor(inspeccion, revisorId);</span>
+<span class="fc" id="L286">    aplicar(inspeccion, evento, revisorId, motivo.strip(), revisionId);</span>
+<span class="fc" id="L287">    return mapper.toResumenResponse(inspecciones.saveAndFlush(inspeccion));</span>
+  }
+
+  /**
+   * Guarda PUBLICADA y su historial y calcula el IC definitivo dentro de la transacción en curso;
+   * si el cálculo o la actualización del puente fallan, la excepción revierte todo (HU-020).
+   */
+  private InspeccionResumenResponse publicarConIndice(Inspeccion inspeccion, UUID usuarioId) {
+<span class="fc" id="L295">    Inspeccion guardada = inspecciones.saveAndFlush(inspeccion);</span>
+<span class="fc" id="L296">    publicacionIc.integrarPublicacion(guardada.getId(), usuarioId);</span>
+<span class="pc bpc" id="L297" title="1 of 2 branches missed.">    if (eventos != null) {</span>
+<span class="fc" id="L298">      eventos.publishEvent(new InspeccionPublicadaEvent(guardada.getId(), usuarioId));</span>
+    }
+<span class="fc" id="L300">    return mapper.toResumenResponse(guardada);</span>
+  }
+
+  /** Aplica la transición validada, con su historial y auditoría en la misma transacción. */
+  private void aplicar(
+      Inspeccion inspeccion, EventoInspeccion evento, UUID usuarioId, String motivo) {
+<span class="fc" id="L306">    aplicar(inspeccion, evento, usuarioId, motivo, null);</span>
+<span class="fc" id="L307">  }</span>
+
+  private void aplicar(
+      Inspeccion inspeccion,
+      EventoInspeccion evento,
+      UUID usuarioId,
+      String motivo,
+      UUID revisionId) {
+<span class="fc" id="L315">    EstadoInspeccion anterior = inspeccion.estadoActual();</span>
+<span class="fc" id="L316">    EstadoInspeccion destino = MaquinaEstadosInspeccion.destino(anterior, evento);</span>
+<span class="fc" id="L317">    Instant ahora = clock.instant();</span>
+
+<span class="fc" id="L319">    inspeccion.aplicarEstado(destino, ahora);</span>
+<span class="fc" id="L320">    historial.save(</span>
+        new HistorialEstadoInspeccion(
+<span class="fc" id="L322">            UuidV7Generator.generate(),</span>
+<span class="fc" id="L323">            inspeccion.getId(),</span>
+<span class="fc" id="L324">            historial.ultimaSecuencia(inspeccion.getId()) + 1,</span>
+<span class="fc" id="L325">            anterior.name(),</span>
+<span class="fc" id="L326">            destino.name(),</span>
+            usuarioId,
+            revisionId,
+<span class="fc" id="L329">            evento.name(),</span>
+            motivo,
+            ahora));
+
+<span class="fc" id="L333">    ObjectNode antes = json.createObjectNode().put(&quot;estado&quot;, anterior.name());</span>
+<span class="fc" id="L334">    ObjectNode despues =</span>
+<span class="fc" id="L335">        json.createObjectNode().put(&quot;estado&quot;, destino.name()).put(&quot;evento&quot;, evento.name());</span>
+<span class="fc bfc" id="L336" title="All 2 branches covered.">    if (motivo != null) {</span>
+<span class="fc" id="L337">      despues.put(&quot;motivo&quot;, motivo);</span>
+    }
+<span class="fc" id="L339">    auditoria.registrarEnTransaccion(</span>
+        usuarioId,
+        AccionAuditoria.CAMBIAR_ESTADO,
+        &quot;inspeccion&quot;,
+<span class="fc" id="L343">        inspeccion.getId(),</span>
+        antes,
+        despues,
+        null);
+<span class="fc" id="L347">  }</span>
+
+  /**
+   * Campos obligatorios del esquema de su versión y fotografías mínimas por categoría (RN-INS-06,
+   * RN-FRM-08). Detalla todo lo que falta en una sola respuesta 422.
+   */
+  private void exigirCompleta(Inspeccion inspeccion) {
+<span class="fc" id="L354">    List&lt;Map&lt;String, String&gt;&gt; faltantes = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L355">    validadorEsquema</span>
+<span class="fc" id="L356">        .obtenerErroresValidacion(</span>
+<span class="fc" id="L357">            inspeccion.getVersionFormulario().getEsquema(), inspeccion.getDatos(), false)</span>
+<span class="fc" id="L358">        .forEach(</span>
+<span class="fc" id="L359">            error -&gt; faltantes.add(Map.of(&quot;campo&quot;, error.campo(), &quot;mensaje&quot;, error.mensaje())));</span>
+<span class="fc" id="L360">    exigirEvidenciaCompleta(inspeccion, faltantes);</span>
+<span class="fc" id="L361">  }</span>
+
+  private void exigirEvidenciaCompleta(
+      Inspeccion inspeccion, List&lt;Map&lt;String, String&gt;&gt; erroresCampos) {
+<span class="fc" id="L365">    List&lt;Map&lt;String, String&gt;&gt; faltantes = new ArrayList&lt;&gt;(erroresCampos);</span>
+<span class="fc" id="L366">    int campos = erroresCampos.size();</span>
+<span class="fc" id="L367">    var conteos =</span>
+<span class="fc" id="L368">        inspecciones.findConteosFotoDisponibles(inspeccion.getId()).stream()</span>
+<span class="fc" id="L369">            .collect(</span>
+<span class="fc" id="L370">                Collectors.toMap(</span>
+                    InspeccionRepository.ConteoFotoCategoria::getCategoria,
+                    InspeccionRepository.ConteoFotoCategoria::getCantidad));
+<span class="fc" id="L373">    reglasEvidencia</span>
+<span class="fc" id="L374">        .faltantesObligatorios(conteos)</span>
+<span class="fc" id="L375">        .forEach(</span>
+            faltante -&gt;
+<span class="fc" id="L377">                faltantes.add(</span>
+<span class="fc" id="L378">                    Map.of(</span>
+<span class="fc" id="L379">                        &quot;campo&quot;, &quot;fotografias.&quot; + faltante.categoria(),</span>
+                        &quot;mensaje&quot;,
+                            &quot;Falta al menos una fotografia de la categoria &quot;
+<span class="fc" id="L382">                                + faltante.categoria())));</span>
+
+<span class="fc bfc" id="L384" title="All 2 branches covered.">    if (!faltantes.isEmpty()) {</span>
+<span class="fc" id="L385">      throw new ApiException(</span>
+          HttpStatus.UNPROCESSABLE_ENTITY,
+          &quot;inspeccion_incompleta&quot;,
+          &quot;La inspeccion no puede enviarse ni publicarse&quot;,
+          &quot;Faltan &quot;
+              + campos
+              + &quot; campos obligatorios y &quot;
+<span class="fc" id="L392">              + (faltantes.size() - campos)</span>
+              + &quot; categorias de fotografia.&quot;,
+          faltantes);
+    }
+<span class="fc" id="L396">  }</span>
+
+  /**
+   * Una inspección original solo admite una corrección publicada (RN-INS-08). La base de datos lo
+   * garantiza también con el índice uq_inspeccion_sucesora_publicada.
+   */
+  private void exigirSinCorreccionPublicada(Inspeccion inspeccion) {
+<span class="fc bfc" id="L403" title="All 2 branches covered.">    if (inspeccion.getSupersedeAId() != null</span>
+<span class="fc bfc" id="L404" title="All 2 branches covered.">        &amp;&amp; inspecciones.findCorreccionPublicadaId(inspeccion.getSupersedeAId()).isPresent()) {</span>
+<span class="fc" id="L405">      throw new ApiException(</span>
+          HttpStatus.CONFLICT,
+          &quot;correccion_ya_publicada&quot;,
+          &quot;Correccion ya publicada&quot;,
+          &quot;La inspeccion original ya tiene una correccion publicada; corrija esa correccion.&quot;);
+    }
+<span class="fc" id="L411">  }</span>
+
+  private void exigirAutor(Inspeccion inspeccion, UUID usuarioId) {
+<span class="fc bfc" id="L414" title="All 2 branches covered.">    if (!inspeccion.getAutorId().equals(usuarioId)) {</span>
+<span class="fc" id="L415">      throw new ApiException(</span>
+          HttpStatus.FORBIDDEN,
+          &quot;solo_autor&quot;,
+          &quot;Acceso denegado&quot;,
+          &quot;Solo el autor responsable puede enviar o publicar esta inspeccion (RN-INS-02).&quot;);
+    }
+<span class="fc" id="L421">  }</span>
+
+  private void exigirRevisorDistintoDelAutor(Inspeccion inspeccion, UUID revisorId) {
+<span class="fc bfc" id="L424" title="All 2 branches covered.">    if (inspeccion.getAutorId().equals(revisorId)) {</span>
+<span class="fc" id="L425">      throw new ApiException(</span>
+          HttpStatus.FORBIDDEN,
+          &quot;revisor_es_autor&quot;,
+          &quot;Acceso denegado&quot;,
+          &quot;El revisor no puede ser el autor de la inspeccion (RN-REV-03).&quot;);
+    }
+<span class="fc" id="L431">  }</span>
+
+  /** El Profesional externo solo publica con su colegiado verificado (RN-USR-04). */
+  private void exigirColegiadoVerificado(Inspeccion inspeccion) {
+<span class="fc bfc" id="L435" title="All 2 branches covered.">    if (!RoleName.PROFESIONAL_EXTERNO.name().equals(inspeccion.getRolAutorCreacion())) {</span>
+<span class="fc" id="L436">      return;</span>
+    }
+<span class="fc" id="L438">    boolean verificado =</span>
+        profesionales
+<span class="fc" id="L440">            .findById(inspeccion.getAutorId())</span>
+<span class="fc" id="L441">            .map(UsuarioProfesional::isColegiadoVerificado)</span>
+<span class="fc" id="L442">            .orElse(false);</span>
+<span class="fc bfc" id="L443" title="All 2 branches covered.">    if (!verificado) {</span>
+<span class="fc" id="L444">      throw new ApiException(</span>
+          HttpStatus.FORBIDDEN,
+          &quot;colegiado_no_verificado&quot;,
+          &quot;Colegiado no verificado&quot;,
+          &quot;El Administrador debe verificar su numero de colegiado antes de publicar inspecciones.&quot;);
+    }
+<span class="fc" id="L450">  }</span>
+
+  private boolean publicaSinRevision(Inspeccion inspeccion) {
+<span class="fc" id="L453">    return ROLES_PUBLICACION_DIRECTA.contains(inspeccion.getRolAutorCreacion());</span>
+  }
+
+  private Inspeccion bloquear(UUID inspeccionId) {
+<span class="fc" id="L457">    return inspecciones</span>
+<span class="fc" id="L458">        .findActivaByIdForUpdate(inspeccionId)</span>
+<span class="pc" id="L459">        .orElseThrow(() -&gt; inspeccionNoEncontrada(inspeccionId));</span>
+  }
+
+  /**
+   * Bloquea primero el puente y después la inspección, el mismo orden que usa la integración del
+   * IC, para que dos publicaciones simultáneas se serialicen sin interbloqueos.
+   */
+  private Inspeccion bloquearParaPublicar(UUID inspeccionId) {
+<span class="fc" id="L467">    UUID puenteId =</span>
+        inspecciones
+<span class="fc" id="L469">            .findPuenteIdByInspeccionId(inspeccionId)</span>
+<span class="pc" id="L470">            .orElseThrow(() -&gt; inspeccionNoEncontrada(inspeccionId));</span>
+<span class="fc" id="L471">    puentes</span>
+<span class="fc" id="L472">        .findByIdForUpdate(puenteId)</span>
+<span class="fc" id="L473">        .orElseThrow(</span>
+            () -&gt;
+<span class="nc" id="L475">                new ApiException(</span>
+                    HttpStatus.NOT_FOUND,
+                    &quot;puente_no_encontrado&quot;,
+                    &quot;Puente no encontrado&quot;,
+                    &quot;No existe el puente de la inspeccion.&quot;));
+<span class="fc" id="L480">    return bloquear(inspeccionId);</span>
+  }
+
+  private ApiException inspeccionNoEncontrada(UUID inspeccionId) {
+<span class="nc" id="L484">    return new ApiException(</span>
+        HttpStatus.NOT_FOUND,
+        &quot;inspeccion_no_encontrada&quot;,
+        &quot;Inspeccion no encontrada&quot;,
+        &quot;No existe la inspeccion &quot; + inspeccionId);
+  }
+
+  private String hash(String valor) {
+    try {
+<span class="fc" id="L493">      return HexFormat.of()</span>
+<span class="fc" id="L494">          .formatHex(</span>
+<span class="fc" id="L495">              MessageDigest.getInstance(&quot;SHA-256&quot;).digest(valor.getBytes(StandardCharsets.UTF_8)));</span>
+<span class="nc" id="L496">    } catch (NoSuchAlgorithmException ex) {</span>
+<span class="nc" id="L497">      throw new IllegalStateException(&quot;SHA-256 no está disponible&quot;, ex);</span>
+    }
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

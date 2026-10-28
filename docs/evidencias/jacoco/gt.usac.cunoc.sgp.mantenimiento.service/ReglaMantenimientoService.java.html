@@ -1,0 +1,440 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ReglaMantenimientoService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">sgp-api</a> &gt; <a href="index.source.html" class="el_package">gt.usac.cunoc.sgp.mantenimiento.service</a> &gt; <span class="el_source">ReglaMantenimientoService.java</span></div><h1>ReglaMantenimientoService.java</h1><pre class="source lang-java linenums">package gt.usac.cunoc.sgp.mantenimiento.service;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import gt.usac.cunoc.sgp.common.audit.aspect.Auditable;
+import gt.usac.cunoc.sgp.common.audit.model.AccionAuditoria;
+import gt.usac.cunoc.sgp.common.exception.ApiException;
+import gt.usac.cunoc.sgp.formulario.entity.VersionFormulario;
+import gt.usac.cunoc.sgp.formulario.repository.VersionFormularioRepository;
+import gt.usac.cunoc.sgp.mantenimiento.dto.CrearReglaMantenimientoRequest;
+import gt.usac.cunoc.sgp.mantenimiento.dto.EditarReglaMantenimientoRequest;
+import gt.usac.cunoc.sgp.mantenimiento.dto.ReglaMantenimientoResponse;
+import gt.usac.cunoc.sgp.mantenimiento.dto.ResumenReglasVersionResponse;
+import gt.usac.cunoc.sgp.mantenimiento.entity.ReglaMantenimiento;
+import gt.usac.cunoc.sgp.mantenimiento.mapper.ReglaMantenimientoMapper;
+import gt.usac.cunoc.sgp.mantenimiento.model.TipoOrden;
+import gt.usac.cunoc.sgp.mantenimiento.repository.ReglaMantenimientoRepository;
+import gt.usac.cunoc.sgp.notificacion.service.AvisosAcademicosService;
+import gt.usac.cunoc.sgp.usuario.entity.UserAccount;
+import gt.usac.cunoc.sgp.usuario.model.RoleName;
+import gt.usac.cunoc.sgp.usuario.repository.UserAccountRepository;
+import java.io.InputStream;
+import java.time.Clock;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.UUID;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.core.io.ClassPathResource;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
+import org.springframework.http.HttpStatus;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+@Service
+public class ReglaMantenimientoService {
+
+<span class="fc" id="L43">  private static final Logger log = LoggerFactory.getLogger(ReglaMantenimientoService.class);</span>
+  private static final int MAX_PAGE_SIZE = 100;
+
+  private final ReglaMantenimientoRepository reglaMantenimientoRepository;
+  private final VersionFormularioRepository versionFormularioRepository;
+  private final UserAccountRepository userAccountRepository;
+  private final ReglaMantenimientoMapper reglaMantenimientoMapper;
+  private final ValidadorReglaMantenimiento validadorReglaMantenimiento;
+  private final ObjectMapper objectMapper;
+  private final Clock clock;
+  private final AvisosAcademicosService avisosAcademicos;
+
+  public ReglaMantenimientoService(
+      ReglaMantenimientoRepository reglaMantenimientoRepository,
+      VersionFormularioRepository versionFormularioRepository,
+      UserAccountRepository userAccountRepository,
+      ReglaMantenimientoMapper reglaMantenimientoMapper,
+      ValidadorReglaMantenimiento validadorReglaMantenimiento,
+      ObjectMapper objectMapper,
+      Clock clock,
+<span class="fc" id="L63">      AvisosAcademicosService avisosAcademicos) {</span>
+<span class="fc" id="L64">    this.reglaMantenimientoRepository = reglaMantenimientoRepository;</span>
+<span class="fc" id="L65">    this.versionFormularioRepository = versionFormularioRepository;</span>
+<span class="fc" id="L66">    this.userAccountRepository = userAccountRepository;</span>
+<span class="fc" id="L67">    this.reglaMantenimientoMapper = reglaMantenimientoMapper;</span>
+<span class="fc" id="L68">    this.validadorReglaMantenimiento = validadorReglaMantenimiento;</span>
+<span class="fc" id="L69">    this.objectMapper = objectMapper;</span>
+<span class="fc" id="L70">    this.clock = clock;</span>
+<span class="fc" id="L71">    this.avisosAcademicos = avisosAcademicos;</span>
+<span class="fc" id="L72">  }</span>
+
+  @Transactional
+  public int sembrarCatalogoProvisionalSiNoExiste(UUID versionFormularioId, UUID usuarioId) {
+<span class="fc bfc" id="L76" title="All 2 branches covered.">    if (reglaMantenimientoRepository.existsByVersionFormularioId(versionFormularioId)) {</span>
+<span class="fc" id="L77">      log.debug(</span>
+          &quot;La versión {} ya cuenta con reglas de mantenimiento registradas&quot;, versionFormularioId);
+<span class="fc" id="L79">      return 0;</span>
+    }
+
+<span class="fc" id="L82">    VersionFormulario version =</span>
+        versionFormularioRepository
+<span class="fc" id="L84">            .findById(versionFormularioId)</span>
+<span class="fc" id="L85">            .orElseThrow(</span>
+                () -&gt;
+<span class="nc" id="L87">                    new ApiException(</span>
+                        HttpStatus.NOT_FOUND,
+                        &quot;version_no_encontrada&quot;,
+                        &quot;Versión de formulario no encontrada&quot;,
+                        &quot;No existe versión de formulario con id: &quot; + versionFormularioId));
+
+<span class="fc" id="L93">    UUID creadorId = usuarioId;</span>
+<span class="fc bfc" id="L94" title="All 2 branches covered.">    if (creadorId == null) {</span>
+<span class="fc" id="L95">      creadorId =</span>
+          userAccountRepository
+<span class="fc" id="L97">              .findByRole_NameAndActiveTrueOrderByEmailAsc(RoleName.ADMINISTRADOR)</span>
+<span class="fc" id="L98">              .stream()</span>
+<span class="fc" id="L99">              .findFirst()</span>
+<span class="fc" id="L100">              .map(UserAccount::getId)</span>
+<span class="fc" id="L101">              .orElse(version.getCreadoPorId());</span>
+    }
+
+    JsonNode reglasArray;
+<span class="fc" id="L105">    try (InputStream is =</span>
+<span class="fc" id="L106">        new ClassPathResource(&quot;mantenimiento/reglas-sieca-v1-semilla.json&quot;).getInputStream()) {</span>
+<span class="fc" id="L107">      reglasArray = objectMapper.readTree(is);</span>
+<span class="nc" id="L108">    } catch (Exception e) {</span>
+<span class="nc" id="L109">      log.error(&quot;Error al cargar la semilla de reglas de mantenimiento&quot;, e);</span>
+<span class="nc" id="L110">      throw new IllegalStateException(&quot;No fue posible cargar el archivo de semilla de reglas&quot;, e);</span>
+<span class="fc" id="L111">    }</span>
+
+<span class="fc" id="L113">    Instant ahora = clock.instant();</span>
+<span class="fc" id="L114">    List&lt;ReglaMantenimiento&gt; sembradas = new ArrayList&lt;&gt;();</span>
+
+<span class="fc bfc" id="L116" title="All 2 branches covered.">    for (JsonNode nodo : reglasArray) {</span>
+<span class="fc" id="L117">      String codigo = nodo.path(&quot;codigo&quot;).asText();</span>
+<span class="fc" id="L118">      String elementoRef = nodo.path(&quot;elemento_ref&quot;).asText();</span>
+<span class="fc" id="L119">      JsonNode condicion = nodo.path(&quot;condicion&quot;);</span>
+<span class="fc" id="L120">      TipoOrden tipo = TipoOrden.valueOf(nodo.path(&quot;tipo_mantenimiento&quot;).asText());</span>
+<span class="fc" id="L121">      String intervencion = nodo.path(&quot;intervencion_sugerida&quot;).asText();</span>
+<span class="fc" id="L122">      JsonNode reglaPrioridad = nodo.path(&quot;regla_prioridad&quot;);</span>
+
+      // Validar elemento e indicador contra el esquema
+<span class="fc" id="L125">      validadorReglaMantenimiento.validar(version.getEsquema(), elementoRef, condicion);</span>
+
+<span class="fc" id="L127">      ReglaMantenimiento regla =</span>
+          new ReglaMantenimiento(
+<span class="fc" id="L129">              UUID.randomUUID(),</span>
+              codigo,
+<span class="fc" id="L131">              1,</span>
+              version,
+              elementoRef,
+              condicion,
+              tipo,
+              intervencion,
+              reglaPrioridad,
+              true,
+              creadorId,
+              null,
+              null,
+              ahora);
+
+<span class="fc" id="L144">      sembradas.add(regla);</span>
+<span class="fc" id="L145">    }</span>
+
+<span class="fc" id="L147">    reglaMantenimientoRepository.saveAll(sembradas);</span>
+<span class="fc" id="L148">    avisosAcademicos.reglasPendientes(versionFormularioId);</span>
+<span class="fc" id="L149">    log.info(</span>
+        &quot;Sembradas exitosamente {} reglas de mantenimiento para versión {}&quot;,
+<span class="fc" id="L151">        sembradas.size(),</span>
+<span class="fc" id="L152">        version.getCodigo());</span>
+<span class="fc" id="L153">    return sembradas.size();</span>
+  }
+
+  @Transactional(readOnly = true)
+  public Page&lt;ReglaMantenimientoResponse&gt; listar(
+      UUID versionFormularioId,
+      TipoOrden tipo,
+      String elemento,
+      Boolean activa,
+      Pageable pageable) {
+    Pageable paginaAjustada =
+<span class="pc bpc" id="L164" title="1 of 2 branches missed.">        pageable.getPageSize() &gt; MAX_PAGE_SIZE</span>
+<span class="nc" id="L165">            ? PageRequest.of(pageable.getPageNumber(), MAX_PAGE_SIZE, pageable.getSort())</span>
+<span class="fc" id="L166">            : pageable;</span>
+
+<span class="fc" id="L168">    Specification&lt;ReglaMantenimiento&gt; spec =</span>
+<span class="fc" id="L169">        Specification.where(</span>
+            (root, query, cb) -&gt; {
+<span class="fc" id="L171">              query.distinct(true);</span>
+<span class="fc" id="L172">              return cb.conjunction();</span>
+            });
+
+<span class="pc bpc" id="L175" title="1 of 2 branches missed.">    if (versionFormularioId != null) {</span>
+<span class="fc" id="L176">      spec =</span>
+<span class="fc" id="L177">          spec.and(</span>
+              (root, query, cb) -&gt;
+<span class="fc" id="L179">                  cb.equal(root.get(&quot;versionFormulario&quot;).get(&quot;id&quot;), versionFormularioId));</span>
+    }
+
+<span class="pc bpc" id="L182" title="1 of 2 branches missed.">    if (tipo != null) {</span>
+<span class="nc" id="L183">      spec = spec.and((root, query, cb) -&gt; cb.equal(root.get(&quot;tipoMantenimiento&quot;), tipo));</span>
+    }
+
+<span class="pc bpc" id="L186" title="3 of 4 branches missed.">    if (elemento != null &amp;&amp; !elemento.isBlank()) {</span>
+<span class="nc" id="L187">      String termino = &quot;%&quot; + elemento.trim().toLowerCase() + &quot;%&quot;;</span>
+<span class="nc" id="L188">      spec = spec.and((root, query, cb) -&gt; cb.like(cb.lower(root.get(&quot;elementoRef&quot;)), termino));</span>
+    }
+
+<span class="pc bpc" id="L191" title="1 of 2 branches missed.">    if (activa != null) {</span>
+<span class="fc" id="L192">      spec = spec.and((root, query, cb) -&gt; cb.equal(root.get(&quot;activa&quot;), activa));</span>
+    }
+
+<span class="pc bpc" id="L195" title="1 of 2 branches missed.">    if (paginaAjustada.getSort().isUnsorted()) {</span>
+<span class="fc" id="L196">      paginaAjustada =</span>
+<span class="fc" id="L197">          PageRequest.of(</span>
+<span class="fc" id="L198">              paginaAjustada.getPageNumber(),</span>
+<span class="fc" id="L199">              paginaAjustada.getPageSize(),</span>
+<span class="fc" id="L200">              Sort.by(Sort.Order.asc(&quot;codigo&quot;), Sort.Order.desc(&quot;numeroRevision&quot;)));</span>
+    }
+
+<span class="fc" id="L203">    return reglaMantenimientoRepository</span>
+<span class="fc" id="L204">        .findAll(spec, paginaAjustada)</span>
+<span class="fc" id="L205">        .map(reglaMantenimientoMapper::toResponse);</span>
+  }
+
+  @Transactional(readOnly = true)
+  public ReglaMantenimientoResponse obtenerPorId(UUID id) {
+<span class="fc" id="L210">    return reglaMantenimientoRepository</span>
+<span class="fc" id="L211">        .findById(id)</span>
+<span class="fc" id="L212">        .map(reglaMantenimientoMapper::toResponse)</span>
+<span class="fc" id="L213">        .orElseThrow(</span>
+            () -&gt;
+<span class="nc" id="L215">                new ApiException(</span>
+                    HttpStatus.NOT_FOUND,
+                    &quot;regla_no_encontrada&quot;,
+                    &quot;Regla no encontrada&quot;,
+                    &quot;No existe regla de mantenimiento con ID: &quot; + id));
+  }
+
+  @Transactional
+  @Auditable(
+      accion = AccionAuditoria.CREAR,
+      entidad = &quot;regla_mantenimiento&quot;,
+      tipo = ReglaMantenimiento.class)
+  public ReglaMantenimientoResponse crearRegla(
+      CrearReglaMantenimientoRequest request, UUID usuarioId) {
+<span class="fc" id="L229">    VersionFormulario version =</span>
+        versionFormularioRepository
+<span class="fc" id="L231">            .findById(request.versionFormularioId())</span>
+<span class="fc" id="L232">            .orElseThrow(</span>
+                () -&gt;
+<span class="nc" id="L234">                    new ApiException(</span>
+                        HttpStatus.NOT_FOUND,
+                        &quot;version_no_encontrada&quot;,
+                        &quot;Versión de formulario no encontrada&quot;,
+<span class="nc" id="L238">                        &quot;No existe versión con ID: &quot; + request.versionFormularioId()));</span>
+
+<span class="fc" id="L240">    String codigoLimpio = request.codigo().trim();</span>
+<span class="fc" id="L241">    if (reglaMantenimientoRepository</span>
+<span class="fc" id="L242">        .findMaxNumeroRevision(codigoLimpio, version.getId())</span>
+<span class="pc bpc" id="L243" title="1 of 2 branches missed.">        .isPresent()) {</span>
+<span class="nc" id="L244">      throw new ApiException(</span>
+          HttpStatus.CONFLICT,
+          &quot;codigo_duplicado&quot;,
+          &quot;Código de regla ya existe&quot;,
+          &quot;Ya existe una regla con código '&quot;
+              + codigoLimpio
+              + &quot;' para esta versión. Utilice la edición para crear una nueva revisión.&quot;);
+    }
+
+<span class="fc" id="L253">    validadorReglaMantenimiento.validar(</span>
+<span class="fc" id="L254">        version.getEsquema(), request.elementoRef().trim(), request.condicion());</span>
+
+<span class="pc bpc" id="L256" title="2 of 4 branches missed.">    boolean activa = request.activa() == null || request.activa();</span>
+<span class="fc" id="L257">    Instant ahora = clock.instant();</span>
+
+<span class="fc" id="L259">    ReglaMantenimiento regla =</span>
+        new ReglaMantenimiento(
+<span class="fc" id="L261">            UUID.randomUUID(),</span>
+            codigoLimpio,
+<span class="fc" id="L263">            1,</span>
+            version,
+<span class="fc" id="L265">            request.elementoRef().trim(),</span>
+<span class="fc" id="L266">            request.condicion(),</span>
+<span class="fc" id="L267">            request.tipoMantenimiento(),</span>
+<span class="fc" id="L268">            request.intervencionSugerida().trim(),</span>
+<span class="fc" id="L269">            request.reglaPrioridad(),</span>
+            activa,
+            usuarioId,
+            null,
+            null,
+            ahora);
+
+<span class="fc" id="L276">    ReglaMantenimiento guardada = reglaMantenimientoRepository.save(regla);</span>
+<span class="fc" id="L277">    avisosAcademicos.reglasPendientes(version.getId());</span>
+<span class="fc" id="L278">    return reglaMantenimientoMapper.toResponse(guardada);</span>
+  }
+
+  @Transactional
+  @Auditable(
+      accion = AccionAuditoria.MODIFICAR,
+      entidad = &quot;regla_mantenimiento&quot;,
+      tipo = ReglaMantenimiento.class)
+  public ReglaMantenimientoResponse editarRegla(
+      UUID id, EditarReglaMantenimientoRequest request, UUID usuarioId) {
+<span class="fc" id="L288">    ReglaMantenimiento existente =</span>
+        reglaMantenimientoRepository
+<span class="fc" id="L290">            .findByIdForUpdate(id)</span>
+<span class="fc" id="L291">            .orElseThrow(</span>
+                () -&gt;
+<span class="nc" id="L293">                    new ApiException(</span>
+                        HttpStatus.NOT_FOUND,
+                        &quot;regla_no_encontrada&quot;,
+                        &quot;Regla no encontrada&quot;,
+                        &quot;No existe regla con ID: &quot; + id));
+
+<span class="fc" id="L299">    VersionFormulario version = existente.getVersionFormulario();</span>
+<span class="fc" id="L300">    validadorReglaMantenimiento.validar(</span>
+<span class="fc" id="L301">        version.getEsquema(), request.elementoRef().trim(), request.condicion());</span>
+
+<span class="fc" id="L303">    int siguienteRevision =</span>
+        reglaMantenimientoRepository
+<span class="fc" id="L305">                .findMaxNumeroRevision(existente.getCodigo(), version.getId())</span>
+<span class="fc" id="L306">                .orElse(existente.getNumeroRevision())</span>
+            + 1;
+
+<span class="pc bpc" id="L309" title="2 of 4 branches missed.">    boolean activa = request.activa() == null || request.activa();</span>
+<span class="pc bpc" id="L310" title="1 of 2 branches missed.">    if (activa) {</span>
+<span class="fc" id="L311">      reglaMantenimientoRepository.desactivarTodasLasRevisiones(</span>
+<span class="fc" id="L312">          existente.getCodigo(), version.getId());</span>
+    }
+
+<span class="fc" id="L315">    Instant ahora = clock.instant();</span>
+<span class="fc" id="L316">    ReglaMantenimiento nuevaRevision =</span>
+        new ReglaMantenimiento(
+<span class="fc" id="L318">            UUID.randomUUID(),</span>
+<span class="fc" id="L319">            existente.getCodigo(),</span>
+<span class="fc" id="L320">            siguienteRevision,</span>
+            version,
+<span class="fc" id="L322">            request.elementoRef().trim(),</span>
+<span class="fc" id="L323">            request.condicion(),</span>
+<span class="fc" id="L324">            request.tipoMantenimiento(),</span>
+<span class="fc" id="L325">            request.intervencionSugerida().trim(),</span>
+<span class="fc" id="L326">            request.reglaPrioridad(),</span>
+            activa,
+            usuarioId,
+            null,
+            null,
+            ahora);
+
+<span class="fc" id="L333">    ReglaMantenimiento guardada = reglaMantenimientoRepository.save(nuevaRevision);</span>
+<span class="fc" id="L334">    avisosAcademicos.reglasPendientes(version.getId());</span>
+<span class="fc" id="L335">    return reglaMantenimientoMapper.toResponse(guardada);</span>
+  }
+
+  @Transactional
+  @Auditable(
+      accion = AccionAuditoria.CAMBIAR_ESTADO,
+      entidad = &quot;regla_mantenimiento&quot;,
+      tipo = ReglaMantenimiento.class)
+  public ReglaMantenimientoResponse cambiarEstadoActiva(UUID id, boolean activa) {
+<span class="nc" id="L344">    ReglaMantenimiento regla =</span>
+        reglaMantenimientoRepository
+<span class="nc" id="L346">            .findByIdForUpdate(id)</span>
+<span class="nc" id="L347">            .orElseThrow(</span>
+                () -&gt;
+<span class="nc" id="L349">                    new ApiException(</span>
+                        HttpStatus.NOT_FOUND,
+                        &quot;regla_no_encontrada&quot;,
+                        &quot;Regla no encontrada&quot;,
+                        &quot;No existe regla con ID: &quot; + id));
+
+<span class="nc bnc" id="L355" title="All 2 branches missed.">    if (activa) {</span>
+<span class="nc" id="L356">      reglaMantenimientoRepository.desactivarOtrasRevisiones(</span>
+<span class="nc" id="L357">          regla.getCodigo(), regla.getVersionFormulario().getId(), regla.getId());</span>
+<span class="nc" id="L358">      regla.setActiva(true);</span>
+    } else {
+<span class="nc" id="L360">      regla.setActiva(false);</span>
+    }
+
+<span class="nc" id="L363">    ReglaMantenimiento guardada = reglaMantenimientoRepository.save(regla);</span>
+<span class="nc bnc" id="L364" title="All 2 branches missed.">    if (activa) avisosAcademicos.reglasPendientes(guardada.getVersionFormulario().getId());</span>
+<span class="nc" id="L365">    return reglaMantenimientoMapper.toResponse(guardada);</span>
+  }
+
+  @Transactional
+  @Auditable(
+      accion = AccionAuditoria.MODIFICAR,
+      entidad = &quot;regla_mantenimiento&quot;,
+      tipo = ReglaMantenimiento.class,
+      idArg = &quot;id&quot;,
+      recargarPosteriores = true)
+  public ReglaMantenimientoResponse validarRegla(UUID id, UUID usuarioId) {
+<span class="fc" id="L376">    ReglaMantenimiento regla =</span>
+        reglaMantenimientoRepository
+<span class="fc" id="L378">            .findByIdForUpdate(id)</span>
+<span class="fc" id="L379">            .orElseThrow(</span>
+                () -&gt;
+<span class="fc" id="L381">                    new ApiException(</span>
+                        HttpStatus.NOT_FOUND,
+                        &quot;regla_no_encontrada&quot;,
+                        &quot;Regla no encontrada&quot;,
+                        &quot;No existe regla con ID: &quot; + id));
+
+<span class="fc bfc" id="L387" title="All 2 branches covered.">    if (!regla.isActiva()) {</span>
+<span class="fc" id="L388">      throw new ApiException(</span>
+          HttpStatus.CONFLICT,
+          &quot;regla_no_vigente&quot;,
+          &quot;Regla no vigente&quot;,
+          &quot;Solo se puede validar la revision activa de una regla de mantenimiento.&quot;);
+    }
+<span class="fc bfc" id="L394" title="All 2 branches covered.">    if (!regla.isProvisional()) return reglaMantenimientoMapper.toResponse(regla);</span>
+<span class="fc" id="L395">    UserAccount validador =</span>
+        userAccountRepository
+<span class="fc" id="L397">            .findById(usuarioId)</span>
+<span class="fc" id="L398">            .orElseThrow(</span>
+                () -&gt;
+<span class="nc" id="L400">                    new ApiException(</span>
+                        HttpStatus.NOT_FOUND,
+                        &quot;usuario_no_encontrado&quot;,
+                        &quot;Usuario no encontrado&quot;,
+                        &quot;No existe el usuario que valida la regla.&quot;));
+<span class="fc" id="L405">    regla.validar(usuarioId, clock.instant());</span>
+<span class="fc" id="L406">    ReglaMantenimiento guardada = reglaMantenimientoRepository.save(regla);</span>
+<span class="fc" id="L407">    String nombre = validador.getNombreCompleto();</span>
+<span class="pc bpc" id="L408" title="1 of 4 branches missed.">    if (nombre == null || nombre.isBlank()) nombre = validador.getEmail();</span>
+<span class="fc" id="L409">    return reglaMantenimientoMapper.toResponse(guardada).conNombreValidador(nombre.trim());</span>
+  }
+
+  @Transactional(readOnly = true)
+  public ResumenReglasVersionResponse obtenerResumenVersion(UUID versionFormularioId) {
+<span class="fc" id="L414">    VersionFormulario version =</span>
+<span class="fc" id="L415">        versionFormularioRepository.findById(versionFormularioId).orElse(null);</span>
+<span class="pc bpc" id="L416" title="1 of 2 branches missed.">    String codigoVersion = version != null ? version.getCodigo() : &quot;&quot;;</span>
+
+<span class="fc" id="L418">    long total = reglaMantenimientoRepository.countByVersionFormularioId(versionFormularioId);</span>
+<span class="fc" id="L419">    long activas =</span>
+<span class="fc" id="L420">        reglaMantenimientoRepository.countByVersionFormularioIdAndActivaTrue(versionFormularioId);</span>
+<span class="fc" id="L421">    long provisionales =</span>
+<span class="fc" id="L422">        reglaMantenimientoRepository.countByVersionFormularioIdAndValidadoPorIdIsNull(</span>
+            versionFormularioId);
+<span class="fc" id="L424">    long validadas = total - provisionales;</span>
+
+    String advertencia =
+<span class="fc bfc" id="L427" title="All 2 branches covered.">        activas == 0 ? &quot;Esta versión no tiene reglas de mantenimiento activas&quot; : null;</span>
+
+<span class="fc bfc" id="L429" title="All 2 branches covered.">    return new ResumenReglasVersionResponse(</span>
+        versionFormularioId,
+        codigoVersion,
+        activas &gt; 0,
+        total,
+        activas,
+        provisionales,
+        validadas,
+        advertencia);
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

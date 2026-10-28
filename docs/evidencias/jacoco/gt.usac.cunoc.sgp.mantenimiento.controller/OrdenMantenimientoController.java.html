@@ -1,0 +1,214 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>OrdenMantenimientoController.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">sgp-api</a> &gt; <a href="index.source.html" class="el_package">gt.usac.cunoc.sgp.mantenimiento.controller</a> &gt; <span class="el_source">OrdenMantenimientoController.java</span></div><h1>OrdenMantenimientoController.java</h1><pre class="source lang-java linenums">package gt.usac.cunoc.sgp.mantenimiento.controller;
+
+import gt.usac.cunoc.sgp.common.exception.ApiException;
+import gt.usac.cunoc.sgp.common.security.JwtData;
+import gt.usac.cunoc.sgp.mantenimiento.dto.CambiarPrioridadOrdenRequest;
+import gt.usac.cunoc.sgp.mantenimiento.dto.CerrarComoEjecutadaRequest;
+import gt.usac.cunoc.sgp.mantenimiento.dto.CerrarSinEjecucionRequest;
+import gt.usac.cunoc.sgp.mantenimiento.dto.CrearOrdenMantenimientoRequest;
+import gt.usac.cunoc.sgp.mantenimiento.dto.FiltroOrdenesRequest;
+import gt.usac.cunoc.sgp.mantenimiento.dto.HistorialEstadoOrdenResponse;
+import gt.usac.cunoc.sgp.mantenimiento.dto.IniciarEjecucionRequest;
+import gt.usac.cunoc.sgp.mantenimiento.dto.OrdenMantenimientoResponse;
+import gt.usac.cunoc.sgp.mantenimiento.dto.ProgramarOrdenRequest;
+import gt.usac.cunoc.sgp.mantenimiento.dto.TotalesOrdenesResponse;
+import gt.usac.cunoc.sgp.mantenimiento.service.OrdenMantenimientoService;
+import gt.usac.cunoc.sgp.mantenimiento.service.TransicionOrdenService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import java.time.LocalDate;
+import java.util.List;
+import java.util.UUID;
+import org.springframework.data.domain.Page;
+import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+/**
+ * Órdenes de mantenimiento. No asigna estados: los cambios pasan por {@link
+ * TransicionOrdenService}, la única puerta de entrada (DT-BE-07).
+ */
+@RestController
+@RequestMapping(&quot;/api/v1/ordenes-mantenimiento&quot;)
+@SecurityRequirement(name = &quot;bearerAuth&quot;)
+@Tag(name = &quot;Mantenimiento&quot;, description = &quot;Ciclo de vida de las órdenes de mantenimiento&quot;)
+public class OrdenMantenimientoController {
+
+  private final OrdenMantenimientoService ordenes;
+  private final TransicionOrdenService transiciones;
+
+  public OrdenMantenimientoController(
+<span class="fc" id="L52">      OrdenMantenimientoService ordenes, TransicionOrdenService transiciones) {</span>
+<span class="fc" id="L53">    this.ordenes = ordenes;</span>
+<span class="fc" id="L54">    this.transiciones = transiciones;</span>
+<span class="fc" id="L55">  }</span>
+
+  @PostMapping
+  @PreAuthorize(&quot;hasAnyRole('CATEDRATICO','ADMINISTRADOR')&quot;)
+  @Operation(
+      summary = &quot;Crear una orden manual&quot;,
+      description =
+          &quot;Nace en PROPUESTA para un puente activo (409 si está dado de baja). Tipo, descripción y &quot;
+              + &quot;prioridad son obligatorios; tipo RUTINARIO, PREVENTIVO, CORRECTIVO o EMERGENCIA &quot;
+              + &quot;(422 en otro caso). Si indica una inspección, debe ser del mismo puente (409).&quot;)
+  public ResponseEntity&lt;OrdenMantenimientoResponse&gt; crear(
+      @RequestBody CrearOrdenMantenimientoRequest request, Authentication authentication) {
+<span class="fc" id="L67">    return ResponseEntity.status(HttpStatus.CREATED)</span>
+<span class="fc" id="L68">        .body(ordenes.crear(request, usuarioId(authentication)));</span>
+  }
+
+  @GetMapping
+  @PreAuthorize(&quot;isAuthenticated()&quot;)
+  @Operation(
+      summary = &quot;Listar órdenes de mantenimiento&quot;,
+      description =
+          &quot;Filtros combinables: puenteId, estado (se puede repetir), tipo, prioridad confirmada y &quot;
+              + &quot;rango de creación desde/hasta (yyyy-MM-dd, ambos incluidos, hora de Guatemala). &quot;
+              + &quot;Incluye las órdenes de puentes dados de baja. Página desde 0, tamaño entre 1 y &quot;
+              + &quot;100; de la más reciente a la más antigua.&quot;)
+  public Page&lt;OrdenMantenimientoResponse&gt; listar(
+      @RequestParam(required = false) UUID puenteId,
+      @RequestParam(required = false) List&lt;String&gt; estado,
+      @RequestParam(required = false) String tipo,
+      @RequestParam(required = false) String prioridad,
+      @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
+          LocalDate desde,
+      @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
+          LocalDate hasta,
+      @RequestParam(defaultValue = &quot;0&quot;) int pagina,
+      @RequestParam(defaultValue = &quot;20&quot;) int tamanio) {
+<span class="fc" id="L91">    return ordenes.listar(</span>
+        new FiltroOrdenesRequest(puenteId, estado, tipo, prioridad, desde, hasta), pagina, tamanio);
+  }
+
+  @GetMapping(&quot;/totales&quot;)
+  @PreAuthorize(&quot;isAuthenticated()&quot;)
+  @Operation(
+      summary = &quot;Totales de órdenes por estado&quot;,
+      description =
+          &quot;Mismos filtros que el listado, salvo el estado; para el contador de cada pestaña.&quot;)
+  public TotalesOrdenesResponse totales(
+      @RequestParam(required = false) UUID puenteId,
+      @RequestParam(required = false) String tipo,
+      @RequestParam(required = false) String prioridad,
+      @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
+          LocalDate desde,
+      @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
+          LocalDate hasta) {
+<span class="fc" id="L109">    return ordenes.totales(new FiltroOrdenesRequest(puenteId, null, tipo, prioridad, desde, hasta));</span>
+  }
+
+  @GetMapping(&quot;/{id}&quot;)
+  @PreAuthorize(&quot;isAuthenticated()&quot;)
+  @Operation(summary = &quot;Consultar una orden de mantenimiento&quot;)
+  public OrdenMantenimientoResponse obtener(@PathVariable UUID id) {
+<span class="fc" id="L116">    return ordenes.obtener(id);</span>
+  }
+
+  @PutMapping(&quot;/{id}/prioridad&quot;)
+  @PreAuthorize(&quot;hasAnyRole('CATEDRATICO','ADMINISTRADOR')&quot;)
+  @Operation(summary = &quot;Cambiar la prioridad confirmada con justificación&quot;)
+  public OrdenMantenimientoResponse cambiarPrioridad(
+      @PathVariable UUID id,
+      @RequestBody CambiarPrioridadOrdenRequest request,
+      Authentication authentication) {
+<span class="fc" id="L126">    return ordenes.cambiarPrioridad(id, request, usuarioId(authentication));</span>
+  }
+
+  @GetMapping(&quot;/{id}/historial&quot;)
+  @PreAuthorize(&quot;isAuthenticated()&quot;)
+  @Operation(
+      summary = &quot;Historial de estados de una orden&quot;,
+      description = &quot;Ordenado por secuencia; cada fila es inmutable.&quot;)
+  public List&lt;HistorialEstadoOrdenResponse&gt; historial(@PathVariable UUID id) {
+<span class="fc" id="L135">    return ordenes.historial(id);</span>
+  }
+
+  @PostMapping(&quot;/{id}/programar&quot;)
+  @PreAuthorize(&quot;hasAnyRole('CATEDRATICO','ADMINISTRADOR')&quot;)
+  @Operation(
+      summary = &quot;Aceptar y programar una orden propuesta&quot;,
+      description =
+          &quot;PROPUESTA a PROGRAMADA. La fecha no puede ser anterior a hoy (422). Exige la versión &quot;
+              + &quot;leída de la orden; si otro usuario la cambió responde 409.&quot;)
+  public OrdenMantenimientoResponse programar(
+      @PathVariable UUID id,
+      @RequestBody ProgramarOrdenRequest request,
+      Authentication authentication) {
+<span class="fc" id="L149">    return transiciones.aceptarYProgramar(id, request, usuarioId(authentication));</span>
+  }
+
+  @PostMapping(&quot;/{id}/descartar&quot;)
+  @PreAuthorize(&quot;hasAnyRole('CATEDRATICO','ADMINISTRADOR')&quot;)
+  @Operation(
+      summary = &quot;Descartar una orden propuesta&quot;,
+      description = &quot;PROPUESTA a DESCARTADA con motivo obligatorio (422 sin motivo).&quot;)
+  public OrdenMantenimientoResponse descartar(
+      @PathVariable UUID id,
+      @RequestBody CerrarSinEjecucionRequest request,
+      Authentication authentication) {
+<span class="fc" id="L161">    return transiciones.descartar(id, request, usuarioId(authentication));</span>
+  }
+
+  @PostMapping(&quot;/{id}/iniciar&quot;)
+  @PreAuthorize(&quot;hasAnyRole('CATEDRATICO','ADMINISTRADOR')&quot;)
+  @Operation(
+      summary = &quot;Iniciar la ejecución de una orden programada&quot;,
+      description = &quot;PROGRAMADA a EN_EJECUCION; crea el registro de ejecución.&quot;)
+  public OrdenMantenimientoResponse iniciar(
+      @PathVariable UUID id,
+      @RequestBody IniciarEjecucionRequest request,
+      Authentication authentication) {
+<span class="fc" id="L173">    return transiciones.iniciarEjecucion(id, request, usuarioId(authentication));</span>
+  }
+
+  @PostMapping(&quot;/{id}/cancelar&quot;)
+  @PreAuthorize(&quot;hasAnyRole('CATEDRATICO','ADMINISTRADOR')&quot;)
+  @Operation(
+      summary = &quot;Cancelar una orden programada&quot;,
+      description = &quot;PROGRAMADA a CANCELADA con motivo obligatorio (422 sin motivo).&quot;)
+  public OrdenMantenimientoResponse cancelar(
+      @PathVariable UUID id,
+      @RequestBody CerrarSinEjecucionRequest request,
+      Authentication authentication) {
+<span class="fc" id="L185">    return transiciones.cancelar(id, request, usuarioId(authentication));</span>
+  }
+
+  @PostMapping(&quot;/{id}/cerrar&quot;)
+  @PreAuthorize(&quot;hasAnyRole('CATEDRATICO','ADMINISTRADOR')&quot;)
+  @Operation(
+      summary = &quot;Cerrar una orden como ejecutada&quot;,
+      description =
+          &quot;EN_EJECUCION a EJECUTADA. Exige fecha de ejecución, responsable y al menos una &quot;
+              + &quot;fotografía de evidencia disponible (422 con el detalle de lo que falta). Responde &quot;
+              + &quot;503 si el almacenamiento no responde; en ambos casos la orden no cambia.&quot;)
+  public OrdenMantenimientoResponse cerrar(
+      @PathVariable UUID id,
+      @RequestBody CerrarComoEjecutadaRequest request,
+      Authentication authentication) {
+<span class="fc" id="L200">    return transiciones.cerrarComoEjecutada(id, request, usuarioId(authentication));</span>
+  }
+
+  private UUID usuarioId(Authentication authentication) {
+<span class="pc bpc" id="L204" title="2 of 4 branches missed.">    if (authentication == null || !(authentication.getDetails() instanceof JwtData jwtData)) {</span>
+<span class="nc" id="L205">      throw new ApiException(</span>
+          HttpStatus.UNAUTHORIZED,
+          &quot;autenticacion_requerida&quot;,
+          &quot;Autenticación requerida&quot;,
+          &quot;Se requiere una sesión válida para gestionar órdenes de mantenimiento.&quot;);
+    }
+<span class="fc" id="L211">    return jwtData.userId();</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

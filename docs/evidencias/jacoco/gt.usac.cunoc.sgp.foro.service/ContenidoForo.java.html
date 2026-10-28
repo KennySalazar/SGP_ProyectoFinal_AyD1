@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ContenidoForo.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">sgp-api</a> &gt; <a href="index.source.html" class="el_package">gt.usac.cunoc.sgp.foro.service</a> &gt; <span class="el_source">ContenidoForo.java</span></div><h1>ContenidoForo.java</h1><pre class="source lang-java linenums">package gt.usac.cunoc.sgp.foro.service;
+
+import gt.usac.cunoc.sgp.common.exception.ApiException;
+import java.util.Map;
+import org.springframework.http.HttpStatus;
+
+/** Límites y limpieza de lo que se escribe en el foro. */
+final class ContenidoForo {
+
+  /** Longitud máxima del título de un hilo. Es una decisión de HU-063, no de la base de datos. */
+  static final int LONGITUD_MAXIMA_TITULO = 120;
+
+  /** Longitud máxima de un comentario. */
+  static final int LONGITUD_MAXIMA_COMENTARIO = 2000;
+
+  private ContenidoForo() {}
+
+  /**
+   * Prepara un comentario: unifica los saltos de línea, quita los caracteres de control (PostgreSQL
+   * rechaza NUL) y los espacios de los extremos. Devuelve {@code null} si queda vacío. El HTML no
+   * se altera: se guarda como texto y la interfaz lo muestra escapado.
+   */
+  static String limpiarComentario(String texto) {
+<span class="fc bfc" id="L24" title="All 2 branches covered.">    if (texto == null) return null;</span>
+<span class="fc" id="L25">    String limpio =</span>
+<span class="fc" id="L26">        texto.replace(&quot;\r\n&quot;, &quot;\n&quot;).replace('\r', '\n').replaceAll(&quot;[\\p{Cc}&amp;&amp;[^\\n\\t]]&quot;, &quot;&quot;);</span>
+<span class="fc" id="L27">    limpio = limpio.strip();</span>
+<span class="fc bfc" id="L28" title="All 2 branches covered.">    return limpio.isEmpty() ? null : limpio;</span>
+  }
+
+  /** Prepara un título: una sola línea, sin caracteres de control ni espacios repetidos. */
+  static String limpiarTitulo(String texto) {
+<span class="pc bpc" id="L33" title="1 of 2 branches missed.">    if (texto == null) return null;</span>
+<span class="fc" id="L34">    String limpio = texto.replaceAll(&quot;\\p{Cc}&quot;, &quot; &quot;).replaceAll(&quot;\\s+&quot;, &quot; &quot;).strip();</span>
+<span class="fc bfc" id="L35" title="All 2 branches covered.">    return limpio.isEmpty() ? null : limpio;</span>
+  }
+
+  /** Prepara la referencia a un elemento; devuelve {@code null} si viene vacía. */
+  static String limpiarReferencia(String texto) {
+<span class="fc bfc" id="L40" title="All 2 branches covered.">    if (texto == null) return null;</span>
+<span class="fc" id="L41">    String limpio = texto.strip();</span>
+<span class="fc bfc" id="L42" title="All 2 branches covered.">    return limpio.isEmpty() ? null : limpio;</span>
+  }
+
+  /**
+   * Escapa {@code %}, {@code _} y el propio escape para usar un texto literal dentro de un LIKE.
+   */
+  static String escaparLike(String texto) {
+<span class="fc" id="L49">    return texto.replace(&quot;!&quot;, &quot;!!&quot;).replace(&quot;%&quot;, &quot;!%&quot;).replace(&quot;_&quot;, &quot;!_&quot;);</span>
+  }
+
+  static Map&lt;String, String&gt; error(String campo, String mensaje) {
+<span class="fc" id="L53">    return Map.of(&quot;campo&quot;, campo, &quot;mensaje&quot;, mensaje);</span>
+  }
+
+  /** Página desde 0 y tamaño entre 1 y 100 (DT-BE-08). */
+  static void validarPaginacion(int pagina, int tamanio) {
+<span class="fc bfc" id="L58" title="All 6 branches covered.">    if (pagina &lt; 0 || tamanio &lt; 1 || tamanio &gt; 100) {</span>
+<span class="fc" id="L59">      throw new ApiException(</span>
+          HttpStatus.UNPROCESSABLE_ENTITY,
+          &quot;paginacion_invalida&quot;,
+          &quot;Paginación inválida&quot;,
+          &quot;La página debe ser mayor o igual a 0 y el tamaño debe estar entre 1 y 100.&quot;);
+    }
+<span class="fc" id="L65">  }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

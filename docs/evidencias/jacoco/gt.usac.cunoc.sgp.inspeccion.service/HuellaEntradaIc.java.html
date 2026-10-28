@@ -1,0 +1,120 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>HuellaEntradaIc.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">sgp-api</a> &gt; <a href="index.source.html" class="el_package">gt.usac.cunoc.sgp.inspeccion.service</a> &gt; <span class="el_source">HuellaEntradaIc.java</span></div><h1>HuellaEntradaIc.java</h1><pre class="source lang-java linenums">package gt.usac.cunoc.sgp.inspeccion.service;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.JsonNodeFactory;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import gt.usac.cunoc.sgp.common.exception.ApiException;
+import gt.usac.cunoc.sgp.inspeccion.model.EntradaCalculoIc;
+import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.ArrayList;
+import java.util.HexFormat;
+import java.util.List;
+import java.util.Map;
+import org.springframework.http.HttpStatus;
+import org.springframework.stereotype.Service;
+
+@Service
+public class HuellaEntradaIc {
+
+  private final MessageDigest sha256;
+
+<span class="fc" id="L24">  public HuellaEntradaIc() throws NoSuchAlgorithmException {</span>
+<span class="fc" id="L25">    this.sha256 = MessageDigest.getInstance(&quot;SHA-256&quot;);</span>
+<span class="fc" id="L26">  }</span>
+
+  public synchronized String calcular(EntradaCalculoIc entrada) {
+<span class="fc bfc" id="L29" title="All 2 branches covered.">    if (entrada == null) {</span>
+<span class="fc" id="L30">      throw error(&quot;La entrada del calculo es obligatoria&quot;);</span>
+    }
+
+<span class="fc" id="L33">    ObjectNode documento = JsonNodeFactory.instance.objectNode();</span>
+
+<span class="fc" id="L35">    documento.put(</span>
+        &quot;versionFormularioId&quot;,
+<span class="fc bfc" id="L37" title="All 2 branches covered.">        entrada.versionFormularioId() == null ? null : entrada.versionFormularioId().toString());</span>
+
+<span class="fc" id="L39">    documento.put(&quot;codigoFormulario&quot;, entrada.codigoFormulario());</span>
+<span class="fc" id="L40">    documento.put(&quot;versionAlgoritmo&quot;, entrada.versionAlgoritmo());</span>
+<span class="fc" id="L41">    documento.set(&quot;datos&quot;, normalizar(entrada.datos()));</span>
+<span class="fc" id="L42">    documento.set(&quot;esquema&quot;, normalizar(entrada.esquema()));</span>
+<span class="fc" id="L43">    documento.set(&quot;catalogoElementos&quot;, normalizar(entrada.catalogoElementos()));</span>
+<span class="fc" id="L44">    documento.set(&quot;reglasEvaluacion&quot;, normalizar(entrada.reglasEvaluacion()));</span>
+<span class="fc" id="L45">    documento.set(&quot;pesos&quot;, normalizarPesos(entrada.pesos()));</span>
+
+<span class="fc" id="L47">    byte[] contenido = normalizar(documento).toString().getBytes(StandardCharsets.UTF_8);</span>
+
+<span class="fc" id="L49">    return HexFormat.of().formatHex(sha256.digest(contenido));</span>
+  }
+
+  private JsonNode normalizarPesos(Map&lt;String, BigDecimal&gt; pesos) {
+<span class="fc bfc" id="L53" title="All 2 branches covered.">    if (pesos == null) {</span>
+<span class="fc" id="L54">      return JsonNodeFactory.instance.nullNode();</span>
+    }
+
+<span class="fc" id="L57">    ObjectNode resultado = JsonNodeFactory.instance.objectNode();</span>
+
+<span class="fc bfc" id="L59" title="All 2 branches covered.">    for (Map.Entry&lt;String, BigDecimal&gt; entrada : pesos.entrySet()) {</span>
+<span class="fc bfc" id="L60" title="All 2 branches covered.">      if (entrada.getKey() == null) {</span>
+<span class="fc" id="L61">        throw error(&quot;Los pesos no pueden contener una referencia nula&quot;);</span>
+      }
+
+<span class="fc" id="L64">      BigDecimal peso = entrada.getValue();</span>
+
+<span class="fc bfc" id="L66" title="All 2 branches covered.">      if (peso == null) {</span>
+<span class="fc" id="L67">        resultado.putNull(entrada.getKey());</span>
+      } else {
+<span class="fc" id="L69">        resultado.set(</span>
+<span class="fc" id="L70">            entrada.getKey(), JsonNodeFactory.instance.numberNode(peso.stripTrailingZeros()));</span>
+      }
+<span class="fc" id="L72">    }</span>
+
+<span class="fc" id="L74">    return normalizar(resultado);</span>
+  }
+
+  private JsonNode normalizar(JsonNode nodo) {
+<span class="fc bfc" id="L78" title="All 6 branches covered.">    if (nodo == null || nodo.isNull() || nodo.isMissingNode()) {</span>
+<span class="fc" id="L79">      return JsonNodeFactory.instance.nullNode();</span>
+    }
+
+<span class="fc bfc" id="L82" title="All 2 branches covered.">    if (nodo.isObject()) {</span>
+<span class="fc" id="L83">      ObjectNode resultado = JsonNodeFactory.instance.objectNode();</span>
+<span class="fc" id="L84">      List&lt;String&gt; propiedades = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L85">      nodo.fieldNames().forEachRemaining(propiedades::add);</span>
+<span class="fc" id="L86">      propiedades.sort(String::compareTo);</span>
+
+<span class="fc bfc" id="L88" title="All 2 branches covered.">      for (String propiedad : propiedades) {</span>
+<span class="fc" id="L89">        resultado.set(propiedad, normalizar(nodo.get(propiedad)));</span>
+<span class="fc" id="L90">      }</span>
+
+<span class="fc" id="L92">      return resultado;</span>
+    }
+
+<span class="fc bfc" id="L95" title="All 2 branches covered.">    if (nodo.isArray()) {</span>
+<span class="fc" id="L96">      var resultado = JsonNodeFactory.instance.arrayNode();</span>
+
+<span class="fc bfc" id="L98" title="All 2 branches covered.">      for (JsonNode elemento : nodo) {</span>
+<span class="fc" id="L99">        resultado.add(normalizar(elemento));</span>
+<span class="fc" id="L100">      }</span>
+
+<span class="fc" id="L102">      return resultado;</span>
+    }
+
+<span class="fc bfc" id="L105" title="All 2 branches covered.">    if (nodo.isNumber()) {</span>
+<span class="fc" id="L106">      return JsonNodeFactory.instance.numberNode(nodo.decimalValue().stripTrailingZeros());</span>
+    }
+
+<span class="fc" id="L109">    return nodo.deepCopy();</span>
+  }
+
+  private ApiException error(String detalle) {
+<span class="fc" id="L113">    return new ApiException(</span>
+        HttpStatus.UNPROCESSABLE_ENTITY,
+        &quot;entrada_ic_invalida&quot;,
+        &quot;Entrada del indice de condicion invalida&quot;,
+        detalle);
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

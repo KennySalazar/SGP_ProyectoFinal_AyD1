@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AuditoriaWriter.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">sgp-api</a> &gt; <a href="index.source.html" class="el_package">gt.usac.cunoc.sgp.common.audit.service</a> &gt; <span class="el_source">AuditoriaWriter.java</span></div><h1>AuditoriaWriter.java</h1><pre class="source lang-java linenums">package gt.usac.cunoc.sgp.common.audit.service;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import gt.usac.cunoc.sgp.common.audit.entity.Auditoria;
+import gt.usac.cunoc.sgp.common.audit.model.AccionAuditoria;
+import gt.usac.cunoc.sgp.common.audit.repository.AuditoriaRepository;
+import gt.usac.cunoc.sgp.common.util.UuidV7Generator;
+import java.time.Clock;
+import java.util.UUID;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
+
+@Service
+public class AuditoriaWriter {
+
+  private final AuditoriaRepository repositorio;
+  private final Clock clock;
+
+<span class="fc" id="L20">  public AuditoriaWriter(AuditoriaRepository repositorio, Clock clock) {</span>
+<span class="fc" id="L21">    this.repositorio = repositorio;</span>
+<span class="fc" id="L22">    this.clock = clock;</span>
+<span class="fc" id="L23">  }</span>
+
+  @Transactional(propagation = Propagation.REQUIRES_NEW)
+  public void registrar(
+      UUID usuarioId,
+      AccionAuditoria accion,
+      String entidad,
+      UUID entidadId,
+      JsonNode valoresAnteriores,
+      JsonNode valoresPosteriores,
+      String proceso) {
+<span class="fc" id="L34">    guardar(usuarioId, accion, entidad, entidadId, valoresAnteriores, valoresPosteriores, proceso);</span>
+<span class="fc" id="L35">  }</span>
+
+  @Transactional(propagation = Propagation.MANDATORY)
+  public void registrarEnTransaccion(
+      UUID usuarioId,
+      AccionAuditoria accion,
+      String entidad,
+      UUID entidadId,
+      JsonNode valoresAnteriores,
+      JsonNode valoresPosteriores,
+      String proceso) {
+<span class="fc" id="L46">    guardar(usuarioId, accion, entidad, entidadId, valoresAnteriores, valoresPosteriores, proceso);</span>
+<span class="fc" id="L47">  }</span>
+
+  /**
+   * Resumen de una ejecución de un proceso programado: sin usuario y con el nombre del proceso como
+   * proceso automático (HU-069, RN-USR-09).
+   */
+  @Transactional(propagation = Propagation.REQUIRES_NEW)
+  public void registrarProceso(String proceso, JsonNode resumen) {
+<span class="fc" id="L55">    guardar(</span>
+        null, AccionAuditoria.EJECUTAR_PROCESO, &quot;proceso_programado&quot;, null, null, resumen, proceso);
+<span class="fc" id="L57">  }</span>
+
+  private void guardar(
+      UUID usuarioId,
+      AccionAuditoria accion,
+      String entidad,
+      UUID entidadId,
+      JsonNode valoresAnteriores,
+      JsonNode valoresPosteriores,
+      String proceso) {
+<span class="fc" id="L67">    var auditoria =</span>
+        new Auditoria(
+<span class="fc" id="L69">            UuidV7Generator.generate(),</span>
+            usuarioId,
+            accion,
+            entidad,
+            entidadId,
+            valoresAnteriores,
+            valoresPosteriores,
+<span class="fc" id="L76">            procesoNormalizado(proceso),</span>
+<span class="fc" id="L77">            clock.instant());</span>
+
+<span class="fc" id="L79">    repositorio.save(auditoria);</span>
+<span class="fc" id="L80">  }</span>
+
+  private String procesoNormalizado(String proceso) {
+<span class="fc bfc" id="L83" title="All 4 branches covered.">    if (proceso == null || proceso.isBlank()) {</span>
+<span class="fc" id="L84">      return null;</span>
+    }
+<span class="fc" id="L86">    return proceso;</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

@@ -1,0 +1,594 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Inspeccion.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">sgp-api</a> &gt; <a href="index.source.html" class="el_package">gt.usac.cunoc.sgp.inspeccion.entity</a> &gt; <span class="el_source">Inspeccion.java</span></div><h1>Inspeccion.java</h1><pre class="source lang-java linenums">package gt.usac.cunoc.sgp.inspeccion.entity;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import gt.usac.cunoc.sgp.common.util.UuidV7Generator;
+import gt.usac.cunoc.sgp.formulario.entity.VersionFormulario;
+import gt.usac.cunoc.sgp.inspeccion.model.EstadoInspeccion;
+import gt.usac.cunoc.sgp.puente.entity.Puente;
+import jakarta.persistence.CascadeType;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OneToMany;
+import jakarta.persistence.OneToOne;
+import jakarta.persistence.PrePersist;
+import jakarta.persistence.PreUpdate;
+import jakarta.persistence.Table;
+import jakarta.persistence.Version;
+import java.math.BigDecimal;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
+import java.util.UUID;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
+import org.locationtech.jts.geom.Point;
+
+@Entity
+@Table(name = &quot;inspeccion&quot;)
+public class Inspeccion {
+
+  @Id private UUID id;
+
+  @ManyToOne(fetch = FetchType.LAZY, optional = false)
+  @JoinColumn(name = &quot;puente_id&quot;, nullable = false)
+  private Puente puente;
+
+  @ManyToOne(fetch = FetchType.LAZY, optional = false)
+  @JoinColumn(name = &quot;version_formulario_id&quot;, nullable = false)
+  private VersionFormulario versionFormulario;
+
+  @Column(name = &quot;autor_id&quot;, nullable = false)
+  private UUID autorId;
+
+  @Column(name = &quot;huella_solicitud_inicio&quot;, length = 64, updatable = false)
+  private String huellaSolicitudInicio;
+
+  @Column(name = &quot;rol_autor_creacion&quot;, nullable = false, length = 40)
+  private String rolAutorCreacion;
+
+  @Column(name = &quot;nombre_autor_capturado&quot;, nullable = false, length = 200)
+  private String nombreAutorCapturado;
+
+  @Column(name = &quot;asignacion_puente_id&quot;)
+  private UUID asignacionPuenteId;
+
+  @Column(name = &quot;preparacion_salida_id&quot;)
+  private UUID preparacionSalidaId;
+
+  @Column(name = &quot;inspeccion_base_id&quot;)
+  private UUID inspeccionBaseId;
+
+<span class="fc" id="L67">  @Column(nullable = false, length = 20)</span>
+  private String tipo = &quot;ORIGINAL&quot;;
+
+  @Column(name = &quot;supersede_a_id&quot;)
+  private UUID supersedeAId;
+
+  @Column(name = &quot;motivo_correccion&quot;)
+  private String motivoCorreccion;
+
+<span class="fc" id="L76">  @Column(nullable = false, length = 30)</span>
+  private String estado = &quot;BORRADOR&quot;;
+
+  @Column(name = &quot;fecha_inspeccion&quot;, nullable = false)
+  private LocalDate fechaInspeccion;
+
+  @Column(name = &quot;dispositivo_id&quot;, nullable = false, length = 100)
+  private String dispositivoId;
+
+  @JdbcTypeCode(SqlTypes.GEOGRAPHY)
+  @Column(name = &quot;ubicacion_inicio&quot;, columnDefinition = &quot;geography(Point,4326)&quot;)
+  private Point ubicacionInicio;
+
+  @Column(name = &quot;precision_gps_m&quot;, precision = 10, scale = 2)
+  private BigDecimal precisionGpsM;
+
+  @Column(name = &quot;distancia_al_puente_m&quot;, precision = 12, scale = 2)
+  private BigDecimal distanciaAlPuenteM;
+
+  @Column(name = &quot;datos_permanentes_confirmados_en&quot;)
+  private Instant datosPermanentesConfirmadosEn;
+
+  @JdbcTypeCode(SqlTypes.JSON)
+  @Column(name = &quot;identificacion_capturada&quot;)
+  private JsonNode identificacionCapturada;
+
+  @JdbcTypeCode(SqlTypes.JSON)
+  @Column(name = &quot;datos&quot;, nullable = false)
+  private JsonNode datos;
+
+  @Column(name = &quot;creado_dispositivo_en&quot;)
+  private Instant creadoDispositivoEn;
+
+  @Column(name = &quot;enviado_dispositivo_en&quot;)
+  private Instant enviadoDispositivoEn;
+
+  @Column(name = &quot;sincronizado_en&quot;)
+  private Instant sincronizadoEn;
+
+  @Column(name = &quot;publicado_en&quot;)
+  private Instant publicadoEn;
+
+  @Column(name = &quot;ultima_actividad_en&quot;, nullable = false)
+  private Instant ultimaActividadEn;
+
+  @Column(name = &quot;eliminado_en&quot;)
+  private Instant eliminadoEn;
+
+  @Column(name = &quot;eliminado_por_id&quot;)
+  private UUID eliminadoPorId;
+
+  @Column(name = &quot;creado_en&quot;, nullable = false, updatable = false)
+  private Instant creadoEn;
+
+  @Column(name = &quot;actualizado_en&quot;, nullable = false)
+  private Instant actualizadoEn;
+
+  @Version
+  @Column(nullable = false)
+  private Long version;
+
+<span class="fc" id="L137">  @OneToMany(mappedBy = &quot;inspeccion&quot;, cascade = CascadeType.ALL, orphanRemoval = true)</span>
+  private List&lt;InspeccionAcompanante&gt; acompanantes = new ArrayList&lt;&gt;();
+
+  @OneToOne(mappedBy = &quot;inspeccion&quot;, cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+  private InspeccionDatoTecnico datoTecnico;
+
+  public String getHuellaSolicitudInicio() {
+<span class="fc" id="L144">    return huellaSolicitudInicio;</span>
+  }
+
+  public void setHuellaSolicitudInicio(String huella) {
+<span class="pc bpc" id="L148" title="3 of 4 branches missed.">    if (huellaSolicitudInicio != null &amp;&amp; !huellaSolicitudInicio.equals(huella)) {</span>
+<span class="nc" id="L149">      throw new IllegalStateException(&quot;La huella de inicio es inmutable&quot;);</span>
+    }
+<span class="fc" id="L151">    huellaSolicitudInicio = huella;</span>
+<span class="fc" id="L152">  }</span>
+
+<span class="fc" id="L154">  public Inspeccion() {}</span>
+
+  public Inspeccion(
+      UUID id,
+      Puente puente,
+      VersionFormulario versionFormulario,
+      UUID autorId,
+      String rolAutorCreacion,
+      String nombreAutorCapturado,
+      LocalDate fechaInspeccion,
+      String dispositivoId,
+      Point ubicacionInicio,
+      BigDecimal precisionGpsM,
+      BigDecimal distanciaAlPuenteM,
+      Instant datosPermanentesConfirmadosEn,
+      JsonNode datos,
+<span class="fc" id="L170">      Instant ahora) {</span>
+<span class="fc" id="L171">    this.id = id;</span>
+<span class="fc" id="L172">    this.puente = puente;</span>
+<span class="fc" id="L173">    this.versionFormulario = versionFormulario;</span>
+<span class="fc" id="L174">    this.autorId = autorId;</span>
+<span class="fc" id="L175">    this.rolAutorCreacion = rolAutorCreacion;</span>
+<span class="fc" id="L176">    this.nombreAutorCapturado = nombreAutorCapturado;</span>
+<span class="fc" id="L177">    this.fechaInspeccion = fechaInspeccion;</span>
+<span class="fc" id="L178">    this.dispositivoId = dispositivoId;</span>
+<span class="fc" id="L179">    this.ubicacionInicio = ubicacionInicio;</span>
+<span class="fc" id="L180">    this.precisionGpsM = precisionGpsM;</span>
+<span class="fc" id="L181">    this.distanciaAlPuenteM = distanciaAlPuenteM;</span>
+<span class="fc" id="L182">    this.datosPermanentesConfirmadosEn = datosPermanentesConfirmadosEn;</span>
+<span class="fc" id="L183">    this.datos = datos;</span>
+<span class="fc" id="L184">    this.tipo = &quot;ORIGINAL&quot;;</span>
+<span class="fc" id="L185">    this.estado = &quot;BORRADOR&quot;;</span>
+<span class="fc" id="L186">    this.ultimaActividadEn = ahora;</span>
+<span class="fc" id="L187">    this.creadoEn = ahora;</span>
+<span class="fc" id="L188">    this.actualizadoEn = ahora;</span>
+<span class="fc" id="L189">  }</span>
+
+  public Inspeccion(
+      Puente puente,
+      VersionFormulario versionFormulario,
+      UUID autorId,
+      String rolAutorCreacion,
+      String nombreAutorCapturado,
+      LocalDate fechaInspeccion,
+      String dispositivoId,
+      JsonNode datos) {
+<span class="fc" id="L200">    this(</span>
+<span class="fc" id="L201">        UuidV7Generator.generate(),</span>
+        puente,
+        versionFormulario,
+        autorId,
+        rolAutorCreacion,
+        nombreAutorCapturado,
+        fechaInspeccion,
+<span class="pc bpc" id="L208" title="1 of 2 branches missed.">        dispositivoId != null ? dispositivoId : &quot;web&quot;,</span>
+        null,
+        null,
+        null,
+        null,
+        datos,
+<span class="fc" id="L214">        Instant.now());</span>
+<span class="fc" id="L215">  }</span>
+
+  /**
+   * Nueva inspección de tipo CORRECCION en BORRADOR, relacionada con la original publicada mediante
+   * supersede_a (RN-INS-08). Parte de los datos de la original porque corrige la misma visita; la
+   * original no se modifica.
+   */
+  public static Inspeccion correccionDe(
+      Inspeccion original,
+      UUID autorId,
+      String rolAutor,
+      String nombreAutor,
+      String motivo,
+      Instant ahora) {
+<span class="fc" id="L229">    Inspeccion correccion =</span>
+        new Inspeccion(
+<span class="fc" id="L231">            UuidV7Generator.generate(),</span>
+<span class="fc" id="L232">            original.getPuente(),</span>
+<span class="fc" id="L233">            original.getVersionFormulario(),</span>
+            autorId,
+            rolAutor,
+            nombreAutor,
+<span class="fc" id="L237">            original.getFechaInspeccion(),</span>
+            &quot;web&quot;,
+            null,
+            null,
+            null,
+            null,
+<span class="pc bpc" id="L243" title="1 of 2 branches missed.">            original.getDatos() == null ? null : original.getDatos().deepCopy(),</span>
+            ahora);
+<span class="fc" id="L245">    correccion.tipo = &quot;CORRECCION&quot;;</span>
+<span class="fc" id="L246">    correccion.supersedeAId = original.getId();</span>
+<span class="fc" id="L247">    correccion.motivoCorreccion = motivo;</span>
+<span class="fc" id="L248">    correccion.identificacionCapturada =</span>
+<span class="pc bpc" id="L249" title="1 of 2 branches missed.">        original.getIdentificacionCapturada() == null</span>
+<span class="fc" id="L250">            ? null</span>
+<span class="pc" id="L251">            : original.getIdentificacionCapturada().deepCopy();</span>
+<span class="fc" id="L252">    return correccion;</span>
+  }
+
+  @PrePersist
+  public void alPersistir() {
+<span class="pc bpc" id="L257" title="1 of 2 branches missed.">    if (this.id == null) {</span>
+<span class="nc" id="L258">      this.id = UuidV7Generator.generate();</span>
+    }
+<span class="fc" id="L260">    Instant ahora = Instant.now();</span>
+<span class="pc bpc" id="L261" title="1 of 2 branches missed.">    if (this.creadoEn == null) {</span>
+<span class="nc" id="L262">      this.creadoEn = ahora;</span>
+    }
+<span class="pc bpc" id="L264" title="1 of 2 branches missed.">    if (this.actualizadoEn == null) {</span>
+<span class="nc" id="L265">      this.actualizadoEn = ahora;</span>
+    }
+<span class="pc bpc" id="L267" title="1 of 2 branches missed.">    if (this.ultimaActividadEn == null) {</span>
+<span class="nc" id="L268">      this.ultimaActividadEn = ahora;</span>
+    }
+<span class="fc" id="L270">  }</span>
+
+  @PreUpdate
+  public void alActualizar() {
+<span class="fc" id="L274">    Instant ahora = Instant.now();</span>
+<span class="fc" id="L275">    this.actualizadoEn = ahora;</span>
+<span class="fc" id="L276">    this.ultimaActividadEn = ahora;</span>
+<span class="fc" id="L277">  }</span>
+
+  public UUID getId() {
+<span class="fc" id="L280">    return id;</span>
+  }
+
+  public void setId(UUID id) {
+<span class="nc" id="L284">    this.id = id;</span>
+<span class="nc" id="L285">  }</span>
+
+  public Puente getPuente() {
+<span class="fc" id="L288">    return puente;</span>
+  }
+
+  public void setPuente(Puente puente) {
+<span class="nc" id="L292">    this.puente = puente;</span>
+<span class="nc" id="L293">  }</span>
+
+  public VersionFormulario getVersionFormulario() {
+<span class="fc" id="L296">    return versionFormulario;</span>
+  }
+
+  public void setVersionFormulario(VersionFormulario versionFormulario) {
+<span class="nc" id="L300">    this.versionFormulario = versionFormulario;</span>
+<span class="nc" id="L301">  }</span>
+
+  public UUID getAutorId() {
+<span class="fc" id="L304">    return autorId;</span>
+  }
+
+  public void setAutorId(UUID autorId) {
+<span class="nc" id="L308">    this.autorId = autorId;</span>
+<span class="nc" id="L309">  }</span>
+
+  public String getRolAutorCreacion() {
+<span class="fc" id="L312">    return rolAutorCreacion;</span>
+  }
+
+  public void setRolAutorCreacion(String rolAutorCreacion) {
+<span class="nc" id="L316">    this.rolAutorCreacion = rolAutorCreacion;</span>
+<span class="nc" id="L317">  }</span>
+
+  public String getNombreAutorCapturado() {
+<span class="fc" id="L320">    return nombreAutorCapturado;</span>
+  }
+
+  public void setNombreAutorCapturado(String nombreAutorCapturado) {
+<span class="nc" id="L324">    this.nombreAutorCapturado = nombreAutorCapturado;</span>
+<span class="nc" id="L325">  }</span>
+
+  public UUID getAsignacionPuenteId() {
+<span class="fc" id="L328">    return asignacionPuenteId;</span>
+  }
+
+  public void setAsignacionPuenteId(UUID asignacionPuenteId) {
+<span class="fc" id="L332">    this.asignacionPuenteId = asignacionPuenteId;</span>
+<span class="fc" id="L333">  }</span>
+
+  public UUID getPreparacionSalidaId() {
+<span class="nc" id="L336">    return preparacionSalidaId;</span>
+  }
+
+  public void setPreparacionSalidaId(UUID preparacionSalidaId) {
+<span class="nc" id="L340">    this.preparacionSalidaId = preparacionSalidaId;</span>
+<span class="nc" id="L341">  }</span>
+
+  public UUID getInspeccionBaseId() {
+<span class="nc" id="L344">    return inspeccionBaseId;</span>
+  }
+
+  public void setInspeccionBaseId(UUID inspeccionBaseId) {
+<span class="nc" id="L348">    this.inspeccionBaseId = inspeccionBaseId;</span>
+<span class="nc" id="L349">  }</span>
+
+  public String getTipo() {
+<span class="fc" id="L352">    return tipo;</span>
+  }
+
+  public void setTipo(String tipo) {
+<span class="nc" id="L356">    this.tipo = tipo;</span>
+<span class="nc" id="L357">  }</span>
+
+  public UUID getSupersedeAId() {
+<span class="fc" id="L360">    return supersedeAId;</span>
+  }
+
+  public void setSupersedeAId(UUID supersedeAId) {
+<span class="nc" id="L364">    this.supersedeAId = supersedeAId;</span>
+<span class="nc" id="L365">  }</span>
+
+  public String getMotivoCorreccion() {
+<span class="fc" id="L368">    return motivoCorreccion;</span>
+  }
+
+  public void setMotivoCorreccion(String motivoCorreccion) {
+<span class="nc" id="L372">    this.motivoCorreccion = motivoCorreccion;</span>
+<span class="nc" id="L373">  }</span>
+
+  public String getEstado() {
+<span class="fc" id="L376">    return estado;</span>
+  }
+
+  /**
+   * Cambia el estado. Solo debe invocarlo {@code TransicionInspeccionService}, la única puerta de
+   * entrada que valida la transición y registra el historial (DT-BE-07).
+   */
+  public void aplicarEstado(EstadoInspeccion nuevo, Instant ahora) {
+<span class="fc" id="L384">    this.estado = nuevo.name();</span>
+<span class="fc bfc" id="L385" title="All 2 branches covered.">    if (nuevo == EstadoInspeccion.ENVIADA) {</span>
+<span class="fc" id="L386">      this.enviadoDispositivoEn = ahora;</span>
+<span class="fc bfc" id="L387" title="All 2 branches covered.">    } else if (nuevo == EstadoInspeccion.PUBLICADA) {</span>
+<span class="fc" id="L388">      this.publicadoEn = ahora;</span>
+    }
+<span class="fc" id="L390">    this.ultimaActividadEn = ahora;</span>
+<span class="fc" id="L391">    this.actualizadoEn = ahora;</span>
+<span class="fc" id="L392">  }</span>
+
+  public EstadoInspeccion estadoActual() {
+<span class="fc" id="L395">    return EstadoInspeccion.valueOf(estado);</span>
+  }
+
+  public LocalDate getFechaInspeccion() {
+<span class="fc" id="L399">    return fechaInspeccion;</span>
+  }
+
+  public void setFechaInspeccion(LocalDate fechaInspeccion) {
+<span class="nc" id="L403">    this.fechaInspeccion = fechaInspeccion;</span>
+<span class="nc" id="L404">  }</span>
+
+  public String getDispositivoId() {
+<span class="fc" id="L407">    return dispositivoId;</span>
+  }
+
+  public void setDispositivoId(String dispositivoId) {
+<span class="nc" id="L411">    this.dispositivoId = dispositivoId;</span>
+<span class="nc" id="L412">  }</span>
+
+  public Point getUbicacionInicio() {
+<span class="fc" id="L415">    return ubicacionInicio;</span>
+  }
+
+  public void setUbicacionInicio(Point ubicacionInicio) {
+<span class="nc" id="L419">    this.ubicacionInicio = ubicacionInicio;</span>
+<span class="nc" id="L420">  }</span>
+
+  public BigDecimal getPrecisionGpsM() {
+<span class="fc" id="L423">    return precisionGpsM;</span>
+  }
+
+  public void setPrecisionGpsM(BigDecimal precisionGpsM) {
+<span class="nc" id="L427">    this.precisionGpsM = precisionGpsM;</span>
+<span class="nc" id="L428">  }</span>
+
+  public BigDecimal getDistanciaAlPuenteM() {
+<span class="fc" id="L431">    return distanciaAlPuenteM;</span>
+  }
+
+  public void setDistanciaAlPuenteM(BigDecimal distanciaAlPuenteM) {
+<span class="nc" id="L435">    this.distanciaAlPuenteM = distanciaAlPuenteM;</span>
+<span class="nc" id="L436">  }</span>
+
+  public Instant getDatosPermanentesConfirmadosEn() {
+<span class="fc" id="L439">    return datosPermanentesConfirmadosEn;</span>
+  }
+
+  public void setDatosPermanentesConfirmadosEn(Instant datosPermanentesConfirmadosEn) {
+<span class="nc" id="L443">    this.datosPermanentesConfirmadosEn = datosPermanentesConfirmadosEn;</span>
+<span class="nc" id="L444">  }</span>
+
+  public JsonNode getIdentificacionCapturada() {
+<span class="fc" id="L447">    return identificacionCapturada;</span>
+  }
+
+  public void setIdentificacionCapturada(JsonNode identificacionCapturada) {
+<span class="nc" id="L451">    this.identificacionCapturada = identificacionCapturada;</span>
+<span class="nc" id="L452">  }</span>
+
+  public JsonNode getDatos() {
+<span class="fc" id="L455">    return datos;</span>
+  }
+
+  public void setDatos(JsonNode datos) {
+<span class="fc" id="L459">    this.datos = datos;</span>
+<span class="fc" id="L460">  }</span>
+
+  public Instant getCreadoDispositivoEn() {
+<span class="nc" id="L463">    return creadoDispositivoEn;</span>
+  }
+
+  public void setCreadoDispositivoEn(Instant creadoDispositivoEn) {
+<span class="nc" id="L467">    this.creadoDispositivoEn = creadoDispositivoEn;</span>
+<span class="nc" id="L468">  }</span>
+
+  public Instant getEnviadoDispositivoEn() {
+<span class="fc" id="L471">    return enviadoDispositivoEn;</span>
+  }
+
+  public void setEnviadoDispositivoEn(Instant enviadoDispositivoEn) {
+<span class="nc" id="L475">    this.enviadoDispositivoEn = enviadoDispositivoEn;</span>
+<span class="nc" id="L476">  }</span>
+
+  public Instant getSincronizadoEn() {
+<span class="nc" id="L479">    return sincronizadoEn;</span>
+  }
+
+  public void setSincronizadoEn(Instant sincronizadoEn) {
+<span class="nc" id="L483">    this.sincronizadoEn = sincronizadoEn;</span>
+<span class="nc" id="L484">  }</span>
+
+  public Instant getPublicadoEn() {
+<span class="fc" id="L487">    return publicadoEn;</span>
+  }
+
+  public Instant getUltimaActividadEn() {
+<span class="fc" id="L491">    return ultimaActividadEn;</span>
+  }
+
+  public void setUltimaActividadEn(Instant ultimaActividadEn) {
+<span class="fc" id="L495">    this.ultimaActividadEn = ultimaActividadEn;</span>
+<span class="fc" id="L496">  }</span>
+
+  public Instant getEliminadoEn() {
+<span class="fc" id="L499">    return eliminadoEn;</span>
+  }
+
+  public void setEliminadoEn(Instant eliminadoEn) {
+<span class="nc" id="L503">    this.eliminadoEn = eliminadoEn;</span>
+<span class="nc" id="L504">  }</span>
+
+  public UUID getEliminadoPorId() {
+<span class="fc" id="L507">    return eliminadoPorId;</span>
+  }
+
+  public void setEliminadoPorId(UUID eliminadoPorId) {
+<span class="nc" id="L511">    this.eliminadoPorId = eliminadoPorId;</span>
+<span class="nc" id="L512">  }</span>
+
+  public Instant getCreadoEn() {
+<span class="fc" id="L515">    return creadoEn;</span>
+  }
+
+  public void setCreadoEn(Instant creadoEn) {
+<span class="nc" id="L519">    this.creadoEn = creadoEn;</span>
+<span class="nc" id="L520">  }</span>
+
+  public Instant getActualizadoEn() {
+<span class="fc" id="L523">    return actualizadoEn;</span>
+  }
+
+  public List&lt;InspeccionAcompanante&gt; getAcompanantes() {
+<span class="fc" id="L527">    return acompanantes;</span>
+  }
+
+  public InspeccionDatoTecnico getDatoTecnico() {
+<span class="fc" id="L531">    return datoTecnico;</span>
+  }
+
+  public void setDatoTecnico(InspeccionDatoTecnico datoTecnico) {
+<span class="fc" id="L535">    this.datoTecnico = datoTecnico;</span>
+<span class="fc" id="L536">  }</span>
+
+  public void agregarAcompanante(InspeccionAcompanante acompanante) {
+<span class="fc" id="L539">    this.acompanantes.add(acompanante);</span>
+<span class="fc" id="L540">  }</span>
+
+  public void actualizarBorrador(
+      JsonNode datos, JsonNode identificacionCapturada, LocalDate fechaInspeccion, Instant ahora) {
+<span class="pc bpc" id="L544" title="1 of 2 branches missed.">    if (datos != null) {</span>
+<span class="fc" id="L545">      this.datos = datos;</span>
+    }
+<span class="pc bpc" id="L547" title="1 of 2 branches missed.">    if (identificacionCapturada != null) {</span>
+<span class="nc" id="L548">      this.identificacionCapturada = identificacionCapturada;</span>
+    }
+<span class="pc bpc" id="L550" title="1 of 2 branches missed.">    if (fechaInspeccion != null) {</span>
+<span class="fc" id="L551">      this.fechaInspeccion = fechaInspeccion;</span>
+    }
+<span class="fc" id="L553">    this.ultimaActividadEn = ahora;</span>
+<span class="fc" id="L554">    this.actualizadoEn = ahora;</span>
+<span class="fc" id="L555">  }</span>
+
+  public void reemplazarAcompanantes(List&lt;InspeccionAcompanante&gt; nuevosAcompanantes) {
+<span class="fc" id="L558">    this.acompanantes.clear();</span>
+<span class="pc bpc" id="L559" title="1 of 2 branches missed.">    if (nuevosAcompanantes != null) {</span>
+<span class="fc" id="L560">      this.acompanantes.addAll(nuevosAcompanantes);</span>
+    }
+<span class="fc" id="L562">  }</span>
+
+  public void marcarEliminado(UUID usuarioId, Instant ahora) {
+<span class="fc" id="L565">    this.eliminadoEn = ahora;</span>
+<span class="fc" id="L566">    this.eliminadoPorId = usuarioId;</span>
+<span class="fc" id="L567">    this.actualizadoEn = ahora;</span>
+<span class="fc" id="L568">  }</span>
+
+  public void setActualizadoEn(Instant actualizadoEn) {
+<span class="fc" id="L571">    this.actualizadoEn = actualizadoEn;</span>
+<span class="fc" id="L572">  }</span>
+
+  public Long getVersion() {
+<span class="fc" id="L575">    return version;</span>
+  }
+
+  public void setVersion(Long version) {
+<span class="nc" id="L579">    this.version = version;</span>
+<span class="nc" id="L580">  }</span>
+
+  @Override
+  public boolean equals(Object o) {
+<span class="nc bnc" id="L584" title="All 2 branches missed.">    if (this == o) return true;</span>
+<span class="nc bnc" id="L585" title="All 2 branches missed.">    if (!(o instanceof Inspeccion that)) return false;</span>
+<span class="nc" id="L586">    return Objects.equals(id, that.id);</span>
+  }
+
+  @Override
+  public int hashCode() {
+<span class="nc" id="L591">    return Objects.hash(id);</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

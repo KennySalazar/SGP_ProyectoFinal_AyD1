@@ -1,0 +1,436 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CalculoIndiceCondicionService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">sgp-api</a> &gt; <a href="index.source.html" class="el_package">gt.usac.cunoc.sgp.inspeccion.service</a> &gt; <span class="el_source">CalculoIndiceCondicionService.java</span></div><h1>CalculoIndiceCondicionService.java</h1><pre class="source lang-java linenums">package gt.usac.cunoc.sgp.inspeccion.service;
+
+import com.fasterxml.jackson.core.JsonPointer;
+import com.fasterxml.jackson.databind.JsonNode;
+import gt.usac.cunoc.sgp.common.exception.ApiException;
+import gt.usac.cunoc.sgp.inspeccion.model.EntradaCalculoIc;
+import gt.usac.cunoc.sgp.inspeccion.model.ResultadoCalculoIc;
+import gt.usac.cunoc.sgp.inspeccion.model.ResultadoCalculoIc.DesgloseElemento;
+import gt.usac.cunoc.sgp.inspeccion.model.ResultadoCalculoIc.DesgloseIndicador;
+import gt.usac.cunoc.sgp.inspeccion.model.ResultadoCalculoIc.DesgloseInstancia;
+import gt.usac.cunoc.sgp.inspeccion.service.ResolverElementosIc.ElementoResuelto;
+import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+import org.springframework.http.HttpStatus;
+import org.springframework.stereotype.Service;
+
+@Service
+public class CalculoIndiceCondicionService {
+
+  private final ResolverElementosIc resolver;
+  private final ConversorIndicadoresIc conversor;
+  private final ConversorMedicionesIc mediciones;
+  private final AgregadorCalificacionesIc agregador;
+  private final EvaluadorCondicionesCriticasIc condicionesCriticas;
+  private final HuellaEntradaIc huella;
+  private final MotorPonderacionIc motor;
+
+  public CalculoIndiceCondicionService(
+      ResolverElementosIc resolver,
+      ConversorIndicadoresIc conversor,
+      ConversorMedicionesIc mediciones,
+      AgregadorCalificacionesIc agregador,
+      EvaluadorCondicionesCriticasIc condicionesCriticas,
+      HuellaEntradaIc huella,
+<span class="fc" id="L38">      MotorPonderacionIc motor) {</span>
+<span class="fc" id="L39">    this.resolver = resolver;</span>
+<span class="fc" id="L40">    this.conversor = conversor;</span>
+<span class="fc" id="L41">    this.mediciones = mediciones;</span>
+<span class="fc" id="L42">    this.agregador = agregador;</span>
+<span class="fc" id="L43">    this.condicionesCriticas = condicionesCriticas;</span>
+<span class="fc" id="L44">    this.huella = huella;</span>
+<span class="fc" id="L45">    this.motor = motor;</span>
+<span class="fc" id="L46">  }</span>
+
+  public ResultadoCalculoIc calcular(EntradaCalculoIc entrada) {
+<span class="fc" id="L49">    validarEntrada(entrada);</span>
+
+<span class="fc" id="L51">    JsonNode elementos = entrada.catalogoElementos().get(&quot;elementos&quot;);</span>
+
+<span class="fc bfc" id="L53" title="All 4 branches covered.">    if (elementos == null || !elementos.isArray()) {</span>
+<span class="fc" id="L54">      throw error(&quot;configuracion_ic_incompleta&quot;, &quot;Falta el catalogo de elementos evaluables&quot;);</span>
+    }
+
+<span class="fc" id="L57">    List&lt;DesgloseElemento&gt; desglose = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L58">    Set&lt;String&gt; referencias = new HashSet&lt;&gt;();</span>
+
+<span class="fc bfc" id="L60" title="All 2 branches covered.">    for (JsonNode definicion : elementos) {</span>
+<span class="fc" id="L61">      String referencia = texto(definicion.get(&quot;elemento_ref&quot;), &quot;elemento_ref&quot;);</span>
+
+<span class="fc bfc" id="L63" title="All 2 branches covered.">      if (!referencias.add(referencia)) {</span>
+<span class="fc" id="L64">        throw error(</span>
+            &quot;configuracion_ic_invalida&quot;, &quot;Elemento duplicado en el catalogo: &quot; + referencia);
+      }
+
+<span class="fc bfc" id="L68" title="All 2 branches covered.">      if (excluido(entrada.reglasEvaluacion(), referencia)) {</span>
+<span class="fc" id="L69">        continue;</span>
+      }
+
+<span class="fc bfc" id="L72" title="All 2 branches covered.">      if (cauceNoAplica(entrada.datos(), referencia)) {</span>
+<span class="fc" id="L73">        continue;</span>
+      }
+
+<span class="fc" id="L76">      validarRutaEvaluada(entrada.datos(), JsonPointer.compile(referencia), &quot;&quot;);</span>
+
+<span class="fc" id="L78">      List&lt;ElementoResuelto&gt; instancias = resolver.resolver(entrada.datos(), referencia);</span>
+
+<span class="fc bfc" id="L80" title="All 2 branches covered.">      if (instancias.isEmpty()) {</span>
+<span class="fc bfc" id="L81" title="All 2 branches covered.">        if (definicion.path(&quot;repetible&quot;).asBoolean(false)) {</span>
+<span class="fc" id="L82">          continue;</span>
+        }
+
+<span class="fc" id="L85">        throw error(&quot;datos_ic_incompletos&quot;, &quot;Falta evaluar el elemento &quot; + referencia);</span>
+      }
+
+<span class="fc" id="L88">      List&lt;DesgloseInstancia&gt; detalles = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L89">      List&lt;BigDecimal&gt; calificaciones = new ArrayList&lt;&gt;();</span>
+
+<span class="fc bfc" id="L91" title="All 2 branches covered.">      for (ElementoResuelto instancia : instancias) {</span>
+<span class="fc" id="L92">        DesgloseInstancia detalle = evaluarInstancia(entrada, definicion, instancia);</span>
+<span class="fc" id="L93">        detalles.add(detalle);</span>
+
+<span class="fc bfc" id="L95" title="All 2 branches covered.">        if (detalle.incluida()) {</span>
+<span class="fc" id="L96">          calificaciones.add(detalle.calificacion());</span>
+        }
+<span class="fc" id="L98">      }</span>
+
+<span class="fc bfc" id="L100" title="All 2 branches covered.">      if (calificaciones.isEmpty()) {</span>
+<span class="fc" id="L101">        continue;</span>
+      }
+
+<span class="fc" id="L104">      BigDecimal peso = entrada.pesos().get(referencia);</span>
+
+<span class="fc bfc" id="L106" title="All 4 branches covered.">      if (peso == null || peso.signum() &lt;= 0) {</span>
+<span class="fc" id="L107">        throw error(</span>
+            &quot;configuracion_ic_incompleta&quot;, &quot;Falta configurar un peso positivo para &quot; + referencia);
+      }
+
+<span class="fc" id="L111">      String reglaInstancias =</span>
+<span class="fc" id="L112">          texto(</span>
+<span class="fc" id="L113">              entrada.reglasEvaluacion().path(&quot;agregacion&quot;).get(&quot;instancias_repetibles&quot;),</span>
+              &quot;agregacion.instancias_repetibles&quot;);
+
+<span class="fc" id="L116">      BigDecimal calificacion = agregador.agregar(calificaciones, reglaInstancias, referencia);</span>
+
+<span class="fc" id="L118">      desglose.add(</span>
+          new DesgloseElemento(
+              referencia,
+              peso,
+              calificacion,
+<span class="fc" id="L123">              calificacion.multiply(peso),</span>
+              reglaInstancias,
+              detalles));
+<span class="fc" id="L126">    }</span>
+
+<span class="fc" id="L128">    var anulaciones = condicionesCriticas.evaluar(entrada.datos(), entrada.reglasEvaluacion());</span>
+
+<span class="fc" id="L130">    return motor.calcular(entrada, desglose, anulaciones, huella.calcular(entrada));</span>
+  }
+
+  private DesgloseInstancia evaluarInstancia(
+      EntradaCalculoIc entrada, JsonNode definicion, ElementoResuelto instancia) {
+
+<span class="fc" id="L136">    JsonNode datos = instancia.datos();</span>
+<span class="fc" id="L137">    String existencia = datos.path(&quot;existencia&quot;).asText(&quot;PRESENTE&quot;);</span>
+
+<span class="fc bfc" id="L139" title="All 2 branches covered.">    if (&quot;NO_APLICA&quot;.equals(existencia)) {</span>
+<span class="fc" id="L140">      return detalle(instancia, existencia, false, null, List.of());</span>
+    }
+
+<span class="fc bfc" id="L143" title="All 4 branches covered.">    if (!&quot;PRESENTE&quot;.equals(existencia) &amp;&amp; !&quot;AUSENTE&quot;.equals(existencia)) {</span>
+<span class="fc" id="L144">      throw error(</span>
+          &quot;datos_ic_invalidos&quot;,
+<span class="fc" id="L146">          &quot;Existencia invalida en &quot; + instancia.rutaDatos() + &quot;: &quot; + existencia);</span>
+    }
+
+<span class="fc bfc" id="L149" title="All 2 branches covered.">    if (&quot;AUSENTE&quot;.equals(existencia)) {</span>
+      String reglaAusencia =
+<span class="fc bfc" id="L151" title="All 2 branches covered.">          definicion.path(&quot;portante&quot;).asBoolean(false)</span>
+<span class="fc" id="L152">              ? &quot;elementos_ausentes_portantes&quot;</span>
+<span class="fc" id="L153">              : &quot;elementos_ausentes_no_portantes&quot;;</span>
+
+<span class="fc" id="L155">      BigDecimal calificacion =</span>
+<span class="fc" id="L156">          conversor.leerCalificacion(</span>
+<span class="fc" id="L157">              entrada.reglasEvaluacion().path(&quot;agregacion&quot;).get(reglaAusencia),</span>
+<span class="fc" id="L158">              instancia.rutaDatos() + &quot;.existencia=AUSENTE&quot;);</span>
+
+<span class="fc" id="L160">      return detalle(</span>
+          instancia,
+          existencia,
+          true,
+          calificacion,
+<span class="fc" id="L165">          List.of(new DesgloseIndicador(&quot;existencia&quot;, &quot;AUSENTE&quot;, calificacion)));</span>
+    }
+
+<span class="fc" id="L168">    JsonNode indicadores = definicion.get(&quot;indicadores&quot;);</span>
+
+<span class="fc bfc" id="L170" title="All 6 branches covered.">    if (indicadores == null || !indicadores.isArray() || indicadores.isEmpty()) {</span>
+<span class="fc" id="L171">      throw error(</span>
+<span class="fc" id="L172">          &quot;configuracion_ic_incompleta&quot;, &quot;Faltan los indicadores de &quot; + instancia.rutaDatos());</span>
+    }
+
+<span class="fc" id="L175">    List&lt;DesgloseIndicador&gt; detalles = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L176">    List&lt;BigDecimal&gt; calificaciones = new ArrayList&lt;&gt;();</span>
+
+<span class="fc bfc" id="L178" title="All 2 branches covered.">    for (JsonNode indicador : indicadores) {</span>
+<span class="fc" id="L179">      String nombre = texto(indicador, &quot;indicador&quot;);</span>
+<span class="fc" id="L180">      JsonNode valor = datos.get(nombre);</span>
+
+<span class="fc bfc" id="L182" title="All 2 branches covered.">      if (omitirIndicador(datos, nombre, valor)) {</span>
+<span class="fc" id="L183">        continue;</span>
+      }
+
+<span class="fc bfc" id="L186" title="All 4 branches covered.">      if (valor == null || valor.isNull()) {</span>
+<span class="fc" id="L187">        throw error(</span>
+<span class="fc" id="L188">            &quot;datos_ic_incompletos&quot;, &quot;Falta el indicador &quot; + instancia.rutaDatos() + &quot;/&quot; + nombre);</span>
+      }
+
+<span class="fc bfc" id="L191" title="All 2 branches covered.">      if (valor.isArray()) {</span>
+<span class="fc bfc" id="L192" title="All 2 branches covered.">        if (valor.isEmpty()) {</span>
+<span class="fc" id="L193">          throw error(</span>
+              &quot;datos_ic_incompletos&quot;,
+<span class="fc" id="L195">              &quot;El indicador no puede estar vacio: &quot; + instancia.rutaDatos() + &quot;/&quot; + nombre);</span>
+        }
+
+<span class="fc bfc" id="L198" title="All 2 branches covered.">        for (JsonNode item : valor) {</span>
+<span class="fc" id="L199">          agregarIndicador(entrada, instancia, nombre, item, detalles, calificaciones);</span>
+<span class="fc" id="L200">        }</span>
+      } else {
+<span class="fc" id="L202">        agregarIndicador(entrada, instancia, nombre, valor, detalles, calificaciones);</span>
+      }
+<span class="fc" id="L204">    }</span>
+
+<span class="fc" id="L206">    String regla =</span>
+<span class="fc" id="L207">        texto(</span>
+<span class="fc" id="L208">            entrada.reglasEvaluacion().path(&quot;agregacion&quot;).get(&quot;indicadores_de_un_elemento&quot;),</span>
+            &quot;agregacion.indicadores_de_un_elemento&quot;);
+
+<span class="fc" id="L211">    BigDecimal calificacion = agregador.agregar(calificaciones, regla, instancia.rutaDatos());</span>
+
+<span class="fc" id="L213">    return detalle(instancia, existencia, true, calificacion, detalles);</span>
+  }
+
+  private void agregarIndicador(
+      EntradaCalculoIc entrada,
+      ElementoResuelto instancia,
+      String nombre,
+      JsonNode valor,
+      List&lt;DesgloseIndicador&gt; detalles,
+      List&lt;BigDecimal&gt; calificaciones) {
+
+<span class="fc" id="L224">    String referencia = instancia.rutaDatos() + &quot;/&quot; + nombre;</span>
+<span class="fc" id="L225">    JsonNode reglas = entrada.reglasEvaluacion();</span>
+<span class="fc" id="L226">    JsonNode conversiones = reglas.path(&quot;conversion_indicadores&quot;);</span>
+    BigDecimal calificacion;
+
+<span class="fc bfc" id="L229" title="All 4 branches covered.">    if (&quot;otros&quot;.equals(nombre) || &quot;danos&quot;.equals(nombre)) {</span>
+<span class="fc" id="L230">      calificacion = conversor.convertirSeveridad(valor.get(&quot;severidad&quot;), reglas, referencia);</span>
+<span class="fc bfc" id="L231" title="All 2 branches covered.">    } else if (valor.isNumber()) {</span>
+<span class="fc" id="L232">      JsonNode configuracion = conversiones.path(&quot;numericos&quot;).path(nombre);</span>
+<span class="fc bfc" id="L233" title="All 2 branches covered.">      String campoUmbrales = &quot;golpeado_longitud_m&quot;.equals(nombre) ? &quot;umbrales_m&quot; : &quot;umbrales&quot;;</span>
+
+<span class="fc" id="L235">      calificacion =</span>
+<span class="fc" id="L236">          mediciones.convertir(valor, configuracion.get(campoUmbrales), reglas, referencia);</span>
+<span class="fc bfc" id="L237" title="All 2 branches covered.">    } else if (valor.isBoolean()) {</span>
+<span class="fc" id="L238">      String familia = familiaBooleano(instancia.rutaDatos(), nombre);</span>
+<span class="fc" id="L239">      String clave = familia + &quot;.&quot; + nombre + &quot;=&quot; + valor.asText();</span>
+
+<span class="fc" id="L241">      calificacion =</span>
+<span class="fc" id="L242">          conversor.leerCalificacion(</span>
+<span class="fc" id="L243">              conversiones.path(&quot;booleanos&quot;).get(clave), referencia + &quot; [&quot; + valor.asText() + &quot;]&quot;);</span>
+<span class="fc" id="L244">    } else {</span>
+<span class="fc" id="L245">      JsonNode escala = reglas.path(&quot;escala_severidad&quot;);</span>
+
+<span class="fc bfc" id="L247" title="All 4 branches covered.">      if (valor.isTextual() &amp;&amp; escala.has(valor.textValue())) {</span>
+<span class="fc" id="L248">        calificacion = conversor.convertirSeveridad(valor, reglas, referencia);</span>
+      } else {
+<span class="fc" id="L250">        String familia = familiaEnumerado(instancia.rutaDatos(), nombre);</span>
+
+<span class="fc" id="L252">        calificacion =</span>
+<span class="fc" id="L253">            conversor.convertirCategoria(</span>
+<span class="fc" id="L254">                valor, conversiones.path(&quot;enumerados&quot;).get(familia), referencia);</span>
+      }
+    }
+
+<span class="fc" id="L258">    detalles.add(new DesgloseIndicador(nombre, valor.toString(), calificacion));</span>
+<span class="fc" id="L259">    calificaciones.add(calificacion);</span>
+<span class="fc" id="L260">  }</span>
+
+  private boolean omitirIndicador(JsonNode datos, String nombre, JsonNode valor) {
+<span class="fc bfc" id="L263" title="All 8 branches covered.">    if ((&quot;otros&quot;.equals(nombre) || &quot;danos&quot;.equals(nombre)) &amp;&amp; (valor == null || valor.isNull())) {</span>
+<span class="fc" id="L264">      return true;</span>
+    }
+
+<span class="fc bfc" id="L267" title="All 6 branches covered.">    if (&quot;estado&quot;.equals(nombre) &amp;&amp; datos.has(&quot;existe&quot;) &amp;&amp; !datos.path(&quot;existe&quot;).asBoolean()) {</span>
+<span class="fc" id="L268">      return true;</span>
+    }
+
+<span class="fc bfc" id="L271" title="All 2 branches covered.">    return datos.path(&quot;buen_estado&quot;).asBoolean(false)</span>
+<span class="fc bfc" id="L272" title="All 2 branches covered.">        &amp;&amp; Set.of(&quot;asentado&quot;, &quot;fisurado&quot;, &quot;bache&quot;).contains(nombre);</span>
+  }
+
+  private String familiaBooleano(String ruta, String nombre) {
+<span class="fc bfc" id="L276" title="All 4 branches covered.">    if (&quot;falta_elemento&quot;.equals(nombre) || &quot;junta_limpia&quot;.equals(nombre)) {</span>
+<span class="fc" id="L277">      return &quot;junta&quot;;</span>
+    }
+
+<span class="fc bfc" id="L280" title="All 2 branches covered.">    if (&quot;buen_estado&quot;.equals(nombre)) {</span>
+<span class="fc" id="L281">      return &quot;losa&quot;;</span>
+    }
+
+<span class="fc bfc" id="L284" title="All 2 branches covered.">    if (&quot;existe&quot;.equals(nombre)) {</span>
+<span class="fc bfc" id="L285" title="All 2 branches covered.">      if (ruta.startsWith(&quot;/otros/senalizacion/&quot;)) {</span>
+<span class="fc" id="L286">        return &quot;senal&quot;;</span>
+      }
+
+<span class="fc bfc" id="L289" title="All 2 branches covered.">      if (&quot;/otros/drenajes_aledanos&quot;.equals(ruta)) {</span>
+<span class="fc" id="L290">        return &quot;drenaje_aledano&quot;;</span>
+      }
+    }
+
+<span class="fc" id="L294">    throw error(</span>
+        &quot;configuracion_ic_invalida&quot;, &quot;Booleano no compatible con sieca-v1: &quot; + ruta + &quot;/&quot; + nombre);
+  }
+
+  private String familiaEnumerado(String ruta, String nombre) {
+<span class="fc bfc" id="L299" title="All 4 branches covered.">    if (&quot;aguas_arriba&quot;.equals(nombre) || &quot;aguas_abajo&quot;.equals(nombre)) {</span>
+<span class="fc" id="L300">      return &quot;socavacion.nivel&quot;;</span>
+    }
+
+<span class="fc bfc" id="L303" title="All 2 branches covered.">    if (&quot;condiciones&quot;.equals(nombre)) {</span>
+<span class="fc" id="L304">      return &quot;condicionesCauce&quot;;</span>
+    }
+
+<span class="fc bfc" id="L307" title="All 2 branches covered.">    if (&quot;estado&quot;.equals(nombre)) {</span>
+<span class="fc bfc" id="L308" title="All 2 branches covered.">      return ruta.startsWith(&quot;/superestructura/drenaje&quot;) ? &quot;drenaje.estado&quot; : &quot;estado_bueno_malo&quot;;</span>
+    }
+
+<span class="fc" id="L311">    throw error(</span>
+        &quot;configuracion_ic_invalida&quot;, &quot;Falta una conversion compatible para &quot; + ruta + &quot;/&quot; + nombre);
+  }
+
+  private boolean cauceNoAplica(JsonNode datos, String referencia) {
+<span class="fc bfc" id="L316" title="All 2 branches covered.">    return referencia.startsWith(&quot;/caracteristicas_cauce/&quot;)</span>
+<span class="fc bfc" id="L317" title="All 2 branches covered.">        &amp;&amp; datos.path(&quot;caracteristicas_cauce&quot;).path(&quot;aplica&quot;).isBoolean()</span>
+<span class="fc bfc" id="L318" title="All 2 branches covered.">        &amp;&amp; !datos.path(&quot;caracteristicas_cauce&quot;).path(&quot;aplica&quot;).booleanValue();</span>
+  }
+
+  private boolean excluido(JsonNode reglas, String referencia) {
+<span class="fc" id="L322">    JsonNode excluidos = reglas.get(&quot;elementos_excluidos_ic&quot;);</span>
+
+<span class="fc bfc" id="L324" title="All 2 branches covered.">    if (excluidos == null) {</span>
+<span class="fc" id="L325">      return false;</span>
+    }
+
+<span class="fc bfc" id="L328" title="All 2 branches covered.">    if (!excluidos.isArray()) {</span>
+<span class="fc" id="L329">      throw error(&quot;configuracion_ic_invalida&quot;, &quot;elementos_excluidos_ic debe ser una lista&quot;);</span>
+    }
+
+<span class="fc bfc" id="L332" title="All 2 branches covered.">    for (JsonNode elemento : excluidos) {</span>
+<span class="fc bfc" id="L333" title="All 2 branches covered.">      if (referencia.equals(texto(elemento, &quot;elemento excluido&quot;))) {</span>
+<span class="fc" id="L334">        return true;</span>
+      }
+<span class="fc" id="L336">    }</span>
+
+<span class="fc" id="L338">    return false;</span>
+  }
+
+  private DesgloseInstancia detalle(
+      ElementoResuelto instancia,
+      String existencia,
+      boolean incluida,
+      BigDecimal calificacion,
+      List&lt;DesgloseIndicador&gt; indicadores) {
+
+<span class="fc" id="L348">    return new DesgloseInstancia(</span>
+<span class="fc" id="L349">        instancia.instanciaId(),</span>
+<span class="fc" id="L350">        instancia.rutaDatos(),</span>
+        existencia,
+        incluida,
+        calificacion,
+        indicadores);
+  }
+
+  private void validarEntrada(EntradaCalculoIc entrada) {
+<span class="fc bfc" id="L358" title="All 2 branches covered.">    if (entrada == null</span>
+<span class="fc bfc" id="L359" title="All 2 branches covered.">        || entrada.datos() == null</span>
+<span class="fc bfc" id="L360" title="All 2 branches covered.">        || !entrada.datos().isObject()</span>
+<span class="fc bfc" id="L361" title="All 2 branches covered.">        || entrada.esquema() == null</span>
+<span class="fc bfc" id="L362" title="All 2 branches covered.">        || !entrada.esquema().isObject()</span>
+<span class="fc bfc" id="L363" title="All 2 branches covered.">        || entrada.catalogoElementos() == null</span>
+<span class="fc bfc" id="L364" title="All 2 branches covered.">        || !entrada.catalogoElementos().isObject()</span>
+<span class="fc bfc" id="L365" title="All 2 branches covered.">        || entrada.reglasEvaluacion() == null</span>
+<span class="fc bfc" id="L366" title="All 2 branches covered.">        || !entrada.reglasEvaluacion().isObject()</span>
+<span class="fc bfc" id="L367" title="All 2 branches covered.">        || entrada.pesos() == null) {</span>
+<span class="fc" id="L368">      throw error(</span>
+          &quot;entrada_ic_invalida&quot;,
+          &quot;Se requieren datos, esquema, catalogo, reglas y pesos para calcular el IC&quot;);
+    }
+
+<span class="fc" id="L373">    String formulario = texto(entrada.catalogoElementos().get(&quot;formulario&quot;), &quot;catalogo.formulario&quot;);</span>
+
+<span class="fc bfc" id="L375" title="All 2 branches covered.">    if (!formulario.equals(entrada.codigoFormulario())) {</span>
+<span class="fc" id="L376">      throw error(&quot;version_ic_incongruente&quot;, &quot;El catalogo no corresponde al formulario indicado&quot;);</span>
+    }
+
+<span class="fc" id="L379">    String algoritmo =</span>
+<span class="fc" id="L380">        texto(entrada.reglasEvaluacion().get(&quot;version_algoritmo&quot;), &quot;version_algoritmo&quot;);</span>
+
+<span class="fc bfc" id="L382" title="All 2 branches covered.">    if (!algoritmo.equals(entrada.versionAlgoritmo())) {</span>
+<span class="fc" id="L383">      throw error(&quot;version_ic_incongruente&quot;, &quot;Las reglas no corresponden al algoritmo indicado&quot;);</span>
+    }
+<span class="fc" id="L385">  }</span>
+
+  private String texto(JsonNode valor, String referencia) {
+<span class="fc bfc" id="L388" title="All 6 branches covered.">    if (valor == null || !valor.isTextual() || valor.textValue().isBlank()) {</span>
+<span class="fc" id="L389">      throw error(&quot;configuracion_ic_incompleta&quot;, &quot;Falta configurar &quot; + referencia);</span>
+    }
+
+<span class="fc" id="L392">    return valor.textValue();</span>
+  }
+
+  private ApiException error(String codigo, String detalle) {
+<span class="fc" id="L396">    return new ApiException(</span>
+        HttpStatus.UNPROCESSABLE_ENTITY,
+        codigo,
+        &quot;Calculo del indice de condicion invalido&quot;,
+        detalle);
+  }
+
+  private void validarRutaEvaluada(JsonNode nodo, JsonPointer pendiente, String ruta) {
+<span class="fc bfc" id="L404" title="All 6 branches covered.">    if (nodo == null || nodo.isNull() || nodo.isMissingNode()) {</span>
+<span class="fc" id="L405">      throw error(&quot;datos_ic_incompletos&quot;, &quot;Falta evaluar la ruta &quot; + ruta);</span>
+    }
+
+<span class="fc bfc" id="L408" title="All 2 branches covered.">    if (nodo.isArray()) {</span>
+<span class="fc bfc" id="L409" title="All 2 branches covered.">      for (int indice = 0; indice &lt; nodo.size(); indice++) {</span>
+<span class="fc" id="L410">        validarRutaEvaluada(nodo.get(indice), pendiente, ruta + &quot;/&quot; + indice);</span>
+      }
+
+<span class="fc" id="L413">      return;</span>
+    }
+
+<span class="fc bfc" id="L416" title="All 2 branches covered.">    if (pendiente.matches()) {</span>
+<span class="fc bfc" id="L417" title="All 2 branches covered.">      if (!nodo.isObject()) {</span>
+<span class="fc" id="L418">        throw error(&quot;datos_ic_invalidos&quot;, &quot;El elemento debe ser un objeto: &quot; + ruta);</span>
+      }
+
+<span class="fc" id="L421">      return;</span>
+    }
+
+<span class="fc bfc" id="L424" title="All 2 branches covered.">    if (!nodo.isObject()) {</span>
+<span class="fc" id="L425">      throw error(&quot;datos_ic_invalidos&quot;, &quot;La ruta evaluada no es un objeto: &quot; + ruta);</span>
+    }
+
+<span class="fc" id="L428">    String propiedad = pendiente.getMatchingProperty();</span>
+
+<span class="fc" id="L430">    validarRutaEvaluada(</span>
+<span class="fc" id="L431">        nodo.get(propiedad),</span>
+<span class="fc" id="L432">        pendiente.tail(),</span>
+<span class="fc" id="L433">        ruta + &quot;/&quot; + propiedad.replace(&quot;~&quot;, &quot;~0&quot;).replace(&quot;/&quot;, &quot;~1&quot;));</span>
+<span class="fc" id="L434">  }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>
