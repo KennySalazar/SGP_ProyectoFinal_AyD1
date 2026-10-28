@@ -74,6 +74,7 @@ public class ObservacionService {
     this.clock = clock;
   }
 
+  @Transactional(readOnly = true)
   @PreAuthorize("hasRole('ESTUDIANTE')")
   public Page<CicloObservacionesResponse> recibidas(UUID actor, int pagina, int tamanio) {
     if (actor == null)
@@ -97,7 +98,10 @@ public class ObservacionService {
                     r.getInspeccion().getId(),
                     r.getNumeroCiclo(),
                     r.getEstado(),
-                    r.getEnviadaEn()));
+                    r.getEnviadaEn(),
+                    r.getContenidoEnviado().path("fechaInspeccion").asText(null),
+                    r.getInspeccion().getPuente().getNombre(),
+                    r.getInspeccion().getPuente().getCodigo()));
   }
 
   @Transactional

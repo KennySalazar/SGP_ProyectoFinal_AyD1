@@ -144,6 +144,9 @@ export interface ListadoObservacionesResponse extends ContadorObservacionesRespo
 
 /** Cada enlace abre el snapshot del ciclo indicado, nunca el borrador actual. */
 export interface CicloObservacionesResponse {
+  fechaInspeccion: string | null;
+  puenteNombre: string;
+  puenteCodigo: string;
   revisionId: string;
   inspeccionId: string;
   numeroCiclo: number;
