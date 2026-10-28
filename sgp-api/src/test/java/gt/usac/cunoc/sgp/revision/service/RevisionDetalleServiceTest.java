@@ -9,6 +9,7 @@ import gt.usac.cunoc.sgp.formulario.entity.VersionFormulario;
 import gt.usac.cunoc.sgp.formulario.repository.VersionFormularioRepository;
 import gt.usac.cunoc.sgp.inspeccion.dto.IndiceCondicionPreliminarResponse;
 import gt.usac.cunoc.sgp.inspeccion.entity.Inspeccion;
+import gt.usac.cunoc.sgp.puente.entity.Puente;
 import gt.usac.cunoc.sgp.revision.entity.Revision;
 import gt.usac.cunoc.sgp.revision.repository.RevisionRepository;
 import java.math.BigDecimal;
@@ -35,6 +36,11 @@ class RevisionDetalleServiceTest {
     var inspeccion = mock(Inspeccion.class);
     UUID id = UUID.randomUUID();
     when(inspeccion.getId()).thenReturn(id);
+    when(inspeccion.getNombreAutorCapturado()).thenReturn("Ana López");
+    var puente = mock(Puente.class);
+    when(puente.getNombre()).thenReturn("Puente del Río");
+    when(puente.getCodigo()).thenReturn("P-001");
+    when(inspeccion.getPuente()).thenReturn(puente);
     UUID autorId = UUID.randomUUID();
     when(inspeccion.getAutorId()).thenReturn(autorId);
     var revision = mock(Revision.class);
@@ -55,6 +61,16 @@ class RevisionDetalleServiceTest {
     var version = mock(VersionFormulario.class);
     when(version.getEsquema()).thenReturn(json.createObjectNode().put("type", "object"));
     when(versiones.findById(versionId)).thenReturn(Optional.of(version));
+  }
+
+  @Test
+  void incluyeNombresParaPresentarSinModificarContenidoHistorico() {
+    var respuesta = servicio.obtener(ciclo, actor);
+    assertThat(respuesta.autorNombre()).isEqualTo("Ana López");
+    assertThat(respuesta.puenteNombre()).isEqualTo("Puente del Río");
+    assertThat(respuesta.puenteCodigo()).isEqualTo("P-001");
+    assertThat(respuesta.datos()).isEqualTo(json.createObjectNode());
+    assertThat(respuesta.identificacionCapturada().isNull()).isTrue();
   }
 
   @Test

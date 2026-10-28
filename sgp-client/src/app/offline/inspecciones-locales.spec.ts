@@ -326,6 +326,14 @@ describe('HU-042: Inspecciones Locales y Recuperación tras Recarga', () => {
     };
 
     expect(await service.actualizarBorradorCanonicoSiSinPendientes(canonico, 'user-1')).toBe(true);
+    inspeccionesMemoria.set(canonico.id, {
+      ...inspeccionesMemoria.get(canonico.id)!,
+      estado: 'ENVIADA',
+      intencionFinal: { accion: 'enviar', estado: 'CONFIRMADA' },
+    });
+    expect(await service.actualizarBorradorCanonicoSiSinPendientes(canonico, 'user-1')).toBe(true);
+    expect(inspeccionesMemoria.get(canonico.id)?.intencionFinal).toBeUndefined();
+    expect(inspeccionesMemoria.get(canonico.id)?.estado).toBe('BORRADOR');
     const edicionLocal: LocalInspection = {
       id: canonico.id,
       puenteId: canonico.puenteId,

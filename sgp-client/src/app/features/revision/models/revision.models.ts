@@ -29,6 +29,20 @@ export interface RevisionBandejaResponse {
   estadoRevision: 'PENDIENTE' | 'EN_CURSO';
 }
 
+export interface RevisionResueltaResponse {
+  revisionId: string;
+  inspeccionId: string;
+  puenteCodigo: string;
+  puenteNombre: string;
+  estudianteNombre: string;
+  numeroCiclo: number;
+  enviadaEn: string;
+  resueltaEn: string;
+  veredicto: VeredictoRevision;
+}
+
+export type PaginaRevisionesResueltas = PaginaResponse<RevisionResueltaResponse>;
+
 export interface FiltrosBandejaRevision {
   estado?: 'ENVIADA' | 'EN_REVISION';
   puente?: string;
@@ -69,6 +83,9 @@ export interface RevisionDetalleResponse {
   enviadaEn: string;
   autorId: string;
   puenteId: string;
+  autorNombre?: string | null;
+  puenteNombre?: string | null;
+  puenteCodigo?: string | null;
   fechaInspeccion: string;
   versionFormularioId: string;
   versionFormularioCodigo: string;
@@ -127,6 +144,9 @@ export interface ListadoObservacionesResponse extends ContadorObservacionesRespo
 
 /** Cada enlace abre el snapshot del ciclo indicado, nunca el borrador actual. */
 export interface CicloObservacionesResponse {
+  fechaInspeccion: string | null;
+  puenteNombre: string;
+  puenteCodigo: string;
   revisionId: string;
   inspeccionId: string;
   numeroCiclo: number;
