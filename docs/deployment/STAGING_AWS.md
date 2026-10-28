@@ -16,7 +16,7 @@ se actualiza de forma incremental durante la historia de usuario.
 | Red AWS | VPC, tabla privada, dos subredes dedicadas y DB Subnet Group de RDS confirmados. |
 | Security Groups | EC2 permite públicamente solo TCP 80/443; RDS permite 5432 únicamente desde el grupo de staging. |
 | IAM y Systems Manager | Session Manager, confianza OIDC con identificadores inmutables y Run Command verificados. |
-| S3 | Bucket privado de staging creado y vacío; integración de aplicación no implementada. |
+| S3 | Bucket privado operativo; permisos de objetos y cargas funcionales verificadas el 27 de octubre de 2026. |
 | RDS | `sgp-rds-postgres` disponible; backend saludable y API operativa confirman conexión y migraciones de staging. `verify-full` sigue pendiente. |
 | EC2 | `sgp-staging-ec2` creada, en ejecución y con sus tres comprobaciones superadas; preparación inicial y autenticación en GHCR completadas. |
 | Despliegue real en AWS | Automatización operativa desde `develop`; el despliegue posterior a la integración HTTPS dejó ambos contenedores saludables. |
@@ -43,8 +43,8 @@ envío de correo.
 
 ## Inventario AWS confirmado
 
-Estado consolidado al 15 de octubre de 2026 a partir de las comprobaciones
-manuales realizadas en AWS y GitHub:
+Inventario basado en las comprobaciones manuales de AWS y GitHub del 15 de octubre
+de 2026, con la actualización S3 e IAM del 27 de octubre:
 
 | Elemento | Valor o estado |
 |---|---|
@@ -74,11 +74,11 @@ manuales realizadas en AWS y GitHub:
 | Seguridad del bucket | Bucket owner enforced, ACL deshabilitadas y todas las opciones de bloqueo de acceso público habilitadas. |
 | Protección de objetos | SSE-S3 habilitado; versionado, S3 Bucket Key y Object Lock deshabilitados. |
 | Etiquetas del bucket | `Project=SGP` y `Environment=staging`. |
-| Configuración adicional de S3 | Sin política personalizada, CORS ni objetos. |
-| Rol IAM de EC2 | `sgp-staging-ec2-role`, asociado a la instancia, con confianza en `ec2.amazonaws.com` y política `AmazonSSMManagedInstanceCore`. |
+| Configuración adicional de S3 | Sin política de bucket personalizada ni CORS en la revisión inicial; las cargas posteriores demuestran que ya no estaba vacío. |
+| Rol IAM de EC2 | `sgp-staging-ec2-role`, asociado a la instancia, con confianza en `ec2.amazonaws.com` y políticas `AmazonSSMManagedInstanceCore` y `sgp-staging-s3-objects-policy`. |
 | Administración EC2 | Acceso interactivo mediante AWS Systems Manager Session Manager verificado. |
 | Par de claves | `sgp-staging-key`, ED25519 y formato privado `.pem`; archivo conservado fuera del repositorio. SSH no probado y sin regla de entrada pública. |
-| Acceso S3 desde IAM | No concedido todavía; el rol confirmado solo habilita la administración mediante SSM. |
+| Acceso S3 desde IAM | `PutObject`, `GetObject` y `DeleteObject` sobre objetos del bucket de staging, verificados el 27 de octubre. |
 | Rol OIDC de GitHub Actions | `arn:aws:iam::416086757987:role/sgp-staging-github-actions-role`; asunción y ejecución de SSM verificadas desde `develop`. |
 | Nginx del host | Versión `1.30.5`, activo como terminación TLS y proxy hacia `127.0.0.1:8088`; configuración validada con `nginx -t`. |
 | Certificado HTTPS | Let's Encrypt para `3.235.197.36`, línea `sgp-staging-ip`, vigente desde `2026-10-15 23:30:54 UTC` hasta `2026-10-22 15:30:53 UTC`. |
@@ -96,10 +96,8 @@ de RDS usan CIDR independientes que no se superponen con las seis subredes
 predeterminadas. Su aislamiento se basa en la tabla que solo contiene la ruta
 local.
 
-El nombre del bucket queda registrado como identificador de infraestructura, no
-como variable del backend. No debe agregarse a Compose ni al archivo de entorno
-hasta que el código implemente y defina el contrato de almacenamiento S3. El
-estado, los requisitos y el orden de implementación están transferidos en la
+El backend ya dispone de configuración externa para el proveedor, región y
+bucket. El estado y los requisitos de traspaso se detallan en la
 [guía de integración S3](GUIA_INTEGRACION_S3.md).
 
 ### Red privada para RDS
@@ -268,10 +266,8 @@ Nginx + Angular ---- red sgp_staging_proxy ---- Spring Boot
                   base y usuarios de staging              rol IAM de la EC2 (*)
 ```
 
-`(*)` El backend todavía no implementa la interfaz de almacenamiento de objetos.
-Por ello el Compose no recibe variables S3 ni credenciales estáticas. Cuando se
-implemente el módulo, el SDK deberá obtener credenciales temporales desde el rol
-de instancia y limitarse al bucket de staging.
+`(*)` El backend implementa almacenamiento S3 y utiliza la cadena de credenciales
+del SDK, incluido el rol de instancia, sin claves estáticas en AWS.
 
 ## Archivos implementados
 
@@ -310,9 +306,8 @@ La infraestructura objetivo asigna una EC2 independiente a staging:
 - 2 GiB de swap configurados mediante el script de preparación.
 - Rol de instancia `sgp-staging-ec2-role`, asociado y probado para acceso
   interactivo con `AmazonSSMManagedInstanceCore`.
-- Cuando exista la integración de archivos, una política adicional de mínimo
-  privilegio deberá limitar el rol al bucket
-  `sgp-staging-archivos-ayd1-2026-gt01`; el rol actual no concede acceso S3.
+- La política `sgp-staging-s3-objects-policy` limita las operaciones de objetos
+  al bucket `sgp-staging-archivos-ayd1-2026-gt01`.
 - Salida HTTPS hacia AWS, GHCR/Docker Hub y el proveedor SMTP.
 - Administración mediante Systems Manager, sin publicar SSH.
 - RDS PostgreSQL 16 no pública, en la misma VPC, cuyo Security Group acepte el
@@ -321,8 +316,8 @@ La infraestructura objetivo asigna una EC2 independiente a staging:
 - Una base `sgp_staging`, un usuario migrador y un usuario de aplicación que no
   se reutilicen en producción.
 - Bucket S3 `sgp-staging-archivos-ayd1-2026-gt01`, privado e independiente del
-  futuro bucket de producción. Actualmente está vacío y sin CORS ni políticas
-  personalizadas.
+  futuro bucket de producción. En la revisión inicial no tenía CORS ni política
+  de bucket personalizada; posteriormente recibió cargas funcionales.
 - IMDSv2 obligatorio y salto de respuesta igual a `2`, necesario para que un SDK
   dentro de Docker pueda obtener credenciales temporales del rol de instancia.
 - No se comprará un dominio ni se creará una zona DNS pública para el proyecto.
@@ -648,10 +643,9 @@ archivo de entorno puede utilizarse:
 openssl rand -hex 32
 ```
 
-No se definen `AWS_ACCESS_KEY_ID` ni `AWS_SECRET_ACCESS_KEY`. El acceso futuro a
-S3 utilizará credenciales temporales del rol IAM de la EC2. Tampoco se inventan
-variables de bucket mientras el backend no tenga una configuración que las
-consuma.
+No se definen `AWS_ACCESS_KEY_ID` ni `AWS_SECRET_ACCESS_KEY` para la aplicación
+en AWS. El SDK utiliza credenciales temporales del rol IAM de la EC2; las
+propiedades disponibles se describen en la [guía S3](GUIA_INTEGRACION_S3.md).
 
 ## Preparación de la base RDS
 
@@ -1059,8 +1053,7 @@ usuario. Luego la imagen local del backend inició saludablemente con esos roles
 y Flyway registró 16 migraciones exitosas y ninguna fallida. En AWS, la EC2 está
 en ejecución, Session Manager funciona y el endpoint de RDS respondió primero a
 una prueba TCP. El despliegue posterior confirmó además que el backend se
-autentica, completa Flyway, valida el esquema y atiende la API. El bucket S3
-todavía no tiene una integración funcional que probar.
+autentica, completa Flyway, valida el esquema y atiende la API. La validación posterior de S3 del 27 de octubre se describe más abajo.
 
 El script de preparación de Amazon Linux 2023 se ejecutó correctamente en la EC2
 el 11 de octubre de 2026 después de eliminar de DNF la solicitud del paquete
@@ -1125,8 +1118,57 @@ GET https://3.235.197.36/api/v1/puentes?size=1   -> 200
 `sgp-certbot-renew.service` finalizó correctamente sin renovar, porque el
 certificado aún no había alcanzado su ventana. Se verificó de nuevo `/healthz`
 por HTTPS después de la comprobación. Esto no constituye una prueba funcional
-completa: SMTP, flujos de autenticación dependientes del correo y S3 siguen sin
-validación funcional.
+completa: SMTP y los flujos dependientes del correo siguen sin validación
+funcional. La validación parcial de S3 se realizó posteriormente.
+
+## Incidencia y validación S3 del 27 de octubre de 2026
+
+En `sgp-staging-ec2` (`i-0385c95df8cd7909d`), región `us-east-1`, las
+cargas de fotografías de inspección devolvieron HTTP 409 `operacion_en_proceso`
+con reintentos de solicitudes multipart con metadatos JSON, imagen WebP e
+`Idempotency-Key`. `RecuperacionCargasService` advirtió que conservaba
+operaciones para reintento. Los registros de `AlmacenamientoS3` y
+`DocumentoInspeccionService` confirmaron S3 403 `AccessDenied` para
+`s3:DeleteObject` al eliminar documentos PDF durante un rollback. Este 403 no
+se demostró como causa directa de todos los 409 de fotografías.
+
+El rol `sgp-staging-ec2-role` solo tenía `AmazonSSMManagedInstanceCore` antes
+de la corrección. Desde AWS IAM se creó y asoció la política
+`sgp-staging-s3-objects-policy`, sin cambiar la política SSM:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [{
+    "Sid": "AccesoArchivosSGPStaging",
+    "Effect": "Allow",
+    "Action": ["s3:PutObject", "s3:GetObject", "s3:DeleteObject"],
+    "Resource": "arn:aws:s3:::sgp-staging-archivos-ayd1-2026-gt01/*"
+  }]
+}
+```
+
+No se concedió `AmazonS3FullAccess` ni acceso a otros buckets, no se añadieron
+claves estáticas ni se modificaron secretos, y no hizo falta reiniciar EC2 ni
+contenedores. Desde Session Manager, `aws sts get-caller-identity` confirmó la
+cuenta `416086757987` y el rol asumido
+`arn:aws:sts::416086757987:assumed-role/sgp-staging-ec2-role/i-0385c95df8cd7909d`.
+Con `aws s3api put-object`, `get-object` y `delete-object` se subió, descargó y
+eliminó exclusivamente `diagnostico/iam-test-1793091793-6830.txt`; la lectura se
+comparó con el original mediante `cmp` y la respuesta de carga indicó cifrado
+`AES256`. No se eliminaron fotografías ni documentos reales.
+
+En una nueva prueba desde el navegador, la aplicación permitió subir fotos y
+mostró en **Confirmadas por el servidor** fotografías `ACCESO` y
+`SUPERESTRUCTURA`; el usuario confirmó también la carga de PDF. El bloqueo
+original no se presentó en estas nuevas pruebas. Esto no valida todos los flujos.
+
+Queda pendiente investigar las cargas fallidas anteriores y si aún hay operaciones
+pendientes en `RecuperacionCargasService`; confirmar si los 409 antiguos
+desaparecen al recuperar operaciones existentes; probar descarga desde la
+interfaz, persistencia tras actualizar la página y retiro o eliminación según
+reglas de negocio; revisar observabilidad, respaldo, retención y restauración.
+No se afirma que se hayan recuperado inspecciones antiguas ni probado restauración.
 
 ## Limitaciones y trabajo pendiente
 
@@ -1138,8 +1180,8 @@ validación funcional.
 - Sustituir el SMTP ficticio por un servicio real y validar OTP, invitaciones,
   activación y recuperación de contraseña.
 - Confirmar el tamaño definitivo de EC2 y disco mediante medición.
-- El backend todavía no integra almacenamiento de objetos; S3 no puede validarse
-  funcionalmente hasta que exista la interfaz requerida por DT-ALM-03.
+- Completar las comprobaciones de archivos pendientes indicadas en la incidencia
+  S3; las cargas verificadas no validan todos los flujos.
 - Brotli no está habilitado; Nginx utiliza gzip para evitar una imagen con módulos
   adicionales no justificados.
 - La retención centralizada de logs por 90 días no está implementada.
@@ -1163,8 +1205,8 @@ validación funcional.
    dependientes del correo.
 3. Descargar el bundle CA desde su origen oficial y probar PostgreSQL con
    `sslmode=verify-full`. Registrar el resultado sin exponer la contraseña.
-4. Incorporar la interfaz de almacenamiento en el backend y validar S3 con un
-   rol de mínimo privilegio cuando esa funcionalidad entre en alcance.
+4. Investigar las cargas anteriores y completar las pruebas funcionales de S3
+   pendientes, sin eliminar operaciones ni objetos manualmente.
 5. Ejecutar pruebas funcionales completas y conservar el enlace o identificador
    de la ejecución de GitHub Actions como evidencia del sprint.
 
@@ -1174,14 +1216,14 @@ El alcance acordado de infraestructura, publicación y despliegue automatizado d
 staging está implementado: existen los recursos AWS, RDS atiende a la
 aplicación, GHCR publica imágenes multi-arquitectura, OIDC y SSM despliegan desde
 `develop`, los contenedores están saludables y el acceso público HTTPS respondió
-correctamente. La integración funcional de S3, el SMTP real, producción y los
-respaldos fueron asignados a otras historias o excluidos de esta HU.
+correctamente. La integración S3 recibió posteriormente la validación parcial
+registrada aquí; SMTP real, producción y respaldos requieren seguimiento.
 
 Por ello se recomienda cerrar la HU de staging en su alcance de sprint, dejando
 seguimiento operativo para la renovación efectiva del certificado y las
 excepciones ya registradas. Este cierre no equivale a declarar cumplido todo el
 enunciado final: DT-SEC-10 (HSTS), la política de respaldos, la retención de logs,
-`verify-full` de RDS, SMTP y la integración S3 continúan pendientes. Si HSTS o
+`verify-full` de RDS, SMTP y las pruebas restantes de S3 continúan pendientes. Si HSTS o
 alguno de esos puntos forma parte explícita de los criterios de aceptación de la
 HU en el tablero, el cierre debe ser condicionado a una excepción aceptada por
 el equipo o la HU debe permanecer abierta.

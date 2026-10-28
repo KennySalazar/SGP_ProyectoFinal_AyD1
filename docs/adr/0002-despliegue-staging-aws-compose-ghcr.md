@@ -30,9 +30,8 @@ proveedor de nube pública. Además, el auxiliar aclaró que los archivos no pue
 residir en el mismo servidor de la aplicación. El equipo eligió AWS y dispone de
 créditos limitados, por lo que debe evitar componentes innecesarios.
 
-El backend todavía no implementa `AlmacenamientoArchivos` ni consume MinIO o S3.
-La infraestructura debe reflejar esa limitación sin agregar credenciales o
-variables que el código aún no utiliza.
+Al adoptarse la decisión, la integración de archivos estaba pendiente. Su estado
+posterior se registra en la sección de implementación, sin alterar la decisión.
 
 ## Problema
 
@@ -170,6 +169,12 @@ claves AWS estáticas ni compilar Java o Angular en EC2.
 
 ### Estado de implementación en AWS
 
+El 27 de octubre de 2026 se corrigió la falta de `s3:DeleteObject` observada
+en un rollback de PDF. Se verificaron las tres operaciones de objetos con un
+archivo de diagnóstico y las cargas de fotos y PDF en la aplicación. No se
+demostró que ese 403 causara todos los 409 de fotografías; la recuperación y
+las demás pruebas pendientes se detallan en [staging](../deployment/STAGING_AWS.md).
+
 En `us-east-1` se confirmaron los siguientes recursos de staging:
 
 - `sgp-staging-ec2-sg` (`sg-0e617972b3eedeb73`), con entrada pública solo para
@@ -177,10 +182,12 @@ En `us-east-1` se confirmaron los siguientes recursos de staging:
 - `sgp-rds-sg` (`sg-0ab8d04a2ef4d3db8`), con PostgreSQL TCP 5432 permitido solo
   desde el Security Group anterior.
 - `sgp-staging-archivos-ayd1-2026-gt01`, bucket con bloqueo de acceso público,
-  ACL deshabilitadas y SSE-S3. Está vacío; versionado y Object Lock están
+  ACL deshabilitadas y SSE-S3. Creado vacío; versionado y Object Lock estaban
   deshabilitados y no tiene política personalizada ni CORS.
 - `sgp-staging-ec2-role`, confiado a EC2 y con
-  `AmazonSSMManagedInstanceCore`. Todavía no concede acceso a S3.
+  `AmazonSSMManagedInstanceCore` y, desde el 27 de octubre de 2026,
+  `sgp-staging-s3-objects-policy` para `PutObject`, `GetObject` y
+  `DeleteObject` sobre objetos del bucket de staging.
 - `sgp-rds-private-rt` (`rtb-0bd589b3134333454`), tabla no principal con solo
   la ruta local `172.31.0.0/16` y sin salida mediante Internet Gateway o NAT.
 - `sgp-rds-private-1a` (`subnet-0e261924496a742c8`, `172.31.96.0/24`,
@@ -282,7 +289,8 @@ promover los mismos digests entre ambientes sin reconstruir artefactos.
   no satisface los 30 días del diseño ni sustituye los respaldos mensuales o la
   prueba de restauración.
 - `t4g.micro` puede sufrir presión de memoria y debe medirse.
-- El backend no puede validar todavía el flujo de archivos en S3.
+- Las cargas de fotos y PDF se probaron en staging; otros flujos de archivos
+  aún necesitan validación.
 - El bucket de staging no tiene versionado ni Object Lock; la recuperación ante
   borrados y los respaldos permanecen fuera de esta historia.
 - Un PAT classic con `read:packages` puede leer otros paquetes privados a los
@@ -304,12 +312,11 @@ promover los mismos digests entre ambientes sin reconstruir artefactos.
 - Solo existe una retención automática solicitada de 1 día en RDS. La política
   requerida de respaldos, restauración y la retención centralizada de logs no
   están implementadas.
-- S3 está decidido como servicio, pero su integración de aplicación permanece
-  pendiente de la funcionalidad de archivos.
+- La integración S3 existe y tiene pruebas parciales; quedan pendientes las
+  comprobaciones funcionales y operativas de la guía S3.
 - Brotli no está implementado. HSTS tampoco está habilitado por la dependencia
   de una IP dinámica y certificados de corta duración; DT-SEC-10 requiere una
   excepción aceptada o una solución operativa estable.
-- El bucket S3 existe, pero la aplicación todavía no lo consume.
 - La publicación multi-arquitectura, descarga ARM64, GHCR, OIDC, SSM y el primer
   despliegue ya cuentan con validación real.
 - La renovación automática está programada y su servicio se ejecutó con éxito,
@@ -325,9 +332,9 @@ despliegue a nube pública y la aclaración del auxiliar exige que los archivos 
 residan en EC2.
 
 S3 mantiene una API de almacenamiento de objetos compatible con la intención de
-DT-ALM. MinIO continúa en desarrollo local. La interfaz intercambiable de
-DT-ALM-03 sigue pendiente en el backend y no se declara implementada. El estado
-y el traspaso de esa futura HU se documentan en
+DT-ALM. MinIO continúa en desarrollo local. La interfaz intercambiable
+`AlmacenamientoArchivos` y el adaptador S3 ya existen. Su estado y el traspaso
+se documentan en
 [`GUIA_INTEGRACION_S3.md`](../deployment/GUIA_INTEGRACION_S3.md).
 
 ## Referencias
