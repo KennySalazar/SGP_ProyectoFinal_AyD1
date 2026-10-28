@@ -316,6 +316,89 @@ class VersionFormularioServiceTest {
   }
 
   @Test
+  void actualizarBorradorLimpiaMapeosObsoletosAlModificarEsquema() throws Exception {
+    UUID v1Id = UUID.randomUUID();
+    UUID v2Id = UUID.randomUUID();
+
+    JsonNode esquemaV1 =
+        objectMapper.readTree(
+            """
+            {
+              "type": "object",
+              "properties": {
+                "campo1": { "type": "string" },
+                "campo2": { "type": "string" }
+              }
+            }
+            """);
+
+    JsonNode esquemaV2Original =
+        objectMapper.readTree(
+            """
+            {
+              "type": "object",
+              "properties": {
+                "campo1": { "type": "string" },
+                "campo2": { "type": "string" }
+              }
+            }
+            """);
+
+    JsonNode esquemaV2Nuevo =
+        objectMapper.readTree(
+            """
+            {
+              "type": "object",
+              "properties": {
+                "campo1": { "type": "string" }
+              }
+            }
+            """);
+
+    VersionFormulario v1 = crearEntidad(v1Id, "v1", EstadoVersionFormulario.PUBLICADA, true);
+    v1.setEsquema(esquemaV1);
+    VersionFormulario v2 = crearEntidad(v2Id, "v2", EstadoVersionFormulario.BORRADOR, false);
+    v2.setEsquema(esquemaV2Original);
+    v2.setVersionAnterior(v1);
+
+    when(versiones.findById(v2Id)).thenReturn(Optional.of(v2));
+    when(versiones.save(any(VersionFormulario.class))).thenAnswer(inv -> inv.getArgument(0));
+
+    MapeoCampoFormulario m1 =
+        new MapeoCampoFormulario(
+            UUID.randomUUID(),
+            v1,
+            v2,
+            "/campo1",
+            "/campo1",
+            TipoMapeoCampo.EQUIVALENTE,
+            null,
+            usuarioId,
+            fija);
+    MapeoCampoFormulario m2Obsoleto =
+        new MapeoCampoFormulario(
+            UUID.randomUUID(),
+            v1,
+            v2,
+            "/campo2",
+            "/campo2",
+            TipoMapeoCampo.EQUIVALENTE,
+            null,
+            usuarioId,
+            fija);
+
+    when(mapeos.findAllByVersionOrigenIdAndVersionDestinoId(v1Id, v2Id))
+        .thenReturn(List.of(m1, m2Obsoleto));
+
+    service.actualizarBorrador(v2Id, esquemaV2Nuevo, null, null, "v2-actualizado", usuarioId);
+
+    @SuppressWarnings("unchecked")
+    ArgumentCaptor<List<MapeoCampoFormulario>> captor = ArgumentCaptor.forClass(List.class);
+    verify(mapeos).deleteAll(captor.capture());
+    assertThat(captor.getValue()).containsExactly(m2Obsoleto);
+  }
+
+  @Test
   void calibrarPesosRechazaPesosMenoresOIgualesACero() {
     UUID id = UUID.randomUUID();
     VersionFormulario borrador = crearEntidad(id, "v1", EstadoVersionFormulario.BORRADOR, false);
@@ -431,6 +514,76 @@ class VersionFormularioServiceTest {
     assertThat(analisis.mapeoCompleto()).isFalse();
     assertThat(analisis.camposOrigenSinMapeo()).containsExactly("/campo2");
     assertThat(analisis.camposDestinoSinMapeo()).containsExactly("/campo3");
+  }
+
+  @Test
+  void analizarMapeoInvalidaMapeoPrevioSiCampoDestinoFueEliminado() throws Exception {
+    UUID v1Id = UUID.randomUUID();
+    UUID v2Id = UUID.randomUUID();
+
+    JsonNode esquemaV1 =
+        objectMapper.readTree(
+            """
+            {
+              "type": "object",
+              "properties": {
+                "campo1": { "type": "string" },
+                "campo2": { "type": "string" }
+              }
+            }
+            """);
+
+    JsonNode esquemaV2 =
+        objectMapper.readTree(
+            """
+            {
+              "type": "object",
+              "properties": {
+                "campo1": { "type": "string" }
+              }
+            }
+            """);
+
+    VersionFormulario v1 = crearEntidad(v1Id, "v1", EstadoVersionFormulario.PUBLICADA, true);
+    v1.setEsquema(esquemaV1);
+    VersionFormulario v2 = crearEntidad(v2Id, "v2", EstadoVersionFormulario.BORRADOR, false);
+    v2.setEsquema(esquemaV2);
+    v2.setVersionAnterior(v1);
+
+    when(versiones.findById(v2Id)).thenReturn(Optional.of(v2));
+    MapeoCampoFormulario m1 =
+        new MapeoCampoFormulario(
+            UUID.randomUUID(),
+            v1,
+            v2,
+            "/campo1",
+            "/campo1",
+            TipoMapeoCampo.EQUIVALENTE,
+            null,
+            usuarioId,
+            fija);
+    MapeoCampoFormulario m2Obsoleto =
+        new MapeoCampoFormulario(
+            UUID.randomUUID(),
+            v1,
+            v2,
+            "/campo2",
+            "/campo2",
+            TipoMapeoCampo.EQUIVALENTE,
+            null,
+            usuarioId,
+            fija);
+
+    when(mapeos.findAllByVersionOrigenIdAndVersionDestinoId(v1Id, v2Id))
+        .thenReturn(List.of(m1, m2Obsoleto));
+
+    AnalisisMapeoResponse analisis = service.analizarMapeo(v2Id);
+
+    assertThat(analisis.mapeoCompleto()).isFalse();
+    assertThat(analisis.camposOrigenSinMapeo()).containsExactly("/campo2");
+    assertThat(analisis.camposDestinoSinMapeo()).isEmpty();
+    assertThat(analisis.mapeosDeclarados()).hasSize(1);
+    assertThat(analisis.mapeosDeclarados().getFirst().elementoRefOrigen()).isEqualTo("/campo1");
   }
 
   @Test

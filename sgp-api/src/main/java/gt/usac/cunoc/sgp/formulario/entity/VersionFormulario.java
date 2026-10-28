@@ -15,6 +15,7 @@ import jakarta.persistence.Version;
 import java.time.Instant;
 import java.util.Objects;
 import java.util.UUID;
+import org.hibernate.annotations.Formula;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
@@ -67,6 +68,20 @@ public class VersionFormulario {
 
   @Column(name = "calibrado_por_id")
   private UUID calibradoPorId;
+
+  @Formula(
+      """
+          (select nullif(trim(u.nombre_completo), '') from usuario u
+           where u.id = calibrado_por_id)
+          """)
+  private String calibradoPorNombre;
+
+  @Formula(
+      """
+          (select u.email from usuario u
+           where u.id = calibrado_por_id)
+          """)
+  private String calibradoPorEmail;
 
   @Column(name = "calibrado_en")
   private Instant calibradoEn;
@@ -202,6 +217,22 @@ public class VersionFormulario {
 
   public void setPublicadoEn(Instant publicadoEn) {
     this.publicadoEn = publicadoEn;
+  }
+
+  public String getCalibradoPorNombre() {
+    return calibradoPorNombre;
+  }
+
+  public void setCalibradoPorNombre(String calibradoPorNombre) {
+    this.calibradoPorNombre = calibradoPorNombre;
+  }
+
+  public String getCalibradoPorEmail() {
+    return calibradoPorEmail;
+  }
+
+  public void setCalibradoPorEmail(String calibradoPorEmail) {
+    this.calibradoPorEmail = calibradoPorEmail;
   }
 
   public UUID getCalibradoPorId() {
