@@ -231,7 +231,6 @@ describe('MisInspeccionesPage', () => {
     expect(texto).not.toContain('inspecciones.mis.delete');
   });
 
-
   async function iniciarEliminacion(estado: string = 'BORRADOR'): Promise<void> {
     cargarListado([inspeccion({ estado: estado as InspeccionResumenResponse['estado'] })]);
     page.confirmarEliminar(inspeccion({ estado: estado as InspeccionResumenResponse['estado'] }));
