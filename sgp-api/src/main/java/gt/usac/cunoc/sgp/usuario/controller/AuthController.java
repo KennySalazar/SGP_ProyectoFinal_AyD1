@@ -174,9 +174,10 @@ public class AuthController {
   @Operation(
       summary = "Actualizar el perfil de la cuenta",
       description =
-          "Cualquier rol. Nombre completo (2 a 200 caracteres) y nombre de usuario (3 a 30 "
-              + "caracteres, único sin distinguir mayúsculas; se guarda en minúsculas). 409 si el "
-              + "nombre de usuario ya está en uso y 422 si es inválido o está reservado.")
+          "Cualquier rol. Nombre completo (2 a 200 caracteres), nombre de usuario (3 a 30 "
+              + "caracteres, único sin distinguir mayúsculas; se guarda en minúsculas) y correo "
+              + "electrónico. 409 si el correo o nombre de usuario ya están en uso y 422 si son "
+              + "inválidos o el nombre de usuario está reservado.")
   public UserResponse actualizarPerfil(
       Authentication authentication, @Valid @RequestBody ActualizarPerfilRequest request) {
     return authService.actualizarPerfil(authentication.getName(), request);

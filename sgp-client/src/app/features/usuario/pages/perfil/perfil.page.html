@@ -7,10 +7,6 @@
 <section class="surface-card perfil-card">
   <dl class="cuenta" [attr.aria-label]="'perfil.datosCuenta' | transloco">
     <div>
-      <dt>{{ 'common.email' | transloco }}</dt>
-      <dd>{{ auth.user()?.email }}</dd>
-    </div>
-    <div>
       <dt>{{ 'perfil.rol' | transloco }}</dt>
       <dd>@if (auth.user()?.role; as rol) { {{ 'invitaciones.roles.' + rol | transloco }} }</dd>
     </div>
@@ -35,6 +31,7 @@
     @if (errorNombre(); as mensaje) {
     <small class="validation" role="alert">{{ mensaje }}</small>
     }
+
     <label
       >{{ 'perfil.nombreUsuario' | transloco }}<input
         pInputText
@@ -49,6 +46,22 @@
     } @if (errorUsuario(); as mensaje) {
     <small class="validation" role="alert">{{ mensaje }}</small>
     }
+
+    <label
+      >{{ 'common.email' | transloco }}<input
+        pInputText
+        formControlName="email"
+        type="email"
+        autocomplete="email"
+        maxlength="320"
+        [placeholder]="'perfil.emailPlaceholder' | transloco"
+    /></label>
+    @if (form.controls.email.touched && form.controls.email.invalid) {
+    <small class="validation">{{ 'perfil.reglaEmail' | transloco }}</small>
+    } @if (errorEmail(); as mensaje) {
+    <small class="validation" role="alert">{{ mensaje }}</small>
+    }
+
     <p class="nota">
       <i class="pi pi-id-card" aria-hidden="true"></i> {{ 'perfil.notaPublico' | transloco }}
     </p>

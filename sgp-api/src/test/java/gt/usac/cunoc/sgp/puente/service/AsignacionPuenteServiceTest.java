@@ -27,6 +27,7 @@ import gt.usac.cunoc.sgp.usuario.repository.UserAccountRepository;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -48,6 +49,30 @@ class AsignacionPuenteServiceTest {
           asignaciones,
           auditoria,
           Clock.fixed(AHORA, ZoneOffset.UTC));
+
+  @Test
+  void listaEstudiantesConNombreCursoYPeriodoSinCambiarLaInscripcion() {
+    UserAccount catedratico = catedratico();
+    UUID inscripcionId = UUID.randomUUID();
+    var estudiante = mock(AsignacionPuenteRepository.EstudianteAsignableProjection.class);
+    when(usuarios.findByEmail("catedratico@ejemplo.com")).thenReturn(Optional.of(catedratico));
+    when(asignaciones.findEstudiantesAsignables(catedratico.getId()))
+        .thenReturn(List.of(estudiante));
+    when(estudiante.getCursoEstudianteId()).thenReturn(inscripcionId);
+    when(estudiante.getEstudianteNombre()).thenReturn("Mario Yancor");
+    when(estudiante.getEstudianteEmail()).thenReturn("mario@ejemplo.com");
+    when(estudiante.getCursoNombre()).thenReturn("Puentes");
+    when(estudiante.getPeriodo()).thenReturn("2026-2");
+
+    var resultado = service.listarEstudiantesAsignables("catedratico@ejemplo.com").getFirst();
+
+    assertThat(resultado.cursoEstudianteId()).isEqualTo(inscripcionId);
+    assertThat(resultado.estudianteNombre()).isEqualTo("Mario Yancor");
+    assertThat(resultado.estudianteEmail()).isEqualTo("mario@ejemplo.com");
+    assertThat(resultado.cursoNombre()).isEqualTo("Puentes");
+    assertThat(resultado.periodo()).isEqualTo("2026-2");
+    verifyNoInteractions(inscripciones, puentes, auditoria);
+  }
 
   @Test
   void asignaPuenteActivoAEstudianteActivoDeCursoVigenteYAudita() {

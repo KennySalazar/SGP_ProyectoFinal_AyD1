@@ -8,4 +8,5 @@ public record EstudianteAsignableResponse(
     String estudianteEmail,
     UUID cursoId,
     String cursoNombre,
-    String periodo) {}
+    String periodo,
+    String estudianteNombre) {}

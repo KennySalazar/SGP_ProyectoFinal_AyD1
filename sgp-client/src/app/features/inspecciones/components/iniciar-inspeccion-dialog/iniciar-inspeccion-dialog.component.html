@@ -8,7 +8,7 @@
       ? ('inspecciones.iniciar.exitoTitulo' | transloco)
       : ('inspecciones.iniciar.titulo' | transloco)
   "
-  [style]="{ width: '90%', maxWidth: '640px' }"
+  [style]="{ width: 'min(720px, 94vw)' }"
   [draggable]="false"
   [resizable]="false"
 >
@@ -136,111 +136,103 @@
       <form [formGroup]="form" (ngSubmit)="iniciarInspeccion()" class="formulario-iniciar">
         @if (puente) {
           <div class="resumen-puente">
-            <strong>{{ puente.nombre }}</strong>
-            <span>{{ puente.codigo }} · {{ puente.ruta }}</span>
+            <i class="pi pi-building icono-puente" aria-hidden="true"></i>
+            <div>
+              <strong>{{ puente.nombre }}</strong>
+              <span>{{ puente.codigo }} · {{ puente.ruta }}</span>
+            </div>
           </div>
         }
 
-        <!-- Estado de GPS -->
-        <div class="bloque-gps">
-          <span class="gps-etiqueta">{{ 'inspecciones.iniciar.gpsUbicacion' | transloco }}:</span>
-          @if (gpsEstado() === 'obteniendo') {
-            <span class="gps-estado obteniendo">
-              <i class="pi pi-spin pi-spinner" aria-hidden="true"></i>
-              {{ 'inspecciones.iniciar.gpsObteniendo' | transloco }}
-            </span>
-          } @else if (gpsEstado() === 'obtenido') {
-            <span class="gps-estado obtenido">
-              <i class="pi pi-map-marker" aria-hidden="true"></i>
-              {{
-                'inspecciones.iniciar.gpsObtenido'
-                  | transloco: { lat: gpsLatitud(), lng: gpsLongitud(), acc: gpsPrecision() }
-              }}
-            </span>
-          } @else {
-            <span class="gps-estado no-disponible">
-              <i class="pi pi-info-circle" aria-hidden="true"></i>
-              {{ 'inspecciones.iniciar.gpsNoDisponible' | transloco }}
-            </span>
-          }
-        </div>
-
-        <!-- Fecha de inspección -->
-        <div class="campo-grupo">
-          <label for="fechaInspeccion" class="campo-label">
-            <span>{{ 'inspecciones.iniciar.fechaInspeccion' | transloco }} *</span>
-            <input
-              id="fechaInspeccion"
-              pInputText
-              type="date"
-              [max]="hoy"
-              formControlName="fechaInspeccion"
-              class="campo-input"
-            />
-          </label>
-        </div>
-
-        <!-- Nombre del inspector -->
-        <div class="campo-grupo">
-          <label for="nombreAutor" class="campo-label">
-            <span>{{ 'inspecciones.iniciar.nombreInspector' | transloco }}</span>
-            <input
-              id="nombreAutor"
-              pInputText
-              type="text"
-              formControlName="nombreAutor"
-              class="campo-input"
-              [placeholder]="'inspecciones.iniciar.nombreInspectorPlaceholder' | transloco"
-            />
-          </label>
-        </div>
+        <!-- Datos de la visita -->
+        <section class="seccion">
+          <h4 class="seccion-titulo">
+            <i class="pi pi-calendar" aria-hidden="true"></i>
+            {{ 'inspecciones.iniciar.visitaTitulo' | transloco }}
+          </h4>
+          <div class="seccion-cuerpo visita">
+            <label for="fechaInspeccion" class="campo-label">
+              <span>{{ 'inspecciones.iniciar.fechaInspeccion' | transloco }} *</span>
+              <input
+                id="fechaInspeccion"
+                pInputText
+                type="date"
+                [max]="hoy"
+                formControlName="fechaInspeccion"
+                class="campo-input"
+              />
+            </label>
+            <div class="campo-label">
+              <span>{{ 'inspecciones.iniciar.gpsUbicacion' | transloco }}</span>
+              @if (gpsEstado() === 'obteniendo') {
+                <span class="gps-estado obteniendo" role="status">
+                  <i class="pi pi-spin pi-spinner" aria-hidden="true"></i>
+                  {{ 'inspecciones.iniciar.gpsObteniendo' | transloco }}
+                </span>
+              } @else if (gpsEstado() === 'obtenido') {
+                <span class="gps-estado obtenido" role="status">
+                  <i class="pi pi-map-marker" aria-hidden="true"></i>
+                  {{
+                    'inspecciones.iniciar.gpsObtenido'
+                      | transloco: { lat: gpsLatitud(), lng: gpsLongitud(), acc: gpsPrecision() }
+                  }}
+                </span>
+              } @else {
+                <span class="gps-estado no-disponible" role="status">
+                  <i class="pi pi-info-circle" aria-hidden="true"></i>
+                  {{ 'inspecciones.iniciar.gpsNoDisponible' | transloco }}
+                </span>
+              }
+            </div>
+          </div>
+        </section>
 
         <!-- Precarga de datos técnicos permanentes -->
-        <div class="seccion-permanentes surface-card">
-          <h4>{{ 'inspecciones.iniciar.datosPermanentesTitulo' | transloco }}</h4>
-          @if (cargandoPermanentes()) {
-            <p class="permanentes-nota">
-              <i class="pi pi-spin pi-spinner" aria-hidden="true"></i>
-              {{ 'inspecciones.iniciar.cargandoPermanentes' | transloco }}
-            </p>
-          } @else if (datosPermanentes(); as dp) {
-            <div class="resumen-permanentes">
-              <p class="permanentes-aviso">
-                <i class="pi pi-info-circle" aria-hidden="true"></i>
-                {{ 'inspecciones.iniciar.permanentesEncontrados' | transloco }}
+        <section class="seccion">
+          <h4 class="seccion-titulo">
+            <i class="pi pi-database" aria-hidden="true"></i>
+            {{ 'inspecciones.iniciar.datosPermanentesTitulo' | transloco }}
+          </h4>
+          <div class="seccion-cuerpo">
+            @if (cargandoPermanentes()) {
+              <p class="nota" role="status">
+                <i class="pi pi-spin pi-spinner" aria-hidden="true"></i>
+                {{ 'inspecciones.iniciar.cargandoPermanentes' | transloco }}
               </p>
-              <ul class="datos-permanentes-lista">
+            } @else if (datosPermanentes(); as dp) {
+              <p class="nota">{{ 'inspecciones.iniciar.permanentesEncontrados' | transloco }}</p>
+              <dl class="datos-permanentes">
                 @if (dp.longitudM) {
-                  <li>
-                    <strong>{{ 'inspecciones.iniciar.longitud' | transloco }}:</strong>
-                    {{ dp.longitudM }} m
-                  </li>
+                  <div>
+                    <dt>{{ 'inspecciones.iniciar.longitud' | transloco }}</dt>
+                    <dd>{{ dp.longitudM }} m</dd>
+                  </div>
                 }
                 @if (dp.numeroTramos) {
-                  <li>
-                    <strong>{{ 'inspecciones.iniciar.tramos' | transloco }}:</strong>
-                    {{ dp.numeroTramos }}
-                  </li>
+                  <div>
+                    <dt>{{ 'inspecciones.iniciar.tramos' | transloco }}</dt>
+                    <dd>{{ dp.numeroTramos }}</dd>
+                  </div>
                 }
                 @if (dp.tipologiaPuente) {
-                  <li>
-                    <strong>{{ 'inspecciones.iniciar.tipologia' | transloco }}:</strong>
-                    {{ dp.tipologiaPuente }}
-                  </li>
+                  <div>
+                    <dt>{{ 'inspecciones.iniciar.tipologia' | transloco }}</dt>
+                    <dd>{{ dp.tipologiaPuente }}</dd>
+                  </div>
                 }
                 @if (dp.materialSuperestructura) {
-                  <li>
-                    <strong>{{ 'inspecciones.iniciar.material' | transloco }}:</strong>
-                    {{ dp.materialSuperestructura }}
-                  </li>
+                  <div>
+                    <dt>{{ 'inspecciones.iniciar.material' | transloco }}</dt>
+                    <dd>{{ dp.materialSuperestructura }}</dd>
+                  </div>
                 }
                 @if (dp.anioConstruccion) {
-                  <li>
-                    <strong>{{ 'inspecciones.iniciar.anioConstruccion' | transloco }}:</strong>
-                    {{ dp.anioConstruccion }}
-                  </li>
+                  <div>
+                    <dt>{{ 'inspecciones.iniciar.anioConstruccion' | transloco }}</dt>
+                    <dd>{{ dp.anioConstruccion }}</dd>
+                  </div>
                 }
-              </ul>
+              </dl>
               <div class="checkbox-confirmacion">
                 <p-checkbox
                   formControlName="confirmarDatosPermanentes"
@@ -252,64 +244,83 @@
                   <small>{{ 'inspecciones.iniciar.noDaniosNota' | transloco }}</small>
                 </label>
               </div>
-            </div>
-          } @else {
-            <p class="permanentes-nota primera-vez">
-              <i class="pi pi-info-circle" aria-hidden="true"></i>
-              {{ 'inspecciones.iniciar.primeraInspeccionNota' | transloco }}
-            </p>
-          }
-        </div>
+            } @else {
+              <p class="nota nota-info">
+                <i class="pi pi-info-circle" aria-hidden="true"></i>
+                {{ 'inspecciones.iniciar.primeraInspeccionNota' | transloco }}
+              </p>
+            }
+          </div>
+        </section>
 
         <!-- Acompañantes -->
-        <div class="seccion-acompanantes">
-          <h4>{{ 'inspecciones.iniciar.acompanantesTitulo' | transloco }}</h4>
-          <p class="acompanantes-sub">{{ 'inspecciones.iniciar.acompanantesNota' | transloco }}</p>
-          <div class="fila-nuevo-acompanante">
-            <input
-              pInputText
-              type="text"
-              formControlName="nombreAcompanante"
-              [placeholder]="'inspecciones.iniciar.nombreAcompanantePlaceholder' | transloco"
-              class="input-acompanante"
-            />
-            <input
-              pInputText
-              type="text"
-              formControlName="colegiadoAcompanante"
-              [placeholder]="'inspecciones.iniciar.colegiadoAcompanantePlaceholder' | transloco"
-              class="input-colegiado"
-            />
-            <button
-              pButton
-              type="button"
-              severity="secondary"
-              [outlined]="true"
-              (click)="agregarAcompanante()"
-              [disabled]="!form.get('nombreAcompanante')?.value"
-            >
-              <i class="pi pi-plus" aria-hidden="true"></i>
-              <span>{{ 'inspecciones.iniciar.agregarAcompanante' | transloco }}</span>
-            </button>
+        <section class="seccion">
+          <h4 class="seccion-titulo">
+            <i class="pi pi-users" aria-hidden="true"></i>
+            {{ 'inspecciones.iniciar.acompanantesTitulo' | transloco }}
+          </h4>
+          <div class="seccion-cuerpo">
+            <p class="nota">{{ 'inspecciones.iniciar.acompanantesNota' | transloco }}</p>
+            <div class="fila-nuevo-acompanante">
+              <label for="nombreAcompanante" class="campo-label">
+                <span>{{ 'inspecciones.iniciar.nombreAcompanante' | transloco }}</span>
+                <input
+                  id="nombreAcompanante"
+                  pInputText
+                  type="text"
+                  formControlName="nombreAcompanante"
+                  class="campo-input"
+                  [placeholder]="'inspecciones.iniciar.nombreAcompanantePlaceholder' | transloco"
+                />
+              </label>
+              <label for="colegiadoAcompanante" class="campo-label">
+                <span>{{ 'inspecciones.iniciar.colegiadoAcompanante' | transloco }}</span>
+                <input
+                  id="colegiadoAcompanante"
+                  pInputText
+                  type="text"
+                  formControlName="colegiadoAcompanante"
+                  class="campo-input"
+                  [placeholder]="'inspecciones.iniciar.colegiadoAcompanantePlaceholder' | transloco"
+                />
+              </label>
+              <button
+                pButton
+                type="button"
+                severity="secondary"
+                [outlined]="true"
+                class="boton-agregar"
+                (click)="agregarAcompanante()"
+                [disabled]="!form.get('nombreAcompanante')?.value"
+              >
+                <i class="pi pi-plus" aria-hidden="true"></i>
+                <span>{{ 'inspecciones.iniciar.agregarAcompanante' | transloco }}</span>
+              </button>
+            </div>
+            @if (acompanantes().length > 0) {
+              <ul class="lista-acompanantes-agregados">
+                @for (ac of acompanantes(); track ac.nombre; let i = $index) {
+                  <li class="item-acompanante">
+                    <span>
+                      <i class="pi pi-user" aria-hidden="true"></i>
+                      {{ ac.nombre }} {{ ac.colegiado ? '(' + ac.colegiado + ')' : '' }}
+                    </span>
+                    <button
+                      type="button"
+                      class="btn-quitar-acompanante"
+                      (click)="eliminarAcompanante(i)"
+                      [attr.aria-label]="
+                        ('inspecciones.iniciar.quitarAcompanante' | transloco) + ': ' + ac.nombre
+                      "
+                    >
+                      <i class="pi pi-times" aria-hidden="true"></i>
+                    </button>
+                  </li>
+                }
+              </ul>
+            }
           </div>
-          @if (acompanantes().length > 0) {
-            <ul class="lista-acompanantes-agregados">
-              @for (ac of acompanantes(); track ac.nombre; let i = $index) {
-                <li class="item-acompanante">
-                  <span>{{ ac.nombre }} {{ ac.colegiado ? '(' + ac.colegiado + ')' : '' }}</span>
-                  <button
-                    type="button"
-                    class="btn-quitar-acompanante"
-                    (click)="eliminarAcompanante(i)"
-                    [attr.aria-label]="'inspecciones.iniciar.quitarAcompanante' | transloco"
-                  >
-                    <i class="pi pi-times" aria-hidden="true"></i>
-                  </button>
-                </li>
-              }
-            </ul>
-          }
-        </div>
+        </section>
 
         <!-- Error del servidor o de validación -->
         @if (error()) {

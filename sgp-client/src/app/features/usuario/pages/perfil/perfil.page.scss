@@ -6,7 +6,6 @@
 }
 .cuenta {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 1rem;
   margin: 0;
   padding-bottom: 1.1rem;
@@ -65,9 +64,4 @@ label {
 .accion {
   justify-content: center;
   width: 100%;
-}
-@media (max-width: 560px) {
-  .cuenta {
-    grid-template-columns: 1fr;
-  }
 }

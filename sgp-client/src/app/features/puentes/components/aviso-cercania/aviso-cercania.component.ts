@@ -41,6 +41,12 @@ export class AvisoCercaniaComponent {
   readonly total = input.required<number>();
   readonly modo = input<ModoAvisoCercania>('registro');
 
+  readonly haySuperpuesto = computed(() =>
+    this.cercanos().some(
+      (puente) => puente.distanciaMetros != null && puente.distanciaMetros < 1.0,
+    ),
+  );
+
   readonly hayInactivos = computed(() => this.cercanos().some((puente) => !puente.activo));
 
   /** Si todos los cercanos están dados de baja, el aviso cambia de tono. */

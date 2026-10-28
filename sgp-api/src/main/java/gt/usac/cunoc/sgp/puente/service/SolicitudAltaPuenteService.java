@@ -130,6 +130,7 @@ public class SolicitudAltaPuenteService {
     // RN-INV-06: la misma advertencia (no bloqueante) que el alta directa, para que el Catedrático
     // sepa de un posible duplicado antes de enviar la solicitud.
     var cercanos = puentes.findCercanos(latitud, longitud, PageRequest.of(0, 100));
+    puenteService.validarNoSuperpuesto(cercanos);
     if (cercanos.hasContent() && !request.confirmarCercania()) {
       throw new CercaniaPuenteException(cercanos.map(mapper::toPuenteCercanoResponse));
     }

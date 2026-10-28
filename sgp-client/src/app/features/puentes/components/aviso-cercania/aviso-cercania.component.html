@@ -1,8 +1,12 @@
 <section class="proximity" role="alert">
   <h3>{{ 'puentes.proximityTitle' | transloco }}</h3>
-  <p>{{ claveNota() | transloco }}</p>
-  @if (hayInactivos() && !soloInactivos()) {
-    <p class="aviso-inactivos">{{ claveNotaInactivos() | transloco }}</p>
+  @if (haySuperpuesto()) {
+    <p class="aviso-superpuesto">{{ 'puentes.proximityOverlappingNote' | transloco }}</p>
+  } @else {
+    <p>{{ claveNota() | transloco }}</p>
+    @if (hayInactivos() && !soloInactivos()) {
+      <p class="aviso-inactivos">{{ claveNotaInactivos() | transloco }}</p>
+    }
   }
   <p>{{ 'puentes.proximityTotal' | transloco: { total: total() } }}</p>
 
@@ -13,6 +17,9 @@
         <span>
           {{ 'puentes.distance' | transloco }}: {{ cercano.distanciaMetros | number: '1.1-1' }} m ·
           {{ (cercano.activo ? 'puentes.active' : 'puentes.inactive') | transloco }}
+          @if (cercano.distanciaMetros < 1.0) {
+            · {{ 'puentes.overlapping' | transloco }}
+          }
         </span>
       </li>
     }
@@ -22,5 +29,7 @@
     <p>{{ 'puentes.proximityLimit' | transloco: { cantidad: cercanos().length } }}</p>
   }
 
-  <ng-content />
+  @if (!haySuperpuesto()) {
+    <ng-content />
+  }
 </section>

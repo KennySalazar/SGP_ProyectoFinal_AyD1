@@ -133,6 +133,58 @@ class AuthControllerPerfilSecurityTest {
         .andExpect(jsonPath("$.code").value("nombre_usuario_en_uso"));
   }
 
+  @Test
+  void actualizacionConNuevoCorreoRetornaRespuestaExitosa() throws Exception {
+    when(authService.actualizarPerfil(eq(CORREO), any(ActualizarPerfilRequest.class)))
+        .thenReturn(
+            new UserResponse(
+                UUID.randomUUID(),
+                "nuevo@ejemplo.com",
+                "Ana Reyes",
+                "ana.reyes",
+                RoleName.ESTUDIANTE.name(),
+                true,
+                true,
+                true,
+                false,
+                null));
+
+    mockMvc
+        .perform(
+            put(RUTA)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    "{\"nombreCompleto\":\"Ana Reyes\",\"nombreUsuario\":\"ana.reyes\",\"email\":\"nuevo@ejemplo.com\"}")
+                .principal(autenticar(RoleName.ESTUDIANTE)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.email").value("nuevo@ejemplo.com"));
+
+    verify(authService)
+        .actualizarPerfil(
+            CORREO, new ActualizarPerfilRequest("Ana Reyes", "ana.reyes", "nuevo@ejemplo.com"));
+  }
+
+  @Test
+  void actualizacionConCorreoYaRegistradoRetornaConflicto() throws Exception {
+    when(authService.actualizarPerfil(any(), any()))
+        .thenThrow(
+            new ApiException(
+                HttpStatus.CONFLICT,
+                "email_already_registered",
+                "Correo ya registrado",
+                "El correo electrónico ya está registrado"));
+
+    mockMvc
+        .perform(
+            put(RUTA)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    "{\"nombreCompleto\":\"Ana Reyes\",\"nombreUsuario\":\"ana.reyes\",\"email\":\"ocupado@ejemplo.com\"}")
+                .principal(autenticar(RoleName.ESTUDIANTE)))
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.code").value("email_already_registered"));
+  }
+
   private UserResponse respuesta(RoleName rol) {
     return new UserResponse(
         UUID.randomUUID(),

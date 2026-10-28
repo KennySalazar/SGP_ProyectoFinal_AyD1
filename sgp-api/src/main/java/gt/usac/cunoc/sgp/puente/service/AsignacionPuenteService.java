@@ -85,7 +85,8 @@ public class AsignacionPuenteService {
                     inscripcion.getEstudianteEmail(),
                     inscripcion.getCursoId(),
                     inscripcion.getCursoNombre(),
-                    inscripcion.getPeriodo()))
+                    inscripcion.getPeriodo(),
+                    inscripcion.getEstudianteNombre()))
         .toList();
   }
 

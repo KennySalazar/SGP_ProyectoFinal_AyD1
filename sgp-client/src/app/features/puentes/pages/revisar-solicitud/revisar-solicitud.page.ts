@@ -81,6 +81,12 @@ export class RevisarSolicitudPage {
     puntosDeCercanos(this.detalle()?.puentesCercanos ?? []),
   );
 
+  readonly haySuperpuesto = computed(() =>
+    (this.detalle()?.puentesCercanos ?? []).some(
+      (cercano) => cercano.distanciaMetros != null && cercano.distanciaMetros < 1.0,
+    ),
+  );
+
   constructor() {
     effect(() => {
       this.id();
@@ -112,6 +118,7 @@ export class RevisarSolicitudPage {
   }
 
   aprobar(): void {
+    if (this.haySuperpuesto()) return;
     const detalle = this.detalle();
     if (!detalle || !this.pendiente() || this.procesando()) return;
 
