@@ -273,6 +273,108 @@ describe('esquema-visual utility', () => {
     }
   });
 
+  describe('campos que no se editan', () => {
+    const esquemaOriginal = {
+      type: 'object',
+      properties: {
+        datos_generales: {
+          title: '2. Datos generales',
+          type: 'object',
+          additionalProperties: false,
+          required: ['longitud_m'],
+          'x-sgp-orden': ['longitud_m', 'anio_construccion', 'fecha_evaluacion', 'observaciones'],
+          properties: {
+            longitud_m: {
+              type: 'number',
+              title: 'Longitud (m)',
+              maximum: 5000,
+              exclusiveMinimum: 0,
+            },
+            anio_construccion: {
+              type: ['integer', 'null'],
+              title: 'Año de construcción',
+              minimum: 1800,
+            },
+            fecha_evaluacion: {
+              type: ['string', 'null'],
+              title: 'Fecha última evaluación',
+              format: 'date',
+              readOnly: true,
+            },
+            observaciones: { type: 'string', title: 'Observaciones', maxLength: 4000 },
+          },
+        },
+        tramos: {
+          title: '3. Tramos',
+          type: 'array',
+          items: {
+            type: 'object',
+            title: 'Tramo',
+            additionalProperties: false,
+            required: ['instancia_id', 'orden'],
+            'x-sgp-orden': ['instancia_id', 'orden'],
+            properties: {
+              instancia_id: { $ref: '#/$defs/instanciaId' },
+              orden: { type: 'integer', title: 'Número de tramo', minimum: 1 },
+            },
+          },
+        },
+      },
+    };
+
+    it('conserva sin cambios los campos al guardar en modo visual', () => {
+      const secciones = esquemaASeccionesVisuales(esquemaOriginal);
+      const resultado = seccionesVisualesAEsquema(secciones, esquemaOriginal, {});
+
+      expect(resultado.esquema['properties']).toEqual(esquemaOriginal.properties);
+    });
+
+    it('agrega una sección nueva sin modificar las existentes', () => {
+      const secciones = esquemaASeccionesVisuales(esquemaOriginal);
+      secciones.push({
+        clave: 'seccion_prueba',
+        titulo: '9. Sección de prueba',
+        descripcion: '',
+        esRepetible: false,
+        preguntas: [
+          {
+            clave: 'pregunta_1',
+            titulo: 'Pregunta 1',
+            tipo: 'number',
+            obligatorio: false,
+            soloLectura: false,
+          },
+        ],
+      });
+
+      const resultado = seccionesVisualesAEsquema(secciones, esquemaOriginal, {});
+      const propiedades = resultado.esquema['properties'] as Record<string, unknown>;
+
+      expect(propiedades['datos_generales']).toEqual(esquemaOriginal.properties.datos_generales);
+      expect(propiedades['tramos']).toEqual(esquemaOriginal.properties.tramos);
+      expect(Object.keys(propiedades)).toContain('seccion_prueba');
+    });
+
+    it('mantiene la nulabilidad al cambiar el tipo de un campo nullable', () => {
+      const secciones = esquemaASeccionesVisuales(esquemaOriginal);
+      const anio = secciones
+        .find((seccion) => seccion.clave === 'datos_generales')!
+        .preguntas.find((pregunta) => pregunta.clave === 'anio_construccion')!;
+      anio.tipo = 'number';
+
+      const resultado = seccionesVisualesAEsquema(secciones, esquemaOriginal, {});
+      const propiedades = resultado.esquema['properties'] as Record<
+        string,
+        { properties: Record<string, { type: unknown }> }
+      >;
+
+      expect(propiedades['datos_generales'].properties['anio_construccion'].type).toEqual([
+        'number',
+        'null',
+      ]);
+    });
+  });
+
   it('extrae vínculos visuales desde formato columnas e instantánea', () => {
     const raw = {
       columnas: [
