@@ -36,6 +36,16 @@ label,
   font-weight: 700;
 }
 
+.field {
+  grid-column: 1 / -1;
+  min-width: 0;
+}
+
+.field > p-select {
+  width: 100%;
+  min-width: 0;
+}
+
 form > button {
   grid-column: 1 / -1;
   justify-content: center;
