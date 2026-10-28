@@ -1,3 +1,7 @@
+import {
+  InspeccionBorradorResponse,
+  InspeccionResumenResponse,
+} from '../features/inspecciones/models/inspeccion.models';
 import { Blob as BlobNode } from 'node:buffer';
 import { ReferenciasLocalesService } from './services/referencias-locales.service';
 import {
@@ -922,5 +926,52 @@ describe('HU-061 fase 0: integración local y contratos HTTP', () => {
     await corrida;
     expect((await sgpDb.cola_sync.get('interrumpida'))?.estado).toBe('INTERVENCION');
     http.expectNone(`/api/v1/inspecciones/${INSPECCION}/borrador`);
+  });
+  it('descarta la confirmacion del envio anterior al reabrir y permite encolar otro ciclo', async () => {
+    const local = await iniciar();
+    await sgpDb.cola_sync.clear();
+    await evidencia(local);
+    auth.setUser({ ...usuario(), role: 'ESTUDIANTE' });
+    const borrador = {
+      ...(local.payload as BorradorLocalPayload).borrador,
+      rolAutor: 'ESTUDIANTE',
+      estado: 'BORRADOR',
+      version: 5,
+    } as InspeccionBorradorResponse;
+    await sgpDb.inspecciones.update(INSPECCION, {
+      estado: 'ENVIADA',
+      sincronizado: true,
+      intencionFinal: {
+        accion: 'enviar',
+        estado: 'CONFIRMADA',
+        resultado: { id: INSPECCION, estado: 'ENVIADA' } as InspeccionResumenResponse,
+      },
+    });
+    expect(await locales.actualizarBorradorCanonicoSiSinPendientes(borrador, AUTOR)).toBe(true);
+    const actual = (await sgpDb.inspecciones.get(INSPECCION))!;
+    expect(actual.intencionFinal).toBeUndefined();
+    expect(actual.estado).toBe('BORRADOR');
+    await locales.encolarAccionFinal(INSPECCION, 'enviar', {
+      version: 5,
+      datos: { campo: 'corregido' },
+    });
+    expect(
+      (await sgpDb.cola_sync.toArray()).filter((op) => op.operacion === 'ENVIAR_INSPECCION'),
+    ).toHaveLength(1);
+    expect((await sgpDb.inspecciones.get(INSPECCION))?.intencionFinal?.estado).toBe('PENDIENTE');
+  });
+
+  it('no reemplaza respuestas locales pendientes al actualizar el estado canonico', async () => {
+    const local = await iniciar();
+    const { datos } = await editar(local);
+    const borrador = {
+      ...(local.payload as BorradorLocalPayload).borrador,
+      estado: 'EN_REVISION',
+    } as InspeccionBorradorResponse;
+    expect(await locales.actualizarBorradorCanonicoSiSinPendientes(borrador, AUTOR)).toBe(false);
+    expect((await locales.obtenerInspeccionLocal(INSPECCION))?.payload).toMatchObject({
+      borrador: { datos },
+    });
+    expect(await sgpDb.cola_sync.count()).toBeGreaterThan(0);
   });
 });

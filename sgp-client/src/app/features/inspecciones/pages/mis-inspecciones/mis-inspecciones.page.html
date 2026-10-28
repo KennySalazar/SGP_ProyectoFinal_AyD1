@@ -112,8 +112,8 @@
       }
     </div>
     <div class="acciones">
-      @if (inspeccion.autorId === auth.user()?.id && inspeccion.estado !== 'PUBLICADA' &&
-      inspeccion.estado !== 'RECHAZADA') {
+      @if (auth.user()?.role !== 'ESTUDIANTE' && inspeccion.autorId === auth.user()?.id &&
+      inspeccion.estado !== 'PUBLICADA' && inspeccion.estado !== 'RECHAZADA') {
       <button
         pButton
         type="button"
@@ -142,6 +142,17 @@
       >
         <i class="pi pi-trash" aria-hidden="true"></i
         ><span>{{ 'inspecciones.mis.delete' | transloco }}</span>
+      </button>
+      } @else if (inspeccion.estado === 'CAMBIOS_SOLICITADOS' || inspeccion.estado === 'ENVIADA' ||
+      inspeccion.estado === 'EN_REVISION' || inspeccion.estado === 'RECHAZADA') {
+      <button
+        pButton
+        type="button"
+        severity="secondary"
+        [outlined]="true"
+        (click)="reanudar(inspeccion)"
+      >
+        {{ 'inspecciones.mis.viewReview' | transloco }}
       </button>
       } @else if (puedeCorregir(inspeccion)) {
       <button

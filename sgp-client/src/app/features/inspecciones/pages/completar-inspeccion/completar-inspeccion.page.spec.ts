@@ -988,4 +988,72 @@ describe('CompletarInspeccionPage', () => {
     expect(mockInspeccionApi.publicar).not.toHaveBeenCalled();
     expect(component.ejecutandoAccion()).toBe(false);
   });
+  it('actualiza el editor cuando el autor atiende los cambios desde la misma pantalla', async () => {
+    mockInspeccionApi.obtenerBorrador.mockReturnValue(
+      of({ ...mockBorrador, estado: 'CAMBIOS_SOLICITADOS' }),
+    );
+    await cargar();
+    expect(component.soloLectura()).toBe(true);
+    mockInspeccionApi.obtenerBorrador.mockReturnValue(
+      of({ ...mockBorrador, estado: 'BORRADOR', version: 5 }),
+    );
+    component.actualizarRevision();
+    await vi.waitFor(() => expect(component.soloLectura()).toBe(false));
+    expect(component.borrador()?.version).toBe(5);
+    expect(component.resultadoAccion()).toBeNull();
+  });
+
+  it('no muestra como exitoso un envio anterior cuando la copia local ya volvio a borrador', async () => {
+    await cargar();
+    observacionLocal.next({
+      propietarioId: 'usr-1',
+      estado: 'BORRADOR',
+      intencionFinal: {
+        accion: 'enviar',
+        estado: 'CONFIRMADA',
+        resultado: { id: 'inspeccion-123', estado: 'ENVIADA' },
+      },
+    } as LocalInspection);
+    expect(component.resultadoAccion()).toBeNull();
+    expect(component.soloLectura()).toBe(false);
+  });
+  it('respeta el estado remoto en revision aunque haya cambios locales pendientes', async () => {
+    const remoto = { ...mockBorrador, estado: 'EN_REVISION' as const, version: 2 };
+    mockInspeccionApi.obtenerBorrador.mockReturnValue(of(remoto));
+    const locales = TestBed.inject(InspeccionesLocalesService);
+    vi.spyOn(locales, 'obtenerInspeccionLocal').mockResolvedValue({
+      id: mockBorrador.id,
+      puenteId: mockBorrador.puenteId,
+      propietarioId: 'usr-1',
+      estado: 'BORRADOR',
+      actualizadoEn: mockBorrador.creadoEn,
+      sincronizado: true,
+      actualizacionLocalPendiente: true,
+      payload: { borrador: mockBorrador },
+    });
+    vi.spyOn(locales, 'actualizarBorradorCanonicoSiSinPendientes').mockResolvedValue(false);
+    fixture.detectChanges();
+    await vi.waitFor(() => expect(component.borrador()?.estado).toBe('EN_REVISION'));
+    expect(component.soloLectura()).toBe(true);
+    expect(component.accionFinal()).toBeNull();
+  });
+
+  it('no abre una copia editable cuando el servidor rechaza el acceso', async () => {
+    mockInspeccionApi.obtenerBorrador.mockReturnValue(
+      throwError(() => new HttpErrorResponse({ status: 404 })),
+    );
+    const locales = TestBed.inject(InspeccionesLocalesService);
+    vi.spyOn(locales, 'obtenerInspeccionLocal').mockResolvedValue({
+      id: mockBorrador.id,
+      puenteId: mockBorrador.puenteId,
+      propietarioId: 'usr-1',
+      estado: 'BORRADOR',
+      actualizadoEn: mockBorrador.creadoEn,
+      sincronizado: true,
+      payload: { borrador: mockBorrador },
+    });
+    fixture.detectChanges();
+    await vi.waitFor(() => expect(component.errorCarga()).toBeTruthy());
+    expect(component.borrador()).toBeNull();
+  });
 });

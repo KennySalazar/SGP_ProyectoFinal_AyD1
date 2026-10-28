@@ -30,8 +30,13 @@ describe('Destinos privados de los avisos de revisión', () => {
   it('conserva la bandeja de los catedráticos y los destinos de otras historias', () => {
     user.set({ id: 'revisor', role: 'CATEDRATICO' });
     expect(store.obtenerRutaEntidad('REVISION', 'ciclo')).toEqual(['/revisiones']);
-    expect(store.obtenerRutaEntidad('INSPECCION', 'i')).toEqual(['/inspecciones', 'i']);
+    expect(store.obtenerRutaEntidad('INSPECCION', 'i')).toEqual(['/revisiones']);
     expect(store.obtenerRutaEntidad('ORDEN', 'o')).toEqual(['/mantenimiento', 'ordenes', 'o']);
+  });
+  it('el autor abre su inspeccion y el catedratico su bandeja de revision', () => {
+    expect(store.obtenerRutaEntidad('inspeccion', 'i')).toEqual(['/inspecciones', 'i', 'borrador']);
+    user.set({ id: 'revisor', role: 'CATEDRATICO' });
+    expect(store.obtenerRutaEntidad('inspeccion', 'i')).toEqual(['/revisiones']);
   });
   it('abre el detalle de una orden desde los avisos de mantenimiento (HU-047, HU-069)', () => {
     user.set({ id: 'catedratico', role: 'CATEDRATICO' });

@@ -177,7 +177,13 @@ export class MisInspeccionesPage {
             const porId = new Map(
               respuesta.content.map((inspeccion) => [inspeccion.id, inspeccion]),
             );
-            for (const local of localesResumen) porId.set(local.id, local);
+            for (const local of localesResumen) {
+              if (local.estado === 'PENDIENTE_SYNC' || !porId.has(local.id)) {
+                const copia = inspeccionesLocales.find((item) => item.id === local.id);
+                if (local.estado === 'PENDIENTE_SYNC' || !copia?.sincronizado)
+                  porId.set(local.id, local);
+              }
+            }
             let combinadas = [...porId.values()];
             if (filtro) {
               combinadas = combinadas.filter((i) => i.estado === filtro);

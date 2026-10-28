@@ -1,7 +1,7 @@
 <header class="page-heading">
   <p class="page-kicker">{{ 'studentActivation.kicker' | transloco }}</p>
   <h1 class="page-title">{{ 'studentActivation.title' | transloco }}</h1>
-  <p class="page-description">{{ 'studentActivation.description' | transloco }}</p>
+  <p class="page-description">{{ 'studentActivation.descriptionExtended' | transloco }}</p>
 </header>
 
 @if (exito(); as mensaje) {
@@ -9,10 +9,35 @@
 }
 
 <section class="surface-card activation-card">
+  <div class="modos" role="group" [attr.aria-label]="'studentActivation.mode' | transloco">
+    <button
+      pButton
+      type="button"
+      [outlined]="modo() !== 'activar'"
+      [disabled]="guardando() || cargando()"
+      (click)="cambiarModo('activar')"
+      [attr.aria-pressed]="modo() === 'activar'"
+    >
+      {{ 'studentActivation.activateMode' | transloco }}
+    </button>
+    <button
+      pButton
+      type="button"
+      [outlined]="modo() !== 'vincular'"
+      [disabled]="guardando() || cargando()"
+      (click)="cambiarModo('vincular')"
+      [attr.aria-pressed]="modo() === 'vincular'"
+    >
+      {{ 'studentActivation.linkMode' | transloco }}
+    </button>
+  </div>
   <div class="section-head">
     <div>
       <h2>{{ 'studentActivation.formTitle' | transloco }}</h2>
-      <p>{{ 'studentActivation.formNote' | transloco }}</p>
+      <p>
+        {{ (modo() === 'activar' ? 'studentActivation.formNote' : 'studentActivation.linkNote') |
+        transloco }}
+      </p>
     </div>
     <button pButton type="button" severity="secondary" [outlined]="true" (click)="cargar()">
       {{ 'studentActivation.refresh' | transloco }}
@@ -22,13 +47,19 @@
   @if (cargando()) {
   <p role="status">{{ 'studentActivation.loading' | transloco }}</p>
   } @else if (estudiantes().length === 0) {
-  <p role="status">{{ 'studentActivation.empty' | transloco }}</p>
+  <p role="status">
+    {{ (modo() === 'activar' ? 'studentActivation.empty' : 'studentActivation.noActiveStudents') |
+    transloco }}
+  </p>
   } @else if (cursos().length === 0) {
   <p role="status">{{ 'studentActivation.noCourses' | transloco }}</p>
   } @else {
   <form [formGroup]="form" (ngSubmit)="activar()" novalidate>
     <div class="field">
-      <label for="estudianteId">{{ 'studentActivation.student' | transloco }}</label>
+      <label for="estudianteId"
+        >{{ (modo() === 'activar' ? 'studentActivation.student' : 'studentActivation.activeStudent')
+        | transloco }}</label
+      >
       <p-select
         inputId="estudianteId"
         formControlName="estudianteId"
@@ -56,8 +87,8 @@
     <button pButton type="submit" [disabled]="form.invalid || guardando()">
       <i class="pi pi-user-plus"></i>
       <span
-        >{{ (guardando() ? 'studentActivation.activating' : 'studentActivation.activate') |
-        transloco }}</span
+        >{{ (guardando() ? 'studentActivation.activating' : (modo() === 'activar' ?
+        'studentActivation.activate' : 'studentActivation.link')) | transloco }}</span
       >
     </button>
   </form>

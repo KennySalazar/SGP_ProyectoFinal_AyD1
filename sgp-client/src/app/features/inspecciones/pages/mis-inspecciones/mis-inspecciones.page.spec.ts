@@ -186,4 +186,31 @@ describe('MisInspeccionesPage', () => {
     expect(page.inspeccionCorregir()).toBe(publicada);
     expect(page.corrigiendo()).toBe(false);
   });
+  it('conserva el estado del servidor frente a una copia local ya sincronizada', async () => {
+    cargarListado([]);
+    authStoreMock.user.set({ id: 'usuario-1', role: 'ESTUDIANTE' } as UserSession);
+    vi.mocked(TestBed.inject(InspeccionesLocalesService).listarPorUsuario).mockResolvedValue([
+      {
+        id: 'inspeccion-1',
+        puenteId: 'puente-1',
+        propietarioId: 'usuario-1',
+        estado: 'ENVIADA',
+        actualizadoEn: '2026-10-01T00:00:00Z',
+        sincronizado: true,
+        payload: { borrador: inspeccion({ estado: 'ENVIADA' }) },
+      },
+    ]);
+    page.cargar();
+    await Promise.resolve();
+    cargarListado([inspeccion({ estado: 'EN_REVISION' })]);
+    expect(page.pagina()?.content[0].estado).toBe('EN_REVISION');
+  });
+
+  it('ofrece consultar la revision para una inspeccion con cambios solicitados', () => {
+    cargarListado([inspeccion({ estado: 'CAMBIOS_SOLICITADOS' })]);
+    fixture.detectChanges();
+    const texto = (fixture.nativeElement as HTMLElement).textContent;
+    expect(texto).toContain('inspecciones.mis.viewReview');
+    expect(texto).not.toContain('inspecciones.mis.delete');
+  });
 });

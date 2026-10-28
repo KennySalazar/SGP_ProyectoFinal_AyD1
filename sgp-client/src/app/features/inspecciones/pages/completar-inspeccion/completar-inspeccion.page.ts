@@ -212,8 +212,16 @@ export class CompletarInspeccionPage implements OnInit {
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe((local) => {
         if (local?.propietarioId !== this.auth.user()?.id) return;
-        this.intencionFinal.set(local?.intencionFinal);
-        if (local?.intencionFinal?.estado === 'CONFIRMADA') {
+        const confirmacionAnterior =
+          local?.intencionFinal?.estado === 'CONFIRMADA' &&
+          (local.estado === 'BORRADOR' || local.estado === 'CAMBIOS_SOLICITADOS');
+        this.intencionFinal.set(confirmacionAnterior ? undefined : local?.intencionFinal);
+        if (confirmacionAnterior) this.resultadoAccion.set(null);
+        if (
+          local?.intencionFinal?.estado === 'CONFIRMADA' &&
+          local.estado !== 'BORRADOR' &&
+          local.estado !== 'CAMBIOS_SOLICITADOS'
+        ) {
           this.resultadoAccion.set(local.intencionFinal.resultado ?? null);
           this.borrador.update((b) => (b ? { ...b, estado: local.estado } : b));
         }
@@ -235,6 +243,35 @@ export class CompletarInspeccionPage implements OnInit {
     }
     this.cargarBorrador(id);
   }
+  actualizarRevision(): void {
+    const actual = this.borrador();
+    if (!actual || actual.estado !== 'CAMBIOS_SOLICITADOS' || !this.connectivity.online()) return;
+    this.inspeccionApi
+      .obtenerBorrador(actual.id, true)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (borrador) => {
+          void this.inspeccionesLocales
+            .actualizarBorradorCanonicoSiSinPendientes(borrador, borrador.autorId)
+            .then((actualizado) => {
+              if (!actualizado) {
+                this.errorGuardado.set(
+                  'Hay cambios locales pendientes. Sincronice antes de abrir la correccion.',
+                );
+                return;
+              }
+              this.intencionFinal.set(undefined);
+              this.aplicarBorrador(borrador);
+              this.cargarEsquema(borrador.versionFormularioId);
+            })
+            .catch(() =>
+              this.errorGuardado.set('No fue posible preparar la correccion en este dispositivo.'),
+            );
+        },
+        error: (err: HttpErrorResponse) => this.procesarErrorCarga(err),
+      });
+  }
+
   private cargarBorrador(id: string): void {
     this.cargando.set(true);
     this.errorCarga.set(null);
@@ -272,22 +309,19 @@ export class CompletarInspeccionPage implements OnInit {
       ) as InspeccionBorradorResponse;
 
       if (b && typeof b === 'object' && (b.fechaInspeccion || b.id || b.versionFormularioId)) {
-        if (
-          local.sincronizado &&
-          !local.actualizacionLocalPendiente &&
-          this.connectivity.online()
-        ) {
+        if ((local.sincronizado || b.version > 0) && this.connectivity.online()) {
           this.inspeccionApi
             .obtenerBorrador(id, true)
             .pipe(takeUntilDestroyed(this.destroyRef))
             .subscribe({
               next: (canonico) => {
+                this.esSoloLocal.set(false);
                 void this.inspeccionesLocales
                   .actualizarBorradorCanonicoSiSinPendientes(canonico, canonico.autorId)
                   .then(async (actualizado) => {
                     let borrador = canonico;
                     let sincronizado = actualizado;
-                    if (!actualizado) {
+                    if (!actualizado && canonico.estado === 'BORRADOR') {
                       const copiaLocal = await this.inspeccionesLocales.obtenerInspeccionLocal(id);
                       const payload = copiaLocal?.payload as BorradorLocalPayload | undefined;
                       borrador = payload?.borrador ?? b;
@@ -297,7 +331,14 @@ export class CompletarInspeccionPage implements OnInit {
                   })
                   .catch(() => this.aplicarBorradorLocal(canonico, true));
               },
-              error: () => this.aplicarBorradorLocal(b, true),
+              error: (err: HttpErrorResponse) => {
+                if (err.status === 403 || err.status === 404) {
+                  this.cargando.set(false);
+                  this.procesarErrorCarga(err);
+                } else {
+                  this.aplicarBorradorLocal(b, local.sincronizado);
+                }
+              },
             });
         } else {
           this.aplicarBorradorLocal(b, local.sincronizado && !local.actualizacionLocalPendiente);
@@ -372,6 +413,11 @@ export class CompletarInspeccionPage implements OnInit {
 
   private aplicarBorrador(borrador: InspeccionBorradorResponse): void {
     this.ultimaHuellaDatos = null;
+    this.errorGuardado.set(null);
+    if (borrador.estado === 'BORRADOR' || borrador.estado === 'CAMBIOS_SOLICITADOS') {
+      this.resultadoAccion.set(null);
+      if (this.intencionFinal()?.estado === 'CONFIRMADA') this.intencionFinal.set(undefined);
+    }
     this.revisionInicialConfirmada.set(false);
     this.borrador.set(this.conProgreso(borrador));
     this.datosIniciales.set(borrador);
@@ -836,7 +882,9 @@ export class CompletarInspeccionPage implements OnInit {
     this.errorAccion.set(null);
     if (!this.formulario()?.revisar()) {
       this.errorAccion.set({
-        mensaje: this.i18n.translate('offline.hu061.incomplete'),
+        mensaje:
+          this.formulario()?.problemasValidacion().join(' · ') ||
+          this.i18n.translate('offline.hu061.incomplete'),
         campos: [],
         fotografias: [],
       });
@@ -1036,6 +1084,23 @@ export class CompletarInspeccionPage implements OnInit {
         this.errorGuardado.set(
           'La inspección no es editable porque ya no se encuentra en estado Borrador.',
         );
+        const id = this.borrador()?.id;
+        if (id) {
+          this.inspeccionApi
+            .obtenerBorrador(id, true)
+            .pipe(takeUntilDestroyed(this.destroyRef))
+            .subscribe({
+              next: (actual) => {
+                this.borrador.set(this.conProgreso(actual));
+                this.confirmandoAccion.set(false);
+                this.guardadoPendiente = null;
+                if (actual.estado === 'BORRADOR') this.errorGuardado.set(null);
+              },
+              error: (error: HttpErrorResponse) => {
+                if (error.status === 403 || error.status === 404) this.procesarErrorCarga(error);
+              },
+            });
+        }
       } else {
         this.errorGuardado.set(
           err.error?.detail ||

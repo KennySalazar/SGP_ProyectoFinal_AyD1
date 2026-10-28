@@ -199,8 +199,10 @@ export class NotificacionesStore implements OnDestroy {
         });
       } else {
         const destino = this.obtenerRutaEntidad(aviso.entidad, aviso.entidadId);
-        if (destino) await this.router.navigate(destino);
+        if (!destino || !(await this.router.navigate(destino))) this.errorLectura.set(true);
       }
+    } catch {
+      this.errorLectura.set(true);
     } finally {
       this.abriendoAviso.set(false);
     }
@@ -235,7 +237,9 @@ export class NotificacionesStore implements OnDestroy {
       return ['/admin/formularios', entidadId];
     }
     if (entidadUpper === 'INSPECCION') {
-      return ['/inspecciones', entidadId];
+      return this.auth.user()?.role === 'CATEDRATICO'
+        ? ['/revisiones']
+        : ['/inspecciones', entidadId, 'borrador'];
     }
     // El estudiante consulta el resultado privado; el revisor inicia o reanuda desde su bandeja.
     // entidadId identifica el ciclo, no la inspección.

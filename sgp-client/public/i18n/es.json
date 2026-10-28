@@ -753,7 +753,15 @@
     "refresh": "Actualizar",
     "loading": "Cargando estudiantes pendientes...",
     "empty": "No hay estudiantes pendientes de activación.",
-    "noCourses": "No tienes cursos vigentes disponibles para vincular estudiantes."
+    "noCourses": "No tienes cursos vigentes disponibles para vincular estudiantes.",
+    "descriptionExtended": "Activa estudiantes con correo verificado o vincula estudiantes activos a otros cursos.",
+    "mode": "Operacion de vinculacion",
+    "activateMode": "Activar estudiante pendiente",
+    "linkMode": "Vincular estudiante activo",
+    "linkNote": "Selecciona un estudiante ya activo para inscribirlo en otro de tus cursos. No se modifica su cuenta ni sus otras inscripciones.",
+    "noActiveStudents": "No hay estudiantes activos disponibles para vincular.",
+    "activeStudent": "Estudiante activo",
+    "link": "Vincular al curso"
   },
   "bridgeAssignments": {
     "kicker": "GESTION ACADÉMICA",
@@ -1649,7 +1657,8 @@
         "medidas": "Medidas (opcional)",
         "mostrar": "Mostrar el detalle del elemento",
         "ocultar": "Ocultar el detalle del elemento"
-      }
+      },
+      "notReady": "El formulario todavia no esta listo. Espere a que termine de cargar antes de enviar."
     },
     "validacion": {
       "requerido": "Este campo es obligatorio.",
@@ -2068,10 +2077,11 @@
       "compresionNota": "Las imágenes se procesan en segundo plano, con un lado mayor de hasta 1600 píxeles y un objetivo de 200–400 KB. Una imagen sencilla puede ocupar menos espacio sin perder calidad."
     },
     "borrador": {
-      "kicker": "INSPECCIÓN TÉCNICA · BORRADOR",
+      "kicker": "Inspeccion tecnica",
       "titulo": "Completar inspección técnica",
       "subtitulo": "Captura y edición incremental de borrador de inspección de puente",
       "volverPuente": "Volver a ficha del puente",
+      "regresarMisInspecciones": "Regresar a mis inspecciones",
       "autoguardando": "Guardando cambios...",
       "cambiosPendientes": "Cambios pendientes; se guardarán automáticamente.",
       "almacenamientoLleno": "Almacenamiento local insuficiente para guardar los cambios.",
@@ -2085,7 +2095,7 @@
       "inspector": "Inspector",
       "formulario": "Versión del formulario",
       "ultimaActividad": "Última actividad",
-      "soloLectura": "Estás consultando el borrador de tu estudiante en modo de solo lectura.",
+      "soloLectura": "Esta inspeccion esta en modo de solo lectura. La edicion depende de su estado y de tus permisos.",
       "valoresInicialesIncompatibles": "Al cargar el borrador se encontraron valores con un tipo incompatible con el esquema. La interfaz los descartó al construir los controles; revisa estas rutas y sus valores originales, vuelve a ingresar lo que corresponda y confirma la revisión antes de publicar:",
       "confirmarRevisionInicial": "Ya revisé los valores originales y corregí lo necesario",
       "revisionInicialConfirmada": "Revisión confirmada. Antes de publicar se guardarán los valores actuales del formulario.",
@@ -2130,7 +2140,8 @@
         "PUBLICADA": "Publicada",
         "RECHAZADA": "Rechazada",
         "PENDIENTE_SYNC": "Pendiente de sincronizar"
-      }
+      },
+      "viewReview": "Ver inspeccion y revision"
     },
     "correccion": {
       "corregir": "Corregir",

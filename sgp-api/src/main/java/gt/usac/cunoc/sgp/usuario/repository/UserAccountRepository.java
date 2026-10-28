@@ -26,7 +26,6 @@ public interface UserAccountRepository extends JpaRepository<UserAccount, UUID> 
   @EntityGraph(attributePaths = "role")
   Optional<UserAccount> findWithRoleById(UUID id);
 
-  /** Quien tiene ese nombre de usuario; la comparación usa el índice sobre {@code lower(...)}. */
   @Query("select u from UserAccount u where lower(u.nombreUsuario) = :nombreUsuario")
   Optional<UserAccount> findByNombreUsuarioEnMinusculas(
       @Param("nombreUsuario") String nombreUsuario);
@@ -38,7 +37,10 @@ public interface UserAccountRepository extends JpaRepository<UserAccount, UUID> 
   List<UserAccount> findByRole_NameAndActiveTrueAndVerifiedTrueAndActivatedFalseOrderByEmailAsc(
       RoleName roleName);
 
-  /** Bloquea la cuenta para que dos administradores no la modifiquen al mismo tiempo. */
+  @EntityGraph(attributePaths = "role")
+  List<UserAccount> findByRole_NameAndActiveTrueAndVerifiedTrueAndActivatedTrueOrderByEmailAsc(
+      RoleName roleName);
+
   @Lock(LockModeType.PESSIMISTIC_WRITE)
   @Query("select u from UserAccount u join fetch u.role where u.id = :id")
   Optional<UserAccount> findByIdForUpdate(@Param("id") UUID id);
@@ -46,25 +48,24 @@ public interface UserAccountRepository extends JpaRepository<UserAccount, UUID> 
   @EntityGraph(attributePaths = "role")
   @Query(
       """
-          SELECT u FROM UserAccount u
-          WHERE (:rol IS NULL OR u.role.name = :rol)
-            AND (:estado IS NULL
-              OR (:estado = 'INACTIVO' AND u.active = false)
-              OR (:estado = 'ACTIVO' AND u.active = true AND u.activated = true AND u.verified = true)
-              OR (:estado = 'PENDIENTE' AND u.active = true
-                  AND (u.activated = false OR u.verified = false)))
-          """)
+              SELECT u FROM UserAccount u
+              WHERE (:rol IS NULL OR u.role.name = :rol)
+                AND (:estado IS NULL
+                  OR (:estado = 'INACTIVO' AND u.active = false)
+                  OR (:estado = 'ACTIVO' AND u.active = true AND u.activated = true AND u.verified = true)
+                  OR (:estado = 'PENDIENTE' AND u.active = true
+                      AND (u.activated = false OR u.verified = false)))
+              """)
   Page<UserAccount> findByRolYEstado(
       @Param("rol") RoleName rol, @Param("estado") String estado, Pageable pageable);
 
-  /** Usuarios activos y con la cuenta activada de un rol: destinatarios de avisos (HU-069). */
   @Query(
       "select u.id from UserAccount u where u.role.name = :rol"
           + " and u.active = true and u.activated = true order by u.email")
   List<UUID> findIdsActivosPorRol(@Param("rol") RoleName rol);
 
-  /** De los indicados, los que siguen activos y con la cuenta activada. */
   @Query(
-      "select u.id from UserAccount u where u.id in :ids and u.active = true and u.activated = true")
+      "select u.id from UserAccount u where u.id in :ids and u.active = true and u.activated ="
+          + " true")
   List<UUID> filtrarActivos(@Param("ids") Collection<UUID> ids);
 }
