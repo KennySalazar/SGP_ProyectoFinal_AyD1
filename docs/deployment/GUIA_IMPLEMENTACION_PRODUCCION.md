@@ -193,7 +193,7 @@ zona no impide la conectividad, pero debe considerarse al evaluar costo de
 transferencia y latencia para producción.
 
 Staging conservará la IPv4 dinámica `3.235.197.36` sin Elastic IP por el plazo
-académico hasta el 28 de octubre de 2026. Puede cambiar al detener e iniciar la
+previsto hasta el 28 de octubre de 2026. Puede cambiar al detener e iniciar la
 instancia, por lo que cualquier certificado emitido para ella debe reemplazarse
 si cambia. Esta decisión acotada a staging no resuelve la necesidad de una
 dirección pública operativamente estable para producción.

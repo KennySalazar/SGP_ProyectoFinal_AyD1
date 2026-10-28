@@ -3,7 +3,7 @@
 ## Estado del documento
 
 Esta guía describe la infraestructura de staging implementada en el repositorio y
-se actualiza de forma incremental durante la historia de usuario.
+se actualiza de forma incremental conforme evoluciona el ambiente.
 
 **Actualización posterior:** el usuario confirmó la comprobación de `verify-full`
 y extensiones, la realización de pruebas funcionales y de correo, y que el
@@ -201,8 +201,8 @@ tier customers. To remove all limitations, upgrade your account plan.
 
 La retención de RDS es complementaria. La [guía de respaldos](RESPALDO_Y_RESTAURACION.md)
 documenta volcados diarios y copias mensuales a S3, y una prueba de restauración
-en producción el 17 de octubre de 2026. El enunciado no exige AWS Backup ni una
-retención de 30 días en RDS.
+en producción el 17 de octubre de 2026. Los requisitos no especifican AWS Backup
+ni una retención de 30 días en RDS.
 
 ### Procedimiento de verificación TLS
 
@@ -1200,9 +1200,9 @@ de inspecciones antiguas ni de restauración de archivos.
 1. Vigilar `sgp-certbot-renew.timer` y conservar evidencia de la primera
    renovación efectiva antes del vencimiento del certificado.
 2. Conservar el enlace o identificador de la ejecución de GitHub Actions como
-   evidencia del sprint, si está disponible.
+   evidencia del despliegue, si está disponible.
 
-## Evaluación de cierre de la HU de staging
+## Estado del despliegue de staging
 
 El alcance acordado de infraestructura, publicación y despliegue automatizado de
 staging está implementado: existen los recursos AWS, RDS atiende a la
@@ -1212,15 +1212,12 @@ correctamente. La integración S3 recibió posteriormente la validación parcial
 registrada aquí. El usuario informó pruebas funcionales y de correo posteriores;
 producción y respaldos se documentan en sus guías respectivas.
 
-Por ello se recomienda cerrar la HU de staging en su alcance de sprint, dejando
-seguimiento operativo para la renovación efectiva del certificado y las
-excepciones ya registradas. Este cierre no equivale a declarar cumplido todo el
-enunciado final: DT-SEC-10 (HSTS) y la retención de logs requieren seguimiento.
-Las verificaciones de RDS y las pruebas funcionales
-fueron confirmadas por el usuario sin evidencia detallada. Si HSTS o
-alguno de esos puntos forma parte explícita de los criterios de aceptación de la
-HU en el tablero, el cierre debe ser condicionado a una excepción aceptada por
-el equipo o la HU debe permanecer abierta.
+El despliegue mantiene seguimiento operativo para la renovación efectiva del
+certificado y las excepciones registradas. DT-SEC-10 (HSTS) y la retención de
+logs requieren seguimiento. Las verificaciones de RDS y las pruebas funcionales
+fueron confirmadas por el usuario sin evidencia detallada. Si estos puntos están
+incluidos en los criterios de aceptación acordados, su cierre requiere una
+excepción aceptada por el equipo o completar la validación pendiente.
 
 ## Referencias de AWS
 

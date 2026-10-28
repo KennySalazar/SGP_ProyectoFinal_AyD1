@@ -29,11 +29,10 @@ contenedorizadas, Nginx como único punto de entrada, PostgreSQL/PostGIS,
 almacenamiento de objetos, configuración externa y trazabilidad entre commit,
 imagen y despliegue.
 
-El enunciado propone cuatro servicios en Docker Compose: Nginx, backend,
-PostgreSQL y MinIO. La sección 9.4 permite adaptar esos lineamientos a un
-proveedor de nube pública. Además, el auxiliar aclaró que los archivos no pueden
-residir en el mismo servidor de la aplicación. El equipo eligió AWS y dispone de
-créditos limitados, por lo que debe evitar componentes innecesarios.
+La arquitectura de referencia contempla cuatro servicios en Docker Compose:
+Nginx, backend, PostgreSQL y MinIO. Para el despliegue en nube se requiere que
+los archivos residan fuera del servidor de aplicación. El equipo eligió AWS y
+dispone de créditos limitados, por lo que debe evitar componentes innecesarios.
 
 Al adoptarse la decisión, la integración de archivos estaba pendiente. Su estado
 posterior se registra en la sección de implementación, sin alterar la decisión.
@@ -102,7 +101,7 @@ claves AWS estáticas ni compilar Java o Angular en EC2.
 - **Certificado autofirmado:** descartado porque los clientes no lo consideran
   una identidad pública válida.
 - **ALB o un servicio adicional:** descartado por costo y complejidad para este
-  staging académico.
+  ambiente de staging.
 - **Nginx del host y certificado IP de Let's Encrypt:** elegido. Mantiene el
   contenedor en loopback, permite ACME `webroot` y no requiere dominio.
 - **Certbot de DNF:** descartado porque la versión disponible en Amazon Linux
@@ -125,8 +124,8 @@ claves AWS estáticas ni compilar Java o Angular en EC2.
    desarrollo local.
 5. Usar una RDS PostgreSQL 16 privada y Single-AZ con las bases `sgp_staging` y
    `sgp_prod`, cada una con usuario migrador y usuario de aplicación propios. Se
-   acepta la ausencia de conmutación automática para reducir costos en el
-   contexto académico y con los créditos disponibles.
+   acepta la ausencia de conmutación automática para reducir costos y ajustarse
+   a los créditos disponibles.
 6. Crear `postgis`, `pg_trgm` y `uuid-ossp` una vez como administrador de RDS.
    Para crear la base con el migrador como propietario y configurar sus
    privilegios predeterminados, el administrador recibe membresía temporal,
@@ -169,7 +168,7 @@ claves AWS estáticas ni compilar Java o Angular en EC2.
     octubre de 2026. El funcionamiento informado posteriormente no incluye una
     comprobación directa de las fechas del certificado.
 16. Conservar para staging la IPv4 pública dinámica observada y no asignar una
-    Elastic IP, dado el plazo académico hasta el 28 de octubre de 2026. Se acepta
+    Elastic IP, considerando el plazo previsto hasta el 28 de octubre de 2026. Se acepta
     que detener e iniciar EC2 puede cambiar la IP y obligar a actualizar URLs y
     emitir otro certificado.
 
@@ -319,14 +318,13 @@ promover los mismos digests entre ambientes sin reconstruir artefactos.
   informado por el usuario no identifica el certificado servido ni confirma por
   sí solo una renovación efectiva.
 
-## Relación con el enunciado
+## Relación con los requisitos de despliegue
 
 La decisión conserva Docker Compose, Nginx, imágenes independientes,
 configuración externa, healthchecks, reinicio automático, Flyway y separación de
-ambientes. Se desvía de DT-DEP-01 al usar RDS y S3 administrados en vez de
-contenedores PostgreSQL/MinIO en el servidor; la sección 9.4 permite adaptar el
-despliegue a nube pública y la aclaración del auxiliar exige que los archivos no
-residan en EC2.
+ambientes. La solución adapta DT-DEP-01 al usar RDS y S3 administrados en vez de
+contenedores PostgreSQL/MinIO en el servidor, de acuerdo con la adaptación a
+nube pública y el requisito de mantener los archivos fuera de EC2.
 
 S3 mantiene una API de almacenamiento de objetos compatible con la intención de
 DT-ALM. MinIO continúa en desarrollo local. La interfaz intercambiable

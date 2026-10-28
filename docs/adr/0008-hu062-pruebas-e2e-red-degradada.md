@@ -4,7 +4,7 @@ Fecha: 24 de octubre de 2026.
 
 ## Estado y autoridad
 
-**Implementado en el harness de HU-062.** Se reutilizó Playwright para las pruebas de red degradada; DT-CAL-04 permite Playwright o Cypress. El sprint identifica esta elección como una decisión del responsable. La implementación por sí sola no documenta quién ratificó la elección ni cuándo.
+**Implementado en el harness de HU-062.** Se reutilizó Playwright para las pruebas de red degradada; DT-CAL-04 permite Playwright o Cypress. Esta elección corresponde al responsable de la decisión. La implementación por sí sola no documenta quién ratificó la elección ni cuándo.
 
 Este ADR complementa el [ADR-0007](0007-hu061-publicacion-offline-y-cache-privada.md), aceptado para HU-061, sin modificarlo ni cambiar sincronización, persistencia o contratos de negocio.
 

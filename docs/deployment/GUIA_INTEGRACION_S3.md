@@ -4,8 +4,8 @@
 
 Esta guía transfiere el estado de la infraestructura y de la integración de
 archivos para quienes continúen su desarrollo. No autoriza cambios en AWS ni
-establece reglas de negocio nuevas. Contrastar las HU vigentes y el enunciado
-con el código antes de ampliar cualquier flujo.
+establece reglas de negocio nuevas. Contrastar los requisitos vigentes y las
+historias correspondientes con el código antes de ampliar cualquier flujo.
 
 Los binarios se guardan en almacenamiento de objetos y PostgreSQL conserva
 metadatos y asociaciones. MinIO se usa en desarrollo local y S3 en AWS; cada
@@ -87,9 +87,9 @@ compatible con S3. No se debe editar la migración para cambiar ese comentario.
 Si la implementación necesita columnas o restricciones nuevas, deberá crear la
 siguiente migración disponible después de revisar todas las existentes.
 
-## 5. Requisitos identificados en el enunciado
+## 5. Requisitos de almacenamiento
 
-Las HU pertinentes deben contrastar la implementación con estos requisitos explícitos:
+La implementación debe contrastarse con estos requisitos:
 
 - Toda fotografía pertenece a una inspección y puede quedar anclada mediante
   `elemento_ref` (RN-ARC-01).
@@ -119,10 +119,9 @@ Las HU pertinentes deben contrastar la implementación con estos requisitos expl
 - Los objetos deben incorporarse a la política de respaldos y restauración con
   la misma prioridad que PostgreSQL (DT-ALM-05 y DT-DEP-07/08).
 
-El enunciado define MinIO compatible con S3 para el servidor universitario. El
-ADR-0002 adapta esa decisión a AWS: MinIO permanece local y S3 es el proveedor
-de staging/producción. La portabilidad se conserva mediante
-`AlmacenamientoArchivos`.
+La arquitectura de referencia contempla MinIO compatible con S3. El ADR-0002
+adapta el despliegue a AWS: MinIO permanece local y S3 es el proveedor de
+staging/producción. La portabilidad se conserva mediante `AlmacenamientoArchivos`.
 
 ## 6. Configuración y evolución
 
@@ -167,7 +166,7 @@ evaluar:
 - costo de versiones y cargas incompletas;
 - transición o expiración de objetos retirados/purgados;
 - retención de borradores y protección de inspecciones publicadas;
-- respaldos mensuales y prueba de restauración exigidos por el enunciado.
+- respaldos mensuales y prueba de restauración requeridos.
 
 Una regla de ciclo de vida genérica no debe eliminar objetos sin considerar el
 estado y la asociación almacenados en PostgreSQL. La aplicación y la política de
@@ -211,22 +210,22 @@ operaciones funcionales de eliminación o restauración.
 ## 10. Criterios de seguimiento
 
 El contrato, el adaptador y los endpoints existen; se deben comprobar sus
-resultados frente a las HU y al enunciado, incluyendo autorización, límites,
+resultados frente a los requisitos vigentes, incluyendo autorización, límites,
 consistencia, miniaturas, retención y recuperación. Las pruebas automatizadas
 existentes no sustituyen pruebas reales de AWS ni prueban por sí solas el estado
 del entorno desplegado.
 
 ## 11. Riesgos, dependencias y pendientes
 
-- La HU funcional de archivos y sus prioridades deben confirmarse; HU-028 se
-  menciona en el frontend, pero esta guía no inventa su definición formal.
+- Confirmar las prioridades del trabajo funcional de archivos y el alcance de
+  HU-028, mencionada en el frontend.
 - La consistencia entre S3 y PostgreSQL no es transaccional; revisar el
   comportamiento implementado de idempotencia, compensación y recuperación.
 - La EC2 `t4g.micro` tiene recursos limitados; procesamiento de imágenes debe
   medirse para evitar presión de memoria y CPU.
 - El bucket no tiene versionado ni política de recuperación aplicada.
-- La retención y restauración de objetos siguen fuera de la HU de staging ya
-  implementada, pero son requisitos globales pendientes.
+- La retención y restauración de objetos siguen fuera del alcance implementado
+  para staging y son requisitos globales pendientes.
 - El SMTP ficticio afecta notificaciones de borradores si esa función usa correo.
 - La integración de actas depende también del trabajo pendiente documentado en
   `docs/pendientes/HU-019-acta-calibracion.md`.
