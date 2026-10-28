@@ -64,7 +64,13 @@ describe('Registro de estudiantes', () => {
       (fixture.nativeElement as HTMLElement).querySelectorAll('input[formControlName]'),
     ).map((campo) => campo.getAttribute('formControlName'));
 
-    expect(campos).toEqual(['email', 'nombreCompleto', 'nombreUsuario', 'password', 'confirmacion']);
+    expect(campos).toEqual([
+      'email',
+      'nombreCompleto',
+      'nombreUsuario',
+      'password',
+      'confirmacion',
+    ]);
   });
 
   it('la contraseña y su confirmación se pueden mostrar u ocultar con el ojo', () => {
