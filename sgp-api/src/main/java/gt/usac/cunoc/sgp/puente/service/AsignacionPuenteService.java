@@ -77,6 +77,7 @@ public class AsignacionPuenteService {
   public List<EstudianteAsignableResponse> listarEstudiantesAsignables(String emailCatedratico) {
     UserAccount catedratico = buscarCatedratico(emailCatedratico);
     return asignaciones.findEstudiantesAsignables(catedratico.getId()).stream()
+        .filter(i -> enFechas(i.getFechaInicio(), i.getFechaFin()))
         .map(
             inscripcion ->
                 new EstudianteAsignableResponse(
@@ -202,6 +203,11 @@ public class AsignacionPuenteService {
         .toList();
   }
 
+  private boolean enFechas(LocalDate inicio, LocalDate fin) {
+    LocalDate hoy = LocalDate.now(clock.withZone(ZONA_GUATEMALA));
+    return !hoy.isBefore(inicio) && !hoy.isAfter(fin);
+  }
+
   private void validarInscripcion(
       AsignacionPuenteRepository.InscripcionAsignableProjection inscripcion) {
     if (!inscripcion.getCursoActivo()) {
@@ -210,6 +216,13 @@ public class AsignacionPuenteService {
           "curso_finalizado",
           "Curso finalizado",
           "No es posible asignar puentes en un curso finalizado");
+    }
+    if (!enFechas(inscripcion.getFechaInicio(), inscripcion.getFechaFin())) {
+      throw new ApiException(
+          HttpStatus.UNPROCESSABLE_ENTITY,
+          "curso_fuera_de_fechas",
+          "Curso fuera de fechas",
+          "El curso debe estar vigente por fechas para asignar puentes.");
     }
     if (!"ACTIVO".equals(inscripcion.getEstado())) {
       throw new ApiException(

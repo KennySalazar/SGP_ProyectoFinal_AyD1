@@ -92,7 +92,7 @@ describe('Periodos y fechas del curso', () => {
   it('permite cambiar entre los dos periodos conservando el año del curso editado', () => {
     const pagina = crear();
     pagina.editar({ ...antiguo, periodo: '2025-2' });
-    expect(pagina.form.controls.fechaInicio.value).toBe('2025-07-01');
+    expect(pagina.form.controls.fechaInicio.value).toBe(antiguo.fechaInicio);
     pagina.form.controls.periodo.setValue('2025-1');
     expect(pagina.form.controls.fechaInicio.value).toBe('2025-01-01');
     expect(pagina.form.controls.fechaFin.value).toBe('2025-06-30');
@@ -113,14 +113,33 @@ describe('Periodos y fechas del curso', () => {
     pagina.form.controls.periodo.setValue('2027-1');
     expect(pagina.form.controls.fechaFin.value).toBe('2027-06-30');
   });
-  it('reconstruye las fechas al guardar para no enviar una fecha manual', () => {
+  it('conserva las fechas personalizadas al guardar', () => {
+    const pagina = crear();
+    pagina.editar({ ...antiguo, periodo: '2025-2' });
+    pagina.form.controls.fechaFin.setValue('2025-12-15');
+    pagina.guardar();
+    expect(api.actualizar).toHaveBeenCalledWith(
+      'curso-1',
+      expect.objectContaining({ fechaInicio: antiguo.fechaInicio, fechaFin: '2025-12-15' }),
+    );
+  });
+  it('rechaza un rango de fechas invertido sin enviarlo', () => {
     const pagina = crear();
     pagina.editar({ ...antiguo, periodo: '2025-2' });
     pagina.form.controls.fechaFin.setValue('2025-01-01');
     pagina.guardar();
-    expect(api.actualizar).toHaveBeenCalledWith(
-      'curso-1',
-      expect.objectContaining({ fechaInicio: '2025-07-01', fechaFin: '2025-12-31' }),
+    expect(pagina.form.controls.fechaFin.hasError('rango')).toBe(true);
+    expect(api.actualizar).not.toHaveBeenCalled();
+  });
+  it('distingue el estado administrativo de las fechas inclusivas', () => {
+    const pagina = crear();
+    expect(pagina.vigencia(antiguo)).toBe('admin.courses.expired');
+    expect(pagina.vigencia({ ...antiguo, estado: 'FINALIZADO' })).toBe('admin.courses.inactive');
+    expect(pagina.vigencia({ ...antiguo, fechaInicio: '2027-03-11', fechaFin: '2027-06-30' })).toBe(
+      'admin.courses.upcoming',
+    );
+    expect(pagina.vigencia({ ...antiguo, fechaInicio: '2027-03-10', fechaFin: '2027-03-10' })).toBe(
+      'admin.courses.inDates',
     );
   });
 });

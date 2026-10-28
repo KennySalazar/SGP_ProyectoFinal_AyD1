@@ -10,9 +10,12 @@
 </p>
 }
 
-<section class="surface-card course-form">
+<section class="surface-card course-form" #formularioCurso tabindex="-1">
   <h2>{{ (cursoEnEdicion() ? 'admin.courses.edit' : 'admin.courses.create') | transloco }}</h2>
   <p>{{ 'admin.courses.requiredNote' | transloco }}</p>
+  @if (cursoEnEdicion()) {
+  <p role="note">{{ 'admin.courses.editWarning' | transloco }}</p>
+  }
   <form [formGroup]="form" (ngSubmit)="guardar()" novalidate>
     <label
       ><span>{{ 'admin.courses.name' | transloco }}</span
@@ -48,12 +51,15 @@
     </div>
     <label
       ><span>{{ 'admin.courses.startDate' | transloco }}</span
-      ><input pInputText type="date" formControlName="fechaInicio" [readOnly]="true"
+      ><input pInputText type="date" formControlName="fechaInicio"
     /></label>
     <label
       ><span>{{ 'admin.courses.endDate' | transloco }}</span
-      ><input pInputText type="date" formControlName="fechaFin" [readOnly]="true"
+      ><input pInputText type="date" formControlName="fechaFin"
     /></label>
+    @if (form.controls.fechaFin.hasError('rango')) {
+    <p role="alert">{{ 'admin.courses.invalidDates' | transloco }}</p>
+    }
     <button pButton type="submit" [disabled]="form.invalid || guardando()">
       {{ (guardando() ? 'admin.courses.saving' : (cursoEnEdicion() ? 'admin.courses.save' :
       'admin.courses.create')) | transloco }}
@@ -92,6 +98,7 @@
           <th>{{ 'admin.courses.period' | transloco }}</th>
           <th>{{ 'admin.courses.professor' | transloco }}</th>
           <th>{{ 'admin.courses.status' | transloco }}</th>
+          <th>{{ 'admin.courses.dateValidity' | transloco }}</th>
           <th>{{ 'admin.courses.actions' | transloco }}</th>
         </tr>
       </thead>
@@ -103,9 +110,13 @@
           <td>{{ curso.catedratico.email }}</td>
           <td>
             <p-tag
-              [value]="curso.estado"
+              [value]="(curso.estado === 'VIGENTE' ? 'admin.courses.active' : 'admin.courses.inactive') | transloco"
               [severity]="curso.estado === 'VIGENTE' ? 'success' : 'secondary'"
             />
+          </td>
+          <td>
+            {{ vigencia(curso) | transloco }}
+            <div>{{ curso.fechaInicio }} — {{ curso.fechaFin }}</div>
           </td>
           <td>
             <button
