@@ -530,6 +530,8 @@
       "title": "Crear cuenta",
       "subtitle": "El autorregistro crea una cuenta de Estudiante pendiente de activacion por un Catedratico.",
       "rule": "Minimo 10 caracteres, con al menos una letra y un numero.",
+      "confirm": "Confirmar contraseña",
+      "mismatch": "Las contraseñas no coinciden.",
       "haveAccount": "Ya tengo cuenta"
     },
     "verifyRegistration": {

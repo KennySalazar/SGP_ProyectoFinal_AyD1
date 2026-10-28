@@ -50,6 +50,7 @@ describe('Registro de estudiantes', () => {
     nombreCompleto: 'Ana Reyes',
     nombreUsuario: 'ana.reyes',
     password: 'Puentes2026',
+    confirmacion: 'Puentes2026',
   };
 
   afterEach(() => {
@@ -57,16 +58,16 @@ describe('Registro de estudiantes', () => {
     fixture.destroy();
   });
 
-  it('pide nombre completo y nombre de usuario además del correo y la contraseña', () => {
+  it('pide nombre completo y nombre de usuario además del correo, la contraseña y la confirmación', () => {
     crear();
     const campos = Array.from(
       (fixture.nativeElement as HTMLElement).querySelectorAll('input[formControlName]'),
     ).map((campo) => campo.getAttribute('formControlName'));
 
-    expect(campos).toEqual(['email', 'nombreCompleto', 'nombreUsuario', 'password']);
+    expect(campos).toEqual(['email', 'nombreCompleto', 'nombreUsuario', 'password', 'confirmacion']);
   });
 
-  it('la contraseña se puede mostrar u ocultar con el ojo', () => {
+  it('la contraseña y su confirmación se pueden mostrar u ocultar con el ojo', () => {
     crear();
     const html = fixture.nativeElement as HTMLElement;
     const campo = html.querySelector<HTMLInputElement>('input[formControlName="password"]')!;
@@ -79,6 +80,19 @@ describe('Registro de estudiantes', () => {
     expect(campo.type).toBe('text');
     ojo.click();
     expect(campo.type).toBe('password');
+
+    const campoConfirmacion = html.querySelector<HTMLInputElement>(
+      'input[formControlName="confirmacion"]',
+    )!;
+    const ojoConfirmacion = campoConfirmacion
+      .closest('app-contrasena-visible')!
+      .querySelector<HTMLButtonElement>('button.ojo')!;
+
+    expect(campoConfirmacion.type).toBe('password');
+    ojoConfirmacion.click();
+    expect(campoConfirmacion.type).toBe('text');
+    ojoConfirmacion.click();
+    expect(campoConfirmacion.type).toBe('password');
   });
 
   it('envía el alta con el perfil y avanza a verificar el correo', () => {
@@ -88,11 +102,42 @@ describe('Registro de estudiantes', () => {
     page.submit();
 
     const request = http.expectOne('/api/v1/auth/register');
-    expect(request.request.body).toEqual(completo);
+    expect(request.request.body).toEqual({
+      email: 'ana@ejemplo.com',
+      nombreCompleto: 'Ana Reyes',
+      nombreUsuario: 'ana.reyes',
+      password: 'Puentes2026',
+    });
     request.flush({ challengeId: 'reto-1', expiresAt: '2026-10-20T12:00:00Z', message: 'ok' });
     expect(router.navigate).toHaveBeenCalledWith(['/registro/verificar'], {
       queryParams: { email: 'ana@ejemplo.com', challengeId: 'reto-1' },
     });
+  });
+
+  it('no envía el alta si las contraseñas no coinciden', () => {
+    crear();
+    page.form.setValue({ ...completo, confirmacion: 'OtraClaveDistinta123' });
+
+    page.submit();
+
+    http.expectNone('/api/v1/auth/register');
+    expect(page.form.hasError('noCoinciden')).toBe(true);
+    expect(page.form.invalid).toBe(true);
+
+    page.form.controls.confirmacion.markAsTouched();
+    fixture.detectChanges();
+    expect((fixture.nativeElement as HTMLElement).textContent).toContain('auth.register.mismatch');
+  });
+
+  it('el formulario es inválido si falta la confirmación de la contraseña', () => {
+    crear();
+    page.form.setValue({ ...completo, confirmacion: '' });
+
+    page.submit();
+
+    http.expectNone('/api/v1/auth/register');
+    expect(page.form.controls.confirmacion.invalid).toBe(true);
+    expect(page.form.invalid).toBe(true);
   });
 
   it.each([
