@@ -127,6 +127,145 @@ describe('HU-057: transacciones fotográficas durables', () => {
     expect(await sgpDb.fotos.count()).toBe(0);
     expect(await sgpDb.cola_sync.count()).toBe(0);
   });
+  it('distingue una creación nunca enviada de un borrador remoto con cambios pendientes', async () => {
+    const locales = TestBed.inject(InspeccionesLocalesService);
+    expect(await locales.esBorradorSoloLocal('inspeccion')).toBe(false);
+    await sgpDb.cola_sync.put({
+      id: 'inicio',
+      entityId: 'inspeccion',
+      tipo: 'INSPECCION',
+      propietarioId: 'autor',
+      operacion: 'CREAR_INSPECCION',
+      idempotencyKey: 'clave',
+      intentos: 0,
+      estado: 'PENDIENTE',
+      creadoEn: '',
+    });
+    expect(await locales.esBorradorSoloLocal('inspeccion')).toBe(true);
+    await sgpDb.cola_sync.update('inicio', { iniciadoEn: '2026-10-28T12:00:00Z' });
+    await expect(locales.esBorradorSoloLocal('inspeccion')).rejects.toThrow('creacionPendiente');
+  });
+
+  it('bloquea el borrado durante la creación y permite eliminar tras confirmarla', async () => {
+    await sgpDb.inspecciones.update('inspeccion', {
+      payload: { versionFormularioId: 'v1', borrador: { datos: {} } },
+    });
+    const item = {
+      id: 'inicio',
+      entityId: 'inspeccion',
+      tipo: 'INSPECCION' as const,
+      propietarioId: 'autor',
+      operacion: 'CREAR_INSPECCION' as const,
+      idempotencyKey: 'clave',
+      intentos: 0,
+      estado: 'PENDIENTE' as const,
+      creadoEn: '',
+      payload: { id: 'inspeccion' },
+    };
+    await sgpDb.cola_sync.put(item);
+    const respuesta = new Subject<unknown>();
+    const crear = vi.fn().mockReturnValue(respuesta);
+    Object.assign(api, { iniciarInspeccion: crear });
+    const sync = TestBed.inject(SincronizacionService);
+    const corrida = Reflect.get(sync, 'procesar').call(sync, item, 'autor');
+    await vi.waitFor(() => expect(crear).toHaveBeenCalledOnce());
+    const locales = TestBed.inject(InspeccionesLocalesService);
+    await expect(locales.esBorradorSoloLocal('inspeccion')).rejects.toThrow('creacionPendiente');
+    await expect(locales.eliminarInspeccionLocal('inspeccion', true)).rejects.toThrow(
+      'creacionPendiente',
+    );
+    await expect(locales.confirmarEliminacionRemota('inspeccion', 'autor')).rejects.toThrow(
+      'creacionPendiente',
+    );
+    expect(await sgpDb.inspecciones.count()).toBe(1);
+    expect(await sgpDb.cola_sync.count()).toBe(1);
+    respuesta.next({ id: 'inspeccion', versionFormularioId: 'v1' });
+    respuesta.complete();
+    await corrida;
+    expect(await locales.esBorradorSoloLocal('inspeccion')).toBe(false);
+    await locales.confirmarEliminacionRemota('inspeccion', 'autor');
+    expect(await sgpDb.inspecciones.count()).toBe(0);
+  });
+
+  it('no envía una creación de una instantánea de cola descartada antes de reclamarla', async () => {
+    const item = {
+      id: 'inicio',
+      entityId: 'inspeccion',
+      tipo: 'INSPECCION' as const,
+      propietarioId: 'autor',
+      operacion: 'CREAR_INSPECCION' as const,
+      idempotencyKey: 'clave',
+      intentos: 0,
+      estado: 'PENDIENTE' as const,
+      creadoEn: '',
+    };
+    await sgpDb.cola_sync.put(item);
+    await TestBed.inject(InspeccionesLocalesService).eliminarInspeccionLocal('inspeccion', true);
+    const crear = vi.fn();
+    Object.assign(api, { iniciarInspeccion: crear });
+    const sync = TestBed.inject(SincronizacionService);
+    await Reflect.get(sync, 'procesar').call(sync, item, 'autor');
+    expect(crear).not.toHaveBeenCalled();
+    expect(await sgpDb.inspecciones.count()).toBe(0);
+  });
+
+  it('bloquea una creación con resultado incierto incluso después de reiniciar los intentos', async () => {
+    await sgpDb.cola_sync.put({
+      id: 'inicio',
+      entityId: 'inspeccion',
+      tipo: 'INSPECCION',
+      propietarioId: 'autor',
+      operacion: 'CREAR_INSPECCION',
+      idempotencyKey: 'clave',
+      intentos: 0,
+      estado: 'PENDIENTE',
+      iniciadoEn: '2026-10-28T12:00:00Z',
+      creadoEn: '',
+    });
+    const locales = TestBed.inject(InspeccionesLocalesService);
+    await expect(locales.esBorradorSoloLocal('inspeccion')).rejects.toThrow('creacionPendiente');
+    expect(await sgpDb.cola_sync.count()).toBe(1);
+  });
+
+  it('retira borrador remoto, fotos y cola de forma durable, conservando otras inspecciones', async () => {
+    await servicio.guardar(foto());
+    await sgpDb.inspecciones.update('inspeccion', { sincronizado: true });
+    const otra = { ...(await sgpDb.inspecciones.get('inspeccion'))!, id: 'otra' };
+    await sgpDb.inspecciones.put(otra);
+    await sgpDb.cola_sync.put({
+      id: 'guardado',
+      entityId: 'inspeccion',
+      tipo: 'INSPECCION',
+      propietarioId: 'autor',
+      operacion: 'GUARDAR_BORRADOR',
+      idempotencyKey: 'clave',
+      intentos: 2,
+      estado: 'INTERVENCION',
+      creadoEn: '',
+    });
+    const locales = TestBed.inject(InspeccionesLocalesService);
+    await locales.confirmarEliminacionRemota('inspeccion', 'autor');
+    // Un reintento de limpieza también debe funcionar.
+    await locales.confirmarEliminacionRemota('inspeccion', 'autor');
+    sgpDb.close();
+    await sgpDb.open();
+    expect(await sgpDb.inspecciones.get('inspeccion')).toBeUndefined();
+    expect(await sgpDb.inspecciones.get('otra')).toBeDefined();
+    expect(await sgpDb.fotos.count()).toBe(0);
+    expect(await sgpDb.cola_sync.count()).toBe(0);
+  });
+
+  it('no elimina datos de otro propietario al confirmar una eliminación remota', async () => {
+    await servicio.guardar(foto());
+    await sgpDb.inspecciones.update('inspeccion', { propietarioId: 'otro' });
+    await expect(
+      TestBed.inject(InspeccionesLocalesService).confirmarEliminacionRemota('inspeccion', 'autor'),
+    ).rejects.toThrow('offline.hu061.notEditable');
+    expect(await sgpDb.inspecciones.count()).toBe(1);
+    expect(await sgpDb.fotos.count()).toBe(1);
+    expect(await sgpDb.cola_sync.count()).toBe(1);
+  });
+
   it('rechaza cuota insuficiente antes de guardar y normaliza QuotaExceededError', async () => {
     const storage = TestBed.inject(StorageService);
     vi.spyOn(storage, 'usage').mockImplementation(async () => {
