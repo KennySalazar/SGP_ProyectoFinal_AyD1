@@ -1,5 +1,14 @@
 # Guía de traspaso para la implementación de producción
 
+> **Documento histórico de planificación.** Las secciones siguientes conservan
+> el estado y las decisiones del traspaso inicial; sus listas de pendientes no
+> son una fuente actualizada del estado de producción. Consultar
+> [PRODUCCION_AWS.md](PRODUCCION_AWS.md),
+> [RESPALDO_Y_RESTAURACION.md](RESPALDO_Y_RESTAURACION.md) y
+> [ADR-0004](../adr/0004-despliegue-automatico-produccion-desde-main.md) para
+> los avances posteriores. El usuario también confirmó pruebas funcionales,
+> correo y verificaciones de RDS sin aportar resultados detallados.
+
 ## 1. Contexto y responsabilidades
 
 La historia de despliegue se dividió en dos responsabilidades:
@@ -611,7 +620,7 @@ crear el Compose real de producción.
   digests probados en staging y registrar su correspondencia con la revisión
   aprobada en `main`.
 
-## 14. Decisiones pendientes
+## 14. Decisiones pendientes al momento del traspaso
 
 - Validación administrativa de TLS `verify-full` y consulta directa de
   extensiones sobre `sgp-rds-postgres`; Flyway ya funcionó desde el backend.

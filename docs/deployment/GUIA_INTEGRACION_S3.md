@@ -34,6 +34,10 @@ el alcance y la incidencia están en [staging](STAGING_AWS.md). La prueba de
 eliminación solo afectó al objeto de diagnóstico y no acredita una eliminación
 funcional desde la interfaz.
 
+La política IAM corrigió el permiso `DeleteObject` que causaba un 403 durante
+el rollback de un PDF. El usuario confirmó que la corrección también resolvió
+los errores 409 observados anteriormente.
+
 ## 3. Implementación existente en el repositorio
 
 - [`AlmacenamientoArchivos`](../../sgp-api/src/main/java/gt/usac/cunoc/sgp/archivo/service/AlmacenamientoArchivos.java)
@@ -54,8 +58,7 @@ funcional desde la interfaz.
   `/documentos`. Su existencia no acredita que todos los flujos se hayan probado
   en staging.
 - [`RecuperacionCargasService`](../../sgp-api/src/main/java/gt/usac/cunoc/sgp/archivo/service/RecuperacionCargasService.java)
-  gestiona recuperación de cargas; su estado operativo posterior a la incidencia
-  sigue pendiente de revisión.
+  gestiona recuperación de cargas.
 - `docker-compose.yml` prepara MinIO local. La migración
   `sgp-api/src/main/resources/db/migration/V10__mantenimiento_y_archivos.sql`
   creó metadatos y no debe modificarse retroactivamente.
@@ -200,26 +203,12 @@ recuperación deben acordar cuál es la fuente de verdad.
 Las pruebas locales no prueban IAM y una llamada aislada a S3 no demuestra las
 reglas funcionales. Ambas evidencias son necesarias.
 
-## 10. Seguimiento sugerido
-
-1. Investigar las cargas fallidas antes de la corrección y verificar si
-   `RecuperacionCargasService` conserva operaciones pendientes; confirmar si
-   los 409 antiguos desaparecen al recuperar operaciones existentes.
-2. Probar descargas de fotos y documentos desde la interfaz, persistencia tras
-   actualizar la página y retiro o eliminación según las reglas de negocio.
-3. Revisar observabilidad y diagnóstico de errores, idempotencia, reintentos y
-   sincronización offline, incluidos fallos parciales entre S3 y PostgreSQL.
-4. Revisar y probar respaldo, retención y restauración antes de declarar
-   satisfechos los requisitos globales correspondientes.
-5. Para producción, adaptar y verificar recursos, IAM y pruebas reales de
-   subida, descarga y eliminación autorizada de forma independiente.
-
 Los registros confirmaron un 403 de `s3:DeleteObject` durante rollback de PDF;
-no demostraron que ese error causara todos los HTTP 409 de fotografías. No se
-han declarado verificadas la recuperación de inspecciones antiguas ni las
+el usuario confirmó que los 409 anteriores se resolvieron con la corrección IAM.
+No se han declarado verificadas la recuperación de inspecciones antiguas ni las
 operaciones funcionales de eliminación o restauración.
 
-## 11. Criterios de seguimiento
+## 10. Criterios de seguimiento
 
 El contrato, el adaptador y los endpoints existen; se deben comprobar sus
 resultados frente a las HU y al enunciado, incluyendo autorización, límites,
@@ -227,7 +216,7 @@ consistencia, miniaturas, retención y recuperación. Las pruebas automatizadas
 existentes no sustituyen pruebas reales de AWS ni prueban por sí solas el estado
 del entorno desplegado.
 
-## 12. Riesgos, dependencias y pendientes
+## 11. Riesgos, dependencias y pendientes
 
 - La HU funcional de archivos y sus prioridades deben confirmarse; HU-028 se
   menciona en el frontend, pero esta guía no inventa su definición formal.
@@ -241,9 +230,8 @@ del entorno desplegado.
 - El SMTP ficticio afecta notificaciones de borradores si esa función usa correo.
 - La integración de actas depende también del trabajo pendiente documentado en
   `docs/pendientes/HU-019-acta-calibracion.md`.
-- Producción requiere bucket, rol, política, datos y pruebas independientes.
 
-## 13. Evidencia y referencias del repositorio
+## 12. Evidencia y referencias del repositorio
 
 - `docs/ARCHITECTURE.md`: límites de los dominios `archivo/` y `offline/`.
 - `docs/DEVELOPMENT.md`: operación actual de MinIO local.

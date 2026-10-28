@@ -5,6 +5,13 @@
 Esta guía describe la infraestructura de staging implementada en el repositorio y
 se actualiza de forma incremental durante la historia de usuario.
 
+**Actualización posterior:** el usuario confirmó la comprobación de `verify-full`
+y extensiones, la realización de pruebas funcionales y de correo, y que el
+rendimiento es satisfactorio. No se registraron fechas, casos o mediciones.
+También informó que ambos entornos funcionaban el 27 de octubre de 2026; no se
+registraron los datos del certificado servido. Los inventarios y resultados de
+pruebas iniciales de las secciones siguientes conservan su carácter histórico.
+
 | Área | Estado |
 |---|---|
 | Imágenes reutilizables de backend y frontend | Publicadas desde `develop` para AMD64/ARM64; descarga ARM64 verificada en EC2. |
@@ -17,7 +24,7 @@ se actualiza de forma incremental durante la historia de usuario.
 | Security Groups | EC2 permite públicamente solo TCP 80/443; RDS permite 5432 únicamente desde el grupo de staging. |
 | IAM y Systems Manager | Session Manager, confianza OIDC con identificadores inmutables y Run Command verificados. |
 | S3 | Bucket privado operativo; permisos de objetos y cargas funcionales verificadas el 27 de octubre de 2026. |
-| RDS | `sgp-rds-postgres` disponible; backend saludable y API operativa confirman conexión y migraciones de staging. `verify-full` sigue pendiente. |
+| RDS | Backend y migraciones operativos; el usuario confirmó `verify-full` y extensiones, sin evidencia técnica detallada registrada. |
 | EC2 | `sgp-staging-ec2` creada, en ejecución y con sus tres comprobaciones superadas; preparación inicial y autenticación en GHCR completadas. |
 | Despliegue real en AWS | Automatización operativa desde `develop`; el despliegue posterior a la integración HTTPS dejó ambos contenedores saludables. |
 | HTTPS público | Operativo y validado en `https://3.235.197.36`; certificado IP de Let's Encrypt y comprobación automática de renovación instalados. |
@@ -38,8 +45,9 @@ En la EC2 se creó `/etc/sgp/staging/staging.env` con propietario `root` y modo
 `0600`. Se verificaron las 12 variables obligatorias: las cinco de PostgreSQL,
 `SECRET_KEY_JWT`, las dos del administrador inicial y cuatro variables SMTP. La
 comprobación devolvió `[OK]` para todas ellas. No se registran valores sensibles
-en esta guía. SMTP conserva valores ficticios y no constituye una prueba de
-envío de correo.
+en esta guía. En la preparación inicial SMTP tenía valores ficticios; el usuario
+informó posteriormente que se realizaron pruebas funcionales y de correo, sin
+detallar configuración, casos ni resultados.
 
 ## Inventario AWS confirmado
 
@@ -62,7 +70,7 @@ de 2026, con la actualización S3 e IAM del 27 de octubre:
 | Instancia RDS | `sgp-rds-postgres`, estado observado `Disponible` en `us-east-1b`. |
 | Endpoint RDS | `sgp-rds-postgres.c8hwo202k9fb.us-east-1.rds.amazonaws.com:5432`. |
 | Administrador RDS | `postgres`; `rolsuper=false` y `rolcreaterole=true`. El script comprueba además `rolcreatedb` antes de crear la base. |
-| Extensiones de staging | El backend inició, Flyway terminó y Hibernate validó el esquema; la inspección SQL independiente de extensiones sigue sin registrarse. |
+| Extensiones de staging | El usuario confirmó su verificación; no se registró la consulta SQL ni sus resultados. |
 | Instancia EC2 | `sgp-staging-ec2` (`i-0385c95df8cd7909d`), Amazon Linux 2023 ARM64, `t4g.micro`, en ejecución y con comprobaciones `3/3`. |
 | Ubicación EC2 | Subred pública `subnet-0745affbda7ec4bb1`, CIDR `172.31.64.0/20`, en `us-east-1f`. |
 | Almacenamiento EC2 | 20 GiB gp3 cifrados con `aws/ebs`; se observaron 5.4 GB utilizados, 15 GB disponibles y 27 % de uso. |
@@ -137,8 +145,8 @@ Multi-AZ ni proporcionan conmutación automática ante la falla de una zona.
 AWS completó la creación de la instancia compartida y se observó el estado
 `Disponible`. Además de la conectividad TCP inicial, el despliegue real confirmó
 que el backend puede autenticarse, ejecutar Flyway, validar el esquema y atender
-consultas. La comprobación administrativa independiente con `verify-full`
-continúa pendiente.
+consultas. El usuario confirmó posteriormente la comprobación administrativa de
+`verify-full`, sin registrar la fecha ni la evidencia técnica.
 
 | Propiedad | Configuración solicitada |
 |---|---|
@@ -191,11 +199,12 @@ tier customers. To remove all limitations, upgrade your account plan.
 - copia de etiquetas a respaldos automáticos e instantáneas habilitada;
 - replicación a otra región deshabilitada.
 
-Esta excepción no satisface el requisito original de 30 días. Los 12 respaldos
-mensuales mediante AWS Backup y la prueba de restauración tampoco están
-implementados y permanecen como trabajo pendiente fuera de esta historia.
+La retención de RDS es complementaria. La [guía de respaldos](RESPALDO_Y_RESTAURACION.md)
+documenta volcados diarios y copias mensuales a S3, y una prueba de restauración
+en producción el 17 de octubre de 2026. El enunciado no exige AWS Backup ni una
+retención de 30 días en RDS.
 
-### Verificación TLS pendiente
+### Procedimiento de verificación TLS
 
 La conexión administrativa deberá realizarse desde un equipo con alcance de red
 a RDS. La EC2 administrada mediante SSM ya demostró alcance TCP y se utilizará
@@ -217,14 +226,13 @@ unset RDSHOST
 
 `<RDS_ADMIN>` debe sustituirse por el usuario maestro configurado realmente; no
 se debe asumir que sea `postgres` ni escribir su contraseña en comandos,
-documentación o logs. Este procedimiento todavía no se ha ejecutado y no se
-declara exitoso.
+documentación o logs. El usuario confirmó la verificación, pero no se dispone de
+la fecha, el comando utilizado ni sus resultados detallados.
 
-Esta prueba cubre al cliente `psql`, no al backend. La plantilla actual del
-backend usa `sslmode=require`; pasarla a `verify-full` también requiere hacer
-disponible el bundle CA dentro del contenedor y validar el driver JDBC. Esa
-integración sigue pendiente y no debe declararse implementada solo porque la
-prueba administrativa funcione.
+La conexión de staging a RDS quedó demostrada mediante el backend y Flyway.
+La prueba administrativa de `psql` y la configuración TLS del backend son
+comprobaciones distintas: la plantilla del backend usa `sslmode=require`, y no
+se dispone de evidencia de `verify-full` en el driver JDBC.
 
 También se prevé un túnel de Systems Manager hacia el endpoint para usar un
 cliente local como DBeaver. Session Manager interactivo ya funciona, pero el
@@ -330,8 +338,8 @@ La infraestructura objetivo asigna una EC2 independiente a staging:
 
 La EC2 y su disco están aprovisionados. RDS está `Disponible`; el despliegue
 inició el backend, ejecutó Flyway, validó el esquema con Hibernate y atendió una
-consulta real de la API. La comprobación independiente de TLS con
-`sslmode=verify-full` y el bundle CA sigue pendiente. La imposibilidad de
+consulta real de la API. El usuario confirmó posteriormente la comprobación
+independiente de TLS, sin evidencia técnica detallada. La imposibilidad de
 configurar alertas automáticas obliga a mantener un control manual del saldo.
 
 ### EC2 de staging creada
@@ -623,12 +631,13 @@ MAIL_PASSWORD=SMTP_NO_CONFIGURADO
 MAIL_FROM=no-reply@example.invalid
 ```
 
-No hay un servidor SMTP escuchando en esa dirección y no se espera que los
-correos se envíen. Esta configuración permite completar el contrato de variables,
+En la configuración inicial no había un servidor SMTP escuchando en esa dirección
+y no se esperaba que los correos se enviaran. Esa configuración permitía completar el contrato de variables,
 pero no valida correo, OTP, invitaciones, activación de cuentas, recuperación de
-contraseñas ni ningún flujo de autenticación dependiente del correo. Antes de
-declarar staging funcional debe configurarse un servicio SMTP real y probar esos
-flujos. El marcador `SMTP_NO_CONFIGURADO` no debe reutilizarse en producción.
+contraseñas ni ningún flujo de autenticación dependiente del correo. El usuario
+informó posteriormente que se realizaron pruebas de correo; no se registraron
+los casos ni la configuración empleada. El marcador `SMTP_NO_CONFIGURADO` no
+debe reutilizarse en producción.
 
 En staging, `SPRING_PROFILES_ACTIVE=staging`, `OPENAPI_PUBLIC=false` y
 `REFRESH_COOKIE_SECURE=true` están definidos por Compose. El perfil mantiene
@@ -715,9 +724,9 @@ La primera migración también contiene `CREATE EXTENSION IF NOT EXISTS`; al est
 las extensiones ya instaladas, Flyway puede ejecutarla sin elevar privilegios.
 El arranque exitoso de Spring Boot confirmó que los roles y el esquema son
 utilizables por la aplicación y que Flyway completó sus migraciones. No se
-conservó evidencia de una ejecución administrativa independiente con
-`sslmode=verify-full` ni de una consulta directa de versiones de extensiones;
-esas comprobaciones permanecen pendientes.
+conservó evidencia detallada de una ejecución administrativa independiente con
+`sslmode=verify-full` ni de una consulta de versiones de extensiones; el usuario
+confirmó posteriormente ambas comprobaciones.
 
 ## Docker Compose
 
@@ -1076,8 +1085,8 @@ heredó los privilegios predeterminados: la aplicación pudo realizar
 `INSERT`, `SELECT`, `UPDATE` y `DELETE`, pero su intento de `CREATE TABLE` fue
 rechazado. Esta prueba local cubrió en detalle los permisos. En RDS, el
 funcionamiento de los roles y migraciones quedó demostrado indirectamente por
-el arranque saludable de la aplicación; falta conservar una comprobación SQL
-administrativa independiente de extensiones y TLS `verify-full`.
+el arranque saludable de la aplicación. El usuario confirmó posteriormente la
+verificación de extensiones y TLS `verify-full`, sin resultados detallados.
 
 El workflow se ejecutó en GitHub después de integrar los cambios en `develop`.
 `Validate backend`, `Validate frontend`, `Publish backend image`, `Publish
@@ -1117,9 +1126,9 @@ GET https://3.235.197.36/api/v1/puentes?size=1   -> 200
 `sgp-certbot-renew.timer` quedó habilitado y la ejecución manual de
 `sgp-certbot-renew.service` finalizó correctamente sin renovar, porque el
 certificado aún no había alcanzado su ventana. Se verificó de nuevo `/healthz`
-por HTTPS después de la comprobación. Esto no constituye una prueba funcional
-completa: SMTP y los flujos dependientes del correo siguen sin validación
-funcional. La validación parcial de S3 se realizó posteriormente.
+por HTTPS después de la comprobación. Esa prueba inicial no validó SMTP ni los
+flujos dependientes del correo; el usuario informó posteriormente que se realizaron
+pruebas funcionales y de correo. La validación parcial de S3 también fue posterior.
 
 ## Incidencia y validación S3 del 27 de octubre de 2026
 
@@ -1129,8 +1138,8 @@ con reintentos de solicitudes multipart con metadatos JSON, imagen WebP e
 `Idempotency-Key`. `RecuperacionCargasService` advirtió que conservaba
 operaciones para reintento. Los registros de `AlmacenamientoS3` y
 `DocumentoInspeccionService` confirmaron S3 403 `AccessDenied` para
-`s3:DeleteObject` al eliminar documentos PDF durante un rollback. Este 403 no
-se demostró como causa directa de todos los 409 de fotografías.
+`s3:DeleteObject` al eliminar documentos PDF durante un rollback. El usuario
+confirmó posteriormente que la corrección IAM también resolvió los 409 observados.
 
 El rol `sgp-staging-ec2-role` solo tenía `AmazonSSMManagedInstanceCore` antes
 de la corrección. Desde AWS IAM se creó y asoció la política
@@ -1163,31 +1172,20 @@ mostró en **Confirmadas por el servidor** fotografías `ACCESO` y
 `SUPERESTRUCTURA`; el usuario confirmó también la carga de PDF. El bloqueo
 original no se presentó en estas nuevas pruebas. Esto no valida todos los flujos.
 
-Queda pendiente investigar las cargas fallidas anteriores y si aún hay operaciones
-pendientes en `RecuperacionCargasService`; confirmar si los 409 antiguos
-desaparecen al recuperar operaciones existentes; probar descarga desde la
-interfaz, persistencia tras actualizar la página y retiro o eliminación según
-reglas de negocio; revisar observabilidad, respaldo, retención y restauración.
-No se afirma que se hayan recuperado inspecciones antiguas ni probado restauración.
+La corrección y las pruebas realizadas no constituyen evidencia de recuperación
+de inspecciones antiguas ni de restauración de archivos.
 
 ## Limitaciones y trabajo pendiente
 
-- Probar autenticación PostgreSQL desde EC2 con `sslmode=verify-full` y el bundle
-  CA de RDS; el funcionamiento de la aplicación no sustituye esa evidencia.
-- Registrar una consulta SQL administrativa de extensiones y permisos en RDS.
-- Definir responsable y recordatorio de rotación del PAT; su disponibilidad
-  depende de que la cuenta conserve acceso a los paquetes privados.
-- Sustituir el SMTP ficticio por un servicio real y validar OTP, invitaciones,
-  activación y recuperación de contraseña.
-- Confirmar el tamaño definitivo de EC2 y disco mediante medición.
-- Completar las comprobaciones de archivos pendientes indicadas en la incidencia
-  S3; las cargas verificadas no validan todos los flujos.
+- No están disponibles la fecha ni la evidencia técnica detallada de las
+  verificaciones de RDS y de las pruebas funcionales y de correo informadas.
+- El usuario informó que el rendimiento es satisfactorio; no hay mediciones
+  registradas para confirmar el tamaño definitivo de EC2 y disco.
 - Brotli no está habilitado; Nginx utiliza gzip para evitar una imagen con módulos
   adicionales no justificados.
 - La retención centralizada de logs por 90 días no está implementada.
-- RDS conserva temporalmente solo 1 día de respaldos automáticos por la
-  restricción del plan gratuito. La retención requerida de 30 días, los 12
-  respaldos mensuales y la prueba de restauración permanecen pendientes.
+- RDS conserva 1 día de respaldos automáticos. La guía de respaldos documenta
+  volcados diarios y mensuales a S3 y una restauración probada en producción.
 - Los respaldos y restauraciones de S3 están fuera del alcance de esta historia.
 - Observar y registrar al menos una renovación efectiva del certificado. El
   temporizador y el servicio ya funcionan, pero Certbot determinó que aún no
@@ -1201,14 +1199,8 @@ No se afirma que se hayan recuperado inspecciones antiguas ni probado restauraci
 
 1. Vigilar `sgp-certbot-renew.timer` y conservar evidencia de la primera
    renovación efectiva antes del vencimiento del certificado.
-2. Sustituir el SMTP ficticio por un proveedor autorizado y probar los flujos
-   dependientes del correo.
-3. Descargar el bundle CA desde su origen oficial y probar PostgreSQL con
-   `sslmode=verify-full`. Registrar el resultado sin exponer la contraseña.
-4. Investigar las cargas anteriores y completar las pruebas funcionales de S3
-   pendientes, sin eliminar operaciones ni objetos manualmente.
-5. Ejecutar pruebas funcionales completas y conservar el enlace o identificador
-   de la ejecución de GitHub Actions como evidencia del sprint.
+2. Conservar el enlace o identificador de la ejecución de GitHub Actions como
+   evidencia del sprint, si está disponible.
 
 ## Evaluación de cierre de la HU de staging
 
@@ -1217,13 +1209,15 @@ staging está implementado: existen los recursos AWS, RDS atiende a la
 aplicación, GHCR publica imágenes multi-arquitectura, OIDC y SSM despliegan desde
 `develop`, los contenedores están saludables y el acceso público HTTPS respondió
 correctamente. La integración S3 recibió posteriormente la validación parcial
-registrada aquí; SMTP real, producción y respaldos requieren seguimiento.
+registrada aquí. El usuario informó pruebas funcionales y de correo posteriores;
+producción y respaldos se documentan en sus guías respectivas.
 
 Por ello se recomienda cerrar la HU de staging en su alcance de sprint, dejando
 seguimiento operativo para la renovación efectiva del certificado y las
 excepciones ya registradas. Este cierre no equivale a declarar cumplido todo el
-enunciado final: DT-SEC-10 (HSTS), la política de respaldos, la retención de logs,
-`verify-full` de RDS, SMTP y las pruebas restantes de S3 continúan pendientes. Si HSTS o
+enunciado final: DT-SEC-10 (HSTS) y la retención de logs requieren seguimiento.
+Las verificaciones de RDS y las pruebas funcionales
+fueron confirmadas por el usuario sin evidencia detallada. Si HSTS o
 alguno de esos puntos forma parte explícita de los criterios de aceptación de la
 HU en el tablero, el cierre debe ser condicionado a una excepción aceptada por
 el equipo o la HU debe permanecer abierta.

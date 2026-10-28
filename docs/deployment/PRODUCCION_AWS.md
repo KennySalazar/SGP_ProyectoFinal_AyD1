@@ -4,9 +4,10 @@
 
 Esta guía implementa la propuesta de
 [`GUIA_IMPLEMENTACION_PRODUCCION.md`](GUIA_IMPLEMENTACION_PRODUCCION.md) y
-conserva sus decisiones: EC2 ARM64 propia, RDS compartida con base y usuarios
-exclusivos, imágenes aprobadas en staging desplegadas por digest, HTTPS sobre una
-IPv4 estable y ningún secreto en el repositorio.
+conserva su infraestructura: EC2 ARM64 propia, RDS compartida con base y usuarios
+exclusivos, HTTPS sobre una IPv4 estable y ningún secreto en el repositorio. El
+[ADR-0004](../adr/0004-despliegue-automatico-produccion-desde-main.md) reemplazó
+la promoción manual de imágenes de staging por el despliegue desde `main`.
 
 | Área | Estado |
 |---|---|
@@ -14,7 +15,7 @@ IPv4 estable y ningún secreto en el repositorio.
 | Recursos AWS de producción | Creados en `us-east-1`: `sgp-prod-ec2-sg`, regla 5432 en `sgp-rds-sg`, rol `sgp-prod-ec2-role`, bucket `sgp-prod-respaldos-ayd1-2026-gt01`, EC2 `sgp-prod-ec2` (`t4g.small`, IPv4 privada `172.31.85.45`, subred pública predeterminada de `us-east-1b`) y Elastic IP `35.174.88.15`. Session Manager y TCP 5432 hacia RDS verificados. |
 | Base `sgp_prod` | Preparada con `prepare-database.sql` usando `sslmode=verify-full`; extensiones `postgis` 3.4.6, `pg_trgm` 1.6 y `uuid-ossp` 1.1 confirmadas con `\dx`. |
 | Despliegue real | Revisión `61dae8a43bbaa064159d03b15872f6b8eceb7d4f` desplegada manualmente el 17 de octubre de 2026 con `deploy.sh`; backend y Nginx saludables. Ver el manifiesto de liberación más abajo. |
-| Despliegue automático | Job `deploy-production` agregado al workflow (ADR-0004); pendiente de crear el rol OIDC y las variables de repositorio (sección 7). |
+| Despliegue automático | El usuario confirmó que el despliegue automático de producción está funcionando; el procedimiento se describe en la sección 7. No se registró un identificador de ejecución. |
 | HTTPS público | Operativo en `https://35.174.88.15` con certificado IP de Let's Encrypt y temporizador `sgp-prod-certbot-renew` habilitado. |
 | SMTP | Gmail con contraseña de aplicación configurado en `production.env`. |
 | Respaldos | Temporizador diario activo; primer volcado subido a S3 y prueba de restauración exitosa el 17 de octubre de 2026 (ver [`RESPALDO_Y_RESTAURACION.md`](RESPALDO_Y_RESTAURACION.md)). |
@@ -142,8 +143,8 @@ rm prepare-database.sql
 
 Genere las claves con `openssl rand -hex 32`. Guárdelas solo en el archivo de
 entorno del paso siguiente y en el gestor de contraseñas del equipo. Esta
-ejecución con `verify-full` también deja la evidencia de TLS pendiente desde
-staging.
+ejecución con `verify-full` también permite registrar evidencia de TLS desde
+producción.
 
 ## 5. Archivo de entorno y SMTP de Gmail
 
@@ -177,8 +178,7 @@ contraseña de aplicación se filtra, revóquela en la misma página de Google.
 Producción no reutiliza el token de staging. Cree un Personal Access Token
 (classic) propio con solo `read:packages` y fecha de expiración posterior a la
 entrega, y autentique a `root` con el procedimiento de la sección 8 de
-`GUIA_IMPLEMENTACION_PRODUCCION.md`. Registre fuera del repositorio quién es su
-responsable y cuándo expira.
+`GUIA_IMPLEMENTACION_PRODUCCION.md`.
 
 ## 7. Despliegue
 

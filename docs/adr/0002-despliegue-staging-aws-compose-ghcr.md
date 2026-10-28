@@ -179,8 +179,9 @@ El 27 de octubre de 2026 se corrigió la falta de permisos S3 mediante una polí
 IAM asociada al rol de la EC2 de staging, con `PutObject`, `GetObject` y
 `DeleteObject`. Se verificaron estas operaciones con un archivo de diagnóstico y
 las cargas de fotos y PDF en la aplicación. El permiso `DeleteObject` resolvió
-el 403 observado durante un rollback de PDF; no se demostró que fuera causa de
-todos los 409 anteriores. Véase [staging](../deployment/STAGING_AWS.md).
+el 403 observado durante un rollback de PDF; el usuario confirmó que la
+corrección IAM también resolvió los 409 anteriores. Véase
+[staging](../deployment/STAGING_AWS.md).
 
 En `us-east-1` se confirmaron los siguientes recursos de staging:
 

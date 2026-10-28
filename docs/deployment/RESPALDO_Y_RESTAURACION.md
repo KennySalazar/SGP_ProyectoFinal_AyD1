@@ -91,15 +91,9 @@ Antes de guardarlo en S3, el script verifica que el volcado sea legible con
 `pg_restore --list`. Si `pg_dump`, la verificación o la subida fallan, el
 servicio termina con error y queda registrado en `journalctl`.
 
-Limitación: si la instancia está apagada el día 1 del mes, `Persistent=true`
-ejecuta el respaldo pendiente al encenderla, pero ese día ya no es el 1 y no se
-genera la copia mensual. En ese caso, copie a mano el diario más cercano a
-`mensuales/sgp_prod/sgp_prod-AAAA-MM.dump`.
-
 ## 5. Prueba de restauración (DT-DEP-08)
 
-Se debe ejecutar al menos una vez por semestre y después de cualquier cambio en
-este procedimiento. En Session Manager:
+En Session Manager:
 
 ```bash
 sudo /opt/sgp/backup/restore-test.sh
