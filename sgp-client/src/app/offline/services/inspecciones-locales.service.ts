@@ -225,6 +225,108 @@ export class InspeccionesLocalesService {
     });
   }
 
+  async reconciliarGuardadosConfirmados(
+    servidor: InspeccionBorradorResponse,
+    propietarioId: string,
+  ): Promise<number> {
+    const normalizar = (valor: unknown): unknown => {
+      if (Array.isArray(valor)) return valor.map(normalizar);
+      if (valor && typeof valor === 'object')
+        return Object.fromEntries(
+          Object.entries(valor)
+            .filter(([, v]) => v !== undefined)
+            .sort(([a], [b]) => a.localeCompare(b))
+            .map(([k, v]) => [k, normalizar(v)]),
+        );
+      return valor;
+    };
+    const iguales = (a: unknown, b: unknown) =>
+      JSON.stringify(normalizar(a ?? null)) === JSON.stringify(normalizar(b ?? null));
+    const acompanantes = (lista: unknown) =>
+      Array.isArray(lista)
+        ? lista.map((v: Record<string, unknown>) => ({
+            usuarioId: v['usuarioId'] ?? null,
+            nombre: v['nombre'] ?? null,
+            colegiado: v['colegiado'] ?? v['numeroColegiado'] ?? null,
+          }))
+        : [];
+    return sgpDb.transaction('rw', sgpDb.inspecciones, sgpDb.cola_sync, async () => {
+      if (
+        this.auth.user()?.id !== propietarioId ||
+        servidor.autorId !== propietarioId ||
+        servidor.estado !== 'BORRADOR'
+      )
+        return 0;
+      const local = await sgpDb.inspecciones.get(servidor.id);
+      const b = (local?.payload as BorradorLocalPayload | undefined)?.borrador;
+      if (
+        !local ||
+        !b ||
+        local.propietarioId !== propietarioId ||
+        local.actualizacionLocalPendiente ||
+        local.intencionFinal?.estado === 'PENDIENTE' ||
+        b.version > servidor.version ||
+        b.versionFormularioId !== servidor.versionFormularioId ||
+        !iguales(b.datos, servidor.datos) ||
+        b.fechaInspeccion !== servidor.fechaInspeccion ||
+        !iguales(b.identificacionCapturada, servidor.identificacionCapturada) ||
+        !iguales(acompanantes(b.acompanantes), acompanantes(servidor.acompanantes))
+      )
+        return 0;
+      const operaciones = await sgpDb.cola_sync.where('entityId').equals(servidor.id).toArray();
+      if (!operaciones.length) return 0;
+      const confirmadoEn = Date.parse(servidor.actualizadoEn ?? servidor.ultimaActividadEn ?? '');
+      const segura = (item: SyncQueueItem) => {
+        if (
+          item.propietarioId !== propietarioId ||
+          item.operacion !== 'GUARDAR_BORRADOR' ||
+          item.estado === 'ENVIANDO'
+        )
+          return false;
+        const request = item.payload as GuardarBorradorRequest | null;
+        if (!request || typeof request !== 'object') return false;
+        const campos = [
+          'datos',
+          'identificacionCapturada',
+          'fechaInspeccion',
+          'acompanantes',
+        ] as const;
+        const identica =
+          campos.some((k) => request[k] !== undefined) &&
+          campos.every(
+            (k) =>
+              request[k] === undefined ||
+              (k === 'acompanantes'
+                ? iguales(acompanantes(request[k]), acompanantes(servidor[k]))
+                : iguales(request[k], servidor[k])),
+          );
+        const creadaEn = Date.parse(item.creadoEn);
+        const superada =
+          typeof request.version === 'number' &&
+          request.version < servidor.version &&
+          Number.isFinite(confirmadoEn) &&
+          Number.isFinite(creadaEn) &&
+          creadaEn <= confirmadoEn;
+        return identica || superada;
+      };
+      if (!operaciones.every(segura)) return 0;
+      await sgpDb.cola_sync.bulkDelete(operaciones.map((item) => item.id));
+      await sgpDb.inspecciones.put({
+        ...local,
+        estado: servidor.estado,
+        sincronizado: true,
+        actualizacionLocalPendiente: false,
+        intencionFinal:
+          local.intencionFinal?.accion === 'enviar' && local.intencionFinal.estado === 'CONFIRMADA'
+            ? undefined
+            : local.intencionFinal,
+        payload: { ...(local.payload as BorradorLocalPayload), borrador: servidor },
+        actualizadoEn: servidor.actualizadoEn ?? servidor.ultimaActividadEn ?? local.actualizadoEn,
+      });
+      return operaciones.length;
+    });
+  }
+
   async guardarBorradorLocal(
     inspeccion: LocalInspection,
     request: GuardarBorradorRequest,

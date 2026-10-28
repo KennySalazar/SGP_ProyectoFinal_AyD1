@@ -1056,4 +1056,33 @@ describe('CompletarInspeccionPage', () => {
     await vi.waitFor(() => expect(component.errorCarga()).toBeTruthy());
     expect(component.borrador()).toBeNull();
   });
+  it('actualiza el estado al atender cambios aunque la cache conserve operaciones pendientes', async () => {
+    fixture.detectChanges();
+    await fixture.whenStable();
+    mockInspeccionApi.obtenerBorrador.mockReturnValue(of(mockBorrador));
+    const locales = TestBed.inject(InspeccionesLocalesService);
+    vi.spyOn(locales, 'actualizarBorradorCanonicoSiSinPendientes').mockResolvedValue(false);
+    const datosLocales = {
+      otros: { recomendaciones: { mantenimiento: 'Edicion local conservada' } },
+    };
+    vi.spyOn(locales, 'obtenerInspeccionLocal').mockResolvedValue({
+      id: mockBorrador.id,
+      puenteId: mockBorrador.puenteId,
+      propietarioId: 'usr-1',
+      estado: 'CAMBIOS_SOLICITADOS',
+      actualizadoEn: mockBorrador.creadoEn,
+      sincronizado: false,
+      payload: { borrador: { ...mockBorrador, datos: datosLocales } },
+    });
+    component.borrador.set({ ...mockBorrador, estado: 'CAMBIOS_SOLICITADOS' });
+    component.actualizarRevision();
+    await vi.waitFor(() =>
+      expect(component.errorGuardado()).toContain('guardados locales pendientes'),
+    );
+    expect(component.borrador()?.estado).toBe('BORRADOR');
+    expect(component.datosIniciales()?.datos).toEqual(datosLocales);
+    expect(component.errorGuardado()).toContain('guardados locales pendientes');
+    expect(mockInspeccionApi.guardarBorrador).not.toHaveBeenCalled();
+    expect(mockInspeccionApi.enviar).not.toHaveBeenCalled();
+  });
 });

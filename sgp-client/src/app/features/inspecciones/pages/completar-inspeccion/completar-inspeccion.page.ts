@@ -255,10 +255,25 @@ export class CompletarInspeccionPage implements OnInit {
         next: (borrador) => {
           void this.inspeccionesLocales
             .actualizarBorradorCanonicoSiSinPendientes(borrador, borrador.autorId)
-            .then((actualizado) => {
+            .then(async (actualizado) => {
               if (!actualizado) {
+                const local = await this.inspeccionesLocales.obtenerInspeccionLocal(borrador.id);
+                if (this.auth.user()?.id !== borrador.autorId) return;
+                const copia =
+                  local?.propietarioId === borrador.autorId
+                    ? (local.payload as BorradorLocalPayload | undefined)?.borrador
+                    : undefined;
+                this.aplicarBorrador({
+                  ...borrador,
+                  datos: copia?.datos ?? borrador.datos,
+                  identificacionCapturada:
+                    copia?.identificacionCapturada ?? borrador.identificacionCapturada,
+                  acompanantes: copia?.acompanantes ?? borrador.acompanantes,
+                  fechaInspeccion: copia?.fechaInspeccion ?? borrador.fechaInspeccion,
+                });
+                this.cargarEsquema(borrador.versionFormularioId);
                 this.errorGuardado.set(
-                  'Hay cambios locales pendientes. Sincronice antes de abrir la correccion.',
+                  'El borrador esta habilitado. Hay guardados locales pendientes; revisalos en Offline antes de reenviar.',
                 );
                 return;
               }
