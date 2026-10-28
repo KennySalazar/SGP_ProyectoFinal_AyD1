@@ -114,6 +114,8 @@ export class ReporteFotograficoComponent implements OnDestroy {
    * cancelara ahí la lista de pendientes quedaría congelada hasta recargar.
    */
   private inventarioEnVivo?: Subscription;
+  /** Miniaturas que se están descargando, para no pedir dos veces la misma. */
+  private readonly miniaturasEnCurso = new Set<string>();
   private generacionCarga = 0;
   readonly bloqueada = signal(false);
   readonly inventarioCargado = signal(false);
@@ -182,6 +184,8 @@ export class ReporteFotograficoComponent implements OnDestroy {
                   miniatura: anteriores.get(foto.id),
                 })),
               );
+              // Una foto recién confirmada por la sincronización llega sin miniatura.
+              void this.completarMiniaturas(usuario.id, inspeccion.id, this.revision);
             });
         }
         if (usuario) void this.recargar(usuario.id, inspeccion.id, this.revision);
@@ -497,6 +501,31 @@ export class ReporteFotograficoComponent implements OnDestroy {
   }
   etiqueta(categoria: string) {
     return this.i18n.translate('inspecciones.fotos.categorias.' + categoria);
+  }
+  /** Descarga las miniaturas que faltan en las fotos confirmadas, una vez por foto. */
+  private async completarMiniaturas(usuario: string, inspeccion: string, revision: number) {
+    if (!this.connectivity.online()) return;
+    const faltantes = this.confirmadas().filter(
+      (foto) => !foto.miniatura && !this.miniaturasEnCurso.has(foto.id),
+    );
+    for (const foto of faltantes) {
+      this.miniaturasEnCurso.add(foto.id);
+      try {
+        const blob = await firstValueFrom(this.api.contenidoFotografia(inspeccion, foto.id, true));
+        if (!this.vigente(usuario, inspeccion, revision)) return;
+        const actual = this.confirmadas().find((f) => f.id === foto.id);
+        // Si ya no está o la recarga ya trajo su miniatura, no se usa esta.
+        if (!actual || actual.miniatura) continue;
+        const miniatura = URL.createObjectURL(blob);
+        this.confirmadas.update((lista) =>
+          lista.map((f) => (f.id === foto.id ? { ...f, miniatura } : f)),
+        );
+      } catch {
+        if (this.vigente(usuario, inspeccion, revision)) this.error.set('lectura');
+      } finally {
+        this.miniaturasEnCurso.delete(foto.id);
+      }
+    }
   }
   private revocar(url?: string | null) {
     if (url) URL.revokeObjectURL(url);
