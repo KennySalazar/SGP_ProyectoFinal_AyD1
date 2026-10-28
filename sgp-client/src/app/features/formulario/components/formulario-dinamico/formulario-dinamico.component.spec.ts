@@ -1005,3 +1005,39 @@ function botonesPorTexto(texto: string): HTMLButtonElement[] {
     b.textContent?.includes(texto),
   );
 }
+
+describe('Validacion visible antes de enviar', () => {
+  it('senala la lista invalida aunque todos sus campos obligatorios tengan respuesta', async () => {
+    const fixture = await crear(
+      {
+        type: 'object',
+        required: ['seccion'],
+        properties: {
+          seccion: {
+            type: 'object',
+            title: 'Seccion',
+            required: ['filas'],
+            properties: {
+              filas: {
+                type: 'array',
+                title: 'Filas',
+                minItems: 1,
+                maxItems: 1,
+                items: {
+                  type: 'object',
+                  required: ['valor'],
+                  properties: { valor: { type: 'string', title: 'Valor' } },
+                },
+              },
+            },
+          },
+        },
+      },
+      { valoresIniciales: { seccion: { filas: [{ valor: 'uno' }, { valor: 'dos' }] } } },
+    );
+    expect(fixture.componentInstance.revisar()).toBe(false);
+    expect(fixture.componentInstance.problemasValidacion().join(' ')).toContain('Filas');
+    fixture.detectChanges();
+    expect(raiz(fixture).querySelector('.seccion.errores')).not.toBeNull();
+  });
+});

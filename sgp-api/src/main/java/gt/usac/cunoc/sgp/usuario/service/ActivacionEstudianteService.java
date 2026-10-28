@@ -62,6 +62,75 @@ public class ActivacionEstudianteService {
         .toList();
   }
 
+  public List<EstudiantePendienteResponse> listarActivos() {
+    return usuarios
+        .findByRole_NameAndActiveTrueAndVerifiedTrueAndActivatedTrueOrderByEmailAsc(
+            RoleName.ESTUDIANTE)
+        .stream()
+        .map(
+            estudiante ->
+                new EstudiantePendienteResponse(
+                    estudiante.getId(),
+                    estudiante.getEmail(),
+                    estudiante.getNombreCompleto(),
+                    estudiante.getNombreUsuario()))
+        .toList();
+  }
+
+  @Transactional
+  public MessageResponse vincular(String emailCatedratico, ActivarEstudianteRequest request) {
+    UserAccount catedratico = buscarCatedratico(emailCatedratico);
+    UserAccount estudiante =
+        usuarios
+            .findByIdForUpdate(request.estudianteId())
+            .filter(
+                u ->
+                    u.getRole().getName() == RoleName.ESTUDIANTE
+                        && u.isActive()
+                        && u.isVerified()
+                        && u.isActivated())
+            .orElseThrow(
+                () ->
+                    new ApiException(
+                        HttpStatus.UNPROCESSABLE_ENTITY,
+                        "estudiante_no_activo",
+                        "Estudiante no activo",
+                        "Seleccione un estudiante activo con correo verificado"));
+    Curso curso = buscarCursoDelCatedratico(request.cursoId(), catedratico.getId());
+    if (!curso.isActivo()) {
+      throw new ApiException(
+          HttpStatus.UNPROCESSABLE_ENTITY,
+          "curso_finalizado",
+          "Curso finalizado",
+          "No es posible vincular estudiantes a un curso finalizado");
+    }
+    if (inscripciones.existsByCurso_IdAndEstudiante_Id(curso.getId(), estudiante.getId())) {
+      throw new ApiException(
+          HttpStatus.CONFLICT,
+          "estudiante_ya_inscrito",
+          "Inscripcion existente",
+          "El estudiante ya tiene una inscripcion en este curso");
+    }
+    Instant ahora = clock.instant();
+    CursoEstudiante inscripcion =
+        inscripciones.save(
+            new CursoEstudiante(curso, estudiante, request.seccion().trim(), catedratico, ahora));
+    auditoria.register(
+        catedratico.getId(),
+        "VINCULAR_ESTUDIANTE",
+        "curso_estudiante",
+        inscripcion.getId(),
+        Map.of(
+            "estudianteId",
+            estudiante.getId(),
+            "cursoId",
+            curso.getId(),
+            "seccion",
+            request.seccion().trim()),
+        ahora);
+    return new MessageResponse("Estudiante vinculado al curso correctamente");
+  }
+
   public List<CursoDisponibleResponse> listarCursosVigentes(String emailCatedratico) {
     UserAccount catedratico = buscarCatedratico(emailCatedratico);
     return cursos.findByCatedratico_IdAndActivoTrueOrderByPeriodoDesc(catedratico.getId()).stream()

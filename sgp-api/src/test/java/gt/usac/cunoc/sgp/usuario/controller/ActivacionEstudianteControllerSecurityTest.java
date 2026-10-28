@@ -40,9 +40,9 @@ class ActivacionEstudianteControllerSecurityTest {
 
   private static final String REQUEST =
       """
-      {"estudianteId":"019a0000-0000-7000-8000-000000000001",
-       "cursoId":"019a0000-0000-7000-8000-000000000002","seccion":"A"}
-      """;
+          {"estudianteId":"019a0000-0000-7000-8000-000000000001",
+           "cursoId":"019a0000-0000-7000-8000-000000000002","seccion":"A"}
+          """;
 
   @Autowired private ActivacionEstudianteController controller;
 
@@ -88,6 +88,31 @@ class ActivacionEstudianteControllerSecurityTest {
   @Test
   void rechazaProfesionalExterno() throws Exception {
     rechazaRol(RoleName.PROFESIONAL_EXTERNO);
+  }
+
+  @Test
+  void soloCatedraticoPuedeVincularEnOtroCurso() throws Exception {
+    for (RoleName rol :
+        List.of(RoleName.ADMINISTRADOR, RoleName.ESTUDIANTE, RoleName.PROFESIONAL_EXTERNO)) {
+      var authentication = autenticar(rol);
+      mockMvc
+          .perform(
+              post("/api/v1/activaciones-estudiantes/vinculaciones")
+                  .principal(authentication)
+                  .contentType("application/json")
+                  .content(REQUEST))
+          .andExpect(status().isForbidden());
+    }
+    verifyNoInteractions(service);
+    var authentication = autenticar(RoleName.CATEDRATICO);
+    mockMvc
+        .perform(
+            post("/api/v1/activaciones-estudiantes/vinculaciones")
+                .principal(authentication)
+                .contentType("application/json")
+                .content(REQUEST))
+        .andExpect(status().isOk());
+    verify(service).vincular(any(), any(ActivarEstudianteRequest.class));
   }
 
   private void rechazaRol(RoleName role) throws Exception {

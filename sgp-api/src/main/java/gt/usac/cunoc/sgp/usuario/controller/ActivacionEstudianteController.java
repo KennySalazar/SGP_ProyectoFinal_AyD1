@@ -37,6 +37,19 @@ public class ActivacionEstudianteController {
     return activaciones.listarPendientes();
   }
 
+  @GetMapping("/activos")
+  @Operation(summary = "Listar estudiantes activos para vincular a otro curso")
+  public List<EstudiantePendienteResponse> listarActivos() {
+    return activaciones.listarActivos();
+  }
+
+  @PostMapping("/vinculaciones")
+  @Operation(summary = "Vincular estudiante activo a otro curso del catedratico")
+  public MessageResponse vincular(
+      Authentication authentication, @Valid @RequestBody ActivarEstudianteRequest request) {
+    return activaciones.vincular(authentication.getName(), request);
+  }
+
   @GetMapping("/cursos")
   @Operation(summary = "Listar cursos vigentes del catedratico")
   public List<CursoDisponibleResponse> listarCursos(Authentication authentication) {

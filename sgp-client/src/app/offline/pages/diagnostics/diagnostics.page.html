@@ -31,7 +31,22 @@
       }}</span
     >
   </div>
-  @for (item of datos.elementos; track item.id) {
+  <p>
+    Si ya guardaste la correccion en el servidor, comprueba los guardados antiguos antes de
+    reintentarlos.
+  </p>
+  <button
+    pButton
+    type="button"
+    (click)="verificarGuardados()"
+    [disabled]="verificandoGuardados() || sync.sincronizando() || !connectivity.online()"
+  >
+    {{ verificandoGuardados() ? 'Verificando guardados...' : 'Verificar guardados con el servidor'
+    }}
+  </button>
+  @if (resultadoGuardados(); as resultado) {
+  <p role="status">{{ resultado }}</p>
+  } @for (item of datos.elementos; track item.id) {
   <article class="queue-row">
     <h3>{{ 'offline.hu061.' + item.operacion | transloco }}</h3>
     <p>{{ 'offline.diagnostico.identificador' | transloco }}: {{ item.entityId }}</p>

@@ -13,7 +13,8 @@ import {
   untracked,
   viewChild,
 } from '@angular/core';
-import { TranslocoPipe } from '@jsverse/transloco';
+import { AbstractControl, FormArray, FormGroup } from '@angular/forms';
+import { TranslocoService, TranslocoPipe } from '@jsverse/transloco';
 import { ButtonModule } from 'primeng/button';
 import { EsquemaJson, NodoArreglo, NodoFormulario, NodoObjeto } from '../../motor/esquema/modelos';
 import { resolverEsquema } from '../../motor/esquema/resolutor';
@@ -70,6 +71,7 @@ type Resultado = { construido: FormularioConstruido } | { error: string } | null
 })
 export class FormularioDinamicoComponent {
   /** Esquema JSON de la versión del formulario (el que entrega el backend). */
+  private readonly i18n = inject(TranslocoService);
   readonly esquema = input.required<EsquemaJson>();
   /** Valores con los que se llena el formulario: datos precargados o una inspección guardada. */
   readonly valoresIniciales = input<Record<string, unknown> | null>(null);
@@ -123,7 +125,11 @@ export class FormularioDinamicoComponent {
       const elementos = control
         ? resumirElementos(nodo, control, construido.ocultos)
         : { total: 0, revisados: 0 };
-      return { nodo, avance, elementos, estado: estadoDe(avance, construido.revisado()) };
+      const estado =
+        control?.invalid && avance.completos >= avance.obligatorios
+          ? 'errores'
+          : estadoDe(avance, construido.revisado());
+      return { nodo, avance, elementos, estado };
     });
   });
 
@@ -245,6 +251,34 @@ export class FormularioDinamicoComponent {
     // Con los errores ya dibujados, se lleva al usuario al primer campo que debe corregir.
     afterNextRender(() => this.enfocarPrimerProblema(), { injector: this.injector });
     return valido && primera < 0;
+  }
+
+  problemasValidacion(): string[] {
+    const construido = this.construido();
+    if (!construido) return [this.i18n.translate('formulario.dinamico.notReady')];
+    const problemas: string[] = [];
+    const visitar = (nodo: NodoFormulario, control: AbstractControl, ruta: string[]) => {
+      if (control.disabled || construido.ocultos.has(control)) return;
+      const nombre = [...ruta, nodo.titulo];
+      for (const [clave, detalle] of Object.entries(control.errors ?? {})) {
+        const parametros = typeof detalle === 'object' && detalle !== null ? detalle : {};
+        problemas.push(
+          `${nombre.join(' > ')}: ${this.i18n.translate('formulario.validacion.' + clave, parametros)}`,
+        );
+      }
+      if (nodo.clase === 'objeto') {
+        for (const hijo of nodo.hijos) {
+          const hija = (control as FormGroup).controls[hijo.clave];
+          if (hija) visitar(hijo, hija, nodo.ruta ? nombre : ruta);
+        }
+      } else if (nodo.clase === 'arreglo') {
+        (control as FormArray).controls.forEach((instancia, i) =>
+          visitar(nodo.elemento, instancia, [...nombre, String(i + 1)]),
+        );
+      }
+    };
+    visitar(construido.esquema.raiz, construido.form, []);
+    return problemas;
   }
 
   private enfocarPrimerProblema(): void {

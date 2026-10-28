@@ -475,7 +475,8 @@ class InspeccionServiceHu024Test {
 
   @Test
   @DisplayName(
-      "Precarga datos permanentes de la última inspección publicada con confirmación explícita (sin daños)")
+      "Precarga datos permanentes de la última inspección publicada con confirmación explícita (sin"
+          + " daños)")
   void iniciarInspeccion_precargaDatosPermanentes_conConfirmacion() {
     UUID usuarioId = catedratico.getId();
     UUID inspeccionVigenteId = UUID.randomUUID();
@@ -789,7 +790,8 @@ class InspeccionServiceHu024Test {
 
   @Test
   @DisplayName(
-      "HU-025: Calcula IC preliminar etiquetado cuando existen datos suficientes sin alterar estado del puente")
+      "HU-025: Calcula IC preliminar etiquetado cuando existen datos suficientes sin alterar estado"
+          + " del puente")
   void guardarBorrador_conSuficientesDatos_calculaIcPreliminar() {
     UUID usuarioId = catedratico.getId();
     UUID inspeccionId = UUID.randomUUID();
@@ -1094,6 +1096,45 @@ class InspeccionServiceHu024Test {
         inspeccionService.obtenerBorrador(inspeccionId, usuarioId);
 
     assertThat(response).isNotNull();
+    assertThat(response.id()).isEqualTo(inspeccionId);
+    assertThat(response.progreso()).isNotNull();
+    assertThat(response.progreso().secciones()).hasSize(8);
+  }
+
+  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.provider.ValueSource(
+      strings = {"ENVIADA", "EN_REVISION", "CAMBIOS_SOLICITADOS", "RECHAZADA"})
+  void obtenerBorrador_autorConsultaEstadoActualSinEditar(String estado) {
+    UUID usuarioId = catedratico.getId();
+    UUID inspeccionId = UUID.randomUUID();
+
+    Inspeccion inspeccion =
+        new Inspeccion(
+            inspeccionId,
+            puenteActivo,
+            versionActiva,
+            usuarioId,
+            "CATEDRATICO",
+            "Profesor",
+            LocalDate.of(2026, 10, 15),
+            "disp-1",
+            null,
+            null,
+            null,
+            null,
+            objectMapper.createObjectNode(),
+            AHORA);
+    ReflectionTestUtils.setField(inspeccion, "version", 0L);
+    ReflectionTestUtils.setField(inspeccion, "estado", estado);
+
+    when(inspeccionRepository.findConDetallesById(inspeccionId))
+        .thenReturn(Optional.of(inspeccion));
+
+    InspeccionBorradorResponse response =
+        inspeccionService.obtenerBorrador(inspeccionId, usuarioId);
+
+    assertThat(response).isNotNull();
+    assertThat(response.estado()).isEqualTo(estado);
     assertThat(response.id()).isEqualTo(inspeccionId);
     assertThat(response.progreso()).isNotNull();
     assertThat(response.progreso().secciones()).hasSize(8);

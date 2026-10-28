@@ -367,12 +367,16 @@ public class FotografiaService {
                         "inspeccion_no_encontrada",
                         "Inspección no encontrada."));
     if ("PUBLICADA".equals(i.getEstado()) || i.getAutorId().equals(actor)) return;
+    if (rol == RoleName.CATEDRATICO
+        && Set.of("BORRADOR", "CAMBIOS_SOLICITADOS", "RECHAZADA").contains(i.getEstado())
+        && revisiones.existsByInspeccionIdAndRevisorIdAndEstado(id, actor, "RESUELTA")) return;
     if ("EN_REVISION".equals(i.getEstado())) {
       if (rol != RoleName.CATEDRATICO)
         throw error(
             HttpStatus.FORBIDDEN,
             "lectura_revision_no_permitida",
-            "La lectura de una inspección en revisión requiere ser su autor o su catedrático revisor.");
+            "La lectura de una inspección en revisión requiere ser su autor o su catedrático"
+                + " revisor.");
       if (revisiones.existsByInspeccionIdAndRevisorIdAndEstado(id, actor, "EN_CURSO")) return;
       throw error(HttpStatus.NOT_FOUND, "inspeccion_no_encontrada", "Inspección no encontrada.");
     }

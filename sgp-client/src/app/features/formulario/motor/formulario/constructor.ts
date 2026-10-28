@@ -300,7 +300,7 @@ export class FormularioConstruido {
 
     for (const hijo of nodo.hijos) {
       const control = grupo.controls[hijo.clave];
-      if (!control) continue;
+      if (!control || this.ocultos.has(control)) continue;
       if (hijo.clase === 'objeto') {
         this.actualizarVisibilidadInicial(hijo, control as FormGroup);
       } else if (hijo.clase === 'arreglo') {

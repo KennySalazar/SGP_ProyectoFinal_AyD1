@@ -178,7 +178,8 @@ export class MisInspeccionesPage {
               respuesta.content.map((inspeccion) => [inspeccion.id, inspeccion]),
             );
             for (const local of localesResumen) {
-              if (!porId.has(local.id) || local.estado === 'PENDIENTE_SYNC') {
+              const copia = inspeccionesLocales.find((item) => item.id === local.id);
+              if (copia && !copia.sincronizado) {
                 porId.set(local.id, local);
               }
             }
