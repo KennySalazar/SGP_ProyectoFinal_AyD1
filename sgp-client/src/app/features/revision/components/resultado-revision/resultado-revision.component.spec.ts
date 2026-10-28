@@ -102,6 +102,52 @@ describe('Veredicto privado HU-038', () => {
     fixture.detectChanges();
     return fixture.componentInstance;
   };
+  it('identifica claramente la accion del catedratico sin enviar un veredicto al abrir', () => {
+    const html = fixture.nativeElement as HTMLElement;
+    const boton = Array.from(html.querySelectorAll('button')).find((b) =>
+      b.textContent?.includes('Abrir calificacion y veredicto'),
+    );
+    expect(boton).toBeDefined();
+    boton!.click();
+    fixture.detectChanges();
+    expect(api.historial).toHaveBeenCalledWith('i');
+    expect(api.emitirVeredicto).not.toHaveBeenCalled();
+    expect(html.textContent).toContain('Revisar y confirmar decision');
+  });
+  it('conserva el acceso de consulta del estudiante sin ofrecerle emitir veredicto', () => {
+    user.set({ id: 'autor', role: 'ESTUDIANTE' });
+    fixture.detectChanges();
+    const html = fixture.nativeElement as HTMLElement;
+    expect(html.textContent).toContain('Consultar resultado e historial');
+    expect(html.textContent).not.toContain('Abrir calificacion y veredicto');
+    abrir();
+    expect(html.querySelector('form')).toBeNull();
+    expect(api.emitirVeredicto).not.toHaveBeenCalled();
+  });
+  it('cierra el panel sin enviar veredicto y permite volver a abrirlo', () => {
+    const c = abrir();
+    const html = fixture.nativeElement as HTMLElement;
+    const boton = Array.from(html.querySelectorAll('button')).find((b) =>
+      b.textContent?.includes('Cerrar panel'),
+    );
+    expect(boton).toBeDefined();
+    boton!.click();
+    fixture.detectChanges();
+    expect(c.abierto()).toBe(false);
+    expect(html.querySelector('form')).toBeNull();
+    expect(html.textContent).toContain('Abrir calificacion y veredicto');
+    expect(api.emitirVeredicto).not.toHaveBeenCalled();
+    abrir();
+    expect(c.abierto()).toBe(true);
+    expect(html.querySelector('form')).not.toBeNull();
+  });
+  it('no permite cerrar mientras hay una operacion pendiente', () => {
+    const c = abrir();
+    c.ocupado.set(true);
+    c.cerrar();
+    expect(c.abierto()).toBe(true);
+    expect(api.emitirVeredicto).not.toHaveBeenCalled();
+  });
   it('consulta datos privados solo al abrir el seguimiento', () => {
     expect(api.historial).not.toHaveBeenCalled();
     abrir();

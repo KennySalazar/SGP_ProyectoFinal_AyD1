@@ -7,7 +7,11 @@
     <i class="pi pi-check-circle"></i> {{ 'auth.reset.success' | transloco }}
   </p>
   <div class="links"><a routerLink="/login">{{ 'auth.login.title' | transloco }}</a></div>
-  } @else {
+  } @else { @if (codigoEnviado) {
+  <p class="note" role="status">
+    <i class="pi pi-envelope"></i> {{ 'auth.recovery.sent' | transloco }}
+  </p>
+  }
   <form [formGroup]="form" (ngSubmit)="submit()">
     <label
       >{{ 'common.emailShort' | transloco }}<input
@@ -38,5 +42,6 @@
       <i class="pi pi-key"></i><span>{{ 'auth.reset.action' | transloco }}</span>
     </button>
   </form>
+  <div class="links"><a routerLink="/login">{{ 'auth.recovery.back' | transloco }}</a></div>
   }
 </app-auth-card>

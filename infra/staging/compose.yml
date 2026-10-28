@@ -3,8 +3,8 @@ name: sgp-staging
 x-logging: &default-logging
   driver: json-file
   options:
-    max-size: "10m"
-    max-file: "5"
+    max-size: "50m"
+    max-file: "90"
 
 services:
   backend:

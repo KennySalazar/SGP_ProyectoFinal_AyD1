@@ -55,7 +55,18 @@
   </div>
 
   <div class="acciones-encabezado">
-    @switch (o.estado) { @case ('PROPUESTA') {
+    @if (puedeCambiarPrioridad()) {
+    <button
+      pButton
+      type="button"
+      severity="secondary"
+      [outlined]="true"
+      (click)="abrirEdicionPrioridad()"
+    >
+      <i class="pi pi-sliders-h" aria-hidden="true"></i
+      ><span>{{ 'mantenimiento.ordenes.editarPrioridad' | transloco }}</span>
+    </button>
+    } @switch (o.estado) { @case ('PROPUESTA') {
     <button pButton type="button" (click)="abrirAccion('programar')">
       <i class="pi pi-calendar-plus" aria-hidden="true"></i
       ><span>{{ 'mantenimiento.ordenes.acciones.programar' | transloco }}</span>
@@ -570,5 +581,69 @@
     [alt]="'mantenimiento.ordenes.evidencia.alt' | transloco"
   />
   }
+</p-dialog>
+
+<p-dialog
+  [visible]="editandoPrioridad()"
+  (visibleChange)="!$event && !guardandoPrioridad() && editandoPrioridad.set(false)"
+  [modal]="true"
+  [style]="{ width: 'min(32rem, 94vw)' }"
+  [draggable]="false"
+  [resizable]="false"
+  [header]="'mantenimiento.ordenes.editarPrioridad' | transloco"
+>
+  <p>{{ 'mantenimiento.ordenes.prioridadEditTexto' | transloco }}</p>
+  <label class="campo-dialogo" for="prioridad-confirmada">
+    <span>{{ 'mantenimiento.ordenes.prioridadConfirmada' | transloco }}</span>
+    <p-select
+      inputId="prioridad-confirmada"
+      [options]="opcionesPrioridad"
+      [ngModel]="prioridadNueva()"
+      (ngModelChange)="prioridadNueva.set($event)"
+      styleClass="w-full"
+    >
+      <ng-template #item let-prioridad>
+        {{ 'mantenimiento.ordenes.prioridades.' + prioridad | transloco }}
+      </ng-template>
+      <ng-template #selectedItem let-prioridad>
+        {{ 'mantenimiento.ordenes.prioridades.' + prioridad | transloco }}
+      </ng-template>
+    </p-select>
+  </label>
+  <label class="campo-dialogo">
+    <span>{{ 'mantenimiento.ordenes.justificacion' | transloco }}</span>
+    <textarea
+      pTextarea
+      rows="3"
+      [ngModel]="justificacionNueva()"
+      (ngModelChange)="justificacionNueva.set($event)"
+    ></textarea>
+  </label>
+  @if (errorPrioridad(); as error) {
+  <p class="mensaje error" role="alert">{{ error }}</p>
+  }
+  <div class="dialog-acciones">
+    <button
+      pButton
+      type="button"
+      severity="secondary"
+      [outlined]="true"
+      [disabled]="guardandoPrioridad()"
+      (click)="editandoPrioridad.set(false)"
+    >
+      <span>{{ 'common.cancel' | transloco }}</span>
+    </button>
+    <button
+      pButton
+      type="button"
+      [disabled]="guardandoPrioridad() || !justificacionNueva().trim()"
+      (click)="guardarPrioridad()"
+    >
+      <span
+        >{{ (guardandoPrioridad() ? 'mantenimiento.ordenes.prioridadGuardando' : 'common.save') |
+        transloco }}</span
+      >
+    </button>
+  </div>
 </p-dialog>
 }

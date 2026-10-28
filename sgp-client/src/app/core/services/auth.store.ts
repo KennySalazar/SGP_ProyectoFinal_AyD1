@@ -49,6 +49,7 @@ export class AuthStore {
       if (id !== this.userState()?.id) {
         this.tokenState.set(null);
         this.userState.set(null);
+        this.cambiosSesion$.next(null);
         sessionStorage.removeItem(OFFLINE_USER_KEY);
       }
     });

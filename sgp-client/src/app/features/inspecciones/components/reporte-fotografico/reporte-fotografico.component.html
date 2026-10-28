@@ -1,11 +1,18 @@
 <section class="reporte surface-card" [attr.aria-label]="'inspecciones.fotos.titulo' | transloco">
   <h3>{{ 'inspecciones.fotos.titulo' | transloco }}</h3>
   <p>{{ 'inspecciones.fotos.descripcion' | transloco }}</p>
+  <p>{{ 'inspecciones.fotos.compresionNota' | transloco }}</p>
   @if (esOffline()) {
     <div class="alerta-offline" role="status">
       <i class="pi pi-info-circle" aria-hidden="true"></i>
       <p>{{ 'inspecciones.fotos.offlineSprint4Aviso' | transloco }}</p>
     </div>
+  }
+  @if (editable() && storage.persistent() === false) {
+    <p role="status">{{ 'offline.almacenamiento.noPersistente' | transloco }}</p>
+  }
+  @if (editable() && storage.pocoEspacio()) {
+    <p role="status">{{ 'offline.almacenamiento.pocoEspacio' | transloco }}</p>
   }
   @if (!editable()) {
     <p role="status">
@@ -125,6 +132,16 @@
         <button pButton type="button" [disabled]="ocupado()" (click)="reintentar(foto)">
           {{ 'inspecciones.fotos.reintentar' | transloco }}
         </button>
+        <button
+          pButton
+          type="button"
+          severity="danger"
+          [outlined]="true"
+          [disabled]="ocupado()"
+          (click)="fotoLocalARetirar.set(foto)"
+        >
+          {{ 'inspecciones.fotos.eliminarLocal' | transloco }}
+        </button>
       }
     </div>
   }
@@ -214,5 +231,39 @@
         </button>
       </div>
     }
+  </p-dialog>
+  <p-dialog
+    [header]="'inspecciones.fotos.eliminarLocal' | transloco"
+    [visible]="fotoLocalARetirar() !== null"
+    (visibleChange)="!$event && !ocupado() && fotoLocalARetirar.set(null)"
+    [modal]="true"
+    [closable]="!ocupado()"
+    [draggable]="false"
+    [resizable]="false"
+  >
+    <p>{{ 'inspecciones.fotos.confirmarEliminarLocal' | transloco }}</p>
+    @if (error(); as mensaje) {
+      <p role="alert">{{ 'inspecciones.fotos.errores.' + mensaje | transloco }}</p>
+    }
+    <div class="acciones">
+      <button
+        pButton
+        type="button"
+        severity="secondary"
+        [disabled]="ocupado()"
+        (click)="fotoLocalARetirar.set(null)"
+      >
+        {{ 'common.close' | transloco }}
+      </button>
+      <button
+        pButton
+        type="button"
+        severity="danger"
+        [disabled]="ocupado()"
+        (click)="eliminarLocal()"
+      >
+        {{ 'inspecciones.fotos.eliminarLocal' | transloco }}
+      </button>
+    </div>
   </p-dialog>
 </section>

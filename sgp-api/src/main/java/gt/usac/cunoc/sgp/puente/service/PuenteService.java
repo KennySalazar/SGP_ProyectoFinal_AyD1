@@ -4,6 +4,7 @@ import gt.usac.cunoc.sgp.common.audit.aspect.Auditable;
 import gt.usac.cunoc.sgp.common.audit.model.AccionAuditoria;
 import gt.usac.cunoc.sgp.common.exception.ApiException;
 import gt.usac.cunoc.sgp.common.util.UuidV7Generator;
+import gt.usac.cunoc.sgp.mantenimiento.service.PlanMantenimientoService;
 import gt.usac.cunoc.sgp.puente.dto.ActualizarPuenteRequest;
 import gt.usac.cunoc.sgp.puente.dto.CrearPuenteRequest;
 import gt.usac.cunoc.sgp.puente.dto.DarBajaPuenteRequest;
@@ -17,6 +18,7 @@ import gt.usac.cunoc.sgp.puente.mapper.PuenteMapper;
 import gt.usac.cunoc.sgp.puente.repository.DepartamentoRepository;
 import gt.usac.cunoc.sgp.puente.repository.MunicipioRepository;
 import gt.usac.cunoc.sgp.puente.repository.PuenteRepository;
+import gt.usac.cunoc.sgp.puente.repository.PuenteRepository.PuenteCercanoProjection;
 import jakarta.validation.ConstraintViolationException;
 import jakarta.validation.Validator;
 import java.time.Clock;
@@ -39,6 +41,8 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class PuenteService {
 
+  public static final double DISTANCIA_MINIMA_SUPERPUESTO_METROS = 1.0;
+
   private static final GeometryFactory GEOMETRY_FACTORY =
       new GeometryFactory(new PrecisionModel(), 4326);
 
@@ -48,6 +52,7 @@ public class PuenteService {
   private final PuenteMapper mapper;
   private final Validator validator;
   private final Clock clock;
+  private final PlanMantenimientoService planesMantenimiento;
 
   public PuenteService(
       DepartamentoRepository departamentos,
@@ -55,13 +60,15 @@ public class PuenteService {
       PuenteRepository puentes,
       PuenteMapper mapper,
       Validator validator,
-      Clock clock) {
+      Clock clock,
+      PlanMantenimientoService planesMantenimiento) {
     this.departamentos = departamentos;
     this.municipios = municipios;
     this.puentes = puentes;
     this.mapper = mapper;
     this.validator = validator;
     this.clock = clock;
+    this.planesMantenimiento = planesMantenimiento;
   }
 
   @Transactional
@@ -101,6 +108,7 @@ public class PuenteService {
     validarUbicacionEnMunicipio(municipio.getId(), latitud, longitud);
 
     var cercanos = puentes.findCercanos(latitud, longitud, PageRequest.of(0, 100));
+    validarNoSuperpuesto(cercanos);
     if (cercanos.hasContent() && !request.confirmarCercania()) {
       throw new CercaniaPuenteException(cercanos.map(mapper::toPuenteCercanoResponse));
     }
@@ -141,6 +149,7 @@ public class PuenteService {
             ahora);
 
     Puente guardado = puentes.saveAndFlush(puente);
+    planesMantenimiento.crearPorDefecto(guardado, administradorId);
     return mapper.toAltaResponse(guardado, utm);
   }
 
@@ -225,6 +234,7 @@ public class PuenteService {
 
     var cercanos =
         puentes.findCercanosExcluyendoPuente(latitud, longitud, id, PageRequest.of(0, 100));
+    validarNoSuperpuesto(cercanos);
     if (cercanos.hasContent() && !request.confirmarCercania()) {
       throw new CercaniaPuenteException(cercanos.map(mapper::toPuenteCercanoResponse));
     }
@@ -308,6 +318,7 @@ public class PuenteService {
     Instant ahora = clock.instant();
     puente.reactivar(ahora);
     Puente guardado = puentes.saveAndFlush(puente);
+    planesMantenimiento.crearPorDefecto(guardado, administradorId);
 
     var utm =
         mapper.toCoordenadaUtmResponse(
@@ -398,6 +409,32 @@ public class PuenteService {
                 : puentes.findCatalogoPorEstadoConBusqueda(
                     departamentoId, activo, estado, busquedaLimpia, pageable);
     return resultado.map(mapper::toCatalogoResponse);
+  }
+
+  void validarNoSuperpuesto(Page<PuenteCercanoProjection> cercanos) {
+    if (cercanos == null || !cercanos.hasContent()) {
+      return;
+    }
+    cercanos.getContent().stream()
+        .filter(
+            c ->
+                c.getDistanciaMetros() != null
+                    && c.getDistanciaMetros() < DISTANCIA_MINIMA_SUPERPUESTO_METROS)
+        .findFirst()
+        .ifPresent(
+            c -> {
+              String estado = c.getActivo() ? "activo" : "inactivo";
+              throw new ApiException(
+                  HttpStatus.CONFLICT,
+                  "puente_superpuesto",
+                  "Ubicacion ocupada",
+                  String.format(
+                      Locale.ROOT,
+                      "Ya existe un puente %s registrado en esta misma ubicacion (%s — %s). No se puede posicionar un puente sobre otro.",
+                      estado,
+                      c.getCodigo(),
+                      c.getNombre()));
+            });
   }
 
   private ApiException validacion(String codigo, String detalle) {

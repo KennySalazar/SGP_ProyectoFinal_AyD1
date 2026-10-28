@@ -105,6 +105,15 @@ public class PerfilUsuarioService {
       if (causa.getMessage() != null && causa.getMessage().contains(INDICE_UNICO)) {
         throw nombreUsuarioEnUso();
       }
+      if (causa.getMessage() != null
+          && (causa.getMessage().toLowerCase(Locale.ROOT).contains("email")
+              || causa.getMessage().contains("usuario_email_key"))) {
+        throw new ApiException(
+            HttpStatus.CONFLICT,
+            "email_already_registered",
+            "Correo ya registrado",
+            "El correo electrónico ya está registrado");
+      }
       throw e;
     }
   }

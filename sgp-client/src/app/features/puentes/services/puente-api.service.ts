@@ -59,11 +59,11 @@ export class PuenteApiService {
 
   /** Puentes activos con coordenadas, para mostrarlos en el mapa de los formularios. */
   listarPuntosMapa(): Observable<PuntoMapa[]> {
-    return this.listarCatalogo({ pagina: 0, tamanio: 100 }).pipe(
+    return this.listarCatalogo({ pagina: 0, tamanio: 100, todos: true }).pipe(
       switchMap((primera) => {
         const ultima = Math.min(primera.totalPages, MAX_PAGINAS_MAPA);
         const restantes = Array.from({ length: Math.max(ultima - 1, 0) }, (_, i) =>
-          this.listarCatalogo({ pagina: i + 1, tamanio: 100 }),
+          this.listarCatalogo({ pagina: i + 1, tamanio: 100, todos: true }),
         );
 
         return (restantes.length > 0 ? forkJoin(restantes) : of([])).pipe(
@@ -79,6 +79,7 @@ export class PuenteApiService {
             titulo: `${puente.codigo} — ${puente.nombre}`,
             latitud: puente.latitud as number,
             longitud: puente.longitud as number,
+            inactivo: !puente.activo,
           })),
       ),
     );

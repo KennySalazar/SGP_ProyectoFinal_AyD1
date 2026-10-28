@@ -121,6 +121,29 @@
     "guardar": "Guardar regla",
     "crearRevision": "Crear nueva revisión",
     "confirmarValidacion": "Marcar como validada",
+    "plan": {
+      "kicker": "Plan rutinario",
+      "titulo": "Plan de mantenimiento rutinario",
+      "listado": "Planes rutinarios por puente",
+      "periodicidad": "Periodicidad",
+      "meses": "meses",
+      "maximoAnual": "La periodicidad debe estar entre 1 y 12 meses.",
+      "proximoCiclo": "Próximo ciclo",
+      "puenteInactivo": "Puente inactivo; no se generan ciclos",
+      "actividades": "Actividades",
+      "actividadesAyuda": "Escriba una actividad por línea.",
+      "sinActividades": "No se han definido actividades para este plan.",
+      "editar": "Editar plan",
+      "guardar": "Guardar plan",
+      "guardando": "Guardando...",
+      "guardado": "El plan se actualizó.",
+      "cargando": "Cargando el plan...",
+      "error": "No fue posible cargar o guardar el plan.",
+      "errorListado": "No fue posible cargar los planes rutinarios.",
+      "reintentar": "Reintentar",
+      "ver": "Ver plan",
+      "sinPlanes": "Todavía no hay planes rutinarios registrados."
+    },
     "ordenes": {
       "titulo": "Órdenes de mantenimiento",
       "descripcion": "Programa, ejecuta y cierra las intervenciones de los puentes dejando constancia verificable de lo realizado.",
@@ -227,6 +250,9 @@
       "vacioFiltros": "Ninguna orden cumple todos los filtros seleccionados.",
       "provisional": "Provisional",
       "prioridadConfirmada": "Prioridad confirmada",
+      "editarPrioridad": "Cambiar prioridad",
+      "prioridadEditTexto": "La prioridad sugerida se conserva. Indique la prioridad confirmada y el motivo del cambio.",
+      "prioridadGuardando": "Guardando...",
       "puente": "Puente",
       "inspeccionOrigen": "Inspección de origen",
       "verInspeccion": "Ver inspección publicada",
@@ -240,7 +266,15 @@
         "operador": "Operador",
         "umbral": "Umbral",
         "valorEncontrado": "Valor encontrado",
-        "instanciaElementoId": "Instancia del elemento"
+        "instanciaElementoId": "Instancia del elemento",
+        "prioridadBase": "Prioridad base de la regla",
+        "prioridadSugerida": "Prioridad sugerida por HU-067",
+        "indiceCondicion": "Índice de Condición (IC)",
+        "pesoElemento": "Peso del elemento",
+        "pesoMaximoVersion": "Peso máximo de la versión",
+        "pesoRelativo": "Peso relativo",
+        "formulaPrioridad": "Fórmula",
+        "motivoFallbackPrioridad": "Motivo para conservar la prioridad base"
       },
       "pestanas": {
         "propuestas": "Propuestas",
@@ -434,6 +468,8 @@
     "descripcion": "Tu nombre de usuario es lo que ven los demás en el foro. Tu nombre completo solo lo ven las personas con sesión.",
     "datosCuenta": "Datos de la cuenta",
     "rol": "Rol",
+    "emailPlaceholder": "correo@ejemplo.com",
+    "reglaEmail": "Ingresa una dirección de correo electrónico válida.",
     "guardar": "Guardar perfil",
     "guardando": "Guardando...",
     "guardado": "Tu perfil se actualizó.",
@@ -461,15 +497,15 @@
   "common": {
     "email": "Correo electronico",
     "emailShort": "Correo",
-    "password": "Contrasena",
+    "password": "Contraseña",
     "showPassword": "Mostrar contraseña",
     "hidePassword": "Ocultar contraseña",
-    "currentPassword": "Contrasena actual",
-    "newPassword": "Nueva contrasena",
+    "currentPassword": "Contraseña actual",
+    "newPassword": "Nueva contraseña",
     "otpCode": "Codigo OTP",
     "emailPlaceholder": "nombre@correo.com",
-    "passwordPlaceholder": "Ingresa tu contrasena",
-    "confirmPasswordPlaceholder": "Confirma tu contrasena",
+    "passwordPlaceholder": "Ingresa tu contraseña",
+    "confirmPasswordPlaceholder": "Confirma tu contraseña",
     "minPasswordPlaceholder": "Minimo 10 caracteres",
     "continue": "Continuar",
     "pending": "Pendiente",
@@ -488,7 +524,7 @@
     "login": {
       "title": "Iniciar sesion",
       "subtitle": "Accede con tu cuenta del Sistema de Gestion de Puentes.",
-      "forgot": "Olvide mi contrasena"
+      "forgot": "Olvide mi contraseña"
     },
     "register": {
       "title": "Crear cuenta",
@@ -509,18 +545,18 @@
       "note": "Usa el codigo mas reciente recibido en tu correo."
     },
     "recovery": {
-      "title": "Recuperar contrasena",
+      "title": "Recuperar contraseña",
       "subtitle": "Solicita un codigo temporal para restablecer tu acceso.",
       "send": "Enviar codigo",
       "sent": "Si el correo esta registrado, recibira un codigo de recuperacion.",
-      "haveCode": "Ya tengo el codigo",
+      "sending": "Enviando...",
       "back": "Volver al inicio de sesion"
     },
     "reset": {
-      "title": "Restablecer contrasena",
-      "subtitle": "Usa el codigo OTP de recuperacion para establecer una nueva contrasena.",
-      "success": "Contrasena restablecida correctamente.",
-      "action": "Restablecer contrasena"
+      "title": "Restablecer contraseña",
+      "subtitle": "Usa el codigo OTP de recuperacion para establecer una nueva contraseña.",
+      "success": "Contraseña restablecida correctamente.",
+      "action": "Restablecer contraseña"
     },
     "activation": {
       "title": "Activar cuenta",
@@ -653,7 +689,50 @@
       "resolveErrors": "Resuelva los errores de sincronización antes de confirmar.",
       "prepareFirst": "Prepare el formulario antes de iniciar sin conexión.",
       "versionMismatch": "La versión confirmada difiere del formulario capturado. Conserva la copia local y revisa la preparación.",
-      "unknownOperation": "Esta operación no se reconoce. Conserva los datos y solicita revisión."
+      "unknownOperation": "Esta operación no se reconoce. Conserva los datos y solicita revisión.",
+      "DESCONOCIDA": "Operación pendiente de revisión"
+    },
+    "almacenamiento": {
+      "noPersistente": "El navegador no concedió almacenamiento persistente. Los datos siguen guardados, pero podrían ser desalojados por el navegador. Sincronice cuando tenga conexión.",
+      "pocoEspacio": "Queda poco espacio en este dispositivo. Sincronice y libere únicamente datos confirmados.",
+      "origen": "El espacio del navegador corresponde a este sitio completo y puede incluir datos de otras sesiones. No representa el tamaño de sus fotografías.",
+      "disponible": "Espacio disponible estimado",
+      "solicitar": "Solicitar almacenamiento persistente",
+      "actualizar": "Actualizar medición",
+      "errorMedicion": "No se pudo consultar el espacio. Los datos guardados se conservan."
+    },
+    "diagnostico": {
+      "bytesFotos": "Espacio de sus fotografías pendientes",
+      "identificador": "Identificador del elemento",
+      "intentos": "Intentos de sincronización",
+      "sinIntentos": "Todavía no se ha intentado",
+      "agotado": "Se agotaron cinco intentos. Se conservan los datos; revise la conexión antes de reintentar.",
+      "esperaReintento": "El último intento no se confirmó. Se conservan los datos para reintentar.",
+      "sinCola": "Hay datos locales sin operación de sincronización. Abra el borrador para revisarlos; no se eliminarán automáticamente.",
+      "rechazada": "La acción final fue rechazada. Abra el borrador, corrija los datos y confirme nuevamente.",
+      "errorAccion": "No se pudo completar la acción. Sus datos pendientes se conservan.",
+      "limpiezaSegura": "Liberar espacio conserva inspecciones editadas, fotografías pendientes y operaciones sin confirmar.",
+      "desconocido": "No disponible",
+      "conflictos": "Historial de conflictos de sincronización",
+      "conflictosNota": "Incluye conflictos resueltos automáticamente, aunque ya no estén en la cola. La copia técnica es de solo lectura; se omiten identificación, ubicación y texto libre.",
+      "consultar": "Actualizar conflictos",
+      "conflictosConexion": "Se requiere conexión para consultar el historial del servidor.",
+      "cargando": "Consultando conflictos…",
+      "errorConflictos": "No se pudo consultar todo el historial. Revise la sesión y la conexión y vuelva a intentarlo.",
+      "versiones": "Versión del cliente → versión del servidor al detectar el conflicto",
+      "clientePrevalece": "Resuelto automáticamente: prevalecieron los cambios del cliente.",
+      "copiaServidor": "Consultar copia técnica anterior del servidor (solo lectura)",
+      "sinConflictos": "No se encontraron conflictos en sus inspecciones.",
+      "errores": {
+        "general": "La operación fue rechazada o requiere revisión. Abra el borrador y compruebe sus datos antes de reintentar.",
+        "conflicto": "Se detectó un conflicto de versiones. Revise el borrador y el historial.",
+        "version": "La versión del formulario no coincide. Conserve los datos y consulte al responsable.",
+        "metadatos": "Revise la categoría, ubicación y fecha de la fotografía.",
+        "estado": "La inspección ya no admite esta operación. Los datos locales se conservan.",
+        "datos": "La fotografía u operación local está incompleta. Conserve los datos y consulte al responsable.",
+        "proceso": "El servidor sigue procesando la operación. Espere antes de reintentar."
+      },
+      "comprobando": "Comprobando datos locales…"
     }
   },
   "studentActivation": {
@@ -728,7 +807,7 @@
     "bandeja": {
       "kicker": "REVISIÓN ACADÉMICA",
       "title": "Bandeja de revisión",
-      "description": "Consulta y toma únicamente las inspecciones enviadas por estudiantes de tus cursos.",
+      "description": "Revisa las inspecciones enviadas por estudiantes de tus cursos, registra observaciones y emite una decision.",
       "viewSelector": "Vistas de la bandeja de revisión",
       "pendingTab": "Pendientes de revisión",
       "draftsTab": "Borradores en curso",
@@ -743,7 +822,7 @@
       "clear": "Limpiar",
       "apply": "Aplicar filtros",
       "listTitle": "Inspecciones por revisar",
-      "listNote": "Ordenadas desde la fecha de envío más antigua.",
+      "listNote": "Pulsa Revisar inspeccion para abrir el contenido enviado. Si ya comenzaste, pulsa Continuar revision. Ordenadas por fecha de envio.",
       "total": "ciclos",
       "draftsTotal": "borradores",
       "loading": "Cargando bandeja de revisión...",
@@ -753,8 +832,8 @@
       "sent": "Enviada:",
       "days": "días en espera",
       "delayed": "Más de 15 días en espera",
-      "start": "Iniciar revisión",
-      "resume": "Reanudar revisión",
+      "start": "Revisar inspeccion",
+      "resume": "Continuar revision",
       "starting": "Abriendo...",
       "started": "La revisión quedó iniciada y la inspección pasó a En revisión.",
       "resumed": "La revisión ya estaba iniciada; puedes continuar con el mismo ciclo.",
@@ -827,10 +906,15 @@
       "ic": "Índice de condición calculado",
       "estado": "Confirmar o ajustar el estado del puente",
       "justificacion": "Justificación obligatoria si ajusta el estado calculado",
-      "emitir": "Emitir veredicto",
+      "emitir": "Confirmar y enviar veredicto",
       "historial": "Historial privado de revisiones",
       "confirmar": "Confirmar veredicto",
-      "confirmarTexto": "El veredicto cerrará este ciclo. Una aprobación publica la inspección y un rechazo es terminal. Revise su decisión y calificación antes de confirmar."
+      "confirmarTexto": "El veredicto cerrará este ciclo. Una aprobación publica la inspección y un rechazo es terminal. Revise su decisión y calificación antes de confirmar.",
+      "tituloRevisor": "Calificacion y veredicto de la inspeccion",
+      "abrirRevisor": "Abrir calificacion y veredicto",
+      "ayudaRevisor": "Aqui puedes ingresar la nota y elegir aprobar, solicitar cambios o rechazar. Abrir este panel no envia ninguna decision.",
+      "preparar": "Revisar y confirmar decision",
+      "cerrar": "Cerrar panel"
     },
     "atencion": {
       "atender": "Atender cambios",
@@ -886,7 +970,8 @@
       "rejectedNote": "Se notificó el motivo al Catedrático y no se creó ningún puente.",
       "decisionFailed": "No se pudo registrar la decisión. Inténtalo de nuevo.",
       "proximityOnlyInactiveNote": "Solo hay puentes inactivos a menos de 100 metros de esta solicitud. Si es el mismo puente, reactívalo desde el catálogo en lugar de aprobarla; si es otro (por ejemplo, uno reconstruido), puedes aprobarla.",
-      "proximityInactiveNote": "Entre los resultados hay puentes inactivos. Si alguno es el mismo puente, reactívalo desde el catálogo en lugar de aprobar esta solicitud."
+      "proximityInactiveNote": "Entre los resultados hay puentes inactivos. Si alguno es el mismo puente, reactívalo desde el catálogo en lugar de aprobar esta solicitud.",
+      "overlappingBlocked": "Existe un puente registrado en esta misma ubicación. No se puede aprobar la solicitud sobre otro puente."
     },
     "solicitud": {
       "title": "Solicitar alta de puente",
@@ -1037,6 +1122,9 @@
     "proximityNote": "Se encontraron puentes a menos de 100 metros. Revisa los resultados y confirma si deseas registrar este puente.",
     "proximityTotal": "Puentes encontrados: {{total}}",
     "proximityLimit": "Se muestran los primeros {{cantidad}} resultados.",
+    "proximityOverlappingNote": "Existe al menos un puente en esta misma ubicación (distancia menor a 1 metro). No está permitido posicionar un puente sobre otro.",
+    "overlappingLocation": "Ya existe un puente registrado en esta misma ubicación ({{codigo}}). No se puede posicionar un puente sobre otro.",
+    "overlapping": "Superpuesto",
     "confirm": "Confirmar y registrar",
     "cancelConfirmation": "Volver al formulario",
     "distance": "Distancia",
@@ -1228,7 +1316,10 @@
       "finalize": "Finalizar",
       "edit": "Editar curso",
       "save": "Guardar cambios",
-      "cancel": "Cancelar edición"
+      "cancel": "Cancelar edición",
+      "selectPeriod": "Selecciona el periodo",
+      "periodDates": "Las fechas se calculan segun el periodo y el año indicado: enero a junio o julio a diciembre.",
+      "legacyPeriod": "Este curso tiene un periodo anterior no estandar. Selecciona Periodo 1 o Periodo 2 antes de guardar."
     }
   },
   "invitaciones": {
@@ -1401,7 +1492,7 @@
     "inactive": "Inactiva",
     "algorithm": "Algoritmo IC",
     "baseVersion": "Versión base (opcional)",
-    "noBase": "Ninguna (desde cero)",
+    "noBase": "Plantilla canónica SIECA (sin copiar otra versión)",
     "created": "Fecha creación",
     "published": "Fecha publicación",
     "actions": "Acciones",
@@ -1772,7 +1863,7 @@
       },
       "pendientes": "Complete y guarde las reglas de calculo del IC antes de publicar esta version."
     },
-    "crearSinBaseNota": "Si no selecciona una version base, se cargara la plantilla inicial SIECA. Configure y calibre sus reglas antes de publicarla.",
+    "crearSinBaseNota": "Esta opción carga el esquema canónico SIECA. Si elige una versión base, se copian su esquema, vínculos y reglas; no la use para corregir una versión con esquema inconsistente. Configure y calibre las reglas antes de publicar.",
     "hu050": {
       "provisional": "Calibracion provisional · sin aprobar",
       "nota": "Los valores son provisionales. Las notas pendientes de RN-IC-05a y RN-IC-05c se conservan y no impiden publicar esta plantilla.",
@@ -1892,8 +1983,9 @@
       "gpsObtenido": "Lat: {{lat}}, Long: {{lng}} (±{{acc}} m)",
       "gpsNoDisponible": "GPS no disponible o no permitido (se registrará sin ubicación)",
       "fechaInspeccion": "Fecha de inspección",
-      "nombreInspector": "Inspector responsable",
-      "nombreInspectorPlaceholder": "Nombre o firma del inspector",
+      "visitaTitulo": "Datos de la visita",
+      "nombreAcompanante": "Nombre del acompañante",
+      "colegiadoAcompanante": "No. de colegiado",
       "datosPermanentesTitulo": "Datos técnicos permanentes del puente",
       "cargandoPermanentes": "Consultando datos de la última inspección publicada...",
       "permanentesEncontrados": "Se encontraron datos permanentes registrados en la última inspección publicada:",
@@ -1953,18 +2045,25 @@
         "panel": "No se pudo abrir el panel de fotografías. Revise la conexión y vuelva a intentarlo.",
         "anclaje": "El elemento o su instancia ya no están disponibles en esta inspección. Conserve el pendiente y consulte al responsable.",
         "limite": "La inspección admite como máximo 60 fotografías confirmadas. Retire alguna de un borrador propio antes de adjuntar otra. Los pendientes se conservan para reintentar.",
-        "retirada": "No se pudo retirar la fotografía. La galería conserva su estado; compruebe la conexión y vuelva a intentarlo."
+        "retirada": "No se pudo retirar la fotografía. La galería conserva su estado; compruebe la conexión y vuelva a intentarlo.",
+        "compresion": "No se pudo obtener una fotografía válida de hasta 400 KB. Intente otra captura con menos detalle. No se guardó la imagen.",
+        "procesamientoNoDisponible": "Este navegador no permite procesar fotografías en segundo plano. Use un navegador compatible actualizado.",
+        "espacioInsuficiente": "No queda suficiente espacio para guardar la fotografía. Los datos anteriores se conservan. Sincronice o libere datos confirmados.",
+        "envioIncierto": "La fotografía ya inició un envío. Confirme su sincronización antes de retirarla para evitar perder datos."
       },
       "continuar": "Continuar fotografías pendientes",
       "continuarNota": "Hay fotografías pendientes de una inspección de este puente guardadas para su usuario en este dispositivo.",
       "soloLectura": "Solo puede consultar las fotografías de esta inspección.",
-      "contador": "Fotografías confirmadas: {{cantidad}} de {{maximo}}.",
-      "faltantes": "Falta al menos una fotografía confirmada en cada una de estas categorías:",
+      "contador": "Fotografías registradas: {{cantidad}} de {{maximo}}.",
+      "faltantes": "Falta al menos una fotografía en cada una de estas categorías:",
       "retirar": "Retirar fotografía",
       "retirada": "Fotografía retirada. La galería y los contadores se actualizaron.",
       "pendientesLocales": "Pendientes en este dispositivo",
       "confirmadasServidor": "Confirmadas por el servidor",
-      "confirmarRetirada": "¿Retirar esta fotografía de la inspección? Dejará de estar disponible y de contar como evidencia. Esta acción no se puede deshacer desde la galería."
+      "confirmarRetirada": "¿Retirar esta fotografía de la inspección? Dejará de estar disponible y de contar como evidencia. Esta acción no se puede deshacer desde la galería.",
+      "eliminarLocal": "Eliminar fotografía local",
+      "confirmarEliminarLocal": "¿Eliminar esta fotografía del dispositivo y cancelar su carga pendiente? Esta acción no se puede deshacer. Los envíos ya iniciados deben confirmarse antes de eliminar.",
+      "compresionNota": "Las imágenes se procesan en segundo plano, con un lado mayor de hasta 1600 píxeles y un objetivo de 200–400 KB. Una imagen sencilla puede ocupar menos espacio sin perder calidad."
     },
     "borrador": {
       "kicker": "INSPECCIÓN TÉCNICA · BORRADOR",
@@ -1985,6 +2084,9 @@
       "formulario": "Versión del formulario",
       "ultimaActividad": "Última actividad",
       "soloLectura": "Estás consultando el borrador de tu estudiante en modo de solo lectura.",
+      "valoresInicialesIncompatibles": "Al cargar el borrador se encontraron valores con un tipo incompatible con el esquema. La interfaz los descartó al construir los controles; revisa estas rutas y sus valores originales, vuelve a ingresar lo que corresponda y confirma la revisión antes de publicar:",
+      "confirmarRevisionInicial": "Ya revisé los valores originales y corregí lo necesario",
+      "revisionInicialConfirmada": "Revisión confirmada. Antes de publicar se guardarán los valores actuales del formulario.",
       "progresoTitulo": "Progreso general de la inspección",
       "progresoResumen": "{{completados}} de {{total}} campos obligatorios completados ({{porcentaje}}%)",
       "seccionesTitulo": "Progreso por sección (8 secciones)",
@@ -2127,6 +2229,27 @@
         "general": "No fue posible completar la operación con el documento. Intenta nuevamente.",
         "carga": "No fue posible cargar los documentos de la inspección."
       }
+    },
+    "recalculo": {
+      "titulo": "Comparacion del IC",
+      "ayuda": "Recalcule con la configuracion vigente. El IC original y el estado vigente del puente se conservan. Las fechas se muestran en hora de Guatemala.",
+      "accion": "Recalcular con configuracion vigente",
+      "procesando": "Recalculando...",
+      "cargando": "Cargando resultados del IC...",
+      "reintentar": "Reintentar consulta",
+      "creado": "Resultado disponible para comparar. Se conserva la fecha y el solicitante registrados.",
+      "existente": "Este recalculo ya estaba registrado. Se conserva su fecha y solicitante originales.",
+      "comparacion": "IC original y recalculos registrados",
+      "resultado": "Resultado",
+      "version": "Version de configuracion",
+      "calculado": "Estado calculado",
+      "confirmado": "Estado confirmado al publicar",
+      "fecha": "Fecha de calculo",
+      "solicitante": "Solicitado por",
+      "original": "IC original",
+      "recalculado": "Recalculo del IC",
+      "noAplica": "No aplica",
+      "vacio": "Todavia no hay recalculos registrados."
     }
   }
 }

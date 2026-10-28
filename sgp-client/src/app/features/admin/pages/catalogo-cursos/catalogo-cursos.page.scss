@@ -14,6 +14,7 @@ form {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 1rem;
+  align-items: start;
   margin-top: 1rem;
 }
 label {
@@ -70,4 +71,31 @@ th small {
   form {
     grid-template-columns: 1fr;
   }
+}
+
+.field {
+  display: grid;
+  gap: 0.45rem;
+  align-content: start;
+  min-width: 0;
+}
+.field > p-select {
+  width: 100%;
+}
+.periodo-ayuda {
+  display: block;
+  color: var(--sgp-steel-700);
+  font-size: 0.8rem;
+  line-height: 1.5;
+}
+input[readonly] {
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+  color: #475569;
+  box-shadow: none;
+  cursor: not-allowed;
+  opacity: 1;
+}
+input[readonly]::-webkit-calendar-picker-indicator {
+  display: none;
 }

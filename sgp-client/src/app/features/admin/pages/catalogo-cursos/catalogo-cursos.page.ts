@@ -1,4 +1,12 @@
-import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  DestroyRef,
+  inject,
+  signal,
+} from '@angular/core';
 import { ReactiveFormsModule, Validators } from '@angular/forms';
 import { FormBuilder } from '@angular/forms';
 import { TranslocoPipe } from '@jsverse/transloco';
@@ -28,9 +36,36 @@ import { CursoApiService } from '../../services/curso-api.service';
 })
 export class CatalogoCursosPage {
   private readonly fb = inject(FormBuilder);
+  private readonly destroyRef = inject(DestroyRef);
   private readonly api = inject(CursoApiService);
   private readonly apiErrors = inject(ApiErrorService);
 
+  readonly anioActual = Number(
+    new Intl.DateTimeFormat('en', { year: 'numeric', timeZone: 'America/Guatemala' }).format(
+      new Date(),
+    ),
+  );
+  readonly periodos = computed(() => {
+    const curso = this.cursoEnEdicion();
+    const anio =
+      curso?.periodo.match(/^(\d{4})-/)?.[1] ??
+      curso?.fechaInicio.match(/^(\d{4})-/)?.[1] ??
+      String(this.anioActual);
+    return [
+      {
+        etiqueta: `Periodo 1 (${anio})`,
+        valor: `${anio}-1`,
+        inicio: `${anio}-01-01`,
+        fin: `${anio}-06-30`,
+      },
+      {
+        etiqueta: `Periodo 2 (${anio})`,
+        valor: `${anio}-2`,
+        inicio: `${anio}-07-01`,
+        fin: `${anio}-12-31`,
+      },
+    ];
+  });
   readonly cursos = signal<CursoResponse[]>([]);
   readonly catedraticos = signal<CatedraticoResponse[]>([]);
   readonly cargando = signal(false);
@@ -48,7 +83,20 @@ export class CatalogoCursosPage {
   });
 
   constructor() {
+    this.form.controls.periodo.valueChanges
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe((valor) => {
+        this.aplicarPeriodo(valor);
+      });
     this.cargar();
+  }
+
+  private aplicarPeriodo(valor: string): void {
+    const periodo = this.periodos().find((item) => item.valor === valor);
+    this.form.patchValue(
+      { fechaInicio: periodo?.inicio ?? '', fechaFin: periodo?.fin ?? '' },
+      { emitEvent: false },
+    );
   }
 
   cargar(): void {
@@ -66,6 +114,12 @@ export class CatalogoCursosPage {
 
   guardar(): void {
     this.form.markAllAsTouched();
+    const periodo = this.form.controls.periodo.value;
+    if (!this.periodos().some((item) => item.valor === periodo)) {
+      this.form.controls.periodo.setErrors({ periodoInvalido: true });
+      return;
+    }
+    this.aplicarPeriodo(periodo);
     if (this.guardando() || this.form.invalid) return;
     const values = this.form.getRawValue();
     if (values.fechaFin < values.fechaInicio) {
@@ -102,13 +156,20 @@ export class CatalogoCursosPage {
   editar(curso: CursoResponse): void {
     this.cursoEnEdicion.set(curso);
     this.exito.set(null);
-    this.form.setValue({
-      nombre: curso.nombre,
-      periodo: curso.periodo,
-      catedraticoId: curso.catedratico.id,
-      fechaInicio: curso.fechaInicio,
-      fechaFin: curso.fechaFin,
-    });
+    const periodo = this.periodos().some((item) => item.valor === curso.periodo)
+      ? curso.periodo
+      : '';
+    this.form.setValue(
+      {
+        nombre: curso.nombre,
+        periodo,
+        catedraticoId: curso.catedratico.id,
+        fechaInicio: '',
+        fechaFin: '',
+      },
+      { emitEvent: false },
+    );
+    this.aplicarPeriodo(periodo);
   }
 
   cancelarEdicion(): void {

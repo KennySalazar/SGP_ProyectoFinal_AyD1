@@ -173,6 +173,16 @@ describe('RevisarSolicitudPage: HU011', () => {
     peticion.flush(solicitud({ estado: 'APROBADA', puenteCreadoCodigo: 'GT-01-0114-0002' }));
   });
 
+  it('bloquea la aprobacion cuando hay un puente superpuesto (< 1m)', () => {
+    const superpuesto = { ...cercano, distanciaMetros: 0.0 };
+    cargar(detalle({}, [superpuesto]));
+
+    expect(page.haySuperpuesto()).toBe(true);
+    expect(fixture.nativeElement.textContent).toContain('puentes.revision.overlappingBlocked');
+    const botonAprobar = boton('puentes.revision.approveAnyway');
+    expect(botonAprobar?.disabled).toBe(true);
+  });
+
   it('si aparecen puentes cercanos mientras se revisa, muestra el error y recarga el detalle', () => {
     cargar(detalle());
 

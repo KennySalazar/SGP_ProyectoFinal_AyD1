@@ -19,4 +19,14 @@ public record AceptarInvitacionRequest(
         String nombreCompleto,
     @NotBlank(message = "El nombre de usuario es obligatorio")
         @Pattern(regexp = ReglasPerfil.PATRON_USUARIO, message = ReglasPerfil.MENSAJE_USUARIO)
-        String nombreUsuario) {}
+        String nombreUsuario) {
+
+  @Override
+  public String toString() {
+    return "AceptarInvitacionRequest[token=[PROTEGIDO], password=[PROTEGIDO], nombreCompleto="
+        + nombreCompleto
+        + ", nombreUsuario="
+        + nombreUsuario
+        + "]";
+  }
+}

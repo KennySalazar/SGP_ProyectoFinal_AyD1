@@ -2,6 +2,7 @@ package gt.usac.cunoc.sgp.usuario.controller;
 
 import gt.usac.cunoc.sgp.common.config.JwtProperties;
 import gt.usac.cunoc.sgp.common.config.RefreshCookieProperties;
+import gt.usac.cunoc.sgp.common.util.EmailNormalizer;
 import gt.usac.cunoc.sgp.usuario.dto.AccessTokenResponse;
 import gt.usac.cunoc.sgp.usuario.dto.ActualizarPerfilRequest;
 import gt.usac.cunoc.sgp.usuario.dto.ChallengeResponse;
@@ -23,6 +24,8 @@ import gt.usac.cunoc.sgp.usuario.service.AuthService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import jakarta.validation.Valid;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseCookie;
@@ -40,6 +43,8 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/v1/auth")
 public class AuthController {
+
+  private static final Logger log = LoggerFactory.getLogger(AuthController.class);
 
   private final AuthService authService;
   private final RefreshCookieProperties cookieProperties;
@@ -72,6 +77,8 @@ public class AuthController {
 
   @PostMapping("/login")
   public ResponseEntity<LoginResponse> login(@Valid @RequestBody LoginRequest request) {
+    log.info(
+        "Intento de inicio de sesion para usuario: {}", EmailNormalizer.normalize(request.email()));
     var result = authService.login(request);
     return withRefreshCookie(result.response(), result.refreshToken());
   }
@@ -167,9 +174,10 @@ public class AuthController {
   @Operation(
       summary = "Actualizar el perfil de la cuenta",
       description =
-          "Cualquier rol. Nombre completo (2 a 200 caracteres) y nombre de usuario (3 a 30 "
-              + "caracteres, único sin distinguir mayúsculas; se guarda en minúsculas). 409 si el "
-              + "nombre de usuario ya está en uso y 422 si es inválido o está reservado.")
+          "Cualquier rol. Nombre completo (2 a 200 caracteres), nombre de usuario (3 a 30 "
+              + "caracteres, único sin distinguir mayúsculas; se guarda en minúsculas) y correo "
+              + "electrónico. 409 si el correo o nombre de usuario ya están en uso y 422 si son "
+              + "inválidos o el nombre de usuario está reservado.")
   public UserResponse actualizarPerfil(
       Authentication authentication, @Valid @RequestBody ActualizarPerfilRequest request) {
     return authService.actualizarPerfil(authentication.getName(), request);

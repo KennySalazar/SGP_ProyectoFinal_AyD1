@@ -1,11 +1,35 @@
 <section class="surface-card seguimiento">
-  <h2>{{ 'revision.resultado.titulo' | transloco }}</h2>
+  <h2>
+    {{
+      (esCatedratico() ? 'revision.resultado.tituloRevisor' : 'revision.resultado.titulo')
+        | transloco
+    }}
+  </h2>
   <p class="privado">{{ 'revision.resultado.privado' | transloco }}</p>
+  @if (esCatedratico()) {
+    <p>{{ 'revision.resultado.ayudaRevisor' | transloco }}</p>
+  }
   @if (!abierto()) {
     <button pButton type="button" (click)="abrir()">
-      {{ 'revision.resultado.abrir' | transloco }}
+      {{
+        (esCatedratico() ? 'revision.resultado.abrirRevisor' : 'revision.resultado.abrir')
+          | transloco
+      }}
     </button>
   } @else {
+    <div class="acciones">
+      <button
+        pButton
+        type="button"
+        severity="secondary"
+        [outlined]="true"
+        [disabled]="ocupado()"
+        (click)="cerrar()"
+      >
+        <i class="pi pi-times" aria-hidden="true"></i>
+        {{ 'revision.resultado.cerrar' | transloco }}
+      </button>
+    </div>
     @if (ocupado()) {
       <p role="status">{{ 'revision.resultado.procesando' | transloco }}</p>
     }
@@ -100,7 +124,7 @@
             }
           }
           <button pButton type="submit" [disabled]="!valido()">
-            {{ 'revision.resultado.emitir' | transloco }}
+            {{ 'revision.resultado.preparar' | transloco }}
           </button>
         </form>
       }

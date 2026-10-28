@@ -20,4 +20,16 @@ public record RegisterRequest(
         String nombreCompleto,
     @NotBlank(message = "El nombre de usuario es obligatorio")
         @Pattern(regexp = ReglasPerfil.PATRON_USUARIO, message = ReglasPerfil.MENSAJE_USUARIO)
-        String nombreUsuario) {}
+        String nombreUsuario) {
+
+  @Override
+  public String toString() {
+    return "RegisterRequest[email="
+        + email
+        + ", password=[PROTEGIDO], nombreCompleto="
+        + nombreCompleto
+        + ", nombreUsuario="
+        + nombreUsuario
+        + "]";
+  }
+}

@@ -9,6 +9,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -144,6 +145,36 @@ class OrdenMantenimientoControllerSecurityTest {
     mockMvc
         .perform(post(BASE).contentType(MediaType.APPLICATION_JSON).content("{}"))
         .andExpect(status().isUnauthorized());
+    verifyNoInteractions(ordenes);
+  }
+
+  @ParameterizedTest
+  @EnumSource(
+      value = RoleName.class,
+      names = {"CATEDRATICO", "ADMINISTRADOR"})
+  void catedraticoYAdministradorPuedenCambiarPrioridad(RoleName rol) throws Exception {
+    mockMvc
+        .perform(
+            put(BASE + "/{id}/prioridad", ORDEN_ID)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"prioridad\":\"ALTA\",\"justificacion\":\"Motivo\"}")
+                .principal(autenticar(rol)))
+        .andExpect(status().isOk());
+    verify(ordenes).cambiarPrioridad(eq(ORDEN_ID), any(), eq(USUARIO_ID));
+  }
+
+  @ParameterizedTest
+  @EnumSource(
+      value = RoleName.class,
+      names = {"PROFESIONAL_EXTERNO", "ESTUDIANTE"})
+  void estudianteYProfesionalExternoNoCambianPrioridad(RoleName rol) throws Exception {
+    mockMvc
+        .perform(
+            put(BASE + "/{id}/prioridad", ORDEN_ID)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"prioridad\":\"ALTA\",\"justificacion\":\"Motivo\"}")
+                .principal(autenticar(rol)))
+        .andExpect(status().isForbidden());
     verifyNoInteractions(ordenes);
   }
 

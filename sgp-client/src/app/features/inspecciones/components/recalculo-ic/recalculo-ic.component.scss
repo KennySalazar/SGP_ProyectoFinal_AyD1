@@ -1,0 +1,36 @@
+.comparacion-ic {
+  padding: 1.5rem;
+  margin-block: 1rem;
+}
+.tabla-ic {
+  overflow-x: auto;
+  margin-top: 1rem;
+}
+table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+caption {
+  text-align: left;
+  margin-bottom: 0.75rem;
+  font-weight: 600;
+}
+th,
+td {
+  padding: 0.75rem;
+  border-bottom: 1px solid var(--p-content-border-color, #ddd);
+  vertical-align: top;
+}
+tr[data-tipo='PUBLICACION'] {
+  background: var(--p-surface-100, #f5f5f5);
+  color: var(--p-surface-900, #111);
+}
+@media print {
+  .no-print {
+    display: none;
+  }
+  .tabla-ic {
+    overflow: visible;
+  }
+}

@@ -13,6 +13,7 @@ import gt.usac.cunoc.sgp.inspeccion.model.ResultadoCalculoIc;
 import gt.usac.cunoc.sgp.inspeccion.service.CalculoIndiceCondicionService;
 import gt.usac.cunoc.sgp.inspeccion.service.PreparadorEntradaIcService;
 import gt.usac.cunoc.sgp.inspeccion.service.PublicacionIndiceCondicionService;
+import gt.usac.cunoc.sgp.mantenimiento.service.PlanMantenimientoService;
 import gt.usac.cunoc.sgp.puente.dto.ActualizarPuenteRequest;
 import gt.usac.cunoc.sgp.puente.mapper.PuenteMapper;
 import gt.usac.cunoc.sgp.puente.mapper.PuenteMapperImpl;
@@ -103,6 +104,8 @@ class PublicacionIndiceCondicionIntegrationTest {
   @Autowired private gt.usac.cunoc.sgp.puente.service.EstadoCalibracionPuenteService respaldo;
   @MockBean private CalculoIndiceCondicionService calculador;
 
+  @MockBean private PlanMantenimientoService planesMantenimiento;
+
   private UUID usuarioId;
   private UUID puenteId;
   private UUID versionId;
@@ -116,6 +119,23 @@ class PublicacionIndiceCondicionIntegrationTest {
     versionId = UUID.randomUUID();
     inspeccionId = UUID.randomUUID();
     transaccion = new TransactionTemplate(transactionManager);
+
+    jdbc.update(
+        """
+        UPDATE puente SET
+          estado_actual = 'Sin evaluar',
+          indice_condicion_actual = NULL,
+          fecha_ultima_inspeccion = NULL,
+          inspeccion_vigente_id = NULL,
+          resultado_ic_vigente_id = NULL,
+          inspeccion_vigente_publicada_en = NULL
+        """);
+    jdbc.update("DELETE FROM resultado_ic");
+    jdbc.update("DELETE FROM inspeccion");
+    jdbc.update("DELETE FROM auditoria");
+    jdbc.update("DELETE FROM aprobacion_calibracion_ic");
+    jdbc.update("DELETE FROM configuracion_ic_elemento");
+    jdbc.update("DELETE FROM puente");
 
     jdbc.update(
         """

@@ -17,6 +17,7 @@ import gt.usac.cunoc.sgp.common.audit.model.AccionAuditoria;
 import gt.usac.cunoc.sgp.common.audit.service.AuditoriaWriter;
 import gt.usac.cunoc.sgp.common.exception.ApiException;
 import gt.usac.cunoc.sgp.inspeccion.repository.InspeccionRepository;
+import gt.usac.cunoc.sgp.mantenimiento.dto.CambiarPrioridadOrdenRequest;
 import gt.usac.cunoc.sgp.mantenimiento.dto.CrearOrdenMantenimientoRequest;
 import gt.usac.cunoc.sgp.mantenimiento.dto.FiltroOrdenesRequest;
 import gt.usac.cunoc.sgp.mantenimiento.dto.OrdenMantenimientoResponse;
@@ -409,6 +410,66 @@ class OrdenMantenimientoServiceTest {
         .extracting(h -> h.secuencia() + ":" + h.estadoNuevo())
         .containsExactly("1:PROPUESTA", "2:DESCARTADA");
     assertThat(service.obtener(ORDEN_ID).id()).isEqualTo(ORDEN_ID);
+  }
+
+  @Test
+  void cambiarPrioridadConservaLaSugeridaYAuditaActorMotivoYValores() {
+    OrdenMantenimiento orden = orden();
+    when(ordenes.findById(ORDEN_ID)).thenReturn(Optional.of(orden));
+
+    var response =
+        service.cambiarPrioridad(
+            ORDEN_ID,
+            new CambiarPrioridadOrdenRequest("ALTA", "Requiere atención inmediata"),
+            USUARIO_ID);
+
+    assertThat(response.prioridadSugerida()).isEqualTo(PrioridadOrden.BAJA);
+    assertThat(response.prioridadConfirmada()).isEqualTo(PrioridadOrden.ALTA);
+    assertThat(response.justificacionPrioridad()).isEqualTo("Requiere atención inmediata");
+    ArgumentCaptor<JsonNode> anterior = ArgumentCaptor.forClass(JsonNode.class);
+    ArgumentCaptor<JsonNode> posterior = ArgumentCaptor.forClass(JsonNode.class);
+    verify(auditoria)
+        .registrarEnTransaccion(
+            eq(USUARIO_ID),
+            eq(AccionAuditoria.MODIFICAR),
+            eq("orden_mantenimiento"),
+            eq(ORDEN_ID),
+            anterior.capture(),
+            posterior.capture(),
+            isNull());
+    assertThat(anterior.getValue().get("prioridadConfirmada").asText()).isEqualTo("BAJA");
+    assertThat(posterior.getValue().get("prioridadConfirmada").asText()).isEqualTo("ALTA");
+    assertThat(posterior.getValue().get("justificacionPrioridad").asText())
+        .isEqualTo("Requiere atención inmediata");
+  }
+
+  @Test
+  void cambiarPrioridadSinJustificacionResponde422() {
+    assertCodigo(
+        () ->
+            service.cambiarPrioridad(
+                ORDEN_ID, new CambiarPrioridadOrdenRequest("ALTA", " "), USUARIO_ID),
+        HttpStatus.UNPROCESSABLE_ENTITY,
+        "prioridad_invalida");
+    verifyNoInteractions(ordenes);
+  }
+
+  @ParameterizedTest
+  @EnumSource(
+      value = EstadoOrden.class,
+      names = {"EJECUTADA", "CANCELADA", "DESCARTADA"})
+  void cambiarPrioridadEnEstadoTerminalResponde409(EstadoOrden estado) {
+    OrdenMantenimiento orden = orden();
+    orden.aplicarTransicion(estado, AHORA);
+    when(ordenes.findById(ORDEN_ID)).thenReturn(Optional.of(orden));
+
+    assertCodigo(
+        () ->
+            service.cambiarPrioridad(
+                ORDEN_ID, new CambiarPrioridadOrdenRequest("ALTA", "Motivo"), USUARIO_ID),
+        HttpStatus.CONFLICT,
+        "orden_terminal");
+    verify(ordenes, never()).saveAndFlush(any());
   }
 
   private OrdenMantenimiento orden() {

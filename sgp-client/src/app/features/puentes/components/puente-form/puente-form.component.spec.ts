@@ -603,7 +603,14 @@ describe('PuenteFormComponent: formulario compartido de puentes', () => {
         .expectOne((req) => req.url === '/api/v1/puentes')
         .flush({
           content: [
-            { id: 'p1', codigo: 'GT-01-0101-0001', nombre: 'Uno', latitud: 14.6, longitud: -90.5 },
+            {
+              id: 'p1',
+              codigo: 'GT-01-0101-0001',
+              nombre: 'Uno',
+              latitud: 14.6,
+              longitud: -90.5,
+              activo: true,
+            },
           ],
           totalElements: 1,
           totalPages: 1,
@@ -616,7 +623,13 @@ describe('PuenteFormComponent: formulario compartido de puentes', () => {
       fixture.detectChanges();
 
       expect(selector().existentes()).toEqual([
-        { id: 'p1', titulo: 'GT-01-0101-0001 — Uno', latitud: 14.6, longitud: -90.5 },
+        {
+          id: 'p1',
+          titulo: 'GT-01-0101-0001 — Uno',
+          latitud: 14.6,
+          longitud: -90.5,
+          inactivo: false,
+        },
       ]);
     });
 
@@ -633,6 +646,52 @@ describe('PuenteFormComponent: formulario compartido de puentes', () => {
       formularioValido();
       component.enviarFormulario();
       expect(enviados).toHaveLength(1);
+    });
+
+    it('detecta puente superpuesto y no valida la ubicacion', () => {
+      fixture.componentRef.setInput('mostrarExistentes', true);
+      fixture.detectChanges();
+
+      http
+        .expectOne((req) => req.url === '/api/v1/puentes')
+        .flush({
+          content: [
+            {
+              id: 'p1',
+              codigo: 'GT-01-0101-0001',
+              nombre: 'Uno',
+              latitud: 14.481,
+              longitud: -90.615,
+              activo: true,
+            },
+          ],
+          totalElements: 1,
+          totalPages: 1,
+          number: 0,
+          size: 100,
+          first: true,
+          last: true,
+          empty: false,
+        });
+      fixture.detectChanges();
+
+      formularioValido();
+      expect(component.puenteSuperpuesto()).not.toBeNull();
+      expect(component.ubicacionValidada()).toBe(false);
+      component.enviarFormulario();
+      expect(enviados).toHaveLength(0);
+
+      fixture.componentRef.setInput('valoresIniciales', {
+        id: 'p1',
+        nombre: 'Uno',
+        ruta: 'CA-1',
+        kilometraje: null,
+        latitud: 14.481,
+        longitud: -90.615,
+      });
+      fixture.detectChanges();
+      expect(component.puenteSuperpuesto()).toBeNull();
+      expect(component.ubicacionValidada()).toBe(true);
     });
   });
 });

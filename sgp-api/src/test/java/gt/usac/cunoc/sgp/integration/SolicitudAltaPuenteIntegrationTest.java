@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import gt.usac.cunoc.sgp.common.exception.ApiException;
+import gt.usac.cunoc.sgp.mantenimiento.service.PlanMantenimientoService;
 import gt.usac.cunoc.sgp.notificacion.service.NotificacionService;
 import gt.usac.cunoc.sgp.puente.dto.AprobarSolicitudAltaPuenteRequest;
 import gt.usac.cunoc.sgp.puente.dto.CrearSolicitudAltaPuenteRequest;
@@ -30,6 +31,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpStatus;
@@ -102,6 +104,8 @@ class SolicitudAltaPuenteIntegrationTest {
   @Autowired private PuenteRepository puenteRepository;
 
   @Autowired private JdbcTemplate jdbc;
+
+  @MockBean private PlanMantenimientoService planesMantenimiento;
 
   private UUID departamentoId;
   private UUID municipioId;
@@ -235,6 +239,54 @@ class SolicitudAltaPuenteIntegrationTest {
             () -> comoCatedratico(() -> solicitudService.crear(cercana, CATEDRATICO_ID)));
 
     assertThat(excepcion.getCercanos().getContent().get(0).activo()).isFalse();
+  }
+
+  @Test
+  @WithMockUser(roles = "ADMINISTRADOR")
+  void solicitarSuperpuestoSobrePuenteActivoFallaConConflictoInclusoConConfirmacion() {
+    var existente = crearSolicitud("Existente", "14.481", "-90.615");
+    solicitudService.aprobar(
+        existente.id(), new AprobarSolicitudAltaPuenteRequest(false), ADMINISTRADOR_ID);
+
+    var superpuesta =
+        solicitud("Superpuesta", departamentoId, municipioId, "14.481", "-90.615", null, true);
+
+    var excepcion =
+        assertThrows(
+            ApiException.class,
+            () -> comoCatedratico(() -> solicitudService.crear(superpuesta, CATEDRATICO_ID)));
+
+    assertThat(excepcion.getStatus()).isEqualTo(HttpStatus.CONFLICT);
+    assertThat(excepcion.getCode()).isEqualTo("puente_superpuesto");
+  }
+
+  @Test
+  @WithMockUser(roles = "ADMINISTRADOR")
+  void solicitarSuperpuestoSobrePuenteInactivoFallaConConflictoInclusoConConfirmacion() {
+    var existente = crearSolicitud("Existente", "14.481", "-90.615");
+    var aprobada =
+        solicitudService.aprobar(
+            existente.id(), new AprobarSolicitudAltaPuenteRequest(false), ADMINISTRADOR_ID);
+    jdbc.update(
+        """
+        UPDATE puente
+        SET activo = false, inactivado_en = now(), inactivado_por_id = ?, motivo_inactivacion = 'prueba'
+        WHERE id = ?
+        """,
+        ADMINISTRADOR_ID,
+        aprobada.puenteCreadoId());
+
+    var superpuesta =
+        solicitud("Superpuesta", departamentoId, municipioId, "14.481", "-90.615", null, true);
+
+    var excepcion =
+        assertThrows(
+            ApiException.class,
+            () -> comoCatedratico(() -> solicitudService.crear(superpuesta, CATEDRATICO_ID)));
+
+    assertThat(excepcion.getStatus()).isEqualTo(HttpStatus.CONFLICT);
+    assertThat(excepcion.getCode()).isEqualTo("puente_superpuesto");
+    assertThat(excepcion.getMessage()).contains("inactivo");
   }
 
   @Test

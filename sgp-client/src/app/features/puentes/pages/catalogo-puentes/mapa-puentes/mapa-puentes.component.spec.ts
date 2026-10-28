@@ -270,4 +270,21 @@ describe('Mapa público de puentes', () => {
     segundo.destroy();
     expect(mocks.mapas[1].remove).toHaveBeenCalledOnce();
   });
+
+  it('limita el zoom mínimo y máximo para evitar errores de teselas faltantes', async () => {
+    await abrir([]);
+    expect(mocks.opciones).toHaveBeenCalledWith(
+      expect.objectContaining({
+        minZoom: 5,
+        maxZoom: 18,
+        style: expect.objectContaining({
+          sources: expect.objectContaining({
+            osm: expect.objectContaining({
+              maxzoom: 18,
+            }),
+          }),
+        }),
+      }),
+    );
+  });
 });

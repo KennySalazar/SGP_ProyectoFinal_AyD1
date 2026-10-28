@@ -1,3 +1,4 @@
+import { ERROR_GESTIONADO_LOCALMENTE } from '../../../core/interceptors/problem.interceptor';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
@@ -169,5 +170,11 @@ describe('InspeccionApiService', () => {
     const retiro = http.expectOne(`${base}/doc%2F1`);
     expect(retiro.request.method).toBe('DELETE');
     retiro.flush(null);
+  });
+  it('consulta conflictos propios con identificador codificado y gestiona errores localmente', () => {
+    service.listarConflictosSincronizacion('inspeccion/1').subscribe();
+    const req = http.expectOne('/api/v1/inspecciones/inspeccion%2F1/conflictos-sincronizacion');
+    expect(req.request.context.get(ERROR_GESTIONADO_LOCALMENTE)).toBe(true);
+    req.flush([]);
   });
 });
