@@ -134,7 +134,9 @@ describe('IniciarInspeccionDialogComponent', () => {
     fixture.detectChanges();
 
     expect(component.form.get('fechaInspeccion')?.value).toBe(component.hoy);
-    expect(component.form.get('nombreAutor')?.value).toBe('catedratico@cunoc.edu.gt');
+    // El inspector responsable lo registra la API con la cuenta autenticada; no se captura.
+    expect(component.form.get('nombreAutor')).toBeNull();
+    expect((fixture.nativeElement as HTMLElement).querySelector('#nombreAutor')).toBeNull();
     expect(component.form.get('confirmarDatosPermanentes')?.value).toBe(false);
   });
 
@@ -329,12 +331,14 @@ describe('IniciarInspeccionDialogComponent', () => {
     await Promise.resolve();
     const primera = mockApi.iniciarInspeccion.mock.calls[0];
     expect(component.form.enabled).toBe(true);
-    component.form.patchValue({ nombreAutor: 'Corregido' });
+    const ayer = new Date(Date.now() - 86_400_000).toISOString().slice(0, 10);
+    component.form.patchValue({ fechaInspeccion: ayer });
     component.iniciarInspeccion();
     await Promise.resolve();
     await Promise.resolve();
     const segunda = mockApi.iniciarInspeccion.mock.calls[1];
-    expect(segunda[0].nombreAutor).toBe('Corregido');
+    expect(segunda[0].fechaInspeccion).toBe(ayer);
+    expect(segunda[0].nombreAutor).toBeUndefined();
     expect(segunda[0].id).not.toBe(primera[0].id);
     expect(segunda[1]).not.toBe(primera[1]);
   });
