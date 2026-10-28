@@ -497,15 +497,15 @@
   "common": {
     "email": "Correo electronico",
     "emailShort": "Correo",
-    "password": "Contrasena",
+    "password": "Contraseña",
     "showPassword": "Mostrar contraseña",
     "hidePassword": "Ocultar contraseña",
-    "currentPassword": "Contrasena actual",
-    "newPassword": "Nueva contrasena",
+    "currentPassword": "Contraseña actual",
+    "newPassword": "Nueva contraseña",
     "otpCode": "Codigo OTP",
     "emailPlaceholder": "nombre@correo.com",
-    "passwordPlaceholder": "Ingresa tu contrasena",
-    "confirmPasswordPlaceholder": "Confirma tu contrasena",
+    "passwordPlaceholder": "Ingresa tu contraseña",
+    "confirmPasswordPlaceholder": "Confirma tu contraseña",
     "minPasswordPlaceholder": "Minimo 10 caracteres",
     "continue": "Continuar",
     "pending": "Pendiente",
@@ -524,7 +524,7 @@
     "login": {
       "title": "Iniciar sesion",
       "subtitle": "Accede con tu cuenta del Sistema de Gestion de Puentes.",
-      "forgot": "Olvide mi contrasena"
+      "forgot": "Olvide mi contraseña"
     },
     "register": {
       "title": "Crear cuenta",
@@ -545,18 +545,18 @@
       "note": "Usa el codigo mas reciente recibido en tu correo."
     },
     "recovery": {
-      "title": "Recuperar contrasena",
+      "title": "Recuperar contraseña",
       "subtitle": "Solicita un codigo temporal para restablecer tu acceso.",
       "send": "Enviar codigo",
       "sent": "Si el correo esta registrado, recibira un codigo de recuperacion.",
-      "haveCode": "Ya tengo el codigo",
+      "sending": "Enviando...",
       "back": "Volver al inicio de sesion"
     },
     "reset": {
-      "title": "Restablecer contrasena",
-      "subtitle": "Usa el codigo OTP de recuperacion para establecer una nueva contrasena.",
-      "success": "Contrasena restablecida correctamente.",
-      "action": "Restablecer contrasena"
+      "title": "Restablecer contraseña",
+      "subtitle": "Usa el codigo OTP de recuperacion para establecer una nueva contraseña.",
+      "success": "Contraseña restablecida correctamente.",
+      "action": "Restablecer contraseña"
     },
     "activation": {
       "title": "Activar cuenta",
@@ -1983,8 +1983,9 @@
       "gpsObtenido": "Lat: {{lat}}, Long: {{lng}} (±{{acc}} m)",
       "gpsNoDisponible": "GPS no disponible o no permitido (se registrará sin ubicación)",
       "fechaInspeccion": "Fecha de inspección",
-      "nombreInspector": "Inspector responsable",
-      "nombreInspectorPlaceholder": "Nombre o firma del inspector",
+      "visitaTitulo": "Datos de la visita",
+      "nombreAcompanante": "Nombre del acompañante",
+      "colegiadoAcompanante": "No. de colegiado",
       "datosPermanentesTitulo": "Datos técnicos permanentes del puente",
       "cargandoPermanentes": "Consultando datos de la última inspección publicada...",
       "permanentesEncontrados": "Se encontraron datos permanentes registrados en la última inspección publicada:",

@@ -84,7 +84,6 @@ export class IniciarInspeccionDialogComponent implements OnChanges {
 
   readonly form: FormGroup = this.fb.group({
     fechaInspeccion: ['', [Validators.required]],
-    nombreAutor: [''],
     confirmarDatosPermanentes: [false],
     nombreAcompanante: [''],
     colegiadoAcompanante: [''],
@@ -298,7 +297,6 @@ export class IniciarInspeccionDialogComponent implements OnChanges {
       puenteId: this.puente.id,
       fechaInspeccion: fecha,
       dispositivoId: dispositivoId,
-      nombreAutor: (this.form.get('nombreAutor')?.value || '').trim() || undefined,
       latitud: this.gpsLatitud(),
       longitud: this.gpsLongitud(),
       precisionGpsM: this.gpsPrecision(),
@@ -471,11 +469,9 @@ export class IniciarInspeccionDialogComponent implements OnChanges {
     this.resultado.set(null);
     this.guardando.set(false);
     this.acompanantes.set([]);
-    const emailUsuario = this.auth.user()?.email || '';
     this.form.enable({ emitEvent: false });
     this.form.reset({
       fechaInspeccion: this.hoy,
-      nombreAutor: emailUsuario,
       confirmarDatosPermanentes: false,
       nombreAcompanante: '',
       colegiadoAcompanante: '',
