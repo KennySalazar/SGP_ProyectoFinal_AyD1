@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RefreshTokenService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">sgp-api</a> &gt; <a href="index.source.html" class="el_package">gt.usac.cunoc.sgp.usuario.service</a> &gt; <span class="el_source">RefreshTokenService.java</span></div><h1>RefreshTokenService.java</h1><pre class="source lang-java linenums">package gt.usac.cunoc.sgp.usuario.service;
+
+import gt.usac.cunoc.sgp.common.exception.ApiException;
+import gt.usac.cunoc.sgp.common.security.JwtService;
+import gt.usac.cunoc.sgp.common.util.TokenHasher;
+import gt.usac.cunoc.sgp.usuario.entity.RefreshToken;
+import gt.usac.cunoc.sgp.usuario.entity.UserAccount;
+import gt.usac.cunoc.sgp.usuario.repository.RefreshTokenRepository;
+import java.security.SecureRandom;
+import java.time.Clock;
+import java.time.Instant;
+import java.util.Base64;
+import org.springframework.http.HttpStatus;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+@Service
+public class RefreshTokenService {
+
+  private final RefreshTokenRepository tokens;
+  private final JwtService jwtService;
+  private final Clock clock;
+<span class="fc" id="L23">  private final SecureRandom random = new SecureRandom();</span>
+
+<span class="fc" id="L25">  public RefreshTokenService(RefreshTokenRepository tokens, JwtService jwtService, Clock clock) {</span>
+<span class="fc" id="L26">    this.tokens = tokens;</span>
+<span class="fc" id="L27">    this.jwtService = jwtService;</span>
+<span class="fc" id="L28">    this.clock = clock;</span>
+<span class="fc" id="L29">  }</span>
+
+  @Transactional
+  public String issue(UserAccount user) {
+<span class="fc" id="L33">    byte[] bytes = new byte[48];</span>
+<span class="fc" id="L34">    random.nextBytes(bytes);</span>
+<span class="fc" id="L35">    String raw = Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);</span>
+<span class="fc" id="L36">    Instant now = clock.instant();</span>
+<span class="fc" id="L37">    tokens.save(</span>
+        new RefreshToken(
+<span class="fc" id="L39">            user, TokenHasher.sha256(raw), now.plusMillis(jwtService.refreshExpirationMs()), now));</span>
+<span class="fc" id="L40">    return raw;</span>
+  }
+
+  @Transactional
+  public RotatedRefreshToken rotate(String raw) {
+<span class="nc bnc" id="L45" title="All 4 branches missed.">    if (raw == null || raw.isBlank()) throw invalidRefreshToken();</span>
+<span class="nc" id="L46">    RefreshToken stored =</span>
+        tokens
+<span class="nc" id="L48">            .findByTokenHashWithUser(TokenHasher.sha256(raw))</span>
+<span class="nc" id="L49">            .orElseThrow(this::invalidRefreshToken);</span>
+<span class="nc" id="L50">    Instant now = clock.instant();</span>
+<span class="nc bnc" id="L51" title="All 2 branches missed.">    if (!stored.isActive(now)) throw invalidRefreshToken();</span>
+<span class="nc" id="L52">    UserAccount user = stored.getUser();</span>
+<span class="nc bnc" id="L53" title="All 6 branches missed.">    if (!user.isActive() || !user.isActivated() || !user.isVerified()) throw invalidRefreshToken();</span>
+<span class="nc" id="L54">    stored.revoke(now);</span>
+<span class="nc" id="L55">    String replacement = issue(user);</span>
+<span class="nc" id="L56">    return new RotatedRefreshToken(user, replacement);</span>
+  }
+
+  @Transactional
+  public void revoke(String raw) {
+<span class="nc bnc" id="L61" title="All 4 branches missed.">    if (raw == null || raw.isBlank()) return;</span>
+<span class="nc" id="L62">    tokens</span>
+<span class="nc" id="L63">        .findByTokenHashWithUser(TokenHasher.sha256(raw))</span>
+<span class="nc" id="L64">        .ifPresent(token -&gt; token.revoke(clock.instant()));</span>
+<span class="nc" id="L65">  }</span>
+
+  @Transactional
+  public void revokeAll(UserAccount user) {
+<span class="fc" id="L69">    tokens.revokeAllForUser(user, clock.instant());</span>
+<span class="fc" id="L70">  }</span>
+
+  private ApiException invalidRefreshToken() {
+<span class="nc" id="L73">    return new ApiException(</span>
+        HttpStatus.UNAUTHORIZED,
+        &quot;invalid_refresh_token&quot;,
+        &quot;Sesion no valida&quot;,
+        &quot;El token de renovacion es invalido o expiro&quot;);
+  }
+
+<span class="nc" id="L80">  public record RotatedRefreshToken(UserAccount user, String rawToken) {}</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

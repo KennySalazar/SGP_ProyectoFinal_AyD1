@@ -1,0 +1,279 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PuenteMapperImpl.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">sgp-api</a> &gt; <a href="index.source.html" class="el_package">gt.usac.cunoc.sgp.puente.mapper</a> &gt; <span class="el_source">PuenteMapperImpl.java</span></div><h1>PuenteMapperImpl.java</h1><pre class="source lang-java linenums">package gt.usac.cunoc.sgp.puente.mapper;
+
+import gt.usac.cunoc.sgp.puente.dto.CoordenadaUtmResponse;
+import gt.usac.cunoc.sgp.puente.dto.DepartamentoResponse;
+import gt.usac.cunoc.sgp.puente.dto.MunicipioResponse;
+import gt.usac.cunoc.sgp.puente.dto.PuenteCatalogoResponse;
+import gt.usac.cunoc.sgp.puente.dto.PuenteCercanoResponse;
+import gt.usac.cunoc.sgp.puente.dto.PuenteResponse;
+import gt.usac.cunoc.sgp.puente.dto.SolicitudAltaPuenteResponse;
+import gt.usac.cunoc.sgp.puente.entity.Departamento;
+import gt.usac.cunoc.sgp.puente.entity.Municipio;
+import gt.usac.cunoc.sgp.puente.entity.Puente;
+import gt.usac.cunoc.sgp.puente.entity.SolicitudAltaPuente;
+import gt.usac.cunoc.sgp.puente.model.EstadoSolicitudAltaPuente;
+import gt.usac.cunoc.sgp.puente.repository.PuenteRepository;
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.OffsetDateTime;
+import java.util.UUID;
+import javax.annotation.processing.Generated;
+import org.springframework.stereotype.Component;
+
+@Generated(
+    value = &quot;org.mapstruct.ap.MappingProcessor&quot;,
+    date = &quot;2026-10-27T23:39:17-0600&quot;,
+    comments = &quot;version: 1.6.3, compiler: javac, environment: Java 25.0.4.1 (Debian)&quot;
+)
+@Component
+<span class="fc" id="L29">public class PuenteMapperImpl implements PuenteMapper {</span>
+
+    @Override
+    public PuenteCatalogoResponse toCatalogoResponse(Puente puente) {
+<span class="pc bpc" id="L33" title="1 of 2 branches missed.">        if ( puente == null ) {</span>
+<span class="nc" id="L34">            return null;</span>
+        }
+
+<span class="fc" id="L37">        DepartamentoResponse departamento = null;</span>
+<span class="fc" id="L38">        String estadoActual = null;</span>
+<span class="fc" id="L39">        BigDecimal indiceCondicionActual = null;</span>
+<span class="fc" id="L40">        LocalDate fechaUltimaInspeccion = null;</span>
+<span class="fc" id="L41">        UUID id = null;</span>
+<span class="fc" id="L42">        String codigo = null;</span>
+<span class="fc" id="L43">        String nombre = null;</span>
+<span class="fc" id="L44">        MunicipioResponse municipio = null;</span>
+<span class="fc" id="L45">        boolean activo = false;</span>
+<span class="fc" id="L46">        UUID versionFormularioIdIcVigente = null;</span>
+
+<span class="fc" id="L48">        departamento = toDepartamentoResponse( puenteMunicipioDepartamento( puente ) );</span>
+<span class="fc" id="L49">        estadoActual = puente.getEstadoActual();</span>
+<span class="fc" id="L50">        indiceCondicionActual = puente.getIndiceCondicionActual();</span>
+<span class="fc" id="L51">        fechaUltimaInspeccion = puente.getFechaUltimaInspeccion();</span>
+<span class="fc" id="L52">        id = puente.getId();</span>
+<span class="fc" id="L53">        codigo = puente.getCodigo();</span>
+<span class="fc" id="L54">        nombre = puente.getNombre();</span>
+<span class="fc" id="L55">        municipio = toMunicipioResponse( puente.getMunicipio() );</span>
+<span class="fc" id="L56">        activo = puente.isActivo();</span>
+<span class="fc" id="L57">        versionFormularioIdIcVigente = puente.getVersionFormularioIdIcVigente();</span>
+
+<span class="fc" id="L59">        Double latitud = puente.getUbicacion().getY();</span>
+<span class="fc" id="L60">        Double longitud = puente.getUbicacion().getX();</span>
+
+<span class="fc" id="L62">        PuenteCatalogoResponse puenteCatalogoResponse = new PuenteCatalogoResponse( id, codigo, nombre, departamento, municipio, latitud, longitud, activo, estadoActual, indiceCondicionActual, fechaUltimaInspeccion, versionFormularioIdIcVigente );</span>
+
+<span class="fc" id="L64">        return puenteCatalogoResponse;</span>
+    }
+
+    @Override
+    public DepartamentoResponse toDepartamentoResponse(Departamento departamento) {
+<span class="pc bpc" id="L69" title="1 of 2 branches missed.">        if ( departamento == null ) {</span>
+<span class="nc" id="L70">            return null;</span>
+        }
+
+<span class="fc" id="L73">        UUID id = null;</span>
+<span class="fc" id="L74">        String codigoIne = null;</span>
+<span class="fc" id="L75">        String nombre = null;</span>
+
+<span class="fc" id="L77">        id = departamento.getId();</span>
+<span class="fc" id="L78">        codigoIne = departamento.getCodigoIne();</span>
+<span class="fc" id="L79">        nombre = departamento.getNombre();</span>
+
+<span class="fc" id="L81">        DepartamentoResponse departamentoResponse = new DepartamentoResponse( id, codigoIne, nombre );</span>
+
+<span class="fc" id="L83">        return departamentoResponse;</span>
+    }
+
+    @Override
+    public MunicipioResponse toMunicipioResponse(Municipio municipio) {
+<span class="pc bpc" id="L88" title="1 of 2 branches missed.">        if ( municipio == null ) {</span>
+<span class="nc" id="L89">            return null;</span>
+        }
+
+<span class="fc" id="L92">        UUID departamentoId = null;</span>
+<span class="fc" id="L93">        UUID id = null;</span>
+<span class="fc" id="L94">        String codigoIne = null;</span>
+<span class="fc" id="L95">        String nombre = null;</span>
+
+<span class="fc" id="L97">        departamentoId = municipioDepartamentoId( municipio );</span>
+<span class="fc" id="L98">        id = municipio.getId();</span>
+<span class="fc" id="L99">        codigoIne = municipio.getCodigoIne();</span>
+<span class="fc" id="L100">        nombre = municipio.getNombre();</span>
+
+<span class="fc" id="L102">        MunicipioResponse municipioResponse = new MunicipioResponse( id, departamentoId, codigoIne, nombre );</span>
+
+<span class="fc" id="L104">        return municipioResponse;</span>
+    }
+
+    @Override
+    public PuenteCercanoResponse toPuenteCercanoResponse(PuenteRepository.PuenteCercanoProjection cercano) {
+<span class="pc bpc" id="L109" title="1 of 2 branches missed.">        if ( cercano == null ) {</span>
+<span class="nc" id="L110">            return null;</span>
+        }
+
+<span class="fc" id="L113">        UUID id = null;</span>
+<span class="fc" id="L114">        String codigo = null;</span>
+<span class="fc" id="L115">        String nombre = null;</span>
+<span class="fc" id="L116">        boolean activo = false;</span>
+<span class="fc" id="L117">        double distanciaMetros = 0.0d;</span>
+<span class="fc" id="L118">        double latitud = 0.0d;</span>
+<span class="fc" id="L119">        double longitud = 0.0d;</span>
+
+<span class="fc" id="L121">        id = cercano.getId();</span>
+<span class="fc" id="L122">        codigo = cercano.getCodigo();</span>
+<span class="fc" id="L123">        nombre = cercano.getNombre();</span>
+<span class="fc" id="L124">        activo = cercano.getActivo();</span>
+<span class="pc bpc" id="L125" title="1 of 2 branches missed.">        if ( cercano.getDistanciaMetros() != null ) {</span>
+<span class="fc" id="L126">            distanciaMetros = cercano.getDistanciaMetros();</span>
+        }
+<span class="pc bpc" id="L128" title="1 of 2 branches missed.">        if ( cercano.getLatitud() != null ) {</span>
+<span class="fc" id="L129">            latitud = cercano.getLatitud();</span>
+        }
+<span class="pc bpc" id="L131" title="1 of 2 branches missed.">        if ( cercano.getLongitud() != null ) {</span>
+<span class="fc" id="L132">            longitud = cercano.getLongitud();</span>
+        }
+
+<span class="fc" id="L135">        PuenteCercanoResponse puenteCercanoResponse = new PuenteCercanoResponse( id, codigo, nombre, activo, distanciaMetros, latitud, longitud );</span>
+
+<span class="fc" id="L137">        return puenteCercanoResponse;</span>
+    }
+
+    @Override
+    public CoordenadaUtmResponse toCoordenadaUtmResponse(PuenteRepository.CoordenadaUtmProjection coordenada) {
+<span class="pc bpc" id="L142" title="1 of 2 branches missed.">        if ( coordenada == null ) {</span>
+<span class="nc" id="L143">            return null;</span>
+        }
+
+<span class="fc" id="L146">        int zona = 0;</span>
+<span class="fc" id="L147">        int epsg = 0;</span>
+<span class="fc" id="L148">        double este = 0.0d;</span>
+<span class="fc" id="L149">        double norte = 0.0d;</span>
+
+<span class="pc bpc" id="L151" title="1 of 2 branches missed.">        if ( coordenada.getZona() != null ) {</span>
+<span class="fc" id="L152">            zona = coordenada.getZona();</span>
+        }
+<span class="pc bpc" id="L154" title="1 of 2 branches missed.">        if ( coordenada.getEpsg() != null ) {</span>
+<span class="fc" id="L155">            epsg = coordenada.getEpsg();</span>
+        }
+<span class="pc bpc" id="L157" title="1 of 2 branches missed.">        if ( coordenada.getEste() != null ) {</span>
+<span class="fc" id="L158">            este = coordenada.getEste();</span>
+        }
+<span class="pc bpc" id="L160" title="1 of 2 branches missed.">        if ( coordenada.getNorte() != null ) {</span>
+<span class="fc" id="L161">            norte = coordenada.getNorte();</span>
+        }
+
+<span class="fc" id="L164">        String hemisferio = &quot;N&quot;;</span>
+
+<span class="fc" id="L166">        CoordenadaUtmResponse coordenadaUtmResponse = new CoordenadaUtmResponse( zona, hemisferio, epsg, este, norte );</span>
+
+<span class="fc" id="L168">        return coordenadaUtmResponse;</span>
+    }
+
+    @Override
+    public PuenteResponse toAltaResponse(Puente puente, CoordenadaUtmResponse utm) {
+<span class="pc bpc" id="L173" title="3 of 4 branches missed.">        if ( puente == null &amp;&amp; utm == null ) {</span>
+<span class="nc" id="L174">            return null;</span>
+        }
+
+<span class="fc" id="L177">        DepartamentoResponse departamento = null;</span>
+<span class="fc" id="L178">        String estadoActual = null;</span>
+<span class="fc" id="L179">        BigDecimal indiceCondicionActual = null;</span>
+<span class="fc" id="L180">        LocalDate fechaUltimaInspeccion = null;</span>
+<span class="fc" id="L181">        UUID id = null;</span>
+<span class="fc" id="L182">        String codigo = null;</span>
+<span class="fc" id="L183">        String nombre = null;</span>
+<span class="fc" id="L184">        MunicipioResponse municipio = null;</span>
+<span class="fc" id="L185">        String ruta = null;</span>
+<span class="fc" id="L186">        BigDecimal kilometraje = null;</span>
+<span class="fc" id="L187">        boolean activo = false;</span>
+<span class="fc" id="L188">        UUID versionFormularioIdIcVigente = null;</span>
+<span class="pc bpc" id="L189" title="1 of 2 branches missed.">        if ( puente != null ) {</span>
+<span class="fc" id="L190">            departamento = toDepartamentoResponse( puenteMunicipioDepartamento( puente ) );</span>
+<span class="fc" id="L191">            estadoActual = puente.getEstadoActual();</span>
+<span class="fc" id="L192">            indiceCondicionActual = puente.getIndiceCondicionActual();</span>
+<span class="fc" id="L193">            fechaUltimaInspeccion = puente.getFechaUltimaInspeccion();</span>
+<span class="fc" id="L194">            id = puente.getId();</span>
+<span class="fc" id="L195">            codigo = puente.getCodigo();</span>
+<span class="fc" id="L196">            nombre = puente.getNombre();</span>
+<span class="fc" id="L197">            municipio = toMunicipioResponse( puente.getMunicipio() );</span>
+<span class="fc" id="L198">            ruta = puente.getRuta();</span>
+<span class="fc" id="L199">            kilometraje = puente.getKilometraje();</span>
+<span class="fc" id="L200">            activo = puente.isActivo();</span>
+<span class="fc" id="L201">            versionFormularioIdIcVigente = puente.getVersionFormularioIdIcVigente();</span>
+        }
+<span class="fc" id="L203">        CoordenadaUtmResponse utm1 = null;</span>
+<span class="fc" id="L204">        utm1 = utm;</span>
+
+<span class="fc" id="L206">        Double latitud = puente.getUbicacion().getY();</span>
+<span class="fc" id="L207">        Double longitud = puente.getUbicacion().getX();</span>
+<span class="fc" id="L208">        OffsetDateTime creadoEn = puente.getCreadoEn().atZone(java.time.ZoneId.of(&quot;America/Guatemala&quot;)).toOffsetDateTime();</span>
+
+<span class="fc" id="L210">        PuenteResponse puenteResponse = new PuenteResponse( id, codigo, nombre, departamento, municipio, ruta, kilometraje, latitud, longitud, utm1, activo, estadoActual, indiceCondicionActual, fechaUltimaInspeccion, creadoEn, versionFormularioIdIcVigente );</span>
+
+<span class="fc" id="L212">        return puenteResponse;</span>
+    }
+
+    @Override
+    public SolicitudAltaPuenteResponse toSolicitudResponse(SolicitudAltaPuente solicitud) {
+<span class="pc bpc" id="L217" title="1 of 2 branches missed.">        if ( solicitud == null ) {</span>
+<span class="nc" id="L218">            return null;</span>
+        }
+
+<span class="fc" id="L221">        String nombre = null;</span>
+<span class="fc" id="L222">        DepartamentoResponse departamento = null;</span>
+<span class="fc" id="L223">        UUID id = null;</span>
+<span class="fc" id="L224">        MunicipioResponse municipio = null;</span>
+<span class="fc" id="L225">        String ruta = null;</span>
+<span class="fc" id="L226">        BigDecimal kilometraje = null;</span>
+<span class="fc" id="L227">        String justificacion = null;</span>
+<span class="fc" id="L228">        EstadoSolicitudAltaPuente estado = null;</span>
+<span class="fc" id="L229">        String motivoDecision = null;</span>
+<span class="fc" id="L230">        OffsetDateTime revisadoEn = null;</span>
+<span class="fc" id="L231">        OffsetDateTime creadoEn = null;</span>
+
+<span class="fc" id="L233">        nombre = solicitud.getNombrePropuesto();</span>
+<span class="fc" id="L234">        departamento = toDepartamentoResponse( solicitudMunicipioDepartamento( solicitud ) );</span>
+<span class="fc" id="L235">        id = solicitud.getId();</span>
+<span class="fc" id="L236">        municipio = toMunicipioResponse( solicitud.getMunicipio() );</span>
+<span class="fc" id="L237">        ruta = solicitud.getRuta();</span>
+<span class="fc" id="L238">        kilometraje = solicitud.getKilometraje();</span>
+<span class="fc" id="L239">        justificacion = solicitud.getJustificacion();</span>
+<span class="fc" id="L240">        estado = solicitud.getEstado();</span>
+<span class="fc" id="L241">        motivoDecision = solicitud.getMotivoDecision();</span>
+<span class="fc" id="L242">        revisadoEn = aHoraGuatemala( solicitud.getRevisadoEn() );</span>
+<span class="fc" id="L243">        creadoEn = aHoraGuatemala( solicitud.getCreadoEn() );</span>
+
+<span class="fc" id="L245">        double latitud = solicitud.getUbicacion().getY();</span>
+<span class="fc" id="L246">        double longitud = solicitud.getUbicacion().getX();</span>
+<span class="fc bfc" id="L247" title="All 2 branches covered.">        UUID puenteCreadoId = solicitud.getPuenteCreado() == null ? null : solicitud.getPuenteCreado().getId();</span>
+<span class="fc bfc" id="L248" title="All 2 branches covered.">        String puenteCreadoCodigo = solicitud.getPuenteCreado() == null ? null : solicitud.getPuenteCreado().getCodigo();</span>
+
+<span class="fc" id="L250">        SolicitudAltaPuenteResponse solicitudAltaPuenteResponse = new SolicitudAltaPuenteResponse( id, nombre, departamento, municipio, ruta, kilometraje, latitud, longitud, justificacion, estado, motivoDecision, revisadoEn, puenteCreadoId, puenteCreadoCodigo, creadoEn );</span>
+
+<span class="fc" id="L252">        return solicitudAltaPuenteResponse;</span>
+    }
+
+    private Departamento puenteMunicipioDepartamento(Puente puente) {
+<span class="fc" id="L256">        Municipio municipio = puente.getMunicipio();</span>
+<span class="pc bpc" id="L257" title="1 of 2 branches missed.">        if ( municipio == null ) {</span>
+<span class="nc" id="L258">            return null;</span>
+        }
+<span class="fc" id="L260">        return municipio.getDepartamento();</span>
+    }
+
+    private UUID municipioDepartamentoId(Municipio municipio) {
+<span class="fc" id="L264">        Departamento departamento = municipio.getDepartamento();</span>
+<span class="pc bpc" id="L265" title="1 of 2 branches missed.">        if ( departamento == null ) {</span>
+<span class="nc" id="L266">            return null;</span>
+        }
+<span class="fc" id="L268">        return departamento.getId();</span>
+    }
+
+    private Departamento solicitudMunicipioDepartamento(SolicitudAltaPuente solicitudAltaPuente) {
+<span class="fc" id="L272">        Municipio municipio = solicitudAltaPuente.getMunicipio();</span>
+<span class="pc bpc" id="L273" title="1 of 2 branches missed.">        if ( municipio == null ) {</span>
+<span class="nc" id="L274">            return null;</span>
+        }
+<span class="fc" id="L276">        return municipio.getDepartamento();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

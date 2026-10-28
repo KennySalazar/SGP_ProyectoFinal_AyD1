@@ -1,0 +1,432 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>OrdenMantenimientoService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">sgp-api</a> &gt; <a href="index.source.html" class="el_package">gt.usac.cunoc.sgp.mantenimiento.service</a> &gt; <span class="el_source">OrdenMantenimientoService.java</span></div><h1>OrdenMantenimientoService.java</h1><pre class="source lang-java linenums">package gt.usac.cunoc.sgp.mantenimiento.service;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import gt.usac.cunoc.sgp.common.audit.model.AccionAuditoria;
+import gt.usac.cunoc.sgp.common.audit.service.AuditoriaWriter;
+import gt.usac.cunoc.sgp.common.exception.ApiException;
+import gt.usac.cunoc.sgp.common.util.UuidV7Generator;
+import gt.usac.cunoc.sgp.inspeccion.repository.InspeccionRepository;
+import gt.usac.cunoc.sgp.mantenimiento.dto.CambiarPrioridadOrdenRequest;
+import gt.usac.cunoc.sgp.mantenimiento.dto.CrearOrdenMantenimientoRequest;
+import gt.usac.cunoc.sgp.mantenimiento.dto.FiltroOrdenesRequest;
+import gt.usac.cunoc.sgp.mantenimiento.dto.HistorialEstadoOrdenResponse;
+import gt.usac.cunoc.sgp.mantenimiento.dto.OrdenMantenimientoResponse;
+import gt.usac.cunoc.sgp.mantenimiento.dto.TotalesOrdenesResponse;
+import gt.usac.cunoc.sgp.mantenimiento.entity.HistorialEstadoOrden;
+import gt.usac.cunoc.sgp.mantenimiento.entity.OrdenMantenimiento;
+import gt.usac.cunoc.sgp.mantenimiento.mapper.OrdenMantenimientoMapper;
+import gt.usac.cunoc.sgp.mantenimiento.model.EstadoOrden;
+import gt.usac.cunoc.sgp.mantenimiento.model.PrioridadOrden;
+import gt.usac.cunoc.sgp.mantenimiento.model.TipoOrden;
+import gt.usac.cunoc.sgp.mantenimiento.repository.HistorialEstadoOrdenRepository;
+import gt.usac.cunoc.sgp.mantenimiento.repository.OrdenMantenimientoRepository;
+import gt.usac.cunoc.sgp.puente.entity.Puente;
+import gt.usac.cunoc.sgp.puente.repository.PuenteRepository;
+import java.time.Clock;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.EnumMap;
+import java.util.EnumSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
+import java.util.stream.Collectors;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
+import org.springframework.http.HttpStatus;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+/**
+ * Alta manual y consulta de órdenes de mantenimiento (RN-MTO-01, RN-MTO-03). Los cambios de estado
+ * pertenecen a {@link TransicionOrdenService} (DT-BE-07).
+ */
+@Service
+public class OrdenMantenimientoService {
+
+  /** Límites del rango de creación cuando la bandeja no filtra por fecha. */
+<span class="fc" id="L52">  private static final Instant INICIO_DE_LOS_TIEMPOS = Instant.parse(&quot;1970-01-01T00:00:00Z&quot;);</span>
+
+<span class="fc" id="L54">  private static final Instant FIN_DE_LOS_TIEMPOS = Instant.parse(&quot;9999-12-31T00:00:00Z&quot;);</span>
+
+  static final int LONGITUD_MAXIMA_DESCRIPCION = 4000;
+  static final int LONGITUD_MAXIMA_ELEMENTO_REF = 300;
+
+  private final OrdenMantenimientoRepository ordenes;
+  private final HistorialEstadoOrdenRepository historial;
+  private final PuenteRepository puentes;
+  private final InspeccionRepository inspecciones;
+  private final AuditoriaWriter auditoria;
+  private final OrdenMantenimientoMapper mapper;
+  private final ObjectMapper json;
+  private final Clock clock;
+
+  public OrdenMantenimientoService(
+      OrdenMantenimientoRepository ordenes,
+      HistorialEstadoOrdenRepository historial,
+      PuenteRepository puentes,
+      InspeccionRepository inspecciones,
+      AuditoriaWriter auditoria,
+      OrdenMantenimientoMapper mapper,
+      ObjectMapper json,
+<span class="fc" id="L76">      Clock clock) {</span>
+<span class="fc" id="L77">    this.ordenes = ordenes;</span>
+<span class="fc" id="L78">    this.historial = historial;</span>
+<span class="fc" id="L79">    this.puentes = puentes;</span>
+<span class="fc" id="L80">    this.inspecciones = inspecciones;</span>
+<span class="fc" id="L81">    this.auditoria = auditoria;</span>
+<span class="fc" id="L82">    this.mapper = mapper;</span>
+<span class="fc" id="L83">    this.json = json;</span>
+<span class="fc" id="L84">    this.clock = clock;</span>
+<span class="fc" id="L85">  }</span>
+
+  /**
+   * Crea una orden manual en PROPUESTA para un puente activo. Si indica una inspección, debe ser
+   * del mismo puente (RN-MTO-01). Valida todos los campos y responde un único 422 con el detalle.
+   */
+  @Transactional
+  public OrdenMantenimientoResponse crear(CrearOrdenMantenimientoRequest request, UUID usuarioId) {
+<span class="fc" id="L93">    List&lt;Map&lt;String, String&gt;&gt; errores = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L94" title="All 2 branches covered.">    if (request.puenteId() == null) {</span>
+<span class="fc" id="L95">      errores.add(error(&quot;puenteId&quot;, &quot;El puente es obligatorio.&quot;));</span>
+    }
+<span class="fc" id="L97">    TipoOrden tipo = convertir(TipoOrden.class, request.tipo(), &quot;tipo&quot;, errores);</span>
+<span class="fc" id="L98">    PrioridadOrden prioridad =</span>
+<span class="fc" id="L99">        convertir(PrioridadOrden.class, request.prioridad(), &quot;prioridad&quot;, errores);</span>
+<span class="fc" id="L100">    String descripcion = texto(request.descripcion());</span>
+<span class="fc bfc" id="L101" title="All 2 branches covered.">    if (descripcion == null) {</span>
+<span class="fc" id="L102">      errores.add(error(&quot;descripcion&quot;, &quot;La descripcion es obligatoria.&quot;));</span>
+<span class="fc bfc" id="L103" title="All 2 branches covered.">    } else if (descripcion.length() &gt; LONGITUD_MAXIMA_DESCRIPCION) {</span>
+<span class="fc" id="L104">      errores.add(</span>
+<span class="fc" id="L105">          error(</span>
+              &quot;descripcion&quot;,
+              &quot;La descripcion no puede exceder &quot; + LONGITUD_MAXIMA_DESCRIPCION + &quot; caracteres.&quot;));
+    }
+<span class="fc" id="L109">    String elementoRef = texto(request.elementoRef());</span>
+<span class="fc bfc" id="L110" title="All 4 branches covered.">    if (elementoRef != null &amp;&amp; elementoRef.length() &gt; LONGITUD_MAXIMA_ELEMENTO_REF) {</span>
+<span class="fc" id="L111">      errores.add(</span>
+<span class="fc" id="L112">          error(</span>
+              &quot;elementoRef&quot;,
+              &quot;El elemento no puede exceder &quot; + LONGITUD_MAXIMA_ELEMENTO_REF + &quot; caracteres.&quot;));
+    }
+<span class="fc bfc" id="L116" title="All 4 branches covered.">    if (request.instanciaElementoId() != null &amp;&amp; elementoRef == null) {</span>
+<span class="fc" id="L117">      errores.add(error(&quot;instanciaElementoId&quot;, &quot;La instancia requiere indicar el elemento.&quot;));</span>
+    }
+<span class="fc bfc" id="L119" title="All 2 branches covered.">    if (!errores.isEmpty()) {</span>
+<span class="fc" id="L120">      throw new ApiException(</span>
+          HttpStatus.UNPROCESSABLE_ENTITY,
+          &quot;orden_invalida&quot;,
+          &quot;Orden invalida&quot;,
+          &quot;La orden contiene datos invalidos.&quot;,
+          errores);
+    }
+
+<span class="fc" id="L128">    Puente puente =</span>
+        puentes
+<span class="fc" id="L130">            .findById(request.puenteId())</span>
+<span class="fc" id="L131">            .orElseThrow(</span>
+                () -&gt;
+<span class="fc" id="L133">                    new ApiException(</span>
+                        HttpStatus.NOT_FOUND,
+                        &quot;puente_no_encontrado&quot;,
+                        &quot;Puente no encontrado&quot;,
+<span class="fc" id="L137">                        &quot;No existe el puente &quot; + request.puenteId()));</span>
+<span class="fc bfc" id="L138" title="All 2 branches covered.">    if (!puente.isActivo()) {</span>
+<span class="fc" id="L139">      throw new ApiException(</span>
+          HttpStatus.CONFLICT,
+          &quot;puente_inactivo&quot;,
+          &quot;Puente inactivo&quot;,
+          &quot;No se pueden crear ordenes para un puente dado de baja.&quot;);
+    }
+<span class="fc bfc" id="L145" title="All 2 branches covered.">    if (request.inspeccionOrigenId() != null) {</span>
+<span class="fc" id="L146">      exigirInspeccionDelPuente(request.inspeccionOrigenId(), puente.getId());</span>
+    }
+
+<span class="fc" id="L149">    Instant ahora = clock.instant();</span>
+<span class="fc" id="L150">    OrdenMantenimiento orden =</span>
+<span class="fc" id="L151">        ordenes.saveAndFlush(</span>
+            new OrdenMantenimiento(
+<span class="fc" id="L153">                UuidV7Generator.generate(),</span>
+<span class="fc" id="L154">                puente.getId(),</span>
+<span class="fc" id="L155">                request.inspeccionOrigenId(),</span>
+                elementoRef,
+<span class="fc" id="L157">                request.instanciaElementoId(),</span>
+                tipo,
+                descripcion,
+                prioridad,
+                usuarioId,
+                ahora));
+<span class="fc" id="L163">    historial.save(</span>
+        new HistorialEstadoOrden(
+<span class="fc" id="L165">            UuidV7Generator.generate(),</span>
+<span class="fc" id="L166">            orden.getId(),</span>
+            1,
+            null,
+<span class="fc" id="L169">            EstadoOrden.PROPUESTA.name(),</span>
+            usuarioId,
+            null,
+            ahora));
+
+<span class="fc" id="L174">    ObjectNode despues =</span>
+<span class="fc" id="L175">        json.createObjectNode()</span>
+<span class="fc" id="L176">            .put(&quot;estado&quot;, orden.getEstado().name())</span>
+<span class="fc" id="L177">            .put(&quot;tipo&quot;, tipo.name())</span>
+<span class="fc" id="L178">            .put(&quot;prioridad&quot;, prioridad.name())</span>
+<span class="fc" id="L179">            .put(&quot;puenteId&quot;, puente.getId().toString())</span>
+<span class="fc" id="L180">            .put(&quot;descripcion&quot;, descripcion);</span>
+<span class="fc bfc" id="L181" title="All 2 branches covered.">    if (orden.getInspeccionOrigenId() != null) {</span>
+<span class="fc" id="L182">      despues.put(&quot;inspeccionOrigenId&quot;, orden.getInspeccionOrigenId().toString());</span>
+    }
+<span class="fc bfc" id="L184" title="All 2 branches covered.">    if (elementoRef != null) {</span>
+<span class="fc" id="L185">      despues.put(&quot;elementoRef&quot;, elementoRef);</span>
+    }
+<span class="fc" id="L187">    auditoria.registrarEnTransaccion(</span>
+        usuarioId,
+        AccionAuditoria.CREAR,
+        TransicionOrdenService.ENTIDAD,
+<span class="fc" id="L191">        orden.getId(),</span>
+        null,
+        despues,
+        null);
+<span class="fc" id="L195">    return mapper.toResponse(orden);</span>
+  }
+
+  /** Detalle de una orden; también se consultan las de puentes dados de baja. */
+  @Transactional(readOnly = true)
+  public OrdenMantenimientoResponse obtener(UUID ordenId) {
+<span class="fc" id="L201">    return mapper.toResponse(buscar(ordenId));</span>
+  }
+
+  /** HU-047: updates the confirmed priority with justification and an auditable before/after. */
+  @Transactional
+  public OrdenMantenimientoResponse cambiarPrioridad(
+      UUID ordenId, CambiarPrioridadOrdenRequest request, UUID usuarioId) {
+<span class="fc" id="L208">    List&lt;Map&lt;String, String&gt;&gt; errores = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L209">    PrioridadOrden prioridad =</span>
+<span class="fc" id="L210">        convertir(</span>
+            PrioridadOrden.class,
+<span class="pc bpc" id="L212" title="1 of 2 branches missed.">            request == null ? null : request.prioridad(),</span>
+            &quot;prioridad&quot;,
+            errores);
+<span class="pc bpc" id="L215" title="1 of 2 branches missed.">    String justificacion = request == null ? null : texto(request.justificacion());</span>
+<span class="fc bfc" id="L216" title="All 2 branches covered.">    if (justificacion == null) {</span>
+<span class="fc" id="L217">      errores.add(error(&quot;justificacion&quot;, &quot;La justificación es obligatoria.&quot;));</span>
+    }
+<span class="fc bfc" id="L219" title="All 2 branches covered.">    if (!errores.isEmpty()) {</span>
+<span class="fc" id="L220">      throw new ApiException(</span>
+          HttpStatus.UNPROCESSABLE_ENTITY,
+          &quot;prioridad_invalida&quot;,
+          &quot;Prioridad inválida&quot;,
+          &quot;Indique una prioridad válida y su justificación.&quot;,
+          errores);
+    }
+
+<span class="fc" id="L228">    OrdenMantenimiento orden = buscar(ordenId);</span>
+<span class="fc" id="L229">    if (EnumSet.of(EstadoOrden.EJECUTADA, EstadoOrden.CANCELADA, EstadoOrden.DESCARTADA)</span>
+<span class="fc bfc" id="L230" title="All 2 branches covered.">        .contains(orden.getEstado())) {</span>
+<span class="fc" id="L231">      throw new ApiException(</span>
+          HttpStatus.CONFLICT,
+          &quot;orden_terminal&quot;,
+          &quot;Orden cerrada&quot;,
+          &quot;No se puede cambiar la prioridad de una orden en estado terminal.&quot;);
+    }
+<span class="fc" id="L237">    PrioridadOrden anterior = orden.getPrioridadConfirmada();</span>
+<span class="fc" id="L238">    ObjectNode valoresAnteriores =</span>
+<span class="fc" id="L239">        json.createObjectNode()</span>
+<span class="fc" id="L240">            .put(&quot;prioridadSugerida&quot;, orden.getPrioridadSugerida().name())</span>
+<span class="fc" id="L241">            .put(&quot;prioridadConfirmada&quot;, anterior.name())</span>
+<span class="fc" id="L242">            .put(&quot;justificacionPrioridad&quot;, orden.getJustificacionPrioridad());</span>
+<span class="fc" id="L243">    orden.cambiarPrioridadConfirmada(prioridad, justificacion, clock.instant());</span>
+<span class="fc" id="L244">    OrdenMantenimiento guardada = ordenes.saveAndFlush(orden);</span>
+<span class="fc" id="L245">    ObjectNode valoresPosteriores =</span>
+<span class="fc" id="L246">        json.createObjectNode()</span>
+<span class="fc" id="L247">            .put(&quot;prioridadSugerida&quot;, guardada.getPrioridadSugerida().name())</span>
+<span class="fc" id="L248">            .put(&quot;prioridadConfirmada&quot;, guardada.getPrioridadConfirmada().name())</span>
+<span class="fc" id="L249">            .put(&quot;justificacionPrioridad&quot;, guardada.getJustificacionPrioridad());</span>
+<span class="fc" id="L250">    auditoria.registrarEnTransaccion(</span>
+        usuarioId,
+        AccionAuditoria.MODIFICAR,
+        TransicionOrdenService.ENTIDAD,
+<span class="fc" id="L254">        guardada.getId(),</span>
+        valoresAnteriores,
+        valoresPosteriores,
+        null);
+<span class="fc" id="L258">    return mapper.toResponse(guardada);</span>
+  }
+
+  /**
+   * Bandeja de mantenimiento con filtros combinados (HU-049), de la más reciente a la más antigua.
+   * Sin estados se listan todos.
+   */
+  @Transactional(readOnly = true)
+  public Page&lt;OrdenMantenimientoResponse&gt; listar(
+      FiltroOrdenesRequest filtro, int pagina, int tamanio) {
+<span class="fc bfc" id="L268" title="All 6 branches covered.">    if (pagina &lt; 0 || tamanio &lt; 1 || tamanio &gt; 100) {</span>
+<span class="fc" id="L269">      throw new ApiException(</span>
+          HttpStatus.UNPROCESSABLE_ENTITY,
+          &quot;paginacion_invalida&quot;,
+          &quot;Paginación inválida&quot;,
+          &quot;La página debe ser mayor o igual a 0 y el tamaño debe estar entre 1 y 100.&quot;);
+    }
+<span class="fc" id="L275">    List&lt;Map&lt;String, String&gt;&gt; errores = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L276">    Set&lt;EstadoOrden&gt; estados = EnumSet.noneOf(EstadoOrden.class);</span>
+<span class="fc bfc" id="L277" title="All 2 branches covered.">    if (filtro.estados() != null) {</span>
+<span class="fc bfc" id="L278" title="All 2 branches covered.">      for (String estado : filtro.estados()) {</span>
+        EstadoOrden convertido =
+<span class="fc bfc" id="L280" title="All 2 branches covered.">            texto(estado) == null ? null : convertir(EstadoOrden.class, estado, &quot;estado&quot;, errores);</span>
+<span class="fc bfc" id="L281" title="All 2 branches covered.">        if (convertido != null) {</span>
+<span class="fc" id="L282">          estados.add(convertido);</span>
+        }
+<span class="fc" id="L284">      }</span>
+    }
+<span class="fc" id="L286">    Filtros comunes = comunes(filtro, errores);</span>
+<span class="fc" id="L287">    PageRequest orden =</span>
+<span class="fc" id="L288">        PageRequest.of(</span>
+<span class="fc" id="L289">            pagina, tamanio, Sort.by(Sort.Order.desc(&quot;creadoEn&quot;), Sort.Order.desc(&quot;id&quot;)));</span>
+<span class="fc" id="L290">    return ordenes</span>
+<span class="fc" id="L291">        .filtrar(</span>
+<span class="fc bfc" id="L292" title="All 2 branches covered.">            estados.isEmpty() ? EnumSet.allOf(EstadoOrden.class) : estados,</span>
+<span class="fc" id="L293">            filtro.puenteId(),</span>
+<span class="fc" id="L294">            comunes.tipo(),</span>
+<span class="fc" id="L295">            comunes.prioridad(),</span>
+<span class="fc" id="L296">            comunes.desde(),</span>
+<span class="fc" id="L297">            comunes.hasta(),</span>
+            orden)
+<span class="fc" id="L299">        .map(mapper::toResponse);</span>
+  }
+
+  /** Total por estado con los filtros de la bandeja, para el contador de cada pestaña. */
+  @Transactional(readOnly = true)
+  public TotalesOrdenesResponse totales(FiltroOrdenesRequest filtro) {
+<span class="fc" id="L305">    Filtros comunes = comunes(filtro, new ArrayList&lt;&gt;());</span>
+<span class="fc" id="L306">    Map&lt;EstadoOrden, Long&gt; porEstado = new EnumMap&lt;&gt;(EstadoOrden.class);</span>
+<span class="fc bfc" id="L307" title="All 2 branches covered.">    for (EstadoOrden estado : EstadoOrden.values()) {</span>
+<span class="fc" id="L308">      porEstado.put(estado, 0L);</span>
+    }
+<span class="fc" id="L310">    long total = 0;</span>
+    for (Object[] fila :
+<span class="fc bfc" id="L312" title="All 2 branches covered.">        ordenes.contarPorEstado(</span>
+<span class="fc" id="L313">            filtro.puenteId(),</span>
+<span class="fc" id="L314">            comunes.tipo(),</span>
+<span class="fc" id="L315">            comunes.prioridad(),</span>
+<span class="fc" id="L316">            comunes.desde(),</span>
+<span class="fc" id="L317">            comunes.hasta())) {</span>
+<span class="fc" id="L318">      long cantidad = ((Number) fila[1]).longValue();</span>
+<span class="fc" id="L319">      porEstado.put((EstadoOrden) fila[0], cantidad);</span>
+<span class="fc" id="L320">      total += cantidad;</span>
+<span class="fc" id="L321">    }</span>
+<span class="fc" id="L322">    return new TotalesOrdenesResponse(total, porEstado);</span>
+  }
+
+  /** Filtros compartidos por la lista y los totales, ya validados y convertidos. */
+<span class="fc" id="L326">  private record Filtros(TipoOrden tipo, PrioridadOrden prioridad, Instant desde, Instant hasta) {}</span>
+
+  private static Filtros comunes(FiltroOrdenesRequest filtro, List&lt;Map&lt;String, String&gt;&gt; errores) {
+    TipoOrden tipo =
+<span class="fc bfc" id="L330" title="All 2 branches covered.">        texto(filtro.tipo()) == null</span>
+<span class="fc" id="L331">            ? null</span>
+<span class="fc" id="L332">            : convertir(TipoOrden.class, filtro.tipo(), &quot;tipo&quot;, errores);</span>
+    PrioridadOrden prioridad =
+<span class="fc bfc" id="L334" title="All 2 branches covered.">        texto(filtro.prioridad()) == null</span>
+<span class="fc" id="L335">            ? null</span>
+<span class="fc" id="L336">            : convertir(PrioridadOrden.class, filtro.prioridad(), &quot;prioridad&quot;, errores);</span>
+<span class="fc bfc" id="L337" title="All 2 branches covered.">    if (filtro.desde() != null</span>
+<span class="fc bfc" id="L338" title="All 2 branches covered.">        &amp;&amp; filtro.hasta() != null</span>
+<span class="fc bfc" id="L339" title="All 2 branches covered.">        &amp;&amp; filtro.desde().isAfter(filtro.hasta())) {</span>
+<span class="fc" id="L340">      errores.add(error(&quot;desde&quot;, &quot;La fecha inicial no puede ser posterior a la final.&quot;));</span>
+    }
+<span class="fc bfc" id="L342" title="All 2 branches covered.">    if (!errores.isEmpty()) {</span>
+<span class="fc" id="L343">      throw new ApiException(</span>
+          HttpStatus.UNPROCESSABLE_ENTITY,
+          &quot;filtro_invalido&quot;,
+          &quot;Filtro invalido&quot;,
+          &quot;Revise los filtros de la búsqueda.&quot;,
+          errores);
+    }
+    Instant desde =
+<span class="fc bfc" id="L351" title="All 2 branches covered.">        filtro.desde() == null</span>
+<span class="fc" id="L352">            ? INICIO_DE_LOS_TIEMPOS</span>
+<span class="fc" id="L353">            : filtro.desde().atStartOfDay(TransicionOrdenService.ZONA_GUATEMALA).toInstant();</span>
+    Instant hasta =
+<span class="fc bfc" id="L355" title="All 2 branches covered.">        filtro.hasta() == null</span>
+<span class="fc" id="L356">            ? FIN_DE_LOS_TIEMPOS</span>
+            : filtro
+<span class="fc" id="L358">                .hasta()</span>
+<span class="fc" id="L359">                .plusDays(1)</span>
+<span class="fc" id="L360">                .atStartOfDay(TransicionOrdenService.ZONA_GUATEMALA)</span>
+<span class="fc" id="L361">                .toInstant();</span>
+<span class="fc" id="L362">    return new Filtros(tipo, prioridad, desde, hasta);</span>
+  }
+
+  /** Historial de estados ordenado por secuencia; nunca se modifica (RN-MTO-04). */
+  @Transactional(readOnly = true)
+  public List&lt;HistorialEstadoOrdenResponse&gt; historial(UUID ordenId) {
+<span class="fc" id="L368">    buscar(ordenId);</span>
+<span class="fc" id="L369">    return historial.findByOrdenMantenimientoIdOrderBySecuenciaAsc(ordenId).stream()</span>
+<span class="fc" id="L370">        .map(mapper::toHistorialResponse)</span>
+<span class="fc" id="L371">        .toList();</span>
+  }
+
+  private void exigirInspeccionDelPuente(UUID inspeccionId, UUID puenteId) {
+<span class="fc" id="L375">    UUID puenteDeInspeccion =</span>
+        inspecciones
+<span class="fc" id="L377">            .findPuenteIdByInspeccionId(inspeccionId)</span>
+<span class="fc" id="L378">            .orElseThrow(</span>
+                () -&gt;
+<span class="fc" id="L380">                    new ApiException(</span>
+                        HttpStatus.NOT_FOUND,
+                        &quot;inspeccion_no_encontrada&quot;,
+                        &quot;Inspeccion no encontrada&quot;,
+                        &quot;No existe la inspeccion &quot; + inspeccionId));
+<span class="fc bfc" id="L385" title="All 2 branches covered.">    if (!puenteDeInspeccion.equals(puenteId)) {</span>
+<span class="fc" id="L386">      throw new ApiException(</span>
+          HttpStatus.CONFLICT,
+          &quot;inspeccion_de_otro_puente&quot;,
+          &quot;Inspeccion de otro puente&quot;,
+          &quot;La inspeccion indicada no pertenece al puente de la orden.&quot;);
+    }
+<span class="fc" id="L392">  }</span>
+
+  private OrdenMantenimiento buscar(UUID ordenId) {
+<span class="fc" id="L395">    return ordenes</span>
+<span class="fc" id="L396">        .findById(ordenId)</span>
+<span class="fc" id="L397">        .orElseThrow(</span>
+            () -&gt;
+<span class="fc" id="L399">                new ApiException(</span>
+                    HttpStatus.NOT_FOUND,
+                    &quot;orden_no_encontrada&quot;,
+                    &quot;Orden no encontrada&quot;,
+                    &quot;No existe la orden de mantenimiento &quot; + ordenId));
+  }
+
+  /** Convierte un valor textual al enum o agrega el error con los valores permitidos. */
+  private static &lt;E extends Enum&lt;E&gt;&gt; E convertir(
+      Class&lt;E&gt; tipo, String valor, String campo, List&lt;Map&lt;String, String&gt;&gt; errores) {
+<span class="fc" id="L409">    String limpio = texto(valor);</span>
+<span class="fc bfc" id="L410" title="All 2 branches covered.">    if (limpio == null) {</span>
+<span class="fc" id="L411">      errores.add(error(campo, &quot;El campo es obligatorio.&quot;));</span>
+<span class="fc" id="L412">      return null;</span>
+    }
+    try {
+<span class="fc" id="L415">      return Enum.valueOf(tipo, limpio);</span>
+<span class="fc" id="L416">    } catch (IllegalArgumentException e) {</span>
+<span class="fc" id="L417">      String permitidos =</span>
+<span class="fc" id="L418">          Arrays.stream(tipo.getEnumConstants()).map(Enum::name).collect(Collectors.joining(&quot;, &quot;));</span>
+<span class="fc" id="L419">      errores.add(error(campo, &quot;Valor no permitido. Use uno de: &quot; + permitidos + &quot;.&quot;));</span>
+<span class="fc" id="L420">      return null;</span>
+    }
+  }
+
+  private static String texto(String valor) {
+<span class="fc bfc" id="L425" title="All 4 branches covered.">    return valor == null || valor.isBlank() ? null : valor.strip();</span>
+  }
+
+  private static Map&lt;String, String&gt; error(String campo, String mensaje) {
+<span class="fc" id="L429">    return Map.of(&quot;campo&quot;, campo, &quot;mensaje&quot;, mensaje);</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

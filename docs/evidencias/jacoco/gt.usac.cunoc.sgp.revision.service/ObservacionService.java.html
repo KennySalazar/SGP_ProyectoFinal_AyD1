@@ -1,0 +1,347 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ObservacionService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">sgp-api</a> &gt; <a href="index.source.html" class="el_package">gt.usac.cunoc.sgp.revision.service</a> &gt; <span class="el_source">ObservacionService.java</span></div><h1>ObservacionService.java</h1><pre class="source lang-java linenums">package gt.usac.cunoc.sgp.revision.service;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import gt.usac.cunoc.sgp.common.audit.model.AccionAuditoria;
+import gt.usac.cunoc.sgp.common.audit.service.AuditoriaWriter;
+import gt.usac.cunoc.sgp.common.exception.ApiException;
+import gt.usac.cunoc.sgp.common.util.UuidV7Generator;
+import gt.usac.cunoc.sgp.formulario.repository.VersionFormularioRepository;
+import gt.usac.cunoc.sgp.formulario.validation.AnclajeInvalidoException;
+import gt.usac.cunoc.sgp.formulario.validation.ValidadorAnclajeFormulario;
+import gt.usac.cunoc.sgp.inspeccion.repository.InspeccionRepository;
+import gt.usac.cunoc.sgp.inspeccion.validation.ValidadorCategoriaFotografica;
+import gt.usac.cunoc.sgp.revision.dto.*;
+import gt.usac.cunoc.sgp.revision.entity.ObservacionRevision;
+import gt.usac.cunoc.sgp.revision.entity.Revision;
+import gt.usac.cunoc.sgp.revision.mapper.ObservacionMapper;
+import gt.usac.cunoc.sgp.revision.model.EstadoObservacion;
+import gt.usac.cunoc.sgp.revision.model.TipoDestinoObservacion;
+import gt.usac.cunoc.sgp.revision.repository.ObservacionRevisionRepository;
+import gt.usac.cunoc.sgp.revision.repository.RevisionRepository;
+import jakarta.validation.Validator;
+import java.time.Clock;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+import org.springframework.dao.PessimisticLockingFailureException;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.http.HttpStatus;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+@Service
+@PreAuthorize(&quot;hasRole('CATEDRATICO')&quot;)
+@Transactional(readOnly = true)
+public class ObservacionService {
+  private final RevisionRepository revisiones;
+  private final InspeccionRepository inspecciones;
+  private final ObservacionRevisionRepository observaciones;
+  private final VersionFormularioRepository versiones;
+  private final ValidadorAnclajeFormulario anclajes;
+  private final ValidadorCategoriaFotografica categorias;
+  private final Validator validator;
+  private final AuditoriaWriter auditoria;
+  private final ObservacionMapper mapper;
+  private final ObjectMapper json;
+  private final Clock clock;
+
+  public ObservacionService(
+      RevisionRepository revisiones,
+      InspeccionRepository inspecciones,
+      ObservacionRevisionRepository observaciones,
+      VersionFormularioRepository versiones,
+      ValidadorAnclajeFormulario anclajes,
+      ValidadorCategoriaFotografica categorias,
+      Validator validator,
+      AuditoriaWriter auditoria,
+      ObservacionMapper mapper,
+      ObjectMapper json,
+<span class="fc" id="L63">      Clock clock) {</span>
+<span class="fc" id="L64">    this.revisiones = revisiones;</span>
+<span class="fc" id="L65">    this.inspecciones = inspecciones;</span>
+<span class="fc" id="L66">    this.observaciones = observaciones;</span>
+<span class="fc" id="L67">    this.versiones = versiones;</span>
+<span class="fc" id="L68">    this.anclajes = anclajes;</span>
+<span class="fc" id="L69">    this.categorias = categorias;</span>
+<span class="fc" id="L70">    this.validator = validator;</span>
+<span class="fc" id="L71">    this.auditoria = auditoria;</span>
+<span class="fc" id="L72">    this.mapper = mapper;</span>
+<span class="fc" id="L73">    this.json = json;</span>
+<span class="fc" id="L74">    this.clock = clock;</span>
+<span class="fc" id="L75">  }</span>
+
+  @PreAuthorize(&quot;hasRole('ESTUDIANTE')&quot;)
+  public Page&lt;CicloObservacionesResponse&gt; recibidas(UUID actor, int pagina, int tamanio) {
+<span class="pc bpc" id="L79" title="1 of 2 branches missed.">    if (actor == null)</span>
+<span class="nc" id="L80">      throw new ApiException(</span>
+          HttpStatus.UNAUTHORIZED,
+          &quot;autenticacion_requerida&quot;,
+          &quot;Autenticación requerida&quot;,
+          &quot;Se requiere una sesión válida.&quot;);
+<span class="pc bpc" id="L85" title="1 of 6 branches missed.">    if (pagina &lt; 0 || tamanio &lt; 1 || tamanio &gt; 100)</span>
+<span class="fc" id="L86">      throw new ApiException(</span>
+          HttpStatus.UNPROCESSABLE_ENTITY,
+          &quot;paginacion_invalida&quot;,
+          &quot;Paginación inválida&quot;,
+          &quot;La página debe ser no negativa y el tamaño debe estar entre 1 y 100.&quot;);
+<span class="fc" id="L91">    return observaciones</span>
+<span class="fc" id="L92">        .ciclosDelAutor(actor, PageRequest.of(pagina, tamanio))</span>
+<span class="fc" id="L93">        .map(</span>
+            r -&gt;
+<span class="fc" id="L95">                new CicloObservacionesResponse(</span>
+<span class="fc" id="L96">                    r.getId(),</span>
+<span class="fc" id="L97">                    r.getInspeccion().getId(),</span>
+<span class="fc" id="L98">                    r.getNumeroCiclo(),</span>
+<span class="fc" id="L99">                    r.getEstado(),</span>
+<span class="fc" id="L100">                    r.getEnviadaEn()));</span>
+  }
+
+  @Transactional
+  public ObservacionResponse crear(UUID revisionId, UUID actor, CrearObservacionRequest request) {
+<span class="fc" id="L105">    Revision ciclo = autorizar(revisionId, actor, true);</span>
+<span class="fc" id="L106">    validar(request);</span>
+<span class="fc" id="L107">    validarDestino(ciclo, request.destino());</span>
+<span class="fc" id="L108">    var destino = request.destino();</span>
+<span class="fc" id="L109">    UUID id = UuidV7Generator.generate();</span>
+    ObservacionRevision observacion =
+<span class="fc bfc" id="L111" title="All 2 branches covered.">        destino.tipo() == TipoDestinoObservacion.ELEMENTO</span>
+<span class="fc" id="L112">            ? ObservacionRevision.paraElemento(</span>
+                id,
+                ciclo,
+<span class="fc" id="L115">                destino.elementoRef(),</span>
+<span class="fc" id="L116">                destino.instanciaElementoId(),</span>
+<span class="fc" id="L117">                request.texto(),</span>
+                actor,
+<span class="fc" id="L119">                clock.instant())</span>
+<span class="fc" id="L120">            : ObservacionRevision.paraCategoriaFotografica(</span>
+<span class="fc" id="L121">                id, ciclo, destino.categoriaFotografica(), request.texto(), actor, clock.instant());</span>
+<span class="fc" id="L122">    observaciones.saveAndFlush(observacion);</span>
+<span class="fc" id="L123">    var respuesta = mapper.toResponse(observacion);</span>
+<span class="fc" id="L124">    auditar(actor, AccionAuditoria.CREAR, id, null, json.valueToTree(respuesta));</span>
+<span class="fc" id="L125">    return respuesta;</span>
+  }
+
+  @PreAuthorize(&quot;hasAnyRole('CATEDRATICO', 'ESTUDIANTE')&quot;)
+  public ListadoObservacionesResponse listar(UUID revisionId, UUID actor) {
+<span class="fc" id="L130">    autorizar(revisionId, actor, false);</span>
+<span class="fc" id="L131">    var lista =</span>
+<span class="fc" id="L132">        observaciones.findByRevisionIdOrderByCreadoEnAscIdAsc(revisionId).stream()</span>
+<span class="fc" id="L133">            .map(mapper::toResponse)</span>
+<span class="fc" id="L134">            .toList();</span>
+<span class="fc bfc" id="L135" title="All 2 branches covered.">    long pendientes = lista.stream().filter(o -&gt; o.estado() == EstadoObservacion.PENDIENTE).count();</span>
+<span class="fc" id="L136">    return new ListadoObservacionesResponse(</span>
+        revisionId,
+        lista,
+<span class="fc" id="L139">        lista.size(),</span>
+        pendientes,
+<span class="fc" id="L141">        new ObservacionGeneralResponse(revisionId, observaciones.buscarGeneral(revisionId)));</span>
+  }
+
+  @PreAuthorize(&quot;hasAnyRole('CATEDRATICO', 'ESTUDIANTE')&quot;)
+  public ObservacionResponse obtener(UUID revisionId, UUID id, UUID actor) {
+<span class="fc" id="L146">    autorizar(revisionId, actor, false);</span>
+<span class="fc" id="L147">    return mapper.toResponse(buscar(revisionId, id));</span>
+  }
+
+  @PreAuthorize(&quot;hasAnyRole('CATEDRATICO', 'ESTUDIANTE')&quot;)
+  public ContadorObservacionesResponse contar(UUID revisionId, UUID actor) {
+<span class="fc" id="L152">    autorizar(revisionId, actor, false);</span>
+<span class="fc" id="L153">    var cuenta = observaciones.contarPorCiclo(revisionId, EstadoObservacion.PENDIENTE);</span>
+<span class="fc" id="L154">    return new ContadorObservacionesResponse(revisionId, cuenta.getTotal(), cuenta.getPendientes());</span>
+  }
+
+  @Transactional
+  public ObservacionResponse editar(
+      UUID revisionId, UUID id, UUID actor, EditarObservacionRequest request) {
+<span class="fc" id="L160">    autorizar(revisionId, actor, true);</span>
+<span class="fc" id="L161">    var observacion = buscar(revisionId, id);</span>
+<span class="fc" id="L162">    validar(request);</span>
+<span class="fc" id="L163">    JsonNode antes = json.valueToTree(mapper.toResponse(observacion));</span>
+<span class="fc" id="L164">    observacion.editarTexto(request.texto());</span>
+<span class="fc" id="L165">    observaciones.flush();</span>
+<span class="fc" id="L166">    var respuesta = mapper.toResponse(observacion);</span>
+<span class="fc" id="L167">    auditar(actor, AccionAuditoria.MODIFICAR, id, antes, json.valueToTree(respuesta));</span>
+<span class="fc" id="L168">    return respuesta;</span>
+  }
+
+  @Transactional
+  public void eliminar(UUID revisionId, UUID id, UUID actor) {
+<span class="fc" id="L173">    autorizar(revisionId, actor, true);</span>
+<span class="fc" id="L174">    var observacion = buscar(revisionId, id);</span>
+<span class="fc" id="L175">    JsonNode antes = json.valueToTree(mapper.toResponse(observacion));</span>
+<span class="fc" id="L176">    observaciones.delete(observacion);</span>
+<span class="fc" id="L177">    observaciones.flush();</span>
+    // El catálogo existente no contiene ELIMINAR: MODIFICAR con posterior null registra la baja.
+<span class="fc" id="L179">    auditar(actor, AccionAuditoria.MODIFICAR, id, antes, null);</span>
+<span class="fc" id="L180">  }</span>
+
+  @PreAuthorize(&quot;hasAnyRole('CATEDRATICO', 'ESTUDIANTE')&quot;)
+  public ObservacionGeneralResponse obtenerGeneral(UUID revisionId, UUID actor) {
+<span class="fc" id="L184">    autorizar(revisionId, actor, false);</span>
+<span class="fc" id="L185">    return new ObservacionGeneralResponse(revisionId, observaciones.buscarGeneral(revisionId));</span>
+  }
+
+  @Transactional
+  public ObservacionGeneralResponse guardarGeneral(
+      UUID revisionId, UUID actor, ObservacionGeneralRequest request) {
+<span class="fc" id="L191">    autorizar(revisionId, actor, true);</span>
+<span class="fc" id="L192">    validar(request);</span>
+<span class="fc" id="L193">    var antes = new ObservacionGeneralResponse(revisionId, observaciones.buscarGeneral(revisionId));</span>
+<span class="fc" id="L194">    observaciones.actualizarGeneral(revisionId, request.texto());</span>
+<span class="fc" id="L195">    var despues = new ObservacionGeneralResponse(revisionId, request.texto());</span>
+<span class="fc" id="L196">    auditoria.registrarEnTransaccion(</span>
+        actor,
+<span class="fc bfc" id="L198" title="All 2 branches covered.">        antes.texto() == null ? AccionAuditoria.CREAR : AccionAuditoria.MODIFICAR,</span>
+        &quot;revision_observacion_general&quot;,
+        revisionId,
+<span class="fc" id="L201">        json.valueToTree(antes),</span>
+<span class="fc" id="L202">        json.valueToTree(despues),</span>
+        null);
+<span class="fc" id="L204">    return despues;</span>
+  }
+
+  /**
+   * Orden compartido con iniciar: ciclo (su consulta une inspección), después inspección. Ambos
+   * bloqueos se mantienen hasta confirmar datos y bitácora. Un cierre que solo bloquee inspección
+   * también se serializa. TransicionInspeccionService.aprobar/solicitarCambios/rechazar todavía
+   * cambian solo la inspección: su futura coordinación deberá resolver también Revision.
+   */
+  private Revision autorizar(UUID id, UUID actor, boolean escritura) {
+<span class="pc bpc" id="L214" title="1 of 2 branches missed.">    if (actor == null)</span>
+<span class="nc" id="L215">      throw new ApiException(</span>
+          HttpStatus.UNAUTHORIZED,
+          &quot;autenticacion_requerida&quot;,
+          &quot;Autenticación requerida&quot;,
+          &quot;Se requiere una sesión válida.&quot;);
+    // Autorizar antes del bloqueo evita revelar al ajeno si un ciclo existente está ocupado.
+<span class="fc bfc" id="L221" title="All 2 branches covered.">    if (!(escritura</span>
+<span class="fc bfc" id="L222" title="All 2 branches covered.">        ? observaciones.existeCicloDelRevisor(id, actor)</span>
+<span class="fc bfc" id="L223" title="All 2 branches covered.">        : observaciones.existeCicloLegible(id, actor))) throw noEncontrada();</span>
+    Revision ciclo;
+    try {
+      ciclo =
+<span class="fc bfc" id="L227" title="All 2 branches covered.">          (escritura ? revisiones.findByIdForUpdate(id) : revisiones.findById(id))</span>
+<span class="fc" id="L228">              .orElseThrow(this::noEncontrada);</span>
+<span class="pc bpc" id="L229" title="1 of 4 branches missed.">      if ((!ciclo.getRevisorId().equals(actor)</span>
+<span class="pc bpc" id="L230" title="1 of 2 branches missed.">              &amp;&amp; (escritura || !ciclo.getInspeccion().getAutorId().equals(actor)))</span>
+<span class="pc bpc" id="L231" title="1 of 2 branches missed.">          || ciclo.getInspeccion().getEliminadoEn() != null) throw noEncontrada();</span>
+<span class="fc bfc" id="L232" title="All 2 branches covered.">      if (escritura) {</span>
+<span class="fc" id="L233">        var inspeccion =</span>
+            inspecciones
+<span class="fc" id="L235">                .findByIdAndEliminadoEnIsNullForUpdate(ciclo.getInspeccion().getId())</span>
+<span class="fc" id="L236">                .orElseThrow(this::noEncontrada);</span>
+<span class="fc bfc" id="L237" title="All 2 branches covered.">        if (!&quot;EN_CURSO&quot;.equals(ciclo.getEstado())</span>
+<span class="fc bfc" id="L238" title="All 2 branches covered.">            || !&quot;EN_REVISION&quot;.equals(inspeccion.getEstado())) {</span>
+<span class="fc" id="L239">          throw new ApiException(</span>
+              HttpStatus.CONFLICT,
+              &quot;observaciones_ciclo_cerrado&quot;,
+              &quot;Ciclo no editable&quot;,
+              &quot;Las observaciones requieren un ciclo EN_CURSO y una inspección EN_REVISION.&quot;);
+        }
+      }
+<span class="fc" id="L246">    } catch (PessimisticLockingFailureException e) {</span>
+<span class="fc" id="L247">      throw new ApiException(</span>
+          HttpStatus.CONFLICT,
+          &quot;revision_en_proceso&quot;,
+          &quot;Revisión en proceso&quot;,
+          &quot;Otra operación está modificando la revisión. Reintente la operación.&quot;);
+<span class="fc" id="L252">    }</span>
+<span class="fc" id="L253">    return ciclo;</span>
+  }
+
+  private ObservacionRevision buscar(UUID revisionId, UUID id) {
+<span class="fc" id="L257">    return observaciones</span>
+<span class="fc" id="L258">        .findByIdAndRevisionId(id, revisionId)</span>
+<span class="fc" id="L259">        .orElseThrow(</span>
+            () -&gt;
+<span class="fc" id="L261">                new ApiException(</span>
+                    HttpStatus.NOT_FOUND,
+                    &quot;observacion_no_encontrada&quot;,
+                    &quot;Observación no encontrada&quot;,
+                    &quot;La observación no pertenece al ciclo solicitado.&quot;));
+  }
+
+  private void validarDestino(Revision ciclo, DestinoObservacion destino) {
+    try {
+<span class="fc bfc" id="L270" title="All 2 branches covered.">      if (destino.tipo() == TipoDestinoObservacion.CATEGORIA_FOTOGRAFICA) {</span>
+<span class="fc" id="L271">        categorias.validar(destino.categoriaFotografica().name());</span>
+<span class="fc" id="L272">        return;</span>
+      }
+<span class="fc" id="L274">      JsonNode contenido = ciclo.getContenidoEnviado();</span>
+      UUID versionId;
+      try {
+<span class="fc" id="L277">        versionId = UUID.fromString(contenido.path(&quot;versionFormularioId&quot;).asText());</span>
+<span class="nc" id="L278">      } catch (IllegalArgumentException | NullPointerException e) {</span>
+<span class="nc" id="L279">        throw snapshotInvalido();</span>
+<span class="fc" id="L280">      }</span>
+<span class="fc" id="L281">      var version = versiones.findById(versionId).orElseThrow(this::snapshotInvalido);</span>
+<span class="pc bpc" id="L282" title="1 of 2 branches missed.">      if (!contenido.path(&quot;datos&quot;).isObject()) throw snapshotInvalido();</span>
+<span class="fc" id="L283">      anclajes.validar(</span>
+<span class="fc" id="L284">          version.getEsquema(),</span>
+<span class="fc" id="L285">          contenido.path(&quot;datos&quot;),</span>
+<span class="fc" id="L286">          destino.elementoRef(),</span>
+<span class="fc" id="L287">          destino.instanciaElementoId());</span>
+<span class="fc" id="L288">    } catch (AnclajeInvalidoException e) {</span>
+<span class="fc" id="L289">      String campo =</span>
+<span class="pc bpc" id="L290" title="1 of 3 branches missed.">          switch (e.getMotivo()) {</span>
+            case INSTANCIA_REQUERIDA,
+                    INSTANCIA_NO_ENCONTRADA,
+                    INSTANCIA_DUPLICADA,
+                    INSTANCIA_NO_PERMITIDA,
+                    DATOS_REPETIBLE_INVALIDOS -&gt;
+<span class="fc" id="L296">                &quot;destino.instanciaElementoId&quot;;</span>
+<span class="nc" id="L297">            case CATEGORIA_FOTOGRAFICA_INVALIDA -&gt; &quot;destino.categoriaFotografica&quot;;</span>
+<span class="fc" id="L298">            default -&gt; &quot;destino.elementoRef&quot;;</span>
+          };
+<span class="fc" id="L300">      throw invalido(List.of(Map.of(&quot;campo&quot;, campo, &quot;mensaje&quot;, e.getMessage())));</span>
+<span class="fc" id="L301">    }</span>
+<span class="fc" id="L302">  }</span>
+
+  private void validar(Object request) {
+<span class="pc bpc" id="L305" title="1 of 2 branches missed.">    if (request == null)</span>
+<span class="nc" id="L306">      throw invalido(</span>
+<span class="nc" id="L307">          List.of(Map.of(&quot;campo&quot;, &quot;solicitud&quot;, &quot;mensaje&quot;, &quot;La solicitud es obligatoria&quot;)));</span>
+<span class="fc" id="L308">    var errores =</span>
+<span class="fc" id="L309">        validator.validate(request).stream()</span>
+<span class="fc" id="L310">            .map(e -&gt; Map.of(&quot;campo&quot;, e.getPropertyPath().toString(), &quot;mensaje&quot;, e.getMessage()))</span>
+<span class="pc" id="L311">            .sorted(Comparator.comparing(e -&gt; e.get(&quot;campo&quot;)))</span>
+<span class="fc" id="L312">            .toList();</span>
+<span class="fc bfc" id="L313" title="All 2 branches covered.">    if (!errores.isEmpty()) throw invalido(errores);</span>
+<span class="fc" id="L314">  }</span>
+
+  private void auditar(
+      UUID actor, AccionAuditoria accion, UUID id, JsonNode antes, JsonNode despues) {
+<span class="fc" id="L318">    auditoria.registrarEnTransaccion(</span>
+        actor, accion, &quot;observacion_revision&quot;, id, antes, despues, null);
+<span class="fc" id="L320">  }</span>
+
+  private ApiException noEncontrada() {
+<span class="fc" id="L323">    return new ApiException(</span>
+        HttpStatus.NOT_FOUND,
+        &quot;revision_no_encontrada&quot;,
+        &quot;Revisión no encontrada&quot;,
+        &quot;No existe la revisión solicitada o no corresponde al catedrático autenticado.&quot;);
+  }
+
+  private ApiException snapshotInvalido() {
+<span class="nc" id="L331">    return new ApiException(</span>
+        HttpStatus.CONFLICT,
+        &quot;revision_contenido_invalido&quot;,
+        &quot;Contenido enviado no disponible&quot;,
+        &quot;El ciclo no contiene una versión histórica y datos congelados válidos.&quot;);
+  }
+
+  private ApiException invalido(List&lt;Map&lt;String, String&gt;&gt; errores) {
+<span class="fc" id="L339">    return new ApiException(</span>
+        HttpStatus.UNPROCESSABLE_ENTITY,
+        &quot;observacion_invalida&quot;,
+        &quot;Observación inválida&quot;,
+        &quot;Revise el texto y el destino de la observación.&quot;,
+        errores);
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

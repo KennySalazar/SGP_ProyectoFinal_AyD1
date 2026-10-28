@@ -1,0 +1,413 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>GeneradorPropuestasMantenimientoService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">sgp-api</a> &gt; <a href="index.source.html" class="el_package">gt.usac.cunoc.sgp.mantenimiento.service</a> &gt; <span class="el_source">GeneradorPropuestasMantenimientoService.java</span></div><h1>GeneradorPropuestasMantenimientoService.java</h1><pre class="source lang-java linenums">package gt.usac.cunoc.sgp.mantenimiento.service;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import gt.usac.cunoc.sgp.common.audit.model.AccionAuditoria;
+import gt.usac.cunoc.sgp.common.audit.service.AuditoriaWriter;
+import gt.usac.cunoc.sgp.common.exception.ApiException;
+import gt.usac.cunoc.sgp.common.util.UuidV7Generator;
+import gt.usac.cunoc.sgp.formulario.entity.ConfiguracionIcElemento;
+import gt.usac.cunoc.sgp.formulario.repository.ConfiguracionIcElementoRepository;
+import gt.usac.cunoc.sgp.inspeccion.entity.Inspeccion;
+import gt.usac.cunoc.sgp.inspeccion.entity.ResultadoIc;
+import gt.usac.cunoc.sgp.inspeccion.model.EstadoInspeccion;
+import gt.usac.cunoc.sgp.inspeccion.repository.InspeccionRepository;
+import gt.usac.cunoc.sgp.inspeccion.repository.ResultadoIcRepository;
+import gt.usac.cunoc.sgp.inspeccion.service.ResolverElementosIc;
+import gt.usac.cunoc.sgp.inspeccion.service.ResolverElementosIc.ElementoResuelto;
+import gt.usac.cunoc.sgp.mantenimiento.dto.GeneracionPropuestasResponse;
+import gt.usac.cunoc.sgp.mantenimiento.entity.HistorialEstadoOrden;
+import gt.usac.cunoc.sgp.mantenimiento.entity.OrdenMantenimiento;
+import gt.usac.cunoc.sgp.mantenimiento.entity.ReglaMantenimiento;
+import gt.usac.cunoc.sgp.mantenimiento.model.EstadoOrden;
+import gt.usac.cunoc.sgp.mantenimiento.model.PrioridadOrden;
+import gt.usac.cunoc.sgp.mantenimiento.model.TipoOrden;
+import gt.usac.cunoc.sgp.mantenimiento.repository.HistorialEstadoOrdenRepository;
+import gt.usac.cunoc.sgp.mantenimiento.repository.OrdenMantenimientoRepository;
+import gt.usac.cunoc.sgp.mantenimiento.repository.ReglaMantenimientoRepository;
+import gt.usac.cunoc.sgp.notificacion.service.NotificacionService;
+import gt.usac.cunoc.sgp.usuario.entity.UserAccount;
+import gt.usac.cunoc.sgp.usuario.model.RoleName;
+import gt.usac.cunoc.sgp.usuario.repository.UserAccountRepository;
+import java.time.Clock;
+import java.time.Instant;
+import java.util.Comparator;
+import java.util.EnumSet;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
+import java.util.stream.Collectors;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpStatus;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
+
+/**
+ * Propone órdenes de mantenimiento a partir de los daños de una inspección publicada (HU-046,
+ * RN-MTO-01, RN-MTO-02, RN-MTO-03).
+ *
+ * &lt;p&gt;Evalúa las reglas activas de la versión del formulario con que se levantó la inspección. Cada
+ * condición que se cumple genera una orden en PROPUESTA: nunca aceptada ni programada. Es
+ * idempotente: la clave de generación impide duplicar y una orden aún en curso sobre el mismo
+ * elemento y regla no se vuelve a proponer.
+ */
+@Service
+public class GeneradorPropuestasMantenimientoService {
+
+<span class="fc" id="L63">  private static final Logger log =</span>
+<span class="fc" id="L64">      LoggerFactory.getLogger(GeneradorPropuestasMantenimientoService.class);</span>
+
+  /** Marca el proceso automático en la bitácora (RN-USR-09). */
+  static final String PROCESO = &quot;generar-propuestas-mantenimiento&quot;;
+
+  static final String TIPO_AVISO = &quot;MANTENIMIENTO_PROPUESTAS&quot;;
+
+<span class="fc" id="L71">  private static final Set&lt;EstadoOrden&gt; ESTADOS_EN_CURSO =</span>
+<span class="fc" id="L72">      EnumSet.of(EstadoOrden.PROPUESTA, EstadoOrden.PROGRAMADA, EstadoOrden.EN_EJECUCION);</span>
+
+  private final InspeccionRepository inspecciones;
+  private final ReglaMantenimientoRepository reglas;
+  private final OrdenMantenimientoRepository ordenes;
+  private final HistorialEstadoOrdenRepository historial;
+  private final ResultadoIcRepository resultadosIc;
+  private final ConfiguracionIcElementoRepository configuracionesIc;
+  private final UserAccountRepository usuarios;
+  private final ResolverElementosIc resolverElementos;
+  private final EvaluadorCondicionRegla evaluador;
+  private final AuditoriaWriter auditoria;
+  private final NotificacionService notificaciones;
+  private final ObjectMapper json;
+  private final Clock clock;
+
+  public GeneradorPropuestasMantenimientoService(
+      InspeccionRepository inspecciones,
+      ReglaMantenimientoRepository reglas,
+      OrdenMantenimientoRepository ordenes,
+      HistorialEstadoOrdenRepository historial,
+      ResultadoIcRepository resultadosIc,
+      ConfiguracionIcElementoRepository configuracionesIc,
+      UserAccountRepository usuarios,
+      ResolverElementosIc resolverElementos,
+      EvaluadorCondicionRegla evaluador,
+      AuditoriaWriter auditoria,
+      NotificacionService notificaciones,
+      ObjectMapper json,
+<span class="fc" id="L101">      Clock clock) {</span>
+<span class="fc" id="L102">    this.inspecciones = inspecciones;</span>
+<span class="fc" id="L103">    this.reglas = reglas;</span>
+<span class="fc" id="L104">    this.ordenes = ordenes;</span>
+<span class="fc" id="L105">    this.historial = historial;</span>
+<span class="fc" id="L106">    this.resultadosIc = resultadosIc;</span>
+<span class="fc" id="L107">    this.configuracionesIc = configuracionesIc;</span>
+<span class="fc" id="L108">    this.usuarios = usuarios;</span>
+<span class="fc" id="L109">    this.resolverElementos = resolverElementos;</span>
+<span class="fc" id="L110">    this.evaluador = evaluador;</span>
+<span class="fc" id="L111">    this.auditoria = auditoria;</span>
+<span class="fc" id="L112">    this.notificaciones = notificaciones;</span>
+<span class="fc" id="L113">    this.json = json;</span>
+<span class="fc" id="L114">    this.clock = clock;</span>
+<span class="fc" id="L115">  }</span>
+
+  /**
+   * Generación automática, disparada después de confirmar una publicación. Corre en su propia
+   * transacción: si falla, la publicación ya confirmada no se revierte (HU-046).
+   *
+   * @param publicadorId quien publicó o aprobó; recibe el aviso junto con los Administradores
+   */
+  @Transactional(propagation = Propagation.REQUIRES_NEW)
+  public GeneracionPropuestasResponse generarTrasPublicacion(UUID inspeccionId, UUID publicadorId) {
+<span class="fc" id="L125">    return ejecutar(inspeccionId, null, PROCESO, publicadorId);</span>
+  }
+
+  /**
+   * Un Administrador vuelve a evaluar una inspección, por ejemplo si la generación falló. Solo se
+   * crean las propuestas que faltan.
+   */
+  @Transactional
+  public GeneracionPropuestasResponse regenerar(UUID inspeccionId, UUID administradorId) {
+<span class="fc" id="L134">    return ejecutar(inspeccionId, administradorId, null, administradorId);</span>
+  }
+
+  private GeneracionPropuestasResponse ejecutar(
+      UUID inspeccionId, UUID actor, String proceso, UUID destinatarioAdicional) {
+<span class="fc" id="L139">    Inspeccion inspeccion =</span>
+        inspecciones
+<span class="fc" id="L141">            .findByIdAndEliminadoEnIsNullForUpdate(inspeccionId)</span>
+<span class="fc" id="L142">            .orElseThrow(</span>
+                () -&gt;
+<span class="fc" id="L144">                    new ApiException(</span>
+                        HttpStatus.NOT_FOUND,
+                        &quot;inspeccion_no_encontrada&quot;,
+                        &quot;Inspección no encontrada&quot;,
+                        &quot;No existe la inspección &quot; + inspeccionId));
+<span class="fc bfc" id="L149" title="All 2 branches covered.">    if (inspeccion.estadoActual() != EstadoInspeccion.PUBLICADA) {</span>
+<span class="fc" id="L150">      throw new ApiException(</span>
+          HttpStatus.CONFLICT,
+          &quot;inspeccion_no_publicada&quot;,
+          &quot;Inspección no publicada&quot;,
+          &quot;Solo una inspección publicada genera propuestas de mantenimiento.&quot;);
+    }
+
+<span class="fc" id="L157">    UUID puenteId = inspeccion.getPuente().getId();</span>
+<span class="fc" id="L158">    UUID versionId = inspeccion.getVersionFormulario().getId();</span>
+<span class="fc" id="L159">    ResultadoIc resultadoIc = resultadosIc.findPublicacionByInspeccionId(inspeccionId).orElse(null);</span>
+<span class="fc" id="L160">    List&lt;ConfiguracionIcElemento&gt; pesosConfigurados =</span>
+<span class="fc" id="L161">        configuracionesIc.findAllByVersionFormularioId(versionId);</span>
+<span class="fc" id="L162">    List&lt;ReglaMantenimiento&gt; activas =</span>
+<span class="fc" id="L163">        reglas.findByVersionFormularioIdAndActivaTrue(versionId).stream()</span>
+<span class="fc" id="L164">            .sorted(Comparator.comparing(ReglaMantenimiento::getCodigo))</span>
+<span class="fc" id="L165">            .toList();</span>
+
+<span class="fc" id="L167">    Contadores contadores = new Contadores(activas.size());</span>
+<span class="fc bfc" id="L168" title="All 2 branches covered.">    for (ReglaMantenimiento regla : activas) {</span>
+      try {
+<span class="fc" id="L170">        evaluarRegla(</span>
+            regla,
+            inspeccion,
+            puenteId,
+            resultadoIc,
+            pesosConfigurados,
+            versionId,
+            actor,
+            proceso,
+            contadores);
+<span class="fc" id="L180">      } catch (RuntimeException e) {</span>
+        // Una regla o un dato defectuoso no debe impedir evaluar las demás.
+<span class="fc" id="L182">        contadores.conError++;</span>
+<span class="fc" id="L183">        log.warn(</span>
+            &quot;No se pudo evaluar la regla {} sobre la inspección {}: {}&quot;,
+<span class="fc" id="L185">            regla.getCodigo(),</span>
+            inspeccionId,
+<span class="fc" id="L187">            e.getMessage());</span>
+<span class="fc" id="L188">      }</span>
+<span class="fc" id="L189">    }</span>
+
+<span class="fc bfc" id="L191" title="All 2 branches covered.">    if (contadores.creadas &gt; 0) {</span>
+<span class="fc" id="L192">      avisar(inspeccionId, contadores.creadas, destinatarioAdicional);</span>
+    }
+<span class="fc" id="L194">    return new GeneracionPropuestasResponse(</span>
+        inspeccionId,
+        contadores.evaluadas,
+        contadores.creadas,
+        contadores.yaGeneradas,
+        contadores.omitidas,
+        contadores.conError);
+  }
+
+  private void evaluarRegla(
+      ReglaMantenimiento regla,
+      Inspeccion inspeccion,
+      UUID puenteId,
+      ResultadoIc resultadoIc,
+      List&lt;ConfiguracionIcElemento&gt; pesosConfigurados,
+      UUID versionId,
+      UUID actor,
+      String proceso,
+      Contadores contadores) {
+<span class="fc" id="L213">    List&lt;ElementoResuelto&gt; elementos =</span>
+<span class="fc" id="L214">        resolverElementos.resolver(inspeccion.getDatos(), regla.getElementoRef());</span>
+<span class="fc bfc" id="L215" title="All 2 branches covered.">    for (ElementoResuelto elemento : elementos) {</span>
+<span class="fc" id="L216">      Optional&lt;JsonNode&gt; hallado = evaluador.evaluar(regla.getCondicion(), elemento.datos());</span>
+<span class="fc bfc" id="L217" title="All 2 branches covered.">      if (hallado.isEmpty()) {</span>
+<span class="fc" id="L218">        continue;</span>
+      }
+<span class="fc" id="L220">      String clave = claveGeneracion(regla, elemento);</span>
+<span class="fc bfc" id="L221" title="All 2 branches covered.">      if (ordenes.existsByInspeccionOrigenIdAndClaveGeneracion(inspeccion.getId(), clave)) {</span>
+<span class="fc" id="L222">        contadores.yaGeneradas++;</span>
+<span class="fc" id="L223">        continue;</span>
+      }
+<span class="fc bfc" id="L225" title="All 2 branches covered.">      if (hayOrdenEnCurso(puenteId, regla, elemento, versionId)) {</span>
+<span class="fc" id="L226">        contadores.omitidas++;</span>
+<span class="fc" id="L227">        continue;</span>
+      }
+<span class="fc" id="L229">      crear(</span>
+          regla,
+          inspeccion,
+          puenteId,
+          resultadoIc,
+          pesosConfigurados,
+          elemento,
+          clave,
+<span class="fc" id="L237">          hallado.get(),</span>
+          actor,
+          proceso);
+<span class="fc" id="L240">      contadores.creadas++;</span>
+<span class="fc" id="L241">    }</span>
+<span class="fc" id="L242">  }</span>
+
+  private static String claveGeneracion(ReglaMantenimiento regla, ElementoResuelto elemento) {
+<span class="fc" id="L245">    return regla.getCodigo()</span>
+        + &quot;:&quot;
+<span class="fc bfc" id="L247" title="All 2 branches covered.">        + (elemento.instanciaId() != null ? elemento.instanciaId() : &quot;-&quot;);</span>
+  }
+
+  /**
+   * Hay una orden en curso del mismo puente y elemento que viene de cualquier revisión de la regla.
+   */
+  private boolean hayOrdenEnCurso(
+      UUID puenteId, ReglaMantenimiento regla, ElementoResuelto elemento, UUID versionId) {
+<span class="fc" id="L255">    Set&lt;UUID&gt; revisiones =</span>
+        reglas
+<span class="fc" id="L257">            .findByCodigoAndVersionFormularioIdOrderByNumeroRevisionDesc(</span>
+<span class="fc" id="L258">                regla.getCodigo(), versionId)</span>
+<span class="fc" id="L259">            .stream()</span>
+<span class="fc" id="L260">            .map(ReglaMantenimiento::getId)</span>
+<span class="fc" id="L261">            .collect(Collectors.toSet());</span>
+<span class="fc" id="L262">    return ordenes</span>
+<span class="fc" id="L263">        .findPorElementoYEstados(puenteId, regla.getElementoRef(), ESTADOS_EN_CURSO)</span>
+<span class="fc" id="L264">        .stream()</span>
+<span class="fc" id="L265">        .anyMatch(</span>
+            orden -&gt;
+<span class="pc bpc" id="L267" title="1 of 2 branches missed.">                revisiones.contains(orden.getReglaOrigenId())</span>
+<span class="pc bpc" id="L268" title="1 of 2 branches missed.">                    &amp;&amp; Objects.equals(orden.getInstanciaElementoId(), elemento.instanciaId()));</span>
+  }
+
+  private void crear(
+      ReglaMantenimiento regla,
+      Inspeccion inspeccion,
+      UUID puenteId,
+      ResultadoIc resultadoIc,
+      List&lt;ConfiguracionIcElemento&gt; pesosConfigurados,
+      ElementoResuelto elemento,
+      String clave,
+      JsonNode valorEncontrado,
+      UUID actor,
+      String proceso) {
+<span class="fc" id="L282">    Instant ahora = clock.instant();</span>
+<span class="fc" id="L283">    TipoOrden tipo = regla.getTipoMantenimiento();</span>
+<span class="fc" id="L284">    PrioridadOrden prioridadBase = regla.getPrioridadBase();</span>
+<span class="fc" id="L285">    PrioridadSugeridaIc.Calculo calculo =</span>
+<span class="fc" id="L286">        PrioridadSugeridaIc.calcular(</span>
+            prioridadBase,
+            resultadoIc,
+<span class="fc" id="L289">            inspeccion.getVersionFormulario().getId(),</span>
+<span class="fc" id="L290">            regla.getElementoRef(),</span>
+            pesosConfigurados);
+<span class="fc" id="L292">    PrioridadOrden prioridad = calculo.prioridad();</span>
+<span class="fc" id="L293">    OrdenMantenimiento orden =</span>
+<span class="fc" id="L294">        ordenes.saveAndFlush(</span>
+<span class="fc" id="L295">            OrdenMantenimiento.propuestaGenerada(</span>
+<span class="fc" id="L296">                UuidV7Generator.generate(),</span>
+                puenteId,
+<span class="fc" id="L298">                inspeccion.getId(),</span>
+<span class="fc" id="L299">                regla.getId(),</span>
+<span class="fc bfc" id="L300" title="All 2 branches covered.">                resultadoIc == null ? null : resultadoIc.getId(),</span>
+<span class="fc" id="L301">                regla.getElementoRef(),</span>
+<span class="fc" id="L302">                elemento.instanciaId(),</span>
+                clave,
+                tipo,
+<span class="fc" id="L305">                regla.getIntervencionSugerida(),</span>
+                prioridad,
+<span class="fc" id="L307">                fundamento(regla, elemento, valorEncontrado, calculo),</span>
+                ahora));
+<span class="fc" id="L309">    historial.save(</span>
+        new HistorialEstadoOrden(
+<span class="fc" id="L311">            UuidV7Generator.generate(),</span>
+<span class="fc" id="L312">            orden.getId(),</span>
+            1,
+            null,
+<span class="fc" id="L315">            EstadoOrden.PROPUESTA.name(),</span>
+            actor,
+            null,
+            ahora));
+
+<span class="fc" id="L320">    ObjectNode despues =</span>
+<span class="fc" id="L321">        json.createObjectNode()</span>
+<span class="fc" id="L322">            .put(&quot;estado&quot;, orden.getEstado().name())</span>
+<span class="fc" id="L323">            .put(&quot;tipo&quot;, tipo.name())</span>
+<span class="fc" id="L324">            .put(&quot;prioridad&quot;, prioridad.name())</span>
+<span class="fc" id="L325">            .put(&quot;puenteId&quot;, puenteId.toString())</span>
+<span class="fc" id="L326">            .put(&quot;inspeccionOrigenId&quot;, inspeccion.getId().toString())</span>
+<span class="fc" id="L327">            .put(&quot;reglaCodigo&quot;, regla.getCodigo())</span>
+<span class="fc" id="L328">            .put(&quot;elementoRef&quot;, regla.getElementoRef());</span>
+<span class="fc" id="L329">    despues.put(&quot;prioridadSugerida&quot;, prioridad.name());</span>
+<span class="fc" id="L330">    auditoria.registrarEnTransaccion(</span>
+        actor,
+        AccionAuditoria.CREAR,
+        TransicionOrdenService.ENTIDAD,
+<span class="fc" id="L334">        orden.getId(),</span>
+        null,
+        despues,
+        proceso);
+<span class="fc" id="L338">  }</span>
+
+  /** Por qué se propone: qué valor se encontró y qué regla lo disparó. */
+  private ObjectNode fundamento(
+      ReglaMantenimiento regla,
+      ElementoResuelto elemento,
+      JsonNode valorEncontrado,
+      PrioridadSugeridaIc.Calculo calculo) {
+<span class="fc" id="L346">    JsonNode condicion = regla.getCondicion();</span>
+<span class="fc" id="L347">    ObjectNode fundamento =</span>
+<span class="fc" id="L348">        json.createObjectNode()</span>
+<span class="fc" id="L349">            .put(&quot;reglaCodigo&quot;, regla.getCodigo())</span>
+<span class="fc" id="L350">            .put(&quot;reglaRevision&quot;, regla.getNumeroRevision())</span>
+<span class="fc" id="L351">            .put(&quot;elementoRef&quot;, regla.getElementoRef())</span>
+<span class="fc" id="L352">            .put(&quot;indicador&quot;, condicion.path(&quot;indicador&quot;).asText())</span>
+<span class="fc" id="L353">            .put(&quot;operador&quot;, condicion.path(&quot;operador&quot;).asText());</span>
+<span class="fc" id="L354">    fundamento.set(&quot;umbral&quot;, condicion.get(&quot;umbral&quot;));</span>
+<span class="fc" id="L355">    fundamento.set(&quot;valorEncontrado&quot;, valorEncontrado);</span>
+<span class="fc" id="L356">    fundamento.put(&quot;prioridadBase&quot;, regla.getPrioridadBase().name());</span>
+<span class="fc" id="L357">    fundamento.put(&quot;prioridadSugerida&quot;, calculo.prioridad().name());</span>
+<span class="fc bfc" id="L358" title="All 2 branches covered.">    if (calculo.ic() != null) fundamento.put(&quot;indiceCondicion&quot;, calculo.ic().toPlainString());</span>
+<span class="pc bpc" id="L359" title="1 of 2 branches missed.">    if (calculo.pesoElemento() != null)</span>
+<span class="nc" id="L360">      fundamento.put(&quot;pesoElemento&quot;, calculo.pesoElemento().toPlainString());</span>
+<span class="pc bpc" id="L361" title="1 of 2 branches missed.">    if (calculo.pesoMaximo() != null)</span>
+<span class="nc" id="L362">      fundamento.put(&quot;pesoMaximoVersion&quot;, calculo.pesoMaximo().toPlainString());</span>
+<span class="pc bpc" id="L363" title="1 of 2 branches missed.">    if (calculo.pesoRelativo() != null)</span>
+<span class="nc" id="L364">      fundamento.put(&quot;pesoRelativo&quot;, calculo.pesoRelativo().toPlainString());</span>
+<span class="fc" id="L365">    fundamento.put(&quot;formulaPrioridad&quot;, &quot;HU-067-OPCION-3&quot;);</span>
+<span class="pc bpc" id="L366" title="1 of 2 branches missed.">    if (calculo.motivoFallback() != null)</span>
+<span class="fc" id="L367">      fundamento.put(&quot;motivoFallbackPrioridad&quot;, calculo.motivoFallback());</span>
+<span class="fc bfc" id="L368" title="All 2 branches covered.">    if (elemento.instanciaId() != null) {</span>
+<span class="fc" id="L369">      fundamento.put(&quot;instanciaElementoId&quot;, elemento.instanciaId().toString());</span>
+    }
+<span class="fc" id="L371">    return fundamento;</span>
+  }
+
+  /** Un solo aviso por inspección y destinatario: los Administradores y quien publicó. */
+  private void avisar(UUID inspeccionId, int creadas, UUID destinatarioAdicional) {
+<span class="fc" id="L376">    Set&lt;UUID&gt; destinatarios = new LinkedHashSet&lt;&gt;();</span>
+<span class="fc" id="L377">    usuarios.findByRole_NameAndActiveTrueOrderByEmailAsc(RoleName.ADMINISTRADOR).stream()</span>
+<span class="fc" id="L378">        .map(UserAccount::getId)</span>
+<span class="fc" id="L379">        .forEach(destinatarios::add);</span>
+<span class="pc bpc" id="L380" title="1 of 2 branches missed.">    if (destinatarioAdicional != null) {</span>
+<span class="fc" id="L381">      destinatarios.add(destinatarioAdicional);</span>
+    }
+    String mensaje =
+<span class="fc bfc" id="L384" title="All 2 branches covered.">        creadas == 1</span>
+<span class="fc" id="L385">            ? &quot;Se generó 1 propuesta de mantenimiento a partir de una inspección publicada.&quot;</span>
+            : &quot;Se generaron &quot;
+                + creadas
+<span class="fc" id="L388">                + &quot; propuestas de mantenimiento a partir de una inspección publicada.&quot;;</span>
+<span class="fc bfc" id="L389" title="All 2 branches covered.">    for (UUID destinatario : destinatarios) {</span>
+<span class="fc" id="L390">      notificaciones.notificar(</span>
+          destinatario,
+          TIPO_AVISO,
+          &quot;Nuevas propuestas de mantenimiento&quot;,
+          mensaje,
+          &quot;inspeccion&quot;,
+          inspeccionId,
+          &quot;mantenimiento-propuestas:&quot; + inspeccionId);
+<span class="fc" id="L398">    }</span>
+<span class="fc" id="L399">  }</span>
+
+  private static final class Contadores {
+    final int evaluadas;
+    int creadas;
+    int yaGeneradas;
+    int omitidas;
+    int conError;
+
+<span class="fc" id="L408">    Contadores(int evaluadas) {</span>
+<span class="fc" id="L409">      this.evaluadas = evaluadas;</span>
+<span class="fc" id="L410">    }</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

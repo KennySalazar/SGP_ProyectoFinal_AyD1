@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>OrdenMantenimientoMapper.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">sgp-api</a> &gt; <a href="index.source.html" class="el_package">gt.usac.cunoc.sgp.mantenimiento.mapper</a> &gt; <span class="el_source">OrdenMantenimientoMapper.java</span></div><h1>OrdenMantenimientoMapper.java</h1><pre class="source lang-java linenums">package gt.usac.cunoc.sgp.mantenimiento.mapper;
+
+import gt.usac.cunoc.sgp.archivo.entity.ArchivoEvidenciaMantenimiento;
+import gt.usac.cunoc.sgp.mantenimiento.dto.EjecucionOrdenResponse;
+import gt.usac.cunoc.sgp.mantenimiento.dto.EvidenciaMantenimientoResponse;
+import gt.usac.cunoc.sgp.mantenimiento.dto.HistorialEstadoOrdenResponse;
+import gt.usac.cunoc.sgp.mantenimiento.dto.OrdenMantenimientoResponse;
+import gt.usac.cunoc.sgp.mantenimiento.entity.HistorialEstadoOrden;
+import gt.usac.cunoc.sgp.mantenimiento.entity.OrdenMantenimiento;
+import gt.usac.cunoc.sgp.mantenimiento.entity.OrdenMantenimientoEjecucion;
+import java.time.Instant;
+import java.time.OffsetDateTime;
+import java.time.ZoneId;
+import org.mapstruct.Mapper;
+import org.mapstruct.Mapping;
+import org.mapstruct.ReportingPolicy;
+
+@Mapper(componentModel = &quot;spring&quot;, unmappedTargetPolicy = ReportingPolicy.ERROR)
+public interface OrdenMantenimientoMapper {
+
+  OrdenMantenimientoResponse toResponse(OrdenMantenimiento orden);
+
+  HistorialEstadoOrdenResponse toHistorialResponse(HistorialEstadoOrden historial);
+
+  @Mapping(target = &quot;ordenId&quot;, source = &quot;ejecucion.ordenMantenimientoId&quot;)
+  @Mapping(target = &quot;responsableUsuarioEmail&quot;, source = &quot;responsableUsuarioEmail&quot;)
+  EjecucionOrdenResponse toEjecucionResponse(
+      OrdenMantenimientoEjecucion ejecucion, String responsableUsuarioEmail);
+
+  @Mapping(target = &quot;id&quot;, source = &quot;archivoId&quot;)
+  @Mapping(target = &quot;ordenId&quot;, source = &quot;ordenMantenimientoId&quot;)
+  @Mapping(target = &quot;mimeReal&quot;, source = &quot;archivo.mimeReal&quot;)
+  @Mapping(target = &quot;tamanoBytes&quot;, source = &quot;archivo.tamanoBytes&quot;)
+  @Mapping(target = &quot;anchoPx&quot;, source = &quot;archivo.anchoPx&quot;)
+  @Mapping(target = &quot;altoPx&quot;, source = &quot;archivo.altoPx&quot;)
+  @Mapping(target = &quot;subidoPorId&quot;, source = &quot;archivo.subidoPorId&quot;)
+  @Mapping(target = &quot;subidoEn&quot;, source = &quot;creadoEn&quot;)
+  EvidenciaMantenimientoResponse toEvidenciaResponse(ArchivoEvidenciaMantenimiento evidencia);
+
+  default OffsetDateTime aHoraGuatemala(Instant instante) {
+<span class="fc bfc" id="L41" title="All 2 branches covered.">    return instante == null</span>
+<span class="fc" id="L42">        ? null</span>
+<span class="fc" id="L43">        : instante.atZone(ZoneId.of(&quot;America/Guatemala&quot;)).toOffsetDateTime();</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

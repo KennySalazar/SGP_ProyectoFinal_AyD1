@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CuentaInvitadaService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">sgp-api</a> &gt; <a href="index.source.html" class="el_package">gt.usac.cunoc.sgp.usuario.service</a> &gt; <span class="el_source">CuentaInvitadaService.java</span></div><h1>CuentaInvitadaService.java</h1><pre class="source lang-java linenums">package gt.usac.cunoc.sgp.usuario.service;
+
+import gt.usac.cunoc.sgp.common.audit.aspect.Auditable;
+import gt.usac.cunoc.sgp.common.audit.model.AccionAuditoria;
+import gt.usac.cunoc.sgp.usuario.entity.Role;
+import gt.usac.cunoc.sgp.usuario.entity.UserAccount;
+import gt.usac.cunoc.sgp.usuario.repository.UserAccountRepository;
+import java.security.SecureRandom;
+import java.util.Base64;
+import java.util.UUID;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+/**
+ * Cambios de estado de las cuentas creadas por invitación. Se separa de {@link InvitacionService}
+ * para que cada cambio pase por el proxy y quede auditado con sus valores anterior y posterior.
+ */
+@Service
+public class CuentaInvitadaService {
+
+  private final UserAccountRepository users;
+  private final PasswordEncoder passwordEncoder;
+<span class="fc" id="L25">  private final SecureRandom random = new SecureRandom();</span>
+
+  private final PerfilUsuarioService perfiles;
+
+  public CuentaInvitadaService(
+<span class="fc" id="L30">      UserAccountRepository users, PasswordEncoder passwordEncoder, PerfilUsuarioService perfiles) {</span>
+<span class="fc" id="L31">    this.users = users;</span>
+<span class="fc" id="L32">    this.passwordEncoder = passwordEncoder;</span>
+<span class="fc" id="L33">    this.perfiles = perfiles;</span>
+<span class="fc" id="L34">  }</span>
+
+  /**
+   * Crea la cuenta pendiente de invitación: sin verificar ni activar y con una contraseña aleatoria
+   * que nadie conoce, por lo que no puede iniciar sesión hasta aceptar la invitación.
+   */
+  @Transactional
+  @PreAuthorize(&quot;hasRole('ADMINISTRADOR')&quot;)
+  @Auditable(
+      accion = AccionAuditoria.CREAR,
+      entidad = &quot;usuario&quot;,
+      tipo = UserAccount.class,
+      emailArgIndex = 0)
+  public UserAccount crearPendiente(String email, Role rol) {
+<span class="fc" id="L48">    return users.saveAndFlush(</span>
+<span class="fc" id="L49">        new UserAccount(email, passwordEncoder.encode(secretoAleatorio()), rol, false, false));</span>
+  }
+
+  @Transactional
+  @Auditable(
+      accion = AccionAuditoria.CAMBIAR_ESTADO,
+      entidad = &quot;usuario&quot;,
+      tipo = UserAccount.class,
+      idArg = &quot;usuarioId&quot;,
+      actorEsEntidad = true)
+  public void activar(
+      UUID usuarioId, String password, String nombreCompleto, String nombreUsuario) {
+<span class="fc" id="L61">    UserAccount user =</span>
+        users
+<span class="fc" id="L63">            .findWithRoleById(usuarioId)</span>
+<span class="pc" id="L64">            .orElseThrow(() -&gt; new IllegalStateException(&quot;La invitacion no tiene cuenta asociada&quot;));</span>
+<span class="fc" id="L65">    perfiles.aplicar(user, nombreCompleto, nombreUsuario);</span>
+<span class="fc" id="L66">    user.setPasswordHash(passwordEncoder.encode(password));</span>
+<span class="fc" id="L67">    user.clearFailedLogins();</span>
+<span class="fc" id="L68">    user.verify();</span>
+<span class="fc" id="L69">    user.activate();</span>
+<span class="fc" id="L70">    perfiles.guardar(user);</span>
+<span class="fc" id="L71">  }</span>
+
+  private String secretoAleatorio() {
+<span class="fc" id="L74">    byte[] bytes = new byte[32];</span>
+<span class="fc" id="L75">    random.nextBytes(bytes);</span>
+<span class="fc" id="L76">    return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

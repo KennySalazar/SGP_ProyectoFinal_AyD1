@@ -1,0 +1,132 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>HistorialEstadoInspeccion.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">sgp-api</a> &gt; <a href="index.source.html" class="el_package">gt.usac.cunoc.sgp.inspeccion.entity</a> &gt; <span class="el_source">HistorialEstadoInspeccion.java</span></div><h1>HistorialEstadoInspeccion.java</h1><pre class="source lang-java linenums">package gt.usac.cunoc.sgp.inspeccion.entity;
+
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.Id;
+import jakarta.persistence.Table;
+import java.time.Instant;
+import java.util.UUID;
+
+/** Registro inmutable de cada cambio de estado de una inspección (RN-INS-13, RN-REV-06). */
+@Entity
+@Table(name = &quot;historial_estado_inspeccion&quot;)
+public class HistorialEstadoInspeccion {
+
+  @Id private UUID id;
+
+  @Column(name = &quot;inspeccion_id&quot;, nullable = false, updatable = false)
+  private UUID inspeccionId;
+
+  @Column(nullable = false, updatable = false)
+  private int secuencia;
+
+  @Column(name = &quot;estado_anterior&quot;, length = 30, updatable = false)
+  private String estadoAnterior;
+
+  @Column(name = &quot;estado_nuevo&quot;, nullable = false, length = 30, updatable = false)
+  private String estadoNuevo;
+
+  @Column(name = &quot;realizado_por_id&quot;, updatable = false)
+  private UUID realizadoPorId;
+
+  @Column(name = &quot;revision_id&quot;, updatable = false)
+  private UUID revisionId;
+
+  @Column(nullable = false, length = 60, updatable = false)
+  private String evento;
+
+  @Column(updatable = false, columnDefinition = &quot;text&quot;)
+  private String motivo;
+
+  @Column(name = &quot;creado_en&quot;, nullable = false, updatable = false)
+  private Instant creadoEn;
+
+<span class="fc" id="L44">  protected HistorialEstadoInspeccion() {}</span>
+
+  public HistorialEstadoInspeccion(
+      UUID id,
+      UUID inspeccionId,
+      int secuencia,
+      String estadoAnterior,
+      String estadoNuevo,
+      UUID realizadoPorId,
+      String evento,
+      String motivo,
+      Instant creadoEn) {
+<span class="nc" id="L56">    this(</span>
+        id,
+        inspeccionId,
+        secuencia,
+        estadoAnterior,
+        estadoNuevo,
+        realizadoPorId,
+        null,
+        evento,
+        motivo,
+        creadoEn);
+<span class="nc" id="L67">  }</span>
+
+  public HistorialEstadoInspeccion(
+      UUID id,
+      UUID inspeccionId,
+      int secuencia,
+      String estadoAnterior,
+      String estadoNuevo,
+      UUID realizadoPorId,
+      UUID revisionId,
+      String evento,
+      String motivo,
+<span class="fc" id="L79">      Instant creadoEn) {</span>
+<span class="fc" id="L80">    this.id = id;</span>
+<span class="fc" id="L81">    this.inspeccionId = inspeccionId;</span>
+<span class="fc" id="L82">    this.secuencia = secuencia;</span>
+<span class="fc" id="L83">    this.estadoAnterior = estadoAnterior;</span>
+<span class="fc" id="L84">    this.estadoNuevo = estadoNuevo;</span>
+<span class="fc" id="L85">    this.realizadoPorId = realizadoPorId;</span>
+<span class="fc" id="L86">    this.revisionId = revisionId;</span>
+<span class="fc" id="L87">    this.evento = evento;</span>
+<span class="fc" id="L88">    this.motivo = motivo;</span>
+<span class="fc" id="L89">    this.creadoEn = creadoEn;</span>
+<span class="fc" id="L90">  }</span>
+
+  public UUID getId() {
+<span class="nc" id="L93">    return id;</span>
+  }
+
+  public UUID getInspeccionId() {
+<span class="nc" id="L97">    return inspeccionId;</span>
+  }
+
+  public int getSecuencia() {
+<span class="nc" id="L101">    return secuencia;</span>
+  }
+
+  public String getEstadoAnterior() {
+<span class="nc" id="L105">    return estadoAnterior;</span>
+  }
+
+  public String getEstadoNuevo() {
+<span class="nc" id="L109">    return estadoNuevo;</span>
+  }
+
+  public UUID getRealizadoPorId() {
+<span class="nc" id="L113">    return realizadoPorId;</span>
+  }
+
+  public UUID getRevisionId() {
+<span class="nc" id="L117">    return revisionId;</span>
+  }
+
+  public String getEvento() {
+<span class="nc" id="L121">    return evento;</span>
+  }
+
+  public String getMotivo() {
+<span class="nc" id="L125">    return motivo;</span>
+  }
+
+  public Instant getCreadoEn() {
+<span class="nc" id="L129">    return creadoEn;</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

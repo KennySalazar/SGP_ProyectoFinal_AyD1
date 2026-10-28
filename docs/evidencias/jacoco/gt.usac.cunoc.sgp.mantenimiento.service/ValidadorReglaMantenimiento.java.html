@@ -1,0 +1,120 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ValidadorReglaMantenimiento.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">sgp-api</a> &gt; <a href="index.source.html" class="el_package">gt.usac.cunoc.sgp.mantenimiento.service</a> &gt; <span class="el_source">ValidadorReglaMantenimiento.java</span></div><h1>ValidadorReglaMantenimiento.java</h1><pre class="source lang-java linenums">package gt.usac.cunoc.sgp.mantenimiento.service;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import gt.usac.cunoc.sgp.common.exception.ApiException;
+import org.springframework.http.HttpStatus;
+import org.springframework.stereotype.Component;
+
+@Component
+<span class="fc" id="L9">public class ValidadorReglaMantenimiento {</span>
+
+  public void validar(JsonNode esquemaRaiz, String elementoRef, JsonNode condicion) {
+<span class="pc bpc" id="L12" title="2 of 4 branches missed.">    if (esquemaRaiz == null || !esquemaRaiz.isObject()) {</span>
+<span class="nc" id="L13">      throw new ApiException(</span>
+          HttpStatus.UNPROCESSABLE_ENTITY,
+          &quot;regla_mantenimiento_invalida&quot;,
+          &quot;Esquema inválido&quot;,
+          &quot;El esquema de la versión de formulario no está disponible o es inválido&quot;);
+    }
+
+<span class="pc bpc" id="L20" title="3 of 6 branches missed.">    if (elementoRef == null || !elementoRef.startsWith(&quot;/&quot;) || elementoRef.trim().length() &lt; 2) {</span>
+<span class="nc" id="L21">      throw new ApiException(</span>
+          HttpStatus.UNPROCESSABLE_ENTITY,
+          &quot;regla_mantenimiento_invalida&quot;,
+          &quot;Ruta de elemento inválida&quot;,
+          &quot;El campo elemento_ref debe comenzar con '/' y especificar una ruta válida en el esquema&quot;);
+    }
+
+<span class="fc" id="L28">    String[] segmentos = elementoRef.substring(1).split(&quot;/&quot;, -1);</span>
+<span class="fc" id="L29">    JsonNode actual = esquemaRaiz;</span>
+
+<span class="fc bfc" id="L31" title="All 2 branches covered.">    for (String segmento : segmentos) {</span>
+<span class="pc bpc" id="L32" title="1 of 2 branches missed.">      if (segmento.isBlank()) {</span>
+<span class="nc" id="L33">        throw new ApiException(</span>
+            HttpStatus.UNPROCESSABLE_ENTITY,
+            &quot;regla_mantenimiento_invalida&quot;,
+            &quot;Ruta de elemento inválida&quot;,
+            &quot;El campo elemento_ref contiene segmentos vacíos: &quot; + elementoRef);
+      }
+
+<span class="fc" id="L40">      actual = resolverReferencias(esquemaRaiz, actual);</span>
+<span class="fc bfc" id="L41" title="All 2 branches covered.">      if (actual.has(&quot;items&quot;)) {</span>
+<span class="fc" id="L42">        actual = resolverReferencias(esquemaRaiz, actual.path(&quot;items&quot;));</span>
+      }
+
+<span class="fc" id="L45">      JsonNode props = actual.path(&quot;properties&quot;);</span>
+<span class="fc bfc" id="L46" title="All 2 branches covered.">      if (!props.has(segmento)) {</span>
+<span class="fc" id="L47">        throw new ApiException(</span>
+            HttpStatus.UNPROCESSABLE_ENTITY,
+            &quot;regla_mantenimiento_invalida&quot;,
+            &quot;Elemento no encontrado&quot;,
+            &quot;El elemento '&quot;
+                + elementoRef
+                + &quot;' no existe en el esquema (segmento no encontrado: '&quot;
+                + segmento
+                + &quot;')&quot;);
+      }
+<span class="fc" id="L57">      actual = props.get(segmento);</span>
+    }
+
+<span class="fc" id="L60">    actual = resolverReferencias(esquemaRaiz, actual);</span>
+<span class="pc bpc" id="L61" title="1 of 2 branches missed.">    if (actual.has(&quot;items&quot;)) {</span>
+<span class="nc" id="L62">      actual = resolverReferencias(esquemaRaiz, actual.path(&quot;items&quot;));</span>
+    }
+
+<span class="pc bpc" id="L65" title="3 of 6 branches missed.">    if (condicion == null || !condicion.isObject() || condicion.isEmpty()) {</span>
+<span class="nc" id="L66">      throw new ApiException(</span>
+          HttpStatus.UNPROCESSABLE_ENTITY,
+          &quot;regla_mantenimiento_invalida&quot;,
+          &quot;Condición requerida&quot;,
+          &quot;La condición de la regla debe ser un objeto JSON válido&quot;);
+    }
+
+<span class="pc bpc" id="L73" title="1 of 2 branches missed.">    if (!condicion.hasNonNull(&quot;indicador&quot;)) {</span>
+<span class="nc" id="L74">      throw new ApiException(</span>
+          HttpStatus.UNPROCESSABLE_ENTITY,
+          &quot;regla_mantenimiento_invalida&quot;,
+          &quot;Indicador requerido&quot;,
+          &quot;La condición de la regla debe especificar un campo 'indicador'&quot;);
+    }
+
+<span class="fc" id="L81">    String indicador = condicion.get(&quot;indicador&quot;).asText().trim();</span>
+<span class="pc bpc" id="L82" title="1 of 2 branches missed.">    if (indicador.isEmpty()) {</span>
+<span class="nc" id="L83">      throw new ApiException(</span>
+          HttpStatus.UNPROCESSABLE_ENTITY,
+          &quot;regla_mantenimiento_invalida&quot;,
+          &quot;Indicador vacío&quot;,
+          &quot;El campo 'indicador' de la condición no puede estar vacío&quot;);
+    }
+
+<span class="fc" id="L90">    JsonNode propiedadesElemento = actual.path(&quot;properties&quot;);</span>
+<span class="fc bfc" id="L91" title="All 2 branches covered.">    if (!propiedadesElemento.has(indicador)) {</span>
+<span class="fc" id="L92">      throw new ApiException(</span>
+          HttpStatus.UNPROCESSABLE_ENTITY,
+          &quot;regla_mantenimiento_invalida&quot;,
+          &quot;Indicador no encontrado&quot;,
+          &quot;El indicador '&quot;
+              + indicador
+              + &quot;' no existe en el elemento '&quot;
+              + elementoRef
+              + &quot;' del esquema&quot;);
+    }
+<span class="fc" id="L102">  }</span>
+
+  private JsonNode resolverReferencias(JsonNode raiz, JsonNode nodo) {
+<span class="pc bpc" id="L105" title="2 of 4 branches missed.">    if (nodo == null || !nodo.isObject()) {</span>
+<span class="nc" id="L106">      return nodo;</span>
+    }
+<span class="fc" id="L108">    int profundidad = 0;</span>
+<span class="pc bpc" id="L109" title="1 of 4 branches missed.">    while (nodo.hasNonNull(&quot;$ref&quot;) &amp;&amp; profundidad &lt; 32) {</span>
+<span class="fc" id="L110">      String ref = nodo.get(&quot;$ref&quot;).asText();</span>
+<span class="pc bpc" id="L111" title="1 of 2 branches missed.">      if (!ref.startsWith(&quot;#/&quot;)) {</span>
+<span class="nc" id="L112">        break;</span>
+      }
+<span class="fc" id="L114">      nodo = raiz.at(ref.substring(1));</span>
+<span class="fc" id="L115">      profundidad++;</span>
+<span class="fc" id="L116">    }</span>
+<span class="fc" id="L117">    return nodo;</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

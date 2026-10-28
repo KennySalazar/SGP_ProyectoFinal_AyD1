@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ActualizarCursoRequest.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">sgp-api</a> &gt; <a href="index.source.html" class="el_package">gt.usac.cunoc.sgp.curso.dto</a> &gt; <span class="el_source">ActualizarCursoRequest.java</span></div><h1>ActualizarCursoRequest.java</h1><pre class="source lang-java linenums">package gt.usac.cunoc.sgp.curso.dto;
+
+import jakarta.validation.constraints.AssertTrue;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
+import java.time.LocalDate;
+import java.util.UUID;
+
+<span class="fc" id="L10">public record ActualizarCursoRequest(</span>
+    @NotBlank(message = &quot;El nombre es obligatorio&quot;) @Size(max = 150) String nombre,
+    @NotBlank(message = &quot;El periodo es obligatorio&quot;) @Size(max = 50) String periodo,
+    @NotNull(message = &quot;El catedratico es obligatorio&quot;) UUID catedraticoId,
+    @NotNull(message = &quot;La fecha de inicio es obligatoria&quot;) LocalDate fechaInicio,
+    @NotNull(message = &quot;La fecha de fin es obligatoria&quot;) LocalDate fechaFin) {
+  @AssertTrue(message = &quot;La fecha de fin debe ser posterior o igual a la fecha de inicio&quot;)
+  public boolean isRangoFechasValido() {
+<span class="nc bnc" id="L18" title="All 6 branches missed.">    return fechaInicio == null || fechaFin == null || !fechaFin.isBefore(fechaInicio);</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

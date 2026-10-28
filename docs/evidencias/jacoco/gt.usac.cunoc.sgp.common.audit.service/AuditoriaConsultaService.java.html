@@ -1,0 +1,222 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AuditoriaConsultaService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">sgp-api</a> &gt; <a href="index.source.html" class="el_package">gt.usac.cunoc.sgp.common.audit.service</a> &gt; <span class="el_source">AuditoriaConsultaService.java</span></div><h1>AuditoriaConsultaService.java</h1><pre class="source lang-java linenums">package gt.usac.cunoc.sgp.common.audit.service;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import gt.usac.cunoc.sgp.common.audit.dto.AuditoriaDetalleResponse;
+import gt.usac.cunoc.sgp.common.audit.dto.AuditoriaResponse;
+import gt.usac.cunoc.sgp.common.audit.dto.CambioAuditoria;
+import gt.usac.cunoc.sgp.common.audit.entity.Auditoria;
+import gt.usac.cunoc.sgp.common.audit.mapper.AuditoriaMapper;
+import gt.usac.cunoc.sgp.common.audit.model.AccionAuditoria;
+import gt.usac.cunoc.sgp.common.audit.repository.AuditoriaRepository;
+import gt.usac.cunoc.sgp.common.exception.ApiException;
+import gt.usac.cunoc.sgp.common.util.EmailNormalizer;
+import gt.usac.cunoc.sgp.usuario.entity.UserAccount;
+import gt.usac.cunoc.sgp.usuario.repository.UserAccountRepository;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.UUID;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
+import org.springframework.http.HttpStatus;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+@Service
+@Transactional(readOnly = true)
+public class AuditoriaConsultaService {
+
+  private final AuditoriaRepository repositorio;
+  private final AuditoriaMapper mapper;
+  private final UserAccountRepository usuarios;
+
+  public AuditoriaConsultaService(
+<span class="fc" id="L39">      AuditoriaRepository repositorio, AuditoriaMapper mapper, UserAccountRepository usuarios) {</span>
+<span class="fc" id="L40">    this.repositorio = repositorio;</span>
+<span class="fc" id="L41">    this.mapper = mapper;</span>
+<span class="fc" id="L42">    this.usuarios = usuarios;</span>
+<span class="fc" id="L43">  }</span>
+
+  public Page&lt;AuditoriaResponse&gt; consultar(
+      UUID usuarioId,
+      String entidad,
+      String accion,
+      Instant desde,
+      Instant hasta,
+      int pagina,
+      int tamanio) {
+<span class="fc" id="L53">    return consultar(usuarioId, null, entidad, accion, desde, hasta, pagina, tamanio);</span>
+  }
+
+  public Page&lt;AuditoriaResponse&gt; consultar(
+      UUID usuarioId,
+      String usuarioEmail,
+      String entidad,
+      String accion,
+      Instant desde,
+      Instant hasta,
+      int pagina,
+      int tamanio) {
+
+<span class="fc bfc" id="L66" title="All 6 branches covered.">    if (pagina &lt; 0 || tamanio &lt; 1 || tamanio &gt; 100) {</span>
+<span class="fc" id="L67">      throw new ApiException(</span>
+          HttpStatus.UNPROCESSABLE_ENTITY,
+          &quot;paginacion_invalida&quot;,
+          &quot;Datos de auditoria invalidos&quot;,
+          &quot;La página debe ser mayor o igual a 0 y el tamaño debe estar entre 1 y 100.&quot;);
+    }
+
+<span class="fc" id="L74">    AccionAuditoria filtroAccion = convertirAccion(accion);</span>
+<span class="pc bpc" id="L75" title="1 of 6 branches missed.">    if (desde != null &amp;&amp; hasta != null &amp;&amp; desde.isAfter(hasta)) {</span>
+<span class="fc" id="L76">      throw new ApiException(</span>
+          HttpStatus.UNPROCESSABLE_ENTITY,
+          &quot;rango_invalido&quot;,
+          &quot;Datos de auditoria invalidos&quot;,
+          &quot;La fecha inicial debe ser anterior o igual a la fecha final.&quot;);
+    }
+
+<span class="fc" id="L83">    var pageable =</span>
+<span class="fc" id="L84">        PageRequest.of(</span>
+<span class="fc" id="L85">            pagina, tamanio, Sort.by(Sort.Order.desc(&quot;creadoEn&quot;), Sort.Order.desc(&quot;id&quot;)));</span>
+
+<span class="fc" id="L87">    Specification&lt;Auditoria&gt; filtros = Specification.where(null);</span>
+<span class="fc" id="L88">    UUID actor = usuarioId;</span>
+<span class="pc bpc" id="L89" title="1 of 4 branches missed.">    if (usuarioEmail != null &amp;&amp; !usuarioEmail.isBlank()) {</span>
+<span class="fc" id="L90">      var usuario = usuarios.findByEmail(EmailNormalizer.normalize(usuarioEmail));</span>
+<span class="pc bpc" id="L91" title="1 of 6 branches missed.">      if (usuario.isEmpty() || (actor != null &amp;&amp; !actor.equals(usuario.get().getId()))) {</span>
+<span class="fc" id="L92">        return Page.empty(pageable);</span>
+      }
+<span class="fc" id="L94">      actor = usuario.get().getId();</span>
+    }
+<span class="fc" id="L96">    UUID filtroUsuario = actor;</span>
+<span class="fc bfc" id="L97" title="All 2 branches covered.">    if (filtroUsuario != null)</span>
+<span class="fc" id="L98">      filtros =</span>
+<span class="fc" id="L99">          filtros.and(</span>
+<span class="fc" id="L100">              (raiz, consulta, criterio) -&gt; criterio.equal(raiz.get(&quot;usuarioId&quot;), filtroUsuario));</span>
+<span class="pc bpc" id="L101" title="1 of 4 branches missed.">    if (entidad != null &amp;&amp; !entidad.isBlank())</span>
+<span class="fc" id="L102">      filtros =</span>
+<span class="fc" id="L103">          filtros.and((raiz, consulta, criterio) -&gt; criterio.equal(raiz.get(&quot;entidad&quot;), entidad));</span>
+<span class="pc bpc" id="L104" title="1 of 2 branches missed.">    if (filtroAccion != null)</span>
+<span class="nc" id="L105">      filtros =</span>
+<span class="nc" id="L106">          filtros.and(</span>
+<span class="nc" id="L107">              (raiz, consulta, criterio) -&gt; criterio.equal(raiz.get(&quot;accion&quot;), filtroAccion));</span>
+<span class="fc bfc" id="L108" title="All 2 branches covered.">    if (desde != null)</span>
+<span class="fc" id="L109">      filtros =</span>
+<span class="fc" id="L110">          filtros.and(</span>
+              (raiz, consulta, criterio) -&gt;
+<span class="fc" id="L112">                  criterio.greaterThanOrEqualTo(raiz.get(&quot;creadoEn&quot;), desde));</span>
+<span class="fc bfc" id="L113" title="All 2 branches covered.">    if (hasta != null)</span>
+<span class="fc" id="L114">      filtros =</span>
+<span class="fc" id="L115">          filtros.and(</span>
+              (raiz, consulta, criterio) -&gt;
+<span class="fc" id="L117">                  criterio.lessThanOrEqualTo(raiz.get(&quot;creadoEn&quot;), hasta));</span>
+
+<span class="fc" id="L119">    var registros = repositorio.findAll(filtros, pageable);</span>
+<span class="fc" id="L120">    var ids =</span>
+<span class="fc" id="L121">        registros.stream()</span>
+<span class="fc" id="L122">            .map(Auditoria::getUsuarioId)</span>
+<span class="fc" id="L123">            .filter(Objects::nonNull)</span>
+<span class="fc" id="L124">            .distinct()</span>
+<span class="fc" id="L125">            .toList();</span>
+<span class="fc" id="L126">    Map&lt;UUID, String&gt; correos = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L127" title="All 2 branches covered.">    if (!ids.isEmpty()) {</span>
+<span class="fc" id="L128">      usuarios</span>
+<span class="fc" id="L129">          .findAllById(ids)</span>
+<span class="fc" id="L130">          .forEach(usuario -&gt; correos.put(usuario.getId(), usuario.getEmail()));</span>
+    }
+<span class="fc" id="L132">    return registros.map(</span>
+<span class="fc" id="L133">        registro -&gt; mapper.toResponse(registro, correos.get(registro.getUsuarioId())));</span>
+  }
+
+  public AuditoriaDetalleResponse detalle(UUID id) {
+<span class="fc" id="L137">    Auditoria registro =</span>
+        repositorio
+<span class="fc" id="L139">            .findById(id)</span>
+<span class="fc" id="L140">            .orElseThrow(</span>
+                () -&gt;
+<span class="fc" id="L142">                    new ApiException(</span>
+                        HttpStatus.NOT_FOUND,
+                        &quot;auditoria_no_encontrada&quot;,
+                        &quot;Registro no encontrado&quot;,
+                        &quot;El registro de auditoría no existe.&quot;));
+<span class="fc" id="L147">    Map&lt;String, JsonNode&gt; anteriores = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L148">    Map&lt;String, JsonNode&gt; posteriores = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L149">    aplanar(&quot;&quot;, registro.getValoresAnteriores(), anteriores);</span>
+<span class="fc" id="L150">    aplanar(&quot;&quot;, registro.getValoresPosteriores(), posteriores);</span>
+<span class="fc" id="L151">    List&lt;CambioAuditoria&gt; cambios = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L152" title="All 2 branches covered.">    for (String campo : posteriores.keySet()) {</span>
+<span class="fc bfc" id="L153" title="All 2 branches covered.">      if (!anteriores.containsKey(campo)</span>
+<span class="fc bfc" id="L154" title="All 2 branches covered.">          || !Objects.equals(anteriores.get(campo), posteriores.get(campo))) {</span>
+<span class="fc" id="L155">        cambios.add(</span>
+            new CambioAuditoria(
+<span class="fc" id="L157">                campo, textoLegible(anteriores.get(campo)), textoLegible(posteriores.get(campo))));</span>
+      }
+<span class="fc" id="L159">    }</span>
+<span class="fc bfc" id="L160" title="All 2 branches covered.">    for (String campo : anteriores.keySet()) {</span>
+<span class="fc bfc" id="L161" title="All 2 branches covered.">      if (!posteriores.containsKey(campo)) {</span>
+<span class="fc" id="L162">        cambios.add(new CambioAuditoria(campo, textoLegible(anteriores.get(campo)), null));</span>
+      }
+<span class="fc" id="L164">    }</span>
+    String correo =
+<span class="pc bpc" id="L166" title="1 of 2 branches missed.">        registro.getUsuarioId() == null</span>
+<span class="nc" id="L167">            ? null</span>
+<span class="fc" id="L168">            : usuarios.findById(registro.getUsuarioId()).map(UserAccount::getEmail).orElse(null);</span>
+<span class="fc" id="L169">    AuditoriaResponse resumen = mapper.toResponse(registro, correo);</span>
+<span class="fc" id="L170">    return new AuditoriaDetalleResponse(</span>
+<span class="fc" id="L171">        resumen.id(),</span>
+<span class="fc" id="L172">        resumen.usuarioId(),</span>
+<span class="fc" id="L173">        resumen.accion(),</span>
+<span class="fc" id="L174">        resumen.entidad(),</span>
+<span class="fc" id="L175">        resumen.entidadId(),</span>
+<span class="fc" id="L176">        resumen.procesoAutomatico(),</span>
+<span class="fc" id="L177">        resumen.creadoEn(),</span>
+        cambios,
+        correo);
+  }
+
+  private void aplanar(String prefijo, JsonNode nodo, Map&lt;String, JsonNode&gt; destino) {
+<span class="fc bfc" id="L183" title="All 2 branches covered.">    if (nodo == null) return;</span>
+<span class="fc bfc" id="L184" title="All 4 branches covered.">    if (nodo.isObject() &amp;&amp; !nodo.isEmpty()) {</span>
+<span class="fc" id="L185">      nodo.fields()</span>
+<span class="fc" id="L186">          .forEachRemaining(</span>
+              campo -&gt;
+<span class="fc" id="L188">                  aplanar(</span>
+<span class="fc bfc" id="L189" title="All 2 branches covered.">                      prefijo.isEmpty() ? campo.getKey() : prefijo + &quot;.&quot; + campo.getKey(),</span>
+<span class="fc" id="L190">                      campo.getValue(),</span>
+                      destino));
+<span class="pc bpc" id="L192" title="1 of 4 branches missed.">    } else if (nodo.isArray() &amp;&amp; !nodo.isEmpty()) {</span>
+<span class="nc bnc" id="L193" title="All 2 branches missed.">      for (int i = 0; i &lt; nodo.size(); i++) aplanar(prefijo + &quot;[&quot; + i + &quot;]&quot;, nodo.get(i), destino);</span>
+    } else {
+<span class="pc bpc" id="L195" title="1 of 2 branches missed.">      destino.put(prefijo.isEmpty() ? &quot;valor&quot; : prefijo, nodo);</span>
+    }
+<span class="fc" id="L197">  }</span>
+
+  private String textoLegible(JsonNode nodo) {
+<span class="fc bfc" id="L200" title="All 4 branches covered.">    if (nodo == null || nodo.isNull()) return null;</span>
+<span class="fc bfc" id="L201" title="All 4 branches covered.">    if (nodo.isBoolean()) return nodo.asBoolean() ? &quot;Sí&quot; : &quot;No&quot;;</span>
+<span class="fc bfc" id="L202" title="All 2 branches covered.">    if (nodo.isArray()) return &quot;Lista vacía&quot;;</span>
+<span class="fc bfc" id="L203" title="All 2 branches covered.">    if (nodo.isObject()) return &quot;Sin campos&quot;;</span>
+<span class="fc" id="L204">    return nodo.asText();</span>
+  }
+
+  private AccionAuditoria convertirAccion(String accion) {
+<span class="fc bfc" id="L208" title="All 2 branches covered.">    if (accion == null) {</span>
+<span class="fc" id="L209">      return null;</span>
+    }
+    try {
+<span class="nc" id="L212">      return AccionAuditoria.valueOf(accion);</span>
+<span class="fc" id="L213">    } catch (IllegalArgumentException excepcion) {</span>
+<span class="fc" id="L214">      throw new ApiException(</span>
+          HttpStatus.UNPROCESSABLE_ENTITY,
+          &quot;accion_invalida&quot;,
+          &quot;Datos de auditoria invalidos&quot;,
+          &quot;La acción debe ser CREAR, MODIFICAR, CAMBIAR_ESTADO o MODERAR.&quot;);
+    }
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

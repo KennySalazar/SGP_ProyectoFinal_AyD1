@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ConfiguracionIcElementoRequest.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">sgp-api</a> &gt; <a href="index.source.html" class="el_package">gt.usac.cunoc.sgp.formulario.dto</a> &gt; <span class="el_source">ConfiguracionIcElementoRequest.java</span></div><h1>ConfiguracionIcElementoRequest.java</h1><pre class="source lang-java linenums">package gt.usac.cunoc.sgp.formulario.dto;
+
+import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.Digits;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
+import java.math.BigDecimal;
+
+<span class="fc" id="L10">public record ConfiguracionIcElementoRequest(</span>
+    @NotBlank(message = &quot;La referencia del elemento es obligatoria&quot;)
+        @Size(max = 300, message = &quot;La referencia no debe superar 300 caracteres&quot;)
+        String elementoRef,
+    @NotNull(message = &quot;El peso es obligatorio&quot;)
+        @DecimalMin(value = &quot;0&quot;, inclusive = false, message = &quot;El peso debe ser mayor a cero&quot;)
+        @Digits(
+            integer = 6,
+            fraction = 6,
+            message = &quot;El peso admite hasta 6 digitos enteros y 6 decimales&quot;)
+        BigDecimal peso,
+    @NotBlank(message = &quot;La descripcion es obligatoria&quot;)
+        @Size(max = 500, message = &quot;La descripcion no debe superar 500 caracteres&quot;)
+        String descripcion) {}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

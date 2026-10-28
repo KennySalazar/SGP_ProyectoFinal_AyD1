@@ -1,0 +1,311 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>InvitacionService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">sgp-api</a> &gt; <a href="index.source.html" class="el_package">gt.usac.cunoc.sgp.usuario.service</a> &gt; <span class="el_source">InvitacionService.java</span></div><h1>InvitacionService.java</h1><pre class="source lang-java linenums">package gt.usac.cunoc.sgp.usuario.service;
+
+import gt.usac.cunoc.sgp.common.audit.aspect.Auditable;
+import gt.usac.cunoc.sgp.common.audit.model.AccionAuditoria;
+import gt.usac.cunoc.sgp.common.config.InvitacionProperties;
+import gt.usac.cunoc.sgp.common.exception.ApiException;
+import gt.usac.cunoc.sgp.common.util.EmailNormalizer;
+import gt.usac.cunoc.sgp.common.util.TokenHasher;
+import gt.usac.cunoc.sgp.common.util.UuidV7Generator;
+import gt.usac.cunoc.sgp.usuario.dto.AceptarInvitacionRequest;
+import gt.usac.cunoc.sgp.usuario.dto.CrearInvitacionRequest;
+import gt.usac.cunoc.sgp.usuario.dto.InvitacionPublicaResponse;
+import gt.usac.cunoc.sgp.usuario.dto.InvitacionResponse;
+import gt.usac.cunoc.sgp.usuario.dto.MessageResponse;
+import gt.usac.cunoc.sgp.usuario.dto.TokenInvitacionRequest;
+import gt.usac.cunoc.sgp.usuario.entity.InvitacionUsuario;
+import gt.usac.cunoc.sgp.usuario.entity.Role;
+import gt.usac.cunoc.sgp.usuario.entity.UserAccount;
+import gt.usac.cunoc.sgp.usuario.mapper.InvitacionMapper;
+import gt.usac.cunoc.sgp.usuario.model.EstadoInvitacion;
+import gt.usac.cunoc.sgp.usuario.model.RoleName;
+import gt.usac.cunoc.sgp.usuario.repository.InvitacionUsuarioRepository;
+import gt.usac.cunoc.sgp.usuario.repository.RoleRepository;
+import gt.usac.cunoc.sgp.usuario.repository.UserAccountRepository;
+import java.security.SecureRandom;
+import java.time.Clock;
+import java.time.Duration;
+import java.time.Instant;
+import java.util.Base64;
+import java.util.EnumSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.UUID;
+import java.util.stream.Collectors;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
+import org.springframework.http.HttpStatus;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+/** Invitaciones del Administrador para roles que no pueden autorregistrarse (RN-USR-03). */
+@Service
+public class InvitacionService {
+
+  private static final String ENTIDAD = &quot;invitacion_usuario&quot;;
+
+  /** Roles habilitados para invitación; HU-004 amplía esta lista. */
+<span class="fc" id="L52">  private static final Set&lt;RoleName&gt; ROLES_INVITABLES =</span>
+<span class="fc" id="L53">      EnumSet.of(RoleName.CATEDRATICO, RoleName.PROFESIONAL_EXTERNO);</span>
+
+  private final InvitacionUsuarioRepository invitaciones;
+  private final UserAccountRepository users;
+  private final RoleRepository roles;
+  private final CuentaInvitadaService cuentas;
+  private final ProfesionalService profesionales;
+  private final InvitacionEmailService invitacionEmailService;
+  private final InvitacionMapper mapper;
+  private final InvitacionProperties properties;
+  private final Clock clock;
+<span class="fc" id="L64">  private final SecureRandom random = new SecureRandom();</span>
+
+  public InvitacionService(
+      InvitacionUsuarioRepository invitaciones,
+      UserAccountRepository users,
+      RoleRepository roles,
+      CuentaInvitadaService cuentas,
+      ProfesionalService profesionales,
+      InvitacionEmailService invitacionEmailService,
+      InvitacionMapper mapper,
+      InvitacionProperties properties,
+<span class="fc" id="L75">      Clock clock) {</span>
+<span class="fc" id="L76">    this.invitaciones = invitaciones;</span>
+<span class="fc" id="L77">    this.users = users;</span>
+<span class="fc" id="L78">    this.roles = roles;</span>
+<span class="fc" id="L79">    this.cuentas = cuentas;</span>
+<span class="fc" id="L80">    this.profesionales = profesionales;</span>
+<span class="fc" id="L81">    this.invitacionEmailService = invitacionEmailService;</span>
+<span class="fc" id="L82">    this.mapper = mapper;</span>
+<span class="fc" id="L83">    this.properties = properties;</span>
+<span class="fc" id="L84">    this.clock = clock;</span>
+<span class="fc" id="L85">  }</span>
+
+  @Transactional
+  @PreAuthorize(&quot;hasRole('ADMINISTRADOR')&quot;)
+  @Auditable(accion = AccionAuditoria.CREAR, entidad = ENTIDAD)
+  public InvitacionResponse invitar(CrearInvitacionRequest request, UUID administradorId) {
+<span class="pc bpc" id="L91" title="1 of 4 branches missed.">    if (request.rol() == null || !ROLES_INVITABLES.contains(request.rol())) {</span>
+<span class="fc" id="L92">      throw new ApiException(</span>
+          HttpStatus.UNPROCESSABLE_ENTITY,
+          &quot;rol_no_invitable&quot;,
+          &quot;Rol no invitable&quot;,
+          &quot;Solo se pueden enviar invitaciones para los roles Catedratico y Profesional externo.&quot;);
+    }
+<span class="fc bfc" id="L98" title="All 2 branches covered.">    boolean esProfesional = request.rol() == RoleName.PROFESIONAL_EXTERNO;</span>
+<span class="fc" id="L99">    String numeroColegiado =</span>
+<span class="fc" id="L100">        ProfesionalService.colegiadoParaRol(request.rol(), request.numeroColegiado());</span>
+
+<span class="fc" id="L102">    String email = EmailNormalizer.normalize(request.email());</span>
+<span class="fc" id="L103">    UserAccount existente = users.findByEmail(email).orElse(null);</span>
+<span class="fc bfc" id="L104" title="All 2 branches covered.">    if (existente != null) {</span>
+<span class="fc" id="L105">      throw correoRegistrado(existente);</span>
+    }
+<span class="fc bfc" id="L107" title="All 4 branches covered.">    if (esProfesional &amp;&amp; profesionales.colegiadoRegistrado(numeroColegiado)) {</span>
+<span class="fc" id="L108">      throw ProfesionalService.colegiadoDuplicado();</span>
+    }
+
+<span class="fc" id="L111">    Role rol =</span>
+        roles
+<span class="fc" id="L113">            .findByName(request.rol())</span>
+<span class="pc" id="L114">            .orElseThrow(() -&gt; new IllegalStateException(&quot;Falta el rol &quot; + request.rol()));</span>
+
+<span class="fc" id="L116">    UserAccount cuenta = cuentas.crearPendiente(email, rol);</span>
+<span class="fc bfc" id="L117" title="All 2 branches covered.">    if (esProfesional) {</span>
+      // La cuenta queda pendiente de verificación de colegiado hasta que el Administrador la
+      // apruebe.
+<span class="fc" id="L120">      profesionales.registrar(cuenta.getId(), numeroColegiado);</span>
+    }
+<span class="fc" id="L122">    return emitir(email, rol, cuenta.getId(), administradorId, numeroColegiado);</span>
+  }
+
+  /**
+   * Reemplaza una invitación pendiente o vencida por una nueva con otro enlace y nueva vigencia. El
+   * enlace anterior queda cancelado.
+   */
+  @Transactional
+  @PreAuthorize(&quot;hasRole('ADMINISTRADOR')&quot;)
+  @Auditable(accion = AccionAuditoria.CREAR, entidad = ENTIDAD)
+  public InvitacionResponse reenviar(UUID id, UUID administradorId) {
+<span class="fc" id="L133">    InvitacionUsuario anterior =</span>
+<span class="fc" id="L134">        invitaciones.findByIdForUpdate(id).orElseThrow(this::invitacionNoEncontrada);</span>
+
+<span class="fc" id="L136">    Instant ahora = clock.instant();</span>
+<span class="fc" id="L137">    EstadoInvitacion estado = anterior.estado(ahora);</span>
+<span class="pc bpc" id="L138" title="1 of 4 branches missed.">    if (estado == EstadoInvitacion.ACEPTADA || estado == EstadoInvitacion.CANCELADA) {</span>
+<span class="fc" id="L139">      throw new ApiException(</span>
+          HttpStatus.CONFLICT,
+          &quot;invitacion_no_reenviable&quot;,
+          &quot;Invitacion no reenviable&quot;,
+<span class="pc bpc" id="L143" title="1 of 2 branches missed.">          estado == EstadoInvitacion.ACEPTADA</span>
+<span class="fc" id="L144">              ? &quot;La invitacion ya fue aceptada.&quot;</span>
+<span class="pc" id="L145">              : &quot;La invitacion fue reemplazada por otra mas reciente.&quot;);</span>
+    }
+
+<span class="fc" id="L148">    anterior.cancelar(ahora);</span>
+    // Se libera la restricción de una invitación pendiente por correo y rol antes de crear la
+    // nueva.
+<span class="fc" id="L151">    invitaciones.saveAndFlush(anterior);</span>
+
+<span class="fc" id="L153">    UUID usuarioId = anterior.getUsuarioCreadoId();</span>
+<span class="fc" id="L154">    return emitir(</span>
+<span class="fc" id="L155">        anterior.getEmail(),</span>
+<span class="fc" id="L156">        anterior.getRol(),</span>
+        usuarioId,
+        administradorId,
+<span class="pc bpc" id="L159" title="1 of 2 branches missed.">        usuarioId == null ? null : profesionales.colegiadosDe(List.of(usuarioId)).get(usuarioId));</span>
+  }
+
+  @Transactional(readOnly = true)
+  @PreAuthorize(&quot;hasRole('ADMINISTRADOR')&quot;)
+  public Page&lt;InvitacionResponse&gt; listar(EstadoInvitacion estado, int pagina, int tamanio) {
+<span class="fc bfc" id="L165" title="All 6 branches covered.">    if (pagina &lt; 0 || tamanio &lt; 1 || tamanio &gt; 100) {</span>
+<span class="fc" id="L166">      throw new ApiException(</span>
+          HttpStatus.UNPROCESSABLE_ENTITY,
+          &quot;paginacion_invalida&quot;,
+          &quot;Paginación inválida&quot;,
+          &quot;La página debe ser mayor o igual a 0 y el tamaño debe estar entre 1 y 100.&quot;);
+    }
+
+<span class="fc" id="L173">    Instant ahora = clock.instant();</span>
+<span class="fc" id="L174">    var pageable =</span>
+<span class="fc" id="L175">        PageRequest.of(</span>
+<span class="fc" id="L176">            pagina, tamanio, Sort.by(Sort.Order.desc(&quot;creadoEn&quot;), Sort.Order.desc(&quot;id&quot;)));</span>
+
+<span class="fc" id="L178">    Page&lt;InvitacionUsuario&gt; resultado =</span>
+<span class="pc bpc" id="L179" title="1 of 2 branches missed.">        invitaciones.findByEstado(estado == null ? null : estado.name(), ahora, pageable);</span>
+<span class="fc" id="L180">    Map&lt;UUID, String&gt; colegiados =</span>
+<span class="fc" id="L181">        profesionales.colegiadosDe(</span>
+<span class="fc" id="L182">            resultado.getContent().stream()</span>
+<span class="fc" id="L183">                .map(InvitacionUsuario::getUsuarioCreadoId)</span>
+<span class="fc" id="L184">                .filter(Objects::nonNull)</span>
+<span class="fc" id="L185">                .collect(Collectors.toSet()));</span>
+
+<span class="fc" id="L187">    return resultado.map(</span>
+        invitacion -&gt;
+<span class="fc" id="L189">            mapper.toResponse(</span>
+                invitacion,
+<span class="fc" id="L191">                invitacion.estado(ahora),</span>
+<span class="fc" id="L192">                colegiados.get(invitacion.getUsuarioCreadoId())));</span>
+  }
+
+  /** Permite al invitado comprobar su enlace antes de definir la contraseña. */
+  @Transactional(readOnly = true)
+  public InvitacionPublicaResponse validar(TokenInvitacionRequest request) {
+<span class="fc" id="L198">    InvitacionUsuario invitacion =</span>
+        invitaciones
+<span class="fc" id="L200">            .findByTokenHash(TokenHasher.sha256(request.token()))</span>
+<span class="fc" id="L201">            .orElseThrow(this::invitacionInvalida);</span>
+
+<span class="fc" id="L203">    exigirPendiente(invitacion, clock.instant());</span>
+<span class="fc" id="L204">    return mapper.toPublicaResponse(invitacion);</span>
+  }
+
+  @Transactional
+  public MessageResponse aceptar(AceptarInvitacionRequest request) {
+<span class="fc bfc" id="L209" title="All 2 branches covered.">    if (!PasswordPolicy.isValid(request.password())) {</span>
+<span class="fc" id="L210">      throw new ApiException(</span>
+          HttpStatus.BAD_REQUEST,
+          &quot;contrasena_invalida&quot;,
+          &quot;Contraseña invalida&quot;,
+          &quot;La contraseña debe tener entre 10 y 72 caracteres e incluir al menos una letra y un&quot;
+              + &quot; digito&quot;);
+    }
+
+<span class="fc" id="L218">    InvitacionUsuario invitacion =</span>
+        invitaciones
+<span class="fc" id="L220">            .findByTokenHashForUpdate(TokenHasher.sha256(request.token()))</span>
+<span class="fc" id="L221">            .orElseThrow(this::invitacionInvalida);</span>
+
+<span class="fc" id="L223">    Instant ahora = clock.instant();</span>
+<span class="fc" id="L224">    exigirPendiente(invitacion, ahora);</span>
+
+<span class="fc" id="L226">    invitacion.aceptar(ahora);</span>
+<span class="fc" id="L227">    cuentas.activar(</span>
+<span class="fc" id="L228">        invitacion.getUsuarioCreadoId(),</span>
+<span class="fc" id="L229">        request.password(),</span>
+<span class="fc" id="L230">        request.nombreCompleto(),</span>
+<span class="fc" id="L231">        request.nombreUsuario());</span>
+
+<span class="fc" id="L233">    return new MessageResponse(&quot;La cuenta fue activada. Ya puede iniciar sesion.&quot;);</span>
+  }
+
+  private InvitacionResponse emitir(
+      String email, Role rol, UUID usuarioId, UUID administradorId, String numeroColegiado) {
+<span class="fc" id="L238">    Instant ahora = clock.instant();</span>
+<span class="fc" id="L239">    String token = generarToken();</span>
+
+<span class="fc" id="L241">    InvitacionUsuario guardada =</span>
+<span class="fc" id="L242">        invitaciones.saveAndFlush(</span>
+            new InvitacionUsuario(
+<span class="fc" id="L244">                UuidV7Generator.generate(),</span>
+                email,
+                rol,
+<span class="fc" id="L247">                TokenHasher.sha256(token),</span>
+                administradorId,
+                usuarioId,
+                ahora,
+<span class="fc" id="L251">                ahora.plus(Duration.ofHours(properties.getVigenciaHoras()))));</span>
+
+    // Si el correo falla, la transacción se revierte y no queda una cuenta sin invitación.
+<span class="fc" id="L254">    invitacionEmailService.enviarInvitacion(email, rol.getName(), token, guardada.getExpiraEn());</span>
+
+<span class="fc" id="L256">    return mapper.toResponse(guardada, guardada.estado(ahora), numeroColegiado);</span>
+  }
+
+  private void exigirPendiente(InvitacionUsuario invitacion, Instant ahora) {
+<span class="fc" id="L260">    EstadoInvitacion estado = invitacion.estado(ahora);</span>
+<span class="fc bfc" id="L261" title="All 2 branches covered.">    if (estado == EstadoInvitacion.VENCIDA) {</span>
+<span class="fc" id="L262">      throw new ApiException(</span>
+          HttpStatus.GONE,
+          &quot;invitacion_vencida&quot;,
+          &quot;Invitacion vencida&quot;,
+          &quot;El enlace de invitacion vencio. Solicite al Administrador que reenvie la invitacion.&quot;);
+    }
+<span class="fc bfc" id="L268" title="All 2 branches covered.">    if (estado != EstadoInvitacion.PENDIENTE) {</span>
+<span class="fc" id="L269">      throw invitacionInvalida();</span>
+    }
+<span class="fc" id="L271">  }</span>
+
+  private ApiException correoRegistrado(UserAccount existente) {
+<span class="fc bfc" id="L274" title="All 2 branches covered.">    if (invitaciones.existsByUsuarioCreadoIdAndAceptadoEnIsNullAndCanceladoEnIsNull(</span>
+<span class="fc" id="L275">        existente.getId())) {</span>
+<span class="fc" id="L276">      return new ApiException(</span>
+          HttpStatus.CONFLICT,
+          &quot;invitacion_pendiente&quot;,
+          &quot;Invitacion pendiente&quot;,
+          &quot;El correo ya tiene una invitacion sin aceptar. Utilice el reenvio de la invitacion.&quot;);
+    }
+<span class="fc" id="L282">    return new ApiException(</span>
+        HttpStatus.CONFLICT,
+        &quot;email_already_registered&quot;,
+        &quot;Correo ya registrado&quot;,
+        &quot;El correo electronico ya esta registrado&quot;);
+  }
+
+  private ApiException invitacionInvalida() {
+<span class="fc" id="L290">    return new ApiException(</span>
+        HttpStatus.BAD_REQUEST,
+        &quot;invitacion_invalida&quot;,
+        &quot;Invitacion invalida&quot;,
+        &quot;El enlace de invitacion no es valido o ya fue utilizado.&quot;);
+  }
+
+  private ApiException invitacionNoEncontrada() {
+<span class="nc" id="L298">    return new ApiException(</span>
+        HttpStatus.NOT_FOUND,
+        &quot;invitacion_no_encontrada&quot;,
+        &quot;Invitacion no encontrada&quot;,
+        &quot;No existe una invitacion con el identificador proporcionado.&quot;);
+  }
+
+  private String generarToken() {
+<span class="fc" id="L306">    byte[] bytes = new byte[32];</span>
+<span class="fc" id="L307">    random.nextBytes(bytes);</span>
+<span class="fc" id="L308">    return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

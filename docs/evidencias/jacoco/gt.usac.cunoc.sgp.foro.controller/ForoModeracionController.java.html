@@ -1,0 +1,131 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ForoModeracionController.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">sgp-api</a> &gt; <a href="index.source.html" class="el_package">gt.usac.cunoc.sgp.foro.controller</a> &gt; <span class="el_source">ForoModeracionController.java</span></div><h1>ForoModeracionController.java</h1><pre class="source lang-java linenums">package gt.usac.cunoc.sgp.foro.controller;
+
+import gt.usac.cunoc.sgp.common.exception.ApiException;
+import gt.usac.cunoc.sgp.common.security.JwtData;
+import gt.usac.cunoc.sgp.foro.dto.ComentarioResponse;
+import gt.usac.cunoc.sgp.foro.dto.EditarComentarioRequest;
+import gt.usac.cunoc.sgp.foro.dto.HiloResponse;
+import gt.usac.cunoc.sgp.foro.dto.InspeccionSinRevisionResponse;
+import gt.usac.cunoc.sgp.foro.dto.MotivoModeracionRequest;
+import gt.usac.cunoc.sgp.foro.service.ForoModeracionService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import java.util.UUID;
+import org.springframework.data.domain.Page;
+import org.springframework.http.HttpStatus;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+/**
+ * Edición, eliminación y moderación del foro (HU-065). El autor edita y elimina sus comentarios
+ * (RN-FOR-05); solo el Catedrático y el Administrador ocultan comentarios, cierran hilos y revisan
+ * las inspecciones publicadas sin revisión (RN-FOR-08, RN-REV-02).
+ */
+@RestController
+@RequestMapping(&quot;/api/v1&quot;)
+@SecurityRequirement(name = &quot;bearerAuth&quot;)
+@Tag(name = &quot;Foro&quot;, description = &quot;Hilos por puente y por inspección, y sus comentarios&quot;)
+public class ForoModeracionController {
+
+  private final ForoModeracionService moderacion;
+
+<span class="fc" id="L42">  public ForoModeracionController(ForoModeracionService moderacion) {</span>
+<span class="fc" id="L43">    this.moderacion = moderacion;</span>
+<span class="fc" id="L44">  }</span>
+
+  @PutMapping(&quot;/comentarios/{comentarioId}&quot;)
+  @PreAuthorize(&quot;isAuthenticated()&quot;)
+  @Operation(
+      summary = &quot;Editar un comentario propio&quot;,
+      description =
+          &quot;Solo su autor (403 si no) y dentro de los 15 minutos siguientes a publicarlo según la &quot;
+              + &quot;hora del servidor (409 plazo_edicion_vencido si no). 409 si el comentario está &quot;
+              + &quot;eliminado u oculto o el hilo está cerrado; 422 si el texto falta o excede 2000 &quot;
+              + &quot;caracteres.&quot;)
+  public ComentarioResponse editar(
+      @PathVariable UUID comentarioId,
+      @RequestBody EditarComentarioRequest request,
+      Authentication authentication) {
+<span class="fc" id="L59">    return moderacion.editar(comentarioId, request, usuarioId(authentication));</span>
+  }
+
+  @DeleteMapping(&quot;/comentarios/{comentarioId}&quot;)
+  @PreAuthorize(&quot;isAuthenticated()&quot;)
+  @Operation(
+      summary = &quot;Eliminar un comentario propio&quot;,
+      description =
+          &quot;Solo su autor (403 si no). Queda la marca de comentario eliminado y sus respuestas se &quot;
+              + &quot;conservan. Repetirlo no cambia nada. 409 si el comentario está oculto o el hilo &quot;
+              + &quot;está cerrado.&quot;)
+  public ComentarioResponse eliminar(
+      @PathVariable UUID comentarioId, Authentication authentication) {
+<span class="fc" id="L72">    return moderacion.eliminar(comentarioId, usuarioId(authentication));</span>
+  }
+
+  @PostMapping(&quot;/comentarios/{comentarioId}/ocultar&quot;)
+  @PreAuthorize(&quot;hasAnyRole('CATEDRATICO','ADMINISTRADOR')&quot;)
+  @Operation(
+      summary = &quot;Ocultar un comentario por moderación&quot;,
+      description =
+          &quot;Catedrático o Administrador. Exige un motivo (422 sin él). Los demás usuarios ven &quot;
+              + &quot;«Oculto por moderación»; los moderadores, el texto y el motivo. 409 si ya está &quot;
+              + &quot;oculto o fue eliminado.&quot;)
+  public ComentarioResponse ocultar(
+      @PathVariable UUID comentarioId,
+      @RequestBody(required = false) MotivoModeracionRequest request,
+      Authentication authentication) {
+<span class="fc" id="L87">    return moderacion.ocultar(comentarioId, request, usuarioId(authentication));</span>
+  }
+
+  @PostMapping(&quot;/hilos/{hiloId}/cerrar&quot;)
+  @PreAuthorize(&quot;hasAnyRole('CATEDRATICO','ADMINISTRADOR')&quot;)
+  @Operation(
+      summary = &quot;Cerrar un hilo&quot;,
+      description =
+          &quot;Catedrático o Administrador. Exige un motivo (422 sin él), que queda visible en el &quot;
+              + &quot;hilo. El hilo sigue visible para lectura y comentar en él responde 409. 409 si ya &quot;
+              + &quot;estaba cerrado.&quot;)
+  public HiloResponse cerrar(
+      @PathVariable UUID hiloId,
+      @RequestBody(required = false) MotivoModeracionRequest request,
+      Authentication authentication) {
+<span class="fc" id="L102">    return moderacion.cerrar(hiloId, request, usuarioId(authentication));</span>
+  }
+
+  @GetMapping(&quot;/moderacion/inspecciones-sin-revision&quot;)
+  @PreAuthorize(&quot;hasAnyRole('CATEDRATICO','ADMINISTRADOR')&quot;)
+  @Operation(
+      summary = &quot;Inspecciones publicadas sin revisión previa&quot;,
+      description =
+          &quot;Catedrático o Administrador. Las que su autor Catedrático o Profesional externo publicó &quot;
+              + &quot;sin revisión, de las más recientes a las más antiguas, con su hilo (nulo si aún &quot;
+              + &quot;no se abrió) para moderarlas a posteriori. Página desde 0, tamaño entre 1 y 100 &quot;
+              + &quot;(20 por defecto).&quot;)
+  public Page&lt;InspeccionSinRevisionResponse&gt; listarInspeccionesSinRevision(
+      @RequestParam(defaultValue = &quot;0&quot;) int pagina,
+      @RequestParam(defaultValue = &quot;20&quot;) int tamanio) {
+<span class="fc" id="L117">    return moderacion.listarInspeccionesSinRevision(pagina, tamanio);</span>
+  }
+
+  private UUID usuarioId(Authentication authentication) {
+<span class="pc bpc" id="L121" title="2 of 4 branches missed.">    if (authentication == null || !(authentication.getDetails() instanceof JwtData jwtData)) {</span>
+<span class="nc" id="L122">      throw new ApiException(</span>
+          HttpStatus.UNAUTHORIZED,
+          &quot;autenticacion_requerida&quot;,
+          &quot;Autenticación requerida&quot;,
+          &quot;Se requiere una sesión válida para participar en el foro.&quot;);
+    }
+<span class="fc" id="L128">    return jwtData.userId();</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

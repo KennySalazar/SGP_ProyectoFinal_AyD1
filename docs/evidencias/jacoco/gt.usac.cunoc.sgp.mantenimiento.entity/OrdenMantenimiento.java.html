@@ -1,0 +1,348 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>OrdenMantenimiento.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">sgp-api</a> &gt; <a href="index.source.html" class="el_package">gt.usac.cunoc.sgp.mantenimiento.entity</a> &gt; <span class="el_source">OrdenMantenimiento.java</span></div><h1>OrdenMantenimiento.java</h1><pre class="source lang-java linenums">package gt.usac.cunoc.sgp.mantenimiento.entity;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import gt.usac.cunoc.sgp.mantenimiento.model.EstadoOrden;
+import gt.usac.cunoc.sgp.mantenimiento.model.PrioridadOrden;
+import gt.usac.cunoc.sgp.mantenimiento.model.TipoOrden;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.Id;
+import jakarta.persistence.Table;
+import jakarta.persistence.Version;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.util.UUID;
+import org.hibernate.annotations.Formula;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
+
+/**
+ * Orden de mantenimiento de un puente (RN-MTO-01, RN-MTO-03). Su estado solo cambia mediante el
+ * servicio de transiciones (DT-BE-07) y nunca se elimina (RN-MTO-09, DT-BD-11).
+ */
+@Entity
+@Table(name = &quot;orden_mantenimiento&quot;)
+public class OrdenMantenimiento {
+
+  @Id private UUID id;
+
+  @Column(name = &quot;puente_id&quot;, nullable = false, updatable = false)
+  private UUID puenteId;
+
+  @Column(name = &quot;inspeccion_origen_id&quot;, updatable = false)
+  private UUID inspeccionOrigenId;
+
+  @Column(name = &quot;regla_origen_id&quot;, updatable = false)
+  private UUID reglaOrigenId;
+
+  /**
+   * Verdadero si la orden nació de una regla todavía sin validar (HU-049); nulo si no tiene regla.
+   * Se calcula al leer la orden y nunca se escribe.
+   */
+  @Formula(
+      &quot;(SELECT r.validado_por_id IS NULL FROM regla_mantenimiento r WHERE r.id = regla_origen_id)&quot;)
+  private Boolean reglaProvisional;
+
+  @Column(name = &quot;resultado_ic_origen_id&quot;, updatable = false)
+  private UUID resultadoIcOrigenId;
+
+  @Column(name = &quot;plan_mantenimiento_rutinario_id&quot;, updatable = false)
+  private UUID planMantenimientoRutinarioId;
+
+  @Column(name = &quot;ciclo_plan&quot;, updatable = false)
+  private Integer cicloPlan;
+
+  @Column(name = &quot;elemento_ref&quot;, length = 300, updatable = false)
+  private String elementoRef;
+
+  @Column(name = &quot;instancia_elemento_id&quot;, updatable = false)
+  private UUID instanciaElementoId;
+
+  @Column(name = &quot;clave_generacion&quot;, length = 200, updatable = false)
+  private String claveGeneracion;
+
+  @Enumerated(EnumType.STRING)
+  @Column(nullable = false, length = 20, updatable = false)
+  private TipoOrden tipo;
+
+  @Enumerated(EnumType.STRING)
+  @Column(nullable = false, length = 20)
+  private EstadoOrden estado;
+
+  @Column(nullable = false, columnDefinition = &quot;text&quot;)
+  private String descripcion;
+
+  @Enumerated(EnumType.STRING)
+  @Column(name = &quot;prioridad_sugerida&quot;, nullable = false, length = 20, updatable = false)
+  private PrioridadOrden prioridadSugerida;
+
+  @Enumerated(EnumType.STRING)
+  @Column(name = &quot;prioridad_confirmada&quot;, nullable = false, length = 20)
+  private PrioridadOrden prioridadConfirmada;
+
+  @Column(name = &quot;justificacion_prioridad&quot;, columnDefinition = &quot;text&quot;)
+  private String justificacionPrioridad;
+
+  @JdbcTypeCode(SqlTypes.JSON)
+  @Column(name = &quot;fundamento_generacion&quot;, updatable = false)
+  private JsonNode fundamentoGeneracion;
+
+  @Column(name = &quot;creado_por_id&quot;, updatable = false)
+  private UUID creadoPorId;
+
+  @Column(name = &quot;aceptado_por_id&quot;)
+  private UUID aceptadoPorId;
+
+  @Column(name = &quot;aceptado_en&quot;)
+  private Instant aceptadoEn;
+
+  @Column(name = &quot;fecha_programada&quot;)
+  private LocalDate fechaProgramada;
+
+  @Column(name = &quot;motivo_cierre_sin_ejecucion&quot;, columnDefinition = &quot;text&quot;)
+  private String motivoCierreSinEjecucion;
+
+  @Column(name = &quot;creado_en&quot;, nullable = false, updatable = false)
+  private Instant creadoEn;
+
+  @Column(name = &quot;actualizado_en&quot;, nullable = false)
+  private Instant actualizadoEn;
+
+  @Version
+  @Column(nullable = false)
+  private Long version;
+
+<span class="fc" id="L117">  protected OrdenMantenimiento() {}</span>
+
+  /**
+   * Orden creada manualmente por un Catedrático o un Administrador. Nace en PROPUESTA y su
+   * prioridad confirmada empieza igual a la sugerida (RN-MTO-01).
+   */
+  public OrdenMantenimiento(
+      UUID id,
+      UUID puenteId,
+      UUID inspeccionOrigenId,
+      String elementoRef,
+      UUID instanciaElementoId,
+      TipoOrden tipo,
+      String descripcion,
+      PrioridadOrden prioridad,
+      UUID creadoPorId,
+<span class="fc" id="L133">      Instant ahora) {</span>
+<span class="fc" id="L134">    this.id = id;</span>
+<span class="fc" id="L135">    this.puenteId = puenteId;</span>
+<span class="fc" id="L136">    this.inspeccionOrigenId = inspeccionOrigenId;</span>
+<span class="fc" id="L137">    this.elementoRef = elementoRef;</span>
+<span class="fc" id="L138">    this.instanciaElementoId = instanciaElementoId;</span>
+<span class="fc" id="L139">    this.tipo = tipo;</span>
+<span class="fc" id="L140">    this.estado = EstadoOrden.PROPUESTA;</span>
+<span class="fc" id="L141">    this.descripcion = descripcion;</span>
+<span class="fc" id="L142">    this.prioridadSugerida = prioridad;</span>
+<span class="fc" id="L143">    this.prioridadConfirmada = prioridad;</span>
+<span class="fc" id="L144">    this.creadoPorId = creadoPorId;</span>
+<span class="fc" id="L145">    this.creadoEn = ahora;</span>
+<span class="fc" id="L146">    this.actualizadoEn = ahora;</span>
+<span class="fc" id="L147">  }</span>
+
+  /**
+   * Propuesta generada por el sistema a partir de una inspección publicada (HU-046, RN-MTO-02).
+   * Nace en PROPUESTA, sin autor humano, con la regla que la originó y la clave que impide generar
+   * dos veces la misma. La prioridad sugerida y la confirmada empiezan iguales.
+   */
+  public static OrdenMantenimiento propuestaGenerada(
+      UUID id,
+      UUID puenteId,
+      UUID inspeccionOrigenId,
+      UUID reglaOrigenId,
+      UUID resultadoIcOrigenId,
+      String elementoRef,
+      UUID instanciaElementoId,
+      String claveGeneracion,
+      TipoOrden tipo,
+      String descripcion,
+      PrioridadOrden prioridad,
+      JsonNode fundamentoGeneracion,
+      Instant ahora) {
+<span class="fc" id="L168">    OrdenMantenimiento orden =</span>
+        new OrdenMantenimiento(
+            id,
+            puenteId,
+            inspeccionOrigenId,
+            elementoRef,
+            instanciaElementoId,
+            tipo,
+            descripcion,
+            prioridad,
+            null,
+            ahora);
+<span class="fc" id="L180">    orden.reglaOrigenId = reglaOrigenId;</span>
+<span class="fc" id="L181">    orden.resultadoIcOrigenId = resultadoIcOrigenId;</span>
+<span class="fc" id="L182">    orden.claveGeneracion = claveGeneracion;</span>
+<span class="fc" id="L183">    orden.fundamentoGeneracion = fundamentoGeneracion;</span>
+<span class="fc" id="L184">    return orden;</span>
+  }
+
+  /** PROPUESTA rutinaria identificada por un ciclo inmutable del plan (HU-068). */
+  public static OrdenMantenimiento propuestaCicloRutinario(
+      UUID id,
+      UUID puenteId,
+      UUID planId,
+      int ciclo,
+      String descripcion,
+      PrioridadOrden prioridad,
+      JsonNode fundamento,
+      Instant ahora) {
+<span class="fc" id="L197">    OrdenMantenimiento orden =</span>
+        new OrdenMantenimiento(
+            id,
+            puenteId,
+            null,
+            null,
+            null,
+            TipoOrden.RUTINARIO,
+            descripcion,
+            prioridad,
+            null,
+            ahora);
+<span class="fc" id="L209">    orden.planMantenimientoRutinarioId = planId;</span>
+<span class="fc" id="L210">    orden.cicloPlan = ciclo;</span>
+<span class="fc" id="L211">    orden.fundamentoGeneracion = fundamento;</span>
+<span class="fc" id="L212">    return orden;</span>
+  }
+
+  /**
+   * Cambia el estado. Solo lo invoca {@code TransicionOrdenService}, después de validar la
+   * transición con la máquina de estados (DT-BE-07).
+   */
+  public void aplicarTransicion(EstadoOrden destino, Instant ahora) {
+<span class="fc" id="L220">    this.estado = destino;</span>
+<span class="fc" id="L221">    this.actualizadoEn = ahora;</span>
+<span class="fc" id="L222">  }</span>
+
+  /** Datos exigidos para PROGRAMADA: quién aceptó, cuándo y para qué fecha. */
+  public void registrarAceptacion(UUID aceptadoPorId, Instant aceptadoEn, LocalDate fecha) {
+<span class="fc" id="L226">    this.aceptadoPorId = aceptadoPorId;</span>
+<span class="fc" id="L227">    this.aceptadoEn = aceptadoEn;</span>
+<span class="fc" id="L228">    this.fechaProgramada = fecha;</span>
+<span class="fc" id="L229">  }</span>
+
+  /** Motivo exigido para DESCARTADA y CANCELADA (RN-MTO-09). */
+  public void registrarMotivoCierre(String motivo) {
+<span class="fc" id="L233">    this.motivoCierreSinEjecucion = motivo;</span>
+<span class="fc" id="L234">  }</span>
+
+  /** HU-047: changes only the confirmed priority; the generated suggestion stays immutable. */
+  public void cambiarPrioridadConfirmada(
+      PrioridadOrden prioridad, String justificacion, Instant ahora) {
+<span class="fc" id="L239">    this.prioridadConfirmada = prioridad;</span>
+<span class="fc" id="L240">    this.justificacionPrioridad = justificacion;</span>
+<span class="fc" id="L241">    this.actualizadoEn = ahora;</span>
+<span class="fc" id="L242">  }</span>
+
+  public UUID getId() {
+<span class="fc" id="L245">    return id;</span>
+  }
+
+  public UUID getPuenteId() {
+<span class="fc" id="L249">    return puenteId;</span>
+  }
+
+  public UUID getInspeccionOrigenId() {
+<span class="fc" id="L253">    return inspeccionOrigenId;</span>
+  }
+
+  public UUID getReglaOrigenId() {
+<span class="fc" id="L257">    return reglaOrigenId;</span>
+  }
+
+  public Boolean getReglaProvisional() {
+<span class="fc" id="L261">    return reglaProvisional;</span>
+  }
+
+  public UUID getResultadoIcOrigenId() {
+<span class="fc" id="L265">    return resultadoIcOrigenId;</span>
+  }
+
+  public UUID getPlanMantenimientoRutinarioId() {
+<span class="fc" id="L269">    return planMantenimientoRutinarioId;</span>
+  }
+
+  public Integer getCicloPlan() {
+<span class="fc" id="L273">    return cicloPlan;</span>
+  }
+
+  public String getElementoRef() {
+<span class="fc" id="L277">    return elementoRef;</span>
+  }
+
+  public UUID getInstanciaElementoId() {
+<span class="fc" id="L281">    return instanciaElementoId;</span>
+  }
+
+  public String getClaveGeneracion() {
+<span class="fc" id="L285">    return claveGeneracion;</span>
+  }
+
+  public TipoOrden getTipo() {
+<span class="fc" id="L289">    return tipo;</span>
+  }
+
+  public EstadoOrden getEstado() {
+<span class="fc" id="L293">    return estado;</span>
+  }
+
+  public String getDescripcion() {
+<span class="fc" id="L297">    return descripcion;</span>
+  }
+
+  public PrioridadOrden getPrioridadSugerida() {
+<span class="fc" id="L301">    return prioridadSugerida;</span>
+  }
+
+  public PrioridadOrden getPrioridadConfirmada() {
+<span class="fc" id="L305">    return prioridadConfirmada;</span>
+  }
+
+  public String getJustificacionPrioridad() {
+<span class="fc" id="L309">    return justificacionPrioridad;</span>
+  }
+
+  public JsonNode getFundamentoGeneracion() {
+<span class="fc" id="L313">    return fundamentoGeneracion;</span>
+  }
+
+  public UUID getCreadoPorId() {
+<span class="fc" id="L317">    return creadoPorId;</span>
+  }
+
+  public UUID getAceptadoPorId() {
+<span class="fc" id="L321">    return aceptadoPorId;</span>
+  }
+
+  public Instant getAceptadoEn() {
+<span class="fc" id="L325">    return aceptadoEn;</span>
+  }
+
+  public LocalDate getFechaProgramada() {
+<span class="fc" id="L329">    return fechaProgramada;</span>
+  }
+
+  public String getMotivoCierreSinEjecucion() {
+<span class="fc" id="L333">    return motivoCierreSinEjecucion;</span>
+  }
+
+  public Instant getCreadoEn() {
+<span class="fc" id="L337">    return creadoEn;</span>
+  }
+
+  public Instant getActualizadoEn() {
+<span class="fc" id="L341">    return actualizadoEn;</span>
+  }
+
+  public Long getVersion() {
+<span class="fc" id="L345">    return version;</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

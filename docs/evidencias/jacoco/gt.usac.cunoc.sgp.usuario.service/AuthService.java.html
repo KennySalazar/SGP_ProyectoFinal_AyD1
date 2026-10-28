@@ -1,0 +1,431 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AuthService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">sgp-api</a> &gt; <a href="index.source.html" class="el_package">gt.usac.cunoc.sgp.usuario.service</a> &gt; <span class="el_source">AuthService.java</span></div><h1>AuthService.java</h1><pre class="source lang-java linenums">package gt.usac.cunoc.sgp.usuario.service;
+
+import gt.usac.cunoc.sgp.common.audit.aspect.Auditable;
+import gt.usac.cunoc.sgp.common.audit.model.AccionAuditoria;
+import gt.usac.cunoc.sgp.common.exception.ApiException;
+import gt.usac.cunoc.sgp.common.security.JwtService;
+import gt.usac.cunoc.sgp.common.util.EmailNormalizer;
+import gt.usac.cunoc.sgp.usuario.dto.AccessTokenResponse;
+import gt.usac.cunoc.sgp.usuario.dto.ActualizarPerfilRequest;
+import gt.usac.cunoc.sgp.usuario.dto.ChallengeResponse;
+import gt.usac.cunoc.sgp.usuario.dto.ChangePasswordRequest;
+import gt.usac.cunoc.sgp.usuario.dto.LoginRequest;
+import gt.usac.cunoc.sgp.usuario.dto.LoginResponse;
+import gt.usac.cunoc.sgp.usuario.dto.MessageResponse;
+import gt.usac.cunoc.sgp.usuario.dto.PasswordChangeResponse;
+import gt.usac.cunoc.sgp.usuario.dto.RecoveryRequest;
+import gt.usac.cunoc.sgp.usuario.dto.RegisterRequest;
+import gt.usac.cunoc.sgp.usuario.dto.UserResponse;
+import gt.usac.cunoc.sgp.usuario.entity.Role;
+import gt.usac.cunoc.sgp.usuario.entity.UserAccount;
+import gt.usac.cunoc.sgp.usuario.entity.UsuarioProfesional;
+import gt.usac.cunoc.sgp.usuario.exception.OtpRateLimitException;
+import gt.usac.cunoc.sgp.usuario.mapper.UserMapper;
+import gt.usac.cunoc.sgp.usuario.model.OtpPurpose;
+import gt.usac.cunoc.sgp.usuario.model.RoleName;
+import gt.usac.cunoc.sgp.usuario.repository.RoleRepository;
+import gt.usac.cunoc.sgp.usuario.repository.UserAccountRepository;
+import gt.usac.cunoc.sgp.usuario.repository.UsuarioProfesionalRepository;
+import java.time.Clock;
+import java.time.Instant;
+import java.util.UUID;
+import org.springframework.http.HttpStatus;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+@Service
+public class AuthService {
+
+  private final UserAccountRepository users;
+  private final RoleRepository roles;
+  private final PasswordEncoder passwordEncoder;
+  private final OtpService otpService;
+  private final JwtService jwtService;
+  private final RefreshTokenService refreshTokens;
+  private final Clock clock;
+  private final UserMapper userMapper;
+  private final UsuarioProfesionalRepository profesionales;
+  private final PerfilUsuarioService perfiles;
+
+  public AuthService(
+      UserAccountRepository users,
+      RoleRepository roles,
+      PasswordEncoder passwordEncoder,
+      OtpService otpService,
+      JwtService jwtService,
+      RefreshTokenService refreshTokens,
+      Clock clock,
+      UserMapper userMapper,
+      UsuarioProfesionalRepository profesionales,
+<span class="fc" id="L61">      PerfilUsuarioService perfiles) {</span>
+<span class="fc" id="L62">    this.users = users;</span>
+<span class="fc" id="L63">    this.roles = roles;</span>
+<span class="fc" id="L64">    this.passwordEncoder = passwordEncoder;</span>
+<span class="fc" id="L65">    this.otpService = otpService;</span>
+<span class="fc" id="L66">    this.jwtService = jwtService;</span>
+<span class="fc" id="L67">    this.refreshTokens = refreshTokens;</span>
+<span class="fc" id="L68">    this.clock = clock;</span>
+<span class="fc" id="L69">    this.userMapper = userMapper;</span>
+<span class="fc" id="L70">    this.profesionales = profesionales;</span>
+<span class="fc" id="L71">    this.perfiles = perfiles;</span>
+<span class="fc" id="L72">  }</span>
+
+  @Transactional
+  @Auditable(
+      accion = AccionAuditoria.CREAR,
+      entidad = &quot;usuario&quot;,
+      tipo = UserAccount.class,
+      emailArgIndex = 0,
+      actorEsEntidad = true)
+  public ChallengeResponse register(RegisterRequest request) {
+<span class="fc" id="L82">    String email = EmailNormalizer.normalize(request.email());</span>
+<span class="pc bpc" id="L83" title="1 of 2 branches missed.">    if (users.findByEmail(email).isPresent())</span>
+<span class="nc" id="L84">      throw new ApiException(</span>
+          HttpStatus.CONFLICT,
+          &quot;email_already_registered&quot;,
+          &quot;Correo ya registrado&quot;,
+          &quot;El correo electronico ya esta registrado&quot;);
+<span class="fc" id="L89">    Role role =</span>
+        roles
+<span class="fc" id="L91">            .findByName(RoleName.ESTUDIANTE)</span>
+<span class="pc" id="L92">            .orElseThrow(() -&gt; new IllegalStateException(&quot;Falta el rol ESTUDIANTE&quot;));</span>
+<span class="fc" id="L93">    UserAccount cuenta =</span>
+<span class="fc" id="L94">        new UserAccount(email, passwordEncoder.encode(request.password()), role, false, false);</span>
+<span class="fc" id="L95">    perfiles.aplicar(cuenta, request.nombreCompleto(), request.nombreUsuario());</span>
+<span class="fc" id="L96">    UserAccount user = perfiles.guardar(cuenta);</span>
+<span class="fc" id="L97">    var challenge = otpService.issue(user, OtpPurpose.REGISTRO);</span>
+<span class="fc" id="L98">    return new ChallengeResponse(</span>
+<span class="fc" id="L99">        challenge.getId(),</span>
+<span class="fc" id="L100">        challenge.getExpiresAt(),</span>
+        &quot;Se envio un codigo de verificacion al correo indicado&quot;);
+  }
+
+  @Transactional
+  public ChallengeResponse resendRegistration(String rawEmail) {
+<span class="nc" id="L106">    UserAccount user = requireUser(rawEmail);</span>
+<span class="nc bnc" id="L107" title="All 2 branches missed.">    if (user.isVerified())</span>
+<span class="nc" id="L108">      throw new ApiException(</span>
+          HttpStatus.CONFLICT,
+          &quot;account_already_verified&quot;,
+          &quot;Cuenta ya verificada&quot;,
+          &quot;La cuenta ya fue verificada&quot;);
+<span class="nc" id="L113">    var challenge = otpService.issue(user, OtpPurpose.REGISTRO);</span>
+<span class="nc" id="L114">    return new ChallengeResponse(</span>
+<span class="nc" id="L115">        challenge.getId(), challenge.getExpiresAt(), &quot;Se envio un nuevo codigo de verificacion&quot;);</span>
+  }
+
+  @Transactional(noRollbackFor = ApiException.class)
+  @Auditable(
+      accion = AccionAuditoria.CAMBIAR_ESTADO,
+      entidad = &quot;usuario&quot;,
+      tipo = UserAccount.class,
+      emailArgIndex = 0,
+      actorEsEntidad = true)
+  public MessageResponse verifyRegistration(String rawEmail, UUID challengeId, String code) {
+<span class="nc" id="L126">    UserAccount user = requireUser(rawEmail);</span>
+<span class="nc bnc" id="L127" title="All 2 branches missed.">    if (user.isVerified())</span>
+<span class="nc" id="L128">      throw new ApiException(</span>
+          HttpStatus.CONFLICT,
+          &quot;account_already_verified&quot;,
+          &quot;Cuenta ya verificada&quot;,
+          &quot;La cuenta ya fue verificada&quot;);
+<span class="nc" id="L133">    otpService.verify(challengeId, user, OtpPurpose.REGISTRO, code);</span>
+<span class="nc" id="L134">    user.verify();</span>
+<span class="nc" id="L135">    return new MessageResponse(</span>
+        &quot;Correo verificado. La cuenta queda pendiente de activacion por un Catedratico.&quot;);
+  }
+
+  @Transactional(noRollbackFor = ApiException.class)
+  public LoginFlowResult login(LoginRequest request) {
+<span class="fc" id="L141">    UserAccount user = users.findByEmail(EmailNormalizer.normalize(request.email())).orElse(null);</span>
+<span class="fc" id="L142">    Instant now = clock.instant();</span>
+<span class="pc bpc" id="L143" title="1 of 2 branches missed.">    if (user == null) throw invalidCredentials();</span>
+<span class="pc bpc" id="L144" title="1 of 2 branches missed.">    if (user.isLocked(now))</span>
+<span class="nc" id="L145">      throw new ApiException(</span>
+          HttpStatus.LOCKED,
+          &quot;account_temporarily_locked&quot;,
+          &quot;Cuenta bloqueada temporalmente&quot;,
+          &quot;Espere 15 minutos antes de volver a intentar&quot;);
+<span class="fc bfc" id="L150" title="All 2 branches covered.">    if (!passwordEncoder.matches(request.password(), user.getPasswordHash())) {</span>
+<span class="fc" id="L151">      user.registerFailedLogin(now);</span>
+<span class="fc" id="L152">      users.save(user);</span>
+<span class="fc" id="L153">      throw invalidCredentials();</span>
+    }
+<span class="fc" id="L155">    user.clearFailedLogins();</span>
+<span class="fc" id="L156">    users.save(user);</span>
+<span class="fc" id="L157">    ensureLoginEligible(user);</span>
+<span class="pc bpc" id="L158" title="1 of 2 branches missed.">    if (user.isTwoFactorEnabled()) {</span>
+<span class="nc" id="L159">      var challenge = otpService.issue(user, OtpPurpose.LOGIN_2FA);</span>
+<span class="nc" id="L160">      return new LoginFlowResult(LoginResponse.challenge(challenge.getId()), null);</span>
+    }
+<span class="fc" id="L162">    return issueLogin(user);</span>
+  }
+
+  @Transactional(noRollbackFor = ApiException.class)
+  public LoginFlowResult verifyLogin(UUID challengeId, String code) {
+<span class="nc" id="L167">    UserAccount user = otpService.verify(challengeId, OtpPurpose.LOGIN_2FA, code);</span>
+<span class="nc" id="L168">    ensureLoginEligible(user);</span>
+<span class="nc" id="L169">    return issueLogin(user);</span>
+  }
+
+  @Transactional
+  public RefreshFlowResult refresh(String rawRefreshToken) {
+<span class="nc" id="L174">    var rotated = refreshTokens.rotate(rawRefreshToken);</span>
+<span class="nc" id="L175">    String access = jwtService.issueAccessToken(rotated.user());</span>
+<span class="nc" id="L176">    return new RefreshFlowResult(</span>
+<span class="nc" id="L177">        new AccessTokenResponse(access, &quot;Bearer&quot;, jwtService.accessExpirationMs()),</span>
+<span class="nc" id="L178">        rotated.rawToken());</span>
+  }
+
+  @Transactional
+  public void logout(String rawRefreshToken) {
+<span class="nc" id="L183">    refreshTokens.revoke(rawRefreshToken);</span>
+<span class="nc" id="L184">  }</span>
+
+  @Transactional
+  public MessageResponse requestRecovery(RecoveryRequest request) {
+<span class="nc" id="L188">    UserAccount user = users.findByEmail(EmailNormalizer.normalize(request.email())).orElse(null);</span>
+<span class="nc bnc" id="L189" title="All 6 branches missed.">    if (user != null &amp;&amp; user.isActive() &amp;&amp; user.isVerified()) {</span>
+      try {
+<span class="nc" id="L191">        otpService.issue(user, OtpPurpose.RECUPERACION_PASSWORD);</span>
+<span class="nc" id="L192">      } catch (OtpRateLimitException ignored) {</span>
+<span class="nc" id="L193">      }</span>
+    }
+<span class="nc" id="L195">    return new MessageResponse(&quot;Si el correo esta registrado, recibira un codigo de recuperacion&quot;);</span>
+  }
+
+  @Transactional(noRollbackFor = ApiException.class)
+  @Auditable(
+      accion = AccionAuditoria.MODIFICAR,
+      entidad = &quot;usuario&quot;,
+      tipo = UserAccount.class,
+      emailArgIndex = 0,
+      actorEsEntidad = true)
+  public MessageResponse verifyRecovery(String email, String code, String newPassword) {
+<span class="nc" id="L206">    UserAccount user = users.findByEmail(EmailNormalizer.normalize(email)).orElse(null);</span>
+<span class="nc bnc" id="L207" title="All 6 branches missed.">    if (user == null || !user.isActive() || !user.isVerified()) throw invalidOtp();</span>
+<span class="nc" id="L208">    otpService.verifyLatest(user, OtpPurpose.RECUPERACION_PASSWORD, code);</span>
+<span class="nc" id="L209">    user.setPasswordHash(passwordEncoder.encode(newPassword));</span>
+<span class="nc" id="L210">    user.incrementTokenVersion();</span>
+<span class="nc" id="L211">    refreshTokens.revokeAll(user);</span>
+<span class="nc" id="L212">    return new MessageResponse(&quot;La contraseña fue restablecida correctamente&quot;);</span>
+  }
+
+  @Transactional
+  @Auditable(
+      accion = AccionAuditoria.MODIFICAR,
+      entidad = &quot;usuario&quot;,
+      tipo = UserAccount.class,
+      emailArgIndex = 0)
+  public PasswordChangeFlowResult changePassword(String rawEmail, ChangePasswordRequest request) {
+
+<span class="nc" id="L223">    UserAccount user = requireUser(rawEmail);</span>
+
+<span class="nc" id="L225">    ensureLoginEligible(user);</span>
+
+<span class="nc bnc" id="L227" title="All 2 branches missed.">    if (!passwordEncoder.matches(request.currentPassword(), user.getPasswordHash())) {</span>
+<span class="nc" id="L228">      throw invalidCredentials(&quot;La contraseña actual no es correcta&quot;);</span>
+    }
+
+<span class="nc bnc" id="L231" title="All 2 branches missed.">    if (request.currentPassword().equals(request.newPassword())) {</span>
+<span class="nc" id="L232">      throw new ApiException(</span>
+          HttpStatus.BAD_REQUEST,
+          &quot;invalid_password_transition&quot;,
+          &quot;Contraseña invalida&quot;,
+          &quot;La nueva contraseña debe ser diferente de la actual&quot;);
+    }
+
+<span class="nc" id="L239">    user.setPasswordHash(passwordEncoder.encode(request.newPassword()));</span>
+
+<span class="nc" id="L241">    user.incrementTokenVersion();</span>
+
+<span class="nc" id="L243">    refreshTokens.revokeAll(user);</span>
+
+<span class="nc" id="L245">    String access = jwtService.issueAccessToken(user);</span>
+<span class="nc" id="L246">    String refresh = refreshTokens.issue(user);</span>
+
+<span class="nc" id="L248">    PasswordChangeResponse body =</span>
+        new PasswordChangeResponse(
+            access,
+            &quot;Bearer&quot;,
+<span class="nc" id="L252">            jwtService.accessExpirationMs(),</span>
+            &quot;La contraseña fue cambiada correctamente&quot;);
+
+<span class="nc" id="L255">    return new PasswordChangeFlowResult(body, refresh);</span>
+  }
+
+  @Transactional
+  public ChallengeResponse requestTwoFactorChange(
+      String rawEmail, String currentPassword, OtpPurpose purpose) {
+
+<span class="nc" id="L262">    UserAccount user = requireUser(rawEmail);</span>
+
+<span class="nc" id="L264">    ensureLoginEligible(user);</span>
+
+<span class="nc bnc" id="L266" title="All 2 branches missed.">    if (!passwordEncoder.matches(currentPassword, user.getPasswordHash())) {</span>
+<span class="nc" id="L267">      throw invalidCredentials(&quot;La contraseña actual no es correcta&quot;);</span>
+    }
+
+<span class="nc bnc" id="L270" title="All 2 branches missed.">    boolean enabling = purpose == OtpPurpose.ACTIVAR_2FA;</span>
+
+<span class="nc bnc" id="L272" title="All 2 branches missed.">    if (user.isTwoFactorEnabled() == enabling) {</span>
+<span class="nc" id="L273">      throw new ApiException(</span>
+          HttpStatus.CONFLICT,
+          &quot;two_factor_state_unchanged&quot;,
+          &quot;Estado sin cambios&quot;,
+          &quot;La autenticacion de dos factores ya tiene ese estado&quot;);
+    }
+
+<span class="nc" id="L280">    var challenge = otpService.issue(user, purpose);</span>
+
+<span class="nc" id="L282">    return new ChallengeResponse(</span>
+<span class="nc" id="L283">        challenge.getId(),</span>
+<span class="nc" id="L284">        challenge.getExpiresAt(),</span>
+        &quot;Se envio un codigo OTP para confirmar el cambio&quot;);
+  }
+
+  @Transactional(noRollbackFor = ApiException.class)
+  @Auditable(
+      accion = AccionAuditoria.CAMBIAR_ESTADO,
+      entidad = &quot;usuario&quot;,
+      tipo = UserAccount.class,
+      emailArgIndex = 0)
+  public MessageResponse confirmTwoFactorChange(
+      String rawEmail, UUID challengeId, String code, OtpPurpose purpose) {
+
+<span class="nc" id="L297">    UserAccount user = requireUser(rawEmail);</span>
+
+<span class="nc" id="L299">    ensureLoginEligible(user);</span>
+
+<span class="nc" id="L301">    otpService.verify(challengeId, user, purpose, code);</span>
+
+<span class="nc bnc" id="L303" title="All 2 branches missed.">    user.setTwoFactorEnabled(purpose == OtpPurpose.ACTIVAR_2FA);</span>
+
+<span class="nc" id="L305">    return new MessageResponse(</span>
+<span class="nc bnc" id="L306" title="All 2 branches missed.">        purpose == OtpPurpose.ACTIVAR_2FA</span>
+<span class="nc" id="L307">            ? &quot;La autenticacion de dos factores fue activada&quot;</span>
+<span class="nc" id="L308">            : &quot;La autenticacion de dos factores fue desactivada&quot;);</span>
+  }
+
+  /** Cambia el perfil y correo electrónico de la cuenta que inició sesión. */
+  @Transactional
+  @Auditable(
+      accion = AccionAuditoria.MODIFICAR,
+      entidad = &quot;usuario&quot;,
+      tipo = UserAccount.class,
+      emailArgIndex = 0)
+  public UserResponse actualizarPerfil(String rawEmail, ActualizarPerfilRequest request) {
+<span class="fc" id="L319">    UserAccount user = requireUser(rawEmail);</span>
+<span class="pc bpc" id="L320" title="1 of 2 branches missed.">    if (request.email() != null) {</span>
+<span class="nc" id="L321">      String nuevoEmail = EmailNormalizer.normalize(request.email());</span>
+<span class="nc bnc" id="L322" title="All 2 branches missed.">      if (nuevoEmail.isBlank()) {</span>
+<span class="nc" id="L323">        throw new ApiException(</span>
+            HttpStatus.UNPROCESSABLE_ENTITY,
+            &quot;perfil_invalido&quot;,
+            &quot;Perfil inválido&quot;,
+            &quot;El correo electrónico no puede estar vacío.&quot;,
+<span class="nc" id="L328">            java.util.List.of(</span>
+<span class="nc" id="L329">                java.util.Map.of(</span>
+                    &quot;campo&quot;, &quot;email&quot;, &quot;mensaje&quot;, &quot;El correo electrónico es obligatorio.&quot;)));
+      }
+<span class="nc bnc" id="L332" title="All 2 branches missed.">      if (!nuevoEmail.equalsIgnoreCase(user.getEmail())) {</span>
+<span class="nc" id="L333">        users</span>
+<span class="nc" id="L334">            .findByEmail(nuevoEmail)</span>
+<span class="nc bnc" id="L335" title="All 2 branches missed.">            .filter(otra -&gt; !otra.getId().equals(user.getId()))</span>
+<span class="nc" id="L336">            .ifPresent(</span>
+                otra -&gt; {
+<span class="nc" id="L338">                  throw new ApiException(</span>
+                      HttpStatus.CONFLICT,
+                      &quot;email_already_registered&quot;,
+                      &quot;Correo ya registrado&quot;,
+                      &quot;El correo electrónico ya está registrado&quot;);
+                });
+<span class="nc" id="L344">        user.setEmail(nuevoEmail);</span>
+      }
+    }
+<span class="fc" id="L347">    perfiles.aplicar(user, request.nombreCompleto(), request.nombreUsuario());</span>
+<span class="fc" id="L348">    perfiles.guardar(user);</span>
+<span class="fc" id="L349">    return currentUser(user.getEmail());</span>
+  }
+
+  @Transactional(readOnly = true)
+  public UserResponse currentUser(String email) {
+<span class="fc" id="L354">    UserAccount user = requireUser(email);</span>
+    // Solo aplica al Profesional Externo: sin colegiado verificado no puede inspeccionar
+    // (RN-USR-04).
+    Boolean colegiadoVerificado =
+<span class="fc bfc" id="L358" title="All 2 branches covered.">        user.getRole().getName() == RoleName.PROFESIONAL_EXTERNO</span>
+            ? profesionales
+<span class="fc" id="L360">                .findById(user.getId())</span>
+<span class="fc" id="L361">                .map(UsuarioProfesional::isColegiadoVerificado)</span>
+<span class="fc" id="L362">                .orElse(false)</span>
+<span class="fc" id="L363">            : null;</span>
+<span class="fc" id="L364">    return userMapper.toResponse(user, colegiadoVerificado);</span>
+  }
+
+  @Transactional(readOnly = true)
+  public UserAccount requireUser(String rawEmail) {
+<span class="fc" id="L369">    return users</span>
+<span class="fc" id="L370">        .findByEmail(EmailNormalizer.normalize(rawEmail))</span>
+<span class="fc" id="L371">        .orElseThrow(</span>
+            () -&gt;
+<span class="nc" id="L373">                new ApiException(</span>
+                    HttpStatus.NOT_FOUND,
+                    &quot;account_not_found&quot;,
+                    &quot;Cuenta no encontrada&quot;,
+                    &quot;La cuenta no existe&quot;));
+  }
+
+  private LoginFlowResult issueLogin(UserAccount user) {
+<span class="fc" id="L381">    String access = jwtService.issueAccessToken(user);</span>
+<span class="fc" id="L382">    String refresh = refreshTokens.issue(user);</span>
+<span class="fc" id="L383">    return new LoginFlowResult(</span>
+<span class="fc" id="L384">        LoginResponse.token(access, jwtService.accessExpirationMs()), refresh);</span>
+  }
+
+  private void ensureLoginEligible(UserAccount user) {
+<span class="fc bfc" id="L388" title="All 2 branches covered.">    if (!user.isActive())</span>
+<span class="fc" id="L389">      throw new ApiException(</span>
+          HttpStatus.FORBIDDEN,
+          &quot;account_disabled&quot;,
+          &quot;Cuenta desactivada&quot;,
+          &quot;La cuenta esta desactivada&quot;);
+<span class="pc bpc" id="L394" title="1 of 2 branches missed.">    if (!user.isVerified())</span>
+<span class="nc" id="L395">      throw new ApiException(</span>
+          HttpStatus.FORBIDDEN,
+          &quot;account_not_verified&quot;,
+          &quot;Cuenta no verificada&quot;,
+          &quot;La cuenta no ha verificado su correo&quot;);
+<span class="pc bpc" id="L400" title="1 of 2 branches missed.">    if (!user.isActivated())</span>
+<span class="nc" id="L401">      throw new ApiException(</span>
+          HttpStatus.FORBIDDEN,
+          &quot;account_pending_activation&quot;,
+          &quot;Cuenta pendiente de activacion&quot;,
+          &quot;Un Catedratico debe activar y vincular la cuenta a un curso&quot;);
+<span class="fc" id="L406">  }</span>
+
+  private ApiException invalidCredentials() {
+<span class="fc" id="L409">    return invalidCredentials(&quot;Credenciales invalidas&quot;);</span>
+  }
+
+  private ApiException invalidCredentials(String detail) {
+<span class="fc" id="L413">    return new ApiException(</span>
+        HttpStatus.UNAUTHORIZED, &quot;invalid_credentials&quot;, &quot;Credenciales invalidas&quot;, detail);
+  }
+
+  private ApiException invalidOtp() {
+<span class="nc" id="L418">    return new ApiException(</span>
+        HttpStatus.BAD_REQUEST,
+        &quot;invalid_otp&quot;,
+        &quot;Codigo OTP invalido&quot;,
+        &quot;Codigo OTP invalido o expirado&quot;);
+  }
+
+<span class="fc" id="L425">  public record LoginFlowResult(LoginResponse response, String refreshToken) {}</span>
+
+<span class="nc" id="L427">  public record RefreshFlowResult(AccessTokenResponse response, String refreshToken) {}</span>
+
+<span class="nc" id="L429">  public record PasswordChangeFlowResult(PasswordChangeResponse response, String refreshToken) {}</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

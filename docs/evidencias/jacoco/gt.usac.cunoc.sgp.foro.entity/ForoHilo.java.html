@@ -1,0 +1,126 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ForoHilo.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">sgp-api</a> &gt; <a href="index.source.html" class="el_package">gt.usac.cunoc.sgp.foro.entity</a> &gt; <span class="el_source">ForoHilo.java</span></div><h1>ForoHilo.java</h1><pre class="source lang-java linenums">package gt.usac.cunoc.sgp.foro.entity;
+
+import gt.usac.cunoc.sgp.foro.model.CategoriaHilo;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.Id;
+import jakarta.persistence.Table;
+import jakarta.persistence.Version;
+import java.time.Instant;
+import java.util.UUID;
+
+/**
+ * Hilo de discusión de un puente. Es permanente: cruza inspecciones y ciclos académicos
+ * (RN-FOR-01). Si {@code inspeccionId} no es nulo, es el hilo de una inspección publicada
+ * (RN-FOR-03).
+ */
+@Entity
+@Table(name = &quot;foro_hilo&quot;)
+public class ForoHilo {
+
+  @Id private UUID id;
+
+  @Column(name = &quot;puente_id&quot;, nullable = false, updatable = false)
+  private UUID puenteId;
+
+  @Column(name = &quot;inspeccion_id&quot;, updatable = false)
+  private UUID inspeccionId;
+
+  @Column(name = &quot;autor_id&quot;, nullable = false, updatable = false)
+  private UUID autorId;
+
+  @Enumerated(EnumType.STRING)
+  @Column(nullable = false, length = 30, updatable = false)
+  private CategoriaHilo categoria;
+
+  @Column(nullable = false, length = 250, updatable = false)
+  private String titulo;
+
+  /**
+   * Un moderador cierra el hilo con un motivo (HU-065, RN-FOR-08) mediante {@code
+   * ForoHiloRepository#cerrar}; aquí solo se lee. Cerrado sigue visible para lectura.
+   */
+  @Column(name = &quot;cerrado_en&quot;, insertable = false, updatable = false)
+  private Instant cerradoEn;
+
+  @Column(name = &quot;cerrado_por_id&quot;, insertable = false, updatable = false)
+  private UUID cerradoPorId;
+
+  @Column(name = &quot;motivo_cierre&quot;, insertable = false, updatable = false, columnDefinition = &quot;text&quot;)
+  private String motivoCierre;
+
+  @Column(name = &quot;creado_en&quot;, nullable = false, updatable = false)
+  private Instant creadoEn;
+
+  @Column(name = &quot;actualizado_en&quot;, nullable = false)
+  private Instant actualizadoEn;
+
+  @Version private long version;
+
+<span class="fc" id="L62">  protected ForoHilo() {}</span>
+
+  public ForoHilo(
+      UUID id,
+      UUID puenteId,
+      UUID inspeccionId,
+      UUID autorId,
+      CategoriaHilo categoria,
+      String titulo,
+<span class="fc" id="L71">      Instant creadoEn) {</span>
+<span class="fc" id="L72">    this.id = id;</span>
+<span class="fc" id="L73">    this.puenteId = puenteId;</span>
+<span class="fc" id="L74">    this.inspeccionId = inspeccionId;</span>
+<span class="fc" id="L75">    this.autorId = autorId;</span>
+<span class="fc" id="L76">    this.categoria = categoria;</span>
+<span class="fc" id="L77">    this.titulo = titulo;</span>
+<span class="fc" id="L78">    this.creadoEn = creadoEn;</span>
+<span class="fc" id="L79">    this.actualizadoEn = creadoEn;</span>
+<span class="fc" id="L80">  }</span>
+
+  public UUID getId() {
+<span class="fc" id="L83">    return id;</span>
+  }
+
+  public UUID getPuenteId() {
+<span class="fc" id="L87">    return puenteId;</span>
+  }
+
+  public UUID getInspeccionId() {
+<span class="fc" id="L91">    return inspeccionId;</span>
+  }
+
+  public UUID getAutorId() {
+<span class="fc" id="L95">    return autorId;</span>
+  }
+
+  public CategoriaHilo getCategoria() {
+<span class="fc" id="L99">    return categoria;</span>
+  }
+
+  public String getTitulo() {
+<span class="fc" id="L103">    return titulo;</span>
+  }
+
+  public Instant getCerradoEn() {
+<span class="fc" id="L107">    return cerradoEn;</span>
+  }
+
+  public UUID getCerradoPorId() {
+<span class="nc" id="L111">    return cerradoPorId;</span>
+  }
+
+  public String getMotivoCierre() {
+<span class="fc" id="L115">    return motivoCierre;</span>
+  }
+
+  public Instant getCreadoEn() {
+<span class="fc" id="L119">    return creadoEn;</span>
+  }
+
+  public Instant getActualizadoEn() {
+<span class="fc" id="L123">    return actualizadoEn;</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

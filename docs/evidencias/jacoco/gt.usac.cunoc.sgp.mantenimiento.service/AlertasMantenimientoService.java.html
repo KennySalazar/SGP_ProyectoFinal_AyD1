@@ -1,0 +1,224 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AlertasMantenimientoService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">sgp-api</a> &gt; <a href="index.source.html" class="el_package">gt.usac.cunoc.sgp.mantenimiento.service</a> &gt; <span class="el_source">AlertasMantenimientoService.java</span></div><h1>AlertasMantenimientoService.java</h1><pre class="source lang-java linenums">package gt.usac.cunoc.sgp.mantenimiento.service;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import gt.usac.cunoc.sgp.common.audit.service.AuditoriaWriter;
+import gt.usac.cunoc.sgp.common.config.ProcesosProgramados;
+import gt.usac.cunoc.sgp.mantenimiento.entity.OrdenMantenimiento;
+import gt.usac.cunoc.sgp.mantenimiento.model.EstadoOrden;
+import gt.usac.cunoc.sgp.mantenimiento.repository.OrdenMantenimientoRepository;
+import gt.usac.cunoc.sgp.notificacion.service.NotificacionService;
+import gt.usac.cunoc.sgp.puente.repository.AsignacionPuenteRepository;
+import gt.usac.cunoc.sgp.puente.repository.PuenteRepository;
+import gt.usac.cunoc.sgp.usuario.model.RoleName;
+import gt.usac.cunoc.sgp.usuario.repository.UserAccountRepository;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Set;
+import java.util.UUID;
+import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.stereotype.Service;
+
+/**
+ * Alertas diarias de mantenimiento (HU-069): puentes sin inspección publicada en 12 meses
+ * (RN-MTO-08) y órdenes programadas próximas o vencidas. Solo avisa; nunca cambia el estado de una
+ * orden (RN-MTO-04). Cada aviso usa su clave de evento para no repetirse.
+ */
+@Service
+public class AlertasMantenimientoService {
+
+  static final String TIPO_PUENTE = &quot;PUENTE_SIN_INSPECCION_12_MESES&quot;;
+  static final String TIPO_PROXIMA = &quot;ORDEN_PROGRAMADA_PROXIMA&quot;;
+  static final String TIPO_VENCIDA = &quot;ORDEN_PROGRAMADA_VENCIDA&quot;;
+
+<span class="fc" id="L43">  private static final Logger LOG = LoggerFactory.getLogger(AlertasMantenimientoService.class);</span>
+<span class="fc" id="L44">  private static final ZoneId ZONA = ZoneId.of(ProcesosProgramados.ZONA);</span>
+<span class="fc" id="L45">  private static final DateTimeFormatter FORMATO_FECHA = DateTimeFormatter.ofPattern(&quot;dd/MM/yyyy&quot;);</span>
+
+  private final PuenteRepository puentes;
+  private final AsignacionPuenteRepository asignaciones;
+  private final OrdenMantenimientoRepository ordenes;
+  private final UserAccountRepository usuarios;
+  private final NotificacionService notificaciones;
+  private final AuditoriaWriter auditoria;
+  private final ObjectMapper json;
+  private final Clock clock;
+  private final int diasAnticipacion;
+
+  public AlertasMantenimientoService(
+      PuenteRepository puentes,
+      AsignacionPuenteRepository asignaciones,
+      OrdenMantenimientoRepository ordenes,
+      UserAccountRepository usuarios,
+      NotificacionService notificaciones,
+      AuditoriaWriter auditoria,
+      ObjectMapper json,
+      Clock clock,
+<span class="fc" id="L66">      @Value(&quot;${app.alertas.orden-programada.dias-anticipacion:3}&quot;) int diasAnticipacion) {</span>
+<span class="fc" id="L67">    this.puentes = puentes;</span>
+<span class="fc" id="L68">    this.asignaciones = asignaciones;</span>
+<span class="fc" id="L69">    this.ordenes = ordenes;</span>
+<span class="fc" id="L70">    this.usuarios = usuarios;</span>
+<span class="fc" id="L71">    this.notificaciones = notificaciones;</span>
+<span class="fc" id="L72">    this.auditoria = auditoria;</span>
+<span class="fc" id="L73">    this.json = json;</span>
+<span class="fc" id="L74">    this.clock = clock;</span>
+<span class="fc" id="L75">    this.diasAnticipacion = diasAnticipacion;</span>
+<span class="fc" id="L76">  }</span>
+
+  /**
+   * Avisa a los Administradores y a los Catedráticos que tienen asignado el puente. La clave
+   * incluye la fecha de referencia: el aviso se repite solo si, tras una nueva publicación, vuelven
+   * a pasar 12 meses.
+   */
+  @Scheduled(cron = ProcesosProgramados.CRON_DIARIO, zone = ProcesosProgramados.ZONA)
+  @SchedulerLock(
+      name = ProcesosProgramados.ALERTA_PUENTES_SIN_INSPECCION,
+      lockAtMostFor = ProcesosProgramados.BLOQUEO_MAXIMO,
+      lockAtLeastFor = ProcesosProgramados.BLOQUEO_MINIMO)
+  public void alertarPuentesSinInspeccion() {
+<span class="fc" id="L89">    Instant limite = clock.instant().atZone(ZONA).minusMonths(12).toInstant();</span>
+<span class="fc" id="L90">    List&lt;Object[]&gt; pendientes = puentes.findActivosSinInspeccionDesde(limite);</span>
+<span class="fc" id="L91">    List&lt;UUID&gt; administradores = usuarios.findIdsActivosPorRol(RoleName.ADMINISTRADOR);</span>
+<span class="fc" id="L92">    int destinatarios = 0;</span>
+<span class="fc" id="L93">    int fallos = 0;</span>
+<span class="fc bfc" id="L94" title="All 2 branches covered.">    for (Object[] fila : pendientes) {</span>
+<span class="fc" id="L95">      UUID puenteId = (UUID) fila[0];</span>
+      try {
+<span class="fc" id="L97">        Set&lt;UUID&gt; avisar = new LinkedHashSet&lt;&gt;(administradores);</span>
+<span class="fc" id="L98">        List&lt;UUID&gt; catedraticos = asignaciones.findCatedraticosConAsignacionVigente(puenteId);</span>
+<span class="fc bfc" id="L99" title="All 2 branches covered.">        if (!catedraticos.isEmpty()) {</span>
+<span class="fc" id="L100">          avisar.addAll(usuarios.filtrarActivos(catedraticos));</span>
+        }
+<span class="fc" id="L102">        String clave =</span>
+            &quot;puente-sin-inspeccion-12-meses:&quot;
+                + puenteId
+                + &quot;:&quot;
+<span class="fc" id="L106">                + ProcesosProgramados.instante(fila[3]).toEpochMilli();</span>
+<span class="fc bfc" id="L107" title="All 2 branches covered.">        for (UUID usuarioId : avisar) {</span>
+<span class="fc" id="L108">          notificaciones.notificar(</span>
+              usuarioId,
+              TIPO_PUENTE,
+              &quot;Puente sin inspección reciente&quot;,
+              &quot;El puente &quot;
+                  + fila[1]
+                  + &quot; · &quot;
+                  + fila[2]
+                  + &quot; no tiene una inspección publicada en&quot;
+                  + &quot; los últimos 12 meses.&quot;,
+              &quot;puente&quot;,
+              puenteId,
+              clave);
+<span class="fc" id="L121">          destinatarios++;</span>
+<span class="fc" id="L122">        }</span>
+<span class="nc" id="L123">      } catch (DataIntegrityViolationException e) {</span>
+        // Una ejecución simultánea ya registró el mismo aviso; la clave de evento lo impide.
+<span class="nc" id="L125">        LOG.debug(&quot;Aviso ya registrado para el puente {}&quot;, puenteId);</span>
+<span class="nc" id="L126">      } catch (RuntimeException e) {</span>
+<span class="nc" id="L127">        fallos++;</span>
+<span class="nc" id="L128">        LOG.warn(&quot;No se pudo avisar el puente sin inspección {}&quot;, puenteId, e);</span>
+<span class="pc" id="L129">      }</span>
+<span class="fc" id="L130">    }</span>
+<span class="fc" id="L131">    auditoria.registrarProceso(</span>
+        ProcesosProgramados.ALERTA_PUENTES_SIN_INSPECCION,
+<span class="fc" id="L133">        json.createObjectNode()</span>
+<span class="fc" id="L134">            .put(&quot;puentes&quot;, pendientes.size())</span>
+<span class="fc" id="L135">            .put(&quot;destinatarios&quot;, destinatarios)</span>
+<span class="fc" id="L136">            .put(&quot;fallos&quot;, fallos));</span>
+<span class="fc" id="L137">  }</span>
+
+  /**
+   * Recuerda las órdenes PROGRAMADA cuya fecha llega en los próximos días y avisa de las vencidas
+   * sin iniciar, a quien las aceptó y a los Administradores. La orden no cambia de estado.
+   */
+  @Scheduled(cron = ProcesosProgramados.CRON_DIARIO, zone = ProcesosProgramados.ZONA)
+  @SchedulerLock(
+      name = ProcesosProgramados.ALERTA_ORDENES_PROGRAMADAS,
+      lockAtMostFor = ProcesosProgramados.BLOQUEO_MAXIMO,
+      lockAtLeastFor = ProcesosProgramados.BLOQUEO_MINIMO)
+  public void alertarOrdenesProgramadas() {
+<span class="fc" id="L149">    LocalDate hoy = LocalDate.now(clock.withZone(ZONA));</span>
+<span class="fc" id="L150">    List&lt;UUID&gt; administradores = usuarios.findIdsActivosPorRol(RoleName.ADMINISTRADOR);</span>
+<span class="fc" id="L151">    List&lt;OrdenMantenimiento&gt; proximas =</span>
+<span class="fc" id="L152">        ordenes.findByEstadoAndFechaProgramadaBetween(</span>
+<span class="fc" id="L153">            EstadoOrden.PROGRAMADA, hoy, hoy.plusDays(diasAnticipacion));</span>
+<span class="fc" id="L154">    List&lt;OrdenMantenimiento&gt; vencidas =</span>
+<span class="fc" id="L155">        ordenes.findByEstadoAndFechaProgramadaBefore(EstadoOrden.PROGRAMADA, hoy);</span>
+
+<span class="fc" id="L157">    int[] resultado = new int[2];</span>
+<span class="fc bfc" id="L158" title="All 2 branches covered.">    for (OrdenMantenimiento orden : proximas) {</span>
+<span class="fc" id="L159">      avisarOrden(</span>
+          orden,
+          administradores,
+          TIPO_PROXIMA,
+          &quot;Orden de mantenimiento próxima&quot;,
+          &quot;La orden «&quot;
+<span class="fc" id="L165">              + orden.getDescripcion()</span>
+              + &quot;» está programada para el &quot;
+<span class="fc" id="L167">              + FORMATO_FECHA.format(orden.getFechaProgramada())</span>
+              + &quot;.&quot;,
+          &quot;orden-programada-proxima:&quot;,
+          resultado);
+<span class="fc" id="L171">    }</span>
+<span class="fc bfc" id="L172" title="All 2 branches covered.">    for (OrdenMantenimiento orden : vencidas) {</span>
+<span class="fc" id="L173">      avisarOrden(</span>
+          orden,
+          administradores,
+          TIPO_VENCIDA,
+          &quot;Orden de mantenimiento vencida&quot;,
+          &quot;La orden «&quot;
+<span class="fc" id="L179">              + orden.getDescripcion()</span>
+              + &quot;» estaba programada para el &quot;
+<span class="fc" id="L181">              + FORMATO_FECHA.format(orden.getFechaProgramada())</span>
+              + &quot; y no se ha iniciado.&quot;,
+          &quot;orden-programada-vencida:&quot;,
+          resultado);
+<span class="fc" id="L185">    }</span>
+<span class="fc" id="L186">    auditoria.registrarProceso(</span>
+        ProcesosProgramados.ALERTA_ORDENES_PROGRAMADAS,
+<span class="fc" id="L188">        json.createObjectNode()</span>
+<span class="fc" id="L189">            .put(&quot;proximas&quot;, proximas.size())</span>
+<span class="fc" id="L190">            .put(&quot;vencidas&quot;, vencidas.size())</span>
+<span class="fc" id="L191">            .put(&quot;diasAnticipacion&quot;, diasAnticipacion)</span>
+<span class="fc" id="L192">            .put(&quot;destinatarios&quot;, resultado[0])</span>
+<span class="fc" id="L193">            .put(&quot;fallos&quot;, resultado[1]));</span>
+<span class="fc" id="L194">  }</span>
+
+  private void avisarOrden(
+      OrdenMantenimiento orden,
+      List&lt;UUID&gt; administradores,
+      String tipo,
+      String titulo,
+      String mensaje,
+      String prefijoClave,
+      int[] resultado) {
+    try {
+<span class="fc" id="L205">      Set&lt;UUID&gt; avisar = new LinkedHashSet&lt;&gt;(administradores);</span>
+<span class="pc bpc" id="L206" title="1 of 2 branches missed.">      if (orden.getAceptadoPorId() != null) {</span>
+<span class="fc" id="L207">        avisar.addAll(usuarios.filtrarActivos(List.of(orden.getAceptadoPorId())));</span>
+      }
+<span class="fc" id="L209">      String clave = prefijoClave + orden.getId() + &quot;:&quot; + orden.getFechaProgramada();</span>
+<span class="fc bfc" id="L210" title="All 2 branches covered.">      for (UUID usuarioId : avisar) {</span>
+<span class="fc" id="L211">        notificaciones.notificar(</span>
+<span class="fc" id="L212">            usuarioId, tipo, titulo, mensaje, &quot;orden_mantenimiento&quot;, orden.getId(), clave);</span>
+<span class="fc" id="L213">        resultado[0]++;</span>
+<span class="fc" id="L214">      }</span>
+<span class="nc" id="L215">    } catch (DataIntegrityViolationException e) {</span>
+      // Una ejecución simultánea ya registró el mismo aviso; la clave de evento lo impide.
+<span class="nc" id="L217">      LOG.debug(&quot;Aviso ya registrado para la orden {}&quot;, orden.getId());</span>
+<span class="nc" id="L218">    } catch (RuntimeException e) {</span>
+<span class="nc" id="L219">      resultado[1]++;</span>
+<span class="nc" id="L220">      LOG.warn(&quot;No se pudo avisar la orden programada {}&quot;, orden.getId(), e);</span>
+<span class="pc" id="L221">    }</span>
+<span class="fc" id="L222">  }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

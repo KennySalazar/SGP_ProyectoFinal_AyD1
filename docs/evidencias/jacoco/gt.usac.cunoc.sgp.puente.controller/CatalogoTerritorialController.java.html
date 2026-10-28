@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CatalogoTerritorialController.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">sgp-api</a> &gt; <a href="index.source.html" class="el_package">gt.usac.cunoc.sgp.puente.controller</a> &gt; <span class="el_source">CatalogoTerritorialController.java</span></div><h1>CatalogoTerritorialController.java</h1><pre class="source lang-java linenums">package gt.usac.cunoc.sgp.puente.controller;
+
+import gt.usac.cunoc.sgp.puente.dto.DepartamentoResponse;
+import gt.usac.cunoc.sgp.puente.dto.MunicipioResponse;
+import gt.usac.cunoc.sgp.puente.service.CatalogoTerritorialService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import java.util.UUID;
+import org.springframework.data.domain.Page;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+@RequestMapping(&quot;/api/v1/catalogos&quot;)
+@PreAuthorize(&quot;hasRole('ADMINISTRADOR')&quot;)
+@Tag(name = &quot;Catálogos territoriales&quot;, description = &quot;Departamentos y municipios del INE&quot;)
+public class CatalogoTerritorialController {
+
+  private final CatalogoTerritorialService catalogoTerritorialService;
+
+<span class="fc" id="L26">  public CatalogoTerritorialController(CatalogoTerritorialService catalogoTerritorialService) {</span>
+<span class="fc" id="L27">    this.catalogoTerritorialService = catalogoTerritorialService;</span>
+<span class="fc" id="L28">  }</span>
+
+  @GetMapping(&quot;/departamentos&quot;)
+  @PreAuthorize(&quot;permitAll()&quot;)
+  @Operation(
+      summary = &quot;Listar departamentos activos&quot;,
+      description = &quot;Consulta pública sin autenticación para el filtro del catálogo de puentes.&quot;)
+  public Page&lt;DepartamentoResponse&gt; listarDepartamentos(
+      @RequestParam(defaultValue = &quot;0&quot;) int pagina,
+      @RequestParam(defaultValue = &quot;100&quot;) int tamanio) {
+<span class="fc" id="L38">    return catalogoTerritorialService.listarDepartamentos(pagina, tamanio);</span>
+  }
+
+  @GetMapping(&quot;/departamentos/{departamentoId}/municipios&quot;)
+  @PreAuthorize(&quot;hasAnyRole('ADMINISTRADOR', 'CATEDRATICO')&quot;)
+  @SecurityRequirement(name = &quot;bearerAuth&quot;)
+  @Operation(summary = &quot;Listar municipios activos de un departamento&quot;)
+  public Page&lt;MunicipioResponse&gt; listarMunicipios(
+      @PathVariable UUID departamentoId,
+      @RequestParam(defaultValue = &quot;0&quot;) int pagina,
+      @RequestParam(defaultValue = &quot;100&quot;) int tamanio) {
+<span class="fc" id="L49">    return catalogoTerritorialService.listarMunicipios(departamentoId, pagina, tamanio);</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ExportacionInspeccionResponse.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">sgp-api</a> &gt; <a href="index.source.html" class="el_package">gt.usac.cunoc.sgp.inspeccion.dto</a> &gt; <span class="el_source">ExportacionInspeccionResponse.java</span></div><h1>ExportacionInspeccionResponse.java</h1><pre class="source lang-java linenums">package gt.usac.cunoc.sgp.inspeccion.dto;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.util.List;
+import java.util.UUID;
+
+/**
+ * Datos estructurados de la inspección publicada para exportación en formato JSON sanitizado,
+ * preservando la estructura histórica del formulario y excluyendo referencias internas sensibles
+ * (RN-FRM-05).
+ */
+<span class="fc" id="L14">public record ExportacionInspeccionResponse(</span>
+    UUID id,
+    LocalDate fechaInspeccion,
+    PuenteResumenExportacion puente,
+    VersionFormularioExportacion versionFormulario,
+    RelacionVersionActivaResponse relacionVersionActiva,
+    String estado,
+    String vigencia,
+    JsonNode identificacionCapturada,
+    JsonNode datos,
+    DatosPermanentesResponse datosPermanentes,
+    ResultadoIcPublicadoResponse ic,
+    List&lt;FotografiaExportacionResponse&gt; fotografias,
+    List&lt;PropuestaMantenimientoExportacionResponse&gt; propuestasMantenimiento,
+    Instant exportadoEn) {
+
+<span class="fc" id="L30">  public record PuenteResumenExportacion(</span>
+      UUID id, String codigo, String nombre, String departamento, String municipio) {}
+
+<span class="fc" id="L33">  public record VersionFormularioExportacion(UUID id, String codigo, JsonNode esquema) {}</span>
+
+<span class="nc" id="L35">  public record FotografiaExportacionResponse(</span>
+      UUID id, String categoria, String elementoRef, Instant capturadoEn) {}
+
+<span class="nc" id="L38">  public record PropuestaMantenimientoExportacionResponse(</span>
+      UUID id, String tipo, String estado, String descripcion, String prioridadSugerida) {}
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

@@ -1,0 +1,129 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PerfilUsuarioService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">sgp-api</a> &gt; <a href="index.source.html" class="el_package">gt.usac.cunoc.sgp.usuario.service</a> &gt; <span class="el_source">PerfilUsuarioService.java</span></div><h1>PerfilUsuarioService.java</h1><pre class="source lang-java linenums">package gt.usac.cunoc.sgp.usuario.service;
+
+import gt.usac.cunoc.sgp.common.exception.ApiException;
+import gt.usac.cunoc.sgp.usuario.entity.UserAccount;
+import gt.usac.cunoc.sgp.usuario.repository.UserAccountRepository;
+import gt.usac.cunoc.sgp.usuario.validation.ReglasPerfil;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
+import java.util.regex.Pattern;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.http.HttpStatus;
+import org.springframework.stereotype.Service;
+
+/**
+ * Nombre completo y nombre de usuario de una cuenta. El nombre de usuario es lo único que el foro
+ * muestra de una persona y lo que se escribe tras la arroba en una mención, así que se guarda en
+ * minúsculas, es único y no puede hacerse pasar por un cargo.
+ */
+@Service
+public class PerfilUsuarioService {
+
+  /**
+   * Nombres que sugieren un cargo o una cuenta del sistema. Como el foro muestra solo el nombre de
+   * usuario, sin el rol, reservarlos evita que alguien se haga pasar por moderación.
+   */
+<span class="fc" id="L28">  private static final Set&lt;String&gt; RESERVADOS =</span>
+<span class="fc" id="L29">      Set.of(</span>
+          &quot;admin&quot;,
+          &quot;administrador&quot;,
+          &quot;catedratico&quot;,
+          &quot;moderador&quot;,
+          &quot;sistema&quot;,
+          &quot;soporte&quot;,
+          &quot;sgp&quot;,
+          &quot;todos&quot;);
+
+<span class="fc" id="L39">  private static final Pattern PATRON = Pattern.compile(ReglasPerfil.PATRON_USUARIO);</span>
+  private static final String INDICE_UNICO = &quot;uq_usuario_nombre_usuario_lower&quot;;
+
+  private final UserAccountRepository usuarios;
+
+<span class="fc" id="L44">  public PerfilUsuarioService(UserAccountRepository usuarios) {</span>
+<span class="fc" id="L45">    this.usuarios = usuarios;</span>
+<span class="fc" id="L46">  }</span>
+
+  /**
+   * Valida el perfil, comprueba que el nombre de usuario esté libre y lo aplica a la cuenta. No
+   * guarda: eso lo hace {@link #guardar(UserAccount)}.
+   */
+  public void aplicar(UserAccount cuenta, String nombreCompleto, String nombreUsuario) {
+<span class="pc bpc" id="L53" title="1 of 2 branches missed.">    String nombre = nombreCompleto == null ? &quot;&quot; : nombreCompleto.strip().replaceAll(&quot;\\s+&quot;, &quot; &quot;);</span>
+<span class="pc bpc" id="L54" title="1 of 2 branches missed.">    String usuario = nombreUsuario == null ? &quot;&quot; : nombreUsuario.strip().toLowerCase(Locale.ROOT);</span>
+
+<span class="fc" id="L56">    List&lt;Map&lt;String, String&gt;&gt; errores = new java.util.ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L57" title="All 2 branches covered.">    if (nombre.length() &lt; ReglasPerfil.NOMBRE_COMPLETO_MINIMO</span>
+<span class="pc bpc" id="L58" title="1 of 2 branches missed.">        || nombre.length() &gt; ReglasPerfil.NOMBRE_COMPLETO_MAXIMO</span>
+<span class="fc bfc" id="L59" title="All 2 branches covered.">        || nombre.codePoints().anyMatch(Character::isISOControl)) {</span>
+<span class="fc" id="L60">      errores.add(</span>
+<span class="fc" id="L61">          Map.of(</span>
+              &quot;campo&quot;,
+              &quot;nombreCompleto&quot;,
+              &quot;mensaje&quot;,
+              &quot;El nombre completo debe tener entre 2 y 200 caracteres.&quot;));
+    }
+<span class="fc bfc" id="L67" title="All 2 branches covered.">    if (!PATRON.matcher(usuario).matches()) {</span>
+<span class="fc" id="L68">      errores.add(Map.of(&quot;campo&quot;, &quot;nombreUsuario&quot;, &quot;mensaje&quot;, ReglasPerfil.MENSAJE_USUARIO + &quot;.&quot;));</span>
+<span class="fc bfc" id="L69" title="All 2 branches covered.">    } else if (RESERVADOS.contains(usuario)) {</span>
+<span class="fc" id="L70">      errores.add(</span>
+<span class="fc" id="L71">          Map.of(</span>
+              &quot;campo&quot;,
+              &quot;nombreUsuario&quot;,
+              &quot;mensaje&quot;,
+              &quot;Ese nombre de usuario está reservado. Elige otro.&quot;));
+    }
+<span class="fc bfc" id="L77" title="All 2 branches covered.">    if (!errores.isEmpty()) {</span>
+<span class="fc" id="L78">      throw new ApiException(</span>
+          HttpStatus.UNPROCESSABLE_ENTITY,
+          &quot;perfil_invalido&quot;,
+          &quot;Perfil inválido&quot;,
+          &quot;El nombre completo o el nombre de usuario no son válidos.&quot;,
+          errores);
+    }
+
+<span class="fc" id="L86">    usuarios</span>
+<span class="fc" id="L87">        .findByNombreUsuarioEnMinusculas(usuario)</span>
+<span class="fc bfc" id="L88" title="All 2 branches covered.">        .filter(otra -&gt; !otra.getId().equals(cuenta.getId()))</span>
+<span class="fc" id="L89">        .ifPresent(</span>
+            otra -&gt; {
+<span class="fc" id="L91">              throw nombreUsuarioEnUso();</span>
+            });
+<span class="fc" id="L93">    cuenta.actualizarPerfil(nombre, usuario);</span>
+<span class="fc" id="L94">  }</span>
+
+  /**
+   * Guarda la cuenta. Si otra petición tomó el mismo nombre de usuario entre la comprobación y el
+   * guardado, el índice único lo detiene y se responde igual que si ya hubiera estado en uso.
+   */
+  public UserAccount guardar(UserAccount cuenta) {
+    try {
+<span class="fc" id="L102">      return usuarios.saveAndFlush(cuenta);</span>
+<span class="fc" id="L103">    } catch (DataIntegrityViolationException e) {</span>
+<span class="fc" id="L104">      Throwable causa = e.getMostSpecificCause();</span>
+<span class="pc bpc" id="L105" title="2 of 4 branches missed.">      if (causa.getMessage() != null &amp;&amp; causa.getMessage().contains(INDICE_UNICO)) {</span>
+<span class="fc" id="L106">        throw nombreUsuarioEnUso();</span>
+      }
+<span class="nc bnc" id="L108" title="All 2 branches missed.">      if (causa.getMessage() != null</span>
+<span class="nc bnc" id="L109" title="All 2 branches missed.">          &amp;&amp; (causa.getMessage().toLowerCase(Locale.ROOT).contains(&quot;email&quot;)</span>
+<span class="nc bnc" id="L110" title="All 2 branches missed.">              || causa.getMessage().contains(&quot;usuario_email_key&quot;))) {</span>
+<span class="nc" id="L111">        throw new ApiException(</span>
+            HttpStatus.CONFLICT,
+            &quot;email_already_registered&quot;,
+            &quot;Correo ya registrado&quot;,
+            &quot;El correo electrónico ya está registrado&quot;);
+      }
+<span class="nc" id="L117">      throw e;</span>
+    }
+  }
+
+  private ApiException nombreUsuarioEnUso() {
+<span class="fc" id="L122">    return new ApiException(</span>
+        HttpStatus.CONFLICT,
+        &quot;nombre_usuario_en_uso&quot;,
+        &quot;Nombre de usuario en uso&quot;,
+        &quot;Ese nombre de usuario ya está en uso. Elige otro.&quot;);
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

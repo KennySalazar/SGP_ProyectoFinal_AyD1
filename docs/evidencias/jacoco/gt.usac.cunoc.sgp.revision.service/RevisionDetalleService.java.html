@@ -1,0 +1,121 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RevisionDetalleService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">sgp-api</a> &gt; <a href="index.source.html" class="el_package">gt.usac.cunoc.sgp.revision.service</a> &gt; <span class="el_source">RevisionDetalleService.java</span></div><h1>RevisionDetalleService.java</h1><pre class="source lang-java linenums">package gt.usac.cunoc.sgp.revision.service;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import gt.usac.cunoc.sgp.common.exception.ApiException;
+import gt.usac.cunoc.sgp.formulario.repository.VersionFormularioRepository;
+import gt.usac.cunoc.sgp.inspeccion.dto.IndiceCondicionPreliminarResponse;
+import gt.usac.cunoc.sgp.revision.dto.RevisionDetalleResponse;
+import gt.usac.cunoc.sgp.revision.repository.RevisionRepository;
+import java.time.LocalDate;
+import java.time.format.DateTimeParseException;
+import java.util.UUID;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpStatus;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+@Service
+@PreAuthorize(&quot;hasAnyRole('CATEDRATICO', 'ESTUDIANTE')&quot;)
+public class RevisionDetalleService {
+<span class="fc" id="L22">  private static final Logger LOGGER = LoggerFactory.getLogger(RevisionDetalleService.class);</span>
+  private final RevisionRepository revisiones;
+  private final VersionFormularioRepository versiones;
+  private final RevisionIndicePreliminarService indicePreliminar;
+
+  public RevisionDetalleService(
+      RevisionRepository revisiones,
+      VersionFormularioRepository versiones,
+<span class="fc" id="L30">      RevisionIndicePreliminarService indicePreliminar) {</span>
+<span class="fc" id="L31">    this.revisiones = revisiones;</span>
+<span class="fc" id="L32">    this.versiones = versiones;</span>
+<span class="fc" id="L33">    this.indicePreliminar = indicePreliminar;</span>
+<span class="fc" id="L34">  }</span>
+
+  @Transactional(readOnly = true)
+  public RevisionDetalleResponse obtener(UUID revisionId, UUID actor) {
+<span class="fc bfc" id="L38" title="All 2 branches covered.">    if (actor == null)</span>
+<span class="fc" id="L39">      throw new ApiException(</span>
+          HttpStatus.UNAUTHORIZED,
+          &quot;autenticacion_requerida&quot;,
+          &quot;Autenticación requerida&quot;,
+          &quot;Se requiere una sesión válida.&quot;);
+<span class="fc" id="L44">    var ciclo = revisiones.findById(revisionId).orElseThrow(this::noEncontrada);</span>
+<span class="fc bfc" id="L45" title="All 4 branches covered.">    if ((!actor.equals(ciclo.getRevisorId()) &amp;&amp; !actor.equals(ciclo.getInspeccion().getAutorId()))</span>
+<span class="pc bpc" id="L46" title="1 of 2 branches missed.">        || ciclo.getInspeccion().getEliminadoEn() != null) throw noEncontrada();</span>
+<span class="fc" id="L47">    JsonNode snapshot = ciclo.getContenidoEnviado();</span>
+<span class="fc" id="L48">    UUID inspeccionId = identificador(snapshot, &quot;inspeccionId&quot;);</span>
+<span class="pc bpc" id="L49" title="1 of 2 branches missed.">    if (!inspeccionId.equals(ciclo.getInspeccion().getId())) throw contenidoInvalido();</span>
+<span class="fc" id="L50">    UUID versionId = identificador(snapshot, &quot;versionFormularioId&quot;);</span>
+<span class="fc" id="L51">    UUID autorId = identificador(snapshot, &quot;autorId&quot;);</span>
+<span class="fc" id="L52">    UUID puenteId = identificador(snapshot, &quot;puenteId&quot;);</span>
+    LocalDate fecha;
+    try {
+<span class="fc" id="L55">      fecha = LocalDate.parse(snapshot.path(&quot;fechaInspeccion&quot;).asText());</span>
+<span class="nc" id="L56">    } catch (DateTimeParseException e) {</span>
+<span class="nc" id="L57">      throw contenidoInvalido();</span>
+<span class="fc" id="L58">    }</span>
+<span class="pc bpc" id="L59" title="1 of 2 branches missed.">    if (!snapshot.path(&quot;datos&quot;).isObject()</span>
+<span class="fc bfc" id="L60" title="All 2 branches covered.">        || !(snapshot.path(&quot;identificacionCapturada&quot;).isObject()</span>
+<span class="pc bpc" id="L61" title="1 of 2 branches missed.">            || snapshot.path(&quot;identificacionCapturada&quot;).isNull())) throw contenidoInvalido();</span>
+<span class="fc" id="L62">    var version = versiones.findById(versionId).orElseThrow(this::contenidoInvalido);</span>
+<span class="pc bpc" id="L63" title="1 of 2 branches missed.">    if (version.getEsquema() == null</span>
+<span class="pc bpc" id="L64" title="1 of 2 branches missed.">        || !version.getEsquema().isObject()</span>
+<span class="pc bpc" id="L65" title="1 of 2 branches missed.">        || version.getEsquema().isEmpty()) throw contenidoInvalido();</span>
+
+<span class="fc" id="L67">    IndiceCondicionPreliminarResponse preliminar = null;</span>
+    try {
+<span class="fc" id="L69">      preliminar = indicePreliminar.calcular(versionId, snapshot.path(&quot;datos&quot;).deepCopy());</span>
+<span class="fc" id="L70">    } catch (RuntimeException e) {</span>
+<span class="fc" id="L71">      LOGGER.warn(</span>
+          &quot;IC preliminar de revision no disponible: tipo={}, motivo={}&quot;,
+<span class="fc" id="L73">          e.getClass().getSimpleName(),</span>
+<span class="fc bfc" id="L74" title="All 2 branches covered.">          e instanceof ApiException api ? api.getCode() : &quot;fallo_inesperado_calculo_ic&quot;);</span>
+<span class="fc" id="L75">    }</span>
+<span class="fc" id="L76">    return new RevisionDetalleResponse(</span>
+<span class="fc" id="L77">        ciclo.getId(),</span>
+        inspeccionId,
+<span class="fc" id="L79">        ciclo.getEstado(),</span>
+<span class="fc" id="L80">        ciclo.getRevisorId(),</span>
+<span class="fc" id="L81">        ciclo.getNumeroCiclo(),</span>
+<span class="fc" id="L82">        ciclo.getEnviadaEn(),</span>
+        autorId,
+        puenteId,
+        fecha,
+        versionId,
+<span class="fc" id="L87">        version.getCodigo(),</span>
+<span class="fc" id="L88">        version.getEsquema().deepCopy(),</span>
+<span class="fc" id="L89">        snapshot.path(&quot;datos&quot;).deepCopy(),</span>
+<span class="fc" id="L90">        snapshot.path(&quot;identificacionCapturada&quot;).deepCopy(),</span>
+        preliminar,
+        &quot;/api/v1/inspecciones/&quot; + inspeccionId + &quot;/fotografias&quot;,
+        false,
+        &quot;/api/v1/revisiones/&quot; + revisionId + &quot;/observaciones&quot;);
+  }
+
+  private UUID identificador(JsonNode snapshot, String campo) {
+    try {
+<span class="fc" id="L99">      return UUID.fromString(snapshot.path(campo).asText());</span>
+<span class="fc" id="L100">    } catch (IllegalArgumentException | NullPointerException e) {</span>
+<span class="fc" id="L101">      throw contenidoInvalido();</span>
+    }
+  }
+
+  private ApiException contenidoInvalido() {
+<span class="fc" id="L106">    return new ApiException(</span>
+        HttpStatus.CONFLICT,
+        &quot;revision_contenido_invalido&quot;,
+        &quot;Contenido enviado no disponible&quot;,
+        &quot;El ciclo no contiene los datos o la versión histórica requeridos.&quot;);
+  }
+
+  private ApiException noEncontrada() {
+<span class="fc" id="L114">    return new ApiException(</span>
+        HttpStatus.NOT_FOUND,
+        &quot;revision_no_encontrada&quot;,
+        &quot;Revisión no encontrada&quot;,
+        &quot;No existe la revisión solicitada o no corresponde al catedrático autenticado.&quot;);
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

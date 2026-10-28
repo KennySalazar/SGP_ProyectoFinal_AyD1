@@ -1,0 +1,273 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ResultadoIc.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">sgp-api</a> &gt; <a href="index.source.html" class="el_package">gt.usac.cunoc.sgp.inspeccion.entity</a> &gt; <span class="el_source">ResultadoIc.java</span></div><h1>ResultadoIc.java</h1><pre class="source lang-java linenums">package gt.usac.cunoc.sgp.inspeccion.entity;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import gt.usac.cunoc.sgp.inspeccion.model.EstadoCondicion;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.Id;
+import jakarta.persistence.Table;
+import java.math.BigDecimal;
+import java.time.Instant;
+import java.util.UUID;
+import org.hibernate.annotations.Immutable;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
+
+@Entity
+@Immutable
+@Table(name = &quot;resultado_ic&quot;)
+public class ResultadoIc {
+
+  @Id private UUID id;
+
+  @Column(name = &quot;inspeccion_id&quot;, nullable = false, updatable = false)
+  private UUID inspeccionId;
+
+  @Column(name = &quot;version_configuracion_id&quot;, nullable = false, updatable = false)
+  private UUID versionConfiguracionId;
+
+  @Column(nullable = false, length = 20, updatable = false)
+  private String tipo;
+
+  @Column(name = &quot;indice_calculado&quot;, nullable = false, precision = 8, scale = 5, updatable = false)
+  private BigDecimal indiceCalculado;
+
+  @Enumerated(EnumType.STRING)
+  @Column(name = &quot;estado_por_rango&quot;, nullable = false, length = 20, updatable = false)
+  private EstadoCondicion estadoPorRango;
+
+  @Enumerated(EnumType.STRING)
+  @Column(name = &quot;estado_calculado&quot;, nullable = false, length = 20, updatable = false)
+  private EstadoCondicion estadoCalculado;
+
+  @Enumerated(EnumType.STRING)
+  @Column(name = &quot;estado_confirmado&quot;, nullable = false, length = 20, updatable = false)
+  private EstadoCondicion estadoConfirmado;
+
+  @JdbcTypeCode(SqlTypes.JSON)
+  @Column(
+      name = &quot;condiciones_anulacion&quot;,
+      nullable = false,
+      columnDefinition = &quot;jsonb&quot;,
+      updatable = false)
+  private JsonNode condicionesAnulacion;
+
+  @JdbcTypeCode(SqlTypes.JSON)
+  @Column(nullable = false, columnDefinition = &quot;jsonb&quot;, updatable = false)
+  private JsonNode desglose;
+
+  @Column(name = &quot;hash_entrada&quot;, nullable = false, length = 64, updatable = false)
+  private String hashEntrada;
+
+  @Column(name = &quot;version_algoritmo&quot;, nullable = false, length = 50, updatable = false)
+  private String versionAlgoritmo;
+
+  @Column(name = &quot;justificacion_ajuste&quot;, updatable = false)
+  private String justificacionAjuste;
+
+  @Column(name = &quot;confirmado_por_id&quot;, updatable = false)
+  private UUID confirmadoPorId;
+
+  @Column(name = &quot;confirmado_en&quot;, updatable = false)
+  private Instant confirmadoEn;
+
+  @Column(name = &quot;solicitado_por_id&quot;, updatable = false)
+  private UUID solicitadoPorId;
+
+  @Column(name = &quot;calculado_en&quot;, nullable = false, updatable = false)
+  private Instant calculadoEn;
+
+  @Column(name = &quot;creado_en&quot;, nullable = false, updatable = false)
+  private Instant creadoEn;
+
+<span class="fc" id="L85">  protected ResultadoIc() {}</span>
+
+  public ResultadoIc(
+      UUID id,
+      UUID inspeccionId,
+      UUID versionConfiguracionId,
+      BigDecimal indiceCalculado,
+      EstadoCondicion estadoPorRango,
+      EstadoCondicion estadoCalculado,
+      JsonNode condicionesAnulacion,
+      JsonNode desglose,
+      String hashEntrada,
+      String versionAlgoritmo,
+      UUID solicitadoPorId,
+      Instant ahora) {
+<span class="fc" id="L100">    this(</span>
+        id,
+        inspeccionId,
+        versionConfiguracionId,
+        indiceCalculado,
+        estadoPorRango,
+        estadoCalculado,
+        condicionesAnulacion,
+        desglose,
+        hashEntrada,
+        versionAlgoritmo,
+        solicitadoPorId,
+        ahora,
+        estadoCalculado,
+        null,
+        null,
+        null);
+<span class="fc" id="L117">  }</span>
+
+  public ResultadoIc(
+      UUID id,
+      UUID inspeccionId,
+      UUID versionConfiguracionId,
+      BigDecimal indiceCalculado,
+      EstadoCondicion estadoPorRango,
+      EstadoCondicion estadoCalculado,
+      JsonNode condicionesAnulacion,
+      JsonNode desglose,
+      String hashEntrada,
+      String versionAlgoritmo,
+      UUID solicitadoPorId,
+      Instant ahora,
+      EstadoCondicion estadoConfirmado,
+      String justificacionAjuste,
+      UUID confirmadoPorId,
+<span class="fc" id="L135">      Instant confirmadoEn) {</span>
+<span class="pc bpc" id="L136" title="2 of 4 branches missed.">    if (estadoCalculado == null || estadoConfirmado == null) {</span>
+<span class="nc" id="L137">      throw new IllegalArgumentException(&quot;Los estados calculado y confirmado son obligatorios.&quot;);</span>
+    }
+<span class="fc bfc" id="L139" title="All 2 branches covered.">    if (estadoCalculado != estadoConfirmado) {</span>
+<span class="pc bpc" id="L140" title="1 of 2 branches missed.">      if (justificacionAjuste == null</span>
+<span class="pc bpc" id="L141" title="3 of 6 branches missed.">          || justificacionAjuste.isBlank()</span>
+          || confirmadoPorId == null
+          || confirmadoEn == null) {
+<span class="nc" id="L144">        throw new IllegalArgumentException(&quot;El ajuste requiere justificacion, autor y fecha.&quot;);</span>
+      }
+<span class="pc bpc" id="L146" title="3 of 6 branches missed.">    } else if (justificacionAjuste != null || confirmadoPorId != null || confirmadoEn != null) {</span>
+<span class="nc" id="L147">      throw new IllegalArgumentException(</span>
+          &quot;Una confirmacion sin cambio de estado no debe contener datos de ajuste.&quot;);
+    }
+<span class="fc bfc" id="L150" title="All 2 branches covered.">    this.justificacionAjuste = justificacionAjuste == null ? null : justificacionAjuste.strip();</span>
+<span class="fc" id="L151">    this.confirmadoPorId = confirmadoPorId;</span>
+<span class="fc" id="L152">    this.confirmadoEn = confirmadoEn;</span>
+<span class="fc" id="L153">    this.id = id;</span>
+<span class="fc" id="L154">    this.inspeccionId = inspeccionId;</span>
+<span class="fc" id="L155">    this.versionConfiguracionId = versionConfiguracionId;</span>
+<span class="fc" id="L156">    this.tipo = &quot;PUBLICACION&quot;;</span>
+<span class="fc" id="L157">    this.indiceCalculado = indiceCalculado;</span>
+<span class="fc" id="L158">    this.estadoPorRango = estadoPorRango;</span>
+<span class="fc" id="L159">    this.estadoCalculado = estadoCalculado;</span>
+<span class="fc" id="L160">    this.estadoConfirmado = estadoConfirmado;</span>
+<span class="fc" id="L161">    this.condicionesAnulacion = condicionesAnulacion.deepCopy();</span>
+<span class="fc" id="L162">    this.desglose = desglose.deepCopy();</span>
+<span class="fc" id="L163">    this.hashEntrada = hashEntrada;</span>
+<span class="fc" id="L164">    this.versionAlgoritmo = versionAlgoritmo;</span>
+<span class="fc" id="L165">    this.solicitadoPorId = solicitadoPorId;</span>
+<span class="fc" id="L166">    this.calculadoEn = ahora;</span>
+<span class="fc" id="L167">    this.creadoEn = ahora;</span>
+<span class="fc" id="L168">  }</span>
+
+  public static ResultadoIc recalculo(
+      UUID id,
+      UUID inspeccionId,
+      UUID versionConfiguracionId,
+      BigDecimal indiceCalculado,
+      EstadoCondicion estadoPorRango,
+      EstadoCondicion estadoCalculado,
+      JsonNode condicionesAnulacion,
+      JsonNode desglose,
+      String hashEntrada,
+      String versionAlgoritmo,
+      UUID solicitadoPorId,
+      Instant ahora) {
+<span class="fc" id="L183">    ResultadoIc resultado =</span>
+        new ResultadoIc(
+            id,
+            inspeccionId,
+            versionConfiguracionId,
+            indiceCalculado,
+            estadoPorRango,
+            estadoCalculado,
+            condicionesAnulacion,
+            desglose,
+            hashEntrada,
+            versionAlgoritmo,
+            solicitadoPorId,
+            ahora);
+<span class="fc" id="L197">    resultado.tipo = &quot;RECALCULO&quot;;</span>
+<span class="fc" id="L198">    return resultado;</span>
+  }
+
+  public UUID getId() {
+<span class="fc" id="L202">    return id;</span>
+  }
+
+  public UUID getInspeccionId() {
+<span class="fc" id="L206">    return inspeccionId;</span>
+  }
+
+  public UUID getVersionConfiguracionId() {
+<span class="fc" id="L210">    return versionConfiguracionId;</span>
+  }
+
+  public String getTipo() {
+<span class="fc" id="L214">    return tipo;</span>
+  }
+
+  public BigDecimal getIndiceCalculado() {
+<span class="fc" id="L218">    return indiceCalculado;</span>
+  }
+
+  public EstadoCondicion getEstadoPorRango() {
+<span class="fc" id="L222">    return estadoPorRango;</span>
+  }
+
+  public EstadoCondicion getEstadoCalculado() {
+<span class="fc" id="L226">    return estadoCalculado;</span>
+  }
+
+  public EstadoCondicion getEstadoConfirmado() {
+<span class="fc" id="L230">    return estadoConfirmado;</span>
+  }
+
+  public JsonNode getCondicionesAnulacion() {
+<span class="fc" id="L234">    return condicionesAnulacion.deepCopy();</span>
+  }
+
+  public JsonNode getDesglose() {
+<span class="fc" id="L238">    return desglose.deepCopy();</span>
+  }
+
+  public String getHashEntrada() {
+<span class="fc" id="L242">    return hashEntrada;</span>
+  }
+
+  public String getVersionAlgoritmo() {
+<span class="fc" id="L246">    return versionAlgoritmo;</span>
+  }
+
+  public String getJustificacionAjuste() {
+<span class="fc" id="L250">    return justificacionAjuste;</span>
+  }
+
+  public UUID getConfirmadoPorId() {
+<span class="fc" id="L254">    return confirmadoPorId;</span>
+  }
+
+  public Instant getConfirmadoEn() {
+<span class="fc" id="L258">    return confirmadoEn;</span>
+  }
+
+  public UUID getSolicitadoPorId() {
+<span class="fc" id="L262">    return solicitadoPorId;</span>
+  }
+
+  public Instant getCalculadoEn() {
+<span class="fc" id="L266">    return calculadoEn;</span>
+  }
+
+  public Instant getCreadoEn() {
+<span class="nc" id="L270">    return creadoEn;</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

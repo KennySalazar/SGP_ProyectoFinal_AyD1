@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ObservacionController.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">sgp-api</a> &gt; <a href="index.source.html" class="el_package">gt.usac.cunoc.sgp.revision.controller</a> &gt; <span class="el_source">ObservacionController.java</span></div><h1>ObservacionController.java</h1><pre class="source lang-java linenums">package gt.usac.cunoc.sgp.revision.controller;
+
+import gt.usac.cunoc.sgp.common.exception.ApiException;
+import gt.usac.cunoc.sgp.common.security.JwtData;
+import gt.usac.cunoc.sgp.revision.dto.*;
+import gt.usac.cunoc.sgp.revision.service.ObservacionService;
+import java.util.UUID;
+import org.springframework.http.HttpStatus;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.*;
+
+@RestController
+@RequestMapping(&quot;/api/v1/revisiones/{revisionId}/observaciones&quot;)
+@PreAuthorize(&quot;hasRole('CATEDRATICO')&quot;)
+public class ObservacionController {
+  private final ObservacionService observaciones;
+
+<span class="fc" id="L19">  public ObservacionController(ObservacionService observaciones) {</span>
+<span class="fc" id="L20">    this.observaciones = observaciones;</span>
+<span class="fc" id="L21">  }</span>
+
+  @PreAuthorize(&quot;hasAnyRole('CATEDRATICO', 'ESTUDIANTE')&quot;)
+  @GetMapping
+  public ListadoObservacionesResponse listar(@PathVariable UUID revisionId, Authentication auth) {
+<span class="fc" id="L26">    return observaciones.listar(revisionId, actor(auth));</span>
+  }
+
+  @PreAuthorize(&quot;hasAnyRole('CATEDRATICO', 'ESTUDIANTE')&quot;)
+  @GetMapping(&quot;/contador&quot;)
+  public ContadorObservacionesResponse contar(@PathVariable UUID revisionId, Authentication auth) {
+<span class="fc" id="L32">    return observaciones.contar(revisionId, actor(auth));</span>
+  }
+
+  @PreAuthorize(&quot;hasAnyRole('CATEDRATICO', 'ESTUDIANTE')&quot;)
+  @GetMapping(&quot;/{observacionId}&quot;)
+  public ObservacionResponse obtener(
+      @PathVariable UUID revisionId, @PathVariable UUID observacionId, Authentication auth) {
+<span class="fc" id="L39">    return observaciones.obtener(revisionId, observacionId, actor(auth));</span>
+  }
+
+  @PostMapping
+  @ResponseStatus(HttpStatus.CREATED)
+  public ObservacionResponse crear(
+      @PathVariable UUID revisionId,
+      @RequestBody CrearObservacionRequest request,
+      Authentication auth) {
+<span class="fc" id="L48">    return observaciones.crear(revisionId, actor(auth), request);</span>
+  }
+
+  @PutMapping(&quot;/{observacionId}&quot;)
+  public ObservacionResponse editar(
+      @PathVariable UUID revisionId,
+      @PathVariable UUID observacionId,
+      @RequestBody EditarObservacionRequest request,
+      Authentication auth) {
+<span class="fc" id="L57">    return observaciones.editar(revisionId, observacionId, actor(auth), request);</span>
+  }
+
+  @DeleteMapping(&quot;/{observacionId}&quot;)
+  @ResponseStatus(HttpStatus.NO_CONTENT)
+  public void eliminar(
+      @PathVariable UUID revisionId, @PathVariable UUID observacionId, Authentication auth) {
+<span class="fc" id="L64">    observaciones.eliminar(revisionId, observacionId, actor(auth));</span>
+<span class="fc" id="L65">  }</span>
+
+  @PreAuthorize(&quot;hasAnyRole('CATEDRATICO', 'ESTUDIANTE')&quot;)
+  @GetMapping(&quot;/general&quot;)
+  public ObservacionGeneralResponse general(@PathVariable UUID revisionId, Authentication auth) {
+<span class="fc" id="L70">    return observaciones.obtenerGeneral(revisionId, actor(auth));</span>
+  }
+
+  @PutMapping(&quot;/general&quot;)
+  public ObservacionGeneralResponse guardarGeneral(
+      @PathVariable UUID revisionId,
+      @RequestBody ObservacionGeneralRequest request,
+      Authentication auth) {
+<span class="fc" id="L78">    return observaciones.guardarGeneral(revisionId, actor(auth), request);</span>
+  }
+
+  private UUID actor(Authentication auth) {
+<span class="pc bpc" id="L82" title="1 of 2 branches missed.">    if (auth == null</span>
+<span class="pc bpc" id="L83" title="1 of 2 branches missed.">        || !auth.isAuthenticated()</span>
+<span class="fc bfc" id="L84" title="All 2 branches covered.">        || !(auth.getDetails() instanceof JwtData jwt)</span>
+<span class="pc bpc" id="L85" title="1 of 2 branches missed.">        || jwt.userId() == null) {</span>
+<span class="fc" id="L86">      throw new ApiException(</span>
+          HttpStatus.UNAUTHORIZED,
+          &quot;autenticacion_requerida&quot;,
+          &quot;Autenticación requerida&quot;,
+          &quot;Se requiere una sesión válida.&quot;);
+    }
+<span class="fc" id="L92">    return jwt.userId();</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

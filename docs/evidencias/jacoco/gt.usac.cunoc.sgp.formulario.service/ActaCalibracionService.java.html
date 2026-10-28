@@ -1,0 +1,320 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ActaCalibracionService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">sgp-api</a> &gt; <a href="index.source.html" class="el_package">gt.usac.cunoc.sgp.formulario.service</a> &gt; <span class="el_source">ActaCalibracionService.java</span></div><h1>ActaCalibracionService.java</h1><pre class="source lang-java linenums">package gt.usac.cunoc.sgp.formulario.service;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import gt.usac.cunoc.sgp.archivo.entity.Archivo;
+import gt.usac.cunoc.sgp.archivo.entity.ArchivoActaCalibracion;
+import gt.usac.cunoc.sgp.archivo.model.EstadoArchivo;
+import gt.usac.cunoc.sgp.archivo.model.TipoUsoArchivo;
+import gt.usac.cunoc.sgp.archivo.repository.ArchivoActaCalibracionRepository;
+import gt.usac.cunoc.sgp.archivo.repository.ArchivoRepository;
+import gt.usac.cunoc.sgp.archivo.service.AlmacenamientoArchivos;
+import gt.usac.cunoc.sgp.common.audit.model.AccionAuditoria;
+import gt.usac.cunoc.sgp.common.audit.service.AuditoriaWriter;
+import gt.usac.cunoc.sgp.common.exception.ApiException;
+import gt.usac.cunoc.sgp.common.util.UuidV7Generator;
+import gt.usac.cunoc.sgp.formulario.dto.ActaCalibracionResponse;
+import gt.usac.cunoc.sgp.formulario.dto.EstadoActaCalibracionResponse;
+import gt.usac.cunoc.sgp.formulario.entity.VersionFormulario;
+import gt.usac.cunoc.sgp.formulario.repository.ConfiguracionIcElementoRepository;
+import gt.usac.cunoc.sgp.formulario.repository.VersionFormularioRepository;
+import gt.usac.cunoc.sgp.formulario.validation.ValidadorActaPdf;
+import gt.usac.cunoc.sgp.usuario.repository.UserAccountRepository;
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.time.Clock;
+import java.util.HashSet;
+import java.util.HexFormat;
+import java.util.UUID;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpStatus;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.web.multipart.MultipartFile;
+
+@Service
+@PreAuthorize(&quot;hasAnyRole('ADMINISTRADOR', 'CATEDRATICO')&quot;)
+public class ActaCalibracionService {
+<span class="fc" id="L43">  private static final Logger LOG = LoggerFactory.getLogger(ActaCalibracionService.class);</span>
+  private final VersionFormularioRepository versiones;
+  private final ConfiguracionIcElementoRepository pesos;
+  private final ArchivoRepository archivos;
+  private final ArchivoActaCalibracionRepository actas;
+  private final AlmacenamientoArchivos almacenamiento;
+  private final ValidadorActaPdf validador;
+  private final AuditoriaWriter auditoria;
+  private final ObjectMapper json;
+  private final Clock clock;
+  private final UserAccountRepository usuarios;
+
+  public ActaCalibracionService(
+      VersionFormularioRepository versiones,
+      ConfiguracionIcElementoRepository pesos,
+      ArchivoRepository archivos,
+      ArchivoActaCalibracionRepository actas,
+      AlmacenamientoArchivos almacenamiento,
+      ValidadorActaPdf validador,
+      AuditoriaWriter auditoria,
+      ObjectMapper json,
+      Clock clock,
+<span class="fc" id="L65">      UserAccountRepository usuarios) {</span>
+<span class="fc" id="L66">    this.versiones = versiones;</span>
+<span class="fc" id="L67">    this.pesos = pesos;</span>
+<span class="fc" id="L68">    this.archivos = archivos;</span>
+<span class="fc" id="L69">    this.actas = actas;</span>
+<span class="fc" id="L70">    this.almacenamiento = almacenamiento;</span>
+<span class="fc" id="L71">    this.validador = validador;</span>
+<span class="fc" id="L72">    this.auditoria = auditoria;</span>
+<span class="fc" id="L73">    this.json = json;</span>
+<span class="fc" id="L74">    this.clock = clock;</span>
+<span class="fc" id="L75">    this.usuarios = usuarios;</span>
+<span class="fc" id="L76">  }</span>
+
+  @Transactional(readOnly = true)
+  public EstadoActaCalibracionResponse consultar(UUID versionId) {
+<span class="fc" id="L80">    obtenerVersion(versionId);</span>
+<span class="fc" id="L81">    return estado(versionId, vigente(versionId));</span>
+  }
+
+  @Transactional
+  public EstadoActaCalibracionResponse adjuntar(
+      UUID versionId, MultipartFile fichero, UUID usuarioId) {
+<span class="fc" id="L87">    VersionFormulario version =</span>
+<span class="fc" id="L88">        versiones.findByIdForUpdate(versionId).orElseThrow(this::versionNoEncontrada);</span>
+<span class="fc bfc" id="L89" title="All 2 branches covered.">    if (version.getEstado()</span>
+        != gt.usac.cunoc.sgp.formulario.model.EstadoVersionFormulario.BORRADOR) {
+<span class="fc" id="L91">      throw new ApiException(</span>
+          HttpStatus.CONFLICT,
+          &quot;version_inmutable&quot;,
+          &quot;Version inmutable&quot;,
+          &quot;El acta de una version publicada no puede modificarse. Cree una version nueva.&quot;);
+    }
+<span class="fc" id="L97">    validarPesos(version);</span>
+<span class="fc" id="L98">    byte[] contenido = validador.validar(fichero);</span>
+<span class="fc" id="L99">    Archivo anterior = vigente(versionId);</span>
+<span class="fc" id="L100">    var antes = estado(versionId, anterior);</span>
+<span class="fc" id="L101">    UUID id = UuidV7Generator.generate();</span>
+<span class="fc" id="L102">    String clave = &quot;acta-&quot; + versionId + &quot;-&quot; + id + &quot;.pdf&quot;;</span>
+<span class="pc bpc" id="L103" title="1 of 2 branches missed.">    if (!TransactionSynchronizationManager.isSynchronizationActive()) {</span>
+<span class="nc" id="L104">      throw new IllegalStateException(&quot;Adjuntar el acta requiere una transaccion activa.&quot;);</span>
+    }
+<span class="fc" id="L106">    TransactionSynchronizationManager.registerSynchronization(</span>
+<span class="fc" id="L107">        new TransactionSynchronization() {</span>
+          @Override
+          public void afterCompletion(int estadoTransaccion) {
+<span class="fc bfc" id="L110" title="All 2 branches covered.">            if (estadoTransaccion == STATUS_ROLLED_BACK) {</span>
+<span class="fc" id="L111">              eliminarObjeto(clave);</span>
+            }
+<span class="fc" id="L113">          }</span>
+        });
+    try {
+<span class="fc" id="L116">      almacenamiento.guardar(</span>
+          clave, new ByteArrayInputStream(contenido), contenido.length, &quot;application/pdf&quot;);
+<span class="fc" id="L118">    } catch (IOException excepcion) {</span>
+<span class="fc" id="L119">      throw error(</span>
+          HttpStatus.SERVICE_UNAVAILABLE,
+          &quot;almacenamiento_no_disponible&quot;,
+          &quot;No fue posible almacenar el acta. Intente nuevamente.&quot;);
+<span class="fc" id="L123">    }</span>
+<span class="fc" id="L124">    var ahora = clock.instant();</span>
+<span class="fc" id="L125">    Archivo nuevo =</span>
+        new Archivo(
+            id,
+            TipoUsoArchivo.ACTA_CALIBRACION,
+            null,
+<span class="fc" id="L130">            nombreSeguro(fichero.getOriginalFilename()),</span>
+            id + &quot;.pdf&quot;,
+            clave,
+            null,
+            &quot;application/pdf&quot;,
+            contenido.length,
+<span class="fc" id="L136">            checksum(contenido),</span>
+            null,
+            null,
+            null,
+            null,
+            usuarioId,
+            ahora);
+<span class="fc" id="L143">    archivos.saveAndFlush(nuevo);</span>
+<span class="fc" id="L144">    actas.saveAndFlush(new ArchivoActaCalibracion(nuevo, version, ahora));</span>
+<span class="fc bfc" id="L145" title="All 2 branches covered.">    if (anterior != null) {</span>
+<span class="fc" id="L146">      anterior.retirar(ahora);</span>
+<span class="fc" id="L147">      archivos.saveAndFlush(anterior);</span>
+    }
+<span class="fc" id="L149">    version.setCalibradoPorId(usuarioId);</span>
+<span class="fc" id="L150">    version.setCalibradoEn(ahora);</span>
+<span class="fc" id="L151">    version.setActualizadoEn(ahora);</span>
+<span class="fc" id="L152">    versiones.saveAndFlush(version);</span>
+<span class="fc" id="L153">    var despues = estado(versionId, nuevo);</span>
+<span class="fc" id="L154">    auditoria.registrarEnTransaccion(</span>
+        usuarioId,
+        AccionAuditoria.MODIFICAR,
+        &quot;version_formulario&quot;,
+        versionId,
+<span class="fc" id="L159">        json.valueToTree(antes),</span>
+<span class="fc" id="L160">        json.valueToTree(despues),</span>
+        &quot;HU-019: acta de calibracion&quot;);
+<span class="fc" id="L162">    return despues;</span>
+  }
+
+  @Transactional(readOnly = true)
+  public byte[] descargar(UUID versionId) {
+<span class="fc" id="L167">    obtenerVersion(versionId);</span>
+<span class="fc" id="L168">    Archivo archivo = vigente(versionId);</span>
+<span class="fc bfc" id="L169" title="All 2 branches covered.">    if (archivo == null) {</span>
+<span class="fc" id="L170">      throw error(</span>
+          HttpStatus.NOT_FOUND, &quot;acta_no_encontrada&quot;, &quot;La version esta sin acta de calibracion.&quot;);
+    }
+<span class="fc" id="L173">    try (var entrada = almacenamiento.abrir(archivo.getClaveObjetoOriginal())) {</span>
+<span class="fc" id="L174">      byte[] contenido = entrada.readNBytes(ValidadorActaPdf.MAXIMO_BYTES + 1);</span>
+<span class="fc bfc" id="L175" title="All 2 branches covered.">      if (contenido.length != archivo.getTamanoBytes()</span>
+<span class="pc bpc" id="L176" title="1 of 2 branches missed.">          || !checksum(contenido).equals(archivo.getChecksumSha256())) {</span>
+<span class="fc" id="L177">        throw error(</span>
+            HttpStatus.SERVICE_UNAVAILABLE,
+            &quot;acta_no_disponible&quot;,
+            &quot;El acta no esta disponible. Contacte al administrador.&quot;);
+      }
+<span class="fc" id="L182">      return contenido;</span>
+<span class="nc" id="L183">    } catch (IOException excepcion) {</span>
+<span class="nc" id="L184">      throw error(</span>
+          HttpStatus.SERVICE_UNAVAILABLE,
+          &quot;almacenamiento_no_disponible&quot;,
+          &quot;No fue posible consultar el acta.&quot;);
+    }
+  }
+
+  private VersionFormulario obtenerVersion(UUID id) {
+<span class="fc" id="L192">    return versiones.findById(id).orElseThrow(this::versionNoEncontrada);</span>
+  }
+
+  private Archivo vigente(UUID id) {
+<span class="fc" id="L196">    return actas</span>
+<span class="fc" id="L197">        .findFirstByVersionFormularioIdAndArchivoEstadoOrderByCreadoEnDescArchivoIdDesc(</span>
+            id, EstadoArchivo.DISPONIBLE)
+<span class="fc" id="L199">        .map(ArchivoActaCalibracion::getArchivo)</span>
+<span class="fc" id="L200">        .orElse(null);</span>
+  }
+
+  private void validarPesos(VersionFormulario version) {
+<span class="fc" id="L204">    var configurados = new HashSet&lt;String&gt;();</span>
+<span class="fc bfc" id="L205" title="All 2 branches covered.">    for (var peso : pesos.findAllByVersionFormularioId(version.getId())) {</span>
+<span class="pc bpc" id="L206" title="2 of 4 branches missed.">      if (peso.getPeso() != null &amp;&amp; peso.getPeso().signum() &gt; 0) {</span>
+<span class="fc" id="L207">        configurados.add(peso.getElementoRef());</span>
+      }
+<span class="fc" id="L209">    }</span>
+<span class="fc" id="L210">    var catalogo = version.getReglasEvaluacionIc();</span>
+<span class="pc bpc" id="L211" title="1 of 2 branches missed.">    if (catalogo == null</span>
+<span class="pc bpc" id="L212" title="1 of 2 branches missed.">        || !catalogo.path(&quot;elementos&quot;).isArray()</span>
+<span class="pc bpc" id="L213" title="1 of 2 branches missed.">        || catalogo.path(&quot;elementos&quot;).isEmpty()) {</span>
+<span class="nc" id="L214">      throw error(</span>
+          HttpStatus.UNPROCESSABLE_ENTITY,
+          &quot;pesos_incompletos&quot;,
+          &quot;Configure el catalogo y los pesos antes de adjuntar el acta.&quot;);
+    }
+<span class="fc bfc" id="L219" title="All 2 branches covered.">    for (var elemento : catalogo.path(&quot;elementos&quot;)) {</span>
+<span class="fc bfc" id="L220" title="All 2 branches covered.">      if (!configurados.contains(elemento.path(&quot;elemento_ref&quot;).asText())) {</span>
+<span class="fc" id="L221">        throw error(</span>
+            HttpStatus.UNPROCESSABLE_ENTITY,
+            &quot;pesos_incompletos&quot;,
+<span class="fc" id="L224">            &quot;Falta configurar el peso de &quot; + elemento.path(&quot;elemento_ref&quot;).asText());</span>
+      }
+<span class="fc" id="L226">    }</span>
+<span class="fc" id="L227">  }</span>
+
+  private EstadoActaCalibracionResponse estado(UUID versionId, Archivo archivo) {
+    var responsable =
+<span class="pc bpc" id="L231" title="1 of 4 branches missed.">        archivo == null || archivo.getSubidoPorId() == null</span>
+<span class="fc" id="L232">            ? null</span>
+<span class="fc" id="L233">            : usuarios.findById(archivo.getSubidoPorId()).orElse(null);</span>
+    ActaCalibracionResponse acta =
+<span class="fc bfc" id="L235" title="All 2 branches covered.">        archivo == null</span>
+<span class="fc" id="L236">            ? null</span>
+<span class="fc" id="L237">            : new ActaCalibracionResponse(</span>
+<span class="fc" id="L238">                archivo.getId(),</span>
+<span class="fc" id="L239">                archivo.getNombreOriginal(),</span>
+<span class="fc" id="L240">                archivo.getMimeReal(),</span>
+<span class="fc" id="L241">                archivo.getTamanoBytes(),</span>
+<span class="fc" id="L242">                archivo.getChecksumSha256(),</span>
+<span class="fc" id="L243">                archivo.getSubidoPorId(),</span>
+<span class="fc bfc" id="L244" title="All 2 branches covered.">                responsable == null ? null : responsable.getNombreCompleto(),</span>
+<span class="fc bfc" id="L245" title="All 2 branches covered.">                responsable == null ? null : responsable.getEmail(),</span>
+<span class="fc" id="L246">                archivo.getConfirmadoEn());</span>
+<span class="fc" id="L247">    return new EstadoActaCalibracionResponse(</span>
+        versionId,
+<span class="fc bfc" id="L249" title="All 2 branches covered.">        archivo == null ? &quot;SIN_ACTA&quot; : &quot;CON_ACTA&quot;,</span>
+<span class="fc bfc" id="L250" title="All 2 branches covered.">        archivo == null ? &quot;Sin acta de calibracion&quot; : &quot;Acta de calibracion disponible&quot;,</span>
+        acta);
+  }
+
+  private void eliminarObjeto(String clave) {
+    try {
+<span class="fc" id="L256">      almacenamiento.eliminar(clave);</span>
+<span class="nc" id="L257">    } catch (IOException | RuntimeException excepcion) {</span>
+<span class="nc" id="L258">      LOG.error(&quot;No fue posible limpiar el objeto de acta tras rollback: {}&quot;, clave, excepcion);</span>
+<span class="fc" id="L259">    }</span>
+<span class="fc" id="L260">  }</span>
+
+  private String nombreSeguro(String nombre) {
+<span class="pc bpc" id="L263" title="2 of 4 branches missed.">    if (nombre == null || nombre.isBlank()) {</span>
+<span class="nc" id="L264">      return &quot;acta-calibracion.pdf&quot;;</span>
+    }
+<span class="fc" id="L266">    String seguro = nombre.replace('\\', '/');</span>
+<span class="fc" id="L267">    seguro = seguro.substring(seguro.lastIndexOf('/') + 1).replaceAll(&quot;[\\p{Cntrl}]&quot;, &quot;&quot;);</span>
+<span class="pc bpc" id="L268" title="1 of 2 branches missed.">    return seguro.isBlank()</span>
+<span class="nc" id="L269">        ? &quot;acta-calibracion.pdf&quot;</span>
+<span class="fc" id="L270">        : seguro.substring(0, Math.min(seguro.length(), 255));</span>
+  }
+
+  private String checksum(byte[] contenido) {
+    try {
+<span class="fc" id="L275">      return HexFormat.of().formatHex(MessageDigest.getInstance(&quot;SHA-256&quot;).digest(contenido));</span>
+<span class="nc" id="L276">    } catch (NoSuchAlgorithmException excepcion) {</span>
+<span class="nc" id="L277">      throw new IllegalStateException(&quot;SHA-256 no disponible&quot;, excepcion);</span>
+    }
+  }
+
+  private ApiException versionNoEncontrada() {
+<span class="fc" id="L282">    return error(</span>
+        HttpStatus.NOT_FOUND,
+        &quot;version_no_encontrada&quot;,
+        &quot;No existe la version de formulario solicitada.&quot;);
+  }
+
+  private ApiException error(HttpStatus estado, String codigo, String detalle) {
+<span class="fc" id="L289">    return new ApiException(estado, codigo, &quot;Acta de calibracion&quot;, detalle);</span>
+  }
+
+  @Transactional
+  public EstadoActaCalibracionResponse adjuntar(
+      UUID versionId, MultipartFile fichero, UUID usuarioId, long versionEsperada) {
+<span class="fc" id="L295">    var version = versiones.findByIdForUpdate(versionId).orElseThrow(this::versionNoEncontrada);</span>
+<span class="pc bpc" id="L296" title="1 of 2 branches missed.">    if (version.getEstado()</span>
+        != gt.usac.cunoc.sgp.formulario.model.EstadoVersionFormulario.BORRADOR) {
+<span class="nc" id="L298">      throw new ApiException(</span>
+          HttpStatus.CONFLICT,
+          &quot;version_inmutable&quot;,
+          &quot;Version inmutable&quot;,
+          &quot;El acta de una version publicada no puede modificarse. Cree una version nueva.&quot;);
+    }
+<span class="fc bfc" id="L304" title="All 2 branches covered.">    if (version.getVersion() != versionEsperada) {</span>
+<span class="fc" id="L305">      throw new ApiException(</span>
+          HttpStatus.CONFLICT,
+          &quot;concurrencia_conflicto&quot;,
+          &quot;Conflicto de version&quot;,
+          &quot;La version fue modificada. Recargue antes de adjuntar el acta.&quot;);
+    }
+<span class="fc" id="L311">    var respuesta = adjuntar(versionId, fichero, usuarioId);</span>
+<span class="pc bpc" id="L312" title="1 of 2 branches missed.">    if (version.getVersion() == versionEsperada) {</span>
+<span class="pc bpc" id="L313" title="1 of 2 branches missed.">      if (versiones.incrementarVersionCalibracion(version.getId(), versionEsperada) != 1) {</span>
+<span class="nc" id="L314">        throw new IllegalStateException(&quot;No se pudo incrementar la version de calibracion&quot;);</span>
+      }
+    }
+<span class="fc" id="L317">    return respuesta;</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

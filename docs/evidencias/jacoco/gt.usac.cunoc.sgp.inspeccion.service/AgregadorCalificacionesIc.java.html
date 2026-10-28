@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AgregadorCalificacionesIc.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">sgp-api</a> &gt; <a href="index.source.html" class="el_package">gt.usac.cunoc.sgp.inspeccion.service</a> &gt; <span class="el_source">AgregadorCalificacionesIc.java</span></div><h1>AgregadorCalificacionesIc.java</h1><pre class="source lang-java linenums">package gt.usac.cunoc.sgp.inspeccion.service;
+
+import gt.usac.cunoc.sgp.common.exception.ApiException;
+import java.math.BigDecimal;
+import java.math.MathContext;
+import java.util.List;
+import org.springframework.http.HttpStatus;
+import org.springframework.stereotype.Service;
+
+@Service
+<span class="fc" id="L11">public class AgregadorCalificacionesIc {</span>
+
+<span class="fc" id="L13">  private static final BigDecimal CALIFICACION_MAXIMA = new BigDecimal(&quot;4&quot;);</span>
+
+  public BigDecimal agregar(List&lt;BigDecimal&gt; calificaciones, String regla, String referencia) {
+
+<span class="fc bfc" id="L17" title="All 4 branches covered.">    if (regla == null || regla.isBlank()) {</span>
+<span class="fc" id="L18">      throw error(</span>
+          &quot;configuracion_ic_incompleta&quot;,
+          &quot;Falta configurar la regla de agregacion de &quot; + referencia);
+    }
+
+<span class="fc bfc" id="L23" title="All 4 branches covered.">    if (!regla.equals(&quot;MAXIMO&quot;) &amp;&amp; !regla.equals(&quot;PROMEDIO&quot;)) {</span>
+<span class="fc" id="L24">      throw error(</span>
+          &quot;regla_agregacion_ic_invalida&quot;,
+          &quot;La regla de agregacion de &quot; + referencia + &quot; no es compatible: &quot; + regla);
+    }
+
+<span class="fc bfc" id="L29" title="All 4 branches covered.">    if (calificaciones == null || calificaciones.isEmpty()) {</span>
+<span class="fc" id="L30">      throw error(&quot;sin_calificaciones_ic&quot;, &quot;No hay calificaciones para agregar en &quot; + referencia);</span>
+    }
+
+<span class="fc" id="L33">    BigDecimal suma = BigDecimal.ZERO;</span>
+<span class="fc" id="L34">    BigDecimal maximo = BigDecimal.ZERO;</span>
+
+<span class="fc bfc" id="L36" title="All 2 branches covered.">    for (BigDecimal calificacion : calificaciones) {</span>
+<span class="fc" id="L37">      validarCalificacion(calificacion, referencia);</span>
+
+<span class="fc" id="L39">      suma = suma.add(calificacion);</span>
+<span class="fc" id="L40">      maximo = maximo.max(calificacion);</span>
+<span class="fc" id="L41">    }</span>
+
+<span class="fc bfc" id="L43" title="All 2 branches covered.">    if (regla.equals(&quot;MAXIMO&quot;)) {</span>
+<span class="fc" id="L44">      return maximo;</span>
+    }
+
+<span class="fc" id="L47">    return suma.divide(BigDecimal.valueOf(calificaciones.size()), MathContext.DECIMAL128);</span>
+  }
+
+  public void validarCalificacion(BigDecimal calificacion, String referencia) {
+
+<span class="fc bfc" id="L52" title="All 2 branches covered.">    if (calificacion == null) {</span>
+<span class="fc" id="L53">      throw error(</span>
+          &quot;configuracion_ic_incompleta&quot;, &quot;Falta configurar la calificacion de &quot; + referencia);
+    }
+
+<span class="fc bfc" id="L57" title="All 4 branches covered.">    if (calificacion.signum() &lt; 0 || calificacion.compareTo(CALIFICACION_MAXIMA) &gt; 0) {</span>
+<span class="fc" id="L58">      throw error(</span>
+          &quot;calificacion_ic_fuera_de_rango&quot;,
+          &quot;La calificacion de &quot;
+              + referencia
+              + &quot; debe estar entre 0 y 4: &quot;
+<span class="fc" id="L63">              + calificacion.toPlainString());</span>
+    }
+<span class="fc" id="L65">  }</span>
+
+  private ApiException error(String codigo, String detalle) {
+<span class="fc" id="L68">    return new ApiException(</span>
+        HttpStatus.UNPROCESSABLE_ENTITY,
+        codigo,
+        &quot;Calificaciones del indice de condicion invalidas&quot;,
+        detalle);
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

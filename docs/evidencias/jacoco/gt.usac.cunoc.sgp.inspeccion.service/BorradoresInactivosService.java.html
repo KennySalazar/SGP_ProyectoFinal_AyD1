@@ -1,0 +1,143 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>BorradoresInactivosService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">sgp-api</a> &gt; <a href="index.source.html" class="el_package">gt.usac.cunoc.sgp.inspeccion.service</a> &gt; <span class="el_source">BorradoresInactivosService.java</span></div><h1>BorradoresInactivosService.java</h1><pre class="source lang-java linenums">package gt.usac.cunoc.sgp.inspeccion.service;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import gt.usac.cunoc.sgp.archivo.service.PurgaArchivosBorradorService;
+import gt.usac.cunoc.sgp.common.audit.service.AuditoriaWriter;
+import gt.usac.cunoc.sgp.common.config.ProcesosProgramados;
+import gt.usac.cunoc.sgp.inspeccion.repository.InspeccionRepository;
+import gt.usac.cunoc.sgp.notificacion.service.NotificacionService;
+import gt.usac.cunoc.sgp.usuario.repository.UserAccountRepository;
+import java.time.Clock;
+import java.time.Duration;
+import java.time.Instant;
+import java.util.List;
+import java.util.UUID;
+import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.stereotype.Service;
+
+/**
+ * Borradores inactivos (RN-ARC-06, HU-069): avisa al autor a los 180 días sin actividad y purga los
+ * archivos multimedia a los 210, conservando el registro de datos. El fallo de un borrador o de un
+ * archivo no detiene a los demás.
+ */
+@Service
+public class BorradoresInactivosService {
+
+  static final String TIPO = &quot;BORRADOR_180_DIAS&quot;;
+<span class="fc" id="L31">  static final Duration AVISO = Duration.ofDays(180);</span>
+<span class="fc" id="L32">  static final Duration PURGA = Duration.ofDays(210);</span>
+
+<span class="fc" id="L34">  private static final Logger LOG = LoggerFactory.getLogger(BorradoresInactivosService.class);</span>
+
+  private final InspeccionRepository inspecciones;
+  private final PurgaArchivosBorradorService purga;
+  private final UserAccountRepository usuarios;
+  private final NotificacionService notificaciones;
+  private final AuditoriaWriter auditoria;
+  private final ObjectMapper json;
+  private final Clock clock;
+
+  public BorradoresInactivosService(
+      InspeccionRepository inspecciones,
+      PurgaArchivosBorradorService purga,
+      UserAccountRepository usuarios,
+      NotificacionService notificaciones,
+      AuditoriaWriter auditoria,
+      ObjectMapper json,
+<span class="fc" id="L51">      Clock clock) {</span>
+<span class="fc" id="L52">    this.inspecciones = inspecciones;</span>
+<span class="fc" id="L53">    this.purga = purga;</span>
+<span class="fc" id="L54">    this.usuarios = usuarios;</span>
+<span class="fc" id="L55">    this.notificaciones = notificaciones;</span>
+<span class="fc" id="L56">    this.auditoria = auditoria;</span>
+<span class="fc" id="L57">    this.json = json;</span>
+<span class="fc" id="L58">    this.clock = clock;</span>
+<span class="fc" id="L59">  }</span>
+
+  /**
+   * La clave incluye la última actividad: si el autor retoma el borrador y vuelve a dejarlo 180
+   * días, recibe un aviso nuevo.
+   */
+  @Scheduled(cron = ProcesosProgramados.CRON_DIARIO, zone = ProcesosProgramados.ZONA)
+  @SchedulerLock(
+      name = ProcesosProgramados.ALERTA_BORRADORES_INACTIVOS,
+      lockAtMostFor = ProcesosProgramados.BLOQUEO_MAXIMO,
+      lockAtLeastFor = ProcesosProgramados.BLOQUEO_MINIMO)
+  public void avisarInactivos() {
+<span class="fc" id="L71">    List&lt;Object[]&gt; borradores =</span>
+<span class="fc" id="L72">        inspecciones.findBorradoresInactivosDesde(clock.instant().minus(AVISO));</span>
+<span class="fc" id="L73">    int destinatarios = 0;</span>
+<span class="fc" id="L74">    int fallos = 0;</span>
+<span class="fc bfc" id="L75" title="All 2 branches covered.">    for (Object[] fila : borradores) {</span>
+<span class="fc" id="L76">      UUID inspeccionId = (UUID) fila[0];</span>
+<span class="fc" id="L77">      UUID autorId = (UUID) fila[1];</span>
+      try {
+<span class="pc bpc" id="L79" title="1 of 2 branches missed.">        if (usuarios.filtrarActivos(List.of(autorId)).isEmpty()) {</span>
+<span class="nc" id="L80">          continue;</span>
+        }
+<span class="fc" id="L82">        notificaciones.notificar(</span>
+            autorId,
+            TIPO,
+            &quot;Borrador sin actividad&quot;,
+            &quot;Tu borrador de inspección del puente &quot;
+                + fila[2]
+                + &quot; lleva 180 días sin actividad. A los 210 días se eliminarán sus fotografías&quot;
+                + &quot; y documentos; los datos capturados se conservan.&quot;,
+            &quot;inspeccion&quot;,
+            inspeccionId,
+            &quot;borrador-180-dias:&quot;
+                + inspeccionId
+                + &quot;:&quot;
+<span class="fc" id="L95">                + ProcesosProgramados.instante(fila[3]).toEpochMilli());</span>
+<span class="fc" id="L96">        destinatarios++;</span>
+<span class="nc" id="L97">      } catch (DataIntegrityViolationException e) {</span>
+        // Una ejecución simultánea ya registró el mismo aviso; la clave de evento lo impide.
+<span class="nc" id="L99">        LOG.debug(&quot;Aviso ya registrado para el borrador {}&quot;, inspeccionId);</span>
+<span class="nc" id="L100">      } catch (RuntimeException e) {</span>
+<span class="nc" id="L101">        fallos++;</span>
+<span class="nc" id="L102">        LOG.warn(&quot;No se pudo avisar el borrador inactivo {}&quot;, inspeccionId, e);</span>
+<span class="pc" id="L103">      }</span>
+<span class="fc" id="L104">    }</span>
+<span class="fc" id="L105">    auditoria.registrarProceso(</span>
+        ProcesosProgramados.ALERTA_BORRADORES_INACTIVOS,
+<span class="fc" id="L107">        json.createObjectNode()</span>
+<span class="fc" id="L108">            .put(&quot;borradores&quot;, borradores.size())</span>
+<span class="fc" id="L109">            .put(&quot;destinatarios&quot;, destinatarios)</span>
+<span class="fc" id="L110">            .put(&quot;fallos&quot;, fallos));</span>
+<span class="fc" id="L111">  }</span>
+
+  @Scheduled(cron = ProcesosProgramados.CRON_DIARIO, zone = ProcesosProgramados.ZONA)
+  @SchedulerLock(
+      name = ProcesosProgramados.PURGA_ARCHIVOS_BORRADORES,
+      lockAtMostFor = ProcesosProgramados.BLOQUEO_MAXIMO,
+      lockAtLeastFor = ProcesosProgramados.BLOQUEO_MINIMO)
+  public void purgarArchivos() {
+<span class="fc" id="L119">    Instant limite = clock.instant().minus(PURGA);</span>
+<span class="fc" id="L120">    List&lt;Object[]&gt; candidatos = purga.candidatos(limite);</span>
+<span class="fc" id="L121">    int purgados = 0;</span>
+<span class="fc" id="L122">    int fallos = 0;</span>
+<span class="fc bfc" id="L123" title="All 2 branches covered.">    for (Object[] fila : candidatos) {</span>
+<span class="fc" id="L124">      UUID archivoId = (UUID) fila[0];</span>
+      try {
+<span class="pc bpc" id="L126" title="1 of 2 branches missed.">        if (purga.purgar(</span>
+            archivoId, (UUID) fila[1], limite, ProcesosProgramados.PURGA_ARCHIVOS_BORRADORES)) {
+<span class="fc" id="L128">          purgados++;</span>
+        }
+<span class="fc" id="L130">      } catch (RuntimeException e) {</span>
+<span class="fc" id="L131">        fallos++;</span>
+<span class="fc" id="L132">        LOG.warn(&quot;No se pudo purgar el archivo {}&quot;, archivoId, e);</span>
+<span class="fc" id="L133">      }</span>
+<span class="fc" id="L134">    }</span>
+<span class="fc" id="L135">    auditoria.registrarProceso(</span>
+        ProcesosProgramados.PURGA_ARCHIVOS_BORRADORES,
+<span class="fc" id="L137">        json.createObjectNode()</span>
+<span class="fc" id="L138">            .put(&quot;candidatos&quot;, candidatos.size())</span>
+<span class="fc" id="L139">            .put(&quot;purgados&quot;, purgados)</span>
+<span class="fc" id="L140">            .put(&quot;fallos&quot;, fallos));</span>
+<span class="fc" id="L141">  }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

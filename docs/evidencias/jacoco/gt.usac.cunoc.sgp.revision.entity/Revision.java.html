@@ -1,0 +1,173 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Revision.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">sgp-api</a> &gt; <a href="index.source.html" class="el_package">gt.usac.cunoc.sgp.revision.entity</a> &gt; <span class="el_source">Revision.java</span></div><h1>Revision.java</h1><pre class="source lang-java linenums">package gt.usac.cunoc.sgp.revision.entity;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import gt.usac.cunoc.sgp.inspeccion.entity.Inspeccion;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Table;
+import java.math.BigDecimal;
+import java.time.Instant;
+import java.util.UUID;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
+
+/** Ciclo inmutable de contenido enviado y su avance de revisión académica. */
+@Entity
+@Table(name = &quot;revision&quot;)
+public class Revision {
+
+  @Id private UUID id;
+
+  @ManyToOne(fetch = FetchType.LAZY, optional = false)
+  @JoinColumn(name = &quot;inspeccion_id&quot;, nullable = false)
+  private Inspeccion inspeccion;
+
+  @Column(name = &quot;numero_ciclo&quot;, nullable = false)
+  private int numeroCiclo;
+
+  @Column(name = &quot;revisor_id&quot;, nullable = false)
+  private UUID revisorId;
+
+  @Column(nullable = false, length = 20)
+  private String estado;
+
+  @Column(length = 30)
+  private String veredicto;
+
+  @Column(name = &quot;observacion_general&quot;, columnDefinition = &quot;text&quot;)
+  private String observacionGeneral;
+
+  @Column(precision = 6, scale = 2)
+  private BigDecimal calificacion;
+
+  @Column(name = &quot;enviada_en&quot;, nullable = false)
+  private Instant enviadaEn;
+
+  @Column(name = &quot;iniciada_en&quot;)
+  private Instant iniciadaEn;
+
+  @Column(name = &quot;resuelta_en&quot;)
+  private Instant resueltaEn;
+
+  @Column(name = &quot;version_inspeccion_enviada&quot;, nullable = false)
+  private long versionInspeccionEnviada;
+
+  @JdbcTypeCode(SqlTypes.JSON)
+  @Column(name = &quot;contenido_enviado&quot;, nullable = false)
+  private JsonNode contenidoEnviado;
+
+  @Column(name = &quot;hash_contenido&quot;, nullable = false, length = 64)
+  private String hashContenido;
+
+  @Column(name = &quot;creado_en&quot;, nullable = false, updatable = false)
+  private Instant creadoEn;
+
+<span class="fc" id="L69">  protected Revision() {}</span>
+
+  public Revision(
+      UUID id,
+      Inspeccion inspeccion,
+      int numeroCiclo,
+      UUID revisorId,
+      Instant enviadaEn,
+      long versionInspeccionEnviada,
+      JsonNode contenidoEnviado,
+<span class="fc" id="L79">      String hashContenido) {</span>
+<span class="fc" id="L80">    this.id = id;</span>
+<span class="fc" id="L81">    this.inspeccion = inspeccion;</span>
+<span class="fc" id="L82">    this.numeroCiclo = numeroCiclo;</span>
+<span class="fc" id="L83">    this.revisorId = revisorId;</span>
+<span class="fc" id="L84">    this.estado = &quot;PENDIENTE&quot;;</span>
+<span class="fc" id="L85">    this.enviadaEn = enviadaEn;</span>
+<span class="fc" id="L86">    this.versionInspeccionEnviada = versionInspeccionEnviada;</span>
+<span class="fc" id="L87">    this.contenidoEnviado = contenidoEnviado;</span>
+<span class="fc" id="L88">    this.hashContenido = hashContenido;</span>
+<span class="fc" id="L89">    this.creadoEn = enviadaEn;</span>
+<span class="fc" id="L90">  }</span>
+
+  public void iniciar(Instant ahora) {
+<span class="nc bnc" id="L93" title="All 2 branches missed.">    if (&quot;PENDIENTE&quot;.equals(estado)) {</span>
+<span class="nc" id="L94">      estado = &quot;EN_CURSO&quot;;</span>
+<span class="nc" id="L95">      iniciadaEn = ahora;</span>
+    }
+<span class="nc" id="L97">  }</span>
+
+  public void resolver(String veredicto, String observacion, BigDecimal nota, Instant ahora) {
+<span class="pc bpc" id="L100" title="1 of 2 branches missed.">    if (!&quot;EN_CURSO&quot;.equals(estado)) throw new IllegalStateException(&quot;El ciclo ya no está en curso&quot;);</span>
+<span class="fc" id="L101">    gt.usac.cunoc.sgp.revision.model.VeredictoRevision.valueOf(veredicto);</span>
+<span class="pc bpc" id="L102" title="1 of 2 branches missed.">    if (nota == null</span>
+<span class="pc bpc" id="L103" title="1 of 2 branches missed.">        || nota.signum() &lt; 0</span>
+<span class="pc bpc" id="L104" title="1 of 2 branches missed.">        || nota.compareTo(new BigDecimal(&quot;100&quot;)) &gt; 0</span>
+<span class="pc bpc" id="L105" title="1 of 2 branches missed.">        || nota.scale() &gt; 2)</span>
+<span class="nc" id="L106">      throw new IllegalArgumentException(</span>
+          &quot;La calificación debe estar entre 0 y 100 con hasta dos decimales&quot;);
+<span class="pc bpc" id="L108" title="2 of 6 branches missed.">    if (!&quot;APROBADA&quot;.equals(veredicto) &amp;&amp; (observacion == null || observacion.isBlank()))</span>
+<span class="nc" id="L109">      throw new IllegalArgumentException(&quot;El veredicto requiere observación general&quot;);</span>
+<span class="fc" id="L110">    this.veredicto = veredicto;</span>
+<span class="fc" id="L111">    this.observacionGeneral = observacion;</span>
+<span class="fc" id="L112">    this.calificacion = nota;</span>
+<span class="fc" id="L113">    this.resueltaEn = java.util.Objects.requireNonNull(ahora);</span>
+<span class="fc" id="L114">    this.estado = &quot;RESUELTA&quot;;</span>
+<span class="fc" id="L115">  }</span>
+
+  public String getVeredicto() {
+<span class="fc" id="L118">    return veredicto;</span>
+  }
+
+  public String getObservacionGeneral() {
+<span class="fc" id="L122">    return observacionGeneral;</span>
+  }
+
+  public BigDecimal getCalificacion() {
+<span class="fc" id="L126">    return calificacion;</span>
+  }
+
+  public Instant getResueltaEn() {
+<span class="fc" id="L130">    return resueltaEn;</span>
+  }
+
+  public UUID getId() {
+<span class="fc" id="L134">    return id;</span>
+  }
+
+  public Inspeccion getInspeccion() {
+<span class="fc" id="L138">    return inspeccion;</span>
+  }
+
+  public int getNumeroCiclo() {
+<span class="fc" id="L142">    return numeroCiclo;</span>
+  }
+
+  public UUID getRevisorId() {
+<span class="fc" id="L146">    return revisorId;</span>
+  }
+
+  public String getEstado() {
+<span class="fc" id="L150">    return estado;</span>
+  }
+
+  public Instant getEnviadaEn() {
+<span class="fc" id="L154">    return enviadaEn;</span>
+  }
+
+  public Instant getIniciadaEn() {
+<span class="nc" id="L158">    return iniciadaEn;</span>
+  }
+
+  public long getVersionInspeccionEnviada() {
+<span class="fc" id="L162">    return versionInspeccionEnviada;</span>
+  }
+
+  public JsonNode getContenidoEnviado() {
+<span class="fc" id="L166">    return contenidoEnviado;</span>
+  }
+
+  public String getHashContenido() {
+<span class="fc" id="L170">    return hashContenido;</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>
