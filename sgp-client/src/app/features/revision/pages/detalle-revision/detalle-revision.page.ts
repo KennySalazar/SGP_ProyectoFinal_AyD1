@@ -1,5 +1,5 @@
 import { AprobacionCalibracionComponent } from '../../../formulario/components/aprobacion-calibracion/aprobacion-calibracion.component';
-import { DatePipe, JsonPipe, KeyValuePipe } from '@angular/common';
+import { DatePipe } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import {
   afterNextRender,
@@ -72,8 +72,6 @@ import { ResultadoRevisionComponent } from '../../components/resultado-revision/
     AprobacionCalibracionComponent,
     ResultadoRevisionComponent,
     DatePipe,
-    JsonPipe,
-    KeyValuePipe,
     RouterLink,
     TranslocoPipe,
     ButtonModule,
@@ -149,6 +147,23 @@ export class DetalleRevisionPage implements ContextoObservacionesFormulario {
       };
     }
     return datos;
+  });
+  readonly identificacionPresentacion = computed(() => {
+    const d = this.detalle();
+    if (!d?.identificacionCapturada) return [];
+    const propiedades = (d.esquemaFormulario['properties'] as Record<string, unknown>) ?? {};
+    const esquema = (propiedades['identificacion'] as Record<string, unknown>) ?? {};
+    return this.presentarIdentificacion(d.identificacionCapturada, esquema);
+  });
+  readonly nombrePuente = computed(() => {
+    const d = this.detalle();
+    const nombre = d?.identificacionCapturada?.['nombre_puente'];
+    return typeof nombre === 'string' && nombre.trim() ? nombre : d?.puenteNombre;
+  });
+  readonly codigoPuente = computed(() => {
+    const d = this.detalle();
+    const codigo = d?.identificacionCapturada?.['codigo'];
+    return typeof codigo === 'string' && codigo.trim() ? codigo : d?.puenteCodigo;
   });
   readonly contextoFotos = computed(() => {
     const d = this.detalle();
@@ -399,7 +414,7 @@ export class DetalleRevisionPage implements ContextoObservacionesFormulario {
       d?.tipo === 'ELEMENTO'
         ? {
             tipo: 'ELEMENTO' as const,
-            etiqueta: d.elementoRef + (d.instanciaElementoId ? ' · ' + d.instanciaElementoId : ''),
+            etiqueta: this.etiquetaElemento(d.elementoRef, d.instanciaElementoId),
             anclaje: crearAnclajeFormulario(d.elementoRef, d.instanciaElementoId ?? undefined),
           }
         : d?.tipo === 'CATEGORIA_FOTOGRAFICA'
@@ -415,6 +430,64 @@ export class DetalleRevisionPage implements ContextoObservacionesFormulario {
               etiqueta: this.i18n.translate('revision.detalle.sinAnclaje'),
             };
     return { id: o.id, texto: o.texto, estado: o.estado, destino };
+  }
+  private presentarIdentificacion(
+    datos: Record<string, unknown>,
+    esquema: Record<string, unknown>,
+    prefijo = '',
+  ): { etiqueta: string; valor: string }[] {
+    const propiedades = (esquema['properties'] as Record<string, Record<string, unknown>>) ?? {};
+    return Object.entries(datos).flatMap(([clave, valor]) => {
+      const campo = propiedades[clave] ?? {};
+      const titulo = typeof campo['title'] === 'string' ? campo['title'] : this.tituloClave(clave);
+      const etiqueta = prefijo ? `${prefijo} · ${titulo}` : titulo;
+      if (valor && typeof valor === 'object' && !Array.isArray(valor)) {
+        return this.presentarIdentificacion(valor as Record<string, unknown>, campo, etiqueta);
+      }
+      const describir = (v: unknown): string => {
+        if (v === null || v === undefined || v === '')
+          return this.i18n.translate('revision.detalle.sinDato');
+        if (typeof v === 'boolean')
+          return this.i18n.translate('revision.detalle.' + (v ? 'si' : 'no'));
+        if (Array.isArray(v)) return v.map(describir).join(', ');
+        if (typeof v === 'object') return Object.values(v).map(describir).join(' · ');
+        return String(v);
+      };
+      return [{ etiqueta, valor: describir(valor) }];
+    });
+  }
+  private tituloClave(clave: string): string {
+    const texto = clave.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/[_-]/g, ' ');
+    return texto.charAt(0).toUpperCase() + texto.slice(1);
+  }
+  private etiquetaElemento(ref: string, instanciaId: string | null): string {
+    let esquema = this.detalle()?.esquemaFormulario ?? {};
+    let datos: unknown = this.detalle()?.datos;
+    const etiquetas: string[] = [];
+    for (const clave of ref
+      .slice(1)
+      .split('/')
+      .map((s) => s.replace(/~1/g, '/').replace(/~0/g, '~'))) {
+      const propiedades = (esquema['properties'] as Record<string, Record<string, unknown>>) ?? {};
+      esquema = propiedades[clave] ?? {};
+      let etiqueta =
+        typeof esquema['title'] === 'string' ? esquema['title'] : this.tituloClave(clave);
+      datos =
+        datos && typeof datos === 'object' ? (datos as Record<string, unknown>)[clave] : undefined;
+      if (esquema['type'] === 'array') {
+        const lista = Array.isArray(datos) ? datos : [];
+        const indice = lista.findIndex(
+          (v) => v && typeof v === 'object' && v['instancia_id'] === instanciaId,
+        );
+        if (indice >= 0) etiqueta += ` ${indice + 1}`;
+        else if (instanciaId)
+          etiqueta += ` · ${this.i18n.translate('revision.detalle.instanciaNoDisponible')}`;
+        datos = lista[indice];
+        esquema = (esquema['items'] as Record<string, unknown>) ?? {};
+      }
+      etiquetas.push(etiqueta);
+    }
+    return etiquetas.join(' · ');
   }
   navegar(destino: DestinoNavegableObservacion): void {
     if (this.panelAbierto()) {

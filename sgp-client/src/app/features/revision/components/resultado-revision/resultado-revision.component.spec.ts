@@ -114,6 +114,59 @@ describe('Veredicto privado HU-038', () => {
     expect(api.emitirVeredicto).not.toHaveBeenCalled();
     expect(html.textContent).toContain('Revisar y confirmar decision');
   });
+  it('consulta un ciclo resuelto con nota y resoluciones aunque exista uno posterior pendiente', () => {
+    api.historial.mockReturnValue(
+      of([
+        {
+          ...ciclo,
+          revisionId: 'siguiente',
+          numeroCiclo: 2,
+          estadoRevision: 'PENDIENTE',
+          estadoInspeccion: 'ENVIADA',
+        },
+        {
+          ...ciclo,
+          estadoRevision: 'RESUELTA',
+          estadoInspeccion: 'ENVIADA',
+          veredicto: 'CAMBIOS_SOLICITADOS',
+          calificacion: 87.65,
+          observacionGeneral: 'Corregir datos',
+          resueltaEn: '2026-10-19T13:00:00Z',
+        },
+      ]),
+    );
+    api.observaciones.mockReturnValue(
+      of({
+        ...lista,
+        observaciones: [
+          {
+            id: 'obs',
+            revisionId: 'r',
+            texto: 'Revisar longitud',
+            estado: 'RESUELTA',
+            destino: null,
+            respuestaAutor: 'Longitud corregida',
+            resueltoPorId: 'autor',
+            resueltoEn: '2026-10-20T12:00:00Z',
+          },
+        ],
+      }),
+    );
+    fixture.componentRef.setInput('soloLectura', true);
+    fixture.detectChanges();
+    const c = abrir();
+    const html = fixture.nativeElement as HTMLElement;
+    expect(c.ciclo()?.revisionId).toBe('r');
+    expect(c.puedeEmitir()).toBe(false);
+    expect(api.observaciones).toHaveBeenLastCalledWith('r');
+    expect(html.querySelector('form')).toBeNull();
+    expect(html.textContent).toContain('87.65');
+    expect(html.textContent).toContain('Longitud corregida');
+    expect(html.textContent).toContain('Corregir datos');
+    expect(html.querySelector('a[href="/revisiones/siguiente"]')).not.toBeNull();
+    expect(api.emitirVeredicto).not.toHaveBeenCalled();
+    expect(api.estadoRevision).not.toHaveBeenCalled();
+  });
   it('conserva el acceso de consulta del estudiante sin ofrecerle emitir veredicto', () => {
     user.set({ id: 'autor', role: 'ESTUDIANTE' });
     fixture.detectChanges();

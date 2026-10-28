@@ -7,6 +7,7 @@ import gt.usac.cunoc.sgp.inspeccion.service.TransicionInspeccionService;
 import gt.usac.cunoc.sgp.revision.dto.BorradorEstudianteResponse;
 import gt.usac.cunoc.sgp.revision.dto.ContadorRevisionesResponse;
 import gt.usac.cunoc.sgp.revision.dto.RevisionBandejaResponse;
+import gt.usac.cunoc.sgp.revision.dto.RevisionResueltaResponse;
 import gt.usac.cunoc.sgp.revision.entity.Revision;
 import gt.usac.cunoc.sgp.revision.repository.RevisionRepository;
 import java.time.Clock;
@@ -92,6 +93,12 @@ public class RevisionService {
             hasta,
             PageRequest.of(pagina, tamanio))
         .map(fila -> respuesta(fila, hoy));
+  }
+
+  @Transactional(readOnly = true)
+  public Page<RevisionResueltaResponse> listarResueltas(UUID revisorId, int pagina, int tamanio) {
+    validarPaginacion(pagina, tamanio);
+    return revisiones.buscarResueltas(revisorId, PageRequest.of(pagina, tamanio));
   }
 
   @Transactional(readOnly = true)

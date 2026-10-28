@@ -24,6 +24,7 @@ import {
   RevisionDetalleResponse,
 } from '../../models/revision.models';
 import { DetalleRevisionPage } from './detalle-revision.page';
+import { ResultadoRevisionComponent } from '../../components/resultado-revision/resultado-revision.component';
 
 const uuid1 = '019abc00-0000-7000-8000-000000000001';
 const uuid2 = '019abc00-0000-7000-8000-000000000002';
@@ -71,7 +72,10 @@ const detalle: RevisionDetalleResponse = {
   numeroCiclo: 2,
   enviadaEn: '2026-10-18T12:00:00Z',
   autorId: 'autor',
+  autorNombre: 'Ana López',
   puenteId: 'puente',
+  puenteNombre: 'Nombre actual del puente',
+  puenteCodigo: 'P-001',
   fechaInspeccion: '2026-10-17',
   versionFormularioId: 'v1',
   versionFormularioCodigo: 'Histórica-v1',
@@ -193,6 +197,55 @@ describe('Detalle de revisión HU-037', () => {
     expect(fotos.listarFotografias).toHaveBeenLastCalledWith('i');
     expect(locales.guardarContexto).not.toHaveBeenCalled();
     http.expectNone((req) => req.url.includes('formulario') || req.url.includes('/borrador'));
+  });
+  it('presenta nombres, fecha y etiquetas legibles conservando los identificadores internos', async () => {
+    await responder();
+    const resumen = html().querySelector('.resumen')?.textContent ?? '';
+    expect(resumen).toContain('Puente capturado · P-001');
+    expect(resumen).toContain('Ana López');
+    expect(resumen).toContain('17/10/2026');
+    expect(resumen).toContain('En curso');
+    expect(resumen).toContain('Nombre puente');
+    expect(resumen).not.toContain('nombre_puente');
+    expect(resumen).not.toContain('EN_CURSO');
+    expect(resumen).not.toContain('Nombre actual del puente');
+    expect(page().detalle()?.autorId).toBe('autor');
+    expect(page().detalle()?.inspeccionId).toBe('i');
+    expect(page().observacionesPresentacion()[0].destino).toMatchObject({
+      etiqueta: 'Tramos 2 · Longitud',
+      anclaje: { elementoRef: '/tramos/longitud', instanciaElementoId: uuid2 },
+    });
+  });
+  it('usa referencias disponibles y un texto claro cuando faltan los nombres', async () => {
+    await responder({
+      ...detalle,
+      autorNombre: null,
+      puenteNombre: null,
+      puenteCodigo: null,
+      identificacionCapturada: null,
+    });
+    const resumen = html().querySelector('.resumen')?.textContent ?? '';
+    expect(resumen).toContain('No disponible');
+    expect(resumen).not.toContain('identificador');
+    expect(page().detalle()?.datos).toEqual(detalle.datos);
+  });
+  it('tras emitir un veredicto conserva la consulta y el regreso a Revisadas sin acciones de escritura', async () => {
+    await responder();
+    expect(page().puedeEscribir()).toBe(true);
+    page().actualizarRevision();
+    await responder({ ...detalle, estadoRevision: 'RESUELTA' });
+    expect(page().puedeEscribir()).toBe(false);
+    const resultado = fixture.debugElement.query(By.directive(ResultadoRevisionComponent))
+      .componentInstance as ResultadoRevisionComponent;
+    expect(resultado.soloLectura()).toBe(true);
+    expect(html().querySelector('a[href="/revisiones?vista=revisadas"]')).not.toBeNull();
+    page().abrirPanel();
+    fixture.detectChanges();
+    expect(html().textContent).not.toContain('Agregar observación');
+    const panel = fixture.debugElement.query(By.directive(PanelObservacionesComponent))
+      .componentInstance as PanelObservacionesComponent;
+    expect(panel.permitirEdicion()).toBe(false);
+    expect(panel.permitirEliminacion()).toBe(false);
   });
   it('sin IC abre el detalle historico con formulario, fotos y observaciones', async () => {
     await responder({ ...detalle, icPreliminar: null });

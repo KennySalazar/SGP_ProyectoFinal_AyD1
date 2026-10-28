@@ -6,6 +6,7 @@ import gt.usac.cunoc.sgp.inspeccion.dto.InspeccionResumenResponse;
 import gt.usac.cunoc.sgp.revision.dto.BorradorEstudianteResponse;
 import gt.usac.cunoc.sgp.revision.dto.ContadorRevisionesResponse;
 import gt.usac.cunoc.sgp.revision.dto.RevisionBandejaResponse;
+import gt.usac.cunoc.sgp.revision.dto.RevisionResueltaResponse;
 import gt.usac.cunoc.sgp.revision.service.RevisionService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -14,7 +15,9 @@ import java.time.LocalDate;
 import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.CacheControl;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -61,6 +64,17 @@ public class RevisionController {
         fechaHasta,
         pagina,
         tamanio);
+  }
+
+  @GetMapping("/revisadas")
+  @Operation(summary = "Listar los ciclos resueltos por el catedrático autenticado")
+  public ResponseEntity<Page<RevisionResueltaResponse>> listarResueltas(
+      @RequestParam(defaultValue = "0") int pagina,
+      @RequestParam(defaultValue = "20") int tamanio,
+      Authentication authentication) {
+    return ResponseEntity.ok()
+        .cacheControl(CacheControl.noStore().cachePrivate())
+        .body(revisiones.listarResueltas(usuarioId(authentication), pagina, tamanio));
   }
 
   @GetMapping("/pendientes/contador")
