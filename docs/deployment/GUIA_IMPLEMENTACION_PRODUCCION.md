@@ -1,5 +1,14 @@
 # Guía de traspaso para la implementación de producción
 
+> **Documento histórico de planificación.** Las secciones siguientes conservan
+> el estado y las decisiones del traspaso inicial; sus listas de pendientes no
+> son una fuente actualizada del estado de producción. Consultar
+> [PRODUCCION_AWS.md](PRODUCCION_AWS.md),
+> [RESPALDO_Y_RESTAURACION.md](RESPALDO_Y_RESTAURACION.md) y
+> [ADR-0004](../adr/0004-despliegue-automatico-produccion-desde-main.md) para
+> los avances posteriores. El usuario también confirmó pruebas funcionales,
+> correo y verificaciones de RDS sin aportar resultados detallados.
+
 ## 1. Contexto y responsabilidades
 
 La historia de despliegue se dividió en dos responsabilidades:
@@ -156,17 +165,17 @@ propio y agregarlo como un origen independiente; no debe reutilizar
 `sgp-staging-ec2-sg`.
 
 El bucket privado de staging es `sgp-staging-archivos-ayd1-2026-gt01`. Tiene
-ACL deshabilitadas, bloqueo completo de acceso público y SSE-S3; permanece vacío,
-sin política personalizada, CORS, versionado ni Object Lock. Producción deberá
+ACL deshabilitadas, bloqueo completo de acceso público y SSE-S3; inicialmente
+no tenía política de bucket personalizada, CORS, versionado ni Object Lock.
+Las cargas posteriores confirman que no permaneció vacío. Producción deberá
 crear otro bucket con nombre, etiquetas, política IAM y configuración propias;
 no debe reutilizar este bucket ni asumir que deshabilitar el versionado será la
 decisión definitiva para producción.
 
-El rol `sgp-staging-ec2-role` confía en EC2 y actualmente solo tiene
-`AmazonSSMManagedInstanceCore`; ya está asociado y permitió administrar staging
-mediante Session Manager. El acceso S3 futuro requerirá una política
-adicional limitada al bucket de staging. Producción debe crear su propio rol de
-instancia, limitado a su bucket. El rol OIDC usado por GitHub Actions es una
+El rol `sgp-staging-ec2-role` confía en EC2 y tiene
+`AmazonSSMManagedInstanceCore` y `sgp-staging-s3-objects-policy`, limitada a
+objetos de staging. Producción debe crear su propio rol y política de instancia,
+limitados a su bucket. El rol OIDC usado por GitHub Actions es una
 identidad diferente y su uso real ya fue validado. La confianza comprobada usa
 el sujeto inmutable
 `repo:KennySalazar@99755600/SGP_ProyectoFinal_AyD1@1386435373:ref:refs/heads/develop`;
@@ -184,7 +193,7 @@ zona no impide la conectividad, pero debe considerarse al evaluar costo de
 transferencia y latencia para producción.
 
 Staging conservará la IPv4 dinámica `3.235.197.36` sin Elastic IP por el plazo
-académico hasta el 28 de octubre de 2026. Puede cambiar al detener e iniciar la
+previsto hasta el 28 de octubre de 2026. Puede cambiar al detener e iniciar la
 instancia, por lo que cualquier certificado emitido para ella debe reemplazarse
 si cambia. Esta decisión acotada a staging no resuelve la necesidad de una
 dirección pública operativamente estable para producción.
@@ -346,7 +355,7 @@ controles independientes:
 | `DATABASE_URL` | JDBC hacia el endpoint RDS privado y la base exclusiva de producción; debe exigir TLS. |
 | `MIGRATION_DATABASE_USERNAME/PASSWORD` | Credencial exclusiva para Flyway. |
 | `DATABASE_USERNAME/PASSWORD` | Usuario de aplicación distinto y con menor privilegio. |
-| S3 | El backend aún no define variables de bucket. Cuando exista la integración, usar el bucket de producción y el rol IAM de su EC2, nunca claves estáticas. |
+| S3 | Configurar `ARCHIVOS_PROVEEDOR`, `ARCHIVOS_BUCKET` y `AWS_REGION` para producción y usar el rol IAM de su EC2, sin claves estáticas. |
 | `SECRET_KEY_JWT` | Secreto aleatorio de al menos 32 caracteres, distinto de staging. |
 | Expiraciones JWT/OTP | Revisar y aprobar valores antes del despliegue. |
 | `INITIAL_ADMIN_EMAIL/PASSWORD` | Identidad controlada; contraseña de 10–72 caracteres con letras y números. |
@@ -403,15 +412,21 @@ para cargas dentro de Docker. No se deben crear `AWS_ACCESS_KEY_ID` ni
 - Crear un bucket privado de producción, con nombre, etiquetas, cifrado,
   versionado y ciclo de vida decididos expresamente. No reutilizar
   `sgp-staging-archivos-ayd1-2026-gt01`.
-- Asociar una política IAM de mínimo privilegio al rol propio de EC2. El backend
-  deberá usar credenciales temporales; las claves estáticas siguen prohibidas.
+- Asociar al rol propio una política de objetos limitada al ARN de su bucket y
+  a las operaciones implementadas necesarias: `s3:PutObject`, `s3:GetObject` y
+  `s3:DeleteObject`, sujetas a revisión de requisitos. No copiar la política de
+  staging sin adaptar el ARN y verificar los requisitos. El backend usará
+  credenciales temporales, sin claves estáticas.
+- Probar realmente subida, descarga y eliminación autorizada de un objeto de
+  diagnóstico en producción y registrar resultados sin afectar archivos reales.
+  En staging faltaba `DeleteObject` y falló la compensación de un PDF; verificar
+  permisos antes de habilitar flujos y diagnosticar 409 por separado.
 - Definir y probar respaldos y restauración de RDS y objetos. La retención de un
   día aplicada actualmente a la RDS compartida no satisface el requisito global
   de 30 días ni los respaldos mensuales.
 
-La integración S3 del backend todavía no existe. El bucket no debe presentarse
-como persistencia funcional hasta que la futura HU implemente el contrato,
-metadatos, autorización y pruebas reales. La
+La integración S3 del backend existe y las cargas de staging se probaron
+parcialmente; producción requiere pruebas independientes. La
 [guía de integración S3](GUIA_INTEGRACION_S3.md) concentra el estado del
 repositorio y los requisitos de traspaso; producción deberá adaptar sus
 decisiones sin reutilizar recursos de staging.
@@ -579,9 +594,8 @@ crear el Compose real de producción.
 
 ## 13. Errores y limitaciones conocidos
 
-- El backend todavía no implementa la interfaz de almacenamiento de objetos ni
-  consume S3. No deben inventarse variables ni declararse validado hasta que esa
-  funcionalidad exista.
+- La integración S3 existe y se ha probado parcialmente en staging; producción
+  requiere configuración y validación propias para sus flujos de archivos.
 - La verificación completa del certificado RDS con `sslmode=verify-full` y el
   bundle CA debe incorporarse y probarse al preparar la infraestructura.
 - Brotli no está configurado; Nginx usa gzip.
@@ -606,7 +620,7 @@ crear el Compose real de producción.
   digests probados en staging y registrar su correspondencia con la revisión
   aprobada en `main`.
 
-## 14. Decisiones pendientes
+## 14. Decisiones pendientes al momento del traspaso
 
 - Validación administrativa de TLS `verify-full` y consulta directa de
   extensiones sobre `sgp-rds-postgres`; Flyway ya funcionó desde el backend.
@@ -618,8 +632,7 @@ crear el Compose real de producción.
 - Nombres y rutas del Compose de producción.
 - Retención y centralización de logs.
 - Estrategia futura de respaldos y restauración.
-- Nombres de las variables S3 que expondrá el backend cuando se implemente
-  `AlmacenamientoArchivos`.
+- Valores y configuración S3 propios de producción y validación de sus flujos.
 
 Estas decisiones no deben cerrarse unilateralmente si cambian contratos
 compartidos con staging.

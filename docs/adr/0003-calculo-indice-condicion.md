@@ -2,7 +2,9 @@
 
 ## Estado
 
-Implementado en la rama de HU-018, pendiente de integracion a develop.
+Implementado en el codigo de este repositorio. El flujo de publicacion invoca
+el servicio de calculo mediante `PublicacionIndiceCondicionService`. El estado
+de integracion en ramas remotas debe comprobarse por separado.
 
 ## Contexto
 
@@ -13,6 +15,9 @@ agregacion y las condiciones criticas pertenecen a la version del formulario.
 El esquema sieca-v1 sirve como referencia estructural. Los valores utilizados
 en las pruebas son configuraciones de prueba y no representan una calibracion
 aprobada por el Catedratico.
+El archivo `formulario/sieca-v1/elementos-ic.json` identifica su calibracion
+como provisional y no aprobada academicamente; esto no determina el estado de
+las configuraciones almacenadas en una base de datos concreta.
 
 ## Decision
 
@@ -160,9 +165,9 @@ El workflow de CI ya ejecuta esta comprobacion mediante Maven.
 El calculo puede utilizarse desde distintos flujos sin depender de HTTP
 ni de la base de datos.
 
-HU-019 debe proporcionar la configuracion calibrada correspondiente
-a la version. El flujo de publicacion de HU-020 debe integrar el servicio,
-conservar su trazabilidad y persistir el resultado.
+La configuracion calibrada corresponde a la version del formulario. El flujo
+de publicacion integra el servicio; la aprobacion academica de la calibracion
+debe verificarse para cada configuracion utilizada.
 
 El 100 % de cobertura demuestra que las pruebas recorren el codigo del
 servicio; no garantiza por si solo la ausencia de errores ni reemplaza

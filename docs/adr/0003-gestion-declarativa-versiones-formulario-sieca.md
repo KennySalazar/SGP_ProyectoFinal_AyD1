@@ -8,7 +8,7 @@ Aceptada.
 
 La regla de negocio RN-FRM-01 y las directrices técnicas DT-FE-07 y DT-BD-02 exigen que la estructura del formulario de evaluación técnica de puentes (manual SIECA) se gestione como un dato versionado (JSON Schema) en la base de datos, desacoplado del código fuente para permitir modificaciones estructurales sin redespliegues ni migraciones de esquema.
 
-El alcance completo teórico contemplaba un editor visual interactivo ("drag-and-drop") de preguntas para el Administrador (Decisión abierta 8). Sin embargo, la complejidad de construir un editor visual completo que genere y sincronice dinámicamente JSON Schema (Draft 2020-12) con anotaciones propietarias (`x-sgp-evaluable`, `x-sgp-fuente`, vínculos a columnas tipadas y pesos del Índice de Condición) excede el valor funcional prioritario del sprint y añade riesgo de inconsistencias estructurales.
+El alcance completo teórico contemplaba un editor visual interactivo ("drag-and-drop") de preguntas para el Administrador (Decisión abierta 8). Sin embargo, la complejidad de construir un editor visual completo que genere y sincronice dinámicamente JSON Schema (Draft 2020-12) con anotaciones propietarias (`x-sgp-evaluable`, `x-sgp-fuente`, vínculos a columnas tipadas y pesos del Índice de Condición) excede las prioridades funcionales del alcance previsto y añade riesgo de inconsistencias estructurales.
 
 ## Decision
 
