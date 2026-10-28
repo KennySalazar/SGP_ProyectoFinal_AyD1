@@ -4,7 +4,7 @@ Fecha: 24 de octubre de 2026.
 
 ## Estado y autoridad
 
-**Propuesto para ratificación formal; implementado en el harness de HU-062.** Las instrucciones de implementación de las fases autorizan expresamente reutilizar Playwright. La revisión QA posterior localizó la HU-062 y la decisión 6 en `.context/sprints/sprint_4_SGP.md`: Cypress es una recomendación de partida, expresamente «no como mandato»; el responsable elige la herramienta y registra su decisión en un ADR. DT-CAL-04 permite Playwright o Cypress. Localizar esta fuente aclara el requisito, pero no constituye ratificación del responsable.
+**Implementado en el harness de HU-062.** Se reutilizó Playwright para las pruebas de red degradada; DT-CAL-04 permite Playwright o Cypress. El sprint identifica esta elección como una decisión del responsable. La implementación por sí sola no documenta quién ratificó la elección ni cuándo.
 
 Este ADR complementa el [ADR-0007](0007-hu061-publicacion-offline-y-cache-privada.md), aceptado para HU-061, sin modificarlo ni cambiar sincronización, persistencia o contratos de negocio.
 
@@ -32,4 +32,4 @@ La elección actual reduce cambios y permite verificar los perfiles implementado
 
 ## Ejecución y consecuencias
 
-Procedimiento único en [docs/testing/HU-062.md](../testing/HU-062.md), con requisitos, comandos, evidencias y matriz actualizada. La ejecución manual reproducible utiliza el script existente; no se modifica CI. La ratificación del responsable sobre este ADR sigue pendiente; los resultados técnicos no sustituyen esa decisión.
+Procedimiento único en [docs/testing/HU-062.md](../testing/HU-062.md), con requisitos, comandos, evidencias y matriz actualizada. La ejecución manual reproducible utiliza el script existente; no se modifica CI.

@@ -60,4 +60,7 @@ La publicación (HU-020) es una operación transaccional: pasa la inspección a 
 
 ### Negativas
 - Entre la confirmación y la generación hay una ventana: si el proceso se detiene justo ahí, la inspección queda publicada sin propuestas hasta que un Administrador las regenere.
-- La generación automática no se reintenta sola.
+- La generación automática no se reintenta sola. Es una limitación de esta
+  decisión: ante un fallo, un Administrador puede usar el endpoint de
+  regeneración descrito arriba. Este ADR no establece un reintento automático
+  como tarea pendiente.

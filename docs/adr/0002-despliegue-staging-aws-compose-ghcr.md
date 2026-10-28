@@ -13,9 +13,14 @@ fueron validados para la revisión
 La terminación HTTPS sobre IP se integró a `develop` mediante `e006c19`, se
 instaló en EC2 y respondió correctamente desde un navegador y mediante las rutas
 de salud, frontend y API. El temporizador de renovación está habilitado y su
-servicio se ejecutó sin error; aún falta observar una renovación efectiva.
-La configuración y el despliegue de producción permanecen fuera del alcance de
-esta historia.
+servicio se ejecutó sin error. El usuario informó que ambos entornos funcionaban
+el 27 de octubre de 2026; no se registraron fechas del certificado vigente ni
+una evidencia directa de renovación.
+La configuración y el despliegue de producción quedaron fuera del alcance de
+esta historia inicial. Los avances posteriores se documentan en
+[producción](../deployment/PRODUCCION_AWS.md) y el
+[ADR-0004](0004-despliegue-automatico-produccion-desde-main.md), que reemplaza
+la promoción manual prevista aquí.
 
 ## Contexto
 
@@ -132,7 +137,7 @@ claves AWS estáticas ni compilar Java o Angular en EC2.
    recibir `rds_superuser`.
 7. Usar un bucket S3 privado por ambiente. La EC2 accederá mediante un rol IAM
    de mínimo privilegio y credenciales temporales; nunca mediante access keys en
-   `.env`. La integración se habilitará cuando exista en el backend.
+   `.env`. La integración posterior se describe en la sección de implementación.
 8. Exigir IMDSv2 y configurar hop limit `2` para que un SDK dentro de Docker
    pueda obtener credenciales del rol de instancia.
 9. Construir backend y frontend en GitHub Actions para `linux/amd64` y
@@ -161,7 +166,8 @@ claves AWS estáticas ni compilar Java o Angular en EC2.
     perfil `shortlived` de Let's Encrypt con Certbot 5.8.0 en Docker y un
     temporizador systemd de comprobación dos veces al día. La instalación real
     y la ejecución del servicio de comprobación quedaron validadas el 15 de
-    octubre de 2026; todavía no se ha observado una renovación efectiva.
+    octubre de 2026. El funcionamiento informado posteriormente no incluye una
+    comprobación directa de las fechas del certificado.
 16. Conservar para staging la IPv4 pública dinámica observada y no asignar una
     Elastic IP, dado el plazo académico hasta el 28 de octubre de 2026. Se acepta
     que detener e iniciar EC2 puede cambiar la IP y obligar a actualizar URLs y
@@ -169,11 +175,12 @@ claves AWS estáticas ni compilar Java o Angular en EC2.
 
 ### Estado de implementación en AWS
 
-El 27 de octubre de 2026 se corrigió la falta de `s3:DeleteObject` observada
-en un rollback de PDF. Se verificaron las tres operaciones de objetos con un
-archivo de diagnóstico y las cargas de fotos y PDF en la aplicación. No se
-demostró que ese 403 causara todos los 409 de fotografías; la recuperación y
-las demás pruebas pendientes se detallan en [staging](../deployment/STAGING_AWS.md).
+El 27 de octubre de 2026 se corrigió la falta de permisos S3 mediante una política
+IAM asociada al rol de la EC2 de staging, con `PutObject`, `GetObject` y
+`DeleteObject`. Se verificaron estas operaciones con un archivo de diagnóstico y
+las cargas de fotos y PDF en la aplicación. El permiso `DeleteObject` resolvió
+el 403 observado durante un rollback de PDF; no se demostró que fuera causa de
+todos los 409 anteriores. Véase [staging](../deployment/STAGING_AWS.md).
 
 En `us-east-1` se confirmaron los siguientes recursos de staging:
 
@@ -221,9 +228,12 @@ demostró autenticación de aplicación, Flyway, validación del esquema y respu
 HTTP 200 del frontend, `/healthz` y `/api/v1/puentes?size=1`. El rol OIDC
 `arn:aws:iam::416086757987:role/sgp-staging-github-actions-role` es distinto del
 rol de instancia y su asunción quedó validada después de corregir el sujeto de
-confianza al identificador inmutable. `sgp_staging` está operativa; no se creó
-`sgp_prod`. Sigue pendiente una comprobación administrativa independiente de
-TLS `verify-full` y extensiones.
+confianza al identificador inmutable. `sgp_staging` está operativa. En la etapa
+inicial no se creó `sgp_prod`; posteriormente, la guía de
+[producción](../deployment/PRODUCCION_AWS.md) documentó su preparación con
+`verify-full` y la consulta de extensiones. El usuario indicó posteriormente
+que la comprobación independiente de `verify-full` y extensiones en staging fue
+verificada, sin registrar fecha ni evidencia técnica adicional.
 
 El Nginx `1.30.5` del host atiende TCP 80/443 y reenvía al contenedor ligado a
 `127.0.0.1:8088`; backend 8090 y PostgreSQL 5432 no están publicados. Certbot
@@ -234,17 +244,15 @@ el 15 hasta el 22 de octubre de 2026. HTTP redirigió con 301 y `/`, `/healthz` 
 procesó la configuración y conservó Nginx saludable, pero no renovó porque el
 certificado todavía no estaba dentro de la ventana de renovación.
 
-### Excepción operativa de respaldos
+### Respaldos de la base de datos
 
-El diseño conserva el requisito de 30 días de respaldos automáticos. La cuenta
-rechazó ese valor porque supera el máximo disponible en su plan gratuito y no se
-autorizó migrar a un plan de pago. Para que AWS aceptara la creación, se redujo
-temporalmente la retención a 1 día, con copia de etiquetas habilitada y sin
-replicación entre regiones.
-
-Esta excepción no modifica el requisito original: la retención de 30 días, los
-12 respaldos mensuales mediante AWS Backup y la prueba de restauración siguen
-pendientes.
+La [guía de respaldos](../deployment/RESPALDO_Y_RESTAURACION.md) documenta
+volcados diarios con `pg_dump` a S3, con eliminación de diarios a los 30 días y
+copias mensuales a los 365 días. El 17 de octubre de 2026 se documentó una prueba
+de restauración exitosa en producción. La retención automática de RDS de un día
+es un complemento; DT-DEP-07 no exige AWS Backup ni 30 días de retención de RDS.
+La guía señala una limitación operativa si la EC2 está apagada el primer día del
+mes. DT-DEP-08 exige repetir y documentar la prueba al menos cada semestre.
 
 ## Justificación
 
@@ -285,42 +293,30 @@ promover los mismos digests entre ambientes sin reconstruir artefactos.
 - Staging y producción comparten capacidad y disponibilidad de una RDS.
 - Single-AZ reduce el costo, pero no ofrece conmutación automática ante la falla
   de la zona que aloje la instancia.
-- El plan gratuito limita la retención automática aplicada a 1 día. Este valor
-  no satisface los 30 días del diseño ni sustituye los respaldos mensuales o la
-  prueba de restauración.
-- `t4g.micro` puede sufrir presión de memoria y debe medirse.
+- El plan gratuito limita a 1 día la retención automática de RDS; los volcados a
+  S3 se documentan por separado.
+- El usuario informó que el rendimiento de la instancia es satisfactorio; no se
+  registró una medición de memoria ni sus condiciones.
 - Las cargas de fotos y PDF se probaron en staging; otros flujos de archivos
   aún necesitan validación.
-- El bucket de staging no tiene versionado ni Object Lock; la recuperación ante
-  borrados y los respaldos permanecen fuera de esta historia.
 - Un PAT classic con `read:packages` puede leer otros paquetes privados a los
   que tenga acceso la cuenta y requiere rotación manual.
-- `sslmode=require` cifra la conexión RDS, pero la verificación de identidad con
-  `verify-full` requiere distribuir y probar el bundle CA.
 - El acceso a credenciales IAM desde contenedores requiere configurar IMDSv2 de
   forma consciente; un hop limit incorrecto impediría acceder a S3.
 
 ## Limitaciones
 
-- La aplicación ya se desplegó y superó las comprobaciones técnicas básicas,
-  pero no las pruebas funcionales completas ni los flujos dependientes de SMTP.
-- RDS está operativa para el backend y Flyway; falta una prueba administrativa
-  de `verify-full` y una consulta directa de extensiones.
+- El usuario informó que se realizaron pruebas funcionales, incluidas las de
+  correo; no se registraron fecha, casos ni resultados detallados.
 - El host EC2, OIDC, Systems Manager y HTTPS público están validados. La compra
   de dominio, una zona DNS pública y Elastic IP se descartaron para staging.
-- No incluye Compose ni despliegue de producción.
-- Solo existe una retención automática solicitada de 1 día en RDS. La política
-  requerida de respaldos, restauración y la retención centralizada de logs no
-  están implementadas.
-- La integración S3 existe y tiene pruebas parciales; quedan pendientes las
-  comprobaciones funcionales y operativas de la guía S3.
-- Brotli no está implementado. HSTS tampoco está habilitado por la dependencia
-  de una IP dinámica y certificados de corta duración; DT-SEC-10 requiere una
-  excepción aceptada o una solución operativa estable.
+- Esta historia no incluyó Compose ni despliegue de producción; el trabajo
+  posterior se documenta en la guía de producción y el ADR-0004.
 - La publicación multi-arquitectura, descarga ARM64, GHCR, OIDC, SSM y el primer
   despliegue ya cuentan con validación real.
-- La renovación automática está programada y su servicio se ejecutó con éxito,
-  pero todavía no existe evidencia de una renovación efectiva.
+- La renovación automática está programada. El funcionamiento de los entornos
+  informado por el usuario no identifica el certificado servido ni confirma por
+  sí solo una renovación efectiva.
 
 ## Relación con el enunciado
 
