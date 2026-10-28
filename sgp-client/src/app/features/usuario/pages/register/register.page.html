@@ -41,6 +41,18 @@
           autocomplete="new-password"
           [placeholder]="'common.minPasswordPlaceholder' | transloco" /></app-contrasena-visible
     ></label>
+    <label
+      >{{ 'auth.register.confirm' | transloco }}<app-contrasena-visible
+        ><input
+          pInputText
+          type="password"
+          formControlName="confirmacion"
+          autocomplete="new-password"
+          [placeholder]="'common.confirmPasswordPlaceholder' | transloco" /></app-contrasena-visible
+    ></label>
+    @if (form.controls.confirmacion.touched && form.hasError('noCoinciden')) {
+    <small class="validation">{{ 'auth.register.mismatch' | transloco }}</small>
+    }
     <p class="note"><i class="pi pi-info-circle"></i> {{ 'auth.register.rule' | transloco }}</p>
     <button pButton class="primary" type="submit" [disabled]="form.invalid">
       <i class="pi pi-user-plus"></i><span>{{ 'auth.register.title' | transloco }}</span>
