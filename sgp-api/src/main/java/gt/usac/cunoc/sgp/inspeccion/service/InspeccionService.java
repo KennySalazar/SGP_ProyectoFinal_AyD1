@@ -718,8 +718,11 @@ public class InspeccionService {
     // inspección del estudiante durante el ciclo de revisión, siempre en solo lectura.
     boolean inspeccionDisponibleParaRevision =
         Set.of("BORRADOR", "ENVIADA", "EN_REVISION").contains(inspeccion.getEstado());
+    boolean disponibleParaAutor =
+        Set.of("BORRADOR", "ENVIADA", "EN_REVISION", "CAMBIOS_SOLICITADOS", "RECHAZADA")
+            .contains(inspeccion.getEstado());
     if (inspeccion.getEliminadoEn() != null
-        || !(autor && "BORRADOR".equals(inspeccion.getEstado()))
+        || !(autor && disponibleParaAutor)
             && !(catedraticoAsignado && inspeccionDisponibleParaRevision)) {
       throw new ApiException(
           HttpStatus.NOT_FOUND,
@@ -948,7 +951,8 @@ public class InspeccionService {
                         HttpStatus.CONFLICT,
                         "sin_formulario_activo",
                         "Formulario no disponible",
-                        "No existe la versión de formulario solicitada para iniciar inspecciones."));
+                        "No existe la versión de formulario solicitada para iniciar"
+                            + " inspecciones."));
     if (versionActiva.getEstado() != EstadoVersionFormulario.PUBLICADA) {
       throw new ApiException(
           HttpStatus.UNPROCESSABLE_ENTITY,

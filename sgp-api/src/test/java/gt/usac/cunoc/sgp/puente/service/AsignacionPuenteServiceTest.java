@@ -56,15 +56,22 @@ class AsignacionPuenteServiceTest {
     UUID inscripcionId = UUID.randomUUID();
     var estudiante = mock(AsignacionPuenteRepository.EstudianteAsignableProjection.class);
     when(usuarios.findByEmail("catedratico@ejemplo.com")).thenReturn(Optional.of(catedratico));
+    var vencido = mock(AsignacionPuenteRepository.EstudianteAsignableProjection.class);
+    when(estudiante.getFechaInicio()).thenReturn(java.time.LocalDate.of(2026, 7, 1));
+    when(estudiante.getFechaFin()).thenReturn(java.time.LocalDate.of(2026, 12, 31));
+    when(vencido.getFechaInicio()).thenReturn(java.time.LocalDate.of(2026, 1, 1));
+    when(vencido.getFechaFin()).thenReturn(java.time.LocalDate.of(2026, 6, 30));
     when(asignaciones.findEstudiantesAsignables(catedratico.getId()))
-        .thenReturn(List.of(estudiante));
+        .thenReturn(List.of(estudiante, vencido));
     when(estudiante.getCursoEstudianteId()).thenReturn(inscripcionId);
     when(estudiante.getEstudianteNombre()).thenReturn("Mario Yancor");
     when(estudiante.getEstudianteEmail()).thenReturn("mario@ejemplo.com");
     when(estudiante.getCursoNombre()).thenReturn("Puentes");
     when(estudiante.getPeriodo()).thenReturn("2026-2");
 
-    var resultado = service.listarEstudiantesAsignables("catedratico@ejemplo.com").getFirst();
+    var lista = service.listarEstudiantesAsignables("catedratico@ejemplo.com");
+    assertThat(lista).hasSize(1);
+    var resultado = lista.getFirst();
 
     assertThat(resultado.cursoEstudianteId()).isEqualTo(inscripcionId);
     assertThat(resultado.estudianteNombre()).isEqualTo("Mario Yancor");
@@ -177,6 +184,23 @@ class AsignacionPuenteServiceTest {
             eq(AHORA));
   }
 
+  @Test
+  void noAsignaPuentesSiElCursoActivoYaVencio() {
+    UserAccount docente = catedratico();
+    var inscripcion = inscripcion(true, "ACTIVO", true, true);
+    when(inscripcion.getFechaFin()).thenReturn(java.time.LocalDate.of(2026, 6, 30));
+    UUID id = inscripcion.getId();
+    when(usuarios.findByEmail("docente")).thenReturn(Optional.of(docente));
+    when(asignaciones.findInscripcionParaAsignacion(id, docente.getId()))
+        .thenReturn(Optional.of(inscripcion));
+    assertThatThrownBy(
+            () -> service.asignar("docente", new AsignarPuenteRequest(id, UUID.randomUUID())))
+        .isInstanceOfSatisfying(
+            ApiException.class, e -> assertThat(e.getCode()).isEqualTo("curso_fuera_de_fechas"));
+    verify(asignaciones, never()).save(any(AsignacionPuente.class));
+    verifyNoInteractions(auditoria);
+  }
+
   private UserAccount catedratico() {
     UserAccount usuario = mock(UserAccount.class);
     Role rol = mock(Role.class);
@@ -192,6 +216,8 @@ class AsignacionPuenteServiceTest {
     var inscripcion = mock(AsignacionPuenteRepository.InscripcionAsignableProjection.class);
     when(inscripcion.getId()).thenReturn(UUID.randomUUID());
     when(inscripcion.getCursoId()).thenReturn(UUID.randomUUID());
+    when(inscripcion.getFechaInicio()).thenReturn(java.time.LocalDate.of(2026, 7, 1));
+    when(inscripcion.getFechaFin()).thenReturn(java.time.LocalDate.of(2026, 12, 31));
     when(inscripcion.getCursoActivo()).thenReturn(cursoActivo);
     when(inscripcion.getEstado()).thenReturn(estado);
     when(inscripcion.getEstudianteActivo()).thenReturn(estudianteActivo);

@@ -6,6 +6,8 @@ import {
   DestroyRef,
   inject,
   signal,
+  viewChild,
+  ElementRef,
 } from '@angular/core';
 import { ReactiveFormsModule, Validators } from '@angular/forms';
 import { FormBuilder } from '@angular/forms';
@@ -39,6 +41,21 @@ export class CatalogoCursosPage {
   private readonly destroyRef = inject(DestroyRef);
   private readonly api = inject(CursoApiService);
   private readonly apiErrors = inject(ApiErrorService);
+
+  readonly formularioCurso = viewChild<ElementRef<HTMLElement>>('formularioCurso');
+  readonly hoy = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Guatemala',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(new Date());
+
+  vigencia(curso: CursoResponse): string {
+    if (curso.estado === 'FINALIZADO') return 'admin.courses.inactive';
+    if (this.hoy < curso.fechaInicio) return 'admin.courses.upcoming';
+    if (this.hoy > curso.fechaFin) return 'admin.courses.expired';
+    return 'admin.courses.inDates';
+  }
 
   readonly anioActual = Number(
     new Intl.DateTimeFormat('en', { year: 'numeric', timeZone: 'America/Guatemala' }).format(
@@ -119,7 +136,6 @@ export class CatalogoCursosPage {
       this.form.controls.periodo.setErrors({ periodoInvalido: true });
       return;
     }
-    this.aplicarPeriodo(periodo);
     if (this.guardando() || this.form.invalid) return;
     const values = this.form.getRawValue();
     if (values.fechaFin < values.fechaInicio) {
@@ -164,12 +180,14 @@ export class CatalogoCursosPage {
         nombre: curso.nombre,
         periodo,
         catedraticoId: curso.catedratico.id,
-        fechaInicio: '',
-        fechaFin: '',
+        fechaInicio: curso.fechaInicio,
+        fechaFin: curso.fechaFin,
       },
       { emitEvent: false },
     );
-    this.aplicarPeriodo(periodo);
+    const elemento = this.formularioCurso()?.nativeElement;
+    elemento?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    elemento?.focus({ preventScroll: true });
   }
 
   cancelarEdicion(): void {

@@ -45,6 +45,8 @@ export class DiagnosticsPage {
   readonly errorConflictos = signal(false);
   readonly errorAlmacenamiento = signal(false);
   readonly errorAccion = signal(false);
+  readonly verificandoGuardados = signal(false);
+  readonly resultadoGuardados = signal<string | null>(null);
   private generacion = 0;
   private propietario?: string;
 
@@ -88,6 +90,50 @@ export class DiagnosticsPage {
       await this.refresh();
     } catch {
       this.errorAccion.set(true);
+    }
+  }
+  async verificarGuardados(): Promise<void> {
+    const owner = this.auth.user()?.id;
+    if (
+      !owner ||
+      !this.connectivity.online() ||
+      this.sync.sincronizando() ||
+      this.verificandoGuardados()
+    )
+      return;
+    const ids = [
+      ...new Set(
+        (this.resumen()?.elementos ?? [])
+          .filter((item) => item.operacion === 'GUARDAR_BORRADOR')
+          .map((item) => item.entityId),
+      ),
+    ];
+    if (ids.length === 0) {
+      this.resultadoGuardados.set('No hay guardados pendientes de verificar.');
+      return;
+    }
+    this.verificandoGuardados.set(true);
+    this.resultadoGuardados.set(null);
+    let retirados = 0;
+    let fallos = 0;
+    try {
+      for (const id of ids) {
+        if (this.auth.user()?.id !== owner) return;
+        try {
+          const servidor = await firstValueFrom(this.api.obtenerBorrador(id));
+          retirados += await this.inspecciones.reconciliarGuardadosConfirmados(servidor, owner);
+        } catch {
+          fallos++;
+        }
+      }
+      if (this.auth.user()?.id === owner)
+        this.resultadoGuardados.set(
+          retirados > 0
+            ? `Se retiraron ${retirados} guardados ya confirmados o superados. Los demas pendientes se conservan.${fallos ? ' Algunas consultas no pudieron completarse.' : ''}`
+            : 'No se retiraron operaciones. Hay diferencias, operaciones en curso o datos que no se pudieron confirmar. Los datos locales se conservan.',
+        );
+    } finally {
+      this.verificandoGuardados.set(false);
     }
   }
   async reintentar(id: string): Promise<void> {

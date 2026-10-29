@@ -113,6 +113,7 @@ Antes de desarrollar una funcionalidad, revisar la documentación correspondient
 - [`docs/UI_GUIDELINES.md`](docs/UI_GUIDELINES.md) — reglas visuales y de experiencia de usuario.
 - [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md) — preparación y ejecución del entorno local.
 - [`docs/testing/HU-062.md`](docs/testing/HU-062.md) — pruebas offline y de red degradada, evidencias, resultados y límites de aceptación.
+- [`docs/testing/EVIDENCIA_E2E.md`](docs/testing/EVIDENCIA_E2E.md) — evidencia E2E de DT-CAL-04: cómo ver el reporte de CI y resultados con red degradada.
 - [`docs/deployment/STAGING_AWS.md`](docs/deployment/STAGING_AWS.md) — arquitectura, configuración y operación de staging en AWS.
 - [`docs/deployment/GUIA_IMPLEMENTACION_PRODUCCION.md`](docs/deployment/GUIA_IMPLEMENTACION_PRODUCCION.md) — contratos y decisiones para el responsable de producción.
 - [`docs/deployment/PRODUCCION_AWS.md`](docs/deployment/PRODUCCION_AWS.md) — recursos, despliegue y verificación de producción en AWS.

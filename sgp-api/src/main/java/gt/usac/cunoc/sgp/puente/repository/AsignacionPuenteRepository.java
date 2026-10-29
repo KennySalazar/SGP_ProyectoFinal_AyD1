@@ -42,7 +42,7 @@ public interface AsignacionPuenteRepository extends JpaRepository<AsignacionPuen
 
   @Query(
       """
-          SELECT ce.id AS id, c.id AS cursoId, c.activo AS cursoActivo, ce.estado AS estado,
+          SELECT ce.id AS id, c.id AS cursoId, c.activo AS cursoActivo, c.fechaInicio AS fechaInicio, c.fechaFin AS fechaFin, ce.estado AS estado,
                  u.active AS estudianteActivo, u.activated AS estudianteActivado
           FROM CursoEstudiante ce
           JOIN ce.curso c
@@ -55,7 +55,7 @@ public interface AsignacionPuenteRepository extends JpaRepository<AsignacionPuen
   @Query(
       """
           SELECT ce.id AS cursoEstudianteId, u.id AS estudianteId, u.email AS estudianteEmail,
-                 c.id AS cursoId, a.nombre AS cursoNombre, c.periodo AS periodo,
+                 c.id AS cursoId, c.fechaInicio AS fechaInicio, c.fechaFin AS fechaFin, a.nombre AS cursoNombre, c.periodo AS periodo,
                  u.nombreCompleto AS estudianteNombre
           FROM CursoEstudiante ce
           JOIN ce.curso c
@@ -130,7 +130,7 @@ public interface AsignacionPuenteRepository extends JpaRepository<AsignacionPuen
 
   @Query(
       """
-          SELECT ap.id AS id, c.catedratico.id AS catedraticoId
+          SELECT ap.id AS id, ap.puente.id AS puenteId, c.catedratico.id AS catedraticoId
           FROM AsignacionPuente ap
           JOIN ap.cursoEstudiante ce
           JOIN ce.curso c
@@ -150,7 +150,7 @@ public interface AsignacionPuenteRepository extends JpaRepository<AsignacionPuen
 
   @Query(
       """
-          SELECT ap.id AS id, c.catedratico.id AS catedraticoId
+          SELECT ap.id AS id, ap.puente.id AS puenteId, c.catedratico.id AS catedraticoId
           FROM AsignacionPuente ap
           JOIN ap.cursoEstudiante ce
           JOIN ce.curso c
@@ -198,6 +198,10 @@ public interface AsignacionPuenteRepository extends JpaRepository<AsignacionPuen
   }
 
   interface InscripcionAsignableProjection {
+    java.time.LocalDate getFechaInicio();
+
+    java.time.LocalDate getFechaFin();
+
     UUID getId();
 
     UUID getCursoId();
@@ -212,6 +216,10 @@ public interface AsignacionPuenteRepository extends JpaRepository<AsignacionPuen
   }
 
   interface EstudianteAsignableProjection {
+    java.time.LocalDate getFechaInicio();
+
+    java.time.LocalDate getFechaFin();
+
     String getEstudianteNombre();
 
     UUID getCursoEstudianteId();
@@ -229,6 +237,8 @@ public interface AsignacionPuenteRepository extends JpaRepository<AsignacionPuen
 
   interface AsignacionInspeccionProjection {
     UUID getId();
+
+    UUID getPuenteId();
 
     UUID getCatedraticoId();
   }

@@ -25,6 +25,7 @@ export class ActivacionEstudiantesPage {
   private readonly api = inject(UsuarioApiService);
   private readonly apiErrors = inject(ApiErrorService);
 
+  readonly modo = signal<'activar' | 'vincular'>('activar');
   readonly estudiantes = signal<EstudiantePendienteResponse[]>([]);
   /** Cada estudiante con una etiqueta que lo distingue: su nombre y usuario si los tiene, y su correo. */
   readonly opcionesEstudiantes = computed(() =>
@@ -58,29 +59,49 @@ export class ActivacionEstudiantesPage {
   cargar(): void {
     this.cargando.set(true);
     this.exito.set(null);
-    this.api
-      .listarEstudiantesPendientes()
+    (this.modo() === 'activar'
+      ? this.api.listarEstudiantesPendientes()
+      : this.api.listarEstudiantesActivos()
+    )
       .pipe(finalize(() => this.cargando.set(false)))
-      .subscribe({ next: (estudiantes) => this.estudiantes.set(estudiantes) });
+      .subscribe({
+        next: (estudiantes) => this.estudiantes.set(estudiantes),
+        error: (error) => {
+          this.estudiantes.set([]);
+          this.apiErrors.normalize(error);
+        },
+      });
     this.api.listarCursosVigentes().subscribe({ next: (cursos) => this.cursos.set(cursos) });
   }
 
+  cambiarModo(modo: 'activar' | 'vincular'): void {
+    if (this.guardando() || this.cargando() || this.modo() === modo) return;
+    this.modo.set(modo);
+    this.estudiantes.set([]);
+    this.form.reset();
+    this.cargar();
+  }
+
   activar(): void {
-    if (this.form.invalid || this.guardando()) return;
+    if (this.form.invalid || !this.form.controls.seccion.value.trim() || this.guardando()) return;
     this.guardando.set(true);
     this.exito.set(null);
-    this.api
-      .activarEstudiante({
-        ...this.form.getRawValue(),
-        seccion: this.form.controls.seccion.value.trim(),
-      })
+    const request = {
+      ...this.form.getRawValue(),
+      seccion: this.form.controls.seccion.value.trim(),
+    };
+    (this.modo() === 'activar'
+      ? this.api.activarEstudiante(request)
+      : this.api.vincularEstudiante(request)
+    )
       .pipe(finalize(() => this.guardando.set(false)))
       .subscribe({
         next: (response) => {
           const estudianteId = this.form.controls.estudianteId.value;
-          this.estudiantes.update((estudiantes) =>
-            estudiantes.filter((estudiante) => estudiante.id !== estudianteId),
-          );
+          if (this.modo() === 'activar')
+            this.estudiantes.update((estudiantes) =>
+              estudiantes.filter((estudiante) => estudiante.id !== estudianteId),
+            );
           this.form.reset();
           this.exito.set(response.message);
         },

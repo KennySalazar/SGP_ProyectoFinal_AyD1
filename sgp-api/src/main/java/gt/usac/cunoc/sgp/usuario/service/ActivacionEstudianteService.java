@@ -15,6 +15,8 @@ import gt.usac.cunoc.sgp.usuario.model.RoleName;
 import gt.usac.cunoc.sgp.usuario.repository.UserAccountRepository;
 import java.time.Clock;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -62,9 +64,80 @@ public class ActivacionEstudianteService {
         .toList();
   }
 
+  public List<EstudiantePendienteResponse> listarActivos() {
+    return usuarios
+        .findByRole_NameAndActiveTrueAndVerifiedTrueAndActivatedTrueOrderByEmailAsc(
+            RoleName.ESTUDIANTE)
+        .stream()
+        .map(
+            estudiante ->
+                new EstudiantePendienteResponse(
+                    estudiante.getId(),
+                    estudiante.getEmail(),
+                    estudiante.getNombreCompleto(),
+                    estudiante.getNombreUsuario()))
+        .toList();
+  }
+
+  @Transactional
+  public MessageResponse vincular(String emailCatedratico, ActivarEstudianteRequest request) {
+    UserAccount catedratico = buscarCatedratico(emailCatedratico);
+    UserAccount estudiante =
+        usuarios
+            .findByIdForUpdate(request.estudianteId())
+            .filter(
+                u ->
+                    u.getRole().getName() == RoleName.ESTUDIANTE
+                        && u.isActive()
+                        && u.isVerified()
+                        && u.isActivated())
+            .orElseThrow(
+                () ->
+                    new ApiException(
+                        HttpStatus.UNPROCESSABLE_ENTITY,
+                        "estudiante_no_activo",
+                        "Estudiante no activo",
+                        "Seleccione un estudiante activo con correo verificado"));
+    Curso curso = buscarCursoDelCatedratico(request.cursoId(), catedratico.getId());
+    if (!curso.isActivo()) {
+      throw new ApiException(
+          HttpStatus.UNPROCESSABLE_ENTITY,
+          "curso_finalizado",
+          "Curso finalizado",
+          "No es posible vincular estudiantes a un curso finalizado");
+    }
+    exigirFechasVigentes(curso);
+    if (inscripciones.existsByCurso_IdAndEstudiante_Id(curso.getId(), estudiante.getId())) {
+      throw new ApiException(
+          HttpStatus.CONFLICT,
+          "estudiante_ya_inscrito",
+          "Inscripcion existente",
+          "El estudiante ya tiene una inscripcion en este curso");
+    }
+    Instant ahora = clock.instant();
+    CursoEstudiante inscripcion =
+        inscripciones.save(
+            new CursoEstudiante(curso, estudiante, request.seccion().trim(), catedratico, ahora));
+    auditoria.register(
+        catedratico.getId(),
+        "VINCULAR_ESTUDIANTE",
+        "curso_estudiante",
+        inscripcion.getId(),
+        Map.of(
+            "estudianteId",
+            estudiante.getId(),
+            "cursoId",
+            curso.getId(),
+            "seccion",
+            request.seccion().trim()),
+        ahora);
+    return new MessageResponse("Estudiante vinculado al curso correctamente");
+  }
+
   public List<CursoDisponibleResponse> listarCursosVigentes(String emailCatedratico) {
     UserAccount catedratico = buscarCatedratico(emailCatedratico);
     return cursos.findByCatedratico_IdAndActivoTrueOrderByPeriodoDesc(catedratico.getId()).stream()
+        .filter(curso -> fechasVigentes(curso))
         .map(
             curso ->
                 new CursoDisponibleResponse(
@@ -85,6 +158,7 @@ public class ActivacionEstudianteService {
           "Curso finalizado",
           "No es posible vincular estudiantes a un curso finalizado");
     }
+    exigirFechasVigentes(curso);
     if (inscripciones.existsByEstudiante_IdAndEstado(estudiante.getId(), "ACTIVO")) {
       throw new ApiException(
           HttpStatus.CONFLICT,
@@ -116,6 +190,21 @@ public class ActivacionEstudianteService {
             "seccion", request.seccion().trim()),
         ahora);
     return new MessageResponse("Estudiante activado y vinculado al curso correctamente");
+  }
+
+  private boolean fechasVigentes(Curso curso) {
+    LocalDate hoy = LocalDate.now(clock.withZone(ZoneId.of("America/Guatemala")));
+    return !hoy.isBefore(curso.getFechaInicio()) && !hoy.isAfter(curso.getFechaFin());
+  }
+
+  private void exigirFechasVigentes(Curso curso) {
+    if (!fechasVigentes(curso)) {
+      throw new ApiException(
+          HttpStatus.UNPROCESSABLE_ENTITY,
+          "curso_fuera_de_fechas",
+          "Curso fuera de fechas",
+          "Seleccione un curso cuyas fechas incluyan el día actual.");
+    }
   }
 
   private UserAccount buscarCatedratico(String email) {

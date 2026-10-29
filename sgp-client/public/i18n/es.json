@@ -579,47 +579,93 @@
   },
   "dashboard": {
     "kicker": "CENTRO DE TRABAJO TECNICO",
-    "description": "Base operativa para inventario, inspeccion tecnica, revision academica, mantenimiento y trabajo de campo sin conexion.",
-    "environmentAvailable": "Entorno disponible",
-    "baseServices": "Servicios base operativos",
-    "summaryAria": "Resumen de modulos",
-    "inventory": "Inventario",
-    "inventoryNote": "Puentes, ubicacion y mapa publico",
-    "inspections": "Inspecciones",
-    "inspectionsNote": "Formulario dinamico y revision",
-    "maintenance": "Mantenimiento",
-    "maintenanceNote": "Ordenes y seguimiento tecnico",
-    "offlineMode": "Modo offline",
-    "offlineNote": "PWA, IndexedDB y persistencia local",
-    "implementation": "IMPLEMENTACION",
-    "modules": "Modulos del proyecto",
-    "architecturalBase": "Base arquitectonica",
-    "bridgeInventory": "Inventario de puentes",
-    "bridgeInventoryNote": "CRUD, georreferenciacion, duplicados por cercania y estado actual.",
-    "formsInspections": "Formulario e inspecciones",
-    "formsInspectionsNote": "JSON Schema, versionado, captura de danos y reporte fotografico.",
-    "reviewCondition": "Revision e indice de condicion",
-    "reviewConditionNote": "Flujo academico, observaciones, maquina de estados y calculo IC.",
-    "forumMaintenance": "Foro y mantenimiento",
-    "forumMaintenanceNote": "Colaboracion tecnica, alertas y ordenes de intervencion.",
     "currentSession": "Sesion actual",
     "globalRole": "Rol global",
     "secondFactor": "Segundo factor",
     "active": "Activo",
     "inactive": "Inactivo",
-    "reference": "REFERENCIA",
-    "bridgeCondition": "Condicion del puente",
-    "conditionNote": "Leyenda visual prevista para el indice de condicion. El estado siempre se acompanara de texto.",
-    "good": "Bueno",
-    "regular": "Regular",
-    "bad": "Malo",
-    "unevaluated": "Sin evaluar",
-    "noPublishedInspection": "Sin inspeccion publicada",
-    "basePrepared": "Base preparada",
-    "toImplement": "Por implementar",
     "colegiadoPendiente": {
       "title": "Tu número de colegiado está pendiente de verificación.",
       "note": "Puedes usar el sistema, pero las acciones de inspección se habilitarán cuando el Administrador verifique tu colegiado."
+    },
+    "homeTitle": "Inicio",
+    "accessTitle": "Tu espacio de trabajo",
+    "account": "Cuenta",
+    "profile": "Mi perfil",
+    "security": "Seguridad de la cuenta",
+    "roles": {
+      "ADMINISTRADOR": "Administrador",
+      "CATEDRATICO": "Catedrático",
+      "ESTUDIANTE": "Estudiante",
+      "PROFESIONAL_EXTERNO": "Profesional externo"
+    },
+    "roleNotes": {
+      "ADMINISTRADOR": "Administra usuarios, cursos y formularios, y consulta la actividad del sistema.",
+      "CATEDRATICO": "Gestiona tus estudiantes y puentes asignados, y consulta tus revisiones académicas.",
+      "ESTUDIANTE": "Consulta tus puentes, continúa tus inspecciones y atiende las observaciones recibidas.",
+      "PROFESIONAL_EXTERNO": "Consulta el inventario y gestiona tus inspecciones con el colegiado verificado."
+    },
+    "actions": {
+      "users": {
+        "title": "Usuarios",
+        "note": "Gestiona cuentas, invitaciones y permisos."
+      },
+      "courses": {
+        "title": "Cursos",
+        "note": "Consulta las fechas, la vigencia y los responsables de los cursos."
+      },
+      "forms": {
+        "title": "Formularios",
+        "note": "Administra versiones del formulario de inspección."
+      },
+      "audit": {
+        "title": "Auditoría",
+        "note": "Consulta las acciones registradas en el sistema."
+      },
+      "maintenance": {
+        "title": "Mantenimiento",
+        "note": "Consulta y gestiona órdenes de mantenimiento."
+      },
+      "reviews": {
+        "title": "Bandeja de revisión",
+        "note": "Revisa inspecciones y consulta los ciclos resueltos."
+      },
+      "students": {
+        "title": "Estudiantes y cursos",
+        "note": "Activa estudiantes o vincula cuentas existentes a tus cursos."
+      },
+      "assignments": {
+        "title": "Asignar puentes",
+        "note": "Gestiona las asignaciones de tus estudiantes."
+      },
+      "inspections": {
+        "title": "Mis inspecciones",
+        "note": "Consulta y continúa las inspecciones de tu cuenta."
+      },
+      "bridges": {
+        "title": "Mis puentes asignados",
+        "note": "Consulta los puentes disponibles en tus cursos vigentes."
+      },
+      "observations": {
+        "title": "Observaciones recibidas",
+        "note": "Consulta los resultados y atiende los cambios solicitados."
+      },
+      "prepare": {
+        "title": "Preparar salida",
+        "note": "Prepara formularios y puentes para trabajar sin conexión."
+      },
+      "catalog": {
+        "title": "Catálogo de puentes",
+        "note": "Explora el inventario y consulta las fichas de los puentes."
+      },
+      "notifications": {
+        "title": "Avisos",
+        "note": "Consulta tus notificaciones y sigue sus enlaces."
+      },
+      "offline": {
+        "title": "Sincronización",
+        "note": "Consulta el estado y las operaciones pendientes de tu dispositivo."
+      }
     }
   },
   "security": {
@@ -753,7 +799,15 @@
     "refresh": "Actualizar",
     "loading": "Cargando estudiantes pendientes...",
     "empty": "No hay estudiantes pendientes de activación.",
-    "noCourses": "No tienes cursos vigentes disponibles para vincular estudiantes."
+    "noCourses": "No tienes cursos vigentes disponibles para vincular estudiantes.",
+    "descriptionExtended": "Activa estudiantes con correo verificado o vincula estudiantes activos a otros cursos.",
+    "mode": "Operacion de vinculacion",
+    "activateMode": "Activar estudiante pendiente",
+    "linkMode": "Vincular estudiante activo",
+    "linkNote": "Selecciona un estudiante ya activo para inscribirlo en otro de tus cursos. No se modifica su cuenta ni sus otras inscripciones.",
+    "noActiveStudents": "No hay estudiantes activos disponibles para vincular.",
+    "activeStudent": "Estudiante activo",
+    "link": "Vincular al curso"
   },
   "bridgeAssignments": {
     "kicker": "GESTION ACADÉMICA",
@@ -1321,7 +1375,7 @@
       "startDate": "Fecha de inicio",
       "endDate": "Fecha de fin",
       "saving": "Guardando...",
-      "created": "Curso creado como VIGENTE.",
+      "created": "Curso creado. Su disponibilidad depende de las fechas y de que permanezca activo.",
       "updated": "Curso actualizado correctamente.",
       "finalized": "Curso finalizado correctamente.",
       "list": "Cursos registrados",
@@ -1335,7 +1389,15 @@
       "save": "Guardar cambios",
       "cancel": "Cancelar edición",
       "selectPeriod": "Selecciona el periodo",
-      "periodDates": "Las fechas se calculan segun el periodo y el año indicado: enero a junio o julio a diciembre.",
+      "periodDates": "El período propone fechas iniciales; puedes ajustarlas antes de guardar.",
+      "active": "Activo",
+      "inactive": "Finalizado",
+      "dateValidity": "Vigencia por fechas",
+      "upcoming": "Aún no inicia",
+      "expired": "Fuera de fechas: curso vencido",
+      "inDates": "En fechas",
+      "editWarning": "Cambiar las fechas afecta la disponibilidad de asignaciones para todos los estudiantes del curso. Conserva las inscripciones y su historial.",
+      "invalidDates": "La fecha de fin debe ser posterior o igual a la de inicio.",
       "legacyPeriod": "Este curso tiene un periodo anterior no estandar. Selecciona Periodo 1 o Periodo 2 antes de guardar."
     }
   },
@@ -1692,7 +1754,8 @@
         "medidas": "Medidas (opcional)",
         "mostrar": "Mostrar el detalle del elemento",
         "ocultar": "Ocultar el detalle del elemento"
-      }
+      },
+      "notReady": "El formulario todavia no esta listo. Espere a que termine de cargar antes de enviar."
     },
     "validacion": {
       "requerido": "Este campo es obligatorio.",
@@ -2110,10 +2173,11 @@
       "compresionNota": "Las imágenes se procesan en segundo plano, con un lado mayor de hasta 1600 píxeles y un objetivo de 200–400 KB. Una imagen sencilla puede ocupar menos espacio sin perder calidad."
     },
     "borrador": {
-      "kicker": "INSPECCIÓN TÉCNICA · BORRADOR",
+      "kicker": "Inspeccion tecnica",
       "titulo": "Completar inspección técnica",
       "subtitulo": "Captura y edición incremental de borrador de inspección de puente",
       "volverPuente": "Volver a ficha del puente",
+      "regresarMisInspecciones": "Regresar a mis inspecciones",
       "autoguardando": "Guardando cambios...",
       "cambiosPendientes": "Cambios pendientes; se guardarán automáticamente.",
       "almacenamientoLleno": "Almacenamiento local insuficiente para guardar los cambios.",
@@ -2127,7 +2191,7 @@
       "inspector": "Inspector",
       "formulario": "Versión del formulario",
       "ultimaActividad": "Última actividad",
-      "soloLectura": "Estás consultando el borrador de tu estudiante en modo de solo lectura.",
+      "soloLectura": "Esta inspeccion esta en modo de solo lectura. La edicion depende de su estado y de tus permisos.",
       "valoresInicialesIncompatibles": "Al cargar el borrador se encontraron valores con un tipo incompatible con el esquema. La interfaz los descartó al construir los controles; revisa estas rutas y sus valores originales, vuelve a ingresar lo que corresponda y confirma la revisión antes de publicar:",
       "confirmarRevisionInicial": "Ya revisé los valores originales y corregí lo necesario",
       "revisionInicialConfirmada": "Revisión confirmada. Antes de publicar se guardarán los valores actuales del formulario.",
@@ -2173,7 +2237,8 @@
         "PUBLICADA": "Publicada",
         "RECHAZADA": "Rechazada",
         "PENDIENTE_SYNC": "Pendiente de sincronizar"
-      }
+      },
+      "viewReview": "Ver inspeccion y revision"
     },
     "correccion": {
       "corregir": "Corregir",

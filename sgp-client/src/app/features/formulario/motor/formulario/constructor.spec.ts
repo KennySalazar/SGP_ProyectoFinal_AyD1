@@ -152,7 +152,6 @@ describe('construirFormulario con el esquema real', () => {
     cauce.controls['aplica'].setValue(false);
     cauce.controls['aplica'].setValue(true);
 
-    // El detalle de OTRO sigue oculto porque no se eligió OTRO.
     expect(cauce.controls['tipo_cuerpo_agua_otro'].disabled).toBe(true);
     expect(cauce.controls['nombre_rio'].enabled).toBe(true);
   });
@@ -252,7 +251,7 @@ describe('construirFormulario con el esquema real', () => {
     expect(grupo(construido.form, 'identificacion').controls['ruta_pavimentada'].enabled).toBe(
       true,
     );
-    // Lo preoculto y los datos precargados vuelven a su estado.
+
     expect(grupo(construido.form, 'identificacion').controls['nombre_puente'].disabled).toBe(true);
     expect(
       grupo(construido.form, 'subestructura/estribo_entrada/cortina_superior').controls[
@@ -302,6 +301,19 @@ describe('avance por sección', () => {
     control.controls['longitud_m'].setValue(-5);
 
     expect(calcularAvance(seccion, control, construido.ocultos).invalidos).toBe(1);
+  });
+});
+
+describe('cauce no aplicable al recuperar el borrador', () => {
+  it('mantiene fuera de validacion los campos ocultos al cargar y volver de solo lectura', () => {
+    const construido = construirFormulario(esquema, { caracteristicas_cauce: { aplica: false } });
+    const cauce = grupo(construido.form, 'caracteristicas_cauce');
+    expect(cauce.valid).toBe(true);
+    construido.establecerSoloLectura(true);
+    construido.establecerSoloLectura(false);
+    expect(cauce.valid).toBe(true);
+    expect(cauce.controls['desbordamiento'].disabled).toBe(true);
+    expect(construido.valor()['caracteristicas_cauce']).toEqual({ aplica: false });
   });
 });
 
@@ -369,7 +381,6 @@ describe('objetos opcionales con campos obligatorios', () => {
   it('no cuenta como pendientes los obligatorios de un objeto opcional sin llenar', () => {
     const avance = calcularAvance(esquemaOpcional.raiz, construido.form, construido.ocultos);
 
-    // «nombre» del elemento y «nombre» de la instancia; «descripcion» y «severidad» no cuentan.
     expect(avance).toEqual({ obligatorios: 2, completos: 2, invalidos: 0 });
   });
 
@@ -458,7 +469,6 @@ describe('avance con identificadores generados', () => {
 
     const avance = calcularAvance(tramos, construido.form.controls['tramos'], construido.ocultos);
 
-    // Número, longitud y tipo de sección; el UUID del tramo lo genera el cliente.
     expect(avance).toEqual({ obligatorios: 3, completos: 0, invalidos: 0 });
   });
 });
@@ -515,7 +525,6 @@ describe('existencia de un elemento y sus medidas', () => {
       construido.ocultos,
     );
 
-    // Solo se exige la existencia; ya respondida, queda completa.
     expect(despues.obligatorios).toBe(antes.obligatorios);
     expect(despues.completos).toBe(antes.completos + 1);
     expect(cortina().errors).toBeNull();

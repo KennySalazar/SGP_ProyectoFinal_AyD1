@@ -129,6 +129,122 @@ class ActivacionEstudianteServiceTest {
     verifyNoInteractions(auditoria);
   }
 
+  @Test
+  void vinculaEstudianteActivoAOtroCursoSinReactivarSuCuenta() {
+    UUID estudianteId = UUID.randomUUID();
+    UUID cursoId = UUID.randomUUID();
+    UserAccount catedratico = usuario(RoleName.CATEDRATICO, true, true);
+    UserAccount estudiante = usuario(RoleName.ESTUDIANTE, true, true);
+    Curso curso = curso(catedratico, true);
+    when(usuarios.findByEmail("catedratico@ejemplo.com")).thenReturn(Optional.of(catedratico));
+    when(usuarios.findByIdForUpdate(estudianteId)).thenReturn(Optional.of(estudiante));
+    when(cursos.findByIdAndCatedratico_Id(cursoId, catedratico.getId()))
+        .thenReturn(Optional.of(curso));
+    when(inscripciones.save(any(CursoEstudiante.class))).thenAnswer(i -> i.getArgument(0));
+    assertThat(
+            service
+                .vincular(
+                    "catedratico@ejemplo.com",
+                    new ActivarEstudianteRequest(estudianteId, cursoId, "B"))
+                .message())
+        .isEqualTo("Estudiante vinculado al curso correctamente");
+    verify(estudiante, org.mockito.Mockito.never()).activate();
+    verify(inscripciones).existsByCurso_IdAndEstudiante_Id(curso.getId(), estudiante.getId());
+    verify(auditoria)
+        .register(
+            eq(catedratico.getId()),
+            eq("VINCULAR_ESTUDIANTE"),
+            eq("curso_estudiante"),
+            any(UUID.class),
+            anyMap(),
+            any(Instant.class));
+  }
+
+  @Test
+  void impideDuplicarInscripcionEnElMismoCurso() {
+    UUID id = UUID.randomUUID();
+    UUID cursoId = UUID.randomUUID();
+    UserAccount catedratico = usuario(RoleName.CATEDRATICO, true, true);
+    UserAccount estudiante = usuario(RoleName.ESTUDIANTE, true, true);
+    Curso curso = curso(catedratico, true);
+    when(usuarios.findByEmail("docente")).thenReturn(Optional.of(catedratico));
+    when(usuarios.findByIdForUpdate(id)).thenReturn(Optional.of(estudiante));
+    when(cursos.findByIdAndCatedratico_Id(cursoId, catedratico.getId()))
+        .thenReturn(Optional.of(curso));
+    when(inscripciones.existsByCurso_IdAndEstudiante_Id(curso.getId(), estudiante.getId()))
+        .thenReturn(true);
+    assertThatThrownBy(
+            () -> service.vincular("docente", new ActivarEstudianteRequest(id, cursoId, "A")))
+        .isInstanceOfSatisfying(
+            ApiException.class, e -> assertThat(e.getCode()).isEqualTo("estudiante_ya_inscrito"));
+    verify(inscripciones, org.mockito.Mockito.never()).save(any(CursoEstudiante.class));
+    verifyNoInteractions(auditoria);
+  }
+
+  @Test
+  void noVinculaEstudianteDesactivado() {
+    UUID id = UUID.randomUUID();
+    UserAccount catedratico = usuario(RoleName.CATEDRATICO, true, true);
+    UserAccount estudiante = usuario(RoleName.ESTUDIANTE, true, true);
+    when(estudiante.isActive()).thenReturn(false);
+    when(usuarios.findByEmail("docente")).thenReturn(Optional.of(catedratico));
+    when(usuarios.findByIdForUpdate(id)).thenReturn(Optional.of(estudiante));
+    assertThatThrownBy(
+            () ->
+                service.vincular(
+                    "docente", new ActivarEstudianteRequest(id, UUID.randomUUID(), "A")))
+        .isInstanceOfSatisfying(
+            ApiException.class, e -> assertThat(e.getCode()).isEqualTo("estudiante_no_activo"));
+    verifyNoInteractions(cursos, inscripciones, auditoria);
+  }
+
+  @Test
+  void noVinculaACursoAjeno() {
+    UUID id = UUID.randomUUID();
+    UUID cursoId = UUID.randomUUID();
+    UserAccount catedratico = usuario(RoleName.CATEDRATICO, true, true);
+    UserAccount estudiante = usuario(RoleName.ESTUDIANTE, true, true);
+    when(usuarios.findByEmail("docente")).thenReturn(Optional.of(catedratico));
+    when(usuarios.findByIdForUpdate(id)).thenReturn(Optional.of(estudiante));
+    when(cursos.findByIdAndCatedratico_Id(cursoId, catedratico.getId()))
+        .thenReturn(Optional.empty());
+    assertThatThrownBy(
+            () -> service.vincular("docente", new ActivarEstudianteRequest(id, cursoId, "A")))
+        .isInstanceOfSatisfying(
+            ApiException.class, e -> assertThat(e.getCode()).isEqualTo("curso_no_encontrado"));
+    verifyNoInteractions(inscripciones, auditoria);
+  }
+
+  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.provider.CsvSource({
+    "2026-01-01,2026-10-04,false",
+    "2026-10-06,2026-12-31,false",
+    "2026-10-05,2026-10-05,true"
+  })
+  void vincularRespetaFechasInclusivasEnGuatemala(
+      LocalDate inicio, LocalDate fin, boolean permitido) {
+    UserAccount docente = usuario(RoleName.CATEDRATICO, true, true);
+    UserAccount estudiante = usuario(RoleName.ESTUDIANTE, true, true);
+    Curso destino =
+        new Curso(mock(Asignatura.class), "2026-2", docente, inicio, fin, Instant.now());
+    UUID id = estudiante.getId();
+    when(usuarios.findByEmail("docente")).thenReturn(Optional.of(docente));
+    when(usuarios.findByIdForUpdate(id)).thenReturn(Optional.of(estudiante));
+    when(cursos.findByIdAndCatedratico_Id(destino.getId(), docente.getId()))
+        .thenReturn(Optional.of(destino));
+    when(inscripciones.save(any(CursoEstudiante.class))).thenAnswer(i -> i.getArgument(0));
+    ActivarEstudianteRequest request = new ActivarEstudianteRequest(id, destino.getId(), "A");
+    if (permitido) {
+      service.vincular("docente", request);
+      verify(inscripciones).save(any(CursoEstudiante.class));
+    } else {
+      assertThatThrownBy(() -> service.vincular("docente", request))
+          .isInstanceOfSatisfying(
+              ApiException.class, e -> assertThat(e.getCode()).isEqualTo("curso_fuera_de_fechas"));
+      verifyNoInteractions(inscripciones, auditoria);
+    }
+  }
+
   private UserAccount usuario(RoleName roleName, boolean verificado, boolean activado) {
     UserAccount usuario = mock(UserAccount.class);
     Role role = mock(Role.class);

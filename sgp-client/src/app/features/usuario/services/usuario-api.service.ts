@@ -113,6 +113,21 @@ export class UsuarioApiService {
     );
   }
 
+  listarEstudiantesActivos(): Observable<EstudiantePendienteResponse[]> {
+    return this.http.get<EstudiantePendienteResponse[]>('/api/v1/activaciones-estudiantes/activos');
+  }
+
+  vincularEstudiante(request: {
+    estudianteId: string;
+    cursoId: string;
+    seccion: string;
+  }): Observable<MessageResponse> {
+    return this.http.post<MessageResponse>(
+      '/api/v1/activaciones-estudiantes/vinculaciones',
+      request,
+    );
+  }
+
   listarCursosVigentes(): Observable<CursoDisponibleResponse[]> {
     return this.http.get<CursoDisponibleResponse[]>('/api/v1/activaciones-estudiantes/cursos');
   }
