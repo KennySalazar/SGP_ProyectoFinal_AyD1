@@ -1,0 +1,20 @@
+title: Manual Técnico del Sistema de Gestión de Puentes
+subtitle: Arquitectura, módulos y operación
+author:
+  - Equipo de desarrollo SGP
+institution: Universidad de San Carlos de Guatemala — Centro Universitario de Occidente
+date: Octubre de 2026
+lang: es-GT
+papersize: letter
+geometry:
+  - top=2.5cm
+  - bottom=2.5cm
+  - left=2.8cm
+  - right=2.5cm
+fontsize: 11pt
+toc: true
+toc-depth: 3
+numbersections: true
+colorlinks: true
+linkcolor: MidnightBlue
+urlcolor: MidnightBlue
