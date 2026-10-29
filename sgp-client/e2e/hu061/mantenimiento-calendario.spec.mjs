@@ -55,10 +55,12 @@ async function preparar(page, estado = 'EN_EJECUCION') {
   return escrituras;
 }
 
-async function comprobarPanel(page) {
-  const panel = page.locator('.p-datepicker-panel:visible');
+async function comprobarPanel(page, input) {
+  await expect(input).toHaveAttribute('aria-expanded', 'true');
+  await expect(input).toHaveAttribute('aria-controls', /.+/);
+  const panel = page.locator(`[id="${await input.getAttribute('aria-controls')}"]`);
   await expect(panel).toBeVisible();
-  await expect(panel.locator('..')).not.toHaveClass(/enter-active/);
+  await expect(panel.locator('..')).not.toHaveClass(/(?:enter|leave)-active/);
   await expect(panel.locator('..')).toHaveCSS('opacity', '1');
   const medidas = await panel.evaluate((el) => {
     const css = getComputedStyle(el);
@@ -97,7 +99,7 @@ for (const viewport of [
       const escrituras = await preparar(page);
       const input = page.locator('#detalle-1');
       await input.locator('..').getByRole('button').click();
-      let panel = await comprobarPanel(page);
+      let panel = await comprobarPanel(page, input);
       await expect(panel.locator('[data-date="2026-9-19"]')).toHaveClass(/p-disabled/);
       await expect(panel.locator('[data-date="2026-9-29"]')).toHaveClass(/p-disabled/);
       await panel.locator('[data-date="2026-9-25"]').click();
@@ -122,7 +124,7 @@ for (const viewport of [
         'Constructora de prueba',
       );
       await input.focus();
-      panel = await comprobarPanel(page);
+      panel = await comprobarPanel(page, input);
       await input.press('ArrowDown');
       const dia = panel.locator('[data-date="2026-9-28"]');
       await expect(dia).toBeFocused();
@@ -142,9 +144,14 @@ for (const viewport of [
     test('programación: bloquea días pasados y programa la fecha elegida', async ({ page }) => {
       const escrituras = await preparar(page, 'PROPUESTA');
       await page.getByRole('button', { name: 'Programar', exact: true }).click();
+      const dialogo = page.getByRole('dialog', { name: 'Programar la orden', exact: true });
+      await expect(dialogo).toBeVisible();
+      await expect(dialogo).not.toHaveClass(/(?:enter|leave)-active/);
       const input = page.locator('#detalle-2');
-      await input.locator('..').getByRole('button').click();
-      const panel = await comprobarPanel(page);
+      // El autofocus del diálogo ya abre el calendario: el icono lo alternaría y lo cerraría.
+      await expect(input).toBeFocused();
+      await input.click();
+      const panel = await comprobarPanel(page, input);
       await expect(panel.locator('[data-date="2026-9-27"]')).toHaveClass(/p-disabled/);
       await panel.locator('[data-date="2026-9-30"]').click();
       await expect(input).toHaveValue('30/10/2026');
@@ -163,13 +170,13 @@ for (const viewport of [
       await page.goto('/mantenimiento/ordenes');
       const desde = page.locator('#filtro-4');
       await desde.click();
-      let panel = await comprobarPanel(page);
+      let panel = await comprobarPanel(page, desde);
       await panel.locator('[data-date="2026-9-25"]').click();
       await expect(desde).toHaveValue('25/10/2026');
       await expect(panel).toBeHidden();
       const hasta = page.locator('#filtro-5');
       await hasta.click();
-      panel = await comprobarPanel(page);
+      panel = await comprobarPanel(page, hasta);
       await expect(panel.locator('[data-date="2026-9-24"]')).toHaveClass(/p-disabled/);
       await panel.locator('[data-date="2026-9-28"]').click();
       await expect(hasta).toHaveValue('28/10/2026');
