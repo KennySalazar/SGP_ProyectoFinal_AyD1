@@ -8,6 +8,7 @@ export interface PaginaResponse<T> {
 export interface CatedraticoResponse {
   id: string;
   email: string;
+  nombre?: string;
 }
 
 export interface CursoResponse {

@@ -83,6 +83,13 @@ export class ReporteFotograficoComponent implements OnDestroy {
     | undefined
   >();
   readonly soloLectura = input(false);
+  readonly categoriasEditables = input<readonly string[] | null>(null);
+  categoriaEditable(categoria: string): boolean {
+    return this.categoriasEditables() === null || this.categoriasEditables()!.includes(categoria);
+  }
+  readonly opcionesCategorias = computed(() =>
+    this.categorias.filter((c) => this.categoriaEditable(c)),
+  );
   readonly contextoElemento = input<{ elementoRef: string; instanciaElementoId?: string } | null>(
     null,
   );
@@ -126,6 +133,7 @@ export class ReporteFotograficoComponent implements OnDestroy {
       this.auth.user()?.id === this.contexto().autorId &&
       this.contexto().estado === 'BORRADOR' &&
       !this.soloLectura() &&
+      (this.categoriasEditables() === null || this.categoriasEditables()!.length > 0) &&
       !this.revisionSoloLectura() &&
       !this.bloqueada(),
   );
@@ -346,6 +354,7 @@ export class ReporteFotograficoComponent implements OnDestroy {
       this.limiteAlcanzado() ||
       !imagen ||
       !categoria ||
+      !this.categoriaEditable(categoria) ||
       !propietarioId ||
       propietarioId !== this.contexto().autorId ||
       this.ocupado()
@@ -409,6 +418,7 @@ export class ReporteFotograficoComponent implements OnDestroy {
       !foto ||
       !propietario ||
       !this.editable() ||
+      !this.categoriaEditable(foto.metadatos.categoria) ||
       this.ocupado() ||
       foto.inspeccionId !== this.contexto().id
     )
@@ -435,6 +445,7 @@ export class ReporteFotograficoComponent implements OnDestroy {
   solicitarRetirada(foto: FotografiaResponse) {
     if (
       !this.editable() ||
+      !this.categoriaEditable(foto.categoria) ||
       this.ocupado() ||
       foto.inspeccionId !== this.contexto().id ||
       !this.confirmadas().some((confirmada) => confirmada.id === foto.id)
@@ -452,6 +463,7 @@ export class ReporteFotograficoComponent implements OnDestroy {
     if (
       !usuario ||
       !this.editable() ||
+      !this.categoriaEditable(foto.categoria) ||
       this.ocupado() ||
       foto.inspeccionId !== id ||
       !this.confirmadas().some((confirmada) => confirmada.id === foto.id)

@@ -65,6 +65,7 @@ import org.testcontainers.utility.DockerImageName;
     })
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @Import({
+  gt.usac.cunoc.sgp.inspeccion.service.PermisosCorreccionService.class,
   DocumentoInspeccionService.class,
   ValidadorDocumentoPdf.class,
   FotografiaService.class,
@@ -422,14 +423,14 @@ class DocumentoInspeccionIntegrationTest {
     UUID id = UUID.randomUUID();
     jdbc.update(
         """
-        INSERT INTO puente (id, codigo, correlativo_municipal, municipio_id, nombre, ruta,
-          ubicacion, creado_por_id)
-        SELECT ?, ?, (SELECT coalesce(max(correlativo_municipal), 0) + 1 FROM puente p
-             WHERE p.municipio_id = m.id),
-          m.id, 'Puente HU-070', 'CA-1',
-          ST_SetSRID(ST_MakePoint(-90.6, 14.5), 4326)::geography, ?
-        FROM municipio m WHERE m.codigo_ine = '0114'
-        """,
+            INSERT INTO puente (id, codigo, correlativo_municipal, municipio_id, nombre, ruta,
+              ubicacion, creado_por_id)
+            SELECT ?, ?, (SELECT coalesce(max(correlativo_municipal), 0) + 1 FROM puente p
+                 WHERE p.municipio_id = m.id),
+              m.id, 'Puente HU-070', 'CA-1',
+              ST_SetSRID(ST_MakePoint(-90.6, 14.5), 4326)::geography, ?
+            FROM municipio m WHERE m.codigo_ine = '0114'
+            """,
         id,
         "T-" + id,
         catedratico);
@@ -472,10 +473,10 @@ class DocumentoInspeccionIntegrationTest {
     UUID version = UUID.randomUUID();
     jdbc.update(
         """
-        INSERT INTO version_formulario (id, codigo, estado, activa, esquema, hash_contenido,
-          version_algoritmo_ic, creado_por_id, publicado_por_id, publicado_en)
-        VALUES (?, ?, 'PUBLICADA', false, '{}'::jsonb, ?, 'ic', ?, ?, CURRENT_TIMESTAMP)
-        """,
+            INSERT INTO version_formulario (id, codigo, estado, activa, esquema, hash_contenido,
+              version_algoritmo_ic, creado_por_id, publicado_por_id, publicado_en)
+            VALUES (?, ?, 'PUBLICADA', false, '{}'::jsonb, ?, 'ic', ?, ?, CURRENT_TIMESTAMP)
+            """,
         version,
         "HU070-" + version,
         "d".repeat(64),
@@ -484,11 +485,11 @@ class DocumentoInspeccionIntegrationTest {
     UUID id = UUID.randomUUID();
     jdbc.update(
         """
-        INSERT INTO inspeccion (id, puente_id, version_formulario_id, autor_id,
-          rol_autor_creacion, nombre_autor_capturado, asignacion_puente_id, fecha_inspeccion,
-          dispositivo_id, datos, estado)
-        VALUES (?, ?, ?, ?, 'ESTUDIANTE', 'Autor', ?, '2026-10-19', 'equipo', '{}'::jsonb, ?)
-        """,
+            INSERT INTO inspeccion (id, puente_id, version_formulario_id, autor_id,
+              rol_autor_creacion, nombre_autor_capturado, asignacion_puente_id, fecha_inspeccion,
+              dispositivo_id, datos, estado)
+            VALUES (?, ?, ?, ?, 'ESTUDIANTE', 'Autor', ?, '2026-10-19', 'equipo', '{}'::jsonb, ?)
+            """,
         id,
         puente,
         version,

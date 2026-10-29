@@ -153,6 +153,12 @@ class DocumentoInspeccionControllerSecurityTest {
   @Configuration
   @EnableMethodSecurity
   static class Config {
+
+    @Bean
+    gt.usac.cunoc.sgp.inspeccion.service.PermisosCorreccionService permisosCorreccionService() {
+      return mock(gt.usac.cunoc.sgp.inspeccion.service.PermisosCorreccionService.class);
+    }
+
     @Bean
     DocumentoInspeccionService documentoInspeccionService() {
       return mock(DocumentoInspeccionService.class);

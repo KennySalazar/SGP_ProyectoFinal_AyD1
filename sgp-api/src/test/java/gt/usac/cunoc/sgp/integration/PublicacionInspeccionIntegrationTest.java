@@ -108,6 +108,7 @@ import org.testcontainers.utility.DockerImageName;
     })
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @Import({
+  gt.usac.cunoc.sgp.inspeccion.service.PermisosCorreccionService.class,
   TransicionInspeccionService.class,
   CorreccionInspeccionService.class,
   InspeccionService.class,
@@ -196,11 +197,11 @@ class PublicacionInspeccionIntegrationTest {
     insertarUsuario(OTRO_CATEDRATICO_ID, "CATEDRATICO");
     jdbc.update(
         """
-        INSERT INTO usuario_profesional (usuario_id, numero_colegiado,
-          colegiado_verificado_en, colegiado_verificado_por_id)
-        VALUES (?, 'HU026-V', now(), ?), (?, 'HU026-N', NULL, NULL)
-        ON CONFLICT (usuario_id) DO NOTHING
-        """,
+            INSERT INTO usuario_profesional (usuario_id, numero_colegiado,
+              colegiado_verificado_en, colegiado_verificado_por_id)
+            VALUES (?, 'HU026-V', now(), ?), (?, 'HU026-N', NULL, NULL)
+            ON CONFLICT (usuario_id) DO NOTHING
+            """,
         PROFESIONAL_VERIFICADO_ID,
         CATEDRATICO_ID,
         PROFESIONAL_SIN_VERIFICAR_ID);
@@ -247,9 +248,9 @@ class PublicacionInspeccionIntegrationTest {
     Map<String, Object> resultado =
         jdbc.queryForMap(
             """
-            SELECT indice_calculado, estado_calculado, estado_confirmado
-            FROM resultado_ic WHERE inspeccion_id = ? AND tipo = 'PUBLICACION'
-            """,
+                    SELECT indice_calculado, estado_calculado, estado_confirmado
+                    FROM resultado_ic WHERE inspeccion_id = ? AND tipo = 'PUBLICACION'
+                    """,
             inspeccion);
     assertThat((BigDecimal) resultado.get("indice_calculado")).isEqualByComparingTo("63.15789");
     assertThat(resultado.get("estado_calculado")).isEqualTo("MALO");
@@ -440,25 +441,24 @@ class PublicacionInspeccionIntegrationTest {
   private Map<String, Object> instantaneaPersistida(UUID inspeccion) {
     return Map.of(
         "inspeccion",
-            jdbc.queryForObject(
-                "SELECT to_jsonb(i)::text FROM inspeccion i WHERE id = ?",
-                String.class,
-                inspeccion),
+        jdbc.queryForObject(
+            "SELECT to_jsonb(i)::text FROM inspeccion i WHERE id = ?", String.class, inspeccion),
         "puente",
-            jdbc.queryForObject(
-                "SELECT to_jsonb(p)::text FROM puente p WHERE id = ?", String.class, puenteId),
-        "historial", historial(inspeccion),
+        jdbc.queryForObject(
+            "SELECT to_jsonb(p)::text FROM puente p WHERE id = ?", String.class, puenteId),
+        "historial",
+        historial(inspeccion),
         "auditoria",
-            jdbc.queryForList(
-                "SELECT to_jsonb(a)::text FROM auditoria a WHERE entidad_id IN (?, ?) ORDER BY id",
-                String.class,
-                inspeccion,
-                puenteId),
+        jdbc.queryForList(
+            "SELECT to_jsonb(a)::text FROM auditoria a WHERE entidad_id IN (?, ?) ORDER BY id",
+            String.class,
+            inspeccion,
+            puenteId),
         "publicacion",
-            jdbc.queryForList(
-                "SELECT to_jsonb(r)::text FROM resultado_ic r WHERE inspeccion_id = ? ORDER BY id",
-                String.class,
-                inspeccion));
+        jdbc.queryForList(
+            "SELECT to_jsonb(r)::text FROM resultado_ic r WHERE inspeccion_id = ? ORDER BY id",
+            String.class,
+            inspeccion));
   }
 
   @ParameterizedTest
@@ -793,10 +793,10 @@ class PublicacionInspeccionIntegrationTest {
         desactualizada, new ConfirmarEstadoIcRequest(EstadoCondicion.MALO, hashAnterior, null));
     jdbc.update(
         """
-        UPDATE inspeccion
-        SET datos = jsonb_set(datos, '{otros,senalizacion,reglamentaria,estado}', '"BUENO"')
-        WHERE id = ?
-        """,
+            UPDATE inspeccion
+            SET datos = jsonb_set(datos, '{otros,senalizacion,reglamentaria,estado}', '"BUENO"')
+            WHERE id = ?
+            """,
         desactualizada);
 
     assertThatThrownBy(() -> transiciones.publicar(desactualizada, CATEDRATICO_ID))
@@ -1073,10 +1073,10 @@ class PublicacionInspeccionIntegrationTest {
     UUID id = UUID.randomUUID();
     jdbc.update(
         """
-        INSERT INTO inspeccion (id, puente_id, version_formulario_id, autor_id,
-          rol_autor_creacion, nombre_autor_capturado, fecha_inspeccion, dispositivo_id, datos)
-        VALUES (?, ?, ?, ?, ?, 'Autor HU026', ?, 'equipo-hu026', CAST(? AS jsonb))
-        """,
+            INSERT INTO inspeccion (id, puente_id, version_formulario_id, autor_id,
+              rol_autor_creacion, nombre_autor_capturado, fecha_inspeccion, dispositivo_id, datos)
+            VALUES (?, ?, ?, ?, ?, 'Autor HU026', ?, 'equipo-hu026', CAST(? AS jsonb))
+            """,
         id,
         puenteId,
         versionId,
@@ -1097,13 +1097,13 @@ class PublicacionInspeccionIntegrationTest {
     UUID archivo = UUID.randomUUID();
     jdbc.update(
         """
-        INSERT INTO archivo (id, tipo_uso, categoria_foto, nombre_almacenado,
-          clave_objeto_original, clave_objeto_miniatura, mime_real, tamano_bytes,
-          checksum_sha256, ancho_px, alto_px, ubicacion_captura, capturado_en,
-          subido_por_id, confirmado_en)
-        VALUES (?, 'FOTO_INSPECCION', ?, ?, ?, ?, 'image/jpeg', 1000, ?, 100, 100,
-          ST_SetSRID(ST_MakePoint(-90.615, 14.481), 4326)::geography, now(), ?, now())
-        """,
+            INSERT INTO archivo (id, tipo_uso, categoria_foto, nombre_almacenado,
+              clave_objeto_original, clave_objeto_miniatura, mime_real, tamano_bytes,
+              checksum_sha256, ancho_px, alto_px, ubicacion_captura, capturado_en,
+              subido_por_id, confirmado_en)
+            VALUES (?, 'FOTO_INSPECCION', ?, ?, ?, ?, 'image/jpeg', 1000, ?, 100, 100,
+              ST_SetSRID(ST_MakePoint(-90.615, 14.481), 4326)::geography, now(), ?, now())
+            """,
         archivo,
         categoria,
         archivo + ".jpg",
@@ -1134,11 +1134,11 @@ class PublicacionInspeccionIntegrationTest {
 
     jdbc.update(
         """
-        INSERT INTO version_formulario (id, codigo, estado, activa, esquema,
-          reglas_evaluacion_ic, hash_contenido, version_algoritmo_ic,
-          creado_por_id, publicado_por_id, publicado_en)
-        VALUES (?, ?, 'PUBLICADA', false, CAST(? AS jsonb), CAST(? AS jsonb), ?, ?, ?, ?, now())
-        """,
+            INSERT INTO version_formulario (id, codigo, estado, activa, esquema,
+              reglas_evaluacion_ic, hash_contenido, version_algoritmo_ic,
+              creado_por_id, publicado_por_id, publicado_en)
+            VALUES (?, ?, 'PUBLICADA', false, CAST(? AS jsonb), CAST(? AS jsonb), ?, ?, ?, ?, now())
+            """,
         id,
         "HU026-" + id,
         esquema.toString(),
@@ -1157,10 +1157,10 @@ class PublicacionInspeccionIntegrationTest {
     }
     jdbc.batchUpdate(
         """
-        INSERT INTO configuracion_ic_elemento
-          (id, version_formulario_id, elemento_ref, peso, descripcion)
-        VALUES (?, ?, ?, 1, ?)
-        """,
+            INSERT INTO configuracion_ic_elemento
+              (id, version_formulario_id, elemento_ref, peso, descripcion)
+            VALUES (?, ?, ?, 1, ?)
+            """,
         pesos);
     return id;
   }
@@ -1169,14 +1169,14 @@ class PublicacionInspeccionIntegrationTest {
     UUID id = UUID.randomUUID();
     jdbc.update(
         """
-        INSERT INTO puente (id, codigo, correlativo_municipal, municipio_id,
-          nombre, ruta, ubicacion, creado_por_id)
-        SELECT ?, ?, (SELECT COALESCE(MAX(p.correlativo_municipal), 0) + 1
-                      FROM puente p WHERE p.municipio_id = m.id),
-          m.id, 'Puente HU026', 'CA-1',
-          ST_SetSRID(ST_MakePoint(-90.615, 14.481), 4326)::geography, ?
-        FROM municipio m WHERE m.codigo_ine = '0114'
-        """,
+            INSERT INTO puente (id, codigo, correlativo_municipal, municipio_id,
+              nombre, ruta, ubicacion, creado_por_id)
+            SELECT ?, ?, (SELECT COALESCE(MAX(p.correlativo_municipal), 0) + 1
+                          FROM puente p WHERE p.municipio_id = m.id),
+              m.id, 'Puente HU026', 'CA-1',
+              ST_SetSRID(ST_MakePoint(-90.615, 14.481), 4326)::geography, ?
+            FROM municipio m WHERE m.codigo_ine = '0114'
+            """,
         id,
         "HU026-" + id.toString().substring(0, 18),
         CATEDRATICO_ID);
@@ -1186,12 +1186,12 @@ class PublicacionInspeccionIntegrationTest {
   private void insertarUsuario(UUID id, String rol) {
     jdbc.update(
         """
-        INSERT INTO usuario (id, email, password_hash, rol_id,
-          verificado, activado, activo, nombre_completo)
-        SELECT ?, ?, 'hash-prueba', id, true, true, true, 'Usuario HU026'
-        FROM rol WHERE nombre = ?
-        ON CONFLICT (id) DO NOTHING
-        """,
+            INSERT INTO usuario (id, email, password_hash, rol_id,
+              verificado, activado, activo, nombre_completo)
+            SELECT ?, ?, 'hash-prueba', id, true, true, true, 'Usuario HU026'
+            FROM rol WHERE nombre = ?
+            ON CONFLICT (id) DO NOTHING
+            """,
         id,
         id + "@hu026.ejemplo.com",
         rol);
@@ -1200,9 +1200,9 @@ class PublicacionInspeccionIntegrationTest {
   private List<String> historial(UUID inspeccion) {
     return jdbc.query(
         """
-        SELECT secuencia, estado_anterior, estado_nuevo, evento, realizado_por_id
-        FROM historial_estado_inspeccion WHERE inspeccion_id = ? ORDER BY secuencia
-        """,
+            SELECT secuencia, estado_anterior, estado_nuevo, evento, realizado_por_id
+            FROM historial_estado_inspeccion WHERE inspeccion_id = ? ORDER BY secuencia
+            """,
         (rs, fila) ->
             rs.getInt("secuencia")
                 + ":"
