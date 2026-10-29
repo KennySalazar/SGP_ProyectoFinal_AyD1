@@ -11,7 +11,7 @@ import {
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Subscription } from 'rxjs';
-import { DatePipe, NgTemplateOutlet } from '@angular/common';
+import { DatePipe, DecimalPipe, NgTemplateOutlet } from '@angular/common';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { ButtonModule } from 'primeng/button';
@@ -35,6 +35,7 @@ import { PuenteApiService } from '../../services/puente-api.service';
     RespaldoIcComponent,
     NgTemplateOutlet,
     DatePipe,
+    DecimalPipe,
     PaginatorModule,
     RouterLink,
     TranslocoPipe,

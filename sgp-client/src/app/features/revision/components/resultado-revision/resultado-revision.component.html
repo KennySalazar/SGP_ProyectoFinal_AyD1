@@ -103,9 +103,9 @@
               <p role="alert">{{ 'revision.resultado.pendientes' | transloco }}</p>
             }
             @if (calculo(); as ic) {
-              <app-aprobacion-calibracion [versionId]="ic.calculo.versionFormularioId" />
               <p>
-                {{ 'revision.resultado.ic' | transloco }}: {{ ic.calculo.indiceCalculado }} ·
+                {{ 'revision.resultado.ic' | transloco }}:
+                {{ ic.calculo.indiceCalculado | number: '1.2-2' }} ·
                 {{ ic.calculo.estadoCalculado }}
               </p>
               <label [for]="'estado-' + inspeccionId()"

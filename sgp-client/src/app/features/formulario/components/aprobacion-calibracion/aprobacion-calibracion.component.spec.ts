@@ -72,7 +72,7 @@ describe('AprobacionCalibracionComponent', () => {
 
   it('un Catedratico puede aprobar publicada sin comprobar acta PDF', () => {
     expect(componente.puedeAprobar()).toBe(true);
-    expect(html().textContent).toContain('Aprobar calibracion');
+    expect(html().textContent).toContain('Aprobar calibración');
     componente.abrir();
     componente.confirmar();
     expect(api.aprobar).toHaveBeenCalledWith('v1', '');
@@ -92,7 +92,7 @@ describe('AprobacionCalibracionComponent', () => {
       componente.confirmar();
       expect(componente.dialogo()).toBe(false);
       expect(api.aprobar).not.toHaveBeenCalled();
-      expect(html().textContent).not.toContain('Aprobar calibracion');
+      expect(html().textContent).not.toContain('Aprobar calibración');
     },
   );
 
@@ -158,7 +158,7 @@ describe('AprobacionCalibracionComponent', () => {
     componente.abrir();
     componente.observaciones.setValue('Mi observacion');
     componente.confirmar();
-    expect(componente.error()).toContain('Otro Catedratico ya aprobo');
+    expect(componente.error()).toContain('Otro Catedrático ya aprobó');
     expect(componente.aprobacion()).toEqual(aprobacion);
     expect(componente.observaciones.value).toBe('Mi observacion');
     expect(componente.exito()).toBe(false);
@@ -181,7 +181,7 @@ describe('AprobacionCalibracionComponent', () => {
     api.aprobar.mockReturnValue(throwError(() => ({ status: 403 })));
     componente.abrir();
     componente.confirmar();
-    expect(componente.error()).toContain('Solo un Catedratico autorizado');
+    expect(componente.error()).toContain('Solo un Catedrático autorizado');
     expect(componente.puedeAprobar()).toBe(false);
   });
 
@@ -194,7 +194,7 @@ describe('AprobacionCalibracionComponent', () => {
     );
     componente.abrir();
     componente.confirmar();
-    expect(componente.error()).toContain('version publicada');
+    expect(componente.error()).toContain('versión publicada');
     expect(componente.exito()).toBe(false);
     expect(componente.puedeAprobar()).toBe(false);
   });
@@ -224,7 +224,7 @@ describe('AprobacionCalibracionComponent', () => {
     componente.abrir();
     componente.confirmar();
     expect(api.aprobar).not.toHaveBeenCalled();
-    expect(html().textContent).toContain('Sin conexion');
+    expect(html().textContent).toContain('Sin conexión');
     online.set(true);
     fixture.detectChanges();
     expect(componente.puedeAprobar()).toBe(true);

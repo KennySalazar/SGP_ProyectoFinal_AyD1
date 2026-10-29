@@ -1,5 +1,5 @@
 import { AprobacionCalibracionComponent } from '../../../formulario/components/aprobacion-calibracion/aprobacion-calibracion.component';
-import { DatePipe } from '@angular/common';
+import { DatePipe, DecimalPipe } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import {
   afterNextRender,
@@ -72,6 +72,7 @@ import { ResultadoRevisionComponent } from '../../components/resultado-revision/
     AprobacionCalibracionComponent,
     ResultadoRevisionComponent,
     DatePipe,
+    DecimalPipe,
     RouterLink,
     TranslocoPipe,
     ButtonModule,

@@ -46,7 +46,8 @@
   </dl>
   <p class="ic" role="status">
     @if (d.icPreliminar; as ic) {
-    <strong>IC {{ ic.etiqueta }}: {{ ic.indice }}</strong> · {{ ic.estado }} } @else {
+    <strong>IC {{ ic.etiqueta }}: {{ ic.indice | number: '1.2-2' }}</strong> · {{ ic.estado }} }
+    @else {
     <strong>{{ 'revision.detalle.icNoDisponible' | transloco }}</strong>
     }
   </p>

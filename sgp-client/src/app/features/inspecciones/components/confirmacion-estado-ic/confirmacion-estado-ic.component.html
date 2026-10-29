@@ -37,16 +37,15 @@
     </p>
   }
   @if (calculoVisible(); as c) {
-    <app-aprobacion-calibracion [versionId]="c.versionFormularioId" />
     <dl>
       <dt>{{ 'inspecciones.confirmacionIc.indice' | transloco }}</dt>
-      <dd>{{ c.indiceCalculado }}</dd>
+      <dd>{{ c.indiceCalculado | number: '1.2-2' }}</dd>
       <dt>{{ 'inspecciones.confirmacionIc.calculado' | transloco }}</dt>
       <dd class="estado" [attr.data-estado]="c.estadoCalculado">
         {{ 'inspecciones.confirmacionIc.estados.' + c.estadoCalculado | transloco }}
       </dd>
       <dt>{{ 'inspecciones.confirmacionIc.version' | transloco }}</dt>
-      <dd>{{ c.codigoFormulario }} / {{ c.versionAlgoritmo }}</dd>
+      <dd>{{ versionFormularioCodigo() ?? c.codigoFormulario }} / {{ c.versionAlgoritmo }}</dd>
     </dl>
     @if (c.condicionesAnulacion.length) {
       <div class="criticas" role="note">
@@ -101,12 +100,10 @@
     @if (respuesta()?.confirmacionVigente) {
       <p role="status">
         {{
-          'inspecciones.confirmacionIc.registro'
-            | transloco
-              : {
-                  autor: respuesta()?.realizadoPorId,
-                  fecha: (respuesta()?.realizadoEn | date: 'dd/MM/yyyy HH:mm'),
-                }
+          (confirmadoPorUsuarioActual()
+            ? 'inspecciones.confirmacionIc.registroUsted'
+            : 'inspecciones.confirmacionIc.registro'
+          ) | transloco: { fecha: (respuesta()?.realizadoEn | date: 'dd/MM/yyyy HH:mm') }
         }}
       </p>
     } @else {

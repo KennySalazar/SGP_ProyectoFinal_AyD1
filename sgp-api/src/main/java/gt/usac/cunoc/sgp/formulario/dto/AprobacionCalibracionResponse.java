@@ -13,7 +13,7 @@ public record AprobacionCalibracionResponse(
     String aprobadoPorNombre,
     Instant aprobadoEn,
     String observaciones) {
-  public static final String ROTULO_SIN_APROBAR = "Calibracion provisional · sin aprobar";
+  public static final String ROTULO_SIN_APROBAR = "Calibración provisional · sin aprobar";
 
   public static AprobacionCalibracionResponse de(AprobacionCalibracion aprobacion) {
     if (aprobacion == null) return null;

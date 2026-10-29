@@ -91,7 +91,7 @@
           <div class="condicion-bloque">
             <span class="dato-etiqueta">{{ 'puentes.ficha.conditionIndex' | transloco }}</span>
             <span class="dato-valor ic-valor">
-              {{ p.indiceCondicionActual !== null ? p.indiceCondicionActual :
+              {{ p.indiceCondicionActual !== null ? (p.indiceCondicionActual | number: '1.2-2') :
               ('puentes.ficha.notAvailable' | transloco) }}
             </span>
             <app-respaldo-ic [puente]="p" />

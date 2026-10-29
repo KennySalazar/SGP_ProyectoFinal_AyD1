@@ -220,6 +220,6 @@ public class RecalculoIcService {
   }
 
   private ApiException error(HttpStatus estado, String codigo, String detalle) {
-    return new ApiException(estado, codigo, "Recalculo del indice de condicion", detalle);
+    return new ApiException(estado, codigo, "Recálculo del índice de condición", detalle);
   }
 }

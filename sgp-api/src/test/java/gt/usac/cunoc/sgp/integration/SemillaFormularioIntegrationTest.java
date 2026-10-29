@@ -137,7 +137,7 @@ class SemillaFormularioIntegrationTest {
     assertThat(publicada.codigo()).isEqualTo("SIECA-v1");
     assertThat(publicada.activa()).isTrue();
     assertThat(publicada.pesos()).hasSize(45).allMatch(peso -> peso.peso().signum() > 0);
-    assertThat(publicada.rotuloCalibracion()).isEqualTo("Calibracion provisional · sin aprobar");
+    assertThat(publicada.rotuloCalibracion()).isEqualTo("Calibración provisional · sin aprobar");
     var plantilla =
         json.readTree(getClass().getResourceAsStream("/formulario/sieca-v1/elementos-ic.json"));
     assertThat(publicada.reglasEvaluacionIc()).isEqualTo(plantilla);

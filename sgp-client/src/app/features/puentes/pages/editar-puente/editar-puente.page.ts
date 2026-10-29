@@ -1,3 +1,4 @@
+import { DecimalPipe } from '@angular/common';
 import { RespaldoIcComponent } from '../../components/respaldo-ic/respaldo-ic.component';
 import { HttpErrorResponse } from '@angular/common/http';
 import {
@@ -37,6 +38,7 @@ const CODIGOS_UBICACION_RECHAZADA = [
   selector: 'app-editar-puente-page',
   standalone: true,
   imports: [
+    DecimalPipe,
     RespaldoIcComponent,
     TranslocoPipe,
     ButtonModule,

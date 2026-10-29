@@ -1,6 +1,4 @@
-import { AprobacionCalibracionComponent } from '../../../formulario/components/aprobacion-calibracion/aprobacion-calibracion.component';
-import { AprobacionCalibracionApiService } from '../../../formulario/services/aprobacion-calibracion-api.service';
-import { of as estadoRespaldo } from 'rxjs';
+import { AuthStore } from '../../../../core/services/auth.store';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
@@ -47,26 +45,14 @@ describe('Confirmacion del estado calculado HU032', () => {
   let component: ConfirmacionEstadoIcComponent;
   let http: HttpTestingController;
   const url = '/api/v1/inspecciones/inspeccion-1/confirmacion-estado';
+  let usuarioActual = 'usuario-1';
 
   beforeEach(() => {
-    TestBed.overrideComponent(AprobacionCalibracionComponent, {
-      set: { template: '', imports: [] },
-    });
+    usuarioActual = 'usuario-1';
     TestBed.configureTestingModule({
       providers: [
         { provide: TranslocoService, useValue: { translate: (clave: string) => clave } },
-        {
-          provide: AprobacionCalibracionApiService,
-          useValue: {
-            actualizada: estadoRespaldo(),
-            estado: () =>
-              estadoRespaldo({
-                estado: 'SIN_APROBAR',
-                rotuloCalibracion: 'Calibracion provisional · sin aprobar',
-              }),
-            consultar: () => estadoRespaldo(null),
-          },
-        },
+        { provide: AuthStore, useValue: { user: () => ({ id: usuarioActual }) } },
         provideHttpClient(),
         provideHttpClientTesting(),
       ],
@@ -100,6 +86,52 @@ describe('Confirmacion del estado calculado HU032', () => {
     expect(fixture.nativeElement.textContent).toContain('80');
     expect(fixture.nativeElement.textContent).toContain('SIECA-v1 / IC-v1');
     expect(component.form.controls.estado.value).toBe('REGULAR');
+  });
+
+  it('muestra el índice con dos decimales y la versión del formulario recibida', () => {
+    fixture.componentRef.setInput('versionFormularioCodigo', 'SIECA-v7');
+    const res = respuesta();
+    res.calculo.indiceCalculado = 94.44444;
+    consultar(res);
+    const texto = fixture.nativeElement.textContent;
+    expect(texto).toContain('94.44');
+    expect(texto).not.toContain('94.444');
+    expect(texto).toContain('SIECA-v7 / IC-v1');
+    expect(texto).not.toContain('SIECA-v1 / IC-v1');
+  });
+
+  it('no repite la tarjeta de respaldo académico de la calibración', () => {
+    consultar();
+    expect(fixture.nativeElement.querySelector('app-aprobacion-calibracion')).toBeNull();
+  });
+
+  it('indica "por usted" cuando confirmó el usuario actual y nunca muestra identificadores', () => {
+    const res = respuesta();
+    Object.assign(res, {
+      confirmacionVigente: true,
+      estadoConfirmado: 'REGULAR',
+      realizadoPorId: 'usuario-1',
+      realizadoEn: '2026-10-28T21:19:00Z',
+    });
+    consultar(res);
+    const texto = fixture.nativeElement.textContent;
+    expect(texto).toContain('inspecciones.confirmacionIc.registroUsted');
+    expect(texto).not.toContain('usuario-1');
+  });
+
+  it('si confirmó otra persona muestra solo la fecha, sin su identificador', () => {
+    const res = respuesta();
+    Object.assign(res, {
+      confirmacionVigente: true,
+      estadoConfirmado: 'REGULAR',
+      realizadoPorId: '8537b096-963f-4b52-a98e-7530eae9c875',
+      realizadoEn: '2026-10-28T21:19:00Z',
+    });
+    consultar(res);
+    const texto = fixture.nativeElement.textContent;
+    expect(texto).toContain('inspecciones.confirmacionIc.registro');
+    expect(texto).not.toContain('registroUsted');
+    expect(texto).not.toContain('8537b096');
   });
 
   it('HU-061 aceptación: sin red oculta el IC anterior y muestra disponible al sincronizar', () => {
