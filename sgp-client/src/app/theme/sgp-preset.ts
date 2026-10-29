@@ -1,6 +1,7 @@
 import { definePreset } from '@primeuix/themes';
 import AuraBase from '@primeuix/themes/aura/base';
 import AuraButton from '@primeuix/themes/aura/button';
+import AuraDatePicker from '@primeuix/themes/aura/datepicker';
 import AuraDialog from '@primeuix/themes/aura/dialog';
 import AuraInputText from '@primeuix/themes/aura/inputtext';
 import AuraSelect from '@primeuix/themes/aura/select';
@@ -25,6 +26,7 @@ export const SgpPreset = definePreset(AuraBase, {
   },
   components: {
     button: AuraButton,
+    datepicker: AuraDatePicker,
     dialog: AuraDialog,
     inputtext: AuraInputText,
     select: AuraSelect,
