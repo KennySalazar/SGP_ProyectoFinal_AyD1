@@ -1,5 +1,6 @@
 import { HttpErrorResponse, HttpInterceptorFn } from '@angular/common/http';
 import { inject } from '@angular/core';
+import { Router } from '@angular/router';
 import { catchError, switchMap, throwError } from 'rxjs';
 import { AuthStore } from '../services/auth.store';
 import { TokenRefreshService } from '../services/token-refresh.service';
@@ -13,6 +14,7 @@ const PUBLIC_AUTH_PATHS = [
 export const authInterceptor: HttpInterceptorFn = (req, next) => {
   const auth = inject(AuthStore);
   const refresh = inject(TokenRefreshService);
+  const router = inject(Router, { optional: true });
   const token = auth.accessToken();
   const withCookie = req.clone({
     withCredentials: true,
@@ -23,7 +25,7 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
     catchError((error: HttpErrorResponse) => {
       const shouldRefresh =
         error.status === 401 &&
-        token !== null &&
+        (token !== null || auth.authenticated()) &&
         !req.url.includes('/api/v1/auth/refresh') &&
         !PUBLIC_AUTH_PATHS.some((path) => req.url.includes(path));
       if (!shouldRefresh) return throwError(() => error);
@@ -40,7 +42,10 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
           const sinConexion =
             refreshError instanceof HttpErrorResponse &&
             (refreshError.status === 0 || refreshError.status >= 500);
-          if (!sinConexion) auth.clear();
+          if (!sinConexion) {
+            auth.clear();
+            void router?.navigate(['/login']);
+          }
           return throwError(() => refreshError);
         }),
       );
