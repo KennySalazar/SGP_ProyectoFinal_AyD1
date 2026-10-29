@@ -530,3 +530,50 @@ describe('existencia de un elemento y sus medidas', () => {
     expect(cortina().errors).toBeNull();
   });
 });
+
+describe('edicion limitada por observaciones', () => {
+  it('bloquea los campos no observados sin excluir sus datos del guardado', () => {
+    const form = construirFormulario(
+      resolverEsquema({
+        type: 'object',
+        properties: {
+          otros: {
+            type: 'object',
+            properties: {
+              recomendacion: { type: 'string' },
+              descripcion: { type: 'string' },
+            },
+          },
+        },
+      }),
+      { otros: { recomendacion: 'Antes', descripcion: 'Conservar' } },
+    );
+    form.establecerRutasEditables(['/otros/recomendacion']);
+    expect(form.form.get('otros.recomendacion')?.enabled).toBe(true);
+    expect(form.form.get('otros.descripcion')?.disabled).toBe(true);
+    form.form.get('otros.recomendacion')?.setValue('Corregida');
+    expect(form.valor()).toEqual({
+      otros: { recomendacion: 'Corregida', descripcion: 'Conservar' },
+    });
+    form.destruir();
+  });
+
+  it('una observacion de seccion habilita sus campos y mantiene bloqueadas las otras secciones', () => {
+    const form = construirFormulario(esquema);
+    form.establecerRutasEditables(['/otros']);
+    expect(form.form.get('otros')?.enabled).toBe(true);
+    expect(form.form.get('datos_generales')?.disabled).toBe(true);
+    form.destruir();
+  });
+
+  it('conserva los campos bloqueados al cambiar una condicion y permite retirar la restriccion', () => {
+    const form = construirFormulario(esquema, { caracteristicas_cauce: { aplica: false } });
+    form.establecerRutasEditables(['/caracteristicas_cauce']);
+    form.form.get('caracteristicas_cauce.aplica')?.setValue(true);
+    expect(form.form.get('otros')?.disabled).toBe(true);
+    expect(form.form.get('caracteristicas_cauce.aplica')?.enabled).toBe(true);
+    form.establecerRutasEditables(null);
+    expect(form.form.get('otros')?.enabled).toBe(true);
+    form.destruir();
+  });
+});

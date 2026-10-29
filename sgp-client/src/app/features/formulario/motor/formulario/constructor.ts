@@ -45,6 +45,7 @@ export class FormularioConstruido {
   /** Pasa a `true` cuando se pide la revisión: lo pendiente se destaca en lugar de esperar. */
   readonly revisado = signal(false);
 
+  private rutasEditables: readonly string[] | null = null;
   private readonly suscripciones = new Subscription();
   private readonly ambitos: AmbitoOpcional[] = [];
   private readonly exigencias = new WeakMap<AbstractControl, () => boolean>();
@@ -162,7 +163,37 @@ export class FormularioConstruido {
     this.notificarCambio();
   }
 
+  establecerRutasEditables(rutas: readonly string[] | null): void {
+    this.rutasEditables = rutas;
+    this.establecerSoloLectura(false);
+  }
+
+  permiteModificar(control: AbstractControl): boolean {
+    if (this.rutasEditables === null) return true;
+    const partes: string[] = [];
+    let actual: AbstractControl | null = control;
+    while (actual?.parent) {
+      const padre: AbstractControl = actual.parent;
+      const controles = (padre as FormGroup).controls;
+      const clave = Object.keys(controles).find((k) => controles[k] === actual);
+      if (clave === undefined) return false;
+      partes.unshift(clave.replace(/~/g, '~0').replace(/\//g, '~1'));
+      actual = padre;
+    }
+    const ruta = '/' + partes.join('/');
+    return this.rutasEditables.some((r) => ruta === r || ruta.startsWith(r + '/'));
+  }
+
+  private aplicarRestricciones(control: AbstractControl): void {
+    if (this.rutasEditables === null || this.permiteModificar(control)) return;
+    if (control instanceof FormGroup || control instanceof FormArray) {
+      for (const hijo of Object.values(control.controls) as AbstractControl[])
+        this.aplicarRestricciones(hijo);
+    } else if (control.enabled) control.disable({ emitEvent: false });
+  }
+
   notificarCambio(): void {
+    this.aplicarRestricciones(this.form);
     this.revision.update((valor) => valor + 1);
   }
 

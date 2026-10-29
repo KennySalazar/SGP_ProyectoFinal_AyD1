@@ -76,7 +76,7 @@
           type="date"
           [max]="hoy"
           [ngModel]="fechaInspeccion()"
-          [disabled]="soloLectura()"
+          [disabled]="soloLectura() || (!!permisosCorreccion()?.restringida && !permisosCorreccion()?.campos?.includes('/identificacion/fecha_inspeccion') && !permisosCorreccion()?.campos?.includes('/identificacion'))"
           (ngModelChange)="onFechaInspeccionChange($event)"
           class="input-fecha"
         />
@@ -155,7 +155,19 @@
   </div>
   } @if (errorAccion() && !confirmandoAccion()) {
   <div class="estado-mensaje estado-error surface-card" role="alert">
-    {{ errorAccion()?.mensaje }}
+    <div>
+      <strong>{{ errorAccion()?.mensaje }}</strong>
+      @if (errorAccion()!.campos.length) {
+      <details open>
+        <summary>Campos que debes revisar ({{ errorAccion()!.campos.length }})</summary>
+        <ul class="lista-validacion">
+          @for (campo of errorAccion()!.campos; track campo.campo) {
+          <li>{{ campo.mensaje }}</li>
+          }
+        </ul>
+      </details>
+      }
+    </div>
   </div>
   } @if (esAutor() && b.estado !== 'PUBLICADA' && b.estado !== 'RECHAZADA') {
   <app-confirmacion-estado-ic
@@ -262,10 +274,27 @@
     </div>
     }
   </div>
-  @if (esquema(); as esq) {
+  @if (errorPermisos(); as error) {
+  <p role="alert">{{ error }}</p>
+  } @if (permisosCorreccion()?.restringida) {
+  <div class="surface-card" role="status">
+    <p>
+      Solo puedes modificar los campos observados por el catedratico. La respuesta a la observacion
+      explica la correccion y no reemplaza el cambio en el formulario.
+    </p>
+    @for (ruta of permisosCorreccion()!.campos; track ruta) {
+    <button pButton type="button" severity="secondary" (click)="formulario()?.mostrarAnclaje(ruta)">
+      Ir al campo observado
+    </button>
+    } @if (!permisosCorreccion()!.campos.length && !permisosCorreccion()!.categorias.length) {
+    <p>El catedratico debe indicar el campo o la categoria fotografica que necesita correccion.</p>
+    }
+  </div>
+  } @if (esquema(); as esq) {
   <div class="formulario-contenedor">
     <app-formulario-dinamico
       [esquema]="esq"
+      [rutasEditables]="permisosCorreccion()?.restringida ? permisosCorreccion()!.campos : null"
       [valoresIniciales]="valoresIniciales()"
       [valoresOriginalesParaRevision]="datosIniciales()?.datos ?? null"
       [soloLectura]="soloLectura()"
@@ -278,10 +307,11 @@
   <app-reporte-fotografico
     [inspeccion]="b"
     [soloLectura]="soloLectura() || confirmandoAccion() || ejecutandoAccion()"
+    [categoriasEditables]="permisosCorreccion()?.restringida ? permisosCorreccion()!.categorias : null"
   />
   <app-documentos-inspeccion
     [inspeccion]="b"
-    [soloLectura]="soloLectura() || confirmandoAccion() || ejecutandoAccion()"
+    [soloLectura]="soloLectura() || !!permisosCorreccion()?.restringida || confirmandoAccion() || ejecutandoAccion()"
   />
 
   <p-dialog

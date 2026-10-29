@@ -79,6 +79,7 @@ export class FormularioDinamicoComponent {
   readonly valoresOriginalesParaRevision = input<Record<string, unknown> | null>(null);
   /** Muestra la inspección sin permitir cambios, con la estructura de su versión original. */
   readonly soloLectura = input(false);
+  readonly rutasEditables = input<readonly string[] | null>(null);
   /** Secciones que no vienen del esquema (por ejemplo, el reporte fotográfico), tras las del esquema. */
   readonly seccionesApoyo = input<SeccionApoyo[]>([]);
   /** Renderiza todas las secciones simultáneamente para vista de impresión o exportación. */
@@ -191,8 +192,12 @@ export class FormularioDinamicoComponent {
     effect(() => {
       const construido = this.construido();
       const soloLectura = this.soloLectura();
-      if (construido && construido.form.disabled !== soloLectura) {
-        untracked(() => construido.establecerSoloLectura(soloLectura));
+      const rutas = this.rutasEditables();
+      if (construido) {
+        untracked(() => {
+          construido.establecerRutasEditables(rutas);
+          if (soloLectura) construido.establecerSoloLectura(true);
+        });
       }
     });
 

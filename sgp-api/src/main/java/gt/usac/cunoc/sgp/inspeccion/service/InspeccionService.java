@@ -123,6 +123,8 @@ public class InspeccionService {
   @Autowired(required = false)
   private ConflictoSincronizacionRepository conflictosSincronizacion;
 
+  @Autowired private PermisosCorreccionService permisosCorreccion;
+
   public InspeccionService(
       InspeccionRepository inspeccionRepository,
       VersionFormularioRepository versionFormularioRepository,
@@ -599,6 +601,8 @@ public class InspeccionService {
             "HU-059");
       }
     }
+
+    if (permisosCorreccion != null) permisosCorreccion.validar(inspeccion, request);
 
     // 9. Fechas futuras o anteriores a la construcción
     if (request != null && request.fechaInspeccion() != null) {
@@ -1421,6 +1425,10 @@ public class InspeccionService {
     if (jsonSchemaValidatorService != null) {
       jsonSchemaValidatorService.validarRespuestas(version.getEsquema(), request.datos(), true);
     }
+    if (permisosCorreccion != null)
+      permisosCorreccion.validar(
+          inspeccion,
+          new GuardarBorradorRequest(request.version(), request.datos(), null, null, null));
     inspeccion.setDatos(request.datos());
     Instant ahora = clock.instant();
     inspeccion.setActualizadoEn(ahora);

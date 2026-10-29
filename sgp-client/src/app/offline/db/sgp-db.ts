@@ -17,6 +17,7 @@ export interface LocalBridge {
   payload: unknown;
 }
 export interface LocalInspection {
+  permisosCorreccion?: { restringida: boolean; campos: string[]; categorias: string[] };
   origen?: 'PREPARACION';
   origenId?: string;
   propietarioId?: string;

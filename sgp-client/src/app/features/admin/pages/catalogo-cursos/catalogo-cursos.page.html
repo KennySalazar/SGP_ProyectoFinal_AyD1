@@ -41,7 +41,7 @@
         inputId="catedraticoId"
         formControlName="catedraticoId"
         [options]="catedraticos()"
-        optionLabel="email"
+        optionLabel="nombre"
         optionValue="id"
         [placeholder]="'admin.courses.selectProfessor' | transloco"
       />
@@ -100,7 +100,7 @@
         <tr>
           <th scope="row">{{ curso.nombre }}</th>
           <td>{{ curso.periodo }}</td>
-          <td>{{ curso.catedratico.email }}</td>
+          <td>{{ curso.catedratico.nombre || 'Docente sin nombre registrado' }}</td>
           <td>
             <p-tag
               [value]="curso.estado"

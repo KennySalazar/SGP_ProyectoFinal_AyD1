@@ -29,6 +29,9 @@ import org.springframework.web.multipart.MultipartFile;
 
 @Service
 public class FotografiaService {
+  @org.springframework.beans.factory.annotation.Autowired
+  private PermisosCorreccionService permisosCorreccion;
+
   private final InspeccionRepository inspecciones;
   private final AsignacionPuenteRepository asignaciones;
   private final RevisionRepository revisiones;
@@ -129,6 +132,7 @@ public class FotografiaService {
           t -> {
             var i = autorizar(inspeccionId, actor, false);
             borrador(i);
+            if (permisosCorreccion != null) permisosCorreccion.validarFoto(i, categoria.name());
             anclajes.validar(i, request.elementoRef(), request.instanciaElementoId());
             validarCapacidad(inspeccionId);
           });
@@ -142,6 +146,8 @@ public class FotografiaService {
               t -> {
                 var inspeccion = autorizar(inspeccionId, actor, true);
                 borrador(inspeccion);
+                if (permisosCorreccion != null)
+                  permisosCorreccion.validarFoto(inspeccion, categoria.name());
                 anclajes.validar(inspeccion, request.elementoRef(), request.instanciaElementoId());
                 validarCapacidad(inspeccionId);
                 operaciones.bloquearEntidad("archivo", request.id());
@@ -289,6 +295,19 @@ public class FotografiaService {
         t -> {
           var inspeccion = autorizar(id, actor, true);
           borrador(inspeccion);
+          if (permisosCorreccion != null) {
+            var foto =
+                vinculos
+                    .findByInspeccionIdAndArchivoIdAndTipoUso(
+                        id, fotoId, TipoUsoArchivo.FOTO_INSPECCION)
+                    .orElseThrow(
+                        () ->
+                            error(
+                                HttpStatus.NOT_FOUND,
+                                "fotografia_no_encontrada",
+                                "Fotografia no encontrada."));
+            permisosCorreccion.validarFoto(inspeccion, foto.getArchivo().getCategoriaFoto().name());
+          }
           registroFotografias.retirar(id, fotoId, clock.instant());
         });
   }
