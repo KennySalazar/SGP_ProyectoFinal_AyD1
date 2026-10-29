@@ -10,7 +10,7 @@ Este ADR complementa el [ADR-0007](0007-hu061-publicacion-offline-y-cache-privad
 
 ## Contexto
 
-El repositorio ya tiene `@playwright/test`, configuración, navegador PWA, pruebas HU-061 y un proxy que sirve el build Angular de producción y puede reenviar `/api/` a Spring Boot. El fixture real prepara usuarios, referencias y formulario en PostGIS desechable. Cypress conserva una configuración y una prueba histórica de revisión, sin ejecutor declarado en el manifiesto actual. Activar otro framework añadiría mantenimiento sin cubrir por sí mismo la pérdida de paquetes IP/TCP.
+El repositorio ya tiene `@playwright/test`, configuración, navegador PWA, pruebas HU-061 y un proxy que sirve el build Angular de producción y puede reenviar `/api/` a Spring Boot. El fixture real prepara usuarios, referencias y formulario en PostGIS desechable. La configuración y la prueba histórica de Cypress, sin ejecutor declarado en el manifiesto, se retiraron por no poder ejecutarse. Activar otro framework añadiría mantenimiento sin cubrir por sí mismo la pérdida de paquetes IP/TCP.
 
 ## Decisión técnica
 
@@ -26,10 +26,10 @@ El repositorio ya tiene `@playwright/test`, configuración, navegador PWA, prueb
 
 Un error HTTP, la latencia o el corte de un flujo no acreditan pérdida de paquetes IP/TCP. El parámetro CDP `packetLoss` localizado describe WebRTC, no certifica este REST. Para acreditar descartes reales se requiere un mecanismo como `tc/netem`, en el namespace desechable del backend, con filtro acotado, contadores y restauración comprobada.
 
-La [revisión QA de pendientes](../../temporalHu062/QA_PENDIENTES_HU062_RESULTADOS.md) resolvió el bloqueo histórico de la [fase 2](../../temporalHu062/FASE_2_HU062_RESULTADOS.md): dos casos con contadores de descartes, snapshots locales, restauración independiente y oráculos remotos completos pasaron. El modo `paquetes` del runner utiliza backend/PostGIS en red desechable y un operador con solo `NET_ADMIN` en la red del backend, sin capacidades adicionales en Java. Monta herramientas locales y el JAR actual de solo lectura, registra su hash y limpia los IDs creados. No aplica qdisc a interfaces del anfitrión. Un watchdog externo a Playwright retira la pérdida a los nueve segundos, antes del tope de diez segundos del perfil P.
+La revisión QA de pendientes resolvió el bloqueo histórico de la fase 2 (informes retirados en `377ea67`; resumen en [EVIDENCIA_E2E.md](../testing/EVIDENCIA_E2E.md)): dos casos con contadores de descartes, snapshots locales, restauración independiente y oráculos remotos completos pasaron. El modo `paquetes` del runner utiliza backend/PostGIS en red desechable y un operador con solo `NET_ADMIN` en la red del backend, sin capacidades adicionales en Java. Monta herramientas locales y el JAR actual de solo lectura, registra su hash y limpia los IDs creados. No aplica qdisc a interfaces del anfitrión. Un watchdog externo a Playwright retira la pérdida a los nueve segundos, antes del tope de diez segundos del perfil P.
 
 La elección actual reduce cambios y permite verificar los perfiles implementados con un solo ejecutor. Sus resultados quedan acotados a Chromium, backend real y proveedor local; no certifican S3/staging, otras redes o sincronización con la aplicación cerrada. La autonomía manual de ocho horas se mantiene fuera de la automatización.
 
 ## Ejecución y consecuencias
 
-Procedimiento único en [docs/testing/HU-062.md](../testing/HU-062.md), con requisitos, comandos, evidencias y matriz actualizada. La ejecución manual reproducible utiliza el script existente; no se modifica CI.
+Procedimiento único en [docs/testing/HU-062.md](../testing/HU-062.md), con requisitos, comandos, evidencias y matriz actualizada. La ejecución manual reproducible utiliza el script existente. La suite PWA con API y red simuladas corre además en CI (job «E2E offline con red simulada») y publica su reporte HTML como artefacto; las fases con backend real y `netem` siguen siendo manuales.

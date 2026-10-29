@@ -215,6 +215,36 @@ class ActivacionEstudianteServiceTest {
     verifyNoInteractions(inscripciones, auditoria);
   }
 
+  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.provider.CsvSource({
+    "2026-01-01,2026-10-04,false",
+    "2026-10-06,2026-12-31,false",
+    "2026-10-05,2026-10-05,true"
+  })
+  void vincularRespetaFechasInclusivasEnGuatemala(
+      LocalDate inicio, LocalDate fin, boolean permitido) {
+    UserAccount docente = usuario(RoleName.CATEDRATICO, true, true);
+    UserAccount estudiante = usuario(RoleName.ESTUDIANTE, true, true);
+    Curso destino =
+        new Curso(mock(Asignatura.class), "2026-2", docente, inicio, fin, Instant.now());
+    UUID id = estudiante.getId();
+    when(usuarios.findByEmail("docente")).thenReturn(Optional.of(docente));
+    when(usuarios.findByIdForUpdate(id)).thenReturn(Optional.of(estudiante));
+    when(cursos.findByIdAndCatedratico_Id(destino.getId(), docente.getId()))
+        .thenReturn(Optional.of(destino));
+    when(inscripciones.save(any(CursoEstudiante.class))).thenAnswer(i -> i.getArgument(0));
+    ActivarEstudianteRequest request = new ActivarEstudianteRequest(id, destino.getId(), "A");
+    if (permitido) {
+      service.vincular("docente", request);
+      verify(inscripciones).save(any(CursoEstudiante.class));
+    } else {
+      assertThatThrownBy(() -> service.vincular("docente", request))
+          .isInstanceOfSatisfying(
+              ApiException.class, e -> assertThat(e.getCode()).isEqualTo("curso_fuera_de_fechas"));
+      verifyNoInteractions(inscripciones, auditoria);
+    }
+  }
+
   private UserAccount usuario(RoleName roleName, boolean verificado, boolean activado) {
     UserAccount usuario = mock(UserAccount.class);
     Role role = mock(Role.class);

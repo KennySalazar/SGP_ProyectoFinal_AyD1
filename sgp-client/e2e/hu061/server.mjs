@@ -404,6 +404,20 @@ createServer(async (req, res) => {
     json([{ id: 'm', nombre: 'Amatitlan' }]);
     return;
   }
+  // El borrador completa ruta, departamento y municipio desde la ficha del puente.
+  if (url.pathname === `/api/v1/puentes/${fixture.puenteId}`) {
+    json({
+      id: fixture.puenteId,
+      codigo: fixture.codigoPuente,
+      nombre: fixture.nombrePuente,
+      ruta: 'CA-9',
+      kilometraje: 21.5,
+      departamento: { id: 'd', nombre: referencia },
+      municipio: { id: 'm', nombre: 'Amatitlan' },
+      activo: true,
+    });
+    return;
+  }
   if (url.pathname === '/api/v1/formularios/activo' || url.pathname.endsWith('/esquema')) {
     json({ id: fixture.versionFormularioId, codigo: 'HU061-PRUEBA', version: 1, esquema: schema });
     return;

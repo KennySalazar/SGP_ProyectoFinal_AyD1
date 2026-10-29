@@ -11,7 +11,14 @@ export default defineConfig({
   ],
   timeout: 90000,
   workers: 1,
-  use: { baseURL: 'http://127.0.0.1:4173', headless: true, trace: 'retain-on-failure' },
+  // Evidencia DT-CAL-04: reporte HTML navegable con una captura por prueba.
+  reporter: [['list'], ['html', { open: 'never' }]],
+  use: {
+    baseURL: 'http://127.0.0.1:4173',
+    headless: true,
+    screenshot: 'on',
+    trace: 'retain-on-failure',
+  },
   webServer: {
     command: 'node e2e/hu061/server.mjs',
     url: 'http://127.0.0.1:4173/__e2e/setup',

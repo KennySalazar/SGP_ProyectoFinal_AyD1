@@ -79,7 +79,7 @@
 | Cola persistente + backoff + Idempotency-Key | Parcial | Esquema de cola e idempotency key listos; motor de reintento se implementa con inspecciones. |
 | `navigator.storage.persist()` | Base preparada | Servicio y vista de diagnostico. |
 | Compresion de fotos antes de persistir | Pendiente | Se implementa al crear captura fotografica. |
-| Pruebas de red degradada | Pendiente | Se agregan con Playwright/Cypress al implementar sincronizacion. |
+| Pruebas de red degradada | Cumplido | Playwright: suite PWA con red simulada en CI (reporte como artefacto) y fases HU-062 con backend real, latencia, cortes y `netem`. Ver `docs/testing/EVIDENCIA_E2E.md`. |
 
 ## 5. Infraestructura, calidad y entrega
 

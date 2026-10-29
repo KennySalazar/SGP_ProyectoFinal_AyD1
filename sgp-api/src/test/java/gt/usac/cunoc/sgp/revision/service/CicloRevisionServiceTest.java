@@ -65,6 +65,7 @@ class CicloRevisionServiceTest {
     when(puente.getCodigo()).thenReturn("GT-001");
     when(version.getId()).thenReturn(formularioId);
     when(asignacion.getCatedraticoId()).thenReturn(catedraticoId);
+    when(asignacion.getPuenteId()).thenReturn(puenteId);
     when(asignaciones.findVigentePorId(
             eq(asignacionId), eq(autorId), eq(LocalDate.of(2026, 10, 18))))
         .thenReturn(Optional.of(asignacion));

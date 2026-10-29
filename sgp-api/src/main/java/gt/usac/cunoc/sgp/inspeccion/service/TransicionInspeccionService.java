@@ -153,6 +153,14 @@ public class TransicionInspeccionService {
           "Accion no aplicable",
           "Las inspecciones de Catedraticos y Profesionales externos se publican directamente.");
     }
+    if ("CORRECCION".equals(inspeccion.getTipo()) && ciclosRevision == null) {
+      throw new IllegalStateException(
+          "La revisión académica es obligatoria para enviar correcciones estudiantiles.");
+    }
+    if ("CORRECCION".equals(inspeccion.getTipo())
+        && inspeccion.estadoActual() == EstadoInspeccion.ENVIADA) {
+      return recuperarCorreccionEnviada(inspeccion, usuarioId);
+    }
     MaquinaEstadosInspeccion.destino(inspeccion.estadoActual(), EventoInspeccion.ENVIAR);
     exigirCompleta(inspeccion);
 
@@ -164,6 +172,43 @@ public class TransicionInspeccionService {
         null,
         revision != null ? revision.getId() : null);
     return mapper.toResumenResponse(inspecciones.saveAndFlush(inspeccion));
+  }
+
+  private InspeccionResumenResponse recuperarCorreccionEnviada(
+      Inspeccion inspeccion, UUID usuarioId) {
+    if (!ciclosRevision.tieneCiclo(inspeccion)) {
+      exigirCompleta(inspeccion);
+      Instant enviadaEn =
+          historial
+              .findFirstByInspeccionIdAndEventoOrderBySecuenciaDesc(
+                  inspeccion.getId(), EventoInspeccion.ENVIAR.name())
+              .map(HistorialEstadoInspeccion::getCreadoEn)
+              .orElseThrow(
+                  () ->
+                      new ApiException(
+                          HttpStatus.CONFLICT,
+                          "envio_sin_historial",
+                          "Envío sin historial",
+                          "No se puede recuperar automáticamente una corrección sin evidencia del envío original."));
+      UUID asignacionAnterior = inspeccion.getAsignacionPuenteId();
+      Revision revision = ciclosRevision.crearParaEnvio(inspeccion, enviadaEn);
+      auditoria.registrarEnTransaccion(
+          usuarioId,
+          AccionAuditoria.MODIFICAR,
+          "inspeccion",
+          inspeccion.getId(),
+          json.createObjectNode()
+              .put(
+                  "asignacionPuenteId",
+                  asignacionAnterior == null ? null : asignacionAnterior.toString()),
+          json.createObjectNode()
+              .put("asignacionPuenteId", inspeccion.getAsignacionPuenteId().toString())
+              .put("revisionId", revision.getId().toString())
+              .put("motivo", "Recuperación de corrección enviada sin ciclo académico"),
+          null);
+      inspecciones.saveAndFlush(inspeccion);
+    }
+    return mapper.toResumenResponse(inspeccion);
   }
 
   /**

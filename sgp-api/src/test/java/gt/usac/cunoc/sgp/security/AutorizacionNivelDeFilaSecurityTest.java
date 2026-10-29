@@ -28,6 +28,9 @@ import gt.usac.cunoc.sgp.usuario.repository.UserAccountRepository;
 import gt.usac.cunoc.sgp.usuario.service.ActivacionEstudianteService;
 import java.lang.reflect.Constructor;
 import java.time.Clock;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneOffset;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -95,7 +98,7 @@ class AutorizacionNivelDeFilaSecurityTest {
             cursoRepository,
             cursoEstudianteRepository,
             auditService,
-            Clock.systemUTC());
+            Clock.fixed(Instant.parse("2026-10-28T18:00:00Z"), ZoneOffset.UTC));
   }
 
   // --- REGLA 1: Estudiante solo accede a sus propios borradores (DT-SEC-04) ---
@@ -172,6 +175,8 @@ class AutorizacionNivelDeFilaSecurityTest {
     Curso cursoA = mock(Curso.class);
     when(cursoA.getId()).thenReturn(cursoAId);
     when(cursoA.isActivo()).thenReturn(true);
+    when(cursoA.getFechaInicio()).thenReturn(LocalDate.of(2026, 7, 1));
+    when(cursoA.getFechaFin()).thenReturn(LocalDate.of(2026, 12, 31));
 
     when(userAccountRepository.findByEmail("profesorA@cunoc.edu.gt"))
         .thenReturn(Optional.of(catedraticoA));
