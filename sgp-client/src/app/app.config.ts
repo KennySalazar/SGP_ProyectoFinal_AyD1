@@ -17,7 +17,7 @@ import { TranslocoHttpLoader } from './core/i18n/transloco-loader';
 export const appConfig: ApplicationConfig = {
   providers: [
     provideRouter(routes, withComponentInputBinding()),
-    provideHttpClient(withInterceptors([offlineInterceptor, authInterceptor, problemInterceptor])),
+    provideHttpClient(withInterceptors([offlineInterceptor, problemInterceptor, authInterceptor])),
     provideAnimationsAsync(),
     provideTransloco({
       config: {

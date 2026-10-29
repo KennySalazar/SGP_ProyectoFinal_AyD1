@@ -12,7 +12,11 @@ import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { BehaviorSubject, of, throwError, Subject } from 'rxjs';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiErrorService } from '../../../../core/services/api-error.service';
-import { DeclaracionMapeoRequest, VersionFormulario } from '../../models/formulario.models';
+import {
+  DeclaracionMapeoRequest,
+  SeccionVisual,
+  VersionFormulario,
+} from '../../models/formulario.models';
 import { FormularioApiService } from '../../services/formulario-api.service';
 import { EditorVersionFormularioPage } from './editor-version-formulario.page';
 @Pipe({ name: 'transloco', standalone: true })
@@ -33,6 +37,7 @@ describe('EditorVersionFormularioPage', () => {
     guardarMapeos: ReturnType<typeof vi.fn>;
     publicar: ReturnType<typeof vi.fn>;
     crear: ReturnType<typeof vi.fn>;
+    listarVersiones: ReturnType<typeof vi.fn>;
   };
   let router: Router;
   const mockVersion: VersionFormulario = {
@@ -95,6 +100,9 @@ describe('EditorVersionFormularioPage', () => {
       guardarMapeos: vi.fn().mockReturnValue(of([])),
       publicar: vi.fn().mockReturnValue(of({ ...mockVersion, estado: 'PUBLICADA', activa: true })),
       crear: vi.fn().mockReturnValue(of({ ...mockVersion, id: 'v-2', codigo: 'SIECA-v2' })),
+      listarVersiones: vi
+        .fn()
+        .mockReturnValue(of([{ codigo: 'SIECA-v1' }, { codigo: 'SIECA-v4' }])),
     };
     TestBed.overrideComponent(AprobacionCalibracionComponent, {
       set: { template: '', imports: [] },
@@ -1007,5 +1015,272 @@ describe('EditorVersionFormularioPage', () => {
     expect(component.severidadTipoMapeo('RENOMBRADO')).toBe('warn');
     expect(component.severidadTipoMapeo('EQUIVALENTE')).toBe('info');
     expect(component.severidadTipoMapeo('OTRO')).toBe('secondary');
+  });
+  describe('experiencia de edición', () => {
+    const seccionConPreguntas = (): SeccionVisual => ({
+      clave: 'identificacion',
+      titulo: '1. Identificación',
+      preguntas: [
+        { clave: 'codigo', titulo: 'Código', tipo: 'string', obligatorio: true },
+        { clave: 'otro', titulo: 'Otro', tipo: 'string', obligatorio: false },
+      ],
+    });
+
+    it('marca la estructura como modificada, bloquea publicar y permite descartar', () => {
+      expect(component.estructuraModificada()).toBe(false);
+      expect(component.puedePublicar()).toBe(true);
+      component.abrirCrearSeccion();
+      component.seccionForm.setValue({
+        clave: 'nueva',
+        titulo: 'Nueva',
+        descripcion: '',
+        esRepetible: false,
+      });
+      component.guardarSeccionModal();
+      expect(component.estructuraModificada()).toBe(true);
+      expect(component.puedePublicar()).toBe(false);
+      expect(component.motivosNoPublicable().map((m) => m.seccion)).toContain('esquema');
+      component.descartarCambiosEstructura();
+      expect(component.estructuraModificada()).toBe(false);
+      expect(component.seccionesVisuales().some((s) => s.clave === 'nueva')).toBe(false);
+      expect(component.puedePublicar()).toBe(true);
+    });
+
+    it('guardar el esquema deja la estructura sin cambios pendientes', () => {
+      component.estructuraModificada.set(true);
+      component.guardarEsquema();
+      expect(apiMock.actualizarBorrador).toHaveBeenCalled();
+      expect(component.estructuraModificada()).toBe(false);
+    });
+
+    it('pide confirmación antes de eliminar una pregunta o una sección', () => {
+      component.seccionesVisuales.set([seccionConPreguntas()]);
+      component.solicitarEliminarPregunta('identificacion', seccionConPreguntas().preguntas[0]);
+      expect(component.confirmacionEliminar()).toMatchObject({
+        tipo: 'pregunta',
+        nombre: 'Código',
+      });
+      expect(component.seccionesVisuales()[0].preguntas).toHaveLength(2);
+      component.cancelarEliminacion();
+      expect(component.confirmacionEliminar()).toBeNull();
+      expect(component.seccionesVisuales()[0].preguntas).toHaveLength(2);
+      component.solicitarEliminarSeccion(component.seccionesVisuales()[0]);
+      expect(component.confirmacionEliminar()).toMatchObject({ tipo: 'seccion', cantidad: 2 });
+      component.confirmarEliminacion();
+      expect(component.seccionesVisuales()).toHaveLength(0);
+      expect(component.confirmacionEliminar()).toBeNull();
+      expect(component.estructuraModificada()).toBe(true);
+    });
+
+    it('no ofrece campos ya vinculados y rechaza un destino repetido', () => {
+      component.seccionesVisuales.set([seccionConPreguntas()]);
+      component.vinculosVisuales.set([
+        {
+          id: 'v1',
+          campoRef: '/identificacion/codigo',
+          columnaDestino: 'puente.codigo',
+          tipo: 'Inventario puente',
+          descripcion: '',
+        },
+      ]);
+      component.abrirCrearVinculo();
+      expect(component.vinculoForm.getRawValue().campoRef).toBe('');
+      expect(component.vinculoForm.getRawValue().columnaDestino).toBe('');
+      expect(component.camposParaVinculo().map((c) => c.value)).toEqual(['/identificacion/otro']);
+      component.vinculoForm.patchValue({
+        campoRef: '/identificacion/otro',
+        columnaDestino: 'puente.codigo',
+      });
+      component.guardarVinculoModal();
+      expect(component.errorVinculo()).toBe('formulario.bindingDuplicateTarget');
+      expect(component.vinculosVisuales()).toHaveLength(1);
+      component.vinculoForm.patchValue({ columnaDestino: 'puente.nombre' });
+      component.guardarVinculoModal();
+      expect(component.errorVinculo()).toBeNull();
+      expect(component.vinculosVisuales()).toHaveLength(2);
+      expect(component.estructuraModificada()).toBe(true);
+    });
+
+    it('al editar un vínculo permite conservar su propio destino y campo', () => {
+      component.seccionesVisuales.set([seccionConPreguntas()]);
+      const vinculo = {
+        id: 'v1',
+        campoRef: '/identificacion/codigo',
+        columnaDestino: 'puente.codigo',
+        tipo: 'Inventario puente',
+        descripcion: '',
+      };
+      component.vinculosVisuales.set([vinculo]);
+      component.abrirEditarVinculo(vinculo);
+      expect(component.camposParaVinculo().map((c) => c.value)).toContain('/identificacion/codigo');
+      component.vinculoForm.patchValue({ descripcion: 'Nota' });
+      component.guardarVinculoModal();
+      expect(component.errorVinculo()).toBeNull();
+      expect(component.vinculosVisuales()[0].descripcion).toBe('Nota');
+    });
+
+    it('genera la clave desde el título hasta que se edita a mano', () => {
+      component.abrirCrearSeccion();
+      component.seccionForm.controls.titulo.setValue('9. Cimentación y pilotes');
+      expect(component.seccionForm.controls.clave.value).toBe('cimentacion_y_pilotes');
+      component.seccionForm.controls.titulo.setValue('9. Cimentación profunda');
+      expect(component.seccionForm.controls.clave.value).toBe('cimentacion_profunda');
+      component.seccionForm.controls.clave.setValue('mi_clave');
+      component.seccionForm.controls.titulo.setValue('Otro título');
+      expect(component.seccionForm.controls.clave.value).toBe('mi_clave');
+
+      component.abrirCrearPregunta('identificacion');
+      component.preguntaForm.controls.titulo.setValue('Ancho de acera (m)');
+      expect(component.preguntaForm.controls.clave.value).toBe('ancho_de_acera_m');
+    });
+
+    it('no regenera la clave al editar una sección existente', () => {
+      component.abrirEditarSeccion({ clave: 'fija', titulo: 'Fija', preguntas: [] });
+      component.seccionForm.controls.titulo.setValue('Un título distinto');
+      expect(component.seccionForm.controls.clave.value).toBe('fija');
+    });
+
+    it('distingue los campos anidados con el mismo nombre', () => {
+      component.seccionesVisuales.set([
+        { clave: 'caracteristicas_cauce', titulo: '7. Características del cauce', preguntas: [] },
+      ]);
+      expect(
+        component.obtenerNombrePregunta('/caracteristicas_cauce/desbordamiento/ha_presentado'),
+      ).toBe('desbordamiento › ha presentado');
+      expect(
+        component.obtenerNombrePregunta('/caracteristicas_cauce/desbordamiento/frecuencia_anios'),
+      ).toBe('desbordamiento › frecuencia anios');
+    });
+
+    it('cuenta los elementos anidados que el editor visual conserva sin editar', () => {
+      component.version.set({
+        ...mockVersion,
+        esquema: {
+          type: 'object',
+          properties: {
+            subestructura: {
+              type: 'object',
+              properties: {
+                estribo: { type: 'object' },
+                pilas: { type: 'array' },
+                nombre: { type: 'string' },
+              },
+            },
+          },
+        },
+      });
+      expect(
+        component.elementosAvanzados({ clave: 'subestructura', titulo: 'Sub', preguntas: [] }),
+      ).toBe(2);
+      expect(
+        component.elementosAvanzados({ clave: 'inexistente', titulo: 'No', preguntas: [] }),
+      ).toBe(0);
+    });
+
+    it('indica el estado de cada pestaña solo mientras la versión es borrador', () => {
+      expect(component.estadoPestanas().esquema).toBe('ok');
+      component.estructuraModificada.set(true);
+      expect(component.estadoPestanas().esquema).toBe('pendiente');
+      expect(component.estadoPestanas().vinculos).toBe('pendiente');
+      expect(component.estadoPestanas().publicar).toBe('pendiente');
+      component.version.set({ ...mockVersion, estado: 'PUBLICADA' });
+      expect(component.estadoPestanas().esquema).toBe('ninguno');
+    });
+
+    it('muestra mapeo y publicación solo al administrador y cuando corresponden', () => {
+      component.version.set({ ...mockVersion, versionAnteriorId: 'anterior' });
+      expect(component.pestanas().map((t) => t.id)).toEqual([
+        'esquema',
+        'vinculos',
+        'pesos',
+        'mapeos',
+        'publicar',
+      ]);
+      vi.spyOn(component.auth, 'user').mockReturnValue({ role: 'CATEDRATICO' } as never);
+      expect(component.pestanas().map((t) => t.id)).toEqual(['esquema', 'vinculos', 'pesos']);
+    });
+
+    it('señala qué sub-sección de pesos tiene pendientes y navega hasta ella', () => {
+      component.actualizarPeso('/vigas', null);
+      const pesos = component.subPestanasPesos().find((s) => s.id === 'pesos');
+      expect(pesos?.pendiente).toBe(true);
+      component.cambiarSeccion('publicar');
+      component.irAMotivo({ clave: '', seccion: 'pesos', subSeccion: 'criticas' });
+      expect(component.seccionActiva()).toBe('pesos');
+      expect(component.subSeccionPesos()).toBe('criticas');
+    });
+
+    it('filtra los pesos por descripción y resume los mapeos por tipo', () => {
+      component.busquedaPesos.set('vig');
+      expect(component.pesosFiltrados()).toHaveLength(1);
+      component.busquedaPesos.set('zzz');
+      expect(component.pesosFiltrados()).toHaveLength(0);
+      component.mapeosEditables.set([
+        {
+          elementoRefOrigen: '/a',
+          elementoRefDestino: '/a',
+          tipo: 'EQUIVALENTE',
+          observacion: null,
+        },
+        { elementoRefOrigen: null, elementoRefDestino: '/b', tipo: 'NUEVO', observacion: null },
+      ]);
+      expect(component.resumenMapeos()).toEqual({
+        TODOS: 2,
+        EQUIVALENTE: 1,
+        NUEVO: 1,
+        RENOMBRADO: 0,
+        ELIMINADO: 0,
+      });
+    });
+
+    it('conserva el mensaje de éxito después de publicar', () => {
+      component.ejecutarPublicacion();
+      expect(apiMock.publicar).toHaveBeenCalled();
+      expect(component.seccionActiva()).toBe('esquema');
+      expect(component.mensajeExito()).toBe('formulario.publishedSuccess');
+    });
+
+    it('sugiere el siguiente código consecutivo al derivar una versión', () => {
+      component.abrirDialogoNuevaDerivada();
+      expect(component.dialogoNuevaDerivada()).toBe(true);
+      expect(component.nuevaDerivadaForm.controls.codigo.value).toBe('SIECA-v5');
+    });
+    it('agrupa por sección las opciones del diálogo de mapeo y pone los pendientes primero', () => {
+      component.version.set({ ...mockVersion, versionAnteriorId: 'anterior' });
+      component.analisisMapeo.set({
+        versionDestinoId: 'v-1',
+        versionDestinoCodigo: 'SIECA-v1',
+        camposOrigen: ['/otros/senalizacion/horizontal', '/subestructura/pilas'],
+        camposDestino: ['/otros/senalizacion/horizontal', '/tramos'],
+        mapeosDeclarados: [],
+        camposOrigenSinMapeo: [],
+        camposDestinoSinMapeo: [],
+        mapeoCompleto: false,
+      });
+      component.mapeosEditables.set([
+        {
+          elementoRefOrigen: '/otros/senalizacion/horizontal',
+          elementoRefDestino: '/otros/senalizacion/horizontal',
+          tipo: 'EQUIVALENTE',
+          observacion: null,
+        },
+      ]);
+
+      const destino = component.opcionesDestinoAgrupadas();
+      expect(destino[0].label).toBe('formulario.pendingGroup');
+      expect(destino[0].items).toEqual([
+        expect.objectContaining({ value: '/tramos', pendiente: true }),
+      ]);
+      expect(destino.slice(1).map((g) => g.items.map((i) => i.value))).toEqual([
+        ['/otros/senalizacion/horizontal'],
+      ]);
+
+      const origen = component.opcionesOrigenAgrupadas();
+      expect(origen[0].items.map((i) => i.value)).toEqual(['/subestructura/pilas']);
+      const noPendientes = origen.slice(1).flatMap((g) => g.items);
+      expect(noPendientes.every((i) => !i.pendiente)).toBe(true);
+      expect(noPendientes[0].completo).toContain(' > ');
+      expect(noPendientes[0].label).not.toContain(' > ');
+    });
   });
 });

@@ -35,7 +35,8 @@ export class NotificacionesStore implements OnDestroy {
     // Escucha cambios en autenticación para iniciar o detener el sondeo cada 60s y al navegar
     effect(() => {
       const isAuth = this.auth.authenticated();
-      if (isAuth) {
+      const hasToken = Boolean(this.auth.accessToken?.());
+      if (isAuth && hasToken) {
         this.iniciarSondeo();
       } else {
         this.detenerSondeo();
@@ -57,14 +58,14 @@ export class NotificacionesStore implements OnDestroy {
     this.navSub = this.router.events
       .pipe(filter((event) => event instanceof NavigationEnd))
       .subscribe(() => {
-        if (this.connectivity.online() && this.auth.authenticated()) {
+        if (this.connectivity.online() && this.auth.authenticated() && this.auth.accessToken?.()) {
           void this.actualizarConteo();
         }
       });
 
     // Actualizar cada 60 segundos si hay conexión
     this.intervalSub = timer(60000, 60000).subscribe(() => {
-      if (this.connectivity.online() && this.auth.authenticated()) {
+      if (this.connectivity.online() && this.auth.authenticated() && this.auth.accessToken?.()) {
         void this.actualizarConteo();
       }
     });
@@ -78,7 +79,7 @@ export class NotificacionesStore implements OnDestroy {
   }
 
   async actualizarConteo(): Promise<void> {
-    if (!this.auth.authenticated()) {
+    if (!this.auth.authenticated() || !this.auth.accessToken?.()) {
       return;
     }
 

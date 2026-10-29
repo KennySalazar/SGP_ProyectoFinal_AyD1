@@ -66,12 +66,6 @@
   padding-left: 1.25rem;
 }
 
-.secciones-nav {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-  margin-bottom: 1.25rem;
-}
 .editor-card {
   padding: 1.25rem;
 }
@@ -107,18 +101,6 @@
 
 .mapeo-header-acciones {
   gap: 0.75rem;
-}
-
-.filtro-tipo-mapeo-wrapper {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  color: #64748b;
-}
-
-.filtro-tipo-mapeo-select {
-  width: auto;
-  min-width: 140px;
 }
 
 .codigo-editor {

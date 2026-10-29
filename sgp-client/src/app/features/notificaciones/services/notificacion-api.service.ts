@@ -1,6 +1,7 @@
-import { HttpClient, HttpParams } from '@angular/common/http';
+import { HttpClient, HttpContext, HttpParams } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
+import { ERROR_GESTIONADO_LOCALMENTE } from '../../../core/interceptors/problem.interceptor';
 import {
   MarcarTodasLeidasResponse,
   NotificacionResponse,
@@ -23,7 +24,9 @@ export class NotificacionApiService {
   }
 
   obtenerResumen(): Observable<ResumenNotificacionesResponse> {
-    return this.http.get<ResumenNotificacionesResponse>('/api/v1/notificaciones/resumen');
+    return this.http.get<ResumenNotificacionesResponse>('/api/v1/notificaciones/resumen', {
+      context: new HttpContext().set(ERROR_GESTIONADO_LOCALMENTE, true),
+    });
   }
 
   obtener(id: string): Observable<NotificacionResponse> {

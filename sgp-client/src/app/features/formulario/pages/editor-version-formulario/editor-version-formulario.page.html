@@ -1,5 +1,5 @@
 @if (version(); as ver) {
-<header class="page-heading">
+<header class="page-heading editor-heading">
   <div class="heading-nav">
     <a pButton size="small" severity="secondary" [outlined]="true" routerLink="/admin/formularios">
       <i class="pi pi-arrow-left" aria-hidden="true"></i>
@@ -8,9 +8,24 @@
   </div>
 
   <div class="heading-row">
-    <div>
+    <div class="heading-main">
       <p class="page-kicker">{{ 'admin.kicker' | transloco }}</p>
-      <h1 class="page-title">{{ ver.codigo }}</h1>
+      <div class="heading-title-row">
+        <h1 class="page-title">{{ ver.codigo }}</h1>
+        <div class="heading-badges">
+          <p-tag
+            [value]="ver.estado"
+            [severity]="ver.estado === 'PUBLICADA' ? 'success' : 'warn'"
+          ></p-tag>
+          @if (ver.activa) {
+          <p-tag value="Activa" severity="success" icon="pi pi-check"></p-tag>
+          }
+          <p-tag
+            [value]="ver.rotuloCalibracion || ('formulario.hu050.sinRegistro' | transloco)"
+            [severity]="ver.aprobacionCalibracion ? 'success' : 'warn'"
+          ></p-tag>
+        </div>
+      </div>
       <p class="page-description">
         @if (ver.estado === 'PUBLICADA') {
         <span
@@ -18,55 +33,71 @@
           }}</span
         >
         } @else {
-        <span>Borrador en edición del formulario SIECA.</span>
+        <span>{{ 'formulario.draftDescription' | transloco }}</span>
         } @if (ver.versionAnteriorCodigo) {
-        <span> · Basado en: <strong>{{ ver.versionAnteriorCodigo }}</strong></span>
+        <span>
+          · {{ 'formulario.basedOn' | transloco }}:
+          <strong>{{ ver.versionAnteriorCodigo }}</strong></span
+        >
         } @if (ver.versionAlgoritmoIc) {
-        <span> · Algoritmo IC: {{ ver.versionAlgoritmoIc }}</span>
+        <span> · {{ 'formulario.algorithmIc' | transloco }}: {{ ver.versionAlgoritmoIc }}</span>
         }
       </p>
+      @if (ver.calibradoEn) {
+      <div class="heading-meta">
+        <span>
+          <i class="pi pi-clock" aria-hidden="true"></i>
+          {{ 'formulario.hu053.fechaCalibracion' | transloco }}: {{
+          fechaCalibracion(ver.calibradoEn) }}
+        </span>
+        @if (ver.calibradoPorNombre || ver.calibradoPorEmail ||
+        ver.aprobacionCalibracion?.aprobadoPorNombre || ver.calibradoPorId) {
+        <details class="responsable-calibracion">
+          <summary>{{ 'formulario.hu053.responsable' | transloco }}</summary>
+          <div>
+            @if (ver.calibradoPorNombre || ver.aprobacionCalibracion?.aprobadoPorNombre; as nombre)
+            {
+            <div><strong>{{ nombre }}</strong></div>
+            } @if (ver.calibradoPorEmail; as email) {
+            <div><a [href]="'mailto:' + email">{{ email }}</a></div>
+            } @if (!ver.calibradoPorNombre && !ver.calibradoPorEmail &&
+            !ver.aprobacionCalibracion?.aprobadoPorNombre) {
+            <code>{{ ver.calibradoPorId }}</code>
+            }
+          </div>
+        </details>
+        }
+      </div>
+      }
     </div>
 
-    <div class="heading-badges">
-      <p-tag
-        [value]="ver.rotuloCalibracion || ('formulario.hu050.sinRegistro' | transloco)"
-        [severity]="ver.aprobacionCalibracion ? 'success' : 'warn'"
-      ></p-tag>
-      <p-tag
-        [value]="ver.estado"
-        [severity]="ver.estado === 'PUBLICADA' ? 'success' : 'warn'"
-      ></p-tag>
-      @if (ver.activa) {
-      <p-tag value="Activa" severity="success" icon="pi pi-check"></p-tag>
-      }
+    <div class="heading-actions">
       <button pButton severity="secondary" [outlined]="true" (click)="abrirDialogoNuevaDerivada()">
         <i class="pi pi-copy" aria-hidden="true"></i>
         <span>{{ 'formulario.deriveNew' | transloco }}</span>
+      </button>
+      <button
+        pButton
+        type="button"
+        severity="secondary"
+        [outlined]="true"
+        (click)="recargarVersion()"
+        [disabled]="cargando() || guardandoEsquema() || guardandoVinculos() || guardandoPesos() || guardandoEscala() || estadoReglas().guardando || estadoCriticas().guardando || publicando()"
+      >
+        <i class="pi pi-refresh" aria-hidden="true"></i>
+        <span>{{ 'formulario.hu053.recargar' | transloco }}</span>
       </button>
     </div>
   </div>
 </header>
 
+@if (ver.estado === 'PUBLICADA') {
 <app-aprobacion-calibracion
   [versionId]="ver.id"
   [estadoVersion]="ver.estado"
   [gestion]="true"
   (aprobada)="registrarAprobacion($event)"
 />
-
-@if (estadoReglas().pendiente) {
-<div class="aviso-activa" role="status">
-  <span>{{ 'formulario.reglasIc.pendientes' | transloco }}</span>
-  <button
-    pButton
-    type="button"
-    severity="secondary"
-    [outlined]="true"
-    (click)="cambiarSeccion('pesos')"
-  >
-    {{ 'formulario.weightsTab' | transloco }}
-  </button>
-</div>
 } @if (ver.estado === 'PUBLICADA' || ver.activa) {
 <div class="aviso-activa" role="status">
   <i class="pi pi-info-circle" aria-hidden="true"></i>
@@ -78,100 +109,64 @@
     }
   </div>
 </div>
-} @if (mensajeExito(); as exito) {
-<div class="aviso-exito" role="status">
-  <i class="pi pi-check-circle" aria-hidden="true"></i>
-  <span>{{ exito }}</span>
-</div>
-} @if (errorValidacion(); as err) {
-<div class="aviso-error" role="alert">
-  <i class="pi pi-exclamation-triangle" aria-hidden="true"></i>
-  <span>{{ err }}</span>
-</div>
 }
 
-<button
-  pButton
-  type="button"
-  severity="secondary"
-  [outlined]="true"
-  (click)="recargarVersion()"
-  [disabled]="cargando() || guardandoEsquema() || guardandoVinculos() || guardandoPesos() || guardandoEscala() || estadoReglas().guardando || estadoCriticas().guardando || publicando()"
->
-  {{ 'formulario.hu053.recargar' | transloco }}
-</button>
-@if (ver.calibradoEn) {
-<p>
-  {{ 'formulario.hu053.fechaCalibracion' | transloco }}: {{ fechaCalibracion(ver.calibradoEn) }}
-</p>
-@if (ver.calibradoPorNombre || ver.calibradoPorEmail || ver.aprobacionCalibracion?.aprobadoPorNombre
-|| ver.calibradoPorId) {
-<details>
-  <summary>{{ 'formulario.hu053.responsable' | transloco }}</summary>
-  <div style="margin-top: 0.25rem">
-    @if (ver.calibradoPorNombre || ver.aprobacionCalibracion?.aprobadoPorNombre; as nombre) {
-    <div><strong>{{ nombre }}</strong></div>
-    } @if (ver.calibradoPorEmail; as email) {
-    <div><a [href]="'mailto:' + email">{{ email }}</a></div>
-    } @if (!ver.calibradoPorNombre && !ver.calibradoPorEmail &&
-    !ver.aprobacionCalibracion?.aprobadoPorNombre) {
-    <code>{{ ver.calibradoPorId }}</code>
+<nav class="editor-tabs" role="tablist" [attr.aria-label]="'formulario.editorSections' | transloco">
+  @for (tab of pestanas(); track tab.id) {
+  <button
+    type="button"
+    role="tab"
+    class="editor-tab"
+    [attr.title]="tab.etiqueta | transloco"
+    [class.activa]="seccionActiva() === tab.id"
+    [attr.aria-selected]="seccionActiva() === tab.id"
+    (click)="cambiarSeccion(tab.id)"
+  >
+    <i [class]="tab.icono" aria-hidden="true"></i>
+    <span class="editor-tab-texto">{{ tab.corta | transloco }}</span>
+    @if (estadoPestanas()[tab.id] === 'pendiente') {
+    <span class="tab-estado pendiente">
+      <i class="pi pi-exclamation-circle" aria-hidden="true"></i>
+      <span class="sr-only">{{ 'formulario.tabStatus.pending' | transloco }}</span>
+    </span>
+    } @else if (estadoPestanas()[tab.id] === 'ok') {
+    <span class="tab-estado ok">
+      <i class="pi pi-check-circle" aria-hidden="true"></i>
+      <span class="sr-only">{{ 'formulario.tabStatus.ok' | transloco }}</span>
+    </span>
     }
-  </div>
-</details>
-} }
-<nav class="secciones-nav" role="tablist">
-  <button
-    pButton
-    [severity]="seccionActiva() === 'esquema' ? 'primary' : 'secondary'"
-    [outlined]="seccionActiva() !== 'esquema'"
-    (click)="cambiarSeccion('esquema')"
-  >
-    <i class="pi pi-code" aria-hidden="true"></i>
-    <span>{{ 'formulario.schemaTab' | transloco }}</span>
-  </button>
-  <button
-    pButton
-    [severity]="seccionActiva() === 'vinculos' ? 'primary' : 'secondary'"
-    [outlined]="seccionActiva() !== 'vinculos'"
-    (click)="cambiarSeccion('vinculos')"
-  >
-    <i class="pi pi-link" aria-hidden="true"></i>
-    <span>{{ 'formulario.linksTab' | transloco }}</span>
-  </button>
-  <button
-    pButton
-    [severity]="seccionActiva() === 'pesos' ? 'primary' : 'secondary'"
-    [outlined]="seccionActiva() !== 'pesos'"
-    (click)="cambiarSeccion('pesos')"
-  >
-    <i class="pi pi-sliders-h" aria-hidden="true"></i>
-    <span>{{ ('formulario.weightsTab' | transloco) + ' (' + pesosEditables().length + ')' }}</span>
-  </button>
-  @if (esAdministrador() && ver.versionAnteriorId) {
-  <button
-    pButton
-    [severity]="seccionActiva() === 'mapeos' ? 'primary' : 'secondary'"
-    [outlined]="seccionActiva() !== 'mapeos'"
-    (click)="cambiarSeccion('mapeos')"
-  >
-    <i class="pi pi-arrows-h" aria-hidden="true"></i>
-    <span>{{ 'formulario.mappingTab' | transloco }}</span>
-  </button>
-  } @if (esAdministrador() && ver.estado === 'BORRADOR') {
-  <button
-    pButton
-    [severity]="seccionActiva() === 'publicar' ? 'primary' : 'secondary'"
-    [outlined]="seccionActiva() !== 'publicar'"
-    (click)="cambiarSeccion('publicar')"
-  >
-    <i class="pi pi-cloud-upload" aria-hidden="true"></i>
-    <span>{{ 'formulario.publishTab' | transloco }}</span>
   </button>
   }
 </nav>
 
-@if (seccionActiva() === 'esquema') {
+<div class="editor-feedback" aria-live="polite">
+  @if (mensajeExito(); as exito) {
+  <div class="aviso-exito" role="status">
+    <i class="pi pi-check-circle" aria-hidden="true"></i>
+    <span>{{ exito }}</span>
+  </div>
+  } @if (errorValidacion(); as err) {
+  <div class="aviso-error" role="alert">
+    <i class="pi pi-exclamation-triangle" aria-hidden="true"></i>
+    <span>{{ err }}</span>
+  </div>
+  }
+</div>
+
+@if (estadoReglas().pendiente) {
+<div class="aviso-activa" role="status">
+  <span>{{ 'formulario.reglasIc.pendientes' | transloco }}</span>
+  <button
+    pButton
+    type="button"
+    severity="secondary"
+    [outlined]="true"
+    (click)="irAMotivo({ clave: '', seccion: 'pesos', subSeccion: 'reglas' })"
+  >
+    {{ 'formulario.rulesSubTab' | transloco }}
+  </button>
+</div>
+} @if (seccionActiva() === 'esquema') {
 <section class="surface-card editor-card">
   <div class="card-header">
     <div>
@@ -263,6 +258,12 @@
             ></p-tag>
             @if (sec.esRepetible) {
             <p-tag value="Repetible" severity="warn"></p-tag>
+            } @if (elementosAvanzados(sec); as avanzados) {
+            <p-tag
+              severity="secondary"
+              icon="pi pi-sitemap"
+              [value]="'formulario.advancedElements' | transloco: { cantidad: avanzados }"
+            ></p-tag>
             }
           </div>
           @if (sec.descripcion) {
@@ -301,7 +302,7 @@
             severity="danger"
             [outlined]="true"
             [attr.aria-label]="'formulario.deleteSection' | transloco"
-            (click)="eliminarSeccion(sec.clave)"
+            (click)="solicitarEliminarSeccion(sec)"
           >
             <i class="pi pi-trash" aria-hidden="true"></i>
           </button>
@@ -311,7 +312,10 @@
 
       <div class="preguntas-tabla-wrapper">
         @if (sec.preguntas.length === 0) {
-        <p class="seccion-sin-preguntas">{{ 'formulario.emptyQuestions' | transloco }}</p>
+        <p class="seccion-sin-preguntas">
+          {{ (elementosAvanzados(sec) ? 'formulario.advancedOnly' : 'formulario.emptyQuestions') |
+          transloco }}
+        </p>
         } @else {
         <table class="tabla-preguntas">
           <thead>
@@ -406,7 +410,7 @@
                     severity="danger"
                     [outlined]="true"
                     [attr.aria-label]="'formulario.deleteQuestion' | transloco"
-                    (click)="eliminarPregunta(sec.clave, p.clave)"
+                    (click)="solicitarEliminarPregunta(sec.clave, p)"
                   >
                     <i class="pi pi-trash" aria-hidden="true"></i>
                   </button>
@@ -506,7 +510,7 @@
     }
   </div>
   } @else {
-  <div class="preguntas-tabla-wrapper">
+  <div class="preguntas-tabla-wrapper tabla-scroll">
     <table class="tabla-preguntas tabla-vinculos">
       <thead>
         <tr>
@@ -589,7 +593,59 @@
   ></textarea>
   }
 </section>
+} @if (ver.estado === 'BORRADOR' && estructuraModificada() && (seccionActiva() === 'esquema' ||
+seccionActiva() === 'vinculos')) {
+<div class="barra-cambios" role="status">
+  <span>
+    <i class="pi pi-info-circle" aria-hidden="true"></i>
+    {{ 'formulario.unsavedStructure' | transloco }}
+  </span>
+  <div class="barra-cambios-acciones">
+    <button
+      pButton
+      type="button"
+      size="small"
+      severity="secondary"
+      [outlined]="true"
+      [disabled]="guardandoEsquema() || guardandoVinculos()"
+      (click)="descartarCambiosEstructura()"
+    >
+      <span>{{ 'formulario.discardChanges' | transloco }}</span>
+    </button>
+    <button
+      pButton
+      type="button"
+      size="small"
+      [disabled]="guardandoEsquema() || guardandoVinculos()"
+      (click)="guardarEsquema()"
+    >
+      <i class="pi pi-save" aria-hidden="true"></i>
+      <span>{{ 'formulario.saveChanges' | transloco }}</span>
+    </button>
+  </div>
+</div>
 } @if (seccionActiva() === 'pesos') {
+<nav class="sub-tabs" role="tablist" [attr.aria-label]="'formulario.weightsTab' | transloco">
+  @for (sub of subPestanasPesos(); track sub.id) {
+  <button
+    type="button"
+    role="tab"
+    class="sub-tab"
+    [class.activa]="subSeccionPesos() === sub.id"
+    [attr.aria-selected]="subSeccionPesos() === sub.id"
+    (click)="cambiarSubSeccionPesos(sub.id)"
+  >
+    <span>{{ sub.etiqueta | transloco }}</span>
+    @if (sub.pendiente) {
+    <span class="tab-estado pendiente">
+      <i class="pi pi-exclamation-circle" aria-hidden="true"></i>
+      <span class="sr-only">{{ 'formulario.tabStatus.pending' | transloco }}</span>
+    </span>
+    }
+  </button>
+  }
+</nav>
+@if (subSeccionPesos() === 'pesos') {
 <section class="surface-card editor-card">
   <div class="card-header">
     <div>
@@ -621,8 +677,26 @@
     </details>
   </div>
   }
+  <div class="vinculos-filtros-bar">
+    <div class="vinculo-search-wrap">
+      <i class="pi pi-search" aria-hidden="true"></i>
+      <input
+        pInputText
+        type="text"
+        [value]="busquedaPesos()"
+        (input)="busquedaPesos.set($any($event.target).value)"
+        [placeholder]="'formulario.filterWeights' | transloco"
+        [attr.aria-label]="'formulario.filterWeights' | transloco"
+        class="vinculo-search-input"
+      />
+    </div>
+    <span class="vinculos-counter">
+      {{ pesosFiltrados().length }} / {{ pesosEditables().length }} {{ 'formulario.weightItems' |
+      transloco }}
+    </span>
+  </div>
   <div
-    class="preguntas-tabla-wrapper"
+    class="preguntas-tabla-wrapper tabla-scroll"
     tabindex="0"
     role="region"
     [attr.aria-label]="'formulario.weightsTab' | transloco"
@@ -635,7 +709,7 @@
         </tr>
       </thead>
       <tbody>
-        @for (elem of pesosEditables(); track elem.elementoRef; let i = $index) {
+        @for (elem of pesosFiltrados(); track elem.elementoRef; let i = $index) {
         <tr>
           <td>
             <label [for]="ver.estado === 'BORRADOR' ? 'peso-ic-' + i : null"
@@ -664,7 +738,10 @@
         </tr>
         } @empty {
         <tr>
-          <td colspan="2">{{ 'formulario.calibracion.sinElementos' | transloco }}</td>
+          <td colspan="2">
+            {{ (busquedaPesos() ? 'formulario.noWeightMatches' :
+            'formulario.calibracion.sinElementos') | transloco }}
+          </td>
         </tr>
         }
       </tbody>
@@ -717,8 +794,8 @@
   </button>
   }
 </section>
-}
-<div [hidden]="seccionActiva() !== 'pesos'">
+} }
+<div [hidden]="seccionActiva() !== 'pesos' || subSeccionPesos() !== 'reglas'">
   <app-reglas-ic
     [version]="ver"
     [bloqueado]="estadoCriticas().pendiente || estadoCriticas().guardando || guardandoPesos() || guardandoEscala() || guardandoEsquema() || publicando() || guardandoVinculos()"
@@ -726,8 +803,11 @@
     (guardada)="version.set($event)"
   />
 </div>
-<div [hidden]="seccionActiva() !== 'pesos'">
+<div
+  [hidden]="seccionActiva() !== 'pesos' || (subSeccionPesos() !== 'criticas' && subSeccionPesos() !== 'acta')"
+>
   <app-calibracion-adicional
+    [vista]="subSeccionPesos() === 'acta' ? 'acta' : 'criticas'"
     [version]="ver"
     [bloqueado]="estadoReglas().pendiente || estadoReglas().guardando || guardandoPesos() || guardandoEscala() || guardandoEsquema() || guardandoVinculos() || publicando()"
     (estado)="estadoCriticas.set($event)"
@@ -750,25 +830,6 @@
       </p>
     </div>
     <div class="editor-header-actions mapeo-header-acciones">
-      <div class="filtro-tipo-mapeo-wrapper">
-        <i class="pi pi-filter" aria-hidden="true"></i>
-        <select
-          id="filtro-tipo-mapeo"
-          class="sgp-select filtro-tipo-mapeo-select"
-          [value]="filtroTipoMapeo()"
-          (change)="cambiarFiltroTipoMapeo($any($event.target).value)"
-          [attr.aria-label]="'formulario.filterByMappingType' | transloco"
-        >
-          <option value="TODOS">{{ 'formulario.allMappingTypes' | transloco }}</option>
-          <option value="EQUIVALENTE">
-            {{ 'formulario.hu050.tipos.EQUIVALENTE' | transloco }}
-          </option>
-          <option value="NUEVO">{{ 'formulario.hu050.tipos.NUEVO' | transloco }}</option>
-          <option value="ELIMINADO">{{ 'formulario.hu050.tipos.ELIMINADO' | transloco }}</option>
-          <option value="RENOMBRADO">{{ 'formulario.hu050.tipos.RENOMBRADO' | transloco }}</option>
-        </select>
-      </div>
-
       @if (ver.estado === 'BORRADOR') {
       <button
         pButton
@@ -814,22 +875,18 @@
   <div class="aviso-cambios-locales" role="status">
     <div>
       <i class="pi pi-info-circle" aria-hidden="true"></i>
-      <span>{{ 'formulario.mappingUnsavedChangesNotice' | transloco }}</span>
+      <span
+        >{{ 'formulario.mappingUnsavedChangesNotice' | transloco }} @if (mapeoLocalCompleto()) { {{
+        'formulario.mappingLocalReady' | transloco }} }</span
+      >
     </div>
   </div>
-  } @if (analisisMapeo(); as analisis) { @if (analisis.mapeoCompleto) {
-  <div class="aviso-exito" role="status">
-    <i class="pi pi-check-circle" aria-hidden="true"></i>
-    <span>{{ 'formulario.mappingComplete' | transloco }}</span>
-  </div>
-  } @else {
+  } @if (analisisMapeo(); as analisis) { @if (camposOrigenSinMapeo().length > 0 ||
+  camposDestinoSinMapeo().length > 0) {
   <div class="aviso-error" role="alert">
     <i class="pi pi-exclamation-triangle" aria-hidden="true"></i>
     <div style="width: 100%">
       <strong>{{ 'formulario.mappingIncomplete' | transloco }}</strong>
-      @if (camposOrigenSinMapeo().length === 0 && camposDestinoSinMapeo().length === 0) {
-      <p style="margin: 0.5rem 0 0">{{ 'formulario.localMappingsComplete' | transloco }}</p>
-      } @else {
       <ul class="lista-pendientes" style="max-height: 16rem; overflow-y: auto">
         @for (pend of camposOrigenSinMapeo(); track pend) {
         <li class="item-pendiente">
@@ -881,10 +938,39 @@
         </li>
         }
       </ul>
-      }
     </div>
   </div>
-  } }
+  } @else if (!hayMapeosSinGuardar() || ver.estado !== 'BORRADOR') { @if (analisis.mapeoCompleto) {
+  <div class="aviso-exito" role="status">
+    <i class="pi pi-check-circle" aria-hidden="true"></i>
+    <span>{{ 'formulario.mappingComplete' | transloco }}</span>
+  </div>
+  } @else {
+  <div class="aviso-error" role="alert">
+    <i class="pi pi-exclamation-triangle" aria-hidden="true"></i>
+    <strong>{{ 'formulario.mappingIncomplete' | transloco }}</strong>
+  </div>
+  } } }
+
+  <div
+    class="mapeo-resumen"
+    role="group"
+    [attr.aria-label]="'formulario.filterByMappingType' | transloco"
+  >
+    @for (f of filtrosMapeo; track f.valor) {
+    <button
+      type="button"
+      class="chip-filtro"
+      [class.activo]="filtroTipoMapeo() === f.valor"
+      [attr.aria-pressed]="filtroTipoMapeo() === f.valor"
+      [disabled]="f.valor !== 'TODOS' && !resumenMapeos()[f.valor] && filtroTipoMapeo() !== f.valor"
+      (click)="cambiarFiltroTipoMapeo(f.valor)"
+    >
+      <span>{{ f.etiqueta | transloco }}</span>
+      <span class="chip-contador">{{ resumenMapeos()[f.valor] }}</span>
+    </button>
+    }
+  </div>
 
   <p-table
     [value]="mapeosFiltrados()"
@@ -963,8 +1049,23 @@
     <h3>{{ 'formulario.publishChecklist' | transloco }}</h3>
     <ul class="checklist">
       <li>
+        @if (!estructuraModificada()) {
         <i class="pi pi-check-circle check-ok" aria-hidden="true"></i>
         <span>{{ 'formulario.checkValidSchema' | transloco }}</span>
+        } @else {
+        <i class="pi pi-times-circle check-bad" aria-hidden="true"></i>
+        <span>{{ 'formulario.publishBlockers.estructura' | transloco }}</span>
+        <button
+          pButton
+          type="button"
+          size="small"
+          severity="secondary"
+          [outlined]="true"
+          (click)="cambiarSeccion('esquema')"
+        >
+          {{ 'formulario.goTo' | transloco }}
+        </button>
+        }
       </li>
       <li>
         @if (calibracionGuardada() && !calibracionPendiente()) {
@@ -973,6 +1074,35 @@
         } @else {
         <i class="pi pi-times-circle check-bad" aria-hidden="true"></i
         ><span>{{ 'formulario.calibracion.incompleta' | transloco }}</span>
+        <button
+          pButton
+          type="button"
+          size="small"
+          severity="secondary"
+          [outlined]="true"
+          (click)="irAMotivo({ clave: '', seccion: 'pesos', subSeccion: 'pesos' })"
+        >
+          {{ 'formulario.goTo' | transloco }}
+        </button>
+        }
+      </li>
+      <li>
+        @if (!criticasSinResolver() && !estadoCriticas().pendiente) {
+        <i class="pi pi-check-circle check-ok" aria-hidden="true"></i>
+        <span>{{ 'formulario.checkCriticalRules' | transloco }}</span>
+        } @else {
+        <i class="pi pi-times-circle check-bad" aria-hidden="true"></i>
+        <span>{{ 'formulario.publishBlockers.criticas' | transloco }}</span>
+        <button
+          pButton
+          type="button"
+          size="small"
+          severity="secondary"
+          [outlined]="true"
+          (click)="irAMotivo({ clave: '', seccion: 'pesos', subSeccion: 'criticas' })"
+        >
+          {{ 'formulario.goTo' | transloco }}
+        </button>
         }
       </li>
       @if (ver.versionAnteriorId) {
@@ -982,7 +1112,17 @@
         <span>{{ 'formulario.checkMapping' | transloco }}</span>
         } @else {
         <i class="pi pi-times-circle check-bad" aria-hidden="true"></i>
-        <span>Hay campos pendientes de mapear con la versión anterior.</span>
+        <span>{{ 'formulario.publishBlockers.mapeo' | transloco }}</span>
+        <button
+          pButton
+          type="button"
+          size="small"
+          severity="secondary"
+          [outlined]="true"
+          (click)="cambiarSeccion('mapeos')"
+        >
+          {{ 'formulario.goTo' | transloco }}
+        </button>
         }
       </li>
       }
@@ -1056,6 +1196,9 @@
   }
 
   <div class="publicar-accion">
+    @if (!puedePublicar() && !publicando()) {
+    <p class="publicar-ayuda">{{ 'formulario.publishDisabledHint' | transloco }}</p>
+    }
     <button
       pButton
       severity="success"
@@ -1108,7 +1251,7 @@
   [header]="'formulario.addMapping' | transloco"
   [visible]="dialogoNuevoMapeo()"
   [modal]="true"
-  [style]="{ width: '520px' }"
+  [style]="{ width: '560px', maxWidth: '95vw' }"
   (onHide)="cerrarDialogoNuevoMapeo()"
 >
   <form [formGroup]="nuevoMapeoForm" (ngSubmit)="agregarDeclaracionMapeo()" class="dialog-form">
@@ -1116,16 +1259,16 @@
       <label for="tipo-mapeo" class="field-label"
         >{{ 'formulario.mappingType' | transloco }} *</label
       >
-      <select
-        id="tipo-mapeo"
-        class="sgp-select"
+      <p-select
+        inputId="tipo-mapeo"
         formControlName="tipo"
-        (change)="onTipoMapeoChange()"
-      >
-        @for (t of tiposMapeo; track t.value) {
-        <option [value]="t.value">{{ t.label }}</option>
-        }
-      </select>
+        [options]="tiposMapeo"
+        optionLabel="label"
+        optionValue="value"
+        appendTo="body"
+        [fluid]="true"
+        (onChange)="onTipoMapeoChange()"
+      />
     </div>
 
     <div class="form-field">
@@ -1139,14 +1282,34 @@
         <span>{{ 'formulario.notApplicableNew' | transloco }}</span>
       </div>
       } @else {
-      <select id="campo-origen" class="sgp-select" formControlName="elementoRefOrigen">
-        <option value="">-- {{ 'formulario.selectSourceField' | transloco }} --</option>
-        @for (c of opcionesCamposOrigen(); track c) {
-        <option [value]="c">
-          {{ nombreCampoMapeo(c, true) }} ({{ c }}){{ esCampoOrigenSinMapear(c) ? ' ★' : '' }}
-        </option>
-        }
-      </select>
+      <p-select
+        inputId="campo-origen"
+        formControlName="elementoRefOrigen"
+        [options]="opcionesOrigenAgrupadas()"
+        [group]="true"
+        optionGroupLabel="label"
+        optionGroupChildren="items"
+        optionLabel="label"
+        optionValue="value"
+        [filter]="true"
+        filterBy="label,completo,value"
+        [filterPlaceholder]="'formulario.searchField' | transloco"
+        [emptyFilterMessage]="'formulario.noFieldMatches' | transloco"
+        [placeholder]="'formulario.selectSourceField' | transloco"
+        appendTo="body"
+        scrollHeight="18rem"
+        [fluid]="true"
+      >
+        <ng-template #selectedItem let-seleccion>
+          <span class="mapeo-seleccion">{{ seleccion.completo }}</span>
+        </ng-template>
+        <ng-template #item let-opcion>
+          <div class="opcion-mapeo">
+            <span>{{ opcion.label }}</span>
+            <small>{{ opcion.value }}</small>
+          </div>
+        </ng-template>
+      </p-select>
       }
     </div>
 
@@ -1161,14 +1324,34 @@
         <span>{{ 'formulario.notApplicableDeleted' | transloco }}</span>
       </div>
       } @else {
-      <select id="campo-destino" class="sgp-select" formControlName="elementoRefDestino">
-        <option value="">-- {{ 'formulario.selectTargetField' | transloco }} --</option>
-        @for (c of opcionesCamposDestino(); track c) {
-        <option [value]="c">
-          {{ nombreCampoMapeo(c) }} ({{ c }}){{ esCampoDestinoSinMapear(c) ? ' ★' : '' }}
-        </option>
-        }
-      </select>
+      <p-select
+        inputId="campo-destino"
+        formControlName="elementoRefDestino"
+        [options]="opcionesDestinoAgrupadas()"
+        [group]="true"
+        optionGroupLabel="label"
+        optionGroupChildren="items"
+        optionLabel="label"
+        optionValue="value"
+        [filter]="true"
+        filterBy="label,completo,value"
+        [filterPlaceholder]="'formulario.searchField' | transloco"
+        [emptyFilterMessage]="'formulario.noFieldMatches' | transloco"
+        [placeholder]="'formulario.selectTargetField' | transloco"
+        appendTo="body"
+        scrollHeight="18rem"
+        [fluid]="true"
+      >
+        <ng-template #selectedItem let-seleccion>
+          <span class="mapeo-seleccion">{{ seleccion.completo }}</span>
+        </ng-template>
+        <ng-template #item let-opcion>
+          <div class="opcion-mapeo">
+            <span>{{ opcion.label }}</span>
+            <small>{{ opcion.value }}</small>
+          </div>
+        </ng-template>
+      </p-select>
       }
     </div>
 
@@ -1255,6 +1438,19 @@
 >
   <form [formGroup]="seccionForm" (ngSubmit)="guardarSeccionModal()" class="dialog-form" novalidate>
     <div class="form-field">
+      <label for="sec-titulo" class="field-label"
+        >{{ 'formulario.sectionTitle' | transloco }} *</label
+      >
+      <input
+        pInputText
+        id="sec-titulo"
+        type="text"
+        formControlName="titulo"
+        placeholder="ej. 9. Cimentación y pilotes"
+      />
+    </div>
+
+    <div class="form-field">
       <label for="sec-clave" class="field-label">{{ 'formulario.sectionKey' | transloco }} *</label>
       <input
         pInputText
@@ -1267,19 +1463,7 @@
       @if (seccionForm.controls.clave.invalid && seccionForm.controls.clave.touched) {
       <small class="validation-msg">Solo letras minúsculas, números y guión bajo.</small>
       }
-    </div>
-
-    <div class="form-field">
-      <label for="sec-titulo" class="field-label"
-        >{{ 'formulario.sectionTitle' | transloco }} *</label
-      >
-      <input
-        pInputText
-        id="sec-titulo"
-        type="text"
-        formControlName="titulo"
-        placeholder="ej. 9. Cimentación y pilotes"
-      />
+      <small class="field-help-text">{{ 'formulario.keyAutoHint' | transloco }}</small>
     </div>
 
     <div class="form-field">
@@ -1341,6 +1525,19 @@
       </select>
     </div>
 
+    <div class="form-field">
+      <label for="preg-titulo" class="field-label"
+        >{{ 'formulario.questionTitle' | transloco }} *</label
+      >
+      <input
+        pInputText
+        id="preg-titulo"
+        type="text"
+        formControlName="titulo"
+        placeholder="ej. Ancho de acera derecha (m)"
+      />
+    </div>
+
     <div class="form-row-2">
       <div class="form-field">
         <label for="preg-clave" class="field-label"
@@ -1357,6 +1554,7 @@
         @if (preguntaForm.controls.clave.invalid && preguntaForm.controls.clave.touched) {
         <small class="validation-msg">Solo letras minúsculas, números y guión bajo.</small>
         }
+        <small class="field-help-text">{{ 'formulario.keyAutoHint' | transloco }}</small>
       </div>
 
       <div class="form-field">
@@ -1367,19 +1565,6 @@
           }
         </select>
       </div>
-    </div>
-
-    <div class="form-field">
-      <label for="preg-titulo" class="field-label"
-        >{{ 'formulario.questionTitle' | transloco }} *</label
-      >
-      <input
-        pInputText
-        id="preg-titulo"
-        type="text"
-        formControlName="titulo"
-        placeholder="ej. Ancho de acera derecha (m)"
-      />
     </div>
 
     <div class="form-field">
@@ -1553,7 +1738,8 @@
       </label>
       @if (camposFormularioDisponibles().length > 0) {
       <select id="vinc-campo" class="sgp-select" formControlName="campoRef">
-        @for (c of camposFormularioDisponibles(); track c.value) {
+        <option value="" disabled>{{ 'formulario.selectFormField' | transloco }}</option>
+        @for (c of camposParaVinculo(); track c.value) {
         <option [value]="c.value">{{ c.label }}</option>
         }
       </select>
@@ -1566,7 +1752,10 @@
         placeholder="/identificacion/codigo"
       />
       }
-      <small class="field-help-text">Ruta del campo en el formulario SIECA</small>
+      <small class="field-help-text"
+        >{{ (camposFormularioDisponibles().length > 0 && camposParaVinculo().length === 0 ?
+        'formulario.allFieldsLinked' : 'formulario.onlyUnlinkedFields') | transloco }}</small
+      >
     </div>
 
     <div class="form-field">
@@ -1579,7 +1768,7 @@
         formControlName="columnaDestino"
         (change)="onDestinoChange($event)"
       >
-        <option value="" disabled>Seleccione el destino en el sistema...</option>
+        <option value="" disabled>{{ 'formulario.selectSystemTarget' | transloco }}</option>
         @for (g of opcionesDestino; track g.grupo) {
         <optgroup [label]="g.grupo">
           @for (item of g.items; track item.valor) {
@@ -1617,7 +1806,21 @@
       } }
     </div>
 
-    <div class="form-row-2">
+    <div class="form-field">
+      <label for="vinc-desc" class="field-label">
+        {{ 'formulario.bindingNote' | transloco }}
+      </label>
+      <input
+        pInputText
+        id="vinc-desc"
+        type="text"
+        formControlName="descripcion"
+        placeholder="Opcional: nota técnica"
+      />
+    </div>
+
+    <details class="opciones-avanzadas">
+      <summary>{{ 'formulario.advancedOptions' | transloco }}</summary>
       <div class="form-field">
         <label for="vinc-tipo" class="field-label">
           {{ 'formulario.bindingScope' | transloco }}
@@ -1627,21 +1830,16 @@
           <option [value]="tv.value">{{ tv.label }}</option>
           }
         </select>
+        <small class="field-help-text">{{ 'formulario.bindingScopeHint' | transloco }}</small>
       </div>
+    </details>
 
-      <div class="form-field">
-        <label for="vinc-desc" class="field-label">
-          {{ 'formulario.bindingNote' | transloco }}
-        </label>
-        <input
-          pInputText
-          id="vinc-desc"
-          type="text"
-          formControlName="descripcion"
-          placeholder="Opcional: nota técnica"
-        />
-      </div>
+    @if (errorVinculo(); as errorDuplicado) {
+    <div class="aviso-error" role="alert">
+      <i class="pi pi-exclamation-circle" aria-hidden="true"></i>
+      <span>{{ errorDuplicado }}</span>
     </div>
+    }
 
     <div class="dialog-actions">
       <button
@@ -1662,6 +1860,44 @@
       </button>
     </div>
   </form>
+</p-dialog>
+
+<p-dialog
+  [header]="
+    (confirmacionEliminar()?.tipo === 'seccion'
+      ? 'formulario.deleteSectionTitle'
+      : 'formulario.deleteQuestionTitle') | transloco
+  "
+  [visible]="!!confirmacionEliminar()"
+  (visibleChange)="!$event && cancelarEliminacion()"
+  [modal]="true"
+  [style]="{ width: 'min(30rem, 95vw)' }"
+  [draggable]="false"
+  [resizable]="false"
+>
+  @if (confirmacionEliminar(); as eliminar) {
+  <p>
+    {{ (eliminar.tipo === 'seccion' ? 'formulario.deleteSectionText' :
+    'formulario.deleteQuestionText') | transloco: { nombre: eliminar.nombre, cantidad:
+    eliminar.cantidad } }}
+  </p>
+  <p class="field-help-text">{{ 'formulario.deleteUndoHint' | transloco }}</p>
+  }
+  <div class="dialog-actions">
+    <button
+      pButton
+      type="button"
+      severity="secondary"
+      [outlined]="true"
+      (click)="cancelarEliminacion()"
+    >
+      {{ 'formulario.cancel' | transloco }}
+    </button>
+    <button pButton type="button" severity="danger" (click)="confirmarEliminacion()">
+      <i class="pi pi-trash" aria-hidden="true"></i>
+      <span>{{ 'formulario.delete' | transloco }}</span>
+    </button>
+  </div>
 </p-dialog>
 
 <p-dialog
