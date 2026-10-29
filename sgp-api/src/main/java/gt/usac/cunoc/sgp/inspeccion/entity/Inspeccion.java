@@ -242,6 +242,9 @@ public class Inspeccion {
             null,
             original.getDatos() == null ? null : original.getDatos().deepCopy(),
             ahora);
+    if ("ESTUDIANTE".equals(rolAutor) && autorId.equals(original.getAutorId())) {
+      correccion.asignacionPuenteId = original.getAsignacionPuenteId();
+    }
     correccion.tipo = "CORRECCION";
     correccion.supersedeAId = original.getId();
     correccion.motivoCorreccion = motivo;

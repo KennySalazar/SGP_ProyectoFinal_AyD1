@@ -1,6 +1,7 @@
 package gt.usac.cunoc.sgp.inspeccion.repository;
 
 import gt.usac.cunoc.sgp.inspeccion.entity.HistorialEstadoInspeccion;
+import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -8,6 +9,9 @@ import org.springframework.data.repository.query.Param;
 
 public interface HistorialEstadoInspeccionRepository
     extends JpaRepository<HistorialEstadoInspeccion, UUID> {
+
+  Optional<HistorialEstadoInspeccion> findFirstByInspeccionIdAndEventoOrderBySecuenciaDesc(
+      UUID inspeccionId, String evento);
 
   @Query(
       "select coalesce(max(h.secuencia), 0) from HistorialEstadoInspeccion h"

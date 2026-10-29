@@ -130,7 +130,7 @@ public interface AsignacionPuenteRepository extends JpaRepository<AsignacionPuen
 
   @Query(
       """
-          SELECT ap.id AS id, c.catedratico.id AS catedraticoId
+          SELECT ap.id AS id, ap.puente.id AS puenteId, c.catedratico.id AS catedraticoId
           FROM AsignacionPuente ap
           JOIN ap.cursoEstudiante ce
           JOIN ce.curso c
@@ -150,7 +150,7 @@ public interface AsignacionPuenteRepository extends JpaRepository<AsignacionPuen
 
   @Query(
       """
-          SELECT ap.id AS id, c.catedratico.id AS catedraticoId
+          SELECT ap.id AS id, ap.puente.id AS puenteId, c.catedratico.id AS catedraticoId
           FROM AsignacionPuente ap
           JOIN ap.cursoEstudiante ce
           JOIN ce.curso c
@@ -237,6 +237,8 @@ public interface AsignacionPuenteRepository extends JpaRepository<AsignacionPuen
 
   interface AsignacionInspeccionProjection {
     UUID getId();
+
+    UUID getPuenteId();
 
     UUID getCatedraticoId();
   }

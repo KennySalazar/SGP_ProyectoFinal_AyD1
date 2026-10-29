@@ -2,6 +2,9 @@ package gt.usac.cunoc.sgp.integration;
 
 import static org.assertj.core.api.Assertions.*;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.AdditionalAnswers.delegatesTo;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -62,6 +65,7 @@ import org.testcontainers.utility.DockerImageName;
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @Import({
   TransicionInspeccionService.class,
+  CorreccionInspeccionService.class,
   ReglasEvidenciaFotografica.class,
   PublicacionIndiceCondicionService.class,
   ConfirmacionEstadoIcService.class,
@@ -119,7 +123,9 @@ class VeredictoRevisionIntegrationTest {
 
   @Autowired private JdbcTemplate jdbc;
   @Autowired private ObjectMapper json;
+  @Autowired private Clock clock;
   @Autowired private TransicionInspeccionService transiciones;
+  @Autowired private CorreccionInspeccionService correcciones;
   @Autowired private ConfirmacionEstadoIcService confirmaciones;
   @Autowired private VeredictoRevisionService veredictos;
   @Autowired private gt.usac.cunoc.sgp.revision.repository.RevisionRepository revisiones;
@@ -137,6 +143,7 @@ class VeredictoRevisionIntegrationTest {
 
   @BeforeEach
   void preparar() throws Exception {
+    when(clock.instant()).thenReturn(AHORA);
 
     autorId = UUID.randomUUID();
     puenteId = UUID.randomUUID();
@@ -235,30 +242,7 @@ class VeredictoRevisionIntegrationTest {
         versionId,
         autorId,
         LocalDate.of(2026, 10, 16));
-    for (String categoria : List.of("ACCESO", "SUPERESTRUCTURA", "SUBESTRUCTURA", "CAUCE")) {
-      UUID archivoId = UUID.randomUUID();
-      jdbc.update(
-          """
-          INSERT INTO archivo (id,tipo_uso,categoria_foto,nombre_almacenado,
-            clave_objeto_original,clave_objeto_miniatura,mime_real,tamano_bytes,checksum_sha256,
-            ancho_px,alto_px,ubicacion_captura,capturado_en,subido_por_id,confirmado_en)
-          VALUES (?,'FOTO_INSPECCION',?,?,?,?,'image/jpeg',100,?,10,10,
-            ST_SetSRID(ST_MakePoint(-90.615,14.481),4326)::geography,?,?,?)
-          """,
-          archivoId,
-          categoria,
-          archivoId + ".jpg",
-          archivoId + ".jpg",
-          archivoId + "-mini.jpg",
-          "c".repeat(64),
-          OffsetDateTime.ofInstant(AHORA, ZoneOffset.UTC),
-          autorId,
-          OffsetDateTime.ofInstant(AHORA, ZoneOffset.UTC));
-      jdbc.update(
-          "INSERT INTO archivo_inspeccion (archivo_id,tipo_uso,inspeccion_id) VALUES (?,'FOTO_INSPECCION',?)",
-          archivoId,
-          inspeccionId);
-    }
+    agregarFotos(inspeccionId);
 
     revisorId = UUID.randomUUID();
     crearUsuario(revisorId, "CATEDRATICO");
@@ -290,6 +274,33 @@ class VeredictoRevisionIntegrationTest {
         snapshot.toString(),
         "a".repeat(64));
     autenticar(revisorId, RoleName.CATEDRATICO);
+  }
+
+  private void agregarFotos(UUID destino) {
+    for (String categoria : List.of("ACCESO", "SUPERESTRUCTURA", "SUBESTRUCTURA", "CAUCE")) {
+      UUID archivoId = UUID.randomUUID();
+      jdbc.update(
+          """
+          INSERT INTO archivo (id,tipo_uso,categoria_foto,nombre_almacenado,
+            clave_objeto_original,clave_objeto_miniatura,mime_real,tamano_bytes,checksum_sha256,
+            ancho_px,alto_px,ubicacion_captura,capturado_en,subido_por_id,confirmado_en)
+          VALUES (?,'FOTO_INSPECCION',?,?,?,?,'image/jpeg',100,?,10,10,
+            ST_SetSRID(ST_MakePoint(-90.615,14.481),4326)::geography,?,?,?)
+          """,
+          archivoId,
+          categoria,
+          archivoId + ".jpg",
+          archivoId + ".jpg",
+          archivoId + "-mini.jpg",
+          "c".repeat(64),
+          OffsetDateTime.ofInstant(AHORA, ZoneOffset.UTC),
+          autorId,
+          OffsetDateTime.ofInstant(AHORA, ZoneOffset.UTC));
+      jdbc.update(
+          "INSERT INTO archivo_inspeccion (archivo_id,tipo_uso,inspeccion_id) VALUES (?,'FOTO_INSPECCION',?)",
+          archivoId,
+          destino);
+    }
   }
 
   private void crearUsuario(UUID id, String rol) {
@@ -325,7 +336,7 @@ class VeredictoRevisionIntegrationTest {
         "select estado from inspeccion where id=?", String.class, inspeccionId);
   }
 
-  private int cantidad(String tabla, String campo, UUID id) {
+  private int cantidad(String tabla, String campo, Object id) {
     return jdbc.queryForObject(
         "select count(*) from " + tabla + " where " + campo + "=?", Integer.class, id);
   }
@@ -530,7 +541,14 @@ class VeredictoRevisionIntegrationTest {
     return id;
   }
 
-  private void asignarPuente() {
+  private UUID asignarPuente() {
+    UUID asignacion = crearAsignacion();
+    jdbc.update(
+        "update inspeccion set asignacion_puente_id=? where id=?", asignacion, inspeccionId);
+    return asignacion;
+  }
+
+  private UUID crearAsignacion() {
     UUID materia = UUID.randomUUID(),
         curso = UUID.randomUUID(),
         inscrito = UUID.randomUUID(),
@@ -556,8 +574,7 @@ class VeredictoRevisionIntegrationTest {
         inscrito,
         puenteId,
         revisorId);
-    jdbc.update(
-        "update inspeccion set asignacion_puente_id=? where id=?", asignacion, inspeccionId);
+    return asignacion;
   }
 
   @ParameterizedTest
@@ -584,6 +601,190 @@ class VeredictoRevisionIntegrationTest {
         .isInstanceOf(ApiException.class);
     assertThatThrownBy(() -> observacionesService.listar(cicloId, otro))
         .isInstanceOf(ApiException.class);
+  }
+
+  private UUID crearCorreccionEstudiantil() {
+    asignarPuente();
+    veredictos.emitir(cicloId, revisorId, solicitud(VeredictoRevision.APROBADA));
+    when(clock.instant()).thenReturn(AHORA.plusSeconds(1));
+    autenticar(autorId, RoleName.ESTUDIANTE);
+    UUID id =
+        correcciones
+            .crear(inspeccionId, "Corregir daño registrado", autorId, RoleName.ESTUDIANTE)
+            .id();
+    agregarFotos(id);
+    return id;
+  }
+
+  @Test
+  void correccionEstudiantilCreaCicloApareceEnBandejaYPublicaSinCambiarLaOriginal() {
+    UUID correccion = crearCorreccionEstudiantil();
+    UUID asignacion =
+        jdbc.queryForObject(
+            "select asignacion_puente_id from inspeccion where id=?", UUID.class, inspeccionId);
+    assertThat(
+            jdbc.queryForObject(
+                "select asignacion_puente_id from inspeccion where id=?", UUID.class, correccion))
+        .isEqualTo(asignacion);
+    var enviada = transiciones.enviar(correccion, autorId, "correccion");
+    assertThat(enviada.estado()).isEqualTo("ENVIADA");
+    assertThat(transiciones.enviar(correccion, autorId, "correccion")).isEqualTo(enviada);
+    transiciones.enviar(correccion, autorId, "otro-reintento");
+    assertThat(cantidad("revision", "inspeccion_id", correccion)).isEqualTo(1);
+    var ciclo = revisiones.findFirstByInspeccionIdOrderByNumeroCicloDesc(correccion).orElseThrow();
+    assertThat(ciclo.getNumeroCiclo()).isEqualTo(1);
+    assertThat(ciclo.getRevisorId()).isEqualTo(revisorId);
+    assertThat(cantidad("notificacion", "clave_evento", "revision-enviada:" + ciclo.getId()))
+        .isEqualTo(1);
+    autenticar(revisorId, RoleName.CATEDRATICO);
+    assertThat(bandejas.listarBandeja(revisorId, "", "", "", "", null, null, 0, 20).getContent())
+        .extracting(RevisionBandejaResponse::inspeccionId)
+        .contains(correccion);
+    bandejas.iniciar(ciclo.getId(), revisorId);
+    veredictos.emitir(ciclo.getId(), revisorId, solicitud(VeredictoRevision.APROBADA));
+    assertThat(estado()).isEqualTo("PUBLICADA");
+    assertThat(
+            jdbc.queryForObject(
+                "select estado from inspeccion where id=?", String.class, correccion))
+        .isEqualTo("PUBLICADA");
+    assertThat(
+            jdbc.queryForObject(
+                "select supersede_a_id from inspeccion where id=?", UUID.class, correccion))
+        .isEqualTo(inspeccionId);
+    assertThat(
+            jdbc.queryForObject(
+                "select inspeccion_vigente_id from puente where id=?", UUID.class, puenteId))
+        .isEqualTo(correccion);
+    assertThat(cantidad("revision", "inspeccion_id", inspeccionId)).isEqualTo(1);
+  }
+
+  @Test
+  void correccionPrefiereSuAsignacionOriginalAunqueExistaOtraVigente() {
+    UUID correccion = crearCorreccionEstudiantil();
+    UUID original =
+        jdbc.queryForObject(
+            "select asignacion_puente_id from inspeccion where id=?", UUID.class, correccion);
+    crearAsignacion();
+    transiciones.enviar(correccion, autorId);
+    assertThat(
+            jdbc.queryForObject(
+                "select asignacion_puente_id from inspeccion where id=?", UUID.class, correccion))
+        .isEqualTo(original);
+  }
+
+  @Test
+  void correccionDelDocenteNoHeredaAsignacionEstudiantilYPublicaDirectamente() {
+    asignarPuente();
+    veredictos.emitir(cicloId, revisorId, solicitud(VeredictoRevision.APROBADA));
+    when(clock.instant()).thenReturn(AHORA.plusSeconds(1));
+    UUID correccion =
+        correcciones
+            .crear(inspeccionId, "Corrección docente", revisorId, RoleName.CATEDRATICO)
+            .id();
+    agregarFotos(correccion);
+    assertThat(
+            jdbc.queryForObject(
+                "select asignacion_puente_id from inspeccion where id=?", UUID.class, correccion))
+        .isNull();
+    assertThat(transiciones.publicar(correccion, revisorId).estado()).isEqualTo("PUBLICADA");
+    assertThat(cantidad("revision", "inspeccion_id", correccion)).isZero();
+  }
+
+  @Test
+  void correccionSinAsignacionVigenteNoSaleDelBorrador() {
+    UUID correccion = crearCorreccionEstudiantil();
+    jdbc.update(
+        "update asignacion_puente set revocado_en=CURRENT_TIMESTAMP,motivo_revocacion='Preparación de prueba' where puente_id=?",
+        puenteId);
+    assertThatThrownBy(() -> transiciones.enviar(correccion, autorId))
+        .isInstanceOfSatisfying(
+            ApiException.class, e -> assertThat(e.getCode()).isEqualTo("asignacion_no_vigente"));
+    assertThat(
+            jdbc.queryForObject(
+                "select estado from inspeccion where id=?", String.class, correccion))
+        .isEqualTo("BORRADOR");
+    assertThat(cantidad("revision", "inspeccion_id", correccion)).isZero();
+    assertThat(cantidad("historial_estado_inspeccion", "inspeccion_id", correccion)).isZero();
+  }
+
+  @Test
+  void correccionPuedeUsarLaUnicaAsignacionActualConOtroDocente() {
+    UUID correccion = crearCorreccionEstudiantil();
+    UUID anterior = revisorId;
+    UUID asignacionOriginal =
+        jdbc.queryForObject(
+            "select asignacion_puente_id from inspeccion where id=?", UUID.class, inspeccionId);
+    jdbc.update("update curso set fecha_fin='2026-06-30' where catedratico_id=?", anterior);
+    revisorId = UUID.randomUUID();
+    crearUsuario(revisorId, "CATEDRATICO");
+    UUID nuevaAsignacion = crearAsignacion();
+    transiciones.enviar(correccion, autorId);
+    var ciclo = revisiones.findFirstByInspeccionIdOrderByNumeroCicloDesc(correccion).orElseThrow();
+    assertThat(ciclo.getRevisorId()).isEqualTo(revisorId).isNotEqualTo(anterior);
+    assertThat(
+            jdbc.queryForObject(
+                "select asignacion_puente_id from inspeccion where id=?", UUID.class, inspeccionId))
+        .isEqualTo(asignacionOriginal);
+    assertThat(
+            jdbc.queryForObject(
+                "select asignacion_puente_id from inspeccion where id=?", UUID.class, correccion))
+        .isEqualTo(nuevaAsignacion);
+  }
+
+  @Test
+  void correccionNoEligeArbitrariamenteEntreAsignacionesNuevas() {
+    UUID correccion = crearCorreccionEstudiantil();
+    jdbc.update(
+        "update asignacion_puente set revocado_en=CURRENT_TIMESTAMP,motivo_revocacion='Preparación de prueba' where puente_id=?",
+        puenteId);
+    crearAsignacion();
+    crearAsignacion();
+    assertThatThrownBy(() -> transiciones.enviar(correccion, autorId))
+        .isInstanceOfSatisfying(
+            ApiException.class, e -> assertThat(e.getCode()).isEqualTo("asignacion_ambigua"));
+    assertThat(cantidad("revision", "inspeccion_id", correccion)).isZero();
+  }
+
+  @Test
+  void reintentarRecuperaCorreccionHuerfanaConFechaOriginalSinDuplicarNiCambiarHistorial() {
+    UUID correccion = crearCorreccionEstudiantil();
+    Instant envioOriginal = AHORA.minusSeconds(16 * 86400);
+    jdbc.update(
+        "update inspeccion set estado='ENVIADA',asignacion_puente_id=null where id=?", correccion);
+    jdbc.update(
+        "insert into historial_estado_inspeccion(id,inspeccion_id,secuencia,estado_anterior,estado_nuevo,realizado_por_id,evento,creado_en) values(?,?,1,'BORRADOR','ENVIADA',?,'ENVIAR',?)",
+        UUID.randomUUID(),
+        correccion,
+        autorId,
+        OffsetDateTime.ofInstant(envioOriginal, ZoneOffset.UTC));
+    assertThatThrownBy(() -> transiciones.enviar(correccion, revisorId))
+        .isInstanceOf(ApiException.class);
+    transiciones.enviar(correccion, autorId, "recuperar-correccion");
+    transiciones.enviar(correccion, autorId, "recuperar-otra-vez");
+    var ciclo = revisiones.findFirstByInspeccionIdOrderByNumeroCicloDesc(correccion).orElseThrow();
+    assertThat(ciclo.getEnviadaEn()).isEqualTo(envioOriginal);
+    assertThat(ciclo.getRevisorId()).isEqualTo(revisorId);
+    assertThat(cantidad("revision", "inspeccion_id", correccion)).isEqualTo(1);
+    assertThat(cantidad("notificacion", "clave_evento", "revision-enviada:" + ciclo.getId()))
+        .isEqualTo(1);
+    assertThat(cantidad("historial_estado_inspeccion", "inspeccion_id", correccion)).isEqualTo(1);
+    assertThat(
+            jdbc.queryForObject(
+                "select count(*) from auditoria where entidad_id=? and valores_posteriores->>'motivo'='Recuperación de corrección enviada sin ciclo académico'",
+                Integer.class,
+                correccion))
+        .isEqualTo(1);
+  }
+
+  @Test
+  void recuperacionSinEvidenciaDeEnvioNoInventaFechaNiCiclo() {
+    UUID correccion = crearCorreccionEstudiantil();
+    jdbc.update(
+        "update inspeccion set estado='ENVIADA',asignacion_puente_id=null where id=?", correccion);
+    assertThatThrownBy(() -> transiciones.enviar(correccion, autorId))
+        .isInstanceOfSatisfying(
+            ApiException.class, e -> assertThat(e.getCode()).isEqualTo("envio_sin_historial"));
+    assertThat(cantidad("revision", "inspeccion_id", correccion)).isZero();
   }
 
   @Test
@@ -854,7 +1055,7 @@ class VeredictoRevisionIntegrationTest {
   static class Config {
     @Bean
     Clock clock() {
-      return Clock.fixed(AHORA, ZoneOffset.UTC);
+      return mock(Clock.class, delegatesTo(Clock.fixed(AHORA, ZoneOffset.UTC)));
     }
 
     @Bean
