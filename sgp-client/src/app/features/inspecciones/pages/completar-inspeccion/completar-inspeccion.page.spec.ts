@@ -7,7 +7,7 @@ import { of as estadoRespaldo } from 'rxjs';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { Pipe, PipeTransform, signal, Component, input } from '@angular/core';
 import { ActivatedRoute, Router, convertToParamMap } from '@angular/router';
-import { HttpErrorResponse } from '@angular/common/http';
+import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { of, throwError } from 'rxjs';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { describe, beforeEach, afterEach, it, expect, vi } from 'vitest';
@@ -209,6 +209,10 @@ describe('CompletarInspeccionPage', () => {
     TestBed.configureTestingModule({
       imports: [CompletarInspeccionPage],
       providers: [
+        {
+          provide: HttpClient,
+          useValue: { get: vi.fn(() => of({ restringida: false, campos: [], categorias: [] })) },
+        },
         { provide: SincronizacionService, useValue: sync },
         {
           provide: InspeccionesLocalesService,
@@ -1083,6 +1087,20 @@ describe('CompletarInspeccionPage', () => {
     expect(component.datosIniciales()?.datos).toEqual(datosLocales);
     expect(component.errorGuardado()).toContain('guardados locales pendientes');
     expect(mockInspeccionApi.guardarBorrador).not.toHaveBeenCalled();
+    expect(mockInspeccionApi.enviar).not.toHaveBeenCalled();
+  });
+  it('presenta los campos incompletos como una lista y no como un mensaje concatenado', async () => {
+    await cargar();
+    vi.spyOn(FormularioDinamicoComponent.prototype, 'revisar').mockReturnValue(false);
+    vi.spyOn(FormularioDinamicoComponent.prototype, 'problemasValidacion').mockReturnValue([
+      'Identificacion: completa la ruta.',
+      'Datos generales: completa el ancho.',
+    ]);
+    component.abrirConfirmacion();
+    fixture.detectChanges();
+    expect(component.errorAccion()?.mensaje).toBe('offline.hu061.incomplete');
+    expect(component.errorAccion()?.campos).toHaveLength(2);
+    expect(fixture.nativeElement.querySelectorAll('.lista-validacion li')).toHaveLength(2);
     expect(mockInspeccionApi.enviar).not.toHaveBeenCalled();
   });
 });

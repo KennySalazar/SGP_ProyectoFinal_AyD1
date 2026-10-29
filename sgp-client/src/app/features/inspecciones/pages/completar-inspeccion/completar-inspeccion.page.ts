@@ -1,4 +1,4 @@
-import { LocalInspection } from '../../../../offline/db/sgp-db';
+import { LocalInspection, sgpDb } from '../../../../offline/db/sgp-db';
 import { SincronizacionService } from '../../../../offline/services/sincronizacion.service';
 import { TranslocoService } from '@jsverse/transloco';
 import { AprobacionCalibracionComponent } from '../../../formulario/components/aprobacion-calibracion/aprobacion-calibracion.component';
@@ -12,11 +12,12 @@ import {
   effect,
   inject,
   signal,
+  untracked,
   viewChild,
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { HttpErrorResponse } from '@angular/common/http';
+import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { debounceTime, Subject } from 'rxjs';
@@ -122,6 +123,76 @@ export class CompletarInspeccionPage implements OnInit {
   readonly guardando = signal(false);
   readonly errorCarga = signal<string | null>(null);
   readonly errorGuardado = signal<string | null>(null);
+  private readonly httpCorreccion = inject(HttpClient);
+  private clavePermisos = '';
+  readonly permisosCorreccion = signal<{
+    restringida: boolean;
+    campos: string[];
+    categorias: string[];
+  } | null>(null);
+  readonly verificandoPermisos = signal(false);
+  readonly errorPermisos = signal<string | null>(null);
+
+  private cargarPermisosCorreccion(borrador: InspeccionBorradorResponse): void {
+    if (this.auth.user()?.role !== 'ESTUDIANTE' || !this.esAutor()) return;
+    const clave = borrador.id + ':' + borrador.estado;
+    if (this.clavePermisos === clave) return;
+    this.clavePermisos = clave;
+    this.permisosCorreccion.set(null);
+    this.verificandoPermisos.set(true);
+    this.errorPermisos.set(null);
+    if (!this.connectivity.online()) {
+      void sgpDb.inspecciones
+        .get(borrador.id)
+        .then((local) => {
+          if (this.clavePermisos !== clave || this.auth.user()?.id !== borrador.autorId) return;
+          const permisos =
+            local?.propietarioId === borrador.autorId ? local.permisosCorreccion : null;
+          if (permisos || borrador.version === 0) {
+            this.permisosCorreccion.set(
+              permisos ?? { restringida: false, campos: [], categorias: [] },
+            );
+            this.verificandoPermisos.set(false);
+          } else
+            this.errorPermisos.set('Conectate una vez para comprobar que campos puedes corregir.');
+        })
+        .catch(() =>
+          this.errorPermisos.set('No fue posible recuperar los permisos de correccion.'),
+        );
+      return;
+    }
+    const actor = this.auth.user()?.id;
+    this.httpCorreccion
+      .get<{ restringida: boolean; campos: string[]; categorias: string[] }>(
+        `/api/v1/inspecciones/${encodeURIComponent(borrador.id)}/permisos-correccion`,
+        { headers: { 'ngsw-bypass': 'true' } },
+      )
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (permisos) => {
+          if (this.clavePermisos !== clave || this.auth.user()?.id !== actor) return;
+          this.permisosCorreccion.set(permisos);
+          this.verificandoPermisos.set(false);
+          void sgpDb
+            .transaction('rw', sgpDb.inspecciones, async () => {
+              const local = await sgpDb.inspecciones.get(borrador.id);
+              if (local?.propietarioId === actor && this.auth.user()?.id === actor)
+                await sgpDb.inspecciones.update(borrador.id, { permisosCorreccion: permisos });
+            })
+            .catch(() =>
+              this.errorPermisos.set(
+                'Los permisos se comprobaron, pero no pudieron guardarse para trabajar sin conexion.',
+              ),
+            );
+        },
+        error: () => {
+          if (this.clavePermisos !== clave || this.auth.user()?.id !== actor) return;
+          this.errorPermisos.set(
+            'No fue posible comprobar los campos editables. Recarga cuando tengas conexion.',
+          );
+        },
+      });
+  }
   readonly mensajeExito = signal<string | null>(null);
   readonly estadoAutoguardado = signal<'pendiente' | 'guardando' | 'guardado' | null>(null);
   readonly borrador = signal<InspeccionBorradorResponse | null>(null);
@@ -138,6 +209,7 @@ export class CompletarInspeccionPage implements OnInit {
       !!borrador &&
       (borrador.autorId !== this.auth.user()?.id ||
         borrador.estado !== 'BORRADOR' ||
+        this.verificandoPermisos() ||
         this.intencionFinal()?.estado === 'PENDIENTE' ||
         this.intencionFinal()?.estado === 'CONFIRMADA')
     );
@@ -196,6 +268,11 @@ export class CompletarInspeccionPage implements OnInit {
     return iniciales;
   });
   constructor() {
+    effect(() => {
+      const formulario = this.formulario();
+      const campo = this.route.snapshot.queryParamMap?.get('campo');
+      if (formulario?.disponible() && campo) untracked(() => formulario.mostrarAnclaje(campo));
+    });
     effect(() => {
       const usuario = this.auth.user()?.id;
       if (this.borrador() && this.borrador()?.autorId !== usuario) {
@@ -437,6 +514,7 @@ export class CompletarInspeccionPage implements OnInit {
     }
     this.revisionInicialConfirmada.set(false);
     this.borrador.set(this.conProgreso(borrador));
+    this.cargarPermisosCorreccion(borrador);
     this.datosIniciales.set(borrador);
     this.fechaInspeccion.set(borrador.fechaInspeccion || this.hoy);
     this.datosEnMemoria.set(borrador.datos ?? {});
@@ -899,10 +977,11 @@ export class CompletarInspeccionPage implements OnInit {
     this.errorAccion.set(null);
     if (!this.formulario()?.revisar()) {
       this.errorAccion.set({
-        mensaje:
-          this.formulario()?.problemasValidacion().join(' · ') ||
-          this.i18n.translate('offline.hu061.incomplete'),
-        campos: [],
+        mensaje: this.i18n.translate('offline.hu061.incomplete'),
+        campos: (this.formulario()?.problemasValidacion() ?? []).map((mensaje, indice) => ({
+          campo: String(indice),
+          mensaje,
+        })),
         fotografias: [],
       });
       return;

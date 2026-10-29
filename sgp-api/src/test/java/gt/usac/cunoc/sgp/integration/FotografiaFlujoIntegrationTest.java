@@ -36,6 +36,7 @@ import org.testcontainers.utility.DockerImageName;
 @DataJpaTest(properties = {"spring.jpa.hibernate.ddl-auto=validate", "spring.jpa.show-sql=false"})
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @Import({
+  gt.usac.cunoc.sgp.inspeccion.service.PermisosCorreccionService.class,
   OperacionIdempotenteService.class,
   InspeccionService.class,
   gt.usac.cunoc.sgp.inspeccion.service.CalculadorProgresoBorrador.class,
@@ -817,25 +818,25 @@ class FotografiaFlujoIntegrationTest {
   void agregarArchivos(UUID id, int cantidad, String tipo, String categoria, String estado) {
     jdbc.update(
         """
-        WITH nuevos AS (
-          SELECT uuid_generate_v4() AS id FROM generate_series(1, ?)
-        ), archivos AS (
-          INSERT INTO archivo (
-            id, tipo_uso, categoria_foto, nombre_almacenado, clave_objeto_original,
-            clave_objeto_miniatura, mime_real, tamano_bytes, checksum_sha256,
-            ancho_px, alto_px, ubicacion_captura, capturado_en, subido_por_id,
-            confirmado_en, estado
-          )
-          SELECT id, ?, ?, id::text, id::text || '.jpg', id::text || '-mini.jpg',
-            ?, 100, repeat('a', 64), 100, 50,
-            ST_SetSRID(ST_MakePoint(-90, 14), 4326)::geography,
-            CURRENT_TIMESTAMP, ?, CURRENT_TIMESTAMP, ?
-          FROM nuevos
-          RETURNING id, tipo_uso
-        )
-        INSERT INTO archivo_inspeccion (archivo_id, tipo_uso, inspeccion_id)
-        SELECT id, tipo_uso, ? FROM archivos
-        """,
+            WITH nuevos AS (
+              SELECT uuid_generate_v4() AS id FROM generate_series(1, ?)
+            ), archivos AS (
+              INSERT INTO archivo (
+                id, tipo_uso, categoria_foto, nombre_almacenado, clave_objeto_original,
+                clave_objeto_miniatura, mime_real, tamano_bytes, checksum_sha256,
+                ancho_px, alto_px, ubicacion_captura, capturado_en, subido_por_id,
+                confirmado_en, estado
+              )
+              SELECT id, ?, ?, id::text, id::text || '.jpg', id::text || '-mini.jpg',
+                ?, 100, repeat('a', 64), 100, 50,
+                ST_SetSRID(ST_MakePoint(-90, 14), 4326)::geography,
+                CURRENT_TIMESTAMP, ?, CURRENT_TIMESTAMP, ?
+              FROM nuevos
+              RETURNING id, tipo_uso
+            )
+            INSERT INTO archivo_inspeccion (archivo_id, tipo_uso, inspeccion_id)
+            SELECT id, tipo_uso, ? FROM archivos
+            """,
         cantidad,
         tipo,
         categoria,

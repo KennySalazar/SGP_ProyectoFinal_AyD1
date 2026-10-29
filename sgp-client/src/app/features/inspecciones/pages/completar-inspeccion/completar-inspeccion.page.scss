@@ -404,3 +404,13 @@
     line-height: 1.5;
   }
 }
+
+.lista-validacion {
+  max-height: 18rem;
+  overflow-y: auto;
+  padding-inline-start: 1.5rem;
+  margin-block: 0.75rem;
+  li {
+    margin-block: 0.5rem;
+  }
+}

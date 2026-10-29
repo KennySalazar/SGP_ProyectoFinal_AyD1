@@ -42,6 +42,8 @@ import org.springframework.web.multipart.MultipartFile;
  */
 @Service
 public class DocumentoInspeccionService {
+  @org.springframework.beans.factory.annotation.Autowired
+  private PermisosCorreccionService permisosCorreccion;
 
   static final int MAXIMO_DOCUMENTOS = 10;
 
@@ -251,6 +253,11 @@ public class DocumentoInspeccionService {
           "estado_inspeccion_no_permite_archivos",
           "Los documentos solo se modifican en un borrador; después del envío quedan fijos.");
     }
+    if (permisosCorreccion != null && permisosCorreccion.consultar(inspeccion).restringida())
+      throw error(
+          HttpStatus.CONFLICT,
+          "documento_no_observado",
+          "Durante la correccion solo se pueden modificar los campos o fotografias observados.");
     return inspeccion;
   }
 

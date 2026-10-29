@@ -14,5 +14,14 @@ public interface CursoMapper {
   @Mapping(target = "estado", expression = "java(curso.isActivo() ? \"VIGENTE\" : \"FINALIZADO\")")
   CursoResponse toResponse(Curso curso);
 
+  @Mapping(target = "nombre", expression = "java(nombreDocente(usuario))")
   CatedraticoResponse toCatedraticoResponse(UserAccount usuario);
+
+  default String nombreDocente(UserAccount usuario) {
+    if (usuario.getNombreCompleto() != null && !usuario.getNombreCompleto().isBlank())
+      return usuario.getNombreCompleto();
+    if (usuario.getNombreUsuario() != null && !usuario.getNombreUsuario().isBlank())
+      return usuario.getNombreUsuario();
+    return "Docente sin nombre registrado";
+  }
 }

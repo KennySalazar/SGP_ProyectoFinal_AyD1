@@ -150,19 +150,31 @@ export class NodoFormularioComponent {
     this.construido().revision();
     const lista = this.control() as FormArray;
     const maximo = this.arreglo().maximoElementos;
-    return lista.enabled && (maximo === undefined || lista.length < maximo);
+    return (
+      this.construido().permiteModificar(lista) &&
+      lista.enabled &&
+      (maximo === undefined || lista.length < maximo)
+    );
   });
 
   protected readonly puedeQuitar = computed(() => {
     this.construido().revision();
     const lista = this.control() as FormArray;
-    return lista.enabled && lista.length > this.arreglo().minimoElementos;
+    return (
+      this.construido().permiteModificar(lista) &&
+      lista.enabled &&
+      lista.length > this.arreglo().minimoElementos
+    );
   });
 
   /** Un bloque opcional ya empezado se puede descartar entero, sin vaciar campo por campo. */
   protected readonly puedeLimpiar = computed(() => {
     this.construido().revision();
-    return this.empezado() && this.control().enabled;
+    return (
+      this.empezado() &&
+      this.control().enabled &&
+      this.construido().permiteModificar(this.control())
+    );
   });
 
   protected limpiar(): void {

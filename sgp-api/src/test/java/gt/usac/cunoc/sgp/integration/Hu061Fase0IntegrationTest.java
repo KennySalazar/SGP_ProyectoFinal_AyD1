@@ -75,6 +75,7 @@ import org.testcontainers.utility.DockerImageName;
 @DataJpaTest(properties = {"spring.jpa.hibernate.ddl-auto=validate", "spring.jpa.show-sql=false"})
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @Import({
+  gt.usac.cunoc.sgp.inspeccion.service.PermisosCorreccionService.class,
   IdempotenciaHttpService.class,
   OperacionHttpRepository.class,
   OperacionIdempotenteService.class,
@@ -377,13 +378,13 @@ class Hu061Fase0IntegrationTest {
       UUID archivo = UUID.randomUUID();
       jdbc.update(
           """
-          insert into archivo(id,tipo_uso,categoria_foto,nombre_almacenado,
-            clave_objeto_original,clave_objeto_miniatura,mime_real,tamano_bytes,
-            checksum_sha256,ancho_px,alto_px,ubicacion_captura,capturado_en,
-            subido_por_id,confirmado_en)
-          values (?,'FOTO_INSPECCION',?,?,?,?,'image/jpeg',100,?,10,10,
-            ST_SetSRID(ST_MakePoint(-90,14),4326)::geography,now(),?,now())
-          """,
+              insert into archivo(id,tipo_uso,categoria_foto,nombre_almacenado,
+                clave_objeto_original,clave_objeto_miniatura,mime_real,tamano_bytes,
+                checksum_sha256,ancho_px,alto_px,ubicacion_captura,capturado_en,
+                subido_por_id,confirmado_en)
+              values (?,'FOTO_INSPECCION',?,?,?,?,'image/jpeg',100,?,10,10,
+                ST_SetSRID(ST_MakePoint(-90,14),4326)::geography,now(),?,now())
+              """,
           archivo,
           categoria,
           archivo + ".jpg",

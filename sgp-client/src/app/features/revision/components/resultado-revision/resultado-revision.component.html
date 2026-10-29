@@ -159,6 +159,14 @@
             {{ o.destino?.instanciaElementoId }}
           </p>
           <p>{{ o.texto }}</p>
+          @if (puedeResolver() && o.destino?.elementoRef) {
+            <a
+              pButton
+              [routerLink]="['/inspecciones', c.inspeccionId]"
+              [queryParams]="{ campo: o.destino?.elementoRef }"
+              >Corregir este campo</a
+            >
+          }
           <p>{{ 'observaciones.estados.' + o.estado | transloco }}</p>
           @if (o.estado === 'RESUELTA') {
             <p>{{ o.respuestaAutor }}</p>
@@ -167,6 +175,10 @@
               {{ o.resueltoEn | date: 'dd/MM/yyyy HH:mm' }}
             </p>
           } @else if (puedeResolver()) {
+            <p>
+              Primero corrige y guarda el campo en el borrador. Esta respuesta solo explica el
+              cambio realizado.
+            </p>
             <label
               >{{ 'revision.atencion.respuesta' | transloco }}
               <textarea

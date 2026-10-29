@@ -97,7 +97,7 @@
       ><p-select
         inputId="categoria-foto"
         [formControl]="categoria"
-        [options]="categorias"
+        [options]="opcionesCategorias()"
         appendTo="body"
       >
         <ng-template #item let-opcion>{{ etiqueta(opcion) }}</ng-template>
@@ -180,7 +180,7 @@
                 type="button"
                 severity="danger"
                 [outlined]="true"
-                [disabled]="ocupado()"
+                [disabled]="ocupado() || !categoriaEditable(foto.categoria)"
                 (click)="solicitarRetirada(foto)"
               >
                 {{ 'inspecciones.fotos.retirar' | transloco }}
