@@ -179,3 +179,24 @@
     }
   }
 }
+
+.aviso-info {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  margin: 0 0 1.25rem;
+  padding: 0.7rem 1rem;
+  background: #eff6ff;
+  color: #1e40af;
+  border: 1px solid #bfdbfe;
+  border-radius: 10px;
+  font-size: 0.9rem;
+}
+
+.celda-estado {
+  white-space: nowrap;
+
+  p-tag + p-tag {
+    margin-left: 0.4rem;
+  }
+}

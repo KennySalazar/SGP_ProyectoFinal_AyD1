@@ -164,4 +164,22 @@ describe('VersionesFormularioPage', () => {
     expect(fixture.nativeElement.querySelector('nav.accesos')).toBeNull();
     expect(fixture.nativeElement.textContent).not.toContain('formulario.loadTemplate');
   });
+  it('propone el siguiente código y la versión activa como base al crear una versión', () => {
+    component.versiones.set([
+      { ...mockVersiones[0], id: '2', codigo: 'SIECA-v2', activa: false, estado: 'BORRADOR' },
+      mockVersiones[0],
+    ]);
+    component.abrirDialogoNueva();
+    expect(component.dialogoNuevaVisible()).toBe(true);
+    expect(component.nuevoForm.getRawValue()).toEqual({ codigo: 'SIECA-v3', versionBaseId: '1' });
+    expect(component.obtenerOpcionesBase().map((o) => o.label)).toContain(
+      'SIECA-v1 (PUBLICADA · activa)',
+    );
+  });
+
+  it('sin versiones previas ofrece la plantilla como base y SIECA-v1 como código', () => {
+    component.versiones.set([]);
+    component.abrirDialogoNueva();
+    expect(component.nuevoForm.getRawValue()).toEqual({ codigo: 'SIECA-v1', versionBaseId: null });
+  });
 });

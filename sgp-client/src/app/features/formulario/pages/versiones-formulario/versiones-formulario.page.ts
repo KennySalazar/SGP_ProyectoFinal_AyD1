@@ -21,6 +21,7 @@ import { finalize } from 'rxjs';
 import { ApiErrorService } from '../../../../core/services/api-error.service';
 import { VersionFormularioResumen } from '../../models/formulario.models';
 import { FormularioApiService } from '../../services/formulario-api.service';
+import { siguienteCodigoVersion } from '../../utils/codigos-formulario';
 
 @Component({
   selector: 'app-versiones-formulario-page',
@@ -126,7 +127,13 @@ export class VersionesFormularioPage implements OnInit {
   }
 
   abrirDialogoNueva(): void {
-    this.nuevoForm.reset({ codigo: '', versionBaseId: null });
+    const versiones = this.versiones();
+    const base =
+      versiones.find((v) => v.activa) ?? versiones.find((v) => v.estado === 'PUBLICADA') ?? null;
+    this.nuevoForm.reset({
+      codigo: siguienteCodigoVersion(versiones.map((v) => v.codigo)),
+      versionBaseId: base?.id ?? null,
+    });
     this.dialogoNuevaVisible.set(true);
   }
 
@@ -167,7 +174,7 @@ export class VersionesFormularioPage implements OnInit {
     return [
       { label: this.transloco.translate('formulario.noBase'), value: null },
       ...this.versiones().map((v) => ({
-        label: `${v.codigo} (${v.estado})`,
+        label: `${v.codigo} (${v.estado}${v.activa ? ' · activa' : ''})`,
         value: v.id,
       })),
     ];

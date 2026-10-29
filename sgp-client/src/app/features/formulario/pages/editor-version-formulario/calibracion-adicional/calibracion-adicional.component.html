@@ -1,4 +1,4 @@
-<section class="surface-card panel">
+<section class="surface-card panel" [hidden]="vista() === 'acta'">
   <h2>{{ 'formulario.adicional.titulo' | transloco }}</h2>
   <p>{{ 'formulario.adicional.ayuda' | transloco }}</p>
   @if (error()) {
@@ -92,7 +92,7 @@
     }
   </form>
 </section>
-<section class="surface-card panel">
+<section class="surface-card panel" [hidden]="vista() === 'criticas'">
   <h2>{{ 'formulario.adicional.actaTitulo' | transloco }}</h2>
   <p>{{ 'formulario.adicional.actaAyuda' | transloco }}</p>
   @if (errorActa()) {

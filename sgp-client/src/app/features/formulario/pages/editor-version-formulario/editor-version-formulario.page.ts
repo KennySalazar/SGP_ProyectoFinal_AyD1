@@ -11,6 +11,7 @@ import {
   Component,
   computed,
   DestroyRef,
+  ElementRef,
   inject,
   OnInit,
   signal,
@@ -52,6 +53,7 @@ import {
   VinculoVisual,
 } from '../../models/formulario.models';
 import { FormularioApiService } from '../../services/formulario-api.service';
+import { claveDesdeTitulo, siguienteCodigoVersion } from '../../utils/codigos-formulario';
 import {
   esquemaASeccionesVisuales,
   extraerVinculosVisuales,
@@ -70,6 +72,30 @@ import {
   configuracionIcCompleta,
 } from '../../utils/configuracion-ic';
 type SeccionActiva = 'esquema' | 'vinculos' | 'pesos' | 'mapeos' | 'publicar';
+type SubSeccionPesos = 'pesos' | 'reglas' | 'criticas' | 'acta';
+type EstadoPestana = 'ok' | 'pendiente' | 'ninguno';
+interface ConfirmacionEliminar {
+  tipo: 'seccion' | 'pregunta';
+  seccionClave: string;
+  preguntaClave?: string;
+  nombre: string;
+  cantidad: number;
+}
+export interface OpcionMapeo {
+  label: string;
+  completo: string;
+  value: string;
+  pendiente: boolean;
+}
+export interface GrupoOpcionesMapeo {
+  label: string;
+  items: OpcionMapeo[];
+}
+export interface MotivoNoPublicable {
+  clave: string;
+  seccion: SeccionActiva;
+  subSeccion?: SubSeccionPesos;
+}
 export interface InfoVinculoDestino {
   categoria: 'puente' | 'tecnico' | 'inspeccion' | 'otro';
   etiquetaCategoria: string;
@@ -98,7 +124,10 @@ export interface InfoVinculoDestino {
     TextareaModule,
   ],
   templateUrl: './editor-version-formulario.page.html',
-  styleUrl: './editor-version-formulario.page.scss',
+  styleUrls: [
+    './editor-version-formulario.page.scss',
+    './editor-version-formulario.page.navegacion.scss',
+  ],
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class EditorVersionFormularioPage implements OnInit {
@@ -111,6 +140,7 @@ export class EditorVersionFormularioPage implements OnInit {
   private readonly transloco = inject(TranslocoService);
   private readonly fb = inject(FormBuilder);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   registrarAprobacion(aprobacion: AprobacionCalibracion): void {
     this.version.update((version) =>
       version && version.id === aprobacion.versionFormularioId
@@ -136,6 +166,11 @@ export class EditorVersionFormularioPage implements OnInit {
     return etiquetaMapeo(ruta, origen ? this.nombresOrigenMapeo() : this.nombresDestinoMapeo());
   }
   readonly seccionActiva = signal<SeccionActiva>('esquema');
+  readonly subSeccionPesos = signal<SubSeccionPesos>('pesos');
+  readonly estructuraModificada = signal(false);
+  readonly busquedaPesos = signal('');
+  readonly confirmacionEliminar = signal<ConfirmacionEliminar | null>(null);
+  readonly errorVinculo = signal<string | null>(null);
   readonly cargando = signal(false);
   readonly guardandoEsquema = signal(false);
   readonly guardandoPesos = signal(false);
@@ -215,6 +250,46 @@ export class EditorVersionFormularioPage implements OnInit {
     return [...pendientes, ...otros];
   });
 
+  readonly opcionesOrigenAgrupadas = computed(() =>
+    this.agruparOpcionesMapeo(this.opcionesCamposOrigen(), this.camposOrigenSinMapeo(), true),
+  );
+  readonly opcionesDestinoAgrupadas = computed(() =>
+    this.agruparOpcionesMapeo(this.opcionesCamposDestino(), this.camposDestinoSinMapeo(), false),
+  );
+
+  private agruparOpcionesMapeo(
+    rutas: string[],
+    pendientes: string[],
+    origen: boolean,
+  ): GrupoOpcionesMapeo[] {
+    const porMapear = new Set(pendientes);
+    const pendientesGrupo: OpcionMapeo[] = [];
+    const secciones = new Map<string, OpcionMapeo[]>();
+    for (const ruta of rutas) {
+      const completo = this.nombreCampoMapeo(ruta, origen);
+      if (porMapear.has(ruta)) {
+        pendientesGrupo.push({ label: completo, completo, value: ruta, pendiente: true });
+        continue;
+      }
+      const [seccion, ...resto] = completo.split(' > ');
+      const items = secciones.get(seccion) ?? [];
+      items.push({
+        label: resto.length ? resto.join(' › ') : seccion,
+        completo,
+        value: ruta,
+        pendiente: false,
+      });
+      secciones.set(seccion, items);
+    }
+    const grupos = [...secciones].map(([label, items]) => ({ label, items }));
+    return pendientesGrupo.length
+      ? [
+          { label: this.transloco.translate('formulario.pendingGroup'), items: pendientesGrupo },
+          ...grupos,
+        ]
+      : grupos;
+  }
+
   readonly hayMapeosSinGuardar = computed(() => {
     const guardados = this.analisisMapeo()?.mapeosDeclarados ?? [];
     const editables = this.mapeosEditables();
@@ -242,12 +317,145 @@ export class EditorVersionFormularioPage implements OnInit {
     return this.camposDestinoSinMapeo().includes(ruta);
   }
 
+  readonly motivosNoPublicable = computed<MotivoNoPublicable[]>(() => {
+    const ver = this.version();
+    if (!ver || ver.estado !== 'BORRADOR') return [];
+    const motivos: MotivoNoPublicable[] = [];
+    if (this.estructuraModificada())
+      motivos.push({ clave: 'formulario.publishBlockers.estructura', seccion: 'esquema' });
+    if (!this.calibracionGuardada() || this.calibracionPendiente() || this.estadoReglas().pendiente)
+      motivos.push({
+        clave: 'formulario.publishBlockers.calibracion',
+        seccion: 'pesos',
+        subSeccion: 'pesos',
+      });
+    if (this.criticasSinResolver() || this.estadoCriticas().pendiente)
+      motivos.push({
+        clave: 'formulario.publishBlockers.criticas',
+        seccion: 'pesos',
+        subSeccion: 'criticas',
+      });
+    if (
+      ver.versionAnteriorId &&
+      !(this.analisisMapeo()?.mapeoCompleto || this.mapeoLocalCompleto())
+    )
+      motivos.push({ clave: 'formulario.publishBlockers.mapeo', seccion: 'mapeos' });
+    return motivos;
+  });
+  pestanas(): { id: SeccionActiva; icono: string; etiqueta: string; corta: string }[] {
+    const ver = this.version();
+    const lista: { id: SeccionActiva; icono: string; etiqueta: string; corta: string }[] = [
+      {
+        id: 'esquema',
+        icono: 'pi pi-list',
+        etiqueta: 'formulario.schemaTab',
+        corta: 'formulario.tabsShort.schema',
+      },
+      {
+        id: 'vinculos',
+        icono: 'pi pi-link',
+        etiqueta: 'formulario.linksTab',
+        corta: 'formulario.tabsShort.links',
+      },
+      {
+        id: 'pesos',
+        icono: 'pi pi-sliders-h',
+        etiqueta: 'formulario.weightsTab',
+        corta: 'formulario.tabsShort.weights',
+      },
+    ];
+    if (this.esAdministrador() && ver?.versionAnteriorId)
+      lista.push({
+        id: 'mapeos',
+        icono: 'pi pi-arrows-h',
+        etiqueta: 'formulario.mappingTab',
+        corta: 'formulario.tabsShort.mapping',
+      });
+    if (this.esAdministrador() && ver?.estado === 'BORRADOR')
+      lista.push({
+        id: 'publicar',
+        icono: 'pi pi-cloud-upload',
+        etiqueta: 'formulario.publishTab',
+        corta: 'formulario.tabsShort.publish',
+      });
+    return lista;
+  }
+  readonly subPestanasPesos = computed(() => {
+    const borrador = this.version()?.estado === 'BORRADOR';
+    return [
+      {
+        id: 'pesos' as SubSeccionPesos,
+        etiqueta: 'formulario.weightsSubTab',
+        pendiente: borrador && (this.pesosPendientes().length > 0 || this.calibracionPendiente()),
+      },
+      {
+        id: 'reglas' as SubSeccionPesos,
+        etiqueta: 'formulario.rulesSubTab',
+        pendiente: borrador && this.estadoReglas().pendiente,
+      },
+      {
+        id: 'criticas' as SubSeccionPesos,
+        etiqueta: 'formulario.criticalSubTab',
+        pendiente: borrador && (this.criticasSinResolver() || this.estadoCriticas().pendiente),
+      },
+      { id: 'acta' as SubSeccionPesos, etiqueta: 'formulario.actaSubTab', pendiente: false },
+    ];
+  });
+  readonly estadoPestanas = computed<Record<SeccionActiva, EstadoPestana>>(() => {
+    const sinEstado: Record<SeccionActiva, EstadoPestana> = {
+      esquema: 'ninguno',
+      vinculos: 'ninguno',
+      pesos: 'ninguno',
+      mapeos: 'ninguno',
+      publicar: 'ninguno',
+    };
+    const ver = this.version();
+    if (!ver || ver.estado !== 'BORRADOR') return sinEstado;
+    const estructura: EstadoPestana = this.estructuraModificada() ? 'pendiente' : 'ok';
+    const calibracionIncompleta =
+      !this.calibracionGuardada() ||
+      this.calibracionPendiente() ||
+      this.estadoReglas().pendiente ||
+      this.criticasSinResolver() ||
+      this.estadoCriticas().pendiente;
+    let mapeos: EstadoPestana = 'ninguno';
+    if (ver.versionAnteriorId && this.analisisMapeo())
+      mapeos = this.mapeoLocalCompleto() && !this.hayMapeosSinGuardar() ? 'ok' : 'pendiente';
+    return {
+      esquema: estructura,
+      vinculos: estructura,
+      pesos: calibracionIncompleta ? 'pendiente' : 'ok',
+      mapeos,
+      publicar: this.motivosNoPublicable().length ? 'pendiente' : 'ok',
+    };
+  });
+  readonly pesosFiltrados = computed(() => {
+    const termino = this.busquedaPesos().trim().toLowerCase();
+    const lista = this.pesosEditables();
+    if (!termino) return lista;
+    return lista.filter((p) => (p.descripcion || p.elementoRef).toLowerCase().includes(termino));
+  });
+  readonly resumenMapeos = computed(() => {
+    const resumen: Record<string, number> = {
+      TODOS: 0,
+      EQUIVALENTE: 0,
+      NUEVO: 0,
+      RENOMBRADO: 0,
+      ELIMINADO: 0,
+    };
+    for (const m of this.mapeosEditables()) {
+      resumen['TODOS']++;
+      resumen[m.tipo] = (resumen[m.tipo] ?? 0) + 1;
+    }
+    return resumen;
+  });
   readonly puedePublicar = computed(() => {
     const ver = this.version();
     return (
       this.esAdministrador() &&
       !!ver &&
       ver.estado === 'BORRADOR' &&
+      !this.estructuraModificada() &&
       this.calibracionGuardada() &&
       !this.criticasSinResolver() &&
       !this.estadoCriticas().pendiente &&
@@ -283,6 +491,13 @@ export class EditorVersionFormularioPage implements OnInit {
     }
     return lista.filter((m) => m.tipo === filtro);
   });
+  readonly filtrosMapeo: { valor: string; etiqueta: string }[] = [
+    { valor: 'TODOS', etiqueta: 'formulario.allMappingTypes' },
+    { valor: 'EQUIVALENTE', etiqueta: 'formulario.hu050.tipos.EQUIVALENTE' },
+    { valor: 'NUEVO', etiqueta: 'formulario.hu050.tipos.NUEVO' },
+    { valor: 'RENOMBRADO', etiqueta: 'formulario.hu050.tipos.RENOMBRADO' },
+    { valor: 'ELIMINADO', etiqueta: 'formulario.hu050.tipos.ELIMINADO' },
+  ];
   mapeoPrimerElemento = signal<number>(0);
   modoEdicion = signal<'visual' | 'codigo'>('visual');
   seccionesVisuales = signal<SeccionVisual[]>([]);
@@ -389,6 +604,15 @@ export class EditorVersionFormularioPage implements OnInit {
       }
     }
     return list;
+  });
+  readonly camposParaVinculo = computed(() => {
+    const actualId = this.vinculoSeleccionadoId();
+    const usados = new Set(
+      this.vinculosVisuales()
+        .filter((v) => v.id !== actualId)
+        .map((v) => v.campoRef),
+    );
+    return this.camposFormularioDisponibles().filter((c) => !usados.has(c.value));
   });
   readonly opcionesDestino = [
     {
@@ -620,13 +844,31 @@ export class EditorVersionFormularioPage implements OnInit {
     label: string;
     value: TipoMapeoCampo;
   }[] = [
-    { label: 'EQUIVALENTE', value: 'EQUIVALENTE' },
-    { label: 'RENOMBRADO', value: 'RENOMBRADO' },
-    { label: 'NUEVO', value: 'NUEVO' },
-    { label: 'ELIMINADO', value: 'ELIMINADO' },
+    { label: 'Equivalente — el campo se mantiene', value: 'EQUIVALENTE' },
+    { label: 'Renombrado — cambió de nombre o de sección', value: 'RENOMBRADO' },
+    { label: 'Nuevo — no existía en la versión anterior', value: 'NUEVO' },
+    { label: 'Eliminado — ya no existe en esta versión', value: 'ELIMINADO' },
   ];
   private solicitudDetalle = 0;
+  private claveAutoSeccion = '';
+  private clavePreguntaAuto = '';
   ngOnInit(): void {
+    this.seccionForm.controls.titulo.valueChanges
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe((titulo) => {
+        const clave = this.seccionForm.controls.clave;
+        if (this.modoSeccion() !== 'crear' || clave.value !== this.claveAutoSeccion) return;
+        this.claveAutoSeccion = claveDesdeTitulo(titulo);
+        clave.setValue(this.claveAutoSeccion, { emitEvent: false });
+      });
+    this.preguntaForm.controls.titulo.valueChanges
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe((titulo) => {
+        const clave = this.preguntaForm.controls.clave;
+        if (this.modoPregunta() !== 'crear' || clave.value !== this.clavePreguntaAuto) return;
+        this.clavePreguntaAuto = claveDesdeTitulo(titulo);
+        clave.setValue(this.clavePreguntaAuto, { emitEvent: false });
+      });
     this.route.paramMap.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((params) => {
       const id = params.get('id');
       if (!id || id === this.versionId()) return;
@@ -655,6 +897,7 @@ export class EditorVersionFormularioPage implements OnInit {
         next: (ver) => {
           if (solicitud !== this.solicitudDetalle) return;
           this.version.set(ver);
+          this.estructuraModificada.set(false);
           this.esquemaTexto.set(JSON.stringify(ver.esquema ?? {}, null, 2));
           this.vinculosTexto.set(JSON.stringify(ver.vinculosAlmacenamiento ?? {}, null, 2));
           this.pesosEditables.set(elementosCalibracion(ver));
@@ -747,6 +990,15 @@ export class EditorVersionFormularioPage implements OnInit {
     this.mensajeExito.set(null);
     this.errorValidacion.set(null);
   }
+  cambiarSubSeccionPesos(subSeccion: SubSeccionPesos): void {
+    this.subSeccionPesos.set(subSeccion);
+    this.mensajeExito.set(null);
+    this.errorValidacion.set(null);
+  }
+  irAMotivo(motivo: MotivoNoPublicable): void {
+    this.cambiarSeccion(motivo.seccion);
+    if (motivo.subSeccion) this.subSeccionPesos.set(motivo.subSeccion);
+  }
   obtenerEtiquetaTipo(tipo: TipoDatoVisual): string {
     const t = this.tiposDato.find((item) => item.value === tipo);
     return t ? t.label : tipo;
@@ -791,6 +1043,7 @@ export class EditorVersionFormularioPage implements OnInit {
   }
   abrirCrearSeccion(): void {
     this.modoSeccion.set('crear');
+    this.claveAutoSeccion = '';
     this.seccionForm.reset({
       clave: '',
       titulo: '',
@@ -834,6 +1087,7 @@ export class EditorVersionFormularioPage implements OnInit {
         preguntas: [],
       });
       this.seccionVisualActiva.set(clave);
+      this.mostrarPestanaActiva();
     } else {
       const idx = lista.findIndex((s) => s.clave === this.seccionSeleccionadaClave());
       if (idx !== -1) {
@@ -846,11 +1100,40 @@ export class EditorVersionFormularioPage implements OnInit {
       }
     }
     this.seccionesVisuales.set(lista);
+    this.estructuraModificada.set(true);
     this.sincronizarVisualACodigo();
     this.dialogoSeccion.set(false);
   }
   seleccionarSeccionVisual(clave: string): void {
     this.seccionVisualActiva.set(clave);
+    this.mostrarPestanaActiva();
+  }
+  private mostrarPestanaActiva(): void {
+    setTimeout(() =>
+      this.host.nativeElement
+        .querySelector('.seccion-tab-btn.active')
+        ?.scrollIntoView?.({ block: 'nearest', inline: 'center' }),
+    );
+  }
+  /** Elementos anidados (objetos o listas) que el editor visual conserva pero no permite editar. */
+  elementosAvanzados(sec: SeccionVisual): number {
+    const esquema = this.version()?.esquema as
+      | {
+          properties?: Record<
+            string,
+            {
+              properties?: Record<string, unknown>;
+              items?: { properties?: Record<string, unknown> };
+            }
+          >;
+        }
+      | undefined;
+    const nodo = esquema?.properties?.[sec.clave];
+    const propiedades = nodo?.properties ?? nodo?.items?.properties ?? {};
+    return Object.values(propiedades).filter((p) => {
+      const tipo = (p as { type?: unknown } | null)?.type;
+      return tipo === 'object' || tipo === 'array';
+    }).length;
   }
   limpiarTituloSeccion(titulo: string): string {
     if (!titulo) return '';
@@ -983,7 +1266,7 @@ export class EditorVersionFormularioPage implements OnInit {
           (preg) => preg.clave === pregClave || preg.clave.startsWith(pregClave),
         );
         if (p) return p.titulo;
-        return pregClave.replace(/_/g, ' ');
+        return partes.slice(1).join(' › ').replace(/_/g, ' ');
       }
     }
     return campoRef.replace(/^\//, '').replace(/\//g, ' › ').replace(/_/g, ' ');
@@ -1009,10 +1292,12 @@ export class EditorVersionFormularioPage implements OnInit {
     if (this.seccionVisualActiva() === secClave) {
       this.seccionVisualActiva.set(lista[0]?.clave || '');
     }
+    this.estructuraModificada.set(true);
     this.sincronizarVisualACodigo();
   }
   abrirCrearPregunta(secClave?: string): void {
     this.modoPregunta.set('crear');
+    this.clavePreguntaAuto = '';
     const defaultSec = secClave || this.seccionesVisuales()[0]?.clave || '';
     this.preguntaForm.reset({
       seccionClave: defaultSec,
@@ -1129,6 +1414,7 @@ export class EditorVersionFormularioPage implements OnInit {
       }
     }
     this.seccionesVisuales.set([...this.seccionesVisuales()]);
+    this.estructuraModificada.set(true);
     this.sincronizarVisualACodigo();
     this.dialogoPregunta.set(false);
   }
@@ -1137,8 +1423,51 @@ export class EditorVersionFormularioPage implements OnInit {
     if (sec) {
       sec.preguntas = sec.preguntas.filter((p) => p.clave !== pregClave);
       this.seccionesVisuales.set([...this.seccionesVisuales()]);
+      this.estructuraModificada.set(true);
       this.sincronizarVisualACodigo();
     }
+  }
+  solicitarEliminarSeccion(sec: SeccionVisual): void {
+    this.confirmacionEliminar.set({
+      tipo: 'seccion',
+      seccionClave: sec.clave,
+      nombre: sec.titulo,
+      cantidad: sec.preguntas.length,
+    });
+  }
+  solicitarEliminarPregunta(secClave: string, pregunta: PreguntaVisual): void {
+    this.confirmacionEliminar.set({
+      tipo: 'pregunta',
+      seccionClave: secClave,
+      preguntaClave: pregunta.clave,
+      nombre: pregunta.titulo,
+      cantidad: 1,
+    });
+  }
+  cancelarEliminacion(): void {
+    this.confirmacionEliminar.set(null);
+  }
+  confirmarEliminacion(): void {
+    const pendiente = this.confirmacionEliminar();
+    if (!pendiente) return;
+    if (pendiente.tipo === 'seccion') this.eliminarSeccion(pendiente.seccionClave);
+    else if (pendiente.preguntaClave)
+      this.eliminarPregunta(pendiente.seccionClave, pendiente.preguntaClave);
+    this.confirmacionEliminar.set(null);
+  }
+  descartarCambiosEstructura(): void {
+    const ver = this.version();
+    if (!ver || this.guardandoEsquema() || this.guardandoVinculos()) return;
+    const secs = esquemaASeccionesVisuales(ver.esquema, ver.vinculosAlmacenamiento);
+    this.seccionesVisuales.set(secs);
+    if (!secs.some((s) => s.clave === this.seccionVisualActiva()))
+      this.seccionVisualActiva.set(secs[0]?.clave ?? '');
+    this.vinculosVisuales.set(extraerVinculosVisuales(ver.vinculosAlmacenamiento, secs));
+    this.esquemaTexto.set(JSON.stringify(ver.esquema ?? {}, null, 2));
+    this.vinculosTexto.set(JSON.stringify(ver.vinculosAlmacenamiento ?? {}, null, 2));
+    this.estructuraModificada.set(false);
+    this.errorValidacion.set(null);
+    this.mostrarPestanaActiva();
   }
   guardarEsquema(): void {
     if (
@@ -1191,6 +1520,7 @@ export class EditorVersionFormularioPage implements OnInit {
       .subscribe({
         next: (actualizada) => {
           this.version.set(actualizada);
+          this.estructuraModificada.set(false);
           const secs = esquemaASeccionesVisuales(
             actualizada.esquema,
             actualizada.vinculosAlmacenamiento,
@@ -1244,12 +1574,11 @@ export class EditorVersionFormularioPage implements OnInit {
     this.vinculoSeleccionadoId.set(null);
     this.destinoPersonalizado.set(false);
     this.columnaPersonalizadaControl.setValue('');
-    const primerCampo = this.camposFormularioDisponibles()[0]?.value || '';
-    const primerDestino = this.opcionesDestino[0]?.items[0]?.valor || 'puente.codigo';
+    this.errorVinculo.set(null);
     this.vinculoForm.reset({
-      campoRef: primerCampo,
-      columnaDestino: primerDestino,
-      tipo: 'Inventario puente',
+      campoRef: '',
+      columnaDestino: '',
+      tipo: 'Columna técnica',
       descripcion: '',
     });
     this.dialogoVinculo.set(true);
@@ -1257,6 +1586,7 @@ export class EditorVersionFormularioPage implements OnInit {
   abrirEditarVinculo(v: VinculoVisual): void {
     this.modoVinculo.set('editar');
     this.vinculoSeleccionadoId.set(v.id);
+    this.errorVinculo.set(null);
     const esConocido = this.opcionesDestino.some((g) =>
       g.items.some((item) => item.valor === v.columnaDestino),
     );
@@ -1299,6 +1629,21 @@ export class EditorVersionFormularioPage implements OnInit {
     }
     const tipo = val.tipo;
     const descripcion = val.descripcion.trim();
+    const repetido = this.vinculosVisuales().find(
+      (v) =>
+        v.columnaDestino === columnaDestino &&
+        (this.modoVinculo() === 'crear' || v.id !== this.vinculoSeleccionadoId()),
+    );
+    if (repetido) {
+      this.errorVinculo.set(
+        this.transloco.translate('formulario.bindingDuplicateTarget', {
+          destino: this.formatearDestinoHumano(columnaDestino),
+          campo: this.obtenerTituloCampoRef(repetido.campoRef),
+        }),
+      );
+      return;
+    }
+    this.errorVinculo.set(null);
     const lista = [...this.vinculosVisuales()];
     if (this.modoVinculo() === 'crear') {
       lista.push({
@@ -1330,12 +1675,14 @@ export class EditorVersionFormularioPage implements OnInit {
       }
     }
     this.seccionesVisuales.set([...this.seccionesVisuales()]);
+    this.estructuraModificada.set(true);
     this.dialogoVinculo.set(false);
   }
   eliminarVinculo(id: string): void {
     const encontrado = this.vinculosVisuales().find((v) => v.id === id);
     const lista = this.vinculosVisuales().filter((v) => v.id !== id);
     this.vinculosVisuales.set(lista);
+    this.estructuraModificada.set(true);
     this.sincronizarVinculosVisualACodigo();
     if (encontrado) {
       for (const sec of this.seccionesVisuales()) {
@@ -1398,6 +1745,7 @@ export class EditorVersionFormularioPage implements OnInit {
       .subscribe({
         next: (actualizada) => {
           this.version.set(actualizada);
+          this.estructuraModificada.set(false);
           this.vinculosTexto.set(JSON.stringify(actualizada.vinculosAlmacenamiento ?? {}, null, 2));
           this.vinculosVisuales.set(
             extraerVinculosVisuales(actualizada.vinculosAlmacenamiento, this.seccionesVisuales()),
@@ -1866,12 +2214,12 @@ export class EditorVersionFormularioPage implements OnInit {
         next: (pub) => {
           this.cerrarConfirmarPublicar();
           this.version.set(pub);
+          this.cambiarSeccion('esquema');
           this.mensajeExito.set(
             this.transloco.translate('formulario.publishedSuccess', {
               codigo: pub.codigo,
             }),
           );
-          this.cambiarSeccion('esquema');
         },
         error: (err) => {
           this.cerrarConfirmarPublicar();
@@ -1881,9 +2229,21 @@ export class EditorVersionFormularioPage implements OnInit {
   }
   abrirDialogoNuevaDerivada(): void {
     const ver = this.version();
-    const sugerido = ver ? `${ver.codigo}-copy` : '';
-    this.nuevaDerivadaForm.reset({ codigo: sugerido });
+    this.nuevaDerivadaForm.reset({ codigo: ver ? siguienteCodigoVersion([ver.codigo]) : '' });
     this.dialogoNuevaDerivada.set(true);
+    if (!ver) return;
+    this.formularioApi
+      .listarVersiones()
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (versiones) => {
+          if (this.nuevaDerivadaForm.controls.codigo.dirty) return;
+          this.nuevaDerivadaForm.controls.codigo.setValue(
+            siguienteCodigoVersion(versiones.map((v) => v.codigo)),
+          );
+        },
+        error: () => undefined,
+      });
   }
   cerrarDialogoNuevaDerivada(): void {
     this.dialogoNuevaDerivada.set(false);

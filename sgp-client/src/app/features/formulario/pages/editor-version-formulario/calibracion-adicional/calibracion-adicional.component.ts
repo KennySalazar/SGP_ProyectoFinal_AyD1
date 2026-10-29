@@ -36,6 +36,7 @@ import {
 export class CalibracionAdicionalComponent {
   readonly version = input.required<VersionFormulario>();
   readonly bloqueado = input(false);
+  readonly vista = input<'todo' | 'criticas' | 'acta'>('todo');
   readonly guardada = output<VersionFormulario>();
   readonly estado = output<{ pendiente: boolean; guardando: boolean }>();
   private readonly api = inject(CalibracionAdicionalApiService);
