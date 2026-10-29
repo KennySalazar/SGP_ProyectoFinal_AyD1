@@ -194,14 +194,14 @@ class InspeccionControllerSecurityTest {
         new GuardarRespuestasRequest(
             OBJECT_MAPPER.readTree(
                 """
-                {
-                  "subestructura": {
-                    "estribo_entrada": {
-                      "material": "PLASTICO_INVALIDO"
-                    }
-                  }
-                }
-                """));
+                            {
+                              "subestructura": {
+                                "estribo_entrada": {
+                                  "material": "PLASTICO_INVALIDO"
+                                }
+                              }
+                            }
+                            """));
 
     when(service.guardarRespuestas(eq(inspeccionId), any(), eq(USUARIO_ID)))
         .thenThrow(
@@ -265,6 +265,11 @@ class InspeccionControllerSecurityTest {
   @Configuration
   @EnableMethodSecurity
   static class Config {
+
+    @Bean
+    gt.usac.cunoc.sgp.inspeccion.service.PermisosCorreccionService permisosCorreccionService() {
+      return mock(gt.usac.cunoc.sgp.inspeccion.service.PermisosCorreccionService.class);
+    }
 
     @Bean
     InspeccionService inspeccionService() {

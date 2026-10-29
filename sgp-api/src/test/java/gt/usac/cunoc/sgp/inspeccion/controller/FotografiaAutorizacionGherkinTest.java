@@ -57,6 +57,7 @@ import org.springframework.transaction.support.SimpleTransactionStatus;
     controllers = FotografiaController.class,
     properties = "app.cors.allowed-origins=http://localhost:4200")
 @Import({
+  gt.usac.cunoc.sgp.inspeccion.service.PermisosCorreccionService.class,
   SecurityConfiguration.class,
   JwtAuthenticationFilter.class,
   AuthRateLimitFilter.class,
@@ -85,6 +86,7 @@ class FotografiaAutorizacionGherkinTest {
   @MockBean JwtService jwt;
   @MockBean UserAccountRepository usuarios;
   @MockBean Clock clock;
+  @MockBean gt.usac.cunoc.sgp.revision.repository.ObservacionRevisionRepository observaciones;
 
   private static final UUID INSPECCION = UUID.fromString("019a0000-0000-7000-8000-000000000011");
   private static final UUID FOTO = UUID.fromString("019a0000-0000-7000-8000-000000000012");

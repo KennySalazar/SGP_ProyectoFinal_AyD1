@@ -34,6 +34,7 @@ import org.testcontainers.utility.DockerImageName;
 @DataJpaTest(properties = {"spring.jpa.hibernate.ddl-auto=validate", "spring.jpa.show-sql=false"})
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @Import({
+  gt.usac.cunoc.sgp.inspeccion.service.PermisosCorreccionService.class,
   OperacionIdempotenteService.class,
   InspeccionService.class,
   gt.usac.cunoc.sgp.inspeccion.service.CalculadorProgresoBorrador.class,
