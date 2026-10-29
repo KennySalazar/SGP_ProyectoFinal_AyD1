@@ -40,7 +40,8 @@ public class TransicionInspeccionController {
       description =
           "Solo el Estudiante autor, desde BORRADOR. Exige los campos obligatorios de su versión "
               + "y fotografías de accesos, superestructura, subestructura y cauce (422 con el "
-              + "detalle de lo que falta). Una transición no permitida responde 409.")
+              + "detalle de lo que falta). Una transición no permitida responde 409. Para una corrección ya ENVIADA, el autor "
+              + "puede reintentar para recuperar el ciclo faltante; conserva la fecha original de envío.")
   public InspeccionResumenResponse enviar(
       @PathVariable UUID id,
       @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,

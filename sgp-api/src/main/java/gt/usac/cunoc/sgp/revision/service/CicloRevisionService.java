@@ -20,6 +20,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.HexFormat;
+import java.util.Optional;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
@@ -53,8 +54,17 @@ public class CicloRevisionService {
     this.clock = clock;
   }
 
+  public boolean tieneCiclo(Inspeccion inspeccion) {
+    return revisiones.findFirstByInspeccionIdOrderByNumeroCicloDesc(inspeccion.getId()).isPresent();
+  }
+
   @Transactional(propagation = Propagation.MANDATORY)
   public Revision crearParaEnvio(Inspeccion inspeccion) {
+    return crearParaEnvio(inspeccion, clock.instant());
+  }
+
+  @Transactional(propagation = Propagation.MANDATORY)
+  public Revision crearParaEnvio(Inspeccion inspeccion, Instant enviadaEn) {
     var anterior =
         revisiones.findFirstByInspeccionIdOrderByNumeroCicloDesc(inspeccion.getId()).orElse(null);
     if (anterior != null) {
@@ -73,7 +83,8 @@ public class CicloRevisionService {
             "Observaciones pendientes",
             "Debe resolver todas las observaciones del último ciclo antes de reenviar.");
     }
-    if (inspeccion.getAsignacionPuenteId() == null) {
+    boolean correccion = "CORRECCION".equals(inspeccion.getTipo());
+    if (inspeccion.getAsignacionPuenteId() == null && !correccion) {
       if (anterior != null)
         throw new ApiException(
             HttpStatus.CONFLICT,
@@ -84,18 +95,8 @@ public class CicloRevisionService {
     }
 
     LocalDate hoy = LocalDate.now(clock.withZone(ZONA_GUATEMALA));
-    var asignacion =
-        asignaciones
-            .findVigentePorId(inspeccion.getAsignacionPuenteId(), inspeccion.getAutorId(), hoy)
-            .orElseThrow(
-                () ->
-                    new ApiException(
-                        HttpStatus.FORBIDDEN,
-                        "asignacion_no_vigente",
-                        "Asignación no vigente",
-                        "La asignación del puente fue revocada, la inscripción no está activa o el curso finalizó."));
+    var asignacion = resolverAsignacion(inspeccion, hoy, correccion && anterior == null);
 
-    Instant ahora = clock.instant();
     ObjectNode contenido = json.createObjectNode();
     contenido.put("inspeccionId", inspeccion.getId().toString());
     contenido.put("puenteId", inspeccion.getPuente().getId().toString());
@@ -118,7 +119,7 @@ public class CicloRevisionService {
                 inspeccion,
                 revisiones.ultimoCiclo(inspeccion.getId()) + 1,
                 anterior == null ? asignacion.getCatedraticoId() : anterior.getRevisorId(),
-                ahora,
+                enviadaEn,
                 inspeccion.getVersion() == null ? 0 : inspeccion.getVersion(),
                 contenido,
                 hash(contenido)));
@@ -132,6 +133,45 @@ public class CicloRevisionService {
         anterior == null ? inspeccion.getId() : revision.getId(),
         "revision-enviada:" + revision.getId());
     return revision;
+  }
+
+  private AsignacionPuenteRepository.AsignacionInspeccionProjection resolverAsignacion(
+      Inspeccion inspeccion, LocalDate hoy, boolean permitirNuevaAsignacion) {
+    var vigente =
+        inspeccion.getAsignacionPuenteId() == null
+            ? Optional.<AsignacionPuenteRepository.AsignacionInspeccionProjection>empty()
+            : asignaciones
+                .findVigentePorId(inspeccion.getAsignacionPuenteId(), inspeccion.getAutorId(), hoy)
+                .filter(a -> inspeccion.getPuente().getId().equals(a.getPuenteId()));
+    if (vigente.isPresent()) return vigente.get();
+    if (permitirNuevaAsignacion) {
+      var candidatas =
+          asignaciones.findVigentesByEstudianteId(inspeccion.getAutorId(), hoy).stream()
+              .filter(a -> inspeccion.getPuente().getId().equals(a.getPuenteId()))
+              .toList();
+      if (candidatas.size() > 1) {
+        throw new ApiException(
+            HttpStatus.CONFLICT,
+            "asignacion_ambigua",
+            "Varias asignaciones vigentes",
+            "Hay varias asignaciones para este puente. Solicite al catedrático aclarar la asignación antes de enviar la corrección.");
+      }
+      if (candidatas.size() == 1) {
+        var candidata =
+            asignaciones
+                .findVigentePorId(candidatas.getFirst().getId(), inspeccion.getAutorId(), hoy)
+                .filter(a -> inspeccion.getPuente().getId().equals(a.getPuenteId()));
+        if (candidata.isPresent()) {
+          inspeccion.setAsignacionPuenteId(candidata.get().getId());
+          return candidata.get();
+        }
+      }
+    }
+    throw new ApiException(
+        HttpStatus.FORBIDDEN,
+        "asignacion_no_vigente",
+        "Asignación no vigente",
+        "Necesita una asignación vigente para este estudiante y puente. Solicite al catedrático la vinculación a un curso vigente y la asignación del puente.");
   }
 
   private String hash(ObjectNode contenido) {
