@@ -96,6 +96,15 @@ describe('Comparacion y recalculo del IC HU071', () => {
     expect(fixture.componentInstance.historial()?.original).toEqual(original);
     expect(html().textContent).toContain('Kenny');
   });
+  it('muestra el IC del recálculo con dos decimales', async () => {
+    usuario.set({ role: 'CATEDRATICO' });
+    await abrir();
+    fixture.componentInstance.recalcular();
+    http.expectOne(ruta + '/recalculos-ic').flush({ ...recalculo, indiceCalculado: 89.65517 });
+    await renderizar();
+    expect(html().textContent).toContain('89.66');
+    expect(html().textContent).not.toContain('89.65517');
+  });
   it.each(['ESTUDIANTE', 'PROFESIONAL_EXTERNO', null])(
     'oculta y bloquea la accion para %s',
     async (role) => {
@@ -112,7 +121,7 @@ describe('Comparacion y recalculo del IC HU071', () => {
     expect(html().textContent).toContain('0.00');
     expect(html().textContent).toContain('Criterio original');
     expect(html().textContent).toContain('24/10/2026 20:00:00');
-    expect(html().textContent).toContain('Todavia no hay recalculos');
+    expect(html().textContent).toContain('Todavía no hay recálculos');
   });
   it('bloquea doble clic mientras espera y conserva el solicitante al repetir', async () => {
     await abrir({ ...comparacion(), recalculos: [recalculo] });

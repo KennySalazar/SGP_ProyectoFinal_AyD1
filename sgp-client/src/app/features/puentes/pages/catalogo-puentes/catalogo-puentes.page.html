@@ -233,8 +233,8 @@
                     <div>
                       <dt>{{ 'puentes.ficha.conditionIndex' | transloco }}</dt>
                       <dd data-testid="catalogo-ic">
-                        {{ puente.indiceCondicionActual ?? ('puentes.ficha.notAvailable' |
-                        transloco) }}
+                        {{ (puente.indiceCondicionActual | number: '1.2-2') ??
+                        ('puentes.ficha.notAvailable' | transloco) }}
                       </dd>
                       <app-respaldo-ic [puente]="puente" />
                     </div>

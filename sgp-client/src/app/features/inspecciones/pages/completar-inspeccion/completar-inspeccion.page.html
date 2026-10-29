@@ -172,6 +172,7 @@
   } @if (esAutor() && b.estado !== 'PUBLICADA' && b.estado !== 'RECHAZADA') {
   <app-confirmacion-estado-ic
     [inspeccionId]="b.id"
+    [versionFormularioCodigo]="versionFormularioCodigo()"
     [revision]="revisionIc()"
     [bloqueado]="soloLectura() || cambiosSinGuardar() || !!errorGuardado() || confirmandoAccion() || ejecutandoAccion()"
     (ocupado)="operandoIc.set($event)"

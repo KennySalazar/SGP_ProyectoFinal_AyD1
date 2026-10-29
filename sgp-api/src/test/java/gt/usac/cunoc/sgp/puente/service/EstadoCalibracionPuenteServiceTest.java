@@ -63,7 +63,7 @@ class EstadoCalibracionPuenteServiceTest {
     var respuesta = servicio.consultar(puenteId);
     assertThat(respuesta.versionFormularioId()).isEqualTo(versionId);
     assertThat(respuesta.estado()).isEqualTo("SIN_APROBAR");
-    assertThat(respuesta.rotuloCalibracion()).isEqualTo("Calibracion provisional · sin aprobar");
+    assertThat(respuesta.rotuloCalibracion()).isEqualTo("Calibración provisional · sin aprobar");
     assertThat(respuesta.aprobadoPorId()).isNull();
   }
 

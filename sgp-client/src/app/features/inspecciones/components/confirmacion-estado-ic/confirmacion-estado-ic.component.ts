@@ -1,4 +1,3 @@
-import { AprobacionCalibracionComponent } from '../../../formulario/components/aprobacion-calibracion/aprobacion-calibracion.component';
 import { CommonModule } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import {
@@ -21,12 +20,12 @@ import { TextareaModule } from 'primeng/textarea';
 import { ConfirmacionEstadoIcResponse, EstadoCondicionIc } from '../../models/inspeccion.models';
 import { InspeccionApiService } from '../../services/inspeccion-api.service';
 import { ConnectivityService } from '../../../../offline/services/connectivity.service';
+import { AuthStore } from '../../../../core/services/auth.store';
 
 @Component({
   selector: 'app-confirmacion-estado-ic',
   standalone: true,
   imports: [
-    AprobacionCalibracionComponent,
     CommonModule,
     ReactiveFormsModule,
     TranslocoPipe,
@@ -42,6 +41,8 @@ export class ConfirmacionEstadoIcComponent {
   readonly inspeccionId = input.required<string>();
   readonly bloqueado = input(false);
   readonly revision = input(0);
+  readonly versionFormularioCodigo = input<string | null>(null);
+  private readonly auth = inject(AuthStore);
   readonly ocupado = output<boolean>();
   private readonly connectivity = inject(ConnectivityService);
   readonly esOffline = computed(() => !this.connectivity.online());
@@ -49,6 +50,10 @@ export class ConfirmacionEstadoIcComponent {
   private readonly destroyRef = inject(DestroyRef);
   private solicitud = 0;
   readonly respuesta = signal<ConfirmacionEstadoIcResponse | null>(null);
+  readonly confirmadoPorUsuarioActual = computed(() => {
+    const autor = this.respuesta()?.realizadoPorId;
+    return !!autor && autor === this.auth.user()?.id;
+  });
   readonly procesando = signal(false);
   readonly error = signal<string | null>(null);
   readonly seccionPendiente = signal<string | null>(null);

@@ -96,7 +96,7 @@ class RecalculoIcServiceTest {
     assertThat(respuesta.solicitadoPorId()).isEqualTo(actor);
     assertThat(respuesta.solicitadoPorNombre()).isEqualTo("Kenny Salazar");
     assertThat(respuesta.calculadoEn()).isEqualTo(AHORA);
-    assertThat(respuesta.rotulo()).isEqualTo("Recalculo del IC · 24/10/2026 14:00");
+    assertThat(respuesta.rotulo()).isEqualTo("Recálculo del IC · 24/10/2026 14:00");
     verify(preparador).preparar(versionId, inspeccion.getDatos());
     verify(resultados)
         .saveAndFlush(

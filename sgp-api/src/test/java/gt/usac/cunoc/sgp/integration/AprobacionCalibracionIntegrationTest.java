@@ -227,7 +227,7 @@ class AprobacionCalibracionIntegrationTest {
                     mapper.toResponse(
                         versiones.findById(version).orElseThrow(), List.of(), List.of());
                 assertThat(detalle.rotuloCalibracion())
-                    .isEqualTo("Calibracion provisional · sin aprobar");
+                    .isEqualTo("Calibración provisional · sin aprobar");
                 assertThat(detalle.rotuloCalibracion())
                     .isEqualTo(servicio.estado(version).rotuloCalibracion());
               });

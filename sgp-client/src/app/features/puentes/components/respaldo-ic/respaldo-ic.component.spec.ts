@@ -77,7 +77,7 @@ describe('Respaldo del IC vigente del puente', () => {
   it('tolera datos antiguos del cache sin version y no supone una aprobacion', async () => {
     await mostrar({ ...puente, versionFormularioIdIcVigente: undefined });
     http.expectNone(ruta);
-    expect(html().textContent).toContain('Respaldo de calibracion no disponible');
+    expect(html().textContent).toContain('Respaldo de calibración no disponible');
     expect(html().textContent).not.toContain('sin aprobar');
   });
 

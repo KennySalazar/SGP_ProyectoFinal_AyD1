@@ -253,10 +253,29 @@ describe('Detalle publicado de HU-030', () => {
   it('muestra IC definitivo, estado calculado, confirmado y justificación sin calcular', async () => {
     const html = await abrir();
     const condicion = html.querySelector('.condicion')!;
-    expect(condicion.textContent).toContain('12.5');
-    expect(condicion.textContent).toContain('Bueno');
-    expect(condicion.textContent).toContain('Regular');
+    expect(condicion.textContent).toContain('12.50');
+    expect(condicion.textContent).toContain('Condición Buena (75 - 100)');
+    expect(condicion.textContent).toContain('Condición Regular · ajustada por el evaluador');
+    expect(condicion.textContent).not.toContain('(50 - 74)');
     expect(condicion.textContent).toContain('Evidencia observada en sitio');
+    expect(condicion.querySelector('.ic-ajuste-nota')).not.toBeNull();
+  });
+
+  it('sin ajuste muestra la condición con su rango y no avisa de ajuste', async () => {
+    respuesta.ic = { ...respuesta.ic!, estadoConfirmado: 'BUENO', justificacionAjuste: null };
+    const html = await abrir();
+    const condicion = html.querySelector('.condicion')!;
+    expect(condicion.querySelector('.ic-estado-textual')?.textContent).toContain(
+      'Condición Buena (75 - 100)',
+    );
+    expect(condicion.textContent).not.toContain('ajustada por el evaluador');
+    expect(condicion.querySelector('.ic-ajuste-nota')).toBeNull();
+  });
+
+  it('muestra el índice con dos decimales', async () => {
+    respuesta.ic = { ...respuesta.ic!, indiceCalculado: 96.2963 };
+    const html = await abrir();
+    expect(html.querySelector('.condicion .indice')?.textContent?.trim()).toBe('96.30');
   });
 
   it('muestra autor, acompañantes, versión, todas las fechas y dispositivo', async () => {

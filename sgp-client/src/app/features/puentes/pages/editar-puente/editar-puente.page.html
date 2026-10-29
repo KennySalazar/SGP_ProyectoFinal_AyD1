@@ -42,7 +42,11 @@
     </div>
     <div class="readonly-item">
       <dt>{{ 'puentes.conditionIndex' | transloco }}</dt>
-      <dd>{{ puente()?.indiceCondicionActual ?? '—' }}<app-respaldo-ic [puente]="puente()" /></dd>
+      <dd>
+        {{ (puente()?.indiceCondicionActual | number: '1.2-2') ?? '—' }}<app-respaldo-ic
+          [puente]="puente()"
+        />
+      </dd>
     </div>
     <div class="readonly-item">
       <dt>{{ 'puentes.lastInspection' | transloco }}</dt>
