@@ -209,7 +209,7 @@ class VersionFormularioServiceTest {
     assertThat(response.estado()).isEqualTo(EstadoVersionFormulario.BORRADOR);
     assertThat(response.activa()).isFalse();
     assertThat(response.pesos()).hasSize(45);
-    assertThat(response.rotuloCalibracion()).isEqualTo("Calibracion provisional · sin aprobar");
+    assertThat(response.rotuloCalibracion()).isEqualTo("Calibración provisional · sin aprobar");
 
     ArgumentCaptor<VersionFormulario> captor = ArgumentCaptor.forClass(VersionFormulario.class);
     verify(versiones).save(captor.capture());

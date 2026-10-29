@@ -362,7 +362,7 @@ describe('Base compartida del catálogo HU014', () => {
     const valores: NodeListOf<HTMLElement> = fixture.nativeElement.querySelectorAll(
       '[data-testid="catalogo-ic"]',
     );
-    expect(Array.from(valores, (el) => el.textContent?.trim())).toEqual(['0', '80']);
+    expect(Array.from(valores, (el) => el.textContent?.trim())).toEqual(['0.00', '80.00']);
     const fechas: NodeListOf<HTMLElement> = fixture.nativeElement.querySelectorAll(
       '[data-testid="catalogo-fecha"]',
     );

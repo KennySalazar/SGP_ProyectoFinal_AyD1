@@ -197,6 +197,7 @@ export class CompletarInspeccionPage implements OnInit {
   readonly estadoAutoguardado = signal<'pendiente' | 'guardando' | 'guardado' | null>(null);
   readonly borrador = signal<InspeccionBorradorResponse | null>(null);
   readonly esquema = signal<EsquemaJson | null>(null);
+  readonly versionFormularioCodigo = signal<string | null>(null);
   readonly fechaInspeccion = signal<string>('');
   readonly esSoloLocal = signal(false);
   readonly errorAlmacenamiento = signal<string | null>(null);
@@ -548,6 +549,7 @@ export class CompletarInspeccionPage implements OnInit {
       .subscribe({
         next: (res) => {
           this.esquema.set(res.esquema as EsquemaJson);
+          this.versionFormularioCodigo.set(res.codigo);
           void this.inspeccionesLocales.guardarEsquemaLocal({
             id: res.id,
             version: String(res.version),

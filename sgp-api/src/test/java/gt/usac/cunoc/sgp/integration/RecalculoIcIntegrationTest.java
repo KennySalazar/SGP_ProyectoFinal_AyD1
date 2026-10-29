@@ -380,7 +380,7 @@ class RecalculoIcIntegrationTest {
         .andExpect(jsonPath("$.original.id").value(originalId.toString()))
         .andExpect(jsonPath("$.original.tipo").value("PUBLICACION"))
         .andExpect(jsonPath("$.recalculos[0].tipo").value("RECALCULO"))
-        .andExpect(jsonPath("$.recalculos[0].rotulo").value("Recalculo del IC · 24/10/2026 14:00"))
+        .andExpect(jsonPath("$.recalculos[0].rotulo").value("Recálculo del IC · 24/10/2026 14:00"))
         .andExpect(jsonPath("$.recalculos[0].versionConfiguracionCodigo").value("v2"));
     assertThat(recalculos()).isEqualTo(1);
   }

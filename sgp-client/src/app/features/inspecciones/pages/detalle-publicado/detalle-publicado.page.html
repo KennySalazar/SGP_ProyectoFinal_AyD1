@@ -176,21 +176,25 @@
   <app-aprobacion-calibracion [versionId]="d.versionFormularioId" />
   @if (d.ic; as ic) {
   <div class="ic-resumen-fila">
-    <p class="indice">{{ ic.indiceCalculado | number: '1.2-5' }}</p>
+    <p class="indice">{{ ic.indiceCalculado | number: '1.2-2' }}</p>
     <div class="ic-etiquetas">
       <p-tag
         [value]="'inspecciones.consulta.estados.' + ic.estadoConfirmado | transloco"
         [severity]="severidad(ic.estadoConfirmado)"
       />
       <span class="ic-estado-textual" [attr.data-estado]="ic.estadoConfirmado">
-        {{ 'inspecciones.consulta.estadoTextual.' + ic.estadoConfirmado | transloco }}
+        {{ ((ic.estadoCalculado === ic.estadoConfirmado ? 'inspecciones.consulta.estadoTextual.' :
+        'inspecciones.consulta.estadoAjustado.') + ic.estadoConfirmado) | transloco }}
       </span>
     </div>
   </div>
+  @if (ic.estadoCalculado !== ic.estadoConfirmado) {
+  <p class="ic-ajuste-nota">{{ 'inspecciones.consulta.ajusteNota' | transloco }}</p>
+  }
   <dl>
     <div>
       <dt>{{ 'inspecciones.consulta.calculado' | transloco }}</dt>
-      <dd>{{ 'inspecciones.consulta.estados.' + ic.estadoCalculado | transloco }}</dd>
+      <dd>{{ 'inspecciones.consulta.estadoTextual.' + ic.estadoCalculado | transloco }}</dd>
     </div>
     <div>
       <dt>{{ 'inspecciones.consulta.confirmado' | transloco }}</dt>

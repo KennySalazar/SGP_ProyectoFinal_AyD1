@@ -1,6 +1,6 @@
 import { RespaldoIcComponent } from '../../components/respaldo-ic/respaldo-ic.component';
 import { ChangeDetectionStrategy, Component, DestroyRef, inject, signal } from '@angular/core';
-import { NgTemplateOutlet } from '@angular/common';
+import { DecimalPipe, NgTemplateOutlet } from '@angular/common';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { RouterLink } from '@angular/router';
@@ -29,6 +29,7 @@ import { AppShellComponent } from '../../../../layouts/app-shell/app-shell.compo
   selector: 'app-catalogo-puentes-page',
   standalone: true,
   imports: [
+    DecimalPipe,
     RespaldoIcComponent,
     NgTemplateOutlet,
     AppShellComponent,

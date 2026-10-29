@@ -1,6 +1,5 @@
-import { AprobacionCalibracionComponent } from '../../../formulario/components/aprobacion-calibracion/aprobacion-calibracion.component';
 import { RouterLink } from '@angular/router';
-import { DatePipe } from '@angular/common';
+import { DatePipe, DecimalPipe } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import {
   ChangeDetectionStrategy,
@@ -38,9 +37,9 @@ import { RevisionApiService } from '../../services/revision-api.service';
   selector: 'app-resultado-revision',
   standalone: true,
   imports: [
-    AprobacionCalibracionComponent,
     RouterLink,
     DatePipe,
+    DecimalPipe,
     ReactiveFormsModule,
     TranslocoPipe,
     ButtonModule,

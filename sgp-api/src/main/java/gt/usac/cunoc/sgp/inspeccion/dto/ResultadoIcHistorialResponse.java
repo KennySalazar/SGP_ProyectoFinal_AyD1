@@ -33,6 +33,6 @@ public record ResultadoIcHistorialResponse(
         DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")
             .withZone(ZoneId.of("America/Guatemala"))
             .format(calculadoEn);
-    return ("PUBLICACION".equals(tipo) ? "IC original" : "Recalculo del IC") + " · " + fecha;
+    return ("PUBLICACION".equals(tipo) ? "IC original" : "Recálculo del IC") + " · " + fecha;
   }
 }

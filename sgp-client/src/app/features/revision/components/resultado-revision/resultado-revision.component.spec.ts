@@ -105,14 +105,14 @@ describe('Veredicto privado HU-038', () => {
   it('identifica claramente la accion del catedratico sin enviar un veredicto al abrir', () => {
     const html = fixture.nativeElement as HTMLElement;
     const boton = Array.from(html.querySelectorAll('button')).find((b) =>
-      b.textContent?.includes('Abrir calificacion y veredicto'),
+      b.textContent?.includes('Abrir calificación y veredicto'),
     );
     expect(boton).toBeDefined();
     boton!.click();
     fixture.detectChanges();
     expect(api.historial).toHaveBeenCalledWith('i');
     expect(api.emitirVeredicto).not.toHaveBeenCalled();
-    expect(html.textContent).toContain('Revisar y confirmar decision');
+    expect(html.textContent).toContain('Revisar y confirmar decisión');
   });
   it('consulta un ciclo resuelto con nota y resoluciones aunque exista uno posterior pendiente', () => {
     api.historial.mockReturnValue(
@@ -172,7 +172,7 @@ describe('Veredicto privado HU-038', () => {
     fixture.detectChanges();
     const html = fixture.nativeElement as HTMLElement;
     expect(html.textContent).toContain('Consultar resultado e historial');
-    expect(html.textContent).not.toContain('Abrir calificacion y veredicto');
+    expect(html.textContent).not.toContain('Abrir calificación y veredicto');
     abrir();
     expect(html.querySelector('form')).toBeNull();
     expect(api.emitirVeredicto).not.toHaveBeenCalled();
@@ -188,7 +188,7 @@ describe('Veredicto privado HU-038', () => {
     fixture.detectChanges();
     expect(c.abierto()).toBe(false);
     expect(html.querySelector('form')).toBeNull();
-    expect(html.textContent).toContain('Abrir calificacion y veredicto');
+    expect(html.textContent).toContain('Abrir calificación y veredicto');
     expect(api.emitirVeredicto).not.toHaveBeenCalled();
     abrir();
     expect(c.abierto()).toBe(true);
